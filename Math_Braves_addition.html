@@ -124,7 +124,7 @@
             max-width: 500px;
         }
 
-        /* ランキング表示用スタイル（修正版） */
+        /* ランキング表示用スタイル */
         .ranking-container {
             display: flex;
             justify-content: center;
@@ -263,108 +263,94 @@
 </div>
 
 
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import { getFirestore, collection, doc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-<script>
-// 1. Firebaseの設定情報 (お客様の設定)
-const firebaseConfig = {
-    apiKey: "AIzaSyBCg5dCEM89UmYYhfGqVeRf_VrUlg8_o-4",
-    authDomain: "math-braves.firebaseapp.com",
-    projectId: "math-braves",
-    storageBucket: "math-braves.firebasestorage.app",
-    messagingSenderId: "217117619290",
-    appId: "1:217117619290:web:d227feb603970d3948d463"
-};
+    // Your web app's Firebase configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyBCg5dCEM89UmYYhfGqVeRf_VrUlg8_o-4",
+      authDomain: "math-braves.firebaseapp.com",
+      projectId: "math-braves",
+      storageBucket: "math-braves.firebasestorage.app",
+      messagingSenderId: "217117619290",
+      appId: "1:217117619290:web:d227feb603970d3948d463"
+    };
 
-// 2. Firebaseを初期化
-const app = firebase.initializeApp(firebaseConfig);
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const provider = new GoogleAuthProvider();
 
-// 3. 認証 (Googleログイン) とデータベースの参照を取得
-const auth = firebase.auth();
-const db = firebase.firestore();
+    // ユーザー情報をグローバルに公開する変数
+    window.currentUser = null; 
 
-// ユーザー情報格納用
-let currentUser = null; 
-
-/**
- * ログイン状態の変更を監視し、UIを更新する
- */
-auth.onAuthStateChanged((user) => {
-    const authStatus = document.getElementById('auth-status');
+    // UI要素の取得 (module内から操作するため)
     const btnLogin = document.getElementById('btn-login');
     const btnLogout = document.getElementById('btn-logout');
+    const authStatus = document.getElementById('auth-status');
 
-    if (user) {
-        // ログイン済み
-        currentUser = {
-            uid: user.uid,
-            displayName: user.displayName || '名無しさん'
-        };
-        authStatus.textContent = `ログイン中: ${currentUser.displayName}`;
-        btnLogin.classList.add('hidden');
-        btnLogout.classList.remove('hidden');
-    } else {
-        // ログアウト済み
-        currentUser = null;
-        authStatus.textContent = 'ログインしていません';
-        btnLogin.classList.remove('hidden');
-        btnLogout.classList.add('hidden');
-    }
-});
+    // --- ログイン処理 ---
+    window.handleLogin = function() {
+        signInWithPopup(auth, provider)
+            .then((result) => {
+                console.log("Login Success:", result.user.displayName);
+            })
+            .catch((error) => {
+                console.error("Login Error:", error);
+                alert("ログインに失敗しました。しばらく待ってから再度お試しください。");
+            });
+    };
 
-/**
- * Googleログイン処理
- */
-function handleLogin() {
-    const provider = new firebase.auth.GoogleAuthProvider();
-    auth.signInWithPopup(provider)
-        .then((result) => {
-            // ログイン成功
-            console.log("ログイン成功:", result.user.displayName);
-        })
-        .catch((error) => {
-            // エラー処理
-            console.error("ログインエラー:", error);
-            alert("ログインに失敗しました。\n\nGitHub PagesのドメインがFirebaseに登録されているか確認してください。");
+    // --- ログアウト処理 ---
+    window.handleLogout = function() {
+        signOut(auth).then(() => {
+            console.log("Logout Success");
+        }).catch((error) => {
+            console.error("Logout Error:", error);
         });
-}
+    };
 
-/**
- * ログアウト処理
- */
-function handleLogout() {
-    auth.signOut().then(() => {
-        console.log("ログアウトしました");
-    }).catch((error) => {
-        console.error("ログアウトエラー:", error);
+    // --- 認証状態の監視 ---
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            // ログイン中
+            window.currentUser = {
+                uid: user.uid,
+                displayName: user.displayName || '名無しさん'
+            };
+            if(authStatus) authStatus.textContent = `ログイン中: ${window.currentUser.displayName}`;
+            if(btnLogin) btnLogin.classList.add('hidden');
+            if(btnLogout) btnLogout.classList.remove('hidden');
+        } else {
+            // ログアウト中
+            window.currentUser = null;
+            if(authStatus) authStatus.textContent = 'ログインしていません';
+            if(btnLogin) btnLogin.classList.remove('hidden');
+            if(btnLogout) btnLogout.classList.add('hidden');
+        }
     });
-}
 
-/**
- * Firebase (Firestore) にスコアを保存する処理
- */
-function saveOnlineScore(userId, userName, difficulty, score) {
-    const timestamp = firebase.firestore.FieldValue.serverTimestamp();
-    const docId = `${userId}_${difficulty}_${Date.now()}`; // 複数回プレイできるように一意のIDを生成
-
-    // 'scores' コレクションにドキュメントを追加
-    db.collection("scores").doc(docId).set({
-        uid: userId,
-        name: userName,
-        difficulty: difficulty,
-        score: score,
-        createdAt: timestamp
-    })
-    .then(() => {
-        console.log("Firestoreへのスコア保存に成功しました！");
-    })
-    .catch((error) => {
-        console.error("Firestoreへのスコア保存中にエラーが発生しました:", error);
-    });
-}
-
+    // --- スコア保存処理 (外部から呼べるようにwindowに登録) ---
+    window.saveOnlineScore = async (userId, userName, difficulty, score) => {
+        try {
+            // ドキュメントIDを一意にする (uid_difficulty_timestamp)
+            const docId = `${userId}_${difficulty}_${Date.now()}`;
+            
+            await setDoc(doc(db, "scores", docId), {
+                uid: userId,
+                name: userName,
+                difficulty: difficulty,
+                score: score,
+                createdAt: serverTimestamp()
+            });
+            console.log("Firestoreへの保存成功!");
+        } catch (error) {
+            console.error("Firestoreへの保存エラー:", error);
+        }
+    };
 </script>
 <script>
 /**
@@ -475,7 +461,7 @@ function getRankingKey(diff) {
 }
 
 function saveScore(difficulty, score) {
-    // ローカルストレージに保存
+    // 1. ローカルストレージに保存
     const key = getRankingKey(difficulty);
     let ranking = JSON.parse(localStorage.getItem(key)) || [];
     
@@ -487,12 +473,11 @@ function saveScore(difficulty, score) {
     
     const isNewRecord = (ranking.length > 0 && ranking[0] === score);
 
-    // ★★★ここが追加・修正された部分です★★★
-    // ログインしていれば、Firebaseにもスコアを保存する
-    if (currentUser) {
-        saveOnlineScore(currentUser.uid, currentUser.displayName, difficulty, score);
+    // 2. Firebase (Firestore) に保存
+    // モジュラーSDK側で定義した window.currentUser と window.saveOnlineScore を使用
+    if (window.currentUser && window.saveOnlineScore) {
+        window.saveOnlineScore(window.currentUser.uid, window.currentUser.displayName, difficulty, score);
     }
-    // ★★★ここまで追加・修正された部分です★★★
 
     return isNewRecord;
 }
@@ -749,7 +734,7 @@ function roundRect(ctx, x, y, w, h, r, fill, stroke) {
 function backToTitle() {
     state.screen = 'TITLE';
     ui.title.classList.remove('hidden');
-    ui.btnToTitle.classList.remove('hidden'); // タイトル画面に戻るボタンは残す
+    ui.btnToTitle.classList.add('hidden');
     ui.rightPanelContent.classList.add('invisible');
     ui.result.style.display = 'none';
     
@@ -882,8 +867,6 @@ function gameClear() {
     const timeBonus = state.time * 100;
     const maxScoreBonus = state.maxScore * 10;
     const finalScore = state.score + timeBonus + maxScoreBonus;
-    
-    state.lastScore = finalScore; // 最後に獲得したスコアとして更新
 
     // スコア保存 & 1位更新チェック
     const isNewRecord = saveScore(state.difficulty, finalScore);
@@ -968,7 +951,7 @@ function drawHUD(ctx) {
 function getEventPos(e) {
     const rect = canvas.getBoundingClientRect();
     const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-    const y = (e.touches ? e.touches[0].clientY : e.touches[0].clientY) - rect.top;
+    const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
     return { x, y };
 }
 
@@ -1177,9 +1160,16 @@ function gameLoop() {
  * UI Events (Touch & Click Support)
  */
 function bindBtn(btn, callback) {
-    btn.addEventListener('click', (e) => { e.preventDefault(); callback(); });
-    btn.addEventListener('touchstart', (e) => { e.preventDefault(); callback(); }, {passive: false});
+    // 修正: btnがnullでないか確認する
+    if (btn) {
+        btn.addEventListener('click', (e) => { e.preventDefault(); callback(); });
+        btn.addEventListener('touchstart', (e) => { e.preventDefault(); callback(); }, {passive: false});
+    }
 }
+
+// Global scope access to functions for bindBtn
+window.handleLogin = window.handleLogin || function(){};
+window.handleLogout = window.handleLogout || function(){};
 
 bindBtn(ui.btnEasy, () => {
     state.difficulty = 'EASY'; 
@@ -1199,9 +1189,9 @@ bindBtn(ui.btnHard, () => {
     initGame();
 });
 
-// タイトル画面のログイン/ログアウトボタンにも処理を紐づける
-bindBtn(ui.btnLogin, handleLogin);
-bindBtn(ui.btnLogout, handleLogout);
+// バインド処理 (要素が存在する場合のみ)
+if (ui.btnLogin) bindBtn(ui.btnLogin, () => window.handleLogin());
+if (ui.btnLogout) bindBtn(ui.btnLogout, () => window.handleLogout());
 
 bindBtn(ui.btnViewRanking, () => {
     showRankingScreen();
