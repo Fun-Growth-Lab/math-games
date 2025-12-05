@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>たしざんバトル - Math Braves</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #f0f4f8;
+            font-family: "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+        #container {
+            display: flex;
+            width: 100vw;
+            height: 100vh;
+        }
+        #left-panel, #right-panel {
+            flex: 1;
+            background-color: #2c3e50;
+            color: white;
+            padding: 20px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        #game-area {
+            flex: 2;
+            position: relative;
+            background-color: #ecf0f1;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        h2 { margin-top: 0; border-bottom: 2px solid #3498db; padding-bottom: 10px; font-size: 1.2rem; }
+        .info-item { margin-bottom: 20px; font-size: 1.1rem; }
+        .info-value { font-size: 1.8rem; font-weight: bold; color: #f1c40f; }
+        .info-label { font-size: 0.9rem; color: #bdc3c7; }
+        
+        /* タイトル画面では右パネルの中身を隠すためのクラス */
+        .invisible {
+            visibility: hidden;
+        }
+
+        /* ボタン共通スタイル */
+        .btn {
+            background-color: #3498db; color: white; border: none; padding: 10px 20px;
+            border-radius: 5px; cursor: pointer; font-size: 1rem; margin: 5px;
+            transition: background 0.2s;
+            box-shadow: 0 4px 0 #2980b9;
+            -webkit-tap-highlight-color: transparent; /* タッチ時のハイライト削除 */
+        }
+        .btn:hover { background-color: #2980b9; transform: translateY(2px); box-shadow: 0 2px 0 #2980b9; }
+        .btn:active { transform: translateY(4px); box-shadow: none; }
+        
+        .btn-danger { background-color: #e74c3c; box-shadow: 0 4px 0 #c0392b; }
+        .btn-danger:hover { background-color: #c0392b; box-shadow: 0 2px 0 #c0392b;}
+        
+        .btn-success { background-color: #2ecc71; box-shadow: 0 4px 0 #27ae60; }
+        .btn-success:hover { background-color: #27ae60; box-shadow: 0 2px 0 #27ae60; }
+
+        /* 設定画面オーバーレイ */
+        #overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 100;
+            flex-direction: column;
+            color: white;
+        }
+        .overlay-content {
+            background: #34495e; padding: 30px; border-radius: 10px;
+            text-align: center; max-width: 600px; width: 90%;
+            max-height: 90vh; overflow-y: auto;
+        }
+        
+        .hidden { display: none !important; }
+        
+        /* 難易度ボタンエリア */
+        .difficulty-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .difficulty-buttons button {
+            width: 120px;
+            padding: 15px 0;
+            font-size: 1rem;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+<div id="container">
+    <div id="left-panel">
+        <h2>あそびかた</h2>
+        <div style="font-size: 1rem; line-height: 1.8;">
+            <p>1. <strong>しろいカード</strong>を かさねると<br>かずが たされるよ。</p>
+            <p>2. <strong>くろいカード</strong>が てきだ！<br>おなじかずを つくって<br>ぶつけよう！</p>
+            <p>3. <strong>〇</strong>が おおいほど<br>とくてんが たかいよ。</p>
+            <p>4. いらないカードは<br>したの <strong>ゴミすてば</strong> へ。</p>
+            <p>5. うごかすと <strong>じかん</strong>がへるよ。<br>てきをたおして かいふくだ！</p>
+        </div>
+        <div style="margin-top:auto; text-align:center;">
+            <button id="btn-to-title" class="btn btn-danger hidden">タイトルへ もどる</button>
+        </div>
+    </div>
+
+    <div id="game-area">
+        <canvas id="gameCanvas"></canvas>
+        
+        <div id="title-screen" class="overlay-content" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); z-index:10; background:rgba(255,255,255,0.95); color:#333; border: 4px solid #2c3e50;">
+            <h1 style="font-size:3rem; margin:0 0 30px 0; color:#c0392b;">MATH BRAVES</h1>
+            <p style="font-size:1.2rem; margin-bottom:40px;">けいさんの ちからで<br>まものを たおせ！</p>
+            
+            <div class="difficulty-buttons">
+                <button id="btn-easy" class="btn btn-success">しょきゅう</button>
+                <button id="btn-normal" class="btn">ちゅうきゅう</button>
+                <button id="btn-hard" class="btn btn-danger">じょうきゅう</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="right-panel">
+        <div id="right-panel-content">
+            <div class="info-item">
+                <div class="info-label">てきのすうじ</div>
+                <div id="disp-enemy-range" class="info-value" style="font-size: 1.4rem;"></div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">のこりの てき</div>
+                <div id="disp-enemies" class="info-value">0</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">さっきの スコア</div>
+                <div id="disp-last-score" class="info-value" style="color:#e67e22;">0</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">ごうけい スコア</div>
+                <div id="disp-total-score" class="info-value">0</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+/**
+ * Game Configuration & State
+ */
+// ■ 初級：たし算の練習。必ず1回は重ねる必要があるが、複雑ではない。
+const PRESET_EASY = {
+    handMin: 1, handMax: 9,       // 手札は小さい
+    enemyMin: 10, enemyMax: 15,    // 敵は手札1枚では倒せない（必ず合体が必要）
+    bossMin: 15, bossMax: 25,     // ボスは3〜5枚合体が必要
+    enemyCount: 20,               // 敵の数を少し減らしてテンポよく（20→15）
+    bossHP: 1200,                 // HPを増やしてボスの「強敵感」を出す
+    initialTime: 10,              // 初心者向けに初期時間は少し多め
+    timeRecovery: 2,              // 基本回復
+    gemProb: [30, 25, 20, 15, 10]
+};
+
+// ■ 中級：適正難易度。2〜3枚の合体が基本。素早い判断が必要。
+const PRESET_NORMAL = {
+    handMin: 1, handMax: 14,       // 1桁の計算をしやすく維持
+    enemyMin: 15, enemyMax: 20,   // 手札2〜3枚分の数値
+    bossMin: 20, bossMax: 30,     // かなりの枚数を重ねないと倒せない
+    enemyCount: 20,               // 標準
+    bossHP: 1500,                 // 大ダメージボーナス前提のHP
+    initialTime: 10,              // 標準
+    timeRecovery: 2,              // 基本回復
+    gemProb: [30, 25, 20, 15, 10]
+};
+
+// ■ 上級：ゲーマー向け。3〜5枚の合体が必須。捨て札の活用も重要。
+const PRESET_HARD = {
+    handMin: 1, handMax: 19,       // 
+    enemyMin: 20, enemyMax: 30,   // 常に3〜5枚の合体が必要（Time消費が激しい）
+    bossMin: 30, bossMax: 40,     // 限界に近い合体が必要
+    enemyCount: 20,
+    bossHP: 2000,                // 途方もないHP（+10秒回復を連発しないと勝てない）
+    initialTime: 20,              // 最初からクライマックス（ミス即終了）
+    timeRecovery: 2,
+    gemProb: [30, 25, 20, 15, 10]
+};
+
+// 初期設定（中級にしておくが、ボタンで上書きされる）
+let CONFIG = Object.assign({}, PRESET_NORMAL);
+
+let state = {
+    screen: 'TITLE', 
+    time: 15,
+    score: 0,
+    lastScore: 0,
+    enemiesRemaining: 0, 
+    cards: [null, null, null, null, null],
+    enemies: [],
+    particles: [],
+    boss: null,         
+    bossSpawned: false, 
+    width: 0,
+    height: 0,
+    dragInfo: null,
+    isGameOverProcessing: false,
+    isGameClearProcessing: false, // ゲームクリア演出中
+    inputLocked: false // 入力ロック
+};
+
+// Canvas Setup
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const ui = {
+    rightPanelContent: document.getElementById('right-panel-content'),
+    enemyRange: document.getElementById('disp-enemy-range'),
+    enemies: document.getElementById('disp-enemies'),
+    lastScore: document.getElementById('disp-last-score'),
+    totalScore: document.getElementById('disp-total-score'),
+    title: document.getElementById('title-screen'),
+    btnEasy: document.getElementById('btn-easy'),
+    btnNormal: document.getElementById('btn-normal'),
+    btnHard: document.getElementById('btn-hard'),
+    btnToTitle: document.getElementById('btn-to-title')
+};
+
+function resize() {
+    state.width = canvas.parentElement.clientWidth;
+    state.height = canvas.parentElement.clientHeight;
+    canvas.width = state.width;
+    canvas.height = state.height;
+}
+window.addEventListener('resize', resize);
+resize();
+
+/**
+ * Utility Functions
+ */
+function randomInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function getWeightedRandom(weights) {
+    const sum = weights.reduce((a, b) => a + b, 0);
+    let r = Math.random() * sum;
+    for (let i = 0; i < weights.length; i++) {
+        if (r < weights[i]) return i + 1;
+        r -= weights[i];
+    }
+    return weights.length;
+}
+
+/**
+ * Classes
+ */
+class Card {
+    constructor(slotIndex) {
+        this.slotIndex = slotIndex;
+        this.value = randomInt(CONFIG.handMin, CONFIG.handMax);
+        this.stackCount = 1;
+        this.width = state.width * 0.12;
+        this.height = this.width * 1.4;
+        this.baseX = 0;
+        this.baseY = state.height * 0.65;
+        this.x = 0;
+        this.y = 0;
+        this.isDragging = false;
+        
+        const spacing = state.width / 6;
+        this.baseX = spacing * (slotIndex + 1) - this.width / 2;
+        this.x = this.baseX;
+        this.y = this.baseY;
+    }
+
+    draw(ctx) {
+        if (!this.isDragging) {
+            this.x = this.baseX;
+            this.y = this.baseY;
+        }
+
+        ctx.fillStyle = '#fff';
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 3;
+        
+        roundRect(ctx, this.x, this.y, this.width, this.height, 10, true, true);
+
+        ctx.fillStyle = '#000';
+        ctx.font = `bold ${this.width * 0.6}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(this.value, this.x + this.width/2, this.y + this.height/2);
+
+        if (this.stackCount > 1) {
+            ctx.fillStyle = '#2980b9';
+            ctx.font = `bold ${this.width * 0.25}px sans-serif`;
+            ctx.fillText(`x${this.stackCount}`, this.x + this.width * 0.8, this.y + this.height * 0.85);
+        }
+    }
+}
+
+class Enemy {
+    constructor(isBoss = false) {
+        this.isBoss = isBoss;
+        this.width = state.width * 0.14;
+        this.height = this.width * 1.3;
+        
+        if (isBoss) {
+            this.value = randomInt(CONFIG.bossMin, CONFIG.bossMax);
+            this.gemCount = getWeightedRandom(CONFIG.gemProb);
+            this.maxHp = CONFIG.bossHP;
+            this.hp = CONFIG.bossHP;
+        } else {
+            this.value = randomInt(CONFIG.enemyMin, CONFIG.enemyMax);
+            this.gemCount = getWeightedRandom(CONFIG.gemProb);
+        }
+
+        this.x = 0;
+        this.y = state.height * 0.35; 
+    }
+
+    reroll() {
+        if(this.isBoss) {
+            this.value = randomInt(CONFIG.bossMin, CONFIG.bossMax);
+        } else {
+            this.value = randomInt(CONFIG.enemyMin, CONFIG.enemyMax);
+        }
+        this.gemCount = getWeightedRandom(CONFIG.gemProb);
+    }
+
+    draw(ctx, index, total) {
+        const spacing = state.width / (total + 1);
+        this.x = spacing * (index + 1) - this.width / 2;
+
+        const bodyColor = this.isBoss ? '#8e44ad' : '#34495e'; 
+        const borderColor = this.isBoss ? '#8e44ad' : '#c0392b'; 
+        const textColor = this.isBoss ? '#fff' : '#fff'; 
+
+        // スライム型
+        ctx.beginPath();
+        const r = 10; 
+        ctx.moveTo(this.x, this.y + this.height - r);
+        ctx.lineTo(this.x, this.y + this.height * 0.4);
+        ctx.bezierCurveTo(
+            this.x, this.y - this.height * 0.1,        
+            this.x + this.width, this.y - this.height * 0.1, 
+            this.x + this.width, this.y + this.height * 0.4  
+        );
+        ctx.lineTo(this.x + this.width, this.y + this.height - r);
+        ctx.quadraticCurveTo(this.x + this.width, this.y + this.height, this.x + this.width - r, this.y + this.height);
+        ctx.lineTo(this.x + r, this.y + this.height);
+        ctx.quadraticCurveTo(this.x, this.y + this.height, this.x, this.y + this.height - r);
+        ctx.closePath();
+
+        ctx.fillStyle = bodyColor;
+        ctx.fill();
+        ctx.strokeStyle = borderColor;
+        ctx.lineWidth = this.isBoss ? 6 : 4;
+        ctx.stroke();
+
+        // 数字
+        ctx.fillStyle = textColor;
+        ctx.font = `bold ${this.width * 0.5}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(this.value, this.x + this.width/2, this.y + this.height/2 + 10);
+
+        // 宝石
+        const gemSize = this.width * 0.12;
+        const gemY = this.y + 20;
+        const totalW = (this.gemCount * gemSize) + ((this.gemCount-1) * 2);
+        let startX = this.x + (this.width - totalW) / 2 + gemSize/2;
+        
+        for(let i=0; i<this.gemCount; i++) {
+            ctx.beginPath();
+            ctx.arc(startX + i * (gemSize+2), gemY, gemSize/2, 0, Math.PI*2);
+            ctx.fillStyle = '#f1c40f'; // Gold
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+
+        if (this.isBoss) {
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 30px sans-serif';
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 3;
+            ctx.strokeText("BOSS", this.x + this.width/2, this.y - 45);
+            ctx.fillText("BOSS", this.x + this.width/2, this.y - 45);
+
+            const barW = this.width * 1.5;
+            const barH = 15;
+            const barX = this.x + this.width/2 - barW/2;
+            const barY = this.y - 30;
+
+            // 背景
+            ctx.fillStyle = '#555';
+            roundRect(ctx, barX, barY, barW, barH, 5, true, false);
+            
+            // HP
+            const pct = Math.max(0, this.hp / this.maxHp);
+            if (pct > 0) { // 幅が0より大きいときだけ描画（はみ出し防止）
+                ctx.fillStyle = '#e74c3c';
+                roundRect(ctx, barX, barY, barW * pct, barH, 5, true, false);
+            }
+            
+            // 枠
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            roundRect(ctx, barX, barY, barW, barH, 5, false, true);
+        }
+    }
+}
+
+class Particle {
+    constructor(x, y, text, color, type = 'text') {
+        this.x = x;
+        this.y = y;
+        this.text = text;
+        this.color = color;
+        this.type = type; 
+        this.life = 1.0;
+        this.size = 0;
+        this.vy = -2;
+    }
+    update() {
+        if (this.type === 'text') {
+            this.y += this.vy;
+            this.life -= 0.01;
+        } else if (this.type === 'circle') {
+            this.size += 5;
+            this.life -= 0.03;
+        }
+    }
+    draw(ctx) {
+        ctx.globalAlpha = Math.max(0, this.life);
+        if (this.type === 'text') {
+            ctx.fillStyle = this.color;
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 3;
+            ctx.font = "bold 30px sans-serif";
+            ctx.strokeText(this.text, this.x, this.y);
+            ctx.fillText(this.text, this.x, this.y);
+        } else if (this.type === 'circle') {
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            ctx.strokeStyle = this.color;
+            ctx.lineWidth = 5;
+            ctx.stroke();
+        }
+        ctx.globalAlpha = 1.0;
+    }
+}
+
+function roundRect(ctx, x, y, w, h, r, fill, stroke) {
+    ctx.beginPath();
+    ctx.moveTo(x+r, y);
+    ctx.arcTo(x+w, y, x+w, y+h, r);
+    ctx.arcTo(x+w, y+h, x, y+h, r);
+    ctx.arcTo(x, y+h, x, y, r);
+    ctx.arcTo(x, y, x+w, y, r);
+    ctx.closePath();
+    if (fill) ctx.fill();
+    if (stroke) ctx.stroke();
+}
+
+/**
+ * Game Logic
+ */
+function backToTitle() {
+    state.screen = 'TITLE';
+    ui.title.classList.remove('hidden');
+    ui.btnToTitle.classList.add('hidden');
+    ui.rightPanelContent.classList.add('invisible');
+    
+    // 値のリセット表示
+    ui.enemyRange.textContent = "";
+    ui.enemies.textContent = "0";
+    ui.lastScore.textContent = "0";
+    ui.totalScore.textContent = "0";
+    
+    ctx.clearRect(0, 0, state.width, state.height);
+}
+
+function initGame() {
+    state.score = 0;
+    state.lastScore = 0;
+    state.time = CONFIG.initialTime;
+    state.enemiesRemaining = CONFIG.enemyCount;
+    state.bossSpawned = false;
+    state.cards = [null, null, null, null, null];
+    state.enemies = [];
+    state.particles = [];
+    state.boss = null;
+    state.isGameOverProcessing = false;
+    state.isGameClearProcessing = false;
+    state.inputLocked = false;
+    
+    resize();
+    refillCards();
+    refillEnemies();
+
+    updateUI();
+    state.screen = 'PLAYING';
+    ui.title.classList.add('hidden');
+    ui.btnToTitle.classList.remove('hidden');
+    ui.rightPanelContent.classList.remove('invisible');
+    
+    requestAnimationFrame(gameLoop);
+}
+
+function refillCards() {
+    for (let i = 0; i < 5; i++) {
+        if (state.cards[i] === null) {
+            state.cards[i] = new Card(i);
+        }
+    }
+}
+
+function refillEnemies() {
+    if (state.bossSpawned || state.isGameClearProcessing) return;
+
+    if (state.enemiesRemaining <= 0 && state.enemies.length === 0) {
+        const boss = new Enemy(true);
+        state.boss = boss;
+        state.enemies.push(boss);
+        state.bossSpawned = true;
+        return;
+    }
+
+    while (state.enemies.length < 3 && state.enemiesRemaining > 0) {
+        state.enemies.push(new Enemy(false));
+        state.enemiesRemaining--;
+    }
+}
+
+function updateUI() {
+    ui.enemyRange.textContent = `${CONFIG.enemyMin}〜${CONFIG.enemyMax}`;
+
+    if (state.boss) {
+        ui.enemies.textContent = "BOSS";
+    } else {
+        ui.enemies.textContent = Math.max(0, state.enemiesRemaining + state.enemies.filter(e => !e.isBoss).length);
+    }
+    ui.lastScore.textContent = state.lastScore;
+    ui.totalScore.textContent = state.score;
+}
+
+function consumeTime() {
+    if (state.isGameClearProcessing || state.inputLocked) return;
+
+    state.time--;
+    if (state.time < 0) state.time = 0;
+    
+    updateUI();
+
+    if (state.time === 0 && !state.isGameOverProcessing) {
+        state.isGameOverProcessing = true;
+        state.inputLocked = true;
+        setTimeout(() => {
+            if (state.screen === 'PLAYING') {
+                gameOver();
+            }
+        }, 500); 
+    }
+}
+
+function addTime(amount) {
+    if (state.isGameClearProcessing) return;
+    state.time += amount;
+    const effectX = state.width / 2 + 130;
+    const effectY = 100; 
+    state.particles.push(new Particle(effectX, effectY, `じかん +${amount}`, '#2ecc71', 'text'));
+    updateUI();
+}
+
+function checkPraise(damage, x, y) {
+    let msg = "";
+    if (damage >= 400) msg = "かみレベル！";
+    else if (damage >= 300) msg = "てんさい！";
+    else if (damage >= 200) msg = "グレート！";
+    else if (damage >= 100) msg = "すごい！";
+
+    if (msg) {
+        state.particles.push(new Particle(x, y - 80, msg, '#e67e22', 'text'));
+    }
+}
+
+function gameOver() {
+    state.screen = 'GAMEOVER';
+    drawOverlayText("ざんねん...", "#e74c3c", "クリックで タイトルへ");
+}
+
+function gameClear() {
+    state.screen = 'CLEAR';
+    drawOverlayText("ゲームクリア！", "#f1c40f", `スコア: ${state.score}`);
+}
+
+function drawOverlayText(mainText, color, subText) {
+    ctx.fillStyle = "rgba(0,0,0,0.7)";
+    ctx.fillRect(0,0,state.width, state.height);
+    
+    ctx.fillStyle = color;
+    ctx.font = "bold 60px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(mainText, state.width/2, state.height/2 - 20);
+    
+    ctx.fillStyle = "white";
+    ctx.font = "30px sans-serif";
+    ctx.fillText(subText, state.width/2, state.height/2 + 40);
+}
+
+function drawHUD(ctx) {
+    ctx.textAlign = 'center';
+    
+    // ■ 修正箇所：「たしざん」を枠の中央に配置
+    const titleText = "たしざん";
+    const boxW = 200;  // 枠の幅
+    const boxH = 50;   // 枠の高さ
+    const boxX = state.width / 2 - boxW / 2;
+    const boxY = 15;   // 枠の上端位置
+    
+    // 枠の描画（背景白、枠線青）
+    ctx.fillStyle = '#fff';
+    ctx.strokeStyle = '#2980b9';
+    ctx.lineWidth = 4;
+    roundRect(ctx, boxX, boxY, boxW, boxH, 10, true, true); 
+
+    // 文字の描画（青く、大きく、中央揃え）
+    ctx.fillStyle = '#2980b9';
+    ctx.font = 'bold 30px sans-serif'; 
+    
+    // 文字の基準線を一時的に「中央」に変更して配置
+    ctx.textBaseline = 'middle'; 
+    ctx.fillText(titleText, state.width / 2, boxY + boxH / 2); 
+    // 基準線を元に戻す（他の文字のため）
+    ctx.textBaseline = 'alphabetic'; 
+
+    // ラベル（位置は変更なし）
+    ctx.fillStyle = '#7f8c8d';
+    ctx.font = 'bold 16px sans-serif';
+    ctx.fillText("のこり じかん", state.width / 2, 95);
+
+    // 時間数値（位置は変更なし）
+    ctx.fillStyle = state.time <= 3 ? '#e74c3c' : '#2c3e50'; 
+    ctx.font = 'bold 60px sans-serif';
+    ctx.fillText(state.time, state.width / 2, 145);
+}
+
+/**
+ * Input Handling
+ */
+function getEventPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+    const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+    return { x, y };
+}
+
+function onDown(e) {
+    if (state.screen !== 'PLAYING' || state.inputLocked) {
+        if (state.screen === 'GAMEOVER' || state.screen === 'CLEAR') {
+            backToTitle();
+        }
+        return;
+    }
+    
+    const pos = getEventPos(e);
+    
+    for (let i = 4; i >= 0; i--) {
+        const c = state.cards[i];
+        if (c && pos.x >= c.x && pos.x <= c.x + c.width && pos.y >= c.y && pos.y <= c.y + c.height) {
+            state.dragInfo = {
+                slotIndex: i,
+                offsetX: pos.x - c.x,
+                offsetY: pos.y - c.y
+            };
+            c.isDragging = true;
+            break;
+        }
+    }
+}
+
+function onMove(e) {
+    if (!state.dragInfo) return;
+    const pos = getEventPos(e);
+    const c = state.cards[state.dragInfo.slotIndex];
+    if (c) {
+        c.x = pos.x - state.dragInfo.offsetX;
+        c.y = pos.y - state.dragInfo.offsetY;
+    }
+}
+
+function onUp(e) {
+    if (!state.dragInfo) return;
+    
+    const idx = state.dragInfo.slotIndex;
+    const card = state.cards[idx];
+    if (!card) { state.dragInfo = null; return; }
+
+    const cx = card.x + card.width/2;
+    const cy = card.y + card.height/2;
+    
+    let actionDone = false;
+
+    // 1. 敵との判定
+    for (let i = 0; i < state.enemies.length; i++) {
+        const enemy = state.enemies[i];
+        if (cx > enemy.x && cx < enemy.x + enemy.width && cy > enemy.y && cy < enemy.y + enemy.height) {
+            if (card.value === enemy.value) {
+                // 攻撃成功
+                const damage = card.stackCount * enemy.gemCount * 10;
+                state.score += damage;
+                state.lastScore = damage;
+                
+                state.particles.push(new Particle(enemy.x + enemy.width/2, enemy.y, `+${damage}`, '#f1c40f', 'text'));
+                state.particles.push(new Particle(enemy.x + enemy.width/2, enemy.y + enemy.height/2, "", "#e74c3c", "circle"));
+                
+                checkPraise(damage, enemy.x + enemy.width/2, enemy.y);
+
+                // カードを即座に消去
+                state.cards[idx] = null;
+                
+                // 時間回復ボーナス
+                let bonusRecovery = Math.floor(damage / 100);
+                if (bonusRecovery > 10) bonusRecovery = 10;
+                const totalRecovery = CONFIG.timeRecovery + bonusRecovery;
+
+                if (enemy.isBoss) {
+                    enemy.hp -= damage;
+                    addTime(totalRecovery);
+                    
+                    if (enemy.hp <= 0) {
+                        enemy.hp = 0; // 見た目を0に
+                        state.inputLocked = true; // 操作ロック
+                        state.isGameClearProcessing = true;
+                        
+                        // 少し待ってからボス消滅 -> さらに待ってクリア画面
+                        setTimeout(() => {
+                            state.enemies.splice(i, 1); // ボス消滅
+                            state.boss = null;
+                            setTimeout(() => {
+                                gameClear();
+                            }, 1000); // 1秒後にクリア画面
+                        }, 500); // 0.5秒間HP0を見せる
+                        
+                        actionDone = true;
+                        state.dragInfo = null;
+                        updateUI(); // 即座にHPバー更新
+                        return; // ここで処理終了
+                    } else {
+                        enemy.reroll();
+                    }
+                } else {
+                    state.enemies.splice(i, 1);
+                    addTime(totalRecovery);
+                }
+                actionDone = true;
+            }
+            break;
+        }
+    }
+
+    // 2. 他のカードとの判定（合体）
+    if (!actionDone) {
+        for (let i = 0; i < 5; i++) {
+            if (i === idx) continue;
+            const target = state.cards[i];
+            if (!target) continue;
+
+            const dx = cx - (target.x + target.width/2);
+            const dy = cy - (target.y + target.height/2);
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            
+            if (dist < card.width * 0.8) {
+                // 合体！
+                const newValue = target.value + card.value;
+                if (newValue <= 99) {
+                    target.value = newValue;
+                    target.stackCount += card.stackCount;
+                    state.cards[idx] = null;
+                    consumeTime();
+                    actionDone = true;
+                    state.particles.push(new Particle(target.x + target.width/2, target.y + target.height/2, "", "#3498db", "circle"));
+                }
+                break;
+            }
+        }
+    }
+
+    // 3. ゴミ箱判定
+    if (!actionDone) {
+        if (cy > state.height * 0.85) {
+            state.cards[idx] = null;
+            consumeTime();
+            actionDone = true;
+            //state.particles.push(new Particle(cx, cy, "ポイッ", "#95a5a6", 'text'));
+        }
+    }
+
+    if (actionDone) {
+        refillCards();
+        refillEnemies();
+        updateUI();
+    } else {
+        card.isDragging = false;
+    }
+    
+    state.dragInfo = null;
+}
+
+canvas.addEventListener('mousedown', onDown);
+window.addEventListener('mousemove', onMove);
+window.addEventListener('mouseup', onUp);
+
+canvas.addEventListener('touchstart', (e) => { e.preventDefault(); onDown(e); }, {passive: false});
+window.addEventListener('touchmove', (e) => { e.preventDefault(); onMove(e); }, {passive: false});
+window.addEventListener('touchend', (e) => { e.preventDefault(); onUp(e); }, {passive: false});
+
+/**
+ * Main Loop
+ */
+function gameLoop() {
+    if (state.screen !== 'PLAYING') return;
+
+    ctx.clearRect(0, 0, state.width, state.height);
+    
+    drawHUD(ctx);
+
+    // ゴミ箱エリア
+    ctx.fillStyle = 'rgba(149, 165, 166, 0.2)';
+    ctx.fillRect(0, state.height * 0.85, state.width, state.height * 0.15);
+    ctx.fillStyle = '#7f8c8d';
+    ctx.font = '20px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText("いらないカードは ここへ", state.width/2, state.height * 0.92);
+
+    state.enemies.forEach((enemy, i) => {
+        enemy.draw(ctx, i, state.enemies.length);
+    });
+
+    state.cards.forEach(c => {
+        if (c && !c.isDragging) c.draw(ctx);
+    });
+    
+    const draggingCard = state.cards.find(c => c && c.isDragging);
+    if (draggingCard) draggingCard.draw(ctx);
+
+    for (let i = state.particles.length - 1; i >= 0; i--) {
+        const p = state.particles[i];
+        p.update();
+        p.draw(ctx);
+        if (p.life <= 0) state.particles.splice(i, 1);
+    }
+
+    requestAnimationFrame(gameLoop);
+}
+
+/**
+ * UI Events (Touch & Click Support)
+ */
+function bindBtn(btn, callback) {
+    btn.addEventListener('click', (e) => { e.preventDefault(); callback(); });
+    btn.addEventListener('touchstart', (e) => { e.preventDefault(); callback(); }, {passive: false});
+}
+
+bindBtn(ui.btnEasy, () => {
+    CONFIG = Object.assign({}, PRESET_EASY);
+    initGame();
+});
+
+bindBtn(ui.btnNormal, () => {
+    CONFIG = Object.assign({}, PRESET_NORMAL);
+    initGame();
+});
+
+bindBtn(ui.btnHard, () => {
+    CONFIG = Object.assign({}, PRESET_HARD);
+    initGame();
+});
+
+bindBtn(ui.btnToTitle, () => {
+    backToTitle();
+});
+
+// 初期ロード時の処理
+backToTitle();
+
+</script>
+</body>
+</html>
