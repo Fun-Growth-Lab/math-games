@@ -1,0 +1,1287 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ひきざんバトル - Math Braves</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #f0f4f8;
+            font-family: "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+        #container {
+            display: flex;
+            width: 100vw;
+            height: 100vh;
+        }
+        #left-panel, #right-panel {
+            flex: 1;
+            background-color: #2c3e50;
+            color: white;
+            padding: 20px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        #game-area {
+            flex: 2;
+            position: relative;
+            background-color: #ecf0f1;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        h2 { margin-top: 0; border-bottom: 2px solid #3498db; padding-bottom: 10px; font-size: 1.2rem; }
+        .info-item { margin-bottom: 20px; font-size: 1.1rem; }
+        .info-value { font-size: 1.8rem; font-weight: bold; color: #f1c40f; }
+        .info-label { font-size: 0.9rem; color: #bdc3c7; }
+        
+        .invisible { visibility: hidden; }
+
+        /* ボタン共通スタイル */
+        .btn {
+            background-color: #3498db; color: white; border: none; padding: 10px 20px;
+            border-radius: 5px; cursor: pointer; font-size: 1rem; margin: 5px;
+            transition: background 0.2s;
+            box-shadow: 0 4px 0 #2980b9;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .btn:hover { background-color: #2980b9; transform: translateY(2px); box-shadow: 0 2px 0 #2980b9; }
+        .btn:active { transform: translateY(4px); box-shadow: none; }
+        
+        .btn-danger { background-color: #e74c3c; box-shadow: 0 4px 0 #c0392b; }
+        .btn-danger:hover { background-color: #c0392b; box-shadow: 0 2px 0 #c0392b;}
+        
+        .btn-success { background-color: #2ecc71; box-shadow: 0 4px 0 #27ae60; }
+        .btn-success:hover { background-color: #27ae60; box-shadow: 0 2px 0 #27ae60; }
+
+        .btn-warning { background-color: #f1c40f; box-shadow: 0 4px 0 #d35400; color: #333; }
+        .btn-warning:hover { background-color: #f39c12; box-shadow: 0 2px 0 #d35400; }
+        
+        .btn-auth {
+            background-color: #ea4335; /* Googleカラー */
+            box-shadow: 0 4px 0 #d93025;
+            color: white;
+            padding: 12px 20px;
+            font-weight: bold;
+            margin-top: 15px;
+        }
+        .btn-auth:hover { background-color: #d93025; }
+
+        /* オーバーレイ */
+        #overlay, #ranking-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 100;
+            flex-direction: column;
+            color: white;
+        }
+        .overlay-content {
+            background: #34495e; padding: 30px; border-radius: 10px;
+            text-align: center; max-width: 90%; width: 90%;
+            max-height: 90vh; overflow-y: auto;
+        }
+        
+        .hidden { display: none !important; }
+        
+        /* 難易度ボタンエリア */
+        .difficulty-buttons {
+            display: flex; justify-content: center; gap: 15px; margin-bottom: 20px;
+        }
+        .difficulty-buttons button {
+            width: 120px; padding: 15px 0; font-size: 1rem; font-weight: bold;
+        }
+        
+        /* 結果表示エリア */
+        #game-result {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            z-index: 20; width: 80%; max-width: 500px;
+        }
+
+        /* ランキング表示用スタイル */
+        .ranking-container {
+            display: flex; justify-content: center; gap: 10px; margin-bottom: 20px;
+            flex-wrap: nowrap; padding-bottom: 0;
+        }
+        .ranking-box {
+            background: #2c3e50; padding: 10px; border-radius: 8px;
+            flex: 1; min-width: 0; border: 2px solid #7f8c8d;
+        }
+        .ranking-title {
+            font-weight: bold; color: #f1c40f; margin-bottom: 8px;
+            border-bottom: 1px solid #555; padding-bottom: 5px; font-size: 1rem; 
+        }
+        .ranking-list {
+            list-style: none; padding: 0; margin: 0; text-align: left;
+            font-size: 0.85rem; height: 300px; overflow-y: auto;
+        }
+        .ranking-list li {
+            padding: 5px 0; border-bottom: 1px dashed #444;
+            display: flex; justify-content: space-between;
+        }
+        .ranking-rank { display: inline-block; width: 20px; color: #bdc3c7; }
+        .ranking-name { display: inline-block; width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+        .ranking-score { font-weight: bold; color: white; float: right; }
+    </style>
+</head>
+<body>
+
+<div id="container">
+    <div id="left-panel">
+        <h2>あそびかた</h2>
+        <div style="font-size: 1rem; line-height: 1.8;">
+            <p>1. <strong>しろいカード</strong>を かさねると<br>かずが ひかれるよ。</p>
+            <p>2. <strong>くろいカード</strong>が てきだ！<br>おなじかずを つくって<br>ぶつけよう！</p>
+            <p>3. <strong>かならず 1かいは</strong><br>かさねないと こうげき<br>できないぞ！<span style="color:#e74c3c;">(▲)</span></p>
+            <p>4. いらないカードは<br>したの <strong>ゴミすてば</strong> へ。</p>
+            <p>5. てきをたおして<br>じかんを かいふくだ！</p>
+        </div>
+        <div style="margin-top:auto; text-align:center;">
+            <button id="btn-to-title" class="btn btn-danger hidden">タイトルへ もどる</button>
+        </div>
+    </div>
+
+    <div id="game-area">
+        <canvas id="gameCanvas"></canvas>
+        
+        <div id="title-screen" class="overlay-content" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); z-index:10; background:rgba(255,255,255,0.95); color:#333; border: 4px solid #2c3e50;">
+            <h1 style="font-size:3rem; margin:0 0 10px 0; color:#2980b9;">MATH BRAVES</h1>
+            <h2 style="font-size:1.8rem; margin:0 0 30px 0; color:#333; border:none;">- ひきざん -</h2>
+            <p style="font-size:1.2rem; margin-bottom:40px;">けいさんの ちからで<br>まものを たおせ！</p>
+            
+            <div class="difficulty-buttons">
+                <button id="btn-easy" class="btn btn-success">しょきゅう</button>
+                <button id="btn-normal" class="btn">ちゅうきゅう</button>
+                <button id="btn-hard" class="btn btn-danger">じょうきゅう</button>
+            </div>
+
+            <hr style="margin: 20px 0; border: 0; border-top: 1px solid #ccc;">
+            <button id="btn-view-ranking" class="btn btn-warning" style="width: 200px;">スコアをみる</button>
+            
+            <p id="auth-status" style="margin-top: 10px; font-size: 0.9rem; color: #555;">ログインしていません</p>
+            <button id="btn-login" class="btn btn-auth" style="width: 200px;">
+                <span style="font-size: 1rem;">Googleでログイン</span>
+            </button>
+            <button id="btn-logout" class="btn btn-danger hidden" style="width: 200px; margin-top: 10px;">ログアウト</button>
+
+        </div>
+
+        <div id="game-result" style="display: none;">
+            </div>
+
+        <div id="ranking-screen" class="hidden">
+            <div id="ranking-overlay">
+                <div class="overlay-content" style="width: 95%; max-width: 900px;">
+                    <h2 id="ranking-header-title" style="color: #f1c40f; margin-top: 0;">ベストスコア 10</h2>
+                    <div class="ranking-container">
+                        <div class="ranking-box">
+                            <div class="ranking-title" style="color: #2ecc71;">しょきゅう</div>
+                            <ul id="rank-list-easy" class="ranking-list"></ul>
+                        </div>
+                        <div class="ranking-box">
+                            <div class="ranking-title" style="color: #3498db;">ちゅうきゅう</div>
+                            <ul id="rank-list-normal" class="ranking-list"></ul>
+                        </div>
+                        <div class="ranking-box">
+                            <div class="ranking-title" style="color: #e74c3c;">じょうきゅう</div>
+                            <ul id="rank-list-hard" class="ranking-list"></ul>
+                        </div>
+                    </div>
+                    <button id="btn-close-ranking" class="btn">とじる</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="right-panel">
+        <div id="right-panel-content">
+            <div class="info-item">
+                <div class="info-label">てきのすうじ</div>
+                <div id="disp-enemy-range" class="info-value" style="font-size: 1.4rem;"></div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">のこりの てき</div>
+                <div id="disp-enemies" class="info-value">0</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">さいだい スコア</div>
+                <div id="disp-max-score" class="info-value" style="color:#e74c3c;">0</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">さっきの スコア</div>
+                <div id="disp-last-score" class="info-value" style="color:#e67e22;">0</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">ごうけい スコア</div>
+                <div id="disp-total-score" class="info-value">0</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import { getFirestore, collection, doc, setDoc, serverTimestamp, query, where, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    // Your web app's Firebase configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyBCg5dCEM89UmYYhfGqVeRf_VrUlg8_o-4",
+      authDomain: "math-braves.firebaseapp.com",
+      projectId: "math-braves",
+      storageBucket: "math-braves.firebasestorage.app",
+      messagingSenderId: "217117619290",
+      appId: "1:217117619290:web:d227feb603970d3948d463"
+    };
+
+    // Initialize Firebase
+    console.log("[Debug] Firebase初期化開始...");
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const provider = new GoogleAuthProvider();
+    console.log("[Debug] Firebase初期化完了");
+
+    // ユーザー情報をグローバルに公開する変数
+    window.currentUser = null; 
+
+    // UI要素の取得
+    const btnLogin = document.getElementById('btn-login');
+    const btnLogout = document.getElementById('btn-logout');
+    const authStatus = document.getElementById('auth-status');
+
+    // --- ログイン処理 ---
+    window.handleLogin = function() {
+        console.log("[Debug] ログイン処理開始");
+        signInWithPopup(auth, provider)
+            .then((result) => {
+                console.log("[Debug] ログイン成功:", result.user.displayName);
+            })
+            .catch((error) => {
+                console.error("[Error] ログインエラー:", error);
+                alert("ログインに失敗しました。");
+            });
+    };
+
+    // --- ログアウト処理 ---
+    window.handleLogout = function() {
+        console.log("[Debug] ログアウト処理開始");
+        signOut(auth).then(() => {
+            console.log("[Debug] ログアウト成功");
+        }).catch((error) => {
+            console.error("[Error] ログアウトエラー:", error);
+        });
+    };
+
+    // --- 認証状態の監視 ---
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            window.currentUser = {
+                uid: user.uid,
+                displayName: user.displayName || '名無しさん'
+            };
+            console.log("[Debug] 認証状態確認: ログイン済み ->", window.currentUser.displayName);
+            if(authStatus) authStatus.textContent = `ログイン中: ${window.currentUser.displayName}`;
+            if(btnLogin) btnLogin.classList.add('hidden');
+            if(btnLogout) btnLogout.classList.remove('hidden');
+        } else {
+            window.currentUser = null;
+            console.log("[Debug] 認証状態確認: 未ログイン");
+            if(authStatus) authStatus.textContent = 'ログインしていません';
+            if(btnLogin) btnLogin.classList.remove('hidden');
+            if(btnLogout) btnLogout.classList.add('hidden');
+        }
+    });
+
+    // --- スコア保存処理 (引き算用コレクション: scores_subtraction) ---
+    window.saveOnlineScore = async (userId, userName, difficulty, score) => {
+        console.log(`[Debug] saveOnlineScore(引き算)呼び出し: ${difficulty}, ${score}点`);
+        try {
+            const docId = `${userId}_${difficulty}_${Date.now()}`;
+            // ★変更点: コレクション名を 'scores_subtraction' に変更
+            await setDoc(doc(db, "scores_subtraction", docId), {
+                uid: userId,
+                name: userName,
+                difficulty: difficulty,
+                score: score,
+                createdAt: serverTimestamp()
+            });
+            console.log("[Debug] Firestore(引き算)への保存成功!");
+        } catch (error) {
+            console.error("[Error] Firestoreへの保存エラー:", error);
+        }
+    };
+
+    // --- オンラインランキング取得処理 (引き算用) ---
+    window.fetchOnlineRanking = async (difficulty) => {
+        console.log(`[Debug] fetchOnlineRanking(引き算)呼び出し: ${difficulty}`);
+        
+        if (!window.currentUser) {
+            console.log("[Debug] ログインしていないため、ランキング取得をスキップします");
+            return [];
+        }
+
+        try {
+            // ★変更点: コレクション名を 'scores_subtraction' に変更
+            const scoresRef = collection(db, "scores_subtraction");
+            
+            const q = query(
+                scoresRef, 
+                where("difficulty", "==", difficulty), 
+                orderBy("score", "desc"), 
+                limit(10)
+            );
+            
+            console.log("[Debug] Firestoreへ問い合わせ中...");
+            const querySnapshot = await getDocs(q);
+            
+            console.log(`[Debug] データ取得完了。件数: ${querySnapshot.size}`);
+            
+            const ranking = [];
+            querySnapshot.forEach((doc) => {
+                const d = doc.data();
+                ranking.push(d);
+            });
+            return ranking;
+        } catch (error) {
+            console.error("[Error] ランキング取得エラー:", error);
+            return [];
+        }
+    };
+</script>
+<script>
+/**
+ * Game Configuration & State
+ */
+// ★変更点: 手札の範囲を変更、敵の数を0-9に変更
+const PRESET_EASY = {
+    handMin: 1, handMax: 10,       
+    enemyMin: 0, enemyMax: 9,    
+    bossMin: 0, bossMax: 9,     
+    enemyCount: 20, bossHP: 1200, 
+    initialTime: 10, timeRecovery: 2, 
+    gemProb: [30, 25, 20, 15, 10]
+};
+
+const PRESET_NORMAL = {
+    handMin: 1, handMax: 15,       
+    enemyMin: 0, enemyMax: 9,   
+    bossMin: 0, bossMax: 9,     
+    enemyCount: 20, bossHP: 1500, 
+    initialTime: 10, timeRecovery: 2, 
+    gemProb: [30, 25, 20, 15, 10]
+};
+
+const PRESET_HARD = {
+    handMin: 1, handMax: 20,       
+    enemyMin: 0, enemyMax: 9,   
+    bossMin: 0, bossMax: 9,     
+    enemyCount: 20, bossHP: 2000, 
+    initialTime: 20, timeRecovery: 2, 
+    gemProb: [30, 25, 20, 15, 10]
+};
+
+let CONFIG = Object.assign({}, PRESET_NORMAL);
+
+let state = {
+    screen: 'TITLE', 
+    difficulty: 'NORMAL', 
+    time: 15,
+    score: 0,
+    lastScore: 0,
+    maxScore: 0, 
+    enemiesRemaining: 0, 
+    cards: [null, null, null, null, null],
+    enemies: [],
+    particles: [],
+    boss: null,         
+    bossSpawned: false, 
+    width: 0,
+    height: 0,
+    dragInfo: null,
+    isGameOverProcessing: false,
+    isGameClearProcessing: false, 
+    inputLocked: false 
+};
+
+// Canvas Setup
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const ui = {
+    rightPanelContent: document.getElementById('right-panel-content'),
+    enemyRange: document.getElementById('disp-enemy-range'),
+    enemies: document.getElementById('disp-enemies'),
+    maxScore: document.getElementById('disp-max-score'),
+    lastScore: document.getElementById('disp-last-score'),
+    totalScore: document.getElementById('disp-total-score'),
+    title: document.getElementById('title-screen'),
+    result: document.getElementById('game-result'),
+    rankingScreen: document.getElementById('ranking-screen'),
+    rankingHeaderTitle: document.getElementById('ranking-header-title'),
+    btnEasy: document.getElementById('btn-easy'),
+    btnNormal: document.getElementById('btn-normal'),
+    btnHard: document.getElementById('btn-hard'),
+    btnViewRanking: document.getElementById('btn-view-ranking'),
+    btnCloseRanking: document.getElementById('btn-close-ranking'),
+    btnToTitle: document.getElementById('btn-to-title'),
+    btnLogin: document.getElementById('btn-login'),
+    btnLogout: document.getElementById('btn-logout')
+};
+
+function resize() {
+    state.width = canvas.parentElement.clientWidth;
+    state.height = canvas.parentElement.clientHeight;
+    canvas.width = state.width;
+    canvas.height = state.height;
+}
+window.addEventListener('resize', resize);
+resize();
+
+/**
+ * Utility Functions
+ */
+function randomInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function getWeightedRandom(weights) {
+    const sum = weights.reduce((a, b) => a + b, 0);
+    let r = Math.random() * sum;
+    for (let i = 0; i < weights.length; i++) {
+        if (r < weights[i]) return i + 1;
+        r -= weights[i];
+    }
+    return weights.length;
+}
+
+// --- Ranking Functions ---
+function getRankingKey(diff) {
+    // ★変更点: ローカル保存キーも引き算用に変更
+    return `math_braves_subtraction_ranking_${diff}`;
+}
+
+function saveScore(difficulty, score) {
+    const key = getRankingKey(difficulty);
+    let ranking = JSON.parse(localStorage.getItem(key)) || [];
+    
+    ranking.push(score);
+    ranking.sort((a, b) => b - a);
+    ranking = ranking.slice(0, 10);
+    
+    localStorage.setItem(key, JSON.stringify(ranking));
+    
+    const isNewRecord = (ranking.length > 0 && ranking[0] === score);
+
+    if (window.currentUser && window.saveOnlineScore) {
+        window.saveOnlineScore(window.currentUser.uid, window.currentUser.displayName, difficulty, score);
+    }
+
+    return isNewRecord;
+}
+
+function getLocalRanking(difficulty) {
+    const key = getRankingKey(difficulty);
+    return JSON.parse(localStorage.getItem(key)) || [];
+}
+
+async function showRankingScreen() {
+    console.log("[Debug] showRankingScreen 開始 (ひきざん)");
+    ui.rankingScreen.classList.remove('hidden');
+    
+    ['rank-list-easy', 'rank-list-normal', 'rank-list-hard'].forEach(id => {
+        document.getElementById(id).innerHTML = '<li style="justify-content:center; color:#7f8c8d;">読み込み中...</li>';
+    });
+
+    if (window.currentUser && window.fetchOnlineRanking) {
+        ui.rankingHeaderTitle.textContent = "みんなのベストスコア (オンライン)";
+        
+        const renderOnlineList = async (diff, elementId) => {
+            const list = await window.fetchOnlineRanking(diff);
+            const ul = document.getElementById(elementId);
+            ul.innerHTML = '';
+            
+            if (list.length === 0) {
+                ul.innerHTML = '<li style="justify-content:center; color:#7f8c8d;">記録なし</li>';
+                return;
+            }
+            
+            list.forEach((data, index) => {
+                const li = document.createElement('li');
+                const isMe = (data.uid === window.currentUser.uid);
+                const nameStyle = isMe ? 'color: #f1c40f; font-weight: bold;' : 'color: #bdc3c7;';
+                
+                li.innerHTML = `
+                    <span class="ranking-rank">${index + 1}.</span>
+                    <span class="ranking-name" style="${nameStyle}">${data.name}</span>
+                    <span class="ranking-score">${data.score}</span>
+                `;
+                ul.appendChild(li);
+            });
+        };
+
+        await Promise.all([
+            renderOnlineList('EASY', 'rank-list-easy'),
+            renderOnlineList('NORMAL', 'rank-list-normal'),
+            renderOnlineList('HARD', 'rank-list-hard')
+        ]);
+
+    } else {
+        ui.rankingHeaderTitle.textContent = "あなたのベストスコア (ローカル)";
+        
+        const renderLocalList = (diff, elementId) => {
+            const list = getLocalRanking(diff);
+            const ul = document.getElementById(elementId);
+            ul.innerHTML = '';
+            
+            if (list.length === 0) {
+                ul.innerHTML = '<li style="justify-content:center; color:#7f8c8d;">記録なし</li>';
+                return;
+            }
+            
+            list.forEach((score, index) => {
+                const li = document.createElement('li');
+                li.innerHTML = `
+                    <span class="ranking-rank">${index + 1}.</span>
+                    <span class="ranking-name">あなた</span>
+                    <span class="ranking-score">${score}</span>
+                `;
+                ul.appendChild(li);
+            });
+        };
+
+        renderLocalList('EASY', 'rank-list-easy');
+        renderLocalList('NORMAL', 'rank-list-normal');
+        renderLocalList('HARD', 'rank-list-hard');
+    }
+}
+
+/**
+ * Classes
+ */
+class Card {
+    constructor(slotIndex) {
+        this.slotIndex = slotIndex;
+        this.value = randomInt(CONFIG.handMin, CONFIG.handMax);
+        this.stackCount = 1;
+        this.width = state.width * 0.12;
+        this.height = this.width * 1.4;
+        this.baseX = 0;
+        this.baseY = state.height * 0.65;
+        this.x = 0;
+        this.y = 0;
+        this.isDragging = false;
+        
+        const spacing = state.width / 6;
+        this.baseX = spacing * (slotIndex + 1) - this.width / 2;
+        this.x = this.baseX;
+        this.y = this.baseY;
+    }
+
+    draw(ctx) {
+        if (!this.isDragging) {
+            this.x = this.baseX;
+            this.y = this.baseY;
+        }
+
+        ctx.fillStyle = '#fff';
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 3;
+        
+        roundRect(ctx, this.x, this.y, this.width, this.height, 10, true, true);
+
+        // ★変更点: 重ねたカード（stackCount >= 2）には赤い▲マークを表示
+        if (this.stackCount >= 2) {
+            ctx.fillStyle = '#e74c3c';
+            ctx.beginPath();
+            const triX = this.x + this.width / 2;
+            const triY = this.y + 15; // カード上部内側
+            ctx.moveTo(triX, triY);
+            ctx.lineTo(triX - 8, triY + 12);
+            ctx.lineTo(triX + 8, triY + 12);
+            ctx.fill();
+        }
+
+        ctx.fillStyle = '#000';
+        ctx.font = `bold ${this.width * 0.6}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(this.value, this.x + this.width/2, this.y + this.height/2);
+
+        if (this.stackCount > 1) {
+            ctx.fillStyle = '#2980b9';
+            ctx.font = `bold ${this.width * 0.25}px sans-serif`;
+            ctx.fillText(`x${this.stackCount}`, this.x + this.width * 0.8, this.y + this.height * 0.85);
+        }
+    }
+}
+
+class Enemy {
+    constructor(isBoss = false) {
+        this.isBoss = isBoss;
+        this.width = state.width * 0.14;
+        this.height = this.width * 1.3;
+        
+        if (isBoss) {
+            this.value = randomInt(CONFIG.bossMin, CONFIG.bossMax);
+            this.gemCount = getWeightedRandom(CONFIG.gemProb);
+            this.maxHp = CONFIG.bossHP;
+            this.hp = CONFIG.bossHP;
+        } else {
+            this.value = randomInt(CONFIG.enemyMin, CONFIG.enemyMax);
+            this.gemCount = getWeightedRandom(CONFIG.gemProb);
+        }
+
+        this.x = 0;
+        this.y = state.height * 0.35; 
+    }
+
+    reroll() {
+        if(this.isBoss) {
+            this.value = randomInt(CONFIG.bossMin, CONFIG.bossMax);
+        } else {
+            this.value = randomInt(CONFIG.enemyMin, CONFIG.enemyMax);
+        }
+        this.gemCount = getWeightedRandom(CONFIG.gemProb);
+    }
+
+    draw(ctx, index, total) {
+        const spacing = state.width / (total + 1);
+        this.x = spacing * (index + 1) - this.width / 2;
+
+        // ★変更点: 敵の色をブルー系に変更
+        const bodyColor = this.isBoss ? '#2c3e50' : '#2980b9'; 
+        const borderColor = this.isBoss ? '#2c3e50' : '#3498db'; 
+        const textColor = this.isBoss ? '#fff' : '#fff'; 
+
+        // スライム型
+        ctx.beginPath();
+        const r = 10; 
+        ctx.moveTo(this.x, this.y + this.height - r);
+        ctx.lineTo(this.x, this.y + this.height * 0.4);
+        ctx.bezierCurveTo(
+            this.x, this.y - this.height * 0.1,        
+            this.x + this.width, this.y - this.height * 0.1, 
+            this.x + this.width, this.y + this.height * 0.4  
+        );
+        ctx.lineTo(this.x + this.width, this.y + this.height - r);
+        ctx.quadraticCurveTo(this.x + this.width, this.y + this.height, this.x + this.width - r, this.y + this.height);
+        ctx.lineTo(this.x + r, this.y + this.height);
+        ctx.quadraticCurveTo(this.x, this.y + this.height, this.x, this.y + this.height - r);
+        ctx.closePath();
+
+        ctx.fillStyle = bodyColor;
+        ctx.fill();
+        ctx.strokeStyle = borderColor;
+        ctx.lineWidth = this.isBoss ? 6 : 4;
+        ctx.stroke();
+
+        // 数字
+        ctx.fillStyle = textColor;
+        ctx.font = `bold ${this.width * 0.5}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(this.value, this.x + this.width/2, this.y + this.height/2 + 10);
+
+        // 宝石
+        const gemSize = this.width * 0.12;
+        const gemY = this.y + 20;
+        const totalW = (this.gemCount * gemSize) + ((this.gemCount-1) * 2);
+        let startX = this.x + (this.width - totalW) / 2 + gemSize/2;
+        
+        for(let i=0; i<this.gemCount; i++) {
+            ctx.beginPath();
+            ctx.arc(startX + i * (gemSize+2), gemY, gemSize/2, 0, Math.PI*2);
+            ctx.fillStyle = '#f1c40f'; // Gold
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+
+        if (this.isBoss) {
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 30px sans-serif';
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 3;
+            ctx.strokeText("BOSS", this.x + this.width/2, this.y - 45);
+            ctx.fillText("BOSS", this.x + this.width/2, this.y - 45);
+
+            const barW = this.width * 1.5;
+            const barH = 15;
+            const barX = this.x + this.width/2 - barW/2;
+            const barY = this.y - 30;
+
+            // 背景
+            ctx.fillStyle = '#555';
+            roundRect(ctx, barX, barY, barW, barH, 5, true, false);
+            
+            // HP
+            const pct = Math.max(0, this.hp / this.maxHp);
+            if (pct > 0) { // 幅が0より大きいときだけ描画（はみ出し防止）
+                ctx.fillStyle = '#e74c3c';
+                roundRect(ctx, barX, barY, barW * pct, barH, 5, true, false);
+            }
+            
+            // 枠
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            roundRect(ctx, barX, barY, barW, barH, 5, false, true);
+        }
+    }
+}
+
+class Particle {
+    constructor(x, y, text, color, type = 'text') {
+        this.x = x;
+        this.y = y;
+        this.text = text;
+        this.color = color;
+        this.type = type; 
+        this.life = 1.0;
+        this.size = 0;
+        this.vy = -2;
+    }
+    update() {
+        if (this.type === 'text') {
+            this.y += this.vy;
+            this.life -= 0.01;
+        } else if (this.type === 'circle') {
+            this.size += 5;
+            this.life -= 0.03;
+        }
+    }
+    draw(ctx) {
+        ctx.globalAlpha = Math.max(0, this.life);
+        if (this.type === 'text') {
+            ctx.fillStyle = this.color;
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 3;
+            ctx.font = "bold 30px sans-serif";
+            ctx.strokeText(this.text, this.x, this.y);
+            ctx.fillText(this.text, this.x, this.y);
+        } else if (this.type === 'circle') {
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            ctx.strokeStyle = this.color;
+            ctx.lineWidth = 5;
+            ctx.stroke();
+        }
+        ctx.globalAlpha = 1.0;
+    }
+}
+
+function roundRect(ctx, x, y, w, h, r, fill, stroke) {
+    ctx.beginPath();
+    ctx.moveTo(x+r, y);
+    ctx.arcTo(x+w, y, x+w, y+h, r);
+    ctx.arcTo(x+w, y+h, x, y+h, r);
+    ctx.arcTo(x, y+h, x, y, r);
+    ctx.arcTo(x, y, x+w, y, r);
+    ctx.closePath();
+    if (fill) ctx.fill();
+    if (stroke) ctx.stroke();
+}
+
+/**
+ * Game Logic
+ */
+function backToTitle() {
+    state.screen = 'TITLE';
+    ui.title.classList.remove('hidden');
+    ui.btnToTitle.classList.add('hidden');
+    ui.rightPanelContent.classList.add('invisible');
+    ui.result.style.display = 'none';
+    
+    // 値のリセット表示
+    ui.enemyRange.textContent = "";
+    ui.enemies.textContent = "0";
+    ui.maxScore.textContent = "0"; 
+    ui.lastScore.textContent = "0";
+    ui.totalScore.textContent = "0";
+    
+    ctx.clearRect(0, 0, state.width, state.height);
+}
+
+function initGame() {
+    state.score = 0;
+    state.lastScore = 0;
+    state.maxScore = 0; 
+    state.time = CONFIG.initialTime;
+    state.enemiesRemaining = CONFIG.enemyCount;
+    state.bossSpawned = false;
+    state.cards = [null, null, null, null, null];
+    state.enemies = [];
+    state.particles = [];
+    state.boss = null;
+    state.isGameOverProcessing = false;
+    state.isGameClearProcessing = false;
+    state.inputLocked = false;
+    
+    resize();
+    refillCards();
+    refillEnemies();
+
+    updateUI();
+    state.screen = 'PLAYING';
+    ui.title.classList.add('hidden');
+    ui.btnToTitle.classList.remove('hidden');
+    ui.rightPanelContent.classList.remove('invisible');
+    
+    requestAnimationFrame(gameLoop);
+}
+
+function refillCards() {
+    for (let i = 0; i < 5; i++) {
+        if (state.cards[i] === null) {
+            state.cards[i] = new Card(i);
+        }
+    }
+}
+
+function refillEnemies() {
+    if (state.bossSpawned || state.isGameClearProcessing) return;
+
+    if (state.enemiesRemaining <= 0 && state.enemies.length === 0) {
+        const boss = new Enemy(true);
+        state.boss = boss;
+        state.enemies.push(boss);
+        state.bossSpawned = true;
+        return;
+    }
+
+    while (state.enemies.length < 3 && state.enemiesRemaining > 0) {
+        state.enemies.push(new Enemy(false));
+        state.enemiesRemaining--;
+    }
+}
+
+function updateUI() {
+    ui.enemyRange.textContent = `${CONFIG.enemyMin}〜${CONFIG.enemyMax}`;
+
+    if (state.boss) {
+        ui.enemies.textContent = "BOSS";
+    } else {
+        ui.enemies.textContent = Math.max(0, state.enemiesRemaining + state.enemies.filter(e => !e.isBoss).length);
+    }
+    ui.maxScore.textContent = state.maxScore; 
+    ui.lastScore.textContent = state.lastScore;
+    ui.totalScore.textContent = state.score;
+}
+
+function consumeTime() {
+    if (state.isGameClearProcessing || state.inputLocked) return;
+
+    state.time--;
+    if (state.time < 0) state.time = 0;
+    
+    updateUI();
+
+    if (state.time === 0 && !state.isGameOverProcessing) {
+        state.isGameOverProcessing = true;
+        state.inputLocked = true;
+        setTimeout(() => {
+            if (state.screen === 'PLAYING') {
+                gameOver();
+            }
+        }, 500); 
+    }
+}
+
+function addTime(amount) {
+    if (state.isGameClearProcessing) return;
+    state.time += amount;
+    const effectX = state.width / 2 + 130;
+    const effectY = 100; 
+    state.particles.push(new Particle(effectX, effectY, `じかん +${amount}`, '#2ecc71', 'text'));
+    updateUI();
+}
+
+function checkPraise(damage, x, y) {
+    let msg = "";
+    if (damage >= 400) msg = "かみレベル！";
+    else if (damage >= 300) msg = "てんさい！";
+    else if (damage >= 200) msg = "グレート！";
+    else if (damage >= 100) msg = "すごい！";
+
+    if (msg) {
+        state.particles.push(new Particle(x, y - 80, msg, '#e67e22', 'text'));
+    }
+}
+
+function gameOver() {
+    state.screen = 'GAMEOVER';
+    ui.btnToTitle.classList.add('hidden'); // ゲームオーバー時は左下ボタンを隠す
+    drawOverlayText("ざんねん...", "#e74c3c", "クリックで タイトルへ");
+}
+
+function gameClear() {
+    state.screen = 'CLEAR';
+    ui.btnToTitle.classList.add('hidden'); 
+    
+    const timeBonus = state.time * 100;
+    const maxScoreBonus = state.maxScore * 10;
+    const finalScore = state.score + timeBonus + maxScoreBonus;
+
+    // スコア保存 & 1位更新チェック
+    const isNewRecord = saveScore(state.difficulty, finalScore);
+    const highScoreMsg = isNewRecord ? '自己ベストこうしん！' : '';
+
+    ctx.fillStyle = "rgba(0,0,0,0.7)";
+    ctx.fillRect(0,0,state.width, state.height);
+
+    ui.result.innerHTML = `
+        <div style="background: #34495e; padding: 30px; border-radius: 10px; color: white; text-align: center; border: 4px solid #f1c40f;">
+            <h2 style="font-size: 2.5rem; color: #f1c40f; margin: 0 0 20px 0;">ゲームクリア！</h2>
+            <div style="font-size: 1.1rem; line-height: 1.8; text-align: left; display: inline-block;">
+                <div>ごうけいスコア：<span style="float:right; color:#f1c40f; font-weight:bold;">${state.score}点</span></div>
+                <div>タイムボーナス：${state.time}×100＝<span style="float:right; color:#2ecc71; font-weight:bold;">${timeBonus}点</span></div>
+                <div>MAXスコアボーナス：${state.maxScore}×10＝<span style="float:right; color:#e67e22; font-weight:bold;">${maxScoreBonus}点</span></div>
+                <hr style="border-color: #7f8c8d; margin: 15px 0;">
+                <div style="font-size: 1.5rem;">最終スコア：<span style="float:right; color:#f1c40f; font-weight:bold;">${finalScore}点</span></div>
+                <div style="text-align: center; margin-top: 10px; color: ${isNewRecord ? '#e74c3c' : '#bdc3c7'}; font-weight: bold;">${highScoreMsg}</div>
+            </div>
+            <br><br>
+            <button id="btn-result-ok" class="btn btn-success" style="font-size: 1.2rem; padding: 10px 40px;">OK</button>
+        </div>
+    `;
+    ui.result.style.display = 'block';
+
+    const okBtn = document.getElementById('btn-result-ok');
+    const handleOk = (e) => {
+        if(e) e.preventDefault();
+        backToTitle();
+    };
+    okBtn.addEventListener('click', handleOk);
+    okBtn.addEventListener('touchstart', handleOk, {passive: false});
+}
+
+function drawOverlayText(mainText, color, subText) {
+    ctx.fillStyle = "rgba(0,0,0,0.7)";
+    ctx.fillRect(0,0,state.width, state.height);
+    
+    ctx.fillStyle = color;
+    ctx.font = "bold 60px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(mainText, state.width/2, state.height/2 - 20);
+    
+    ctx.fillStyle = "white";
+    ctx.font = "30px sans-serif";
+    ctx.fillText(subText, state.width/2, state.height/2 + 40);
+}
+
+function drawHUD(ctx) {
+    ctx.textAlign = 'center';
+    
+    // ★変更点: タイトルをひきざんに
+    const titleText = "ひきざん";
+    const boxW = 200;  
+    const boxH = 50;   
+    const boxX = state.width / 2 - boxW / 2;
+    const boxY = 15;   
+    
+    ctx.fillStyle = '#fff';
+    ctx.strokeStyle = '#2980b9';
+    ctx.lineWidth = 4;
+    roundRect(ctx, boxX, boxY, boxW, boxH, 10, true, true); 
+
+    ctx.fillStyle = '#2980b9';
+    ctx.font = 'bold 30px sans-serif'; 
+    
+    ctx.textBaseline = 'middle'; 
+    ctx.fillText(titleText, state.width / 2, boxY + boxH / 2); 
+    ctx.textBaseline = 'alphabetic'; 
+
+    ctx.fillStyle = '#7f8c8d';
+    ctx.font = 'bold 16px sans-serif';
+    ctx.fillText("のこり じかん", state.width / 2, 95);
+
+    ctx.fillStyle = state.time <= 3 ? '#e74c3c' : '#2c3e50'; 
+    ctx.font = 'bold 60px sans-serif';
+    ctx.fillText(state.time, state.width / 2, 145);
+}
+
+/**
+ * Input Handling
+ */
+function getEventPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+    const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+    return { x, y };
+}
+
+function onDown(e) {
+    if (state.screen !== 'PLAYING' || state.inputLocked) {
+        if (state.screen === 'GAMEOVER') {
+            backToTitle();
+        }
+        return;
+    }
+    
+    const pos = getEventPos(e);
+    
+    for (let i = 4; i >= 0; i--) {
+        const c = state.cards[i];
+        if (c && pos.x >= c.x && pos.x <= c.x + c.width && pos.y >= c.y && pos.y <= c.y + c.height) {
+            state.dragInfo = {
+                slotIndex: i,
+                offsetX: pos.x - c.x,
+                offsetY: pos.y - c.y
+            };
+            c.isDragging = true;
+            break;
+        }
+    }
+}
+
+function onMove(e) {
+    if (!state.dragInfo) return;
+    const pos = getEventPos(e);
+    const c = state.cards[state.dragInfo.slotIndex];
+    if (c) {
+        c.x = pos.x - state.dragInfo.offsetX;
+        c.y = pos.y - state.dragInfo.offsetY;
+    }
+}
+
+function onUp(e) {
+    if (!state.dragInfo) return;
+    
+    const idx = state.dragInfo.slotIndex;
+    const card = state.cards[idx];
+    if (!card) { state.dragInfo = null; return; }
+
+    const cx = card.x + card.width/2;
+    const cy = card.y + card.height/2;
+    
+    let actionDone = false;
+
+    // 1. 敵との判定
+    for (let i = 0; i < state.enemies.length; i++) {
+        const enemy = state.enemies[i];
+        if (cx > enemy.x && cx < enemy.x + enemy.width && cy > enemy.y && cy < enemy.y + enemy.height) {
+            if (card.value === enemy.value) {
+                // ★変更点: 重ねていないカード(stackCount < 2)は弾く
+                if (card.stackCount < 2) {
+                    // 弾く処理
+                    card.isDragging = false;
+                    state.dragInfo = null;
+                    // 警告エフェクト
+                    state.particles.push(new Particle(state.width/2, state.height/2, "まずは カードを かさねよう！", "#e74c3c", "text"));
+                    return; // 処理終了
+                }
+
+                // 攻撃成功
+                const damage = card.stackCount * enemy.gemCount * 10;
+                state.score += damage;
+                state.lastScore = damage;
+                
+                if (damage > state.maxScore) {
+                    state.maxScore = damage;
+                }
+                
+                state.particles.push(new Particle(enemy.x + enemy.width/2, enemy.y, `+${damage}`, '#f1c40f', 'text'));
+                state.particles.push(new Particle(enemy.x + enemy.width/2, enemy.y + enemy.height/2, "", "#e74c3c", "circle"));
+                
+                checkPraise(damage, enemy.x + enemy.width/2, enemy.y);
+
+                // カードを即座に消去
+                state.cards[idx] = null;
+                
+                // 時間回復ボーナス
+                let bonusRecovery = Math.floor(damage / 100);
+                if (bonusRecovery > 10) bonusRecovery = 10;
+                const totalRecovery = CONFIG.timeRecovery + bonusRecovery;
+
+                if (enemy.isBoss) {
+                    enemy.hp -= damage;
+                    addTime(totalRecovery);
+                    
+                    if (enemy.hp <= 0) {
+                        enemy.hp = 0; 
+                        state.inputLocked = true; 
+                        state.isGameClearProcessing = true;
+                        
+                        setTimeout(() => {
+                            state.enemies.splice(i, 1); 
+                            state.boss = null;
+                            setTimeout(() => {
+                                gameClear();
+                            }, 1000); 
+                        }, 500); 
+                        
+                        actionDone = true;
+                        state.dragInfo = null;
+                        updateUI(); 
+                        return; 
+                    } else {
+                        enemy.reroll();
+                    }
+                } else {
+                    state.enemies.splice(i, 1);
+                    addTime(totalRecovery);
+                }
+                actionDone = true;
+            }
+            break;
+        }
+    }
+
+    // 2. 他のカードとの判定（合体）
+    if (!actionDone) {
+        for (let i = 0; i < 5; i++) {
+            if (i === idx) continue;
+            const target = state.cards[i];
+            if (!target) continue;
+
+            const dx = cx - (target.x + target.width/2);
+            const dy = cy - (target.y + target.height/2);
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            
+            if (dist < card.width * 0.8) {
+                // ★変更点: 引き算ロジック (絶対値)
+                const newValue = Math.abs(target.value - card.value);
+                
+                target.value = newValue;
+                target.stackCount += card.stackCount;
+                state.cards[idx] = null;
+                consumeTime();
+                actionDone = true;
+                state.particles.push(new Particle(target.x + target.width/2, target.y + target.height/2, "", "#3498db", "circle"));
+                break;
+            }
+        }
+    }
+
+    // 3. ゴミ箱判定
+    if (!actionDone) {
+        if (cy > state.height * 0.85) {
+            state.cards[idx] = null;
+            consumeTime();
+            actionDone = true;
+        }
+    }
+
+    if (actionDone) {
+        refillCards();
+        refillEnemies();
+        updateUI();
+    } else {
+        card.isDragging = false;
+    }
+    
+    state.dragInfo = null;
+}
+
+canvas.addEventListener('mousedown', onDown);
+window.addEventListener('mousemove', onMove);
+window.addEventListener('mouseup', onUp);
+
+canvas.addEventListener('touchstart', (e) => { e.preventDefault(); onDown(e); }, {passive: false});
+window.addEventListener('touchmove', (e) => { e.preventDefault(); onMove(e); }, {passive: false});
+window.addEventListener('touchend', (e) => { e.preventDefault(); onUp(e); }, {passive: false});
+
+/**
+ * Main Loop
+ */
+function gameLoop() {
+    if (state.screen !== 'PLAYING') return;
+
+    ctx.clearRect(0, 0, state.width, state.height);
+    
+    drawHUD(ctx);
+
+    // ゴミ箱エリア
+    ctx.fillStyle = 'rgba(149, 165, 166, 0.2)';
+    ctx.fillRect(0, state.height * 0.85, state.width, state.height * 0.15);
+    ctx.fillStyle = '#7f8c8d';
+    ctx.font = '20px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText("いらないカードは ここへ", state.width/2, state.height * 0.92);
+
+    state.enemies.forEach((enemy, i) => {
+        enemy.draw(ctx, i, state.enemies.length);
+    });
+
+    state.cards.forEach(c => {
+        if (c && !c.isDragging) c.draw(ctx);
+    });
+    
+    const draggingCard = state.cards.find(c => c && c.isDragging);
+    if (draggingCard) draggingCard.draw(ctx);
+
+    for (let i = state.particles.length - 1; i >= 0; i--) {
+        const p = state.particles[i];
+        p.update();
+        p.draw(ctx);
+        if (p.life <= 0) state.particles.splice(i, 1);
+    }
+
+    requestAnimationFrame(gameLoop);
+}
+
+/**
+ * UI Events (Touch & Click Support)
+ */
+function bindBtn(btn, callback) {
+    if (btn) {
+        btn.addEventListener('click', (e) => { e.preventDefault(); callback(); });
+        btn.addEventListener('touchstart', (e) => { e.preventDefault(); callback(); }, {passive: false});
+    }
+}
+
+// Global scope access to functions for bindBtn
+window.handleLogin = window.handleLogin || function(){};
+window.handleLogout = window.handleLogout || function(){};
+
+bindBtn(ui.btnEasy, () => {
+    state.difficulty = 'EASY'; 
+    CONFIG = Object.assign({}, PRESET_EASY);
+    initGame();
+});
+
+bindBtn(ui.btnNormal, () => {
+    state.difficulty = 'NORMAL'; 
+    CONFIG = Object.assign({}, PRESET_NORMAL);
+    initGame();
+});
+
+bindBtn(ui.btnHard, () => {
+    state.difficulty = 'HARD'; 
+    CONFIG = Object.assign({}, PRESET_HARD);
+    initGame();
+});
+
+// バインド処理 (要素が存在する場合のみ)
+if (ui.btnLogin) bindBtn(ui.btnLogin, () => window.handleLogin());
+if (ui.btnLogout) bindBtn(ui.btnLogout, () => window.handleLogout());
+
+bindBtn(ui.btnViewRanking, () => {
+    showRankingScreen();
+});
+
+bindBtn(ui.btnCloseRanking, () => {
+    ui.rankingScreen.classList.add('hidden');
+});
+
+bindBtn(ui.btnToTitle, () => {
+    backToTitle();
+});
+
+// 初期ロード時の処理
+backToTitle();
+
+</script>
+</body>
+</html>
