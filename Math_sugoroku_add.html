@@ -469,8 +469,8 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-        // ★重要: setDoc, doc, serverTimestamp を追加しました
-        import { getFirestore, collection, query, where, orderBy, limit, getDocs, setDoc, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        // ★ setDoc, doc, serverTimestamp, orderBy を削除し、フィルタだけに集中
+        import { getFirestore, collection, query, where, getDocs, setDoc, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
         // --- Firebase設定 ---
         const firebaseConfig = {
@@ -1022,7 +1022,7 @@
         }
 
         // ==========================================================
-        // ★修正: スコア保存先を scores_sugoroku にし、大文字で保存
+        // ★修正ポイント: スコア保存と取得のロジック
         // ==========================================================
         
         function recordScore(score, level) {
@@ -1038,13 +1038,13 @@
         async function saveOnlineScore(userId, userName, difficulty, score) {
             console.log(`[Debug] saveOnlineScore: ${difficulty}, ${score}pt`);
             try {
+                // ドキュメントIDをユニークに
                 const docId = `${userId}_${difficulty}_${Date.now()}`;
                 
-                // コレクション名を scores_sugoroku に指定
                 await setDoc(doc(db, "scores_sugoroku", docId), {
                     uid: userId,
                     name: userName,
-                    difficulty: difficulty, // 大文字で保存 ("EASY"など)
+                    difficulty: difficulty, // "EASY", "NORMAL", "HARD"
                     score: score,
                     createdAt: serverTimestamp() 
                 });
@@ -1123,22 +1123,34 @@
         }
 
         // --- オンラインランキング (Firestore) ---
-        // ★修正: コレクション名を scores_sugoroku に変更
+        // ★修正: 複合インデックスエラーを避けるため、orderByを削除し、JS側でソートする
         async function fetchOnlineRanking(difficulty) {
              console.log(`[Debug] fetchOnlineRanking: ${difficulty}`);
              try {
+                // 1. まず難易度だけでフィルタリング (これならインデックス不要)
                 const q = query(
-                    collection(db, "scores_sugoroku"), // ここを修正
-                    where("difficulty", "==", difficulty), // 大文字で検索
-                    orderBy("score", "desc"),
-                    limit(10)
+                    collection(db, "scores_sugoroku"), 
+                    where("difficulty", "==", difficulty)
+                    // limit(50) // 必要に応じてlimit
                 );
+                
                 const querySnapshot = await getDocs(q);
-                const ranking = [];
+                let ranking = [];
+                
                 querySnapshot.forEach((doc) => {
-                    ranking.push(doc.data());
+                    const d = doc.data();
+                    // データが不完全なものを除外
+                    if (d.score !== undefined) {
+                        ranking.push(d);
+                    }
                 });
-                return ranking;
+
+                // 2. 取得後にJavaScriptでスコア順にソート (大きい順)
+                ranking.sort((a, b) => b.score - a.score);
+
+                // 3. 上位10件だけ返す
+                return ranking.slice(0, 10);
+
             } catch (error) {
                 console.error("[Error] Fetch ranking failed:", error);
                 return [];
@@ -1167,11 +1179,19 @@
                 const nameStyle = isMe ? 'color: #f1c40f; font-weight: bold;' : 'color: #bdc3c7;';
                 const displayNameHtml = `<span class="rank-name" style="${nameStyle}">${dispName}</span>`;
 
+                // 日付のフォーマット調整
+                let dateStr = "";
+                if (entry.date) {
+                    dateStr = entry.date;
+                } else if (entry.createdAt && entry.createdAt.toDate) {
+                    dateStr = entry.createdAt.toDate().toLocaleDateString();
+                }
+
                 li.innerHTML = `
                     <span class="rank-num">${idx + 1}.</span>
                     <span class="rank-score" style="color:${rankColor}">${entry.score}</span>
                     ${displayNameHtml}
-                    <span class="rank-date">${entry.date || ""}</span>
+                    <span class="rank-date">${dateStr}</span>
                 `;
                 listElement.appendChild(li);
             });
@@ -1199,7 +1219,7 @@
                     return;
                 }
                 
-                // ★重要: Firebaseに合わせて大文字で検索をかける
+                // 大文字で検索 ("EASY", "NORMAL", "HARD")
                 const [easyData, normalData, hardData] = await Promise.all([
                     fetchOnlineRanking('EASY'),
                     fetchOnlineRanking('NORMAL'),
