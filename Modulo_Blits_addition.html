@@ -1,0 +1,1469 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>モジュロ ブリッツ - Math Braves</title>
+    <style>
+        /* 基本スタイル */
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #e8f0fe; /* 明るい青系 */
+            font-family: "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+        #container {
+            display: flex;
+            width: 100vw;
+            height: 100vh;
+        }
+        #left-panel, #right-panel {
+            flex: 1;
+            background-color: #34495e; /* 暗い青/グレー系 */
+            color: white;
+            padding: 20px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            z-index: 5;
+        }
+        #game-area {
+            flex: 2;
+            position: relative;
+            background-color: #f7f9fc; /* 白に近いグレー */
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        h2 { margin-top: 0; border-bottom: 2px solid #9b59b6; padding-bottom: 10px; font-size: 1.2rem; }
+        .info-item { margin-bottom: 15px; font-size: 1.0rem; }
+        .info-value { font-size: 1.6rem; font-weight: bold; color: #f1c40f; }
+        .info-label { font-size: 0.85rem; color: #bdc3c7; }
+        
+        #disp-actions {
+            font-size: 4rem !important;
+            color: #f1c40f !important;
+            line-height: 1;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 0px #000;
+        }
+        
+        /* ガイドスイッチ */
+        .guide-switch-container {
+            display: flex;
+            align-items: center;
+            margin-top: 5px;
+            background: rgba(0,0,0,0.2);
+            padding: 5px 10px;
+            border-radius: 20px;
+            cursor: pointer;
+            width: fit-content;
+        }
+        .guide-label { font-size: 0.9rem; margin-right: 10px; color: #fff; }
+        .toggle-btn {
+            width: 40px; height: 20px; background: #7f8c8d; border-radius: 10px; position: relative; transition: 0.3s;
+        }
+        .toggle-btn::after {
+            content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+            background: #fff; border-radius: 50%; transition: 0.3s;
+        }
+        .guide-on .toggle-btn { background: #2ecc71; }
+        .guide-on .toggle-btn::after { left: 22px; }
+
+        /* ガイド使用不可時のバッジ */
+        .rank-invalid-badge {
+            display: inline-block;
+            background: #e74c3c;
+            color: white;
+            font-size: 0.7rem;
+            padding: 2px 5px;
+            border-radius: 4px;
+            margin-left: 5px;
+            vertical-align: middle;
+        }
+
+        .invisible { visibility: hidden; }
+        .hidden { display: none !important; }
+
+        .btn {
+            background-color: #9b59b6; /* 紫 */
+            color: white; border: none; padding: 10px 20px;
+            border-radius: 5px; cursor: pointer; font-size: 1rem; margin: 5px;
+            transition: background 0.2s;
+            box-shadow: 0 4px 0 #8e44ad;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .btn:hover { background-color: #8e44ad; transform: translateY(2px); box-shadow: 0 2px 0 #8e44ad; }
+        .btn:active { transform: translateY(4px); box-shadow: none; }
+        
+        .btn-danger { background-color: #e74c3c; box-shadow: 0 4px 0 #c0392b; }
+        .btn-danger:hover { background-color: #c0392b; box-shadow: 0 2px 0 #c0392b;}
+        
+        .btn-success { background-color: #2ecc71; box-shadow: 0 4px 0 #27ae60; }
+        .btn-success:hover { background-color: #27ae60; box-shadow: 0 2px 0 #27ae60; }
+
+        .btn-warning { background-color: #f1c40f; box-shadow: 0 4px 0 #d35400; color: #333; }
+        .btn-warning:hover { background-color: #f39c12; box-shadow: 0 2px 0 #d35400; }
+        
+        .btn-auth {
+            background-color: #ea4335; box-shadow: 0 4px 0 #d93025;
+            color: white; padding: 12px 20px; font-weight: bold; margin-top: 15px;
+        }
+        .btn-auth:hover { background-color: #d93025; }
+
+        #overlay, #ranking-overlay, #game-result, #continue-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 100;
+            flex-direction: column;
+            color: white;
+        }
+        .overlay-content {
+            background: #2c3e50;
+            padding: 30px; border-radius: 10px;
+            text-align: center; max-width: 90%; width: 90%;
+            max-height: 90vh; overflow-y: auto;
+        }
+        
+        #title-screen {
+            background: #fff;
+            border: 8px double #9b59b6;
+            color: #333;
+            box-shadow: 0 0 20px rgba(155, 89, 182, 0.5);
+        }
+        
+        #disp-targets {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #2ecc71; 
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+        }
+        .target-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 2px;
+        }
+        .target-item {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #2ecc71;
+            color: #34495e;
+            border-radius: 50%;
+            width: 45px;
+            height: 45px;
+            font-size: 1.4rem;
+            font-weight: bold;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            border: 2px solid #fff;
+            animation: pulse-target-ui 3s infinite ease-in-out;
+        }
+
+        @keyframes pulse-target-ui {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .difficulty-container {
+            display: flex; justify-content: center; gap: 15px; margin-bottom: 20px; align-items: flex-end; 
+        }
+        .diff-wrapper {
+            display: flex; flex-direction: column; align-items: center; position: relative;
+        }
+        .crown-icon {
+            font-size: 2rem; margin-bottom: -5px; text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            filter: drop-shadow(0 0 5px rgba(255,255,0,0.5)); visibility: hidden; 
+        }
+        .clear-count-text {
+            font-size: 1.1rem; color: #34495e; font-weight: bold; margin-top: 5px;
+        }
+        .difficulty-container button {
+            width: 120px; padding: 15px 0; font-size: 1rem; font-weight: bold; margin: 0; 
+        }
+        
+        .ranking-container {
+            display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; flex-wrap: nowrap; padding-bottom: 0;
+        }
+        .ranking-box {
+            background: #34495e; padding: 10px; border-radius: 8px; flex: 1; min-width: 0; border: 2px solid #7f8c8d;
+        }
+        .ranking-title {
+            font-weight: bold; color: #f1c40f; margin-bottom: 8px; border-bottom: 1px solid #555; padding-bottom: 5px; font-size: 1rem; 
+        }
+        .ranking-list {
+            list-style: none; padding: 0; margin: 0; text-align: left; font-size: 0.85rem; height: 300px; overflow-y: auto;
+        }
+        .ranking-list li {
+            padding: 5px 0; border-bottom: 1px dashed #444; display: flex; justify-content: space-between;
+        }
+        .ranking-rank { display: inline-block; width: 20px; color: #bdc3c7; }
+        .ranking-name { display: inline-block; width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+        .ranking-score { font-weight: bold; color: white; float: right; }
+    </style>
+</head>
+<body>
+
+<div id="container">
+    <div id="left-panel">
+        <h2>あそびかた</h2>
+        <div style="font-size: 0.9rem; line-height: 1.6;">
+            <p><strong>1. カードをおく</strong><br>
+               てふだの カードを ますに おこう。<br>
+               たしざんで 10を こえると<br>
+               1のくらいに もどるよ。<br>
+               <span style="color:#bdc3c7; font-size:0.8rem;">(れい: 7 + 5 = 12 → 2 )</span></p>
+            
+            <p><strong>2. 3つそろえてけす</strong><br>
+               おなじ すうじを たて・よこに<br>
+               3つ いじょう つなげよう。<br>
+               まがっていても OK！</p>
+            
+            <p><strong>3. ターゲットボーナス</strong><br>
+               <strong>ターゲット</strong>に なっている<br>
+               すうじを けすと <strong>スコア 2ばい！</strong><br>
+               (かさなると さらに ばい！)</p>
+            
+            <p><strong>4. おじゃまブロック</strong><br>
+               <span style="color:#7f8c8d; font-weight:bold;">くろい ブロック</span> は<br>
+               てふだを おけないよ。<br>
+               となりで けして こわそう！</p>
+        </div>
+        <div style="margin-top:auto; text-align:center;">
+            <button id="btn-to-title" class="btn btn-danger hidden">タイトルへ もどる</button>
+        </div>
+    </div>
+
+    <div id="game-area">
+        <canvas id="gameCanvas"></canvas>
+        
+        <div id="title-screen" class="overlay-content" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); z-index:10;">
+            <h1 style="font-size:3.5rem; margin:0 0 10px 0; color:#8e44ad; text-shadow: 2px 2px 0px #eee;">5x5 MODULO BLITZ</h1>
+            <p style="font-size:1.5rem; margin-top:0; margin-bottom:30px; font-weight:bold; color:#555;">- モジュロ・ブリッツ -</p>
+            <p style="font-size:1.2rem; margin-bottom:40px;">けいさんと パズルの ちからで<br>ハイスコアを めざせ！</p>
+            
+            <div class="difficulty-container">
+                <div class="diff-wrapper">
+                    <div id="crown-EASY" class="crown-icon">👑</div>
+                    <button id="btn-easy" class="btn btn-success">しょきゅう</button>
+                    <div id="clear-EASY" class="clear-count-text">0回クリア</div>
+                </div>
+                <div class="diff-wrapper">
+                    <div id="crown-NORMAL" class="crown-icon">👑</div>
+                    <button id="btn-normal" class="btn">ちゅうきゅう</button>
+                    <div id="clear-NORMAL" class="clear-count-text">0回クリア</div>
+                </div>
+                <div class="diff-wrapper">
+                    <div id="crown-HARD" class="crown-icon">👑</div>
+                    <button id="btn-hard" class="btn btn-danger">じょうきゅう</button>
+                    <div id="clear-HARD" class="clear-count-text">0回クリア</div>
+                </div>
+            </div>
+
+            <hr style="margin: 20px 0; border: 0; border-top: 1px dashed #ccc;">
+            <button id="btn-view-ranking" class="btn btn-warning" style="width: 200px;">スコアをみる</button>
+            
+            <p id="auth-status" style="margin-top: 10px; font-size: 0.9rem; color: #555;">ログインしていません</p>
+            <button id="btn-login" class="btn btn-auth" style="width: 200px;">Googleでログイン</button>
+            <button id="btn-logout" class="btn btn-danger hidden" style="width: 200px; margin-top: 10px;">ログアウト</button>
+            
+            <br>
+            <button id="btn-index" class="btn" style="background-color: #7f8c8d; margin-top: 15px; width: 200px;">INDEXへ</button>
+        </div>
+
+        <div id="game-result" class="hidden">
+            <div class="overlay-content" style="background: #34495e; border: 4px solid #f1c40f;">
+                <h2 id="result-header" style="font-size: 2.5rem; color: #f1c40f; margin: 0 0 20px 0;"></h2>
+                <div id="result-detail" style="font-size: 1.5rem; line-height: 1.8;"></div>
+                <button id="btn-result-ok" class="btn btn-success" style="font-size: 1.2rem; padding: 10px 40px; margin-top: 20px;">タイトルへ</button>
+            </div>
+        </div>
+
+        <div id="continue-screen" class="hidden">
+            <div class="overlay-content" style="background: #34495e; border: 4px solid #f1c40f;">
+                <h2 style="font-size: 2.5rem; color: #f1c40f; margin: 0 0 20px 0;">Round クリア！</h2>
+                <p style="font-size: 1.2rem;">目標スコアを たっせい しました！</p>
+                <p style="font-size: 1.5rem; font-weight: bold; margin-bottom: 30px;">つぎの Roundへ すすみますか？<br><span style="font-size:1rem; color:#e74c3c;">(おじゃまブロックが ふえるよ！)</span></p>
+                <button id="btn-continue-yes" class="btn btn-success" style="font-size: 1.2rem; padding: 10px 30px;">つづける</button>
+                <button id="btn-continue-no" class="btn btn-danger" style="font-size: 1.2rem; padding: 10px 30px; margin-left: 20px;">やめる</button>
+            </div>
+        </div>
+
+        <div id="ranking-screen" class="hidden">
+            <div id="ranking-overlay">
+                <div class="overlay-content" style="width: 95%; max-width: 900px;">
+                    <h2 id="ranking-header-title" style="color: #f1c40f; margin-top: 0;">ベストスコア 10</h2>
+                    <div class="ranking-container">
+                        <div class="ranking-box">
+                            <div class="ranking-title" style="color: #2ecc71;">しょきゅう</div>
+                            <ul id="rank-list-EASY" class="ranking-list"></ul>
+                        </div>
+                        <div class="ranking-box">
+                            <div class="ranking-title" style="color: #9b59b6;">ちゅうきゅう</div>
+                            <ul id="rank-list-NORMAL" class="ranking-list"></ul>
+                        </div>
+                        <div class="ranking-box">
+                            <div class="ranking-title" style="color: #e74c3c;">じょうきゅう</div>
+                            <ul id="rank-list-HARD" class="ranking-list"></ul>
+                        </div>
+                    </div>
+                    <button id="btn-close-ranking" class="btn">とじる</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="right-panel">
+        <div id="right-panel-content">
+            <div class="info-item">
+                <div class="info-label">プレイきゅう (Round)</div>
+                <div style="display:flex; align-items:center; flex-wrap:wrap;">
+                    <div id="disp-difficulty-label" class="info-value" style="font-size: 1.4rem; color: #fff; margin-right:10px;"></div>
+                    <span id="rank-invalid-badge" class="rank-invalid-badge hidden">ランク無効</span>
+                </div>
+                
+                <div id="btn-guide-toggle" class="guide-switch-container">
+                    <span class="guide-label">ガイド</span>
+                    <div class="toggle-btn"></div>
+                </div>
+            </div>
+            
+            <div class="info-item">
+                <div class="info-label">のこり アクション</div>
+                <div id="disp-actions" class="info-value">0</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">もくひょうスコア</div>
+                <div id="disp-goal-score" class="info-value" style="color:#2ecc71;">0</div>
+            </div>
+             <div class="info-item">
+                <div class="info-label">ごうけい スコア</div>
+                <div id="disp-total-score" class="info-value" style="color:#e67e22;">0</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">さいしんの とくてん</div>
+                <div id="disp-last-score" class="info-value" style="font-size: 1.2rem;">0</div>
+            </div>
+            <hr style="border-color: #7f8c8d; margin: 15px 0;">
+            <div class="info-item">
+                <div class="info-label">ターゲット</div>
+                <div id="disp-targets" class="info-value"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import { getFirestore, collection, doc, setDoc, serverTimestamp, query, where, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBCg5dCEM89UmYYhfGqVeRf_VrUlg8_o-4",
+      authDomain: "math-braves.firebaseapp.com",
+      projectId: "math-braves",
+      storageBucket: "math-braves.firebasestorage.app",
+      messagingSenderId: "217117619290",
+      appId: "1:217117619290:web:d227feb603970d3948d463"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const provider = new GoogleAuthProvider();
+    const FIREBASE_COLLECTION_NAME = "scores_modulo"; 
+
+    window.currentUser = null; 
+    const btnLogin = document.getElementById('btn-login');
+    const btnLogout = document.getElementById('btn-logout');
+    const authStatus = document.getElementById('auth-status');
+
+    window.handleLogin = function() {
+        signInWithPopup(auth, provider).catch((error) => { alert("ログインに失敗しました。"); });
+    };
+
+    window.handleLogout = function() {
+        signOut(auth);
+    };
+
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            window.currentUser = { uid: user.uid, displayName: user.displayName || '名無しさん' };
+            if(authStatus) authStatus.textContent = `ログイン中: ${window.currentUser.displayName}`;
+            if(btnLogin) btnLogin.classList.add('hidden');
+            if(btnLogout) btnLogout.classList.remove('hidden');
+        } else {
+            window.currentUser = null;
+            if(authStatus) authStatus.textContent = 'ログインしていません';
+            if(btnLogin) btnLogin.classList.remove('hidden');
+            if(btnLogout) btnLogout.classList.add('hidden');
+        }
+    });
+
+    window.saveOnlineScore = async (userId, userName, difficulty, score) => {
+        try {
+            const docId = `${userId}_${difficulty}_${Date.now()}`;
+            await setDoc(doc(db, FIREBASE_COLLECTION_NAME, docId), {
+                uid: userId,
+                name: userName,
+                difficulty: difficulty,
+                score: score,
+                createdAt: serverTimestamp()
+            });
+        } catch (error) { console.error(error); }
+    };
+
+    window.fetchOnlineRanking = async (difficulty) => {
+        if (!window.currentUser) return [];
+        try {
+            const scoresRef = collection(db, FIREBASE_COLLECTION_NAME);
+            const q = query(scoresRef, where("difficulty", "==", difficulty), orderBy("score", "desc"), limit(10));
+            const querySnapshot = await getDocs(q);
+            const ranking = [];
+            querySnapshot.forEach((doc) => ranking.push(doc.data()));
+            return ranking;
+        } catch (error) { return []; }
+    };
+    
+    window.fetchOnlineRankingGlobal = window.fetchOnlineRanking;
+</script>
+<script>
+/**
+ * Game Configuration & State
+ */
+
+const NUMBER_COLORS = {
+    1: { bg: '#FFD1DC', text: '#2c3e50' }, 
+    2: { bg: '#C8E6C9', text: '#1b5e20' }, 
+    3: { bg: '#90CAF9', text: '#0d47a1' }, 
+    4: { bg: '#FFF9C4', text: '#2c3e50' }, 
+    5: { bg: '#F3E5F5', text: '#2c3e50' }, 
+    6: { bg: '#FFE0B2', text: '#2c3e50' }, 
+    7: { bg: '#F8BBD0', text: '#2c3e50' }, 
+    8: { bg: '#DCEDC8', text: '#2c3e50' }, 
+    9: { bg: '#D1C4E9', text: '#2c3e50' }, 
+    10: { bg: '#CFD8DC', text: '#2c3e50' } 
+};
+
+const CROWN_THRESHOLDS = { BRONZE: 3000, SILVER: 7000, GOLD: 15000 };
+
+// 難易度設定
+// jammerStart: Round1での発生率, jammerStep: Roundごとの増加率
+const PRESET_EASY = { 
+    label: "しょきゅう", initialActions: 30, scoreGoal: 10000, 
+    handMin: 1, handMax: 9, boardMin: 1, boardMax: 10, thresholds: CROWN_THRESHOLDS,
+    jammerStart: 0, jammerStep: 0.1 
+};
+const PRESET_NORMAL = { 
+    label: "ちゅうきゅう", initialActions: 20, scoreGoal: 20000, 
+    handMin: 1, handMax: 9, boardMin: 1, boardMax: 10, thresholds: CROWN_THRESHOLDS,
+    jammerStart: 0.05, jammerStep: 0.1 
+};
+const PRESET_HARD = { 
+    label: "じょうきゅう", initialActions: 10, scoreGoal: 30000, 
+    handMin: 1, handMax: 9, boardMin: 1, boardMax: 10, thresholds: CROWN_THRESHOLDS,
+    jammerStart: 0.1, jammerStep: 0.1 
+};
+
+let CONFIG = Object.assign({}, PRESET_NORMAL);
+
+let state = {
+    screen: 'TITLE', 
+    difficulty: 'NORMAL', 
+    actions: 20, score: 0, lastScore: 0, 
+    board: [], hand: [], particles: [], 
+    width: 0, height: 0, dragInfo: null, 
+    isGameOverProcessing: false, isGameClearProcessing: false, 
+    inputLocked: false, comboCount: 0, 
+    targetNumbers: [], 
+    isMatching: false, boardSize: 5,
+    round: 1, 
+    startTime: 0,
+    guideMode: false,
+    isRankEligible: true,
+    clearedRounds: []
+};
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const ui = {
+    rightPanelContent: document.getElementById('right-panel-content'),
+    difficultyLabel: document.getElementById('disp-difficulty-label'),
+    rankInvalidBadge: document.getElementById('rank-invalid-badge'),
+    actions: document.getElementById('disp-actions'),
+    goalScore: document.getElementById('disp-goal-score'),
+    totalScore: document.getElementById('disp-total-score'),
+    lastScore: document.getElementById('disp-last-score'),
+    targets: document.getElementById('disp-targets'),
+    title: document.getElementById('title-screen'),
+    result: document.getElementById('game-result'),
+    continueScreen: document.getElementById('continue-screen'),
+    rankingScreen: document.getElementById('ranking-screen'),
+    rankingHeaderTitle: document.getElementById('ranking-header-title'),
+    btnEasy: document.getElementById('btn-easy'),
+    btnNormal: document.getElementById('btn-normal'),
+    btnHard: document.getElementById('btn-hard'),
+    btnViewRanking: document.getElementById('btn-view-ranking'),
+    btnCloseRanking: document.getElementById('btn-close-ranking'),
+    btnToTitle: document.getElementById('btn-to-title'),
+    btnResultOk: document.getElementById('btn-result-ok'),
+    btnContinueYes: document.getElementById('btn-continue-yes'),
+    btnContinueNo: document.getElementById('btn-continue-no'),
+    btnLogin: document.getElementById('btn-login'),
+    btnLogout: document.getElementById('btn-logout'),
+    btnIndex: document.getElementById('btn-index'),
+    btnGuideToggle: document.getElementById('btn-guide-toggle'),
+    crowns: { EASY: document.getElementById('crown-EASY'), NORMAL: document.getElementById('crown-NORMAL'), HARD: document.getElementById('crown-HARD') },
+    clears: { EASY: document.getElementById('clear-EASY'), NORMAL: document.getElementById('clear-NORMAL'), HARD: document.getElementById('clear-HARD') }
+};
+
+window.resolveContinue = null;
+
+function resize() {
+    state.width = canvas.parentElement.clientWidth;
+    state.height = canvas.parentElement.clientHeight;
+    canvas.width = state.width;
+    canvas.height = state.height;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// Utility
+function randomInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+function roundRect(ctx, x, y, w, h, r, fill, stroke) {
+    ctx.beginPath(); ctx.moveTo(x+r, y); ctx.arcTo(x+w, y, x+w, y+h, r); ctx.arcTo(x+w, y+h, x, y+h, r); ctx.arcTo(x, y+h, x, y, r); ctx.arcTo(x, y, x+w, y, r); ctx.closePath();
+    if (fill) ctx.fill(); if (stroke) ctx.stroke();
+}
+function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// Stats & LocalStorage
+function getRankingKey(diff) { return `modulo_blitz_ranking_v1_${diff}`; }
+function getClearCountKey(diff) { return `modulo_blitz_clears_v1_${diff}`; }
+function getLocalRanking(difficulty) { return JSON.parse(localStorage.getItem(getRankingKey(difficulty))) || []; }
+function getClearCount(difficulty) { return parseInt(localStorage.getItem(getClearCountKey(difficulty))) || 0; }
+function incrementClearCount(difficulty) {
+    let count = getClearCount(difficulty); count++;
+    localStorage.setItem(getClearCountKey(difficulty), count); return count;
+}
+function saveScore(difficulty, score) {
+    if (!state.isRankEligible) return false;
+
+    let ranking = getLocalRanking(difficulty);
+    ranking.push(score); ranking.sort((a, b) => b - a); ranking = ranking.slice(0, 10);
+    localStorage.setItem(getRankingKey(difficulty), JSON.stringify(ranking));
+    const isNewRecord = (ranking.length > 0 && ranking[0] === score);
+    if (window.currentUser && window.saveOnlineScore) {
+        window.saveOnlineScore(window.currentUser.uid, window.currentUser.displayName, difficulty, score);
+    }
+    return isNewRecord;
+}
+function updateTitleScreenStats() {
+    ['EASY', 'NORMAL', 'HARD'].forEach(diff => {
+        ui.clears[diff].textContent = `${getClearCount(diff)}回クリア`;
+        const bestScore = getLocalRanking(diff)[0] || 0;
+        const crownEl = ui.crowns[diff];
+        crownEl.style.visibility = 'visible';
+        if (bestScore >= CROWN_THRESHOLDS.GOLD) { crownEl.textContent = '👑'; crownEl.style.color = 'gold'; crownEl.style.filter = 'drop-shadow(0 0 5px gold)'; }
+        else if (bestScore >= CROWN_THRESHOLDS.SILVER) { crownEl.textContent = '👑'; crownEl.style.color = 'silver'; crownEl.style.filter = 'drop-shadow(0 0 5px silver)'; }
+        else if (bestScore >= CROWN_THRESHOLDS.BRONZE) { crownEl.textContent = '👑'; crownEl.style.color = '#cd7f32'; crownEl.style.filter = 'drop-shadow(0 0 5px #cd7f32)'; }
+        else { crownEl.style.visibility = 'hidden'; }
+    });
+}
+
+// Logic Classes
+class Cell {
+    constructor(value) { 
+        this.value = value; 
+        this.isMatch = false; 
+        this.drawOffsetY = 0; 
+        this.type = 'NORMAL'; 
+    }
+}
+
+class HandCard {
+    constructor(slotIndex) {
+        this.slotIndex = slotIndex;
+        this.value = randomInt(CONFIG.handMin, CONFIG.handMax); 
+        this.width = state.width * 0.12;
+        this.height = this.width * 1.4;
+        this.x = 0; this.y = 0;
+        this.baseX = 0; 
+        this.baseY = state.height * 0.80; 
+        this.isDragging = false;
+        
+        const gap = this.width * 0.5;
+        const totalSetWidth = (this.width * 3) + (gap * 2);
+        const startX = (state.width - totalSetWidth) / 2;
+        this.baseX = startX + (this.width + gap) * slotIndex;
+        
+        this.x = this.baseX; this.y = this.baseY;
+    }
+
+    draw(ctx) {
+        if (!this.isDragging) { this.x = this.baseX; this.y = this.baseY; }
+        
+        const colorSet = NUMBER_COLORS[this.value];
+        ctx.fillStyle = colorSet ? colorSet.bg : '#fff';
+        ctx.strokeStyle = '#9b59b6';
+        ctx.lineWidth = 4;
+        roundRect(ctx, this.x, this.y, this.width, this.height, 10, true, true);
+        
+        ctx.fillStyle = colorSet ? colorSet.text : '#333';
+        ctx.font = `bold ${this.width * 0.6}px sans-serif`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(this.value, this.x + this.width/2, this.y + this.height/2);
+    }
+}
+
+class Particle {
+    constructor(x, y, text, color, type = 'text', size = 0) {
+        this.x = x; this.y = y; this.text = text; this.color = color; this.type = type;
+        this.life = 1.0; this.size = size; this.vy = -1.5;
+        
+        if (type === 'combo') {
+            this.vy = -0.5; 
+            this.life = 1.5; 
+        } else if (type === 'sparkle') {
+            this.vx = (Math.random() - 0.5) * 2;
+            this.vy = (Math.random() - 0.5) * 2;
+            this.life = 0.8;
+        }
+    }
+    update(dt) {
+        if (this.type === 'sparkle') {
+            this.x += this.vx;
+            this.y += this.vy;
+            this.life -= 0.05;
+        } else if (this.type === 'text' || this.type === 'combo') { 
+            this.y += this.vy; 
+            const decay = (this.type === 'combo') ? 0.01 : 0.015;
+            this.life -= decay; 
+        }
+        else { this.size += 5; this.life -= 0.03; }
+    }
+    draw(ctx) {
+        ctx.globalAlpha = Math.max(0, Math.min(1, this.life));
+        if (this.type === 'sparkle') {
+            ctx.fillStyle = '#fff';
+            ctx.beginPath(); ctx.arc(this.x, this.y, 2, 0, Math.PI*2); ctx.fill();
+        } else if (this.type === 'text' || this.type === 'combo') {
+            const fontSize = this.type === 'combo' ? 60 : Math.max(12, 30 * this.life);
+            ctx.fillStyle = this.color; 
+            ctx.font = `bold ${fontSize}px sans-serif`;
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; 
+            
+            if(this.type === 'combo') {
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 4;
+                ctx.strokeText(this.text, this.x, this.y);
+            }
+            ctx.fillText(this.text, this.x, this.y);
+            
+        } else if (this.type === 'circle') {
+            ctx.strokeStyle = this.color; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(this.x, this.y, 10 + this.size * 0.2, 0, Math.PI * 2); ctx.stroke();
+        } else if (this.type === 'match-effect') {
+            ctx.fillStyle = this.color; ctx.beginPath(); ctx.arc(this.x, this.y, 5 + this.size * 0.5, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.globalAlpha = 1.0;
+    }
+}
+
+// Game Flow
+function initGame() {
+    state.actions = CONFIG.initialActions;
+    state.score = 0; state.lastScore = 0; state.comboCount = 0;
+    state.targetNumbers = []; 
+    state.hand = []; state.board = []; state.particles = [];
+    state.isGameOverProcessing = false; state.isGameClearProcessing = false;
+    state.inputLocked = false; state.isMatching = false;
+    state.round = 1; 
+    state.startTime = performance.now();
+    state.clearedRounds = [];
+    state.isRankEligible = true; 
+    state.guideMode = false; 
+
+    let baseGoal = 0;
+    if(state.difficulty === 'EASY') baseGoal = PRESET_EASY.scoreGoal;
+    else if(state.difficulty === 'NORMAL') baseGoal = PRESET_NORMAL.scoreGoal;
+    else if(state.difficulty === 'HARD') baseGoal = PRESET_HARD.scoreGoal;
+    CONFIG.scoreGoal = baseGoal; 
+    
+    // 初期盤面生成
+    while (true) {
+        for (let i = 0; i < state.boardSize; i++) {
+            state.board[i] = [];
+            for (let j = 0; j < state.boardSize; j++) {
+                state.board[i][j] = new Cell(randomInt(CONFIG.boardMin, CONFIG.boardMax));
+            }
+        }
+        if (!checkInitialMatches()) break;
+    }
+
+    // 初期ターゲットはなし
+
+    resize(); refillHand(); updateUI();
+    state.screen = 'PLAYING';
+    ui.title.classList.add('hidden'); ui.btnToTitle.classList.remove('hidden'); ui.rightPanelContent.classList.remove('invisible');
+    requestAnimationFrame(gameLoop);
+}
+
+function checkInitialMatches() {
+    const visited = Array(state.boardSize).fill(0).map(() => Array(state.boardSize).fill(false));
+    function getCluster(r, c, val) {
+        let stack = [{r, c}]; let cluster = []; visited[r][c] = true; cluster.push({r, c});
+        while(stack.length > 0) {
+            const curr = stack.pop();
+            [[0, 1], [0, -1], [1, 0], [-1, 0]].forEach(([dr, dc]) => {
+                const nr = curr.r + dr, nc = curr.c + dc;
+                if(nr >= 0 && nr < state.boardSize && nc >= 0 && nc < state.boardSize) {
+                    if(!visited[nr][nc] && state.board[nr][nc].value === val && state.board[nr][nc].type === 'NORMAL') {
+                        visited[nr][nc] = true; cluster.push({r: nr, c: nc}); stack.push({r: nr, c: nc});
+                    }
+                }
+            });
+        }
+        return cluster;
+    }
+    for(let i=0; i<state.boardSize; i++) {
+        for(let j=0; j<state.boardSize; j++) {
+            if(!visited[i][j] && state.board[i][j].value > 0) {
+                if (getCluster(i, j, state.board[i][j].value).length >= 3) return true;
+            }
+        }
+    }
+    return false;
+}
+
+function refillHand() {
+    if (state.hand.length === 0) { state.hand = [null, null, null]; }
+    for (let i = 0; i < 3; i++) {
+        if (!state.hand[i]) { state.hand[i] = new HandCard(i); }
+    }
+    state.hand.forEach((card) => {
+        if(card) {
+            const gap = card.width * 0.5;
+            const totalSetWidth = (card.width * 3) + (gap * 2);
+            const startX = (state.width - totalSetWidth) / 2;
+            card.baseX = startX + (card.width + gap) * card.slotIndex;
+            if (!card.isDragging) { card.x = card.baseX; card.y = card.baseY; }
+        }
+    });
+}
+
+function updateUI() {
+    if (state.screen === 'TITLE') return;
+
+    ui.difficultyLabel.textContent = `${CONFIG.label} (Round ${state.round})`;
+    ui.actions.textContent = state.actions;
+    ui.goalScore.textContent = CONFIG.scoreGoal;
+    ui.totalScore.textContent = state.score;
+    ui.lastScore.textContent = state.lastScore;
+    
+    ui.targets.innerHTML = state.targetNumbers.map((n, idx) => {
+        const colorSet = NUMBER_COLORS[n] || NUMBER_COLORS[10];
+        return `
+            <div class="target-wrapper">
+                <span class="target-item" style="background-color: ${colorSet.bg}; color: ${colorSet.text}; box-shadow: 0 0 5px rgba(0,0,0,0.2);">${n}</span>
+            </div>
+        `;
+    }).join('');
+    
+    if(state.guideMode) ui.btnGuideToggle.classList.add('guide-on');
+    else ui.btnGuideToggle.classList.remove('guide-on');
+
+    if(!state.isRankEligible) ui.rankInvalidBadge.classList.remove('hidden');
+    else ui.rankInvalidBadge.classList.add('hidden');
+}
+
+function consumeAction() {
+    if (state.isGameOverProcessing || state.inputLocked) return;
+    state.actions--;
+    // アクション0の時点ではゲームオーバーにしない (マッチで回復する可能性があるため)
+}
+
+function addAction(amount) {
+    state.actions += amount;
+    state.particles.push(new Particle(ui.actions.getBoundingClientRect().left + ui.actions.offsetWidth / 2, ui.actions.getBoundingClientRect().top + ui.actions.offsetHeight / 2, `+${amount}`, '#f1c40f', 'text'));
+}
+
+function applyModulo(original, cardValue) {
+    const r = (original + cardValue) % 10; return r === 0 ? 10 : r;
+}
+
+function getBoardLayout() {
+    const headerHeight = 70; const handHeight = 150;
+    const maxH = state.height - headerHeight - handHeight - 20;
+    const maxW = state.width * 0.9;
+    const boardSizePx = Math.min(maxW, maxH);
+    const cellSize = boardSizePx / state.boardSize;
+    const startX = state.width / 2 - boardSizePx / 2;
+    const startY = headerHeight + 20;
+    return { boardSizePx, cellSize, startX, startY };
+}
+
+function getCellPosition(row, col) {
+    const { cellSize, startX, startY } = getBoardLayout();
+    return { x: startX + col * cellSize, y: startY + row * cellSize, size: cellSize };
+}
+
+function getTargetScale(now) {
+    return 1.0 + Math.sin(now / 800) * 0.05; 
+}
+
+function drawBoard(ctx) {
+    const { boardSizePx, cellSize, startX, startY } = getBoardLayout();
+    const padding = 2; const drawSize = cellSize - padding * 2;
+    ctx.strokeStyle = '#34495e'; ctx.lineWidth = 5; ctx.strokeRect(startX, startY, boardSizePx, boardSizePx);
+
+    const now = performance.now();
+    const glowAlpha = (Math.sin(now / 300) + 1) / 2 * 0.5 + 0.2; 
+    const targetScale = getTargetScale(now);
+
+    for (let i = 0; i < state.boardSize; i++) {
+        for (let j = 0; j < state.boardSize; j++) {
+            const cell = state.board[i][j];
+            const { x, y } = getCellPosition(i, j);
+            const drawY = y + cell.drawOffsetY;
+
+            if (cell.type === 'JAMMER') {
+                ctx.fillStyle = '#2c3e50'; 
+                ctx.fillRect(x + padding, drawY + padding, drawSize, drawSize);
+                ctx.strokeStyle = '#7f8c8d';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(x + padding + 5, drawY + padding + 5);
+                ctx.lineTo(x + padding + drawSize - 5, drawY + padding + drawSize - 5);
+                ctx.moveTo(x + padding + drawSize - 5, drawY + padding + 5);
+                ctx.lineTo(x + padding + 5, drawY + padding + drawSize - 5);
+                ctx.stroke();
+            }
+            else if (cell.value > 0) {
+                const colorSet = NUMBER_COLORS[cell.value] || NUMBER_COLORS[10];
+                const isTarget = state.targetNumbers.includes(cell.value);
+                
+                let cx = x + cellSize/2;
+                let cy = drawY + cellSize/2;
+                let size = drawSize;
+
+                if (isTarget) {
+                    size *= targetScale;
+                    if (Math.random() < 0.05) {
+                        state.particles.push(new Particle(x + Math.random()*cellSize, drawY + Math.random()*cellSize, "", "#FFD700", "sparkle"));
+                    }
+                }
+
+                ctx.fillStyle = colorSet.bg;
+                ctx.fillRect(cx - size/2, cy - size/2, size, size);
+                
+                if (isTarget) {
+                    ctx.save();
+                    ctx.globalAlpha = glowAlpha;
+                    ctx.fillStyle = '#f1c40f'; 
+                    ctx.fillRect(cx - size/2, cy - size/2, size, size);
+                    ctx.restore();
+                    ctx.strokeStyle = `rgba(241, 196, 15, ${glowAlpha + 0.3})`;
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(cx - size/2, cy - size/2, size, size);
+                }
+                
+                ctx.fillStyle = colorSet.text;
+                ctx.font = `bold ${cellSize * 0.5 * (isTarget ? targetScale : 1)}px sans-serif`;
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(cell.value, cx, cy + 5);
+            } else {
+                ctx.fillStyle = '#ecf0f1';
+                ctx.fillRect(x + padding, drawY + padding, drawSize, drawSize);
+            }
+        }
+    }
+}
+
+function checkPotentialMatch(r, c, val) {
+    const visited = Array(state.boardSize).fill(0).map(() => Array(state.boardSize).fill(false));
+    function getCluster(r, c, val) {
+        let stack = [{r, c}]; let cluster = []; visited[r][c] = true; cluster.push({r, c});
+        while(stack.length > 0) {
+            const curr = stack.pop();
+            [[0, 1], [0, -1], [1, 0], [-1, 0]].forEach(([dr, dc]) => {
+                const nr = curr.r + dr, nc = curr.c + dc;
+                if(nr >= 0 && nr < state.boardSize && nc >= 0 && nc < state.boardSize) {
+                    if(!visited[nr][nc] && state.board[nr][nc].value === val && state.board[nr][nc].type === 'NORMAL') {
+                        visited[nr][nc] = true; cluster.push({r: nr, c: nc}); stack.push({r: nr, c: nc});
+                    }
+                }
+            });
+        }
+        return cluster;
+    }
+    return getCluster(r, c, val).length >= 3;
+}
+
+function drawHUD(ctx) {
+    ctx.textAlign = 'center';
+    const boxW = 250; const boxH = 50; const boxX = state.width/2 - boxW/2; const boxY = 15;
+    ctx.fillStyle = '#fff'; ctx.strokeStyle = '#9b59b6'; ctx.lineWidth = 4;
+    roundRect(ctx, boxX, boxY, boxW, boxH, 10, true, true);
+    ctx.fillStyle = '#9b59b6'; ctx.font = 'bold 30px sans-serif'; ctx.textBaseline = 'middle';
+    ctx.fillText("MODULO BLITZ", state.width/2, boxY + boxH/2);
+}
+
+function drawGame(ctx) {
+    ctx.clearRect(0, 0, state.width, state.height);
+    
+    drawBoard(ctx);
+    
+    const { cellSize, startX, startY } = getBoardLayout();
+    
+    for(let i=0; i<state.boardSize; i++) {
+        for(let j=0; j<state.boardSize; j++) {
+            if(state.board[i][j].isMatch) {
+                const {x, y} = getCellPosition(i, j);
+                ctx.globalAlpha = 0.5; ctx.fillStyle = '#9b59b6'; ctx.fillRect(x, y + state.board[i][j].drawOffsetY, cellSize, cellSize); ctx.globalAlpha = 1.0;
+            }
+        }
+    }
+    
+    const draggingCard = state.hand.find(c => c && c.isDragging);
+
+    if (state.guideMode && draggingCard) {
+        for(let i=0; i<state.boardSize; i++) {
+            for(let j=0; j<state.boardSize; j++) {
+                if(state.board[i][j].type === 'NORMAL') {
+                    const originalVal = state.board[i][j].value;
+                    const newVal = applyModulo(originalVal, draggingCard.value);
+                    state.board[i][j].value = newVal;
+                    
+                    if(checkPotentialMatch(i, j, newVal)) {
+                        const {x, y} = getCellPosition(i, j);
+                        ctx.save();
+                        ctx.globalAlpha = 0.6;
+                        ctx.fillStyle = '#00ffff'; 
+                        ctx.fillRect(x, y, cellSize, cellSize);
+                        ctx.strokeStyle = '#fff';
+                        ctx.lineWidth = 3;
+                        ctx.strokeRect(x, y, cellSize, cellSize);
+                        ctx.restore();
+                    }
+                    state.board[i][j].value = originalVal;
+                }
+            }
+        }
+    }
+
+    drawHUD(ctx);
+    state.hand.forEach(c => { if(c && !c.isDragging) c.draw(ctx); });
+    if (draggingCard) draggingCard.draw(ctx);
+    state.particles.forEach(p => p.draw(ctx));
+}
+
+function checkMatchesAndScore() {
+    const visited = Array(state.boardSize).fill(0).map(() => Array(state.boardSize).fill(false));
+    let matchesFound = false;
+    let totalScore = 0;
+    let eliminatedNumbersCount = {}; 
+    let destroyedJammers = [];
+
+    function getCluster(r, c, val) {
+        let stack = [{r, c}];
+        let cluster = [];
+        visited[r][c] = true;
+        cluster.push({r, c});
+        while(stack.length > 0) {
+            const curr = stack.pop();
+            [[0, 1], [0, -1], [1, 0], [-1, 0]].forEach(([dr, dc]) => {
+                const nr = curr.r + dr, nc = curr.c + dc;
+                if(nr >= 0 && nr < state.boardSize && nc >= 0 && nc < state.boardSize) {
+                    if(!visited[nr][nc] && state.board[nr][nc].value === val && state.board[nr][nc].type === 'NORMAL') {
+                        visited[nr][nc] = true; cluster.push({r: nr, c: nc}); stack.push({r: nr, c: nc});
+                    }
+                }
+            });
+        }
+        return cluster;
+    }
+
+    for(let i=0; i<state.boardSize; i++) {
+        for(let j=0; j<state.boardSize; j++) {
+            if(!visited[i][j] && state.board[i][j].value > 0 && state.board[i][j].type === 'NORMAL') {
+                const val = state.board[i][j].value;
+                const cluster = getCluster(i, j, val);
+                if(cluster.length >= 3) {
+                    matchesFound = true;
+                    cluster.forEach(pos => {
+                        state.board[pos.r][pos.c].isMatch = true;
+                        const {x, y, size} = getCellPosition(pos.r, pos.c);
+                        state.particles.push(new Particle(x + size/2, y + size/2, "", '#9b59b6', 'match-effect'));
+                        
+                        [[0, 1], [0, -1], [1, 0], [-1, 0]].forEach(([dr, dc]) => {
+                            const nr = pos.r + dr, nc = pos.c + dc;
+                            if(nr >= 0 && nr < state.boardSize && nc >= 0 && nc < state.boardSize) {
+                                if(state.board[nr][nc].type === 'JAMMER' && !state.board[nr][nc].isMatch) {
+                                    state.board[nr][nc].isMatch = true; 
+                                    destroyedJammers.push({r: nr, c: nc});
+                                    const jp = getCellPosition(nr, nc);
+                                    state.particles.push(new Particle(jp.x + jp.size/2, jp.y + jp.size/2, "BREAK", '#7f8c8d', 'text'));
+                                }
+                            }
+                        });
+                    });
+                    
+                    const N = cluster.length;
+                    let fixedBonus = N === 3 ? 100 : (N === 4 ? 200 : (N - 2) * 100);
+                    let comboBonus = (state.comboCount) * 100;
+                    
+                    let multiplier = 1;
+                    let targetHitCount = 0;
+                    
+                    state.targetNumbers.forEach(tVal => {
+                         if (tVal === val) {
+                             multiplier *= 2; 
+                             targetHitCount++;
+                         }
+                    });
+                    
+                    if (targetHitCount > 0) {
+                        eliminatedNumbersCount[val] = (eliminatedNumbersCount[val] || 0) + 1;
+                    }
+
+                    totalScore += (fixedBonus + comboBonus) * multiplier;
+                    
+                    if (targetHitCount > 0) {
+                         state.particles.push(new Particle(state.width/2, state.height * 0.25, `ターゲットボーナス x${multiplier}!`, '#2ecc71', 'combo'));
+                    }
+                }
+            }
+        }
+    }
+
+    if (!matchesFound) { state.comboCount = 0; return 0; }
+    state.comboCount++;
+    
+    Object.keys(eliminatedNumbersCount).forEach(key => {
+        const val = parseInt(key);
+        let i = state.targetNumbers.length;
+        while (i--) {
+            if (state.targetNumbers[i] === val) {
+                state.targetNumbers.splice(i, 1);
+            }
+        }
+    });
+
+    state.lastScore = totalScore; state.score += totalScore;
+    addAction(1); 
+
+    state.particles.push(new Particle(state.width/2, state.height * 0.45, `+${totalScore}点`, '#e67e22', 'combo'));
+    if (state.comboCount > 1) {
+        state.particles.push(new Particle(state.width/2, state.height * 0.35, `${state.comboCount} COMBO!`, '#e74c3c', 'combo'));
+    }
+
+    if (Math.random() < state.comboCount * 0.2) {
+        generateTargetNumber();
+    }
+
+    return totalScore;
+}
+
+function generateTargetNumber() {
+    if (state.targetNumbers.length >= 5) {
+        state.targetNumbers.shift();
+    }
+    const newNum = randomInt(1, 9);
+    state.targetNumbers.push(newNum); 
+    state.particles.push(new Particle(state.width/2, 80, "ターゲット あらわれた！", '#2ecc71', 'text'));
+}
+
+function getJammerRate() {
+    let startRate = 0;
+    let stepRate = 0;
+    if (state.difficulty === 'EASY') { startRate = PRESET_EASY.jammerStart; stepRate = PRESET_EASY.jammerStep; }
+    else if (state.difficulty === 'NORMAL') { startRate = PRESET_NORMAL.jammerStart; stepRate = PRESET_NORMAL.jammerStep; }
+    else if (state.difficulty === 'HARD') { startRate = PRESET_HARD.jammerStart; stepRate = PRESET_HARD.jammerStep; }
+    
+    const rate = startRate + (state.round - 1) * stepRate;
+    return Math.min(rate, 0.8); 
+}
+
+function updateBoardLogic() {
+    let moved = false;
+    const { cellSize } = getBoardLayout();
+    const jammerRate = getJammerRate();
+
+    for (let j = 0; j < state.boardSize; j++) {
+        let validCells = [];
+        for(let i = 0; i < state.boardSize; i++) {
+            if(state.board[i][j].value !== 0 || state.board[i][j].type === 'JAMMER') {
+                validCells.push({ val: state.board[i][j].value, type: state.board[i][j].type, oldRow: i });
+            }
+        }
+        for(let i=0; i < state.boardSize; i++) { 
+            state.board[i][j].value = 0; 
+            state.board[i][j].type = 'NORMAL';
+        }
+
+        let currentWriteRow = state.boardSize - 1;
+        for(let k = validCells.length - 1; k >= 0; k--) {
+            const cellInfo = validCells[k];
+            state.board[currentWriteRow][j].value = cellInfo.val;
+            state.board[currentWriteRow][j].type = cellInfo.type;
+            
+            if (currentWriteRow !== cellInfo.oldRow) {
+                const distRows = currentWriteRow - cellInfo.oldRow;
+                state.board[currentWriteRow][j].drawOffsetY = -1 * distRows * cellSize;
+                moved = true;
+            }
+            currentWriteRow--;
+        }
+
+        let newCount = 0;
+        for (let row = currentWriteRow; row >= 0; row--) {
+            newCount++;
+            
+            if (Math.random() < jammerRate) {
+                state.board[row][j].type = 'JAMMER';
+                state.board[row][j].value = -1; 
+            } else {
+                state.board[row][j].type = 'NORMAL';
+                state.board[row][j].value = randomInt(CONFIG.boardMin, CONFIG.boardMax);
+            }
+            
+            const distRows = newCount + (currentWriteRow + 1); 
+            state.board[row][j].drawOffsetY = -1 * (distRows * cellSize * 1.5); 
+            moved = true;
+        }
+    }
+    return moved;
+}
+
+function waitForDropAnimation() {
+    return new Promise(resolve => {
+        const check = () => {
+            let animating = false;
+            for(let i=0; i<state.boardSize; i++) {
+                for(let j=0; j<state.boardSize; j++) {
+                    if (state.board[i][j].drawOffsetY < 0) {
+                        animating = true;
+                        break;
+                    }
+                }
+            }
+            if (!animating) resolve();
+            else requestAnimationFrame(check);
+        };
+        check();
+    });
+}
+
+async function handleMatching() {
+    state.isMatching = true; state.inputLocked = true;
+    let scoreGained = 0;
+
+    while (true) {
+        if (state.score + scoreGained >= CONFIG.scoreGoal && !state.clearedRounds.includes(state.round)) {
+            state.score += scoreGained;
+            scoreGained = 0; 
+            updateUI();
+            
+            state.clearedRounds.push(state.round);
+            
+            showContinueScreen();
+            await new Promise(r => window.resolveContinue = r);
+            
+            ui.continueScreen.classList.add('hidden');
+            state.isGameClearProcessing = false;
+            state.inputLocked = true; 
+        }
+
+        let currentScore = checkMatchesAndScore();
+        if (currentScore === 0) break;
+        scoreGained += currentScore;
+
+        await wait(250); 
+
+        for(let i=0; i<state.boardSize; i++) {
+            for(let j=0; j<state.boardSize; j++) {
+                if(state.board[i][j].isMatch) {
+                    state.board[i][j].value = 0;
+                    state.board[i][j].type = 'NORMAL'; 
+                    state.board[i][j].isMatch = false;
+                }
+            }
+        }
+        
+        await wait(400); 
+
+        updateBoardLogic();
+        await waitForDropAnimation();
+        await wait(100);
+    }
+
+    state.score += scoreGained;
+    updateUI();
+    state.isMatching = false;
+    
+    // アクションが0以下で、かつマッチング終了後ならゲームオーバー
+    if (state.actions <= 0) {
+        gameOver(false);
+    } else {
+        state.inputLocked = false;
+    }
+    return 0; 
+}
+
+function gameOver(clearFlag) {
+    if (state.isGameOverProcessing) return;
+    state.isGameOverProcessing = true; state.inputLocked = true;
+    const isNewRecord = saveScore(state.difficulty, state.score);
+    if(clearFlag) incrementClearCount(state.difficulty);
+    
+    if (clearFlag && state.round >= 5) {
+        ui.result.innerHTML = `
+            <div class="overlay-content" style="background: #34495e; border: 4px solid #f1c40f;">
+                <h2 style="font-size: 3rem; color: #f1c40f; margin: 0 0 20px 0;">🎉 完全攻略！ 🎉</h2>
+                <div style="font-size: 1.2rem; line-height: 1.8; margin-bottom: 20px;">
+                    Round 5 を突破しました！<br>あなたは <strong>モジュロ・マスター</strong> です！
+                </div>
+                さいしゅうスコア<br><span style="font-size: 2.5rem; color: #f1c40f; font-weight: bold;">${state.score}点</span>
+                ${isNewRecord ? '<div style="margin-top: 10px; color: #e74c3c; font-weight: bold;">自己ベストこうしん！</div>' : ''}
+                ${!state.isRankEligible ? '<div style="margin-top: 10px; color: #bdc3c7;">(ガイド使用のため記録されません)</div>' : ''}
+                <button id="btn-result-ok-inner" class="btn btn-success" style="font-size: 1.2rem; padding: 10px 40px; margin-top: 20px;">タイトルへ</button>
+            </div>
+        `;
+    } else {
+        ui.result.innerHTML = `
+            <div class="overlay-content" style="background: #34495e; border: 4px solid ${clearFlag ? '#f1c40f' : '#e74c3c'};">
+                <h2 style="font-size: 2.5rem; color: ${clearFlag ? '#f1c40f' : '#e74c3c'}; margin: 0 0 20px 0;">${clearFlag ? "ゲームクリア！" : "ゲームオーバー"}</h2>
+                <div style="font-size: 1.1rem; line-height: 1.8; margin-bottom: 20px;">
+                    ${clearFlag ? `おめでとう！目標スコアを たっせいしました！` : `アクションが 0 になりました。`}
+                </div>
+                あなたの さいしゅうスコアは<br><span style="font-size: 2rem; color: #f1c40f; font-weight: bold;">${state.score}点</span> でした。
+                ${isNewRecord ? '<div style="margin-top: 10px; color: #e74c3c; font-weight: bold;">自己ベストこうしん！</div>' : ''}
+                ${!state.isRankEligible ? '<div style="margin-top: 10px; color: #bdc3c7;">(ガイド使用のため記録されません)</div>' : ''}
+                <button id="btn-result-ok-inner" class="btn btn-success" style="font-size: 1.2rem; padding: 10px 40px; margin-top: 20px;">タイトルへ</button>
+            </div>
+        `;
+    }
+    
+    ui.result.classList.remove('hidden');
+    document.getElementById('btn-result-ok-inner').onclick = backToTitle;
+}
+
+function showContinueScreen() {
+    if (state.round >= 5) {
+        gameOver(true);
+        return;
+    }
+
+    ui.continueScreen.classList.remove('hidden');
+    
+    document.getElementById('btn-continue-yes').onclick = () => {
+        state.round++;
+        let baseGoal = 0;
+        if(state.difficulty === 'EASY') baseGoal = PRESET_EASY.scoreGoal;
+        else if(state.difficulty === 'NORMAL') baseGoal = PRESET_NORMAL.scoreGoal;
+        else if(state.difficulty === 'HARD') baseGoal = PRESET_HARD.scoreGoal;
+        
+        CONFIG.scoreGoal = baseGoal * state.round;
+        addAction(10); 
+        updateUI();
+        if(window.resolveContinue) window.resolveContinue();
+    };
+    
+    document.getElementById('btn-continue-no').onclick = () => {
+        ui.continueScreen.classList.add('hidden');
+        if(window.resolveContinue) window.resolveContinue(); 
+        gameOver(true); 
+    };
+}
+
+window.showRankingScreen = async function() {
+    ui.rankingScreen.classList.remove('hidden');
+    ['rank-list-EASY', 'rank-list-NORMAL', 'rank-list-HARD'].forEach(id => {
+        document.getElementById(id).innerHTML = '<li style="justify-content:center; color:#7f8c8d;">読み込み中...</li>';
+    });
+
+    if (window.currentUser && window.fetchOnlineRankingGlobal) {
+        ui.rankingHeaderTitle.textContent = "みんなのベストスコア (オンライン)";
+        const renderOnlineList = async (diff, elementId) => {
+            const listEl = document.getElementById(elementId);
+            const ranking = await window.fetchOnlineRankingGlobal(diff);
+            if (ranking.length === 0) {
+                listEl.innerHTML = '<li style="justify-content:center; color:#7f8c8d;">データなし</li>';
+                return;
+            }
+            let html = '';
+            ranking.forEach((item, index) => {
+                const rankText = index === 0 ? '👑' : index + 1;
+                const scoreColor = index === 0 ? '#f1c40f' : 'white';
+                html += `<li><span class="ranking-rank">${rankText}</span><span class="ranking-name">${item.name}</span><span class="ranking-score" style="color:${scoreColor};">${item.score}</span></li>`;
+            });
+            listEl.innerHTML = html;
+        };
+        await Promise.all([renderOnlineList('EASY', 'rank-list-EASY'), renderOnlineList('NORMAL', 'rank-list-NORMAL'), renderOnlineList('HARD', 'rank-list-HARD')]);
+    } else {
+        ui.rankingHeaderTitle.textContent = "あなたのベストスコア (ローカル)";
+        const renderLocalList = (diff, elementId) => {
+            const listEl = document.getElementById(elementId);
+            const ranking = getLocalRanking(diff);
+            if (ranking.length === 0) {
+                listEl.innerHTML = '<li style="justify-content:center; color:#7f8c8d;">データなし</li>';
+                return;
+            }
+            let html = '';
+            ranking.forEach((score, index) => {
+                const rankText = index === 0 ? '👑' : index + 1;
+                html += `<li><span class="ranking-rank">${rankText}</span><span class="ranking-name">YOU</span><span class="ranking-score" style="color:${index===0?'#f1c40f':'white'};">${score}</span></li>`;
+            });
+            listEl.innerHTML = html;
+        };
+        renderLocalList('EASY', 'rank-list-EASY'); renderLocalList('NORMAL', 'rank-list-NORMAL'); renderLocalList('HARD', 'rank-list-HARD');
+    }
+}
+
+function backToTitle() {
+    state.screen = 'TITLE';
+    ui.result.classList.add('hidden'); ui.continueScreen.classList.add('hidden'); ui.title.classList.remove('hidden');
+    ui.btnToTitle.classList.add('hidden'); ui.rightPanelContent.classList.add('invisible');
+    ui.rankingScreen.classList.add('hidden'); 
+    updateTitleScreenStats();
+}
+
+let lastUpdate = performance.now();
+function gameLoop(timestamp) {
+    const dt = (timestamp - lastUpdate) / 1000; lastUpdate = timestamp;
+    if (state.screen !== 'PLAYING') return;
+    
+    for (let i = state.particles.length - 1; i >= 0; i--) {
+        state.particles[i].update(dt);
+        if (state.particles[i].life <= 0) state.particles.splice(i, 1);
+    }
+    
+    const { cellSize } = getBoardLayout();
+    const dropSpeed = cellSize * 15 * dt; 
+    
+    for(let i=0; i<state.boardSize; i++) {
+        for(let j=0; j<state.boardSize; j++) {
+            if (state.board[i][j].drawOffsetY < 0) {
+                state.board[i][j].drawOffsetY += dropSpeed;
+                if (state.board[i][j].drawOffsetY > 0) state.board[i][j].drawOffsetY = 0;
+            }
+        }
+    }
+
+    if (!state.isMatching && state.hand.filter(c => c !== null).length < 3) refillHand();
+    
+    updateUI(); drawGame(ctx);
+    requestAnimationFrame(gameLoop);
+}
+
+function getCardAtPoint(x, y) {
+    for (let i = 0; i < 3; i++) {
+        const c = state.hand[i];
+        if (c && x >= c.x && x <= c.x + c.width && y >= c.y && y <= c.y + c.height) return { card: c, index: i };
+    }
+    return null;
+}
+
+function startDrag(x, y) {
+    if (state.screen !== 'PLAYING' || state.inputLocked) return;
+    const hit = getCardAtPoint(x, y);
+    if (hit) {
+        state.dragInfo = { card: hit.card, idx: hit.index, ox: x - hit.card.x, oy: y - hit.card.y };
+        hit.card.isDragging = true;
+    }
+}
+function moveDrag(x, y) {
+    if (!state.dragInfo) return;
+    state.dragInfo.card.x = x - state.dragInfo.ox;
+    state.dragInfo.card.y = y - state.dragInfo.oy;
+}
+function endDrag(x, y) {
+    if (!state.dragInfo) return;
+    const { card, idx } = state.dragInfo;
+    card.isDragging = false;
+    const cx = card.x + card.width/2; const cy = card.y + card.height/2;
+    const { cellSize, startX, startY } = getBoardLayout();
+    
+    if (cx >= startX && cx < startX + cellSize * state.boardSize && cy >= startY && cy < startY + cellSize * state.boardSize) {
+        const col = Math.floor((cx - startX) / cellSize);
+        const row = Math.floor((cy - startY) / cellSize);
+        
+        if (row >= 0 && row < state.boardSize && col >= 0 && col < state.boardSize) {
+            if (state.board[row][col].type !== 'JAMMER') {
+                const cell = state.board[row][col];
+                cell.value = applyModulo(cell.value, card.value);
+                state.hand[idx] = null;
+                consumeAction();
+                const {x, y} = getCellPosition(row, col);
+                state.particles.push(new Particle(x + cellSize/2, y + cellSize/2, "", "#9b59b6", "circle"));
+                if (!state.isMatching) handleMatching().then(() => {});
+            }
+        }
+    }
+    card.x = card.baseX; card.y = card.baseY;
+    state.dragInfo = null;
+}
+
+const inputs = ['mousedown', 'touchstart'];
+const moves = ['mousemove', 'touchmove'];
+const ends = ['mouseup', 'touchend'];
+inputs.forEach(ev => canvas.addEventListener(ev, e => {
+    e.preventDefault(); const r = canvas.getBoundingClientRect();
+    const x = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
+    const y = (e.touches ? e.touches[0].clientY : e.clientY) - r.top;
+    startDrag(x, y);
+}, {passive:false}));
+moves.forEach(ev => canvas.addEventListener(ev, e => {
+    e.preventDefault(); const r = canvas.getBoundingClientRect();
+    const x = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
+    const y = (e.touches ? e.touches[0].clientY : e.clientY) - r.top;
+    moveDrag(x, y);
+}, {passive:false}));
+ends.forEach(ev => canvas.addEventListener(ev, e => {
+    e.preventDefault(); const r = canvas.getBoundingClientRect();
+    const x = (e.changedTouches ? e.changedTouches[0].clientX : e.clientX) - r.left;
+    const y = (e.changedTouches ? e.changedTouches[0].clientY : e.clientY) - r.top;
+    endDrag(x, y);
+}, {passive:false}));
+
+function bindBtn(btn, cb) { if(btn) { btn.onclick = cb; btn.ontouchstart = (e) => { e.preventDefault(); cb(); }; } }
+bindBtn(ui.btnEasy, () => { state.difficulty='EASY'; CONFIG=Object.assign({}, PRESET_EASY); initGame(); });
+bindBtn(ui.btnNormal, () => { state.difficulty='NORMAL'; CONFIG=Object.assign({}, PRESET_NORMAL); initGame(); });
+bindBtn(ui.btnHard, () => { state.difficulty='HARD'; CONFIG=Object.assign({}, PRESET_HARD); initGame(); });
+bindBtn(ui.btnViewRanking, window.showRankingScreen);
+bindBtn(ui.btnCloseRanking, () => ui.rankingScreen.classList.add('hidden'));
+bindBtn(ui.btnToTitle, backToTitle);
+bindBtn(ui.btnIndex, () => window.location.href="index.html");
+bindBtn(ui.btnResultOk, backToTitle);
+
+bindBtn(ui.btnGuideToggle, () => {
+    if (state.guideMode) {
+        state.guideMode = false;
+    } else {
+        if (confirm("ガイドをONにするとスコアはランキングに記録されませんがよろしいですか？")) {
+            state.guideMode = true;
+            state.isRankEligible = false;
+        }
+    }
+    updateUI();
+});
+
+if(ui.btnLogin) bindBtn(ui.btnLogin, window.handleLogin);
+if(ui.btnLogout) bindBtn(ui.btnLogout, window.handleLogout);
+
+updateTitleScreenStats();
+</script>
+</body>
+</html>
