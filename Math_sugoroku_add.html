@@ -467,9 +467,9 @@
     </div>
 
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, query, where, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, collection, addDoc, query, where, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
         // --- Firebase設定 ---
         const firebaseConfig = {
@@ -1107,41 +1107,42 @@
 
         // --- オンラインランキング (Firestore) ---
         async function saveOnlineScore(score, level) {
+            // level (easy/normal/hard) を大文字に変換して difficulty として保存
+            const diffUpper = level.toUpperCase();
+            
             try {
                 await addDoc(collection(db, "scores"), {
                     uid: currentUser.uid,
                     name: currentUser.displayName || "Unknown",
                     score: score,
-                    level: level,
+                    difficulty: diffUpper, // ここを "difficulty" かつ大文字に変更
                     date: new Date().toLocaleDateString(),
                     timestamp: new Date()
                 });
-                console.log("Score saved to Firestore");
+                console.log("Score saved to Firestore with difficulty:", diffUpper);
             } catch (e) {
                 console.error("Error adding score: ", e);
             }
         }
 
-        async function loadOnlineRankingColumn(level, elementId) {
-            const list = document.getElementById(elementId);
-            list.innerHTML = "<li style='text-align:center; padding:10px;'>読み込み中...</li>";
-            
-            try {
+        async function fetchOnlineRanking(difficulty) {
+             console.log(`[Debug] fetchOnlineRanking呼び出し: ${difficulty}`);
+             try {
                 const q = query(
                     collection(db, "scores"),
-                    where("level", "==", level),
+                    where("difficulty", "==", difficulty), // 大文字のdifficultyで検索
                     orderBy("score", "desc"),
                     limit(10)
                 );
                 const querySnapshot = await getDocs(q);
-                const data = [];
+                const ranking = [];
                 querySnapshot.forEach((doc) => {
-                    data.push(doc.data());
+                    ranking.push(doc.data());
                 });
-                renderRankingList(data, list);
-            } catch (e) {
-                console.error("Error fetching online scores: ", e);
-                list.innerHTML = "<li style='text-align:center; color:#e74c3c; padding:10px;'>エラーが発生しました<br><span style='font-size:10px'>Firestoreの設定を確認してください</span></li>";
+                return ranking;
+            } catch (error) {
+                console.error("[Error] ランキング取得エラー:", error);
+                return [];
             }
         }
 
@@ -1160,33 +1161,59 @@
                 if(idx === 0) rankColor = "#f1c40f"; 
                 else if(idx === 1) rankColor = "#bdc3c7";
                 else if(idx === 2) rankColor = "#d35400";
+                
+                // entry.name か、なければ "Unknown"
+                let dispName = entry.name || "Unknown";
+                
+                // 自分のスコアかどうかの判定 (オンライン時のみ)
+                const isMe = (currentUser && entry.uid === currentUser.uid);
+                const nameStyle = isMe ? 'color: #f1c40f; font-weight: bold;' : 'color: #bdc3c7;';
+                const displayNameHtml = `<span class="rank-name" style="${nameStyle}">${dispName}</span>`;
 
                 li.innerHTML = `
                     <span class="rank-num">${idx + 1}.</span>
                     <span class="rank-score" style="color:${rankColor}">${entry.score}</span>
-                    <span class="rank-name">${entry.name}</span>
-                    <span class="rank-date">${entry.date}</span>
+                    ${displayNameHtml}
+                    <span class="rank-date">${entry.date || ""}</span>
                 `;
                 listElement.appendChild(li);
             });
         }
         
         // --- ランキング切り替え ---
-        function switchRankingMode(mode) {
+        async function switchRankingMode(mode) {
             currentRankingMode = mode;
             // タブの見た目更新
             document.getElementById("tab-local").classList.toggle("active", mode === 'local');
             document.getElementById("tab-online").classList.toggle("active", mode === 'online');
 
-            // データ読み込み
+            // ローディング表示
+            ['rank-list-easy', 'rank-list-normal', 'rank-list-hard'].forEach(id => {
+               document.getElementById(id).innerHTML = "<li style='text-align:center; padding:10px;'>読み込み中...</li>";
+            });
+
             if (mode === 'local') {
                 loadLocalRankingColumn('easy', 'rank-list-easy');
                 loadLocalRankingColumn('normal', 'rank-list-normal');
                 loadLocalRankingColumn('hard', 'rank-list-hard');
             } else {
-                loadOnlineRankingColumn('easy', 'rank-list-easy');
-                loadOnlineRankingColumn('normal', 'rank-list-normal');
-                loadOnlineRankingColumn('hard', 'rank-list-hard');
+                if(!currentUser) {
+                    ['rank-list-easy', 'rank-list-normal', 'rank-list-hard'].forEach(id => {
+                       document.getElementById(id).innerHTML = "<li style='text-align:center; color:#aaa; padding:10px;'>ログインが必要です</li>";
+                    });
+                    return;
+                }
+                
+                // 並列で取得
+                const [easyData, normalData, hardData] = await Promise.all([
+                    fetchOnlineRanking('EASY'),
+                    fetchOnlineRanking('NORMAL'),
+                    fetchOnlineRanking('HARD')
+                ]);
+
+                renderRankingList(easyData, document.getElementById('rank-list-easy'));
+                renderRankingList(normalData, document.getElementById('rank-list-normal'));
+                renderRankingList(hardData, document.getElementById('rank-list-hard'));
             }
         }
 
@@ -1223,6 +1250,7 @@
         window.closeRanking = closeRanking;
         window.handleGoogleLogin = handleGoogleLogin;
         window.switchRankingMode = switchRankingMode;
+        window.fetchOnlineRanking = fetchOnlineRanking;
 
     </script>
 </body>
