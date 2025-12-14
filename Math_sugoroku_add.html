@@ -155,24 +155,37 @@
             max-height: 90vh; overflow-y: auto;
         }
 
-        /* ランキング画面用スタイル（ダークテーマ） */
+        /* ランキング画面用スタイル */
         #ranking-screen {
             position: absolute; top:0; left:0; width:100%; height:100%; 
             background:rgba(30, 40, 50, 0.98); 
             display:flex; justify-content:center; align-items:center; z-index:110;
         }
         #ranking-content {
-            width: 90%; max-width: 900px; height: 80%;
+            width: 90%; max-width: 900px; height: 85%;
             display: flex; flex-direction: column;
             color: #fff;
         }
-        .ranking-header { text-align: center; margin-bottom: 20px; font-size: 24px; color: #f1c40f; font-weight: bold; }
+        .ranking-header { text-align: center; margin-bottom: 10px; font-size: 24px; color: #f1c40f; font-weight: bold; }
+        
+        /* ランキングタブ */
+        .ranking-tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 15px; }
+        .rank-tab {
+            padding: 8px 30px; border-radius: 20px; border: 2px solid #7f8c8d;
+            background: transparent; color: #bdc3c7; cursor: pointer; font-weight: bold;
+            transition: all 0.2s;
+        }
+        .rank-tab.active {
+            background: #f1c40f; color: #2c3e50; border-color: #f1c40f;
+            box-shadow: 0 0 10px rgba(241, 196, 15, 0.5);
+        }
+
         .ranking-columns { display: flex; justify-content: space-between; gap: 10px; height: 100%; overflow: hidden; }
         
         .ranking-col {
             flex: 1; 
             background: #2c3e50;
-            border: 2px solid #5d6d7e; /* デフォルトの枠線 */
+            border: 2px solid #5d6d7e; 
             border-radius: 10px;
             display: flex; flex-direction: column;
             padding: 10px;
@@ -185,7 +198,6 @@
         .rank-col-header {
             text-align: center; font-size: 18px; font-weight: bold; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 10px;
         }
-        /* 級ごとの文字色 */
         #rank-col-easy .rank-col-header { color: #2ecc71; }
         #rank-col-normal .rank-col-header { color: #3498db; }
         #rank-col-hard .rank-col-header { color: #e74c3c; }
@@ -198,7 +210,8 @@
         .rank-item:last-child { border-bottom: none; }
         .rank-num { width: 25px; color: #bdc3c7; }
         .rank-score { font-weight: bold; color: #fff; text-align: right; flex-grow: 1; }
-        .rank-date { font-size: 10px; color: #7f8c8d; width: 70px; text-align: right; margin-left: 10px; display: flex; align-items: center; justify-content: flex-end;}
+        .rank-name { font-size: 10px; color: #bdc3c7; width: 60px; text-align: right; margin-left: 5px; display: flex; align-items: center; justify-content: flex-end; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;}
+        .rank-date { font-size: 10px; color: #7f8c8d; width: 60px; text-align: right; margin-left: 5px; display: flex; align-items: center; justify-content: flex-end;}
 
         #title-screen { background: #fff; }
         #title-screen .overlay-content {
@@ -390,7 +403,13 @@
 
             <div id="ranking-screen" class="hidden">
                 <div id="ranking-content">
-                    <div class="ranking-header">あなたのベストスコア (ローカル)</div>
+                    <div class="ranking-header">ランキング</div>
+                    
+                    <div class="ranking-tabs">
+                        <button id="tab-local" class="rank-tab active" onclick="switchRankingMode('local')">ローカル</button>
+                        <button id="tab-online" class="rank-tab" onclick="switchRankingMode('online')">オンライン</button>
+                    </div>
+
                     <div class="ranking-columns">
                         <div class="ranking-col" id="rank-col-easy">
                             <div class="rank-col-header">しょきゅう</div>
@@ -450,6 +469,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, query, where, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         // --- Firebase設定 ---
         const firebaseConfig = {
@@ -463,6 +483,7 @@
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
+        const db = getFirestore(app);
         let currentUser = null;
 
         // --- Firebase関連関数 ---
@@ -479,7 +500,6 @@
                 const provider = new GoogleAuthProvider();
                 signInWithPopup(auth, provider)
                     .then((result) => {
-                        // ログイン成功
                         console.log("Logged in:", result.user);
                     }).catch((error) => {
                         console.error("Login failed:", error);
@@ -535,6 +555,9 @@
         let scrollAnim = { active: false, progress: 0, startOff: 0, targetOff: 0 };
         let messageQueue = [];
         let isDisplayingMessage = false;
+
+        // ランキング管理用
+        let currentRankingMode = 'local'; // 'local' or 'online'
 
         const canvas = document.getElementById("game-canvas");
         const ctx = canvas.getContext("2d");
@@ -983,8 +1006,6 @@
                             clearInterval(slideTimer);
                             gameState = "playing";
                             if(timeLeft <= 0) gameOver();
-                            
-                            // 【修正点】スライド完了後にUI（ボタンの状態）を更新する
                             updateUI(); 
                         }
                         drawGame();
@@ -1004,6 +1025,17 @@
             });
         }
 
+        // --- スコア保存の統合処理 ---
+        function recordScore(score, level) {
+            // 1. ローカル保存 (常に行う)
+            saveLocalScore(score, level);
+
+            // 2. オンライン保存 (ログイン中のみ)
+            if (currentUser) {
+                saveOnlineScore(score, level);
+            }
+        }
+
         function gameOver() {
             gameState = "result";
             document.getElementById("result-screen").classList.remove("hidden");
@@ -1014,7 +1046,8 @@
             document.getElementById("res-time").innerText = 0; document.getElementById("res-time-cnt").innerText = "";
             document.getElementById("res-gem").innerText = 0; document.getElementById("res-gem-cnt").innerText = "";
             document.getElementById("res-final").innerText = points;
-            saveLocalScore(points, difficulty);
+            
+            recordScore(points, difficulty);
         }
 
         function finishGame(cleared, isPerfectGoal) {
@@ -1028,7 +1061,7 @@
 
             if (cleared) {
                 saveClearCount(difficulty);
-                saveLocalScore(final, difficulty);
+                recordScore(final, difficulty);
             }
 
             document.getElementById("result-screen").classList.remove("hidden");
@@ -1051,60 +1084,120 @@
 
         function saveLocalScore(score, level) {
             let rankingData = JSON.parse(localStorage.getItem(LOCAL_RANKING_KEY)) || { easy: [], normal: [], hard: [] };
-            
-            if(Array.isArray(rankingData)) {
-                rankingData = { easy: [], normal: [], hard: [] }; 
-            }
-
+            if(Array.isArray(rankingData)) rankingData = { easy: [], normal: [], hard: [] }; 
             if (!rankingData[level]) rankingData[level] = [];
 
-            rankingData[level].push({ score: score, date: new Date().toLocaleDateString() });
+            // ローカルは名前を「あなた」固定
+            rankingData[level].push({ score: score, name: "あなた", date: new Date().toLocaleDateString() });
             rankingData[level].sort((a, b) => b.score - a.score);
             rankingData[level] = rankingData[level].slice(0, 10); 
             
             localStorage.setItem(LOCAL_RANKING_KEY, JSON.stringify(rankingData));
         }
 
-        function loadRankingColumn(level, elementId) {
+        function loadLocalRankingColumn(level, elementId) {
             const list = document.getElementById(elementId);
             list.innerHTML = "";
             let rankingData = JSON.parse(localStorage.getItem(LOCAL_RANKING_KEY)) || { easy: [], normal: [], hard: [] };
-            
             if(Array.isArray(rankingData)) rankingData = { easy: [], normal: [], hard: [] };
-
+            
             const data = rankingData[level] || [];
+            renderRankingList(data, list);
+        }
 
-            if (data.length === 0) {
-                list.innerHTML = "<li style='text-align:center; color:#7f8c8d; margin-top:20px;'>記録なし</li>";
-            } else {
-                data.forEach((entry, idx) => {
-                    const li = document.createElement("li");
-                    li.className = "rank-item";
-                    
-                    let rankColor = "#fff";
-                    if(idx === 0) rankColor = "#f1c40f"; 
-                    else if(idx === 1) rankColor = "#bdc3c7";
-                    else if(idx === 2) rankColor = "#d35400";
-
-                    li.innerHTML = `
-                        <span class="rank-num">${idx + 1}.</span>
-                        <span class="rank-score" style="color:${rankColor}">${entry.score}</span>
-                        <span class="rank-date">${entry.date}</span>
-                    `;
-                    list.appendChild(li);
+        // --- オンラインランキング (Firestore) ---
+        async function saveOnlineScore(score, level) {
+            try {
+                await addDoc(collection(db, "scores"), {
+                    uid: currentUser.uid,
+                    name: currentUser.displayName || "Unknown",
+                    score: score,
+                    level: level,
+                    date: new Date().toLocaleDateString(),
+                    timestamp: new Date()
                 });
+                console.log("Score saved to Firestore");
+            } catch (e) {
+                console.error("Error adding score: ", e);
             }
         }
+
+        async function loadOnlineRankingColumn(level, elementId) {
+            const list = document.getElementById(elementId);
+            list.innerHTML = "<li style='text-align:center; padding:10px;'>読み込み中...</li>";
+            
+            try {
+                const q = query(
+                    collection(db, "scores"),
+                    where("level", "==", level),
+                    orderBy("score", "desc"),
+                    limit(10)
+                );
+                const querySnapshot = await getDocs(q);
+                const data = [];
+                querySnapshot.forEach((doc) => {
+                    data.push(doc.data());
+                });
+                renderRankingList(data, list);
+            } catch (e) {
+                console.error("Error fetching online scores: ", e);
+                list.innerHTML = "<li style='text-align:center; color:#e74c3c; padding:10px;'>エラーが発生しました<br><span style='font-size:10px'>Firestoreの設定を確認してください</span></li>";
+            }
+        }
+
+        // --- ランキング表示共通 ---
+        function renderRankingList(data, listElement) {
+            listElement.innerHTML = "";
+            if (data.length === 0) {
+                listElement.innerHTML = "<li style='text-align:center; color:#7f8c8d; margin-top:20px;'>記録なし</li>";
+                return;
+            }
+            data.forEach((entry, idx) => {
+                const li = document.createElement("li");
+                li.className = "rank-item";
+                
+                let rankColor = "#fff";
+                if(idx === 0) rankColor = "#f1c40f"; 
+                else if(idx === 1) rankColor = "#bdc3c7";
+                else if(idx === 2) rankColor = "#d35400";
+
+                li.innerHTML = `
+                    <span class="rank-num">${idx + 1}.</span>
+                    <span class="rank-score" style="color:${rankColor}">${entry.score}</span>
+                    <span class="rank-name">${entry.name}</span>
+                    <span class="rank-date">${entry.date}</span>
+                `;
+                listElement.appendChild(li);
+            });
+        }
         
+        // --- ランキング切り替え ---
+        function switchRankingMode(mode) {
+            currentRankingMode = mode;
+            // タブの見た目更新
+            document.getElementById("tab-local").classList.toggle("active", mode === 'local');
+            document.getElementById("tab-online").classList.toggle("active", mode === 'online');
+
+            // データ読み込み
+            if (mode === 'local') {
+                loadLocalRankingColumn('easy', 'rank-list-easy');
+                loadLocalRankingColumn('normal', 'rank-list-normal');
+                loadLocalRankingColumn('hard', 'rank-list-hard');
+            } else {
+                loadOnlineRankingColumn('easy', 'rank-list-easy');
+                loadOnlineRankingColumn('normal', 'rank-list-normal');
+                loadOnlineRankingColumn('hard', 'rank-list-hard');
+            }
+        }
+
         function showFullRanking() {
             document.getElementById("title-screen").classList.add("hidden");
             document.getElementById("result-screen").classList.add("hidden");
             document.getElementById("ranking-screen").classList.remove("hidden");
             gameState = "ranking";
-
-            loadRankingColumn('easy', 'rank-list-easy');
-            loadRankingColumn('normal', 'rank-list-normal');
-            loadRankingColumn('hard', 'rank-list-hard');
+            
+            // 初期表示はローカル
+            switchRankingMode('local');
         }
 
         function closeRanking() {
@@ -1129,6 +1222,7 @@
         window.showFullRanking = showFullRanking;
         window.closeRanking = closeRanking;
         window.handleGoogleLogin = handleGoogleLogin;
+        window.switchRankingMode = switchRankingMode;
 
     </script>
 </body>
