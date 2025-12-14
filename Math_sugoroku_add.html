@@ -1022,40 +1022,35 @@
         }
 
         // ==========================================================
-        // ★修正済み: スコア保存処理 (引き算ゲームの成功パターンに合わせる)
+        // ★修正: スコア保存先を scores_sugoroku にし、大文字で保存
         // ==========================================================
         
         function recordScore(score, level) {
-            // 1. ローカル保存
             saveLocalScore(score, level);
-
-            // 2. オンライン保存
             if (currentUser) {
+                // Firebaseのデータに合わせて大文字に変換
                 const diffUpper = level.toUpperCase();
                 const userName = currentUser.displayName || "Unknown";
-                // 引数を明示的に渡して呼び出す
                 saveOnlineScore(currentUser.uid, userName, diffUpper, score);
             }
         }
 
-        // 引き算ゲームと同様の setDoc 実装 (コレクションは scores_sugoroku)
         async function saveOnlineScore(userId, userName, difficulty, score) {
-            console.log(`[Debug] saveOnlineScore(スゴロク)呼び出し: ${difficulty}, ${score}点`);
+            console.log(`[Debug] saveOnlineScore: ${difficulty}, ${score}pt`);
             try {
-                // ドキュメントIDを作成 (userId_difficulty_timestamp)
                 const docId = `${userId}_${difficulty}_${Date.now()}`;
                 
-                // setDocを使用 (addDocではなく)
+                // コレクション名を scores_sugoroku に指定
                 await setDoc(doc(db, "scores_sugoroku", docId), {
                     uid: userId,
                     name: userName,
-                    difficulty: difficulty,
+                    difficulty: difficulty, // 大文字で保存 ("EASY"など)
                     score: score,
-                    createdAt: serverTimestamp() // サーバー時刻
+                    createdAt: serverTimestamp() 
                 });
-                console.log("[Debug] Firestore(スゴロク)への保存成功!");
+                console.log("[Debug] Saved to scores_sugoroku!");
             } catch (error) {
-                console.error("[Error] Firestoreへの保存エラー:", error);
+                console.error("[Error] Save failed:", error);
             }
         }
 
@@ -1128,14 +1123,13 @@
         }
 
         // --- オンラインランキング (Firestore) ---
-        // 修正点: コレクション名を "scores" から "scores_sugoroku" に変更
+        // ★修正: コレクション名を scores_sugoroku に変更
         async function fetchOnlineRanking(difficulty) {
-             console.log(`[Debug] fetchOnlineRanking呼び出し: ${difficulty}`);
+             console.log(`[Debug] fetchOnlineRanking: ${difficulty}`);
              try {
                 const q = query(
-                    // ここで 'scores' ではなく 'scores_sugoroku' から読み込む
-                    collection(db, "scores_sugoroku"),
-                    where("difficulty", "==", difficulty), 
+                    collection(db, "scores_sugoroku"), // ここを修正
+                    where("difficulty", "==", difficulty), // 大文字で検索
                     orderBy("score", "desc"),
                     limit(10)
                 );
@@ -1146,7 +1140,7 @@
                 });
                 return ranking;
             } catch (error) {
-                console.error("[Error] ランキング取得エラー:", error);
+                console.error("[Error] Fetch ranking failed:", error);
                 return [];
             }
         }
@@ -1205,6 +1199,7 @@
                     return;
                 }
                 
+                // ★重要: Firebaseに合わせて大文字で検索をかける
                 const [easyData, normalData, hardData] = await Promise.all([
                     fetchOnlineRanking('EASY'),
                     fetchOnlineRanking('NORMAL'),
