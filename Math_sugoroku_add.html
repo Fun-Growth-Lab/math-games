@@ -469,7 +469,8 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-        import { getFirestore, collection, addDoc, query, where, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        // ★重要: setDoc, doc, serverTimestamp を追加しました
+        import { getFirestore, collection, query, where, orderBy, limit, getDocs, setDoc, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
         // --- Firebase設定 ---
         const firebaseConfig = {
@@ -489,14 +490,12 @@
         // --- Firebase関連関数 ---
         function handleGoogleLogin() {
             if (currentUser) {
-                // 既にログイン済みならログアウト
                 signOut(auth).then(() => {
                     alert("ログアウトしました");
                 }).catch((error) => {
                     console.error(error);
                 });
             } else {
-                // ログイン処理
                 const provider = new GoogleAuthProvider();
                 signInWithPopup(auth, provider)
                     .then((result) => {
@@ -508,7 +507,6 @@
             }
         }
 
-        // 認証状態の監視
         onAuthStateChanged(auth, (user) => {
             currentUser = user;
             const statusText = document.getElementById("login-status-text");
@@ -556,8 +554,7 @@
         let messageQueue = [];
         let isDisplayingMessage = false;
 
-        // ランキング管理用
-        let currentRankingMode = 'local'; // 'local' or 'online'
+        let currentRankingMode = 'local';
 
         const canvas = document.getElementById("game-canvas");
         const ctx = canvas.getContext("2d");
@@ -614,7 +611,6 @@
             });
         }
 
-        // --- クリア回数 ---
         function loadClearCounts() {
             const data = JSON.parse(localStorage.getItem('mathSugorokuClears')) || { easy: 0, normal: 0, hard: 0 };
             document.getElementById('clear-easy').innerText = data.easy;
@@ -1025,14 +1021,41 @@
             });
         }
 
-        // --- スコア保存の統合処理 ---
+        // ==========================================================
+        // ★修正済み: スコア保存処理 (引き算ゲームの成功パターンに合わせる)
+        // ==========================================================
+        
         function recordScore(score, level) {
-            // 1. ローカル保存 (常に行う)
+            // 1. ローカル保存
             saveLocalScore(score, level);
 
-            // 2. オンライン保存 (ログイン中のみ)
+            // 2. オンライン保存
             if (currentUser) {
-                saveOnlineScore(score, level);
+                const diffUpper = level.toUpperCase();
+                const userName = currentUser.displayName || "Unknown";
+                // 引数を明示的に渡して呼び出す
+                saveOnlineScore(currentUser.uid, userName, diffUpper, score);
+            }
+        }
+
+        // 引き算ゲームと同様の setDoc 実装 (コレクションは scores_sugoroku)
+        async function saveOnlineScore(userId, userName, difficulty, score) {
+            console.log(`[Debug] saveOnlineScore(スゴロク)呼び出し: ${difficulty}, ${score}点`);
+            try {
+                // ドキュメントIDを作成 (userId_difficulty_timestamp)
+                const docId = `${userId}_${difficulty}_${Date.now()}`;
+                
+                // setDocを使用 (addDocではなく)
+                await setDoc(doc(db, "scores_sugoroku", docId), {
+                    uid: userId,
+                    name: userName,
+                    difficulty: difficulty,
+                    score: score,
+                    createdAt: serverTimestamp() // サーバー時刻
+                });
+                console.log("[Debug] Firestore(スゴロク)への保存成功!");
+            } catch (error) {
+                console.error("[Error] Firestoreへの保存エラー:", error);
             }
         }
 
@@ -1087,7 +1110,6 @@
             if(Array.isArray(rankingData)) rankingData = { easy: [], normal: [], hard: [] }; 
             if (!rankingData[level]) rankingData[level] = [];
 
-            // ローカルは名前を「あなた」固定
             rankingData[level].push({ score: score, name: "あなた", date: new Date().toLocaleDateString() });
             rankingData[level].sort((a, b) => b.score - a.score);
             rankingData[level] = rankingData[level].slice(0, 10); 
@@ -1107,25 +1129,6 @@
 
         // --- オンラインランキング (Firestore) ---
         // 修正点: コレクション名を "scores" から "scores_sugoroku" に変更
-        async function saveOnlineScore(score, level) {
-            const diffUpper = level.toUpperCase();
-            
-            try {
-                // ここで 'scores' ではなく 'scores_sugoroku' に保存する
-                await addDoc(collection(db, "scores_sugoroku"), {
-                    uid: currentUser.uid,
-                    name: currentUser.displayName || "Unknown",
-                    score: score,
-                    difficulty: diffUpper, 
-                    date: new Date().toLocaleDateString(),
-                    timestamp: new Date()
-                });
-                console.log("Score saved to Firestore (scores_sugoroku) with difficulty:", diffUpper);
-            } catch (e) {
-                console.error("Error adding score: ", e);
-            }
-        }
-
         async function fetchOnlineRanking(difficulty) {
              console.log(`[Debug] fetchOnlineRanking呼び出し: ${difficulty}`);
              try {
@@ -1183,11 +1186,9 @@
         // --- ランキング切り替え ---
         async function switchRankingMode(mode) {
             currentRankingMode = mode;
-            // タブの見た目更新
             document.getElementById("tab-local").classList.toggle("active", mode === 'local');
             document.getElementById("tab-online").classList.toggle("active", mode === 'online');
 
-            // ローディング表示
             ['rank-list-easy', 'rank-list-normal', 'rank-list-hard'].forEach(id => {
                document.getElementById(id).innerHTML = "<li style='text-align:center; padding:10px;'>読み込み中...</li>";
             });
@@ -1204,7 +1205,6 @@
                     return;
                 }
                 
-                // 並列で取得
                 const [easyData, normalData, hardData] = await Promise.all([
                     fetchOnlineRanking('EASY'),
                     fetchOnlineRanking('NORMAL'),
@@ -1222,8 +1222,6 @@
             document.getElementById("result-screen").classList.add("hidden");
             document.getElementById("ranking-screen").classList.remove("hidden");
             gameState = "ranking";
-            
-            // 初期表示はローカル
             switchRankingMode('local');
         }
 
