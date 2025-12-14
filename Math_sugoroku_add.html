@@ -1106,20 +1106,21 @@
         }
 
         // --- オンラインランキング (Firestore) ---
+        // 修正点: コレクション名を "scores" から "scores_sugoroku" に変更
         async function saveOnlineScore(score, level) {
-            // level (easy/normal/hard) を大文字に変換して difficulty として保存
             const diffUpper = level.toUpperCase();
             
             try {
-                await addDoc(collection(db, "scores"), {
+                // ここで 'scores' ではなく 'scores_sugoroku' に保存する
+                await addDoc(collection(db, "scores_sugoroku"), {
                     uid: currentUser.uid,
                     name: currentUser.displayName || "Unknown",
                     score: score,
-                    difficulty: diffUpper, // ここを "difficulty" かつ大文字に変更
+                    difficulty: diffUpper, 
                     date: new Date().toLocaleDateString(),
                     timestamp: new Date()
                 });
-                console.log("Score saved to Firestore with difficulty:", diffUpper);
+                console.log("Score saved to Firestore (scores_sugoroku) with difficulty:", diffUpper);
             } catch (e) {
                 console.error("Error adding score: ", e);
             }
@@ -1129,8 +1130,9 @@
              console.log(`[Debug] fetchOnlineRanking呼び出し: ${difficulty}`);
              try {
                 const q = query(
-                    collection(db, "scores"),
-                    where("difficulty", "==", difficulty), // 大文字のdifficultyで検索
+                    // ここで 'scores' ではなく 'scores_sugoroku' から読み込む
+                    collection(db, "scores_sugoroku"),
+                    where("difficulty", "==", difficulty), 
                     orderBy("score", "desc"),
                     limit(10)
                 );
@@ -1162,10 +1164,8 @@
                 else if(idx === 1) rankColor = "#bdc3c7";
                 else if(idx === 2) rankColor = "#d35400";
                 
-                // entry.name か、なければ "Unknown"
                 let dispName = entry.name || "Unknown";
                 
-                // 自分のスコアかどうかの判定 (オンライン時のみ)
                 const isMe = (currentUser && entry.uid === currentUser.uid);
                 const nameStyle = isMe ? 'color: #f1c40f; font-weight: bold;' : 'color: #bdc3c7;';
                 const displayNameHtml = `<span class="rank-name" style="${nameStyle}">${dispName}</span>`;
