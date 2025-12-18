@@ -45,6 +45,9 @@
         .info-value { font-size: 1.6rem; font-weight: bold; color: #f1c40f; }
         .info-label { font-size: 0.85rem; color: #bdc3c7; }
         
+        /* 新規追加: 小さい情報表示用 */
+        .info-value-small { font-size: 1.1rem; font-weight: bold; color: #fff; }
+
         .invisible { visibility: hidden; }
 
         .btn {
@@ -71,6 +74,15 @@
             color: white; padding: 12px 20px; font-weight: bold; margin-top: 15px;
         }
         .btn-auth:hover { background-color: #d93025; }
+        
+        /* ランキング切り替えボタン */
+        .btn-toggle {
+            background-color: #95a5a6; color: white; padding: 5px 15px; 
+            font-size: 0.9rem; margin: 0 5px; box-shadow: none;
+        }
+        .btn-toggle.active {
+            background-color: #f1c40f; color: #333; pointer-events: none;
+        }
 
         #overlay, #ranking-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
@@ -110,9 +122,9 @@
             visibility: hidden; /* デフォルトは非表示 */
         }
         .clear-count-text {
-            font-size: 1.1rem;  /* 文字を大きく */
-            color: #2c3e50;     /* 文字を濃く（ほぼ黒） */
-            font-weight: bold;  /* 太字にして見やすく */
+            font-size: 1.1rem;
+            color: #2c3e50;
+            font-weight: bold;
             margin-top: 5px;
         }
         .difficulty-container button {
@@ -214,6 +226,12 @@
             <div id="ranking-overlay">
                 <div class="overlay-content" style="width: 95%; max-width: 900px;">
                     <h2 id="ranking-header-title" style="color: #f1c40f; margin-top: 0;">ベストスコア 10</h2>
+                    
+                    <div style="margin-bottom: 10px;">
+                        <button id="btn-rank-local" class="btn btn-toggle active">ローカル</button>
+                        <button id="btn-rank-world" class="btn btn-toggle">ワールド</button>
+                    </div>
+
                     <div class="ranking-container">
                         <div class="ranking-box">
                             <div class="ranking-title" style="color: #2ecc71;">しょきゅう</div>
@@ -259,6 +277,15 @@
             <div class="info-item">
                 <div class="info-label">ごうけい スコア</div>
                 <div id="disp-total-score" class="info-value">0</div>
+            </div>
+            
+            <div class="info-item" style="margin-top: 20px; border-top: 1px dashed #7f8c8d; padding-top: 10px;">
+                <div class="info-label">たおした かず</div>
+                <div id="disp-defeated" class="info-value-small">0</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">けいか・ペース</div>
+                <div id="disp-elapsed" class="info-value-small">0 (0.0 /体)</div>
             </div>
         </div>
     </div>
@@ -395,13 +422,6 @@
  * Game Configuration & State
  */
 
-// 王冠のボーダーライン設定 (点数)
-const CROWN_THRESHOLDS = {
-    BRONZE: 2000,
-    SILVER: 3000,
-    GOLD: 4000
-};
-
 const PRESET_EASY = {
     label: "しょきゅう",
     handMin: 1, handMax: 9,       
@@ -409,8 +429,7 @@ const PRESET_EASY = {
     bossMin: 15, bossMax: 25,     
     enemyCount: 20, bossHP: 1200, 
     initialTime: 10, timeRecovery: 2, 
-    gemProb: [30, 25, 20, 15, 10],
-    thresholds: CROWN_THRESHOLDS
+    gemProb: [30, 25, 20, 15, 10]
 };
 
 const PRESET_NORMAL = {
@@ -420,8 +439,7 @@ const PRESET_NORMAL = {
     bossMin: 20, bossMax: 30,     
     enemyCount: 20, bossHP: 1500, 
     initialTime: 10, timeRecovery: 2, 
-    gemProb: [30, 25, 20, 15, 10],
-    thresholds: CROWN_THRESHOLDS
+    gemProb: [30, 25, 20, 15, 10]
 };
 
 const PRESET_HARD = {
@@ -431,8 +449,7 @@ const PRESET_HARD = {
     bossMin: 30, bossMax: 40,     
     enemyCount: 20, bossHP: 2000, 
     initialTime: 20, timeRecovery: 2, 
-    gemProb: [30, 25, 20, 15, 10],
-    thresholds: CROWN_THRESHOLDS
+    gemProb: [30, 25, 20, 15, 10]
 };
 
 let CONFIG = Object.assign({}, PRESET_NORMAL);
@@ -455,7 +472,11 @@ let state = {
     dragInfo: null,
     isGameOverProcessing: false,
     isGameClearProcessing: false, 
-    inputLocked: false 
+    inputLocked: false,
+    defeatedCount: 0,       // 倒した敵の数
+    totalConsumedTime: 0,   // 消費したゲーム内時間の累計
+    forbiddenValue: null,   // ゴミ箱に捨てた直後の禁止カード値
+    rankingMode: 'LOCAL'    // ランキング表示モード 'LOCAL' | 'WORLD'
 };
 
 // Canvas Setup
@@ -469,6 +490,11 @@ const ui = {
     maxScore: document.getElementById('disp-max-score'),
     lastScore: document.getElementById('disp-last-score'),
     totalScore: document.getElementById('disp-total-score'),
+    
+    // 追加情報
+    defeated: document.getElementById('disp-defeated'),
+    elapsed: document.getElementById('disp-elapsed'),
+
     title: document.getElementById('title-screen'),
     result: document.getElementById('game-result'),
     rankingScreen: document.getElementById('ranking-screen'),
@@ -482,6 +508,11 @@ const ui = {
     btnLogin: document.getElementById('btn-login'),
     btnLogout: document.getElementById('btn-logout'),
     btnIndex: document.getElementById('btn-index'),
+    
+    // ランキング切り替え
+    btnRankLocal: document.getElementById('btn-rank-local'),
+    btnRankWorld: document.getElementById('btn-rank-world'),
+
     // 王冠・クリア数表示用
     crowns: {
         EASY: document.getElementById('crown-easy'),
@@ -574,81 +605,87 @@ function updateTitleScreenStats() {
         const count = getClearCount(diff);
         ui.clears[diff].textContent = `${count}回クリア`;
 
-        // 王冠の更新
-        const bestScore = getLocalRanking(diff)[0] || 0;
+        // 王冠の更新 (ルール変更: クリア回数依存)
         const crownEl = ui.crowns[diff];
         
-        // 閾値の取得（難易度ごとの設定を参照、なければデフォルト）
-        let thresholds = CROWN_THRESHOLDS;
-        if(diff === 'EASY') thresholds = PRESET_EASY.thresholds;
-        if(diff === 'NORMAL') thresholds = PRESET_NORMAL.thresholds;
-        if(diff === 'HARD') thresholds = PRESET_HARD.thresholds;
-
-        crownEl.style.visibility = 'visible'; // 一旦表示にして色を変える
-        if (bestScore >= thresholds.GOLD) {
-            crownEl.textContent = '👑'; // 金 (絵文字は黄色っぽいのでそのまま)
+        crownEl.style.visibility = 'visible'; 
+        if (count >= 10) {
+            crownEl.textContent = '👑'; 
             crownEl.style.filter = 'drop-shadow(0 0 5px gold)';
-            crownEl.style.color = 'gold'; // CSSで色を強制する場合
-        } else if (bestScore >= thresholds.SILVER) {
+            crownEl.style.color = 'gold'; 
+        } else if (count >= 5) {
             crownEl.textContent = '👑';
-            crownEl.style.filter = 'grayscale(100%) brightness(150%) drop-shadow(0 0 5px silver)'; // 銀色風
-        } else if (bestScore >= thresholds.BRONZE) {
+            crownEl.style.filter = 'grayscale(100%) brightness(150%) drop-shadow(0 0 5px silver)'; // 銀
+        } else if (count >= 1) {
             crownEl.textContent = '👑';
-            crownEl.style.filter = 'sepia(100%) hue-rotate(-50deg) saturate(600%) brightness(80%) drop-shadow(0 0 5px #cd7f32)'; // 銅色風
+            crownEl.style.filter = 'sepia(100%) hue-rotate(-50deg) saturate(600%) brightness(80%) drop-shadow(0 0 5px #cd7f32)'; // 銅
         } else {
-            crownEl.style.visibility = 'hidden'; // 条件満たさなければ非表示
+            crownEl.style.visibility = 'hidden'; 
         }
     });
 }
 
-// 修正: async関数に変更し、デバッグログを追加
+// ランキング表示処理（モード対応）
 async function showRankingScreen() {
-    console.log("[Debug] showRankingScreen 開始");
     ui.rankingScreen.classList.remove('hidden');
     
+    // UIのトグルボタン状態更新
+    if (state.rankingMode === 'WORLD') {
+        ui.btnRankWorld.classList.add('active');
+        ui.btnRankLocal.classList.remove('active');
+        ui.rankingHeaderTitle.textContent = "みんなのベストスコア (オンライン)";
+    } else {
+        ui.btnRankWorld.classList.remove('active');
+        ui.btnRankLocal.classList.add('active');
+        ui.rankingHeaderTitle.textContent = "あなたのベストスコア (ローカル)";
+    }
+
     ['rank-list-easy', 'rank-list-normal', 'rank-list-hard'].forEach(id => {
         document.getElementById(id).innerHTML = '<li style="justify-content:center; color:#7f8c8d;">読み込み中...</li>';
     });
 
-    // ログインしていて、かつ関数が存在する場合
-    if (window.currentUser && window.fetchOnlineRanking) {
-        console.log("[Debug] オンラインモードで表示を試みます");
-        ui.rankingHeaderTitle.textContent = "みんなのベストスコア (オンライン)";
-        
-        const renderOnlineList = async (diff, elementId) => {
-            const list = await window.fetchOnlineRanking(diff);
-            const ul = document.getElementById(elementId);
-            ul.innerHTML = '';
-            
-            if (list.length === 0) {
-                ul.innerHTML = '<li style="justify-content:center; color:#7f8c8d;">記録なし</li>';
-                return;
-            }
-            
-            list.forEach((data, index) => {
-                const li = document.createElement('li');
-                const isMe = (data.uid === window.currentUser.uid);
-                const nameStyle = isMe ? 'color: #f1c40f; font-weight: bold;' : 'color: #bdc3c7;';
-                
-                li.innerHTML = `
-                    <span class="ranking-rank">${index + 1}.</span>
-                    <span class="ranking-name" style="${nameStyle}">${data.name}</span>
-                    <span class="ranking-score">${data.score}</span>
-                `;
-                ul.appendChild(li);
+    if (state.rankingMode === 'WORLD') {
+        // ワールドランキング（要ログイン）
+        if (!window.currentUser) {
+            ['rank-list-easy', 'rank-list-normal', 'rank-list-hard'].forEach(id => {
+                document.getElementById(id).innerHTML = '<li style="justify-content:center; color:#e74c3c;">ログインが必要です</li>';
             });
-        };
+            return;
+        }
 
-        await Promise.all([
-            renderOnlineList('EASY', 'rank-list-easy'),
-            renderOnlineList('NORMAL', 'rank-list-normal'),
-            renderOnlineList('HARD', 'rank-list-hard')
-        ]);
+        if (window.fetchOnlineRanking) {
+            const renderOnlineList = async (diff, elementId) => {
+                const list = await window.fetchOnlineRanking(diff);
+                const ul = document.getElementById(elementId);
+                ul.innerHTML = '';
+                
+                if (list.length === 0) {
+                    ul.innerHTML = '<li style="justify-content:center; color:#7f8c8d;">記録なし</li>';
+                    return;
+                }
+                
+                list.forEach((data, index) => {
+                    const li = document.createElement('li');
+                    const isMe = (data.uid === window.currentUser.uid);
+                    const nameStyle = isMe ? 'color: #f1c40f; font-weight: bold;' : 'color: #bdc3c7;';
+                    
+                    li.innerHTML = `
+                        <span class="ranking-rank">${index + 1}.</span>
+                        <span class="ranking-name" style="${nameStyle}">${data.name}</span>
+                        <span class="ranking-score">${data.score}</span>
+                    `;
+                    ul.appendChild(li);
+                });
+            };
 
+            await Promise.all([
+                renderOnlineList('EASY', 'rank-list-easy'),
+                renderOnlineList('NORMAL', 'rank-list-normal'),
+                renderOnlineList('HARD', 'rank-list-hard')
+            ]);
+        }
     } else {
-        console.log("[Debug] ローカルモードで表示します");
-        ui.rankingHeaderTitle.textContent = "あなたのベストスコア (ローカル)";
-        
+        // ローカルランキング
         const renderLocalList = (diff, elementId) => {
             const list = getLocalRanking(diff);
             const ul = document.getElementById(elementId);
@@ -907,6 +944,8 @@ function backToTitle() {
     ui.maxScore.textContent = "0"; 
     ui.lastScore.textContent = "0";
     ui.totalScore.textContent = "0";
+    ui.defeated.textContent = "0";
+    ui.elapsed.textContent = "0 (0.0 /体)";
     
     updateTitleScreenStats(); // 王冠とクリア回数を更新
     ctx.clearRect(0, 0, state.width, state.height);
@@ -926,6 +965,11 @@ function initGame() {
     state.isGameOverProcessing = false;
     state.isGameClearProcessing = false;
     state.inputLocked = false;
+    
+    // 新規パラメータ初期化
+    state.defeatedCount = 0;
+    state.totalConsumedTime = 0; // 消費したゲーム内時間の累計
+    state.forbiddenValue = null;
     
     // レベル表示設定
     ui.difficultyLabel.textContent = CONFIG.label;
@@ -947,8 +991,17 @@ function refillCards() {
     for (let i = 0; i < 5; i++) {
         if (state.cards[i] === null) {
             state.cards[i] = new Card(i);
+            
+            // カード再抽選ロジック (捨てたカードと同じ数字が出ないようにする)
+            if (state.forbiddenValue !== null && state.cards[i].value === state.forbiddenValue) {
+                while(state.cards[i].value === state.forbiddenValue) {
+                    state.cards[i].value = randomInt(CONFIG.handMin, CONFIG.handMax);
+                }
+            }
         }
     }
+    // 補充が終わったら禁止値をリセット
+    state.forbiddenValue = null;
 }
 
 function refillEnemies() {
@@ -985,12 +1038,26 @@ function updateUI() {
     ui.maxScore.textContent = state.maxScore; 
     ui.lastScore.textContent = state.lastScore;
     ui.totalScore.textContent = state.score;
+    
+    // 追加情報の更新
+    ui.defeated.textContent = state.defeatedCount;
+    
+    // 変更: リアルタイムではなく、消費したゲーム内時間を使用
+    const timeVal = state.totalConsumedTime;
+    let pace = 0;
+    if (state.defeatedCount > 0) {
+        pace = (timeVal / state.defeatedCount).toFixed(1);
+    } else {
+        pace = "-";
+    }
+    ui.elapsed.textContent = `${timeVal} (${pace} /体)`; 
 }
 
 function consumeTime() {
     if (state.isGameClearProcessing || state.inputLocked) return;
 
     state.time--;
+    state.totalConsumedTime++; // 加算
     if (state.time < 0) state.time = 0;
     
     updateUI();
@@ -1030,7 +1097,47 @@ function checkPraise(damage, x, y) {
 function gameOver() {
     state.screen = 'GAMEOVER';
     ui.btnToTitle.classList.add('hidden'); // ゲームオーバー時は左下ボタンを隠す
-    drawOverlayText("ざんねん...", "#e74c3c", "クリックで タイトルへ");
+    
+    // ゲームオーバーでもスコア計算・保存を行う
+    const timeBonus = state.time * 100; // timeは0のはずだが念のため
+    const maxScoreBonus = state.maxScore * 2; 
+    const finalScore = state.score + timeBonus + maxScoreBonus;
+
+    // スコア保存 & 1位更新チェック
+    const isNewRecord = saveScore(state.difficulty, finalScore);
+    
+    // 注意: ゲームオーバーなのでクリア回数はインクリメントしない
+
+    const highScoreMsg = isNewRecord ? '自己ベストこうしん！' : '';
+
+    ctx.fillStyle = "rgba(0,0,0,0.7)";
+    ctx.fillRect(0,0,state.width, state.height);
+
+    // リザルト表示 (背景色などを少し暗めにするなど、クリアと差別化してもよいが、一旦構成は同じに)
+    ui.result.innerHTML = `
+        <div style="background: #2c3e50; padding: 30px; border-radius: 10px; color: white; text-align: center; border: 4px solid #7f8c8d;">
+            <h2 style="font-size: 2.5rem; color: #95a5a6; margin: 0 0 20px 0;">ゲームオーバー</h2>
+            <div style="font-size: 1.1rem; line-height: 1.8; text-align: left; display: inline-block;">
+                <div>ごうけいスコア：<span style="float:right; color:#f1c40f; font-weight:bold;">${state.score}点</span></div>
+                <div>タイムボーナス：${state.time}×100＝<span style="float:right; color:#2ecc71; font-weight:bold;">${timeBonus}点</span></div>
+                <div>MAXスコアボーナス：${state.maxScore}×2＝<span style="float:right; color:#e67e22; font-weight:bold;">${maxScoreBonus}点</span></div>
+                <hr style="border-color: #7f8c8d; margin: 15px 0;">
+                <div style="font-size: 1.5rem;">最終スコア：<span style="float:right; color:#f1c40f; font-weight:bold;">${finalScore}点</span></div>
+                <div style="text-align: center; margin-top: 10px; color: ${isNewRecord ? '#e74c3c' : '#bdc3c7'}; font-weight: bold;">${highScoreMsg}</div>
+            </div>
+            <br><br>
+            <button id="btn-result-ok" class="btn btn-warning" style="font-size: 1.2rem; padding: 10px 40px;">OK</button>
+        </div>
+    `;
+    ui.result.style.display = 'block';
+
+    const okBtn = document.getElementById('btn-result-ok');
+    const handleOk = (e) => {
+        if(e) e.preventDefault();
+        backToTitle();
+    };
+    okBtn.addEventListener('click', handleOk);
+    okBtn.addEventListener('touchstart', handleOk, {passive: false});
 }
 
 function gameClear() {
@@ -1135,7 +1242,7 @@ function getEventPos(e) {
 function onDown(e) {
     if (state.screen !== 'PLAYING' || state.inputLocked) {
         if (state.screen === 'GAMEOVER') {
-            backToTitle();
+            // ここでは何もしない（リザルト画面のOKボタンで戻るため）
         }
         return;
     }
@@ -1213,6 +1320,7 @@ function onUp(e) {
                         enemy.hp = 0; 
                         state.inputLocked = true; 
                         state.isGameClearProcessing = true;
+                        state.defeatedCount++; // 撃破数加算
                         
                         setTimeout(() => {
                             state.enemies.splice(i, 1); 
@@ -1232,6 +1340,7 @@ function onUp(e) {
                 } else {
                     state.enemies.splice(i, 1);
                     addTime(totalRecovery);
+                    state.defeatedCount++; // 撃破数加算
                 }
                 actionDone = true;
             }
@@ -1269,6 +1378,8 @@ function onUp(e) {
     // 3. ゴミ箱判定
     if (!actionDone) {
         if (cy > state.height * 0.85) {
+            // 捨てた値を禁止リストに登録
+            state.forbiddenValue = state.cards[idx].value;
             state.cards[idx] = null;
             consumeTime();
             actionDone = true;
@@ -1320,6 +1431,7 @@ function gameLoop() {
         if (c && !c.isDragging) c.draw(ctx);
     });
     
+    // 修正済み: ドラッグ中のカード描画
     const draggingCard = state.cards.find(c => c && c.isDragging);
     if (draggingCard) draggingCard.draw(ctx);
 
@@ -1329,6 +1441,8 @@ function gameLoop() {
         p.draw(ctx);
         if (p.life <= 0) state.particles.splice(i, 1);
     }
+    
+    updateUI();
 
     requestAnimationFrame(gameLoop);
 }
@@ -1370,6 +1484,12 @@ if (ui.btnLogin) bindBtn(ui.btnLogin, () => window.handleLogin());
 if (ui.btnLogout) bindBtn(ui.btnLogout, () => window.handleLogout());
 
 bindBtn(ui.btnViewRanking, () => {
+    // デフォルトのランキング表示（ログイン状況に合わせて初期化）
+    if (window.currentUser) {
+        state.rankingMode = 'WORLD';
+    } else {
+        state.rankingMode = 'LOCAL';
+    }
     showRankingScreen();
 });
 
@@ -1383,6 +1503,16 @@ bindBtn(ui.btnToTitle, () => {
 
 bindBtn(ui.btnIndex, () => {
     window.location.href = "index.html"; 
+});
+
+// ランキング切り替えボタン
+bindBtn(ui.btnRankLocal, () => {
+    state.rankingMode = 'LOCAL';
+    showRankingScreen();
+});
+bindBtn(ui.btnRankWorld, () => {
+    state.rankingMode = 'WORLD';
+    showRankingScreen();
 });
 
 // 初期ロード時の処理
