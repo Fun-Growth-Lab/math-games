@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Math Braves - かけざん２</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --main-bg: #2c3e50;
+            --panel-bg: #34495e;
+            --text-color: #ecf0f1;
+            --accent-color: #f1c40f;
+            --danger-color: #e74c3c;
+        }
+
+        body {
+            margin: 0; padding: 0; overflow: hidden;
+            background-color: var(--main-bg); color: var(--text-color);
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            touch-action: none; user-select: none;
+            height: 100vh; display: flex;
+        }
+
+        /* レイアウト */
+        #main-container {
+            display: flex; width: 100%; height: 100%;
+            max-width: 1600px; margin: 0 auto;
+        }
+        .side-panel {
+            width: 260px; background-color: var(--panel-bg);
+            padding: 20px; display: flex; flex-direction: column;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5); z-index: 10; box-sizing: border-box;
+        }
+        #game-wrapper {
+            flex: 1; position: relative;
+            display: flex; justify-content: center; align-items: center;
+            background: #f0f4f8; overflow: hidden;
+            border-left: 1px solid #bdc3c7; border-right: 1px solid #bdc3c7;
+        }
+        canvas {
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            background-color: #ffffff; border-radius: 8px;
+        }
+
+        /* 左パネル */
+        #left-panel h2 { margin-top: 0; border-bottom: 2px solid var(--accent-color); padding-bottom: 10px; font-size: 24px; }
+        #left-panel ol { padding-left: 20px; line-height: 1.8; font-size: 15px; }
+        #left-panel li { margin-bottom: 15px; }
+        .btn-back {
+            margin-top: auto; background-color: var(--danger-color); color: white;
+            border: none; padding: 15px; border-radius: 8px; font-size: 18px; font-weight: bold;
+            cursor: pointer; box-shadow: 0 4px 0 #c0392b; transition: transform 0.1s;
+        }
+        .btn-back:active { transform: translateY(4px); box-shadow: none; }
+
+        /* 右パネル */
+        #right-panel-content { display: none; flex-direction: column; height: 100%; }
+        .info-block { margin-bottom: 25px; padding-bottom: 15px; border-bottom: 1px solid #7f8c8d; }
+        .info-label { font-size: 14px; color: #bdc3c7; margin-bottom: 5px; }
+        .info-value { font-size: 28px; font-weight: bold; color: var(--accent-color); }
+        #item-list { flex: 1; overflow-y: auto; padding-right: 5px; }
+        #item-list::-webkit-scrollbar { width: 6px; }
+        #item-list::-webkit-scrollbar-thumb { background: #7f8c8d; border-radius: 3px; }
+
+        .item-btn {
+            display: block; width: 100%; padding: 12px; margin-bottom: 10px;
+            border: none; border-radius: 8px; color: white; font-weight: bold; font-size: 15px;
+            cursor: pointer; text-align: left; position: relative;
+            box-shadow: 0 3px 0 rgba(0,0,0,0.2); transition: transform 0.1s;
+        }
+        .item-btn:active { transform: translateY(3px); box-shadow: none; }
+        .item-count {
+            position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+            background: rgba(0,0,0,0.3); padding: 2px 8px; border-radius: 10px; font-size: 12px;
+        }
+
+        /* オーバーレイ共通 */
+        .overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            background: rgba(240, 244, 248, 0.98); z-index: 20; color: #2c3e50;
+            transition: opacity 0.3s;
+        }
+        .hidden { display: none !important; opacity: 0; pointer-events: none; }
+        
+        /* タイトル画面のスタイル調整 */
+        .title-main { font-size: 64px; margin-bottom: 0px; margin-top: 0; color: #c0392b; text-shadow: 2px 2px 0px #bdc3c7; font-weight: 900; }
+        .title-sub { font-size: 32px; color: #34495e; margin-bottom: 20px; margin-top: 10px; font-weight: bold; }
+        .title-flavor { font-size: 18px; color: #555; margin-bottom: 40px; text-align: center; line-height: 1.5; }
+
+        .btn {
+            padding: 12px 24px; font-size: 20px; border: none; border-radius: 8px;
+            cursor: pointer; margin: 8px; font-weight: bold; color: white; min-width: 220px;
+            font-family: 'M PLUS Rounded 1c', sans-serif; transition: transform 0.1s;
+            box-shadow: 0 4px 0 rgba(0,0,0,0.2);
+        }
+        .btn:active { transform: translateY(4px); box-shadow: none; }
+        .btn-easy { background-color: #2ecc71; min-width: 140px; }
+        .btn-normal { background-color: #3498db; min-width: 140px; } 
+        .btn-hard { background-color: #e74c3c; min-width: 140px; }
+        
+        .btn-score { background-color: #f1c40f; color: #2c3e50; width: 220px; margin-top: 20px; }
+        .btn-red { background-color: #e74c3c; width: 220px; }
+        .btn-gray { background-color: #7f8c8d; width: 220px; }
+        .btn-blue { background-color: #3498db; }
+
+        .difficulty-container { display: flex; gap: 20px; margin-bottom: 10px; }
+        .difficulty-item { text-align: center; display: flex; flex-direction: column; align-items: center; }
+        .crown { font-size: 32px; margin-bottom: -5px; height: 40px; }
+        .clear-count { font-weight: bold; font-size: 14px; margin-top: 5px; color: #555; }
+
+        /* ログインステータス表示 */
+        #login-status-text { margin-top: 10px; margin-bottom: 5px; font-size: 14px; color: #7f8c8d; }
+
+        /* リザルトポップアップ */
+        #result-screen {
+            background: rgba(0, 0, 0, 0.7); /* 暗い背景 */
+        }
+        #result-popup {
+            background: #34495e; padding: 30px; border-radius: 15px;
+            width: 420px; border: 4px solid #7f8c8d;
+            display: flex; flex-direction: column; gap: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        #result-popup-title {
+            text-align: center; margin: 0 0 10px 0; font-size: 36px; font-weight: 900;
+        }
+        .result-row {
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 18px; color: #ecf0f1;
+        }
+        .result-row span:last-child {
+            font-weight: bold; font-size: 24px; color: #f1c40f;
+        }
+        .result-divider {
+            border: 0; border-top: 2px solid #95a5a6; margin: 10px 0; width: 100%;
+        }
+        .total-row {
+            font-size: 24px; font-weight: bold;
+        }
+        .total-row span:last-child {
+            font-size: 36px; color: #f1c40f;
+        }
+        .btn-ok {
+            background-color: #f1c40f; color: #2c3e50; font-size: 24px;
+            padding: 12px; margin-top: 15px; width: 100%; border: none;
+            border-radius: 8px; font-weight: bold; cursor: pointer;
+            box-shadow: 0 4px 0 #d35400; font-family: 'M PLUS Rounded 1c', sans-serif;
+        }
+        .btn-ok:active { transform: translateY(4px); box-shadow: none; }
+
+        /* ランキングポップアップ */
+        #ranking-popup {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: #34495e; color: #ecf0f1;
+            padding: 20px; border-radius: 15px; width: 90%; max-width: 650px;
+            z-index: 100; border: 4px solid var(--accent-color);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        .ranking-header { text-align: center; font-size: 24px; margin-bottom: 15px; color: var(--accent-color); font-weight: bold; }
+        .ranking-tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 15px; }
+        .tab-btn {
+            background: #555; border: none; color: #ccc; font-size: 16px; border-radius: 20px;
+            padding: 8px 20px; cursor: pointer; transition: 0.2s;
+        }
+        .tab-btn.active { background: var(--accent-color); color: #2c3e50; font-weight: bold; }
+        
+        .ranking-list-container { display: flex; gap: 10px; height: 300px; }
+        .ranking-column { flex: 1; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 10px; overflow-y: auto; }
+        .ranking-column h3 { text-align: center; margin: 0 0 10px 0; color: #fff; font-size: 18px; border-bottom: 1px solid #555; padding-bottom: 5px; }
+        .rank-item { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 14px; }
+        .rank-item:last-child { border-bottom: none; }
+        .rank-item span:first-child { max-width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        /* ポップアップ、演出 */
+        #item-confirm-popup {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: white; color: #2c3e50; padding: 25px; border-radius: 20px;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.4); z-index: 100; text-align: center;
+            width: 320px; border: 5px solid #3498db;
+        }
+        #transition-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            background: rgba(0,0,0,0.6); z-index: 30; color: white;
+            opacity: 0; pointer-events: none; transition: opacity 0.3s;
+        }
+        #transition-overlay.active { opacity: 1; pointer-events: auto; cursor: pointer; }
+        .transition-text { font-size: 64px; font-weight: 900; text-shadow: 0 0 20px var(--accent-color); margin-bottom: 20px; animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .transition-sub { font-size: 24px; animation: blink 1.5s infinite; }
+        @keyframes popIn { from { transform: scale(0); } to { transform: scale(1); } }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    </style>
+</head>
+<body>
+
+<div id="main-container">
+    <div id="left-panel" class="side-panel">
+        <h2>あそびかた</h2>
+        <ol>
+            <li>しろいカードをばのカードにかさねるとかずがかけざんされるよ</li>
+            <li>ばのカードが <b>101いじょう</b> になると<br>てきに こうげき するよ！</li>
+            <li>こうげきすると <b>アクション</b> がへるよ。<br>0になると まけちゃう！</li>
+            <li>てきをたおすと ラウンドクリア！<br>がめんをタッチして つぎへ。</li>
+            <li>アイテムを うまくつかって<br>さいごのボスを たおそう！</li>
+        </ol>
+        <button class="btn-back" onclick="game.showTitle()">タイトルへ もどる</button>
+    </div>
+
+    <div id="game-wrapper">
+        <canvas id="gameCanvas"></canvas>
+
+        <div id="title-screen" class="overlay">
+            
+            <h1 class="title-main">MATH BRAVES</h1>
+            <div class="title-sub">- かけざん２ -</div>
+            <div class="title-flavor">けいさんの ちからで<br>まものを たおせ！</div>
+            
+            <div class="difficulty-container">
+                <div class="difficulty-item">
+                    <div class="crown" id="crown-easy"></div>
+                    <button class="btn btn-easy" onclick="game.initGame('easy')">しょきゅう</button>
+                    <div class="clear-count" id="count-easy">0回クリア</div>
+                </div>
+                <div class="difficulty-item">
+                    <div class="crown" id="crown-normal"></div>
+                    <button class="btn btn-normal" onclick="game.initGame('normal')">ちゅうきゅう</button>
+                    <div class="clear-count" id="count-normal">0回クリア</div>
+                </div>
+                <div class="difficulty-item">
+                    <div class="crown" id="crown-hard"></div>
+                    <button class="btn btn-hard" onclick="game.initGame('hard')">じょうきゅう</button>
+                    <div class="clear-count" id="count-hard">0回クリア</div>
+                </div>
+            </div>
+
+            <button class="btn btn-score" onclick="game.toggleRankingPopup(true)">スコアをみる</button>
+
+            <div id="login-status-text">ログインしていません</div>
+            <button id="btn-login" class="btn btn-red" onclick="game.login()">Googleでログイン</button>
+            <button id="btn-logout" class="btn btn-red hidden" onclick="game.logout()">ログアウト</button>
+            
+            <button class="btn btn-gray" onclick="window.location.href='index.html'" style="margin-top: 5px;">INDEXへ</button>
+        </div>
+
+        <div id="result-screen" class="overlay hidden">
+            <div id="result-popup">
+                <h2 id="result-popup-title">ゲームオーバー</h2>
+                <div class="result-row">
+                    <span>レベル</span>
+                    <span id="res-level"></span>
+                </div>
+                <div class="result-row">
+                    <span>ごうけいスコア</span>
+                    <span id="res-base-score"></span>
+                </div>
+                <div class="result-row">
+                    <span>のこりアクションボーナス</span>
+                    <span id="res-bonus"></span>
+                </div>
+                <hr class="result-divider">
+                <div class="result-row total-row">
+                    <span>最終スコア</span>
+                    <span id="res-final-score"></span>
+                </div>
+                <button class="btn-ok" onclick="game.showTitle()">OK</button>
+            </div>
+        </div>
+
+        <div id="transition-overlay">
+            <div class="transition-text" id="transition-msg">クリア！</div>
+            <div class="transition-sub">タッチして すすむ</div>
+        </div>
+
+        <div id="ranking-popup" class="hidden">
+            <div class="ranking-header">ベストスコア</div>
+            <div class="ranking-tabs">
+                <button class="tab-btn active" onclick="game.switchRankingTab('local')">ローカル</button>
+                <button class="tab-btn" onclick="game.switchRankingTab('world')">ワールド</button>
+            </div>
+            <div class="ranking-list-container">
+                <div class="ranking-column">
+                    <h3 style="color:#2ecc71;">しょきゅう</h3>
+                    <div id="rank-list-easy"></div>
+                </div>
+                <div class="ranking-column">
+                    <h3 style="color:#3498db;">ちゅうきゅう</h3>
+                    <div id="rank-list-normal"></div>
+                </div>
+                <div class="ranking-column">
+                    <h3 style="color:#e74c3c;">じょうきゅう</h3>
+                    <div id="rank-list-hard"></div>
+                </div>
+            </div>
+            <div style="text-align: center; margin-top: 20px;">
+                <button class="btn btn-blue" onclick="game.toggleRankingPopup(false)">とじる</button>
+            </div>
+        </div>
+
+        <div id="item-confirm-popup" class="hidden">
+            <h3 id="popup-name" style="margin-top:0; color:#2980b9; font-size: 24px;">アイテム名</h3>
+            <p id="popup-desc" style="font-size:18px; margin:20px 0; line-height:1.5;">せつめい</p>
+            <div style="display:flex; justify-content:space-around; gap: 10px;">
+                <button class="btn btn-blue" style="min-width:100px; padding:10px;" onclick="game.confirmItemUse(true)">つかう</button>
+                <button class="btn btn-gray" style="min-width:100px; padding:10px;" onclick="game.confirmItemUse(false)">やめる</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="right-panel" class="side-panel">
+        <div id="right-panel-content">
+            <div class="info-block">
+                <div class="info-label">レベル</div>
+                <div class="info-value" id="level-display">ちゅうきゅう</div>
+            </div>
+            <div class="info-block">
+                <div class="info-label">ROUND</div>
+                <div class="info-value" id="round-display">1 / 6</div>
+            </div>
+            <div class="info-block">
+                <div class="info-label">スコア</div>
+                <div class="info-value" id="score-display">0</div>
+            </div>
+            <div class="info-block" style="flex: 1; display: flex; flex-direction: column; border-bottom: none; overflow: hidden;">
+                <div class="info-label">アイテム</div>
+                <div id="item-list"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+/**
+ * Math Braves Multiplication 2
+ */
+
+// ==========================================
+// Firebase Config & Init
+// ==========================================
+const firebaseConfig = {
+    apiKey: "AIzaSyBCg5dCEM89UmYYhfGqVeRf_VrUlg8_o-4",
+    authDomain: "math-braves.firebaseapp.com",
+    projectId: "math-braves",
+    storageBucket: "math-braves.firebasestorage.app",
+    messagingSenderId: "217117619290",
+    appId: "1:217117619290:web:d227feb603970d3948d463"
+};
+
+let db, auth;
+try {
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+    auth = firebase.auth();
+} catch (e) { console.error("Firebase init failed:", e); }
+
+// ==========================================
+// ゲームクラス
+// ==========================================
+class Game {
+    constructor() {
+        this.canvas = document.getElementById('gameCanvas');
+        this.ctx = this.canvas.getContext('2d');
+        
+        // コレクション名を設定
+        this.collectionName = "scores_multiplication2"; 
+        
+        // 基本サイズ
+        this.baseWidth = 700;
+        this.baseHeight = 900;
+        this.resize();
+        window.addEventListener('resize', () => this.resize());
+
+        this.attachInputHandlers();
+        this.setupAuth(); // 認証監視開始
+
+        // 状態
+        this.state = 'TITLE'; 
+        this.difficulty = 'normal';
+        this.round = 1;
+        this.maxRound = 6;
+        this.score = 0;
+        this.actionCount = 0;
+        this.rankingMode = 'local';
+        this.user = null;
+
+        // ゲームオブジェクト
+        this.handCards = [];
+        this.fieldCard = null;
+        this.enemy = null;
+        this.draggedCard = null;
+        this.dragOffset = {x:0, y:0};
+        this.particles = [];
+        this.floatTexts = [];
+        
+        // アイテム
+        this.items = {
+            'change': { name: 'チェンジ', desc: 'てふだ を すべて ひきなおす', count: 0, color: '#f39c12' },
+            'action_plus': { name: 'アクション＋１', desc: 'アクションが １ かいふくする', count: 0, color: '#2ecc71' },
+            'x20': { name: '×２０', desc: 'ばのカードを ２０ばい する\n(101いじょうで すぐにこうげき)', count: 0, color: '#9b59b6' },
+            'damage_500': { name: 'ダメージ500', desc: 'てきに 500ダメージを あたえる\n(アクションは へらない)', count: 0, color: '#e74c3c' },
+            'all_plus_5': { name: 'ぜんぶ＋５', desc: 'てふだの すうじが すべて ＋５ される', count: 0, color: '#34495e' }
+        };
+        this.itemKeys = Object.keys(this.items);
+        this.selectedItemKey = null;
+        this.lastItemJSON = "";
+
+        this.lastTime = 0;
+        this.updateClearCounts();
+    }
+
+    // --- 認証関連 ---
+    setupAuth() {
+        if (!auth) return;
+        auth.onAuthStateChanged((user) => {
+            this.user = user;
+            const statusText = document.getElementById('login-status-text');
+            const loginBtn = document.getElementById('btn-login');
+            const logoutBtn = document.getElementById('btn-logout');
+
+            if (user) {
+                statusText.textContent = `ログイン中: ${user.displayName || "名無し"}`;
+                loginBtn.classList.add('hidden');
+                logoutBtn.classList.remove('hidden');
+            } else {
+                statusText.textContent = "ログインしていません";
+                loginBtn.classList.remove('hidden');
+                logoutBtn.classList.add('hidden');
+            }
+        });
+    }
+
+    login() {
+        if (!auth) return;
+        const provider = new firebase.auth.GoogleAuthProvider();
+        auth.signInWithPopup(provider).catch((error) => {
+            console.error("Login failed:", error);
+            alert("ログインに失敗しました");
+        });
+    }
+
+    logout() {
+        if (!auth) return;
+        auth.signOut().catch((error) => console.error("Logout failed:", error));
+    }
+
+    resize() {
+        const wrapper = document.getElementById('game-wrapper');
+        const scale = Math.min(wrapper.clientWidth / this.baseWidth, wrapper.clientHeight / this.baseHeight) * 0.95;
+        this.canvas.width = this.baseWidth;
+        this.canvas.height = this.baseHeight;
+        this.canvas.style.width = `${this.baseWidth * scale}px`;
+        this.canvas.style.height = `${this.baseHeight * scale}px`;
+        this.scale = scale;
+    }
+
+    attachInputHandlers() {
+        const getPos = (e) => {
+            const rect = this.canvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            return { x: (clientX - rect.left) / this.scale, y: (clientY - rect.top) / this.scale };
+        };
+
+        const onStart = (e) => {
+            if (this.state === 'ROUND_TRANSITION_WAIT') { this.nextRound(); return; }
+            if (this.state === 'GAME_OVER_WAIT') { this.gameOver(); return; }
+            if (this.state !== 'PLAYING') return;
+            
+            const pos = getPos(e);
+            for (let i = this.handCards.length - 1; i >= 0; i--) {
+                let card = this.handCards[i];
+                if (pos.x >= card.x - card.width/2 && pos.x <= card.x + card.width/2 &&
+                    pos.y >= card.y - card.height/2 && pos.y <= card.y + card.height/2) {
+                    this.draggedCard = card;
+                    card.isDragging = true;
+                    this.dragOffset.x = pos.x - card.x;
+                    this.dragOffset.y = pos.y - card.y;
+                    this.handCards.splice(i, 1); this.handCards.push(card); 
+                    break;
+                }
+            }
+        };
+        const onMove = (e) => {
+            if (!this.draggedCard) return;
+            const pos = getPos(e);
+            this.draggedCard.x = pos.x - this.dragOffset.x;
+            this.draggedCard.y = pos.y - this.dragOffset.y;
+        };
+        const onEnd = (e) => {
+            if (!this.draggedCard) return;
+            const card = this.draggedCard;
+            const field = this.fieldCard;
+            const dist = Math.sqrt(Math.pow(card.x - field.x, 2) + Math.pow(card.y - field.y, 2));
+            if (dist < 80 && this.state === 'PLAYING') this.mergeCard(card);
+            else card.isDragging = false;
+            this.draggedCard = null;
+        };
+
+        this.canvas.addEventListener('mousedown', onStart);
+        this.canvas.addEventListener('mousemove', onMove);
+        this.canvas.addEventListener('mouseup', onEnd);
+        this.canvas.addEventListener('touchstart', onStart, {passive: false});
+        this.canvas.addEventListener('touchmove', onMove, {passive: false});
+        this.canvas.addEventListener('touchend', onEnd, {passive: false});
+        
+        document.getElementById('transition-overlay').addEventListener('click', () => {
+            if (this.state === 'ROUND_TRANSITION_WAIT') this.nextRound();
+            else if (this.state === 'GAME_OVER_WAIT') this.gameOver();
+        });
+    }
+
+    // --- ゲーム進行 ---
+    initGame(diff) {
+        this.difficulty = diff;
+        this.score = 0;
+        this.round = 1;
+        this.itemKeys.forEach(k => this.items[k].count = 0);
+        this.lastItemJSON = ""; 
+        
+        document.getElementById('title-screen').classList.add('hidden');
+        document.getElementById('result-screen').classList.add('hidden');
+        document.getElementById('transition-overlay').classList.remove('active');
+        document.getElementById('right-panel-content').style.display = 'flex';
+        
+        this.startRound();
+        this.state = 'PLAYING';
+        this.loop();
+    }
+
+    startRound() {
+        const n = this.round;
+        let baseAction = n + 4;
+        let hp = (n + 4) * (50 * n + (this.difficulty==='easy'?300 : this.difficulty==='normal'?350 : 400));
+        
+        this.actionCount = baseAction;
+        this.enemy = { hp: hp, maxHp: hp, shake: 0 };
+        this.handCards = [];
+        for(let i=0; i<5; i++) this.addHandCard(i);
+        this.setFieldCard();
+        this.addFloatText(this.round === 6 ? 'FINAL ROUND' : `ROUND ${this.round}`, this.baseWidth/2, this.baseHeight/2, 60, '#2c3e50');
+    }
+
+    addHandCard(index) {
+        const spacing = 110;
+        const startX = (this.baseWidth - (5 * spacing)) / 2 + spacing/2;
+        const cardY = 740; 
+        this.handCards.push({
+            value: [2,2,3,3,4,5,6,7,8,9][Math.floor(Math.random() * 10)], 
+            x: startX + index * spacing, y: cardY,
+            width: 90, height: 130,
+            targetX: startX + index * spacing, targetY: cardY,
+            isDragging: false, alpha: 1
+        });
+    }
+
+    setFieldCard() {
+        const fieldY = 530;
+        this.fieldCard = {
+            value: Math.floor(Math.random() * 8) + 2,
+            x: this.baseWidth / 2, y: fieldY,
+            width: 120, height: 160, scale: 1.0, alpha: 1,
+            targetY: fieldY, originalY: fieldY
+        };
+    }
+
+    loop(timestamp) {
+        const dt = timestamp - this.lastTime;
+        this.lastTime = timestamp;
+        this.update(dt);
+        this.draw();
+        this.updateUI(); 
+        if (this.state !== 'TITLE') requestAnimationFrame(t => this.loop(t));
+    }
+
+    update(dt) {
+        this.handCards.forEach(card => {
+            if (!card.isDragging) {
+                card.x += (card.targetX - card.x) * 0.2;
+                card.y += (card.targetY - card.y) * 0.2;
+            }
+        });
+        if (this.state === 'ATTACKING') {
+            this.fieldCard.y -= 15;
+            this.fieldCard.alpha -= 0.05;
+            if (this.fieldCard.alpha <= 0) this.applyDamage(this.fieldCard.value);
+        } else {
+            if (this.fieldCard && this.fieldCard.scale > 1.0) this.fieldCard.scale -= 0.05;
+        }
+        this.particles.forEach(p => { p.x+=p.vx; p.y+=p.vy; p.life--; p.alpha-=0.02; });
+        this.particles = this.particles.filter(p => p.life > 0);
+        this.floatTexts.forEach(t => { t.y-=1; t.life--; });
+        this.floatTexts = this.floatTexts.filter(t => t.life > 0);
+        if (this.enemy && this.enemy.shake > 0) this.enemy.shake--;
+    }
+
+    updateUI() {
+        const diffText = this.difficulty === 'easy' ? 'しょきゅう' : this.difficulty === 'normal' ? 'ちゅうきゅう' : 'じょうきゅう';
+        document.getElementById('level-display').textContent = diffText;
+        document.getElementById('round-display').textContent = `${this.round} / ${this.maxRound}${this.round===6?' (FINAL)':''}`;
+        document.getElementById('score-display').textContent = this.score;
+
+        const currentJSON = JSON.stringify(this.items);
+        if (this.lastItemJSON !== currentJSON) {
+            this.lastItemJSON = currentJSON;
+            const itemList = document.getElementById('item-list');
+            itemList.innerHTML = '';
+            this.itemKeys.forEach(key => {
+                const item = this.items[key];
+                if (item.count > 0) {
+                    const btn = document.createElement('button');
+                    btn.className = 'item-btn';
+                    btn.style.backgroundColor = item.color;
+                    btn.innerHTML = `${item.name}<span class="item-count">x${item.count}</span>`;
+                    btn.onclick = () => this.openItemConfirm(key);
+                    itemList.appendChild(btn);
+                }
+            });
+        }
+    }
+
+    mergeCard(handCard) {
+        this.fieldCard.value *= handCard.value;
+        this.fieldCard.scale = 1.5;
+        this.createParticles(this.fieldCard.x, this.fieldCard.y, 10, '#f1c40f');
+        this.addFloatText(`×${handCard.value}`, this.fieldCard.x, this.fieldCard.y - 80, 40, '#e74c3c');
+        handCard.value = [2,2,3,3,4,5,6,7,8,9][Math.floor(Math.random() * 10)];
+        handCard.isDragging = false;
+        handCard.x = handCard.targetX; handCard.y = handCard.targetY;
+
+        if (this.fieldCard.value > 100) this.triggerAttackAnim();
+    }
+
+    triggerAttackAnim() {
+        this.state = 'ATTACKING'; 
+        this.actionCount--;
+    }
+
+    applyDamage(damage) {
+        if (!this.enemy) return;
+        this.enemy.hp -= damage;
+        this.enemy.shake = 20;
+        this.score += damage;
+        this.createParticles(this.baseWidth/2, 200, 30, '#e74c3c');
+        this.addFloatText(`-${damage}`, this.baseWidth/2, 180, 70, '#ff0000');
+
+        if (this.enemy.hp <= 0) {
+            this.enemy.hp = 0;
+            this.winRoundWait();
+        } else if (this.actionCount <= 0) {
+            this.waitGameOver();
+        } else {
+            this.setFieldCard();
+            this.state = 'PLAYING';
+        }
+    }
+
+    winRoundWait() {
+        const msg = this.round === this.maxRound ? "ゲームクリア！" : "クリア！";
+        document.getElementById('transition-msg').textContent = msg;
+        document.getElementById('transition-msg').style.color = 'white';
+        document.getElementById('transition-overlay').classList.add('active');
+        this.state = 'ROUND_TRANSITION_WAIT';
+    }
+
+    waitGameOver() {
+        document.getElementById('transition-msg').textContent = "GAME OVER";
+        document.getElementById('transition-msg').style.color = '#e74c3c';
+        document.getElementById('transition-overlay').classList.add('active');
+        this.state = 'GAME_OVER_WAIT';
+    }
+
+    nextRound() {
+        document.getElementById('transition-overlay').classList.remove('active');
+        if (this.round >= this.maxRound) {
+            this.gameClear();
+        } else {
+            const itemKey = this.itemKeys[Math.floor(Math.random() * this.itemKeys.length)];
+            this.items[itemKey].count++;
+            this.addFloatText(`GET: ${this.items[itemKey].name}`, this.baseWidth/2, this.baseHeight/2, 40, '#f39c12');
+            this.round++;
+            this.startRound();
+            this.state = 'PLAYING';
+        }
+    }
+
+    gameOver() {
+        document.getElementById('transition-overlay').classList.remove('active');
+        this.state = 'RESULT';
+        document.getElementById('result-popup-title').textContent = "ゲームオーバー";
+        document.getElementById('result-popup-title').style.color = "#e74c3c";
+        this.saveScore(this.score);
+        this.showResult();
+    }
+
+    gameClear() {
+        this.state = 'RESULT';
+        const bonus = this.actionCount * 1000;
+        this.score += bonus;
+        document.getElementById('result-popup-title').textContent = "完全クリア！";
+        document.getElementById('result-popup-title').style.color = "#f1c40f";
+        this.showResult(bonus);
+        this.saveScore(this.score);
+        this.updateLocalClearCount();
+    }
+
+    showResult(bonus = 0) {
+        document.getElementById('result-screen').classList.remove('hidden');
+        document.getElementById('right-panel-content').style.display = 'none';
+
+        // スコア計算・表示更新
+        const finalScore = this.score;
+        const baseScore = finalScore - bonus;
+        const diffText = this.difficulty === 'easy' ? 'しょきゅう' : this.difficulty === 'normal' ? 'ちゅうきゅう' : 'じょうきゅう';
+
+        document.getElementById('res-level').textContent = diffText;
+        document.getElementById('res-base-score').textContent = `${baseScore}点`;
+        document.getElementById('res-bonus').textContent = `${bonus}点`;
+        document.getElementById('res-final-score').textContent = `${finalScore}点`;
+    }
+
+    showTitle() {
+        this.state = 'TITLE';
+        document.getElementById('title-screen').classList.remove('hidden');
+        document.getElementById('result-screen').classList.add('hidden');
+        document.getElementById('right-panel-content').style.display = 'none';
+        this.updateClearCounts();
+    }
+
+    // --- アイテム処理 ---
+    openItemConfirm(key) {
+        if (this.state !== 'PLAYING') return;
+        this.selectedItemKey = key;
+        const item = this.items[key];
+        document.getElementById('popup-name').textContent = item.name;
+        document.getElementById('popup-desc').innerText = item.desc;
+        document.getElementById('item-confirm-popup').classList.remove('hidden');
+        this.state = 'ITEM_POPUP'; 
+    }
+    confirmItemUse(doUse) {
+        document.getElementById('item-confirm-popup').classList.add('hidden');
+        if (doUse && this.selectedItemKey) this.useItem(this.selectedItemKey);
+        this.selectedItemKey = null;
+        this.state = 'PLAYING'; 
+    }
+    useItem(key) {
+        if (this.items[key].count <= 0) return;
+        this.items[key].count--;
+        this.lastItemJSON = ""; 
+        const item = this.items[key];
+        this.addFloatText(`USED: ${item.name}`, this.baseWidth/2, this.baseHeight/2 - 100, 40, item.color);
+        switch(key) {
+            case 'change': this.handCards.forEach(c => c.value = [2,2,3,3,4,5,6,7,8,9][Math.floor(Math.random() * 10)]); break;
+            case 'action_plus': this.actionCount++; break;
+            case 'x20':
+                this.fieldCard.value *= 20;
+                this.fieldCard.scale = 2.0;
+                if (this.fieldCard.value > 100) setTimeout(() => this.triggerAttackAnim(), 600);
+                break;
+            case 'damage_500': if(this.enemy) this.applyDamage(500); break;
+            case 'all_plus_5': this.handCards.forEach(c => c.value += 5); break;
+        }
+    }
+
+    // --- 描画 ---
+    draw() {
+        this.ctx.clearRect(0, 0, this.baseWidth, this.baseHeight);
+        
+        // グリッド
+        this.ctx.strokeStyle = '#ecf0f1'; this.ctx.lineWidth = 2;
+        for(let i=0; i<this.baseWidth; i+=60) { this.ctx.beginPath(); this.ctx.moveTo(i,0); this.ctx.lineTo(i,this.baseHeight); this.ctx.stroke(); }
+        for(let i=0; i<this.baseHeight; i+=60) { this.ctx.beginPath(); this.ctx.moveTo(0,i); this.ctx.lineTo(this.baseWidth,i); this.ctx.stroke(); }
+
+        // アクション数
+        this.ctx.fillStyle = '#2c3e50'; this.ctx.font = "bold 24px 'M PLUS Rounded 1c'"; this.ctx.textAlign = 'center';
+        this.ctx.fillText("のこりアクション", this.baseWidth/2, 40);
+        this.ctx.font = "900 64px 'M PLUS Rounded 1c'";
+        this.ctx.lineWidth = 6; this.ctx.strokeStyle = '#c0392b'; 
+        this.ctx.strokeText(this.actionCount, this.baseWidth/2, 100);
+        this.ctx.fillStyle = '#e74c3c'; this.ctx.fillText(this.actionCount, this.baseWidth/2, 100);
+
+        // 敵
+        if (this.enemy && this.enemy.hp > 0) {
+            const shakeX = (Math.random() - 0.5) * this.enemy.shake;
+            this.drawEnemyIcon(this.baseWidth/2 + shakeX, 250, this.round);
+            
+            const barW = 300, barH = 24, barY = 350;
+            const hpPct = Math.max(0, this.enemy.hp / this.enemy.maxHp);
+            this.ctx.fillStyle = '#333';
+            this.ctx.beginPath(); this.ctx.roundRect(this.baseWidth/2 - barW/2, barY, barW, barH, 12); this.ctx.fill();
+            this.ctx.fillStyle = hpPct > 0.5 ? '#2ecc71' : hpPct > 0.2 ? '#f1c40f' : '#e74c3c';
+            this.ctx.beginPath(); this.ctx.roundRect(this.baseWidth/2 - barW/2 + 2, barY + 2, (barW-4) * hpPct, barH - 4, 10); this.ctx.fill();
+            this.ctx.fillStyle = '#2c3e50'; this.ctx.font = "bold 20px 'M PLUS Rounded 1c'";
+            this.ctx.fillText(`${this.enemy.hp} / ${this.enemy.maxHp}`, this.baseWidth/2, barY + 50);
+        }
+
+        // カード
+        if (this.fieldCard && this.fieldCard.alpha > 0) this.drawCard(this.fieldCard, true);
+        this.handCards.forEach(card => this.drawCard(card, false));
+
+        // パーティクル & テキスト
+        this.particles.forEach(p => {
+            this.ctx.globalAlpha = p.alpha; this.ctx.fillStyle = p.color;
+            this.ctx.beginPath(); this.ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); this.ctx.fill();
+        });
+        this.ctx.globalAlpha = 1.0;
+        this.floatTexts.forEach(t => {
+            this.ctx.save();
+            this.ctx.shadowColor = 'rgba(0,0,0,0.5)'; this.ctx.shadowBlur = 4;
+            this.ctx.fillStyle = t.color; this.ctx.font = `bold ${t.size}px 'M PLUS Rounded 1c'`;
+            this.ctx.textAlign = 'center'; this.ctx.lineWidth = 3;
+            this.ctx.strokeText(t.text, t.x, t.y); this.ctx.fillText(t.text, t.x, t.y);
+            this.ctx.restore();
+        });
+    }
+
+    drawCard(card, isField) {
+        this.ctx.save();
+        this.ctx.translate(card.x, card.y);
+        this.ctx.scale(card.scale, card.scale);
+        this.ctx.globalAlpha = card.alpha;
+        if (card.isDragging) { this.ctx.shadowColor='rgba(0,0,0,0.3)'; this.ctx.shadowBlur=20; this.ctx.scale(1.1,1.1); }
+
+        this.ctx.fillStyle = isField ? '#ecf0f1' : '#ffffff';
+        this.ctx.beginPath(); this.ctx.roundRect(-card.width/2, -card.height/2, card.width, card.height, 12); this.ctx.fill();
+        this.ctx.lineWidth = isField ? 4 : 2; this.ctx.strokeStyle = isField ? '#e67e22' : '#bdc3c7'; this.ctx.stroke();
+
+        this.ctx.fillStyle = '#2c3e50'; this.ctx.font = `bold ${isField?64:52}px 'M PLUS Rounded 1c'`;
+        this.ctx.textAlign = 'center'; this.ctx.textBaseline = 'middle';
+        this.ctx.fillText(card.value, 0, 0);
+        
+        if (isField && card.value >= 80 && card.value <= 100 && this.state === 'PLAYING') {
+             this.ctx.fillStyle = '#e74c3c'; this.ctx.font = 'bold 16px sans-serif'; 
+             this.ctx.fillText('あとすこし!', 0, card.height/2 + 20);
+        }
+        this.ctx.restore();
+    }
+
+    drawEnemyIcon(x, y, round) {
+        this.ctx.save(); this.ctx.translate(x, y);
+        const colors = ['#9b59b6', '#3498db', '#2ecc71', '#f1c40f', '#e67e22', '#34495e'];
+        this.ctx.fillStyle = colors[(round-1)%6];
+        this.ctx.beginPath();
+        switch(round) {
+            case 1: this.ctx.arc(0, -20, 60, Math.PI, 0); for(let i=0; i<=6; i++) this.ctx.lineTo(60 - i*20, (i%2===0)?40:60); break;
+            case 2: this.ctx.roundRect(-50, -60, 100, 100, 10); break;
+            case 3: this.ctx.moveTo(0, -70); this.ctx.bezierCurveTo(-60, -20, -70, 50, 0, 50); this.ctx.bezierCurveTo(70, 50, 60, -20, 0, -70); break;
+            case 4: for(let i=0; i<8; i++) { const a = (Math.PI*2/8)*i; this.ctx.lineTo(Math.cos(a)*70, Math.sin(a)*70); this.ctx.lineTo(Math.cos(a+0.4)*40, Math.sin(a+0.4)*40); } break;
+            case 5: this.ctx.arc(0, 0, 65, 0, Math.PI*2); break;
+            case 6: this.ctx.moveTo(-40, -60); this.ctx.lineTo(-70, -110); this.ctx.lineTo(-20, -75); this.ctx.moveTo(40, -60); this.ctx.lineTo(70, -110); this.ctx.lineTo(20, -75); this.ctx.arc(0, 0, 75, 0, Math.PI*2); break;
+        }
+        this.ctx.closePath(); this.ctx.fill();
+        this.ctx.fillStyle = 'white';
+        if (round === 5) {
+            this.ctx.beginPath(); this.ctx.arc(0, -10, 25, 0, Math.PI*2); this.ctx.fill();
+            this.ctx.fillStyle = 'black'; this.ctx.beginPath(); this.ctx.arc(0, -10, 10, 0, Math.PI*2); this.ctx.fill();
+        } else {
+            this.ctx.beginPath(); this.ctx.arc(-20, -20, 15, 0, Math.PI*2); this.ctx.fill();
+            this.ctx.beginPath(); this.ctx.arc(20, -20, 15, 0, Math.PI*2); this.ctx.fill();
+            this.ctx.fillStyle = 'black'; this.ctx.beginPath(); this.ctx.arc(-20, -20, 6, 0, Math.PI*2); this.ctx.fill();
+            this.ctx.beginPath(); this.ctx.arc(20, -20, 6, 0, Math.PI*2); this.ctx.fill();
+        }
+        this.ctx.restore();
+    }
+
+    // --- データ保存・ランキング ---
+    updateLocalClearCount() {
+        const key = `clearCount_${this.difficulty}_mul2`;
+        localStorage.setItem(key, (parseInt(localStorage.getItem(key)||0)+1));
+        this.updateClearCounts();
+    }
+    updateClearCounts() {
+        ['easy', 'normal', 'hard'].forEach(d => {
+            const c = localStorage.getItem(`clearCount_${d}_mul2`)||0;
+            document.getElementById(`count-${d}`).textContent = `${c}回クリア`;
+            document.getElementById(`crown-${d}`).textContent = c>=10?'🥇':c>=5?'🥈':c>=1?'🥉':'';
+        });
+    }
+    async saveScore(score) {
+        // ローカル
+        let ranks = JSON.parse(localStorage.getItem(`ranking_local_${this.collectionName}`) || "{}");
+        if(!ranks[this.difficulty]) ranks[this.difficulty] = [];
+        ranks[this.difficulty].push({name:"あなた", score:score, date: new Date().toISOString()});
+        ranks[this.difficulty].sort((a,b)=>b.score-a.score);
+        ranks[this.difficulty] = ranks[this.difficulty].slice(0,10);
+        localStorage.setItem(`ranking_local_${this.collectionName}`, JSON.stringify(ranks));
+        
+        // Firestore (ログイン時のみ)
+        if(db && this.user) {
+             try {
+                 await db.collection(this.collectionName).add({
+                     uid: this.user.uid,
+                     displayName: this.user.displayName || "名無し",
+                     score: score, difficulty: this.difficulty,
+                     timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                 });
+             } catch(e) { console.error("Score save error:", e); }
+        }
+    }
+
+    toggleRankingPopup(show) {
+        document.getElementById('ranking-popup').classList.toggle('hidden', !show);
+        if(show) this.loadRankingData();
+    }
+    switchRankingTab(mode) {
+        this.rankingMode = mode;
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.textContent.includes(mode==='local'?'ローカル':'ワールド')));
+        this.loadRankingData();
+    }
+    async loadRankingData() {
+        ['easy', 'normal', 'hard'].forEach(diff => {
+            const list = document.getElementById(`rank-list-${diff}`);
+            list.innerHTML = '<div style="text-align:center; margin-top:10px;">ロード中...</div>';
+            this.getRanking(diff).then(data => {
+                list.innerHTML = '';
+                if(data.length===0) list.innerHTML = '<div style="text-align:center; padding:10px;">記録なし</div>';
+                data.forEach((r, i) => {
+                    list.innerHTML += `<div class="rank-item"><span>${i+1}. ${r.name}</span><span>${r.score}</span></div>`;
+                });
+            });
+        });
+    }
+    async getRanking(diff) {
+        if(this.rankingMode === 'local') {
+            const ranks = JSON.parse(localStorage.getItem(`ranking_local_${this.collectionName}`) || "{}");
+            return ranks[diff] || [];
+        } else {
+            if(!db) return [{name:"オフライン", score:0}];
+            try {
+                // 指定されたコレクション名から取得
+                const q = await db.collection(this.collectionName)
+                    .where('difficulty','==',diff)
+                    .orderBy('score','desc')
+                    .limit(10)
+                    .get();
+                return q.docs.map(d => ({name: d.data().displayName, score: d.data().score}));
+            } catch(e) {
+                console.error(e);
+                return [{name:"取得エラー", score:0}];
+            }
+        }
+    }
+
+    createParticles(x, y, n, c) { for(let i=0;i<n;i++) this.particles.push({x,y,vx:(Math.random()-0.5)*10,vy:(Math.random()-0.5)*10,life:30,size:Math.random()*5+2,color:c,alpha:1}); }
+    addFloatText(t, x, y, s, c) { this.floatTexts.push({text:t,x,y,size:s,color:c,life:60}); }
+}
+
+const game = new Game();
+</script>
+</body>
+</html>
