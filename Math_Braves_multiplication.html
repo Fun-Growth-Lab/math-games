@@ -1,0 +1,1497 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>かけざんダンジョン - Math Braves</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #f0f4f8;
+            font-family: "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+        #container {
+            display: flex;
+            width: 100vw;
+            height: 100vh;
+        }
+        #left-panel, #right-panel {
+            flex: 1;
+            background-color: #2c3e50;
+            color: white;
+            padding: 20px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        #game-area {
+            flex: 2;
+            position: relative;
+            background-color: #ecf0f1;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        h2 {
+            margin-top: 0;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+            font-size: 1.2rem;
+        }
+        .info-item {
+            margin-bottom: 8px;
+            font-size: 0.95rem;
+        }
+        .info-value {
+            font-size: 1.3rem;
+            font-weight: bold;
+            color: #f1c40f;
+        }
+        .info-label {
+            font-size: 0.8rem;
+            color: #bdc3c7;
+        }
+        .invisible { visibility: hidden; }
+        
+        /* Buttons */
+        .btn {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            margin: 5px;
+            transition: background 0.2s;
+            box-shadow: 0 4px 0 #2980b9;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .btn:hover { background-color: #2980b9; transform: translateY(2px); box-shadow: 0 2px 0 #2980b9; }
+        .btn:active { transform: translateY(4px); box-shadow: none; }
+        .btn-danger { background-color: #e74c3c; box-shadow: 0 4px 0 #c0392b; }
+        .btn-danger:hover { background-color: #c0392b; box-shadow: 0 2px 0 #c0392b; }
+        .btn-success { background-color: #2ecc71; box-shadow: 0 4px 0 #27ae60; }
+        .btn-success:hover { background-color: #27ae60; box-shadow: 0 2px 0 #27ae60; }
+        .btn-warning { background-color: #f1c40f; box-shadow: 0 4px 0 #d35400; color: #333; }
+        .btn-warning:hover { background-color: #f39c12; box-shadow: 0 2px 0 #d35400; }
+        .btn-skill { background-color: #9b59b6; box-shadow: 0 4px 0 #8e44ad; width: 100%; margin: 5px 0; font-size: 0.9rem; padding: 8px;}
+        .btn-skill:hover { background-color: #8e44ad; box-shadow: 0 2px 0 #8e44ad; }
+        .btn-skill:disabled { background-color: #7f8c8d; box-shadow: none; transform: none; cursor: not-allowed; opacity: 0.6; }
+        .btn-auth { background-color: #ea4335; box-shadow: 0 4px 0 #d93025; color: white; padding: 12px 20px; font-weight: bold; margin-top: 15px; }
+        .btn-auth:hover { background-color: #d93025; }
+
+        /* Overlays */
+        #overlay, #ranking-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 100; flex-direction: column; color: white;
+        }
+        .overlay-content {
+            background: #34495e; padding: 30px; border-radius: 10px;
+            text-align: center; max-width: 90%; width: 90%; max-height: 90vh; overflow-y: auto;
+        }
+        .hidden { display: none !important; }
+
+        /* Title Screen */
+        .difficulty-container {
+            display: flex; justify-content: center; gap: 15px; margin-bottom: 20px; align-items: flex-end;
+        }
+        .diff-wrapper {
+            display: flex; flex-direction: column; align-items: center; position: relative;
+        }
+        .crown-icon {
+            font-size: 2rem; margin-bottom: -5px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            filter: drop-shadow(0 0 5px rgba(255,255,0,0.5));
+            visibility: hidden;
+        }
+        .clear-count-text {
+            font-size: 1.1rem; color: #2c3e50; font-weight: bold; margin-top: 5px;
+        }
+        .difficulty-container button {
+            width: 120px; padding: 15px 0; font-size: 1rem; font-weight: bold; margin: 0;
+        }
+
+        /* Result & Ranking */
+        #game-result {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            z-index: 20; width: 80%; max-width: 500px;
+        }
+        .ranking-container {
+            display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; flex-wrap: nowrap; padding-bottom: 0;
+        }
+        .ranking-box {
+            background: #2c3e50; padding: 10px; border-radius: 8px; flex: 1; min-width: 0; border: 2px solid #7f8c8d;
+        }
+        .ranking-title {
+            font-weight: bold; color: #f1c40f; margin-bottom: 8px; border-bottom: 1px solid #555; padding-bottom: 5px; font-size: 1rem;
+        }
+        .ranking-list {
+            list-style: none; padding: 0; margin: 0; text-align: left; font-size: 0.85rem; height: 300px; overflow-y: auto;
+        }
+        .ranking-list li {
+            padding: 5px 0; border-bottom: 1px dashed #444; display: flex; justify-content: space-between;
+        }
+        .ranking-rank { display: inline-block; width: 20px; color: #bdc3c7; }
+        .ranking-name { display: inline-block; width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+        .ranking-score { font-weight: bold; color: white; float: right; }
+
+        /* Custom for Multiplication */
+        #confirm-dialog {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: white; padding: 20px; border-radius: 10px; border: 4px solid #3498db;
+            text-align: center; z-index: 60; box-shadow: 0 0 15px rgba(0,0,0,0.3); color: #2c3e50;
+            width: 60%; max-width: 400px;
+        }
+        .dialog-btn-container { display: flex; justify-content: center; gap: 20px; margin-top: 20px; }
+
+        /* Stats Grid in Result & Right Panel */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 5px;
+            margin: 10px 0;
+            background: rgba(0,0,0,0.2);
+            padding: 8px;
+            border-radius: 5px;
+        }
+        .result-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            margin: 15px 0;
+            background: #2c3e50;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #7f8c8d;
+        }
+        .stat-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .stat-label { font-size: 0.8rem; color: #bdc3c7; }
+        .stat-val { font-size: 1.1rem; color: #fff; font-weight: bold; }
+    </style>
+</head>
+<body>
+<div id="container">
+    <div id="left-panel">
+        <h2>あそびかた</h2>
+        <div style="font-size: 0.95rem; line-height: 1.7;">
+            <p>1. <strong>しろいカード</strong>をかさねると<br>かずが <strong>かけざん</strong> されるよ。</p>
+            <p>2. <strong>むらさきのてき</strong>と同じかずを<br>つくって ぶつけよう！</p>
+            <p>3. カードをつかうと Timeがへるよ。<br>てきをたおすと Timeかいふく！</p>
+            <p>4. <strong>くらやみ</strong>のてきは<br>こうげき できないよ。</p>
+            <p>5. アイテムや宝石を拾って有利に進もう！</p>
+            <p style="color:#f1c40f; font-weight:bold;">6. さいしゅうフロアからでるには<br>カギが３こひつようだ！</p>
+        </div>
+        <div style="margin-top: auto; text-align: center;">
+            <button id="btn-to-title" class="btn btn-danger hidden">タイトルへもどる</button>
+        </div>
+    </div>
+    <div id="game-area">
+        <canvas id="gameCanvas"></canvas>
+        <div id="confirm-dialog" class="hidden">
+            <h3 style="margin-top:0;">ドアを あけますか？</h3>
+            <p>つぎのフロアへ すすみます。</p>
+            <div class="dialog-btn-container">
+                <button id="btn-yes" class="btn btn-success">はい</button>
+                <button id="btn-no" class="btn btn-danger">いいえ</button>
+            </div>
+        </div>
+        <div id="title-screen" class="overlay-content" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10; background: rgba(255, 255, 255, 0.95); color: #333; border: 4px solid #2c3e50;">
+            <h1 style="font-size: 3rem; margin: 0 0 10px 0; color: #4a148c; text-shadow: 2px 2px 0px #d1c4e9;">MATH BRAVES</h1>
+            <p style="font-size: 1.5rem; margin-top: 0; margin-bottom: 30px; font-weight: bold; color: #2c3e50;">- かけざんダンジョン -</p>
+            <p style="font-size: 1.2rem; margin-bottom: 40px;">かけざんをつかって<br>ちかめいきゅうを こうりゃくせよ！</p>
+            
+            <div class="difficulty-container">
+                <div class="diff-wrapper">
+                    <div id="crown-easy" class="crown-icon">👑</div>
+                    <button id="btn-easy" class="btn btn-success">しょきゅう</button>
+                    <div id="clear-easy" class="clear-count-text">0回クリア</div>
+                </div>
+                <div class="diff-wrapper">
+                    <div id="crown-normal" class="crown-icon">👑</div>
+                    <button id="btn-normal" class="btn">ちゅうきゅう</button>
+                    <div id="clear-normal" class="clear-count-text">0回クリア</div>
+                </div>
+                <div class="diff-wrapper">
+                    <div id="crown-hard" class="crown-icon">👑</div>
+                    <button id="btn-hard" class="btn btn-danger">じょうきゅう</button>
+                    <div id="clear-hard" class="clear-count-text">0回クリア</div>
+                </div>
+            </div>
+            
+            <hr style="margin: 20px 0; border: 0; border-top: 1px solid #ccc;">
+            <button id="btn-view-ranking" class="btn btn-warning" style="width: 200px;">スコアをみる</button>
+            <p id="auth-status" style="margin-top: 10px; font-size: 0.9rem; color: #555;">ログインしていません</p>
+            <button id="btn-login" class="btn btn-auth" style="width: 200px;"><span style="font-size: 1rem;">Googleでログイン</span></button>
+            <button id="btn-logout" class="btn btn-danger hidden" style="width: 200px; margin-top: 10px;">ログアウト</button>
+            <br>
+            <button id="btn-index" class="btn" style="background-color: #7f8c8d; margin-top: 15px; width: 200px;">INDEXへ</button>
+        </div>
+
+        <div id="game-result" style="display: none;"></div>
+
+        <div id="ranking-screen" class="hidden">
+            <div id="ranking-overlay">
+                <div class="overlay-content" style="width: 95%; max-width: 900px;">
+                    <h2 id="ranking-header-title" style="color: #f1c40f; margin-top: 0;">ベストスコア10</h2>
+                    <div class="ranking-container">
+                        <div class="ranking-box">
+                            <div class="ranking-title" style="color: #2ecc71;">しょきゅう</div>
+                            <ul id="rank-list-easy" class="ranking-list"></ul>
+                        </div>
+                        <div class="ranking-box">
+                            <div class="ranking-title" style="color: #3498db;">ちゅうきゅう</div>
+                            <ul id="rank-list-normal" class="ranking-list"></ul>
+                        </div>
+                        <div class="ranking-box">
+                            <div class="ranking-title" style="color: #e74c3c;">じょうきゅう</div>
+                            <ul id="rank-list-hard" class="ranking-list"></ul>
+                        </div>
+                    </div>
+                    <button id="btn-close-ranking" class="btn">とじる</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="right-panel">
+        <div id="right-panel-content" class="invisible">
+            <div class="info-item">
+                <div class="info-label">レベル</div>
+                <div id="disp-difficulty-label" class="info-value" style="font-size: 1.4rem; color: #fff;"></div>
+            </div>
+            
+            <hr style="border-color: #34495e;">
+
+            <div class="info-item">
+                <div class="info-label">のこりこうどう(Time)</div>
+                <div id="disp-time" class="info-value" style="font-size: 2.5rem; color: #e74c3c;">10</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">フロア</div>
+                <div id="disp-floor" class="info-value">1F</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">カギ</div>
+                <div id="disp-key" class="info-value" style="color: #2ecc71;">0/1</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">ほうせき(💎)</div>
+                <div id="disp-gems" class="info-value" style="font-size: 1.6rem; color: #9b59b6;">0</div>
+            </div>
+            
+            <div style="margin-top: 10px;">
+                <div class="info-label" style="margin-bottom:5px;">スキル (💎1消費)</div>
+                <button id="btn-skill-door" class="btn btn-skill">① ドアはっけん！</button>
+                <button id="btn-skill-key" class="btn btn-skill">② カギはっけん！</button>
+                <button id="btn-skill-change" class="btn btn-skill">③ チェンジ</button>
+            </div>
+
+            <hr style="border-color: #34495e;">
+
+            <div class="info-item">
+                <div class="info-label">さいだいスコア</div>
+                <div id="disp-max-score" class="info-value" style="font-size: 1.3rem; color: #e67e22;">0</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">ごうけいスコア</div>
+                <div id="disp-total-score" class="info-value">0</div>
+            </div>
+            
+            <hr style="border-color: #34495e;">
+            
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">たおしたてき</div>
+                    <div id="disp-enemies" class="stat-val">0</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">かかったじかん</div>
+                    <div id="disp-actions" class="stat-val">0</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">こうりつ</div>
+                    <div id="disp-efficiency" class="stat-val">0.00</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import { getFirestore, collection, doc, setDoc, serverTimestamp, query, where, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "YOUR_API_KEY",
+        authDomain: "math-braves.firebaseapp.com",
+        projectId: "math-braves",
+        storageBucket: "math-braves.firebasestorage.app",
+        messagingSenderId: "217117619290",
+        appId: "1:217117619290:web:d227feb603970d3948d463"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const provider = new GoogleAuthProvider();
+
+    window.currentUser = null;
+
+    // UI Refs
+    const btnLogin = document.getElementById('btn-login');
+    const btnLogout = document.getElementById('btn-logout');
+    const authStatus = document.getElementById('auth-status');
+
+    window.handleLogin = function() {
+        signInWithPopup(auth, provider).then((result) => {}).catch((error) => { alert("ログインにしっぱいしました。"); });
+    };
+
+    window.handleLogout = function() {
+        signOut(auth).then(() => {}).catch((error) => {});
+    };
+
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            window.currentUser = { uid: user.uid, displayName: user.displayName || '名無しさん' };
+            if (authStatus) authStatus.textContent = `ログイン中: ${window.currentUser.displayName}`;
+            if (btnLogin) btnLogin.classList.add('hidden');
+            if (btnLogout) btnLogout.classList.remove('hidden');
+        } else {
+            window.currentUser = null;
+            if (authStatus) authStatus.textContent = 'ログインしていません';
+            if (btnLogin) btnLogin.classList.remove('hidden');
+            if (btnLogout) btnLogout.classList.add('hidden');
+        }
+    });
+
+    window.saveOnlineScore = async (userId, userName, difficulty, score) => {
+        try {
+            const docId = `${userId}_${difficulty}_${Date.now()}`;
+            await setDoc(doc(db, "scores_multiplication", docId), {
+                uid: userId, name: userName, difficulty: difficulty, score: score, createdAt: serverTimestamp()
+            });
+        } catch (error) { console.error(error); }
+    };
+
+    window.fetchOnlineRanking = async (difficulty) => {
+        if (!window.currentUser) return [];
+        try {
+            const scoresRef = collection(db, "scores_multiplication");
+            const q = query(scoresRef, where("difficulty", "==", difficulty), orderBy("score", "desc"), limit(10));
+            const querySnapshot = await getDocs(q);
+            const ranking = [];
+            querySnapshot.forEach((doc) => { ranking.push(doc.data()); });
+            return ranking;
+        } catch (error) { console.error(error); return []; }
+    };
+</script>
+
+<script>
+/**
+ * Game Configuration & State
+ */
+const CROWN_THRESHOLDS = { BRONZE: 5000, SILVER: 7500, GOLD: 10000 };
+
+const PRESET_EASY = {
+    label: "しょきゅう",
+    weights: { 1: 1, 2: 20, 3: 12, 5: 6 },
+    enemyList: [4,6,8,9,10,12,15,16,18,20,24,25,27,30],
+    initTime: 10,
+    thresholds: CROWN_THRESHOLDS
+};
+
+const PRESET_NORMAL = {
+    label: "ちゅうきゅう",
+    weights: { 1: 1, 2: 38, 3: 19, 5: 9, 7: 7 },
+    enemyList: [4,6,8,9,10,12,14,15,16,18,20,21,24,25,27,28,30,32,35,36,40,42,45,48,49],
+    initTime: 15,
+    thresholds: CROWN_THRESHOLDS
+};
+
+const PRESET_HARD = {
+    label: "じょうきゅう",
+    weights: { 1: 1, 2: 51, 3: 30, 4: 7, 5: 9, 6: 5, 7: 9, 8: 3, 9: 4 },
+    enemyList: [4,6,8,9,10,12,14,15,16,18,20,21,24,25,27,28,30,32,35,36,40,42,45,48,49,54,56,63,64,72,81],
+    initTime: 20,
+    thresholds: CROWN_THRESHOLDS
+};
+
+let CONFIG = Object.assign({}, PRESET_NORMAL);
+const GRID_ROWS = 5;
+const GRID_COLS = 5;
+const MAX_FLOOR = 5;
+
+let state = {
+    screen: 'TITLE',
+    difficulty: 'NORMAL',
+    time: 15,
+    score: 0,
+    maxSingleScore: 0, 
+    floor: 1,
+    keysFound: 0,
+    keysNeeded: 1,
+    gems: 0,
+    
+    // Stats
+    enemiesDefeated: 0,
+    actionsUsed: 0,
+    
+    // Skills State
+    doorRevealed: false,
+    
+    grid: [], // 25 cells
+    cards: [null, null, null, null, null],
+    particles: [],
+    
+    width: 0,
+    height: 0,
+    dragInfo: null,
+    isGameOverProcessing: false,
+    inputLocked: false
+};
+
+// Canvas Setup
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+const ui = {
+    rightPanelContent: document.getElementById('right-panel-content'),
+    difficultyLabel: document.getElementById('disp-difficulty-label'),
+    time: document.getElementById('disp-time'),
+    floor: document.getElementById('disp-floor'),
+    key: document.getElementById('disp-key'),
+    gems: document.getElementById('disp-gems'),
+    totalScore: document.getElementById('disp-total-score'),
+    maxScore: document.getElementById('disp-max-score'),
+    
+    // Stats Refs
+    dispEnemies: document.getElementById('disp-enemies'),
+    dispActions: document.getElementById('disp-actions'),
+    dispEfficiency: document.getElementById('disp-efficiency'),
+    
+    title: document.getElementById('title-screen'),
+    result: document.getElementById('game-result'),
+    rankingScreen: document.getElementById('ranking-screen'),
+    rankingHeaderTitle: document.getElementById('ranking-header-title'),
+    
+    confirmDialog: document.getElementById('confirm-dialog'),
+    
+    btnEasy: document.getElementById('btn-easy'),
+    btnNormal: document.getElementById('btn-normal'),
+    btnHard: document.getElementById('btn-hard'),
+    btnViewRanking: document.getElementById('btn-view-ranking'),
+    btnCloseRanking: document.getElementById('btn-close-ranking'),
+    btnToTitle: document.getElementById('btn-to-title'),
+    btnLogin: document.getElementById('btn-login'),
+    btnLogout: document.getElementById('btn-logout'),
+    btnIndex: document.getElementById('btn-index'),
+    btnYes: document.getElementById('btn-yes'),
+    btnNo: document.getElementById('btn-no'),
+
+    // Skill Buttons
+    btnSkillDoor: document.getElementById('btn-skill-door'),
+    btnSkillKey: document.getElementById('btn-skill-key'),
+    btnSkillChange: document.getElementById('btn-skill-change'),
+
+    crowns: {
+        EASY: document.getElementById('crown-easy'),
+        NORMAL: document.getElementById('crown-normal'),
+        HARD: document.getElementById('crown-hard')
+    },
+    clears: {
+        EASY: document.getElementById('clear-easy'),
+        NORMAL: document.getElementById('clear-normal'),
+        HARD: document.getElementById('clear-hard')
+    }
+};
+
+function resize() {
+    state.width = canvas.parentElement.clientWidth;
+    state.height = canvas.parentElement.clientHeight;
+    canvas.width = state.width;
+    canvas.height = state.height;
+}
+window.addEventListener('resize', resize);
+resize();
+
+/**
+ * Utility Functions
+ */
+function randomInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+// Ranking & Clear Stats
+function getRankingKey(diff) { return `math_braves_multi_ranking_${diff}`; }
+function getClearCountKey(diff) { return `math_braves_multi_clears_${diff}`; }
+
+function getLocalRanking(difficulty) {
+    const key = getRankingKey(difficulty);
+    return JSON.parse(localStorage.getItem(key)) || [];
+}
+function getClearCount(difficulty) {
+    const key = getClearCountKey(difficulty);
+    return parseInt(localStorage.getItem(key)) || 0;
+}
+function incrementClearCount(difficulty) {
+    const key = getClearCountKey(difficulty);
+    let count = getClearCount(difficulty);
+    count++;
+    localStorage.setItem(key, count);
+    return count;
+}
+function saveScore(difficulty, score) {
+    const key = getRankingKey(difficulty);
+    let ranking = JSON.parse(localStorage.getItem(key)) || [];
+    ranking.push(score);
+    ranking.sort((a, b) => b - a);
+    ranking = ranking.slice(0, 10);
+    localStorage.setItem(key, JSON.stringify(ranking));
+
+    const isNewRecord = (ranking.length > 0 && ranking[0] === score);
+    if (window.currentUser && window.saveOnlineScore) {
+        window.saveOnlineScore(window.currentUser.uid, window.currentUser.displayName, difficulty, score);
+    }
+    return isNewRecord;
+}
+
+function updateTitleScreenStats() {
+    ['EASY', 'NORMAL', 'HARD'].forEach(diff => {
+        const count = getClearCount(diff);
+        ui.clears[diff].textContent = `${count}回クリア`;
+
+        const bestScore = getLocalRanking(diff)[0] || 0;
+        const crownEl = ui.crowns[diff];
+        const thresholds = PRESET_NORMAL.thresholds; 
+
+        crownEl.style.visibility = 'visible';
+        crownEl.textContent = '🎁';
+        crownEl.style.color = '';
+        crownEl.style.filter = 'none';
+
+        if (bestScore >= thresholds.GOLD) {
+            crownEl.style.filter = 'hue-rotate(60deg) brightness(120%) drop-shadow(0 0 10px gold)';
+        } else if (bestScore >= thresholds.SILVER) {
+            crownEl.style.filter = 'grayscale(100%) brightness(130%) drop-shadow(0 0 5px silver)';
+        } else if (bestScore >= thresholds.BRONZE) {
+            crownEl.style.filter = 'sepia(100%) hue-rotate(-50deg) saturate(600%) brightness(90%) drop-shadow(0 0 5px #cd7f32)';
+        } else {
+            crownEl.style.visibility = 'hidden';
+        }
+    });
+}
+
+// Ranking Screen
+async function showRankingScreen() {
+    ui.rankingScreen.classList.remove('hidden');
+    ['rank-list-easy', 'rank-list-normal', 'rank-list-hard'].forEach(id => {
+        document.getElementById(id).innerHTML = '<li style="justify-content: center; color: #7f8c8d;">読み込み中...</li>';
+    });
+
+    if (window.currentUser && window.fetchOnlineRanking) {
+        ui.rankingHeaderTitle.textContent = "みんなのベストスコア (オンライン)";
+        const renderOnlineList = async (diff, elementId) => {
+            const list = await window.fetchOnlineRanking(diff);
+            const ul = document.getElementById(elementId);
+            ul.innerHTML = '';
+            if (list.length === 0) { ul.innerHTML = '<li style="justify-content: center; color: #7f8c8d;">記録なし</li>'; return; }
+            list.forEach((data, index) => {
+                const li = document.createElement('li');
+                const isMe = (data.uid === window.currentUser.uid);
+                const nameStyle = isMe ? 'color: #f1c40f; font-weight: bold;' : 'color: #bdc3c7;';
+                li.innerHTML = `<span class="ranking-rank">${index + 1}.</span><span class="ranking-name" style="${nameStyle}">${data.name}</span><span class="ranking-score">${data.score}</span>`;
+                ul.appendChild(li);
+            });
+        };
+        await Promise.all([renderOnlineList('EASY', 'rank-list-easy'), renderOnlineList('NORMAL', 'rank-list-normal'), renderOnlineList('HARD', 'rank-list-hard')]);
+    } else {
+        ui.rankingHeaderTitle.textContent = "あなたのベストスコア (ローカル)";
+        const renderLocalList = (diff, elementId) => {
+            const list = getLocalRanking(diff);
+            const ul = document.getElementById(elementId);
+            ul.innerHTML = '';
+            if (list.length === 0) { ul.innerHTML = '<li style="justify-content: center; color: #7f8c8d;">記録なし</li>'; return; }
+            list.forEach((score, index) => {
+                const li = document.createElement('li');
+                li.innerHTML = `<span class="ranking-rank">${index + 1}.</span><span class="ranking-name">あなた</span><span class="ranking-score">${score}</span>`;
+                ul.appendChild(li);
+            });
+        };
+        renderLocalList('EASY', 'rank-list-easy');
+        renderLocalList('NORMAL', 'rank-list-normal');
+        renderLocalList('HARD', 'rank-list-hard');
+    }
+}
+
+/**
+ * Classes
+ */
+class Card {
+    constructor(slotIndex, excludeValue = -1) {
+        this.slotIndex = slotIndex;
+        
+        const weights = CONFIG.weights;
+        let weightedPool = [];
+        
+        for (const [valStr, weight] of Object.entries(weights)) {
+            const val = parseInt(valStr);
+            if (val !== excludeValue) {
+                for (let k = 0; k < weight; k++) {
+                    weightedPool.push(val);
+                }
+            }
+        }
+        if (weightedPool.length === 0) {
+            for (const [valStr, weight] of Object.entries(weights)) {
+                const val = parseInt(valStr);
+                for (let k = 0; k < weight; k++) weightedPool.push(val);
+            }
+        }
+        
+        this.value = weightedPool[Math.floor(Math.random() * weightedPool.length)];
+        
+        this.stackCount = 1;
+        this.width = state.width * 0.12;
+        this.height = this.width * 1.4;
+        
+        this.baseX = 0;
+        this.baseY = state.height * 0.70;
+        this.x = 0;
+        this.y = 0;
+        this.isDragging = false;
+        
+        const spacing = state.width / 6;
+        this.baseX = spacing * (slotIndex + 1) - this.width / 2;
+        this.x = this.baseX;
+        this.y = this.baseY;
+    }
+
+    draw(ctx) {
+        if (!this.isDragging) {
+            this.x = this.baseX;
+            this.y = this.baseY;
+        }
+
+        ctx.fillStyle = '#fff';
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 3;
+        roundRect(ctx, this.x, this.y, this.width, this.height, 10, true, true);
+
+        ctx.fillStyle = '#000';
+        ctx.font = `bold ${this.width * 0.6}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(this.value, this.x + this.width / 2, this.y + this.height / 2);
+        
+        if (this.stackCount > 1) {
+            ctx.fillStyle = '#2980b9';
+            ctx.font = `bold ${this.width * 0.25}px sans-serif`;
+            ctx.fillText(`x${this.stackCount}`, this.x + this.width * 0.8, this.y + this.height * 0.85);
+        }
+    }
+}
+
+class Particle {
+    constructor(x, y, text, color, type = 'text') {
+        this.x = x; this.y = y; this.text = text; this.color = color;
+        this.type = type; this.life = 1.0; this.size = 0; this.vy = -2;
+    }
+    update() {
+        if (this.type === 'text') { this.y += this.vy; this.life -= 0.01; }
+        else if (this.type === 'circle') { this.size += 5; this.life -= 0.03; }
+    }
+    draw(ctx) {
+        ctx.globalAlpha = Math.max(0, this.life);
+        if (this.type === 'text') {
+            ctx.fillStyle = this.color; ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;
+            ctx.font = "bold 30px sans-serif";
+            ctx.strokeText(this.text, this.x, this.y);
+            ctx.fillText(this.text, this.x, this.y);
+        } else if (this.type === 'circle') {
+            ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            ctx.strokeStyle = this.color; ctx.lineWidth = 5; ctx.stroke();
+        }
+        ctx.globalAlpha = 1.0;
+    }
+}
+
+function roundRect(ctx, x, y, w, h, r, fill, stroke) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+    if (fill) ctx.fill();
+    if (stroke) ctx.stroke();
+}
+
+/**
+ * Game Logic
+ */
+function generateEnemyValue() {
+    const list = CONFIG.enemyList;
+    return list[Math.floor(Math.random() * list.length)];
+}
+
+function initFloor() {
+    state.grid = [];
+    state.keysFound = 0;
+    state.keysNeeded = (state.floor === MAX_FLOOR) ? 3 : 1;
+    state.doorRevealed = false;
+    // state.keyRevealed は廃止し、セルごとのプロパティで管理
+
+    // Generate 25 Enemies
+    let cells = [];
+    for (let i=0; i<GRID_ROWS * GRID_COLS; i++) {
+        let r = Math.random();
+        let gems = 1;
+        if (r > 0.95) gems = 5;
+        else if (r > 0.85) gems = 4;
+        else if (r > 0.70) gems = 3;
+        else if (r > 0.40) gems = 2;
+
+        cells.push({
+            id: i,
+            row: Math.floor(i / GRID_COLS),
+            col: i % GRID_COLS,
+            value: generateEnemyValue(),
+            gemCount: gems,
+            isEnemy: true,
+            isUnknown: true,
+            item: null,
+            isVisible: false, // Fog of War
+            isKeyRevealed: false // 個別のカギ発見状態
+        });
+    }
+
+    // 初期エリアの強制オープン (十字型: 中央 + 上下左右)
+    const initialReveals = [12, 7, 17, 11, 13];
+    initialReveals.forEach(idx => {
+        if (cells[idx]) {
+            cells[idx].isVisible = true; 
+            if (cells[idx].isEnemy) cells[idx].isUnknown = false; // 数値と宝石を表示
+        }
+    });
+
+    // Items Placement
+    let indices = Array.from({length: 25}, (_, i) => i);
+    // Shuffle
+    for (let i = indices.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [indices[i], indices[j]] = [indices[j], indices[i]];
+    }
+
+    // 1. Door
+    cells[indices[0]].item = 'DOOR';
+
+    // 2. Keys
+    let usedCount = 1;
+    for (let k=0; k<state.keysNeeded; k++) {
+        cells[indices[usedCount]].item = 'KEY';
+        usedCount++;
+    }
+
+    // 3. Items (30% total, 10% each)
+    for (let i = usedCount; i < 25; i++) {
+        let idx = indices[i];
+        let r = Math.random();
+        if (r < 0.10) {
+            cells[idx].item = 'ITEM_TIME';
+        } else if (r < 0.20) {
+            cells[idx].item = 'ITEM_SCORE';
+        } else if (r < 0.30) {
+            cells[idx].item = 'ITEM_GEM';
+        }
+    }
+
+    state.grid = cells;
+    updateUI();
+}
+
+// Reveal neighbors function
+function revealNeighbors(row, col, gridRef = state.grid) {
+    const dirs = [[-1,0], [1,0], [0,-1], [0,1]];
+    dirs.forEach(d => {
+        let r = row + d[0];
+        let c = col + d[1];
+        if (r>=0 && r<GRID_ROWS && c>=0 && c<GRID_COLS) {
+            let idx = r * GRID_COLS + c;
+            gridRef[idx].isVisible = true; // Show enemy
+        }
+    });
+}
+
+function revealUnknown(row, col) {
+    const dirs = [[-1,0], [1,0], [0,-1], [0,1]];
+    dirs.forEach(d => {
+        let r = row + d[0];
+        let c = col + d[1];
+        if (r>=0 && r<GRID_ROWS && c>=0 && c<GRID_COLS) {
+            let idx = r * GRID_COLS + c;
+            if (state.grid[idx].isEnemy) state.grid[idx].isUnknown = false; // Reveal number
+            state.grid[idx].isVisible = true; // Reveal from fog
+        }
+    });
+}
+
+function backToTitle() {
+    state.screen = 'TITLE';
+    ui.title.classList.remove('hidden');
+    ui.btnToTitle.classList.add('hidden');
+    ui.rightPanelContent.classList.add('invisible');
+    ui.result.style.display = 'none';
+    updateTitleScreenStats();
+    ctx.clearRect(0, 0, state.width, state.height);
+}
+
+function initGame() {
+    state.score = 0;
+    state.time = CONFIG.initTime;
+    state.maxSingleScore = 0;
+    state.floor = 1;
+    state.gems = 0;
+    state.cards = [null, null, null, null, null];
+    state.particles = [];
+    state.isGameOverProcessing = false;
+    state.inputLocked = false;
+    
+    // Reset Stats
+    state.enemiesDefeated = 0;
+    state.actionsUsed = 0;
+    
+    ui.difficultyLabel.textContent = CONFIG.label;
+    
+    resize();
+    refillCards(true);
+    initFloor();
+    
+    state.screen = 'PLAYING';
+    ui.title.classList.add('hidden');
+    ui.btnToTitle.classList.remove('hidden');
+    ui.rightPanelContent.classList.remove('invisible');
+    
+    requestAnimationFrame(gameLoop);
+}
+
+function refillCards(forceAll = false) {
+    for (let i = 0; i < 5; i++) {
+        if (state.cards[i] === null || forceAll) {
+            state.cards[i] = new Card(i);
+        }
+    }
+}
+
+function updateUI() {
+    ui.time.textContent = state.time;
+    ui.time.style.color = (state.time <= 3) ? '#c0392b' : '#e74c3c';
+    
+    // フロア表示
+    if (state.floor === MAX_FLOOR) {
+        ui.floor.textContent = "さいしゅうフロア";
+        ui.floor.style.fontSize = "1.0rem";
+    } else {
+        ui.floor.textContent = state.floor + "F";
+        ui.floor.style.fontSize = "1.6rem";
+    }
+
+    ui.key.textContent = `${state.keysFound}/${state.keysNeeded}`;
+    ui.totalScore.textContent = state.score;
+    ui.maxScore.textContent = state.maxSingleScore;
+    ui.gems.textContent = state.gems;
+    
+    // スタッツ表示
+    ui.dispEnemies.textContent = state.enemiesDefeated;
+    ui.dispActions.textContent = state.actionsUsed;
+    const eff = state.actionsUsed > 0 ? (state.enemiesDefeated / state.actionsUsed).toFixed(2) : "0.00";
+    ui.dispEfficiency.textContent = eff;
+    
+    // スキルボタン
+    const hasGem = state.gems > 0;
+    ui.btnSkillDoor.disabled = !hasGem;
+    ui.btnSkillKey.disabled = !hasGem;
+    ui.btnSkillChange.disabled = !hasGem;
+}
+
+function consumeTime() {
+    state.time--;
+    state.actionsUsed++; // Count action
+    if (state.time < 0) state.time = 0;
+    updateUI();
+    if (state.time === 0 && !state.isGameOverProcessing) {
+        state.isGameOverProcessing = true;
+        state.inputLocked = true;
+        setTimeout(() => { if (state.screen === 'PLAYING') gameOver(); }, 500);
+    }
+}
+
+function checkPraise(gain, x, y) {
+    let msg = "";
+    if (gain >= 2000) msg = "かみレベル！";
+    else if (gain >= 1000) msg = "てんさい！";
+    else if (gain >= 500) msg = "グレート！";
+    else if (gain >= 200) msg = "すごい！";
+    if (msg) state.particles.push(new Particle(x, y - 50, msg, '#e67e22', 'text'));
+}
+
+function collectItem(cell, idx) {
+    let scoreGain = 0;
+    let timeGain = 0;
+    let gemGain = 0;
+    let text = "";
+    let color = "";
+    if (cell.item === 'ITEM_TIME') {
+        timeGain = [2,4,6,8,10][randomInt(0,4)];
+        text = `Time+${timeGain}`;
+        color = '#2ecc71';
+    } else if (cell.item === 'ITEM_SCORE') {
+        scoreGain = [100,200,300,400,500][randomInt(0,4)];
+        text = `+${scoreGain}`;
+        color = '#f1c40f';
+    } else if (cell.item === 'ITEM_GEM') {
+        gemGain = 1;
+        text = "💎GET!";
+        color = '#9b59b6';
+    }
+    state.score += scoreGain;
+    state.time += timeGain;
+    state.gems += gemGain;
+    
+    // Effects
+    const pos = getGridPos(cell.row, cell.col);
+    const cx = pos.x + pos.w/2;
+    const cy = pos.y + pos.h/2;
+    
+    if (text) state.particles.push(new Particle(cx, cy - 20, text, color, 'text'));
+    cell.item = null; // Removed
+    updateUI();
+}
+
+function showResultScreen(title, titleColor, isClear, finalScore, timeBonus, maxScoreBonus, isNewRecord) {
+    ctx.fillStyle = "rgba(0,0,0,0.7)";
+    ctx.fillRect(0, 0, state.width, state.height);
+    
+    const eff = state.actionsUsed > 0 ? (state.enemiesDefeated / state.actionsUsed).toFixed(2) : "0.00";
+
+    ui.result.innerHTML = `
+        <div style="background:#34495e; padding:20px; border-radius:10px; color:white; text-align:center; border:4px solid ${titleColor};">
+            <h2 style="font-size:2rem; color:${titleColor}; margin:0 0 15px 0;">${title}</h2>
+            <div style="font-size:1rem; line-height:1.6; text-align:left; display:inline-block; width:100%;">
+                <div>バトルスコア：<span style="float:right; color:#fff; font-weight:bold;">${state.score}点</span></div>
+                <div>タイムボーナス：<span style="float:right; color:#2ecc71; font-weight:bold;">${timeBonus}点</span></div>
+                <div>さいだいスコア：<span style="float:right; color:#e67e22; font-weight:bold;">${maxScoreBonus}点</span></div>
+                
+                <div class="result-stats">
+                    <div class="stat-box">
+                        <div class="stat-label">たおしたてき</div>
+                        <div class="stat-val">${state.enemiesDefeated}</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">かかったじかん</div>
+                        <div class="stat-val">${state.actionsUsed}</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">こうりつ</div>
+                        <div class="stat-val">${eff}</div>
+                    </div>
+                </div>
+
+                <hr style="border-color:#7f8c8d; margin:10px 0;">
+                <div style="font-size:1.4rem;">最終スコア：<span style="float:right; color:#f1c40f; font-weight:bold;">${finalScore}点</span></div>
+                <div style="text-align:center; margin-top:5px; color:${isNewRecord?'#e74c3c':'#bdc3c7'}; font-weight:bold;">${isNewRecord ? '自己ベストこうしん！' : ''}</div>
+            </div>
+            <br><br>
+            <button id="btn-result-ok" class="btn btn-${isClear ? 'success' : 'danger'}" style="font-size:1.2rem; padding:10px 40px;">${isClear ? 'OK' : 'リトライ'}</button>
+        </div>
+    `;
+    ui.result.style.display = 'block';
+    
+    const okBtn = document.getElementById('btn-result-ok');
+    if(isClear) {
+        const handleOk = (e) => { if(e) e.preventDefault(); backToTitle(); };
+        okBtn.addEventListener('click', handleOk);
+        okBtn.addEventListener('touchstart', handleOk, {passive:false});
+    } else {
+        const handleRetry = (e) => { if(e) e.preventDefault(); location.reload(); };
+        okBtn.addEventListener('click', handleRetry);
+        okBtn.addEventListener('touchstart', handleRetry, {passive:false});
+    }
+}
+
+function gameOver() {
+    state.screen = 'GAMEOVER';
+    ui.btnToTitle.classList.add('hidden');
+    
+    const timeBonus = 0; 
+    const maxScoreBonus = state.maxSingleScore * 2;
+    const finalScore = state.score + timeBonus + maxScoreBonus;
+    
+    const isNewRecord = saveScore(state.difficulty, finalScore);
+    
+    showResultScreen("GAME OVER", "#7f8c8d", false, finalScore, timeBonus, maxScoreBonus, isNewRecord);
+}
+
+function gameClear() {
+    state.screen = 'CLEAR';
+    ui.btnToTitle.classList.add('hidden');
+    
+    const timeBonus = state.time * 100;
+    const maxScoreBonus = state.maxSingleScore * 2;
+    const finalScore = state.score + timeBonus + maxScoreBonus;
+    
+    const isNewRecord = saveScore(state.difficulty, finalScore);
+    incrementClearCount(state.difficulty);
+    
+    showResultScreen("ゲームクリア！", "#f1c40f", true, finalScore, timeBonus, maxScoreBonus, isNewRecord);
+}
+
+function drawOverlayText(mainText, color, subText) {
+    ctx.fillStyle = "rgba(0,0,0,0.7)";
+    ctx.fillRect(0, 0, state.width, state.height);
+    ctx.fillStyle = color;
+    ctx.font = "bold 60px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(mainText, state.width / 2, state.height / 2 - 20);
+    ctx.fillStyle = "white";
+    ctx.font = "30px sans-serif";
+    ctx.fillText(subText, state.width / 2, state.height / 2 + 40);
+}
+function drawGrid(ctx) {
+    // Grid Calc
+    const gridW = state.width * 0.9;
+    const cellW = gridW / GRID_COLS;
+    const cellH = cellW * 0.8;
+    const startX = (state.width - gridW) / 2;
+    const startY = 20;
+    state.grid.forEach(cell => {
+        let x = startX + cell.col * cellW;
+        let y = startY + cell.row * cellH;
+        let w = cellW;
+        let h = cellH;
+        // Background (Default empty)
+        ctx.fillStyle = '#ecf0f1';
+        ctx.fillRect(x, y, w, h);
+        ctx.strokeStyle = '#bdc3c7';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x, y, w, h);
+        if (!cell.isVisible) {
+            // FOG OF WAR (Undiscovered)
+            const pad = 4;
+            let ex = x + pad; let ey = y + pad; let ew = w - pad*2; let eh = h - pad*2;
+            
+            ctx.fillStyle = '#9b59b6'; // 敵と同じ色
+            ctx.fillRect(ex, ey, ew, eh);
+            ctx.strokeStyle = '#8e44ad';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(ex, ey, ew, eh);
+            
+            // スキル使用時の表示 (中央配置、通常サイズ)
+            if (state.doorRevealed && cell.item === 'DOOR') {
+                ctx.globalAlpha = 0.3;
+                ctx.font = `${w*0.5}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = '#fff';
+                ctx.fillText("🚪", x + w/2, y + h/2); // Center
+                ctx.globalAlpha = 1.0;
+            }
+            // 修正: 個別のカギ発見状態をチェック
+            if (cell.isKeyRevealed && cell.item === 'KEY') {
+                ctx.globalAlpha = 0.3;
+                ctx.font = `${w*0.5}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = '#fff';
+                ctx.fillText("🗝️", x + w/2, y + h/2); // Center
+                ctx.globalAlpha = 1.0;
+            }
+            return; // Don't draw actual content
+        }
+        if (cell.isEnemy) {
+            // Enemy (Purple)
+            const pad = 4;
+            let ex = x + pad; let ey = y + pad; let ew = w - pad*2; let eh = h - pad*2;
+            
+            ctx.fillStyle = '#9b59b6'; 
+            ctx.fillRect(ex, ey, ew, eh);
+            ctx.strokeStyle = '#8e44ad';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(ex, ey, ew, eh);
+            // Value
+            ctx.fillStyle = 'white';
+            ctx.font = `bold ${w*0.4}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(cell.value, x + w/2, y + h/2 + 5);
+            // Gems or Question Mark
+            if (cell.isUnknown) {
+                ctx.fillStyle = '#e1bee7'; // Very light purple for ?
+                ctx.font = `bold ${w*0.3}px sans-serif`;
+                ctx.fillText("?", x + w*0.85, y + h*0.25);
+            } else {
+                // Gems (Yellow)
+                const gemSize = w * 0.15;
+                const totalGW = (cell.gemCount * gemSize) + ((cell.gemCount-1)*2);
+                let gX = x + (w - totalGW)/2 + gemSize/2;
+                let gY = y + h * 0.2;
+                for(let i=0; i<cell.gemCount; i++){
+                    ctx.beginPath();
+                    ctx.arc(gX + i*(gemSize+2), gY, gemSize/2, 0, Math.PI*2);
+                    ctx.fillStyle = '#f1c40f'; // Yellow Gems
+                    ctx.fill();
+                    ctx.strokeStyle = '#fff';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                }
+            }
+            
+            // スキル使用時の表示 (敵の上から重ねて表示、中央配置、通常サイズ)
+            if (state.doorRevealed && cell.item === 'DOOR') {
+                 ctx.globalAlpha = 0.3;
+                 ctx.font = `${w*0.5}px sans-serif`;
+                 ctx.fillText("🚪", x + w/2, y + h/2); // Center
+                 ctx.globalAlpha = 1.0;
+            }
+            // 修正: 個別のカギ発見状態をチェック
+            if (cell.isKeyRevealed && cell.item === 'KEY') {
+                 ctx.globalAlpha = 0.3;
+                 ctx.font = `${w*0.5}px sans-serif`;
+                 ctx.fillText("🗝️", x + w/2, y + h/2); // Center
+                 ctx.globalAlpha = 1.0;
+            }
+        } else {
+            // Item or Empty
+            ctx.font = `${w*0.5}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#000'; // Reset color for items
+            if (cell.item === 'KEY') {
+               ctx.fillText("🗝️", x + w/2, y + h/2);
+            } else if (cell.item === 'DOOR') {
+               ctx.fillText("🚪", x + w/2, y + h/2);
+            } else if (cell.item === 'ITEM_TIME') {
+               ctx.fillText("⏰", x + w/2, y + h/2);
+            } else if (cell.item === 'ITEM_SCORE') {
+               ctx.fillText("🎁", x + w/2, y + h/2);
+            } else if (cell.item === 'ITEM_GEM') {
+               ctx.fillText("💎", x + w/2, y + h/2);
+            }
+        }
+    });
+}
+function getGridPos(row, col) {
+    const gridW = state.width * 0.9;
+    const cellW = gridW / GRID_COLS;
+    const cellH = cellW * 0.8;
+    const startX = (state.width - gridW) / 2;
+    const startY = 20;
+    return { x: startX + col * cellW, y: startY + row * cellH, w: cellW, h: cellH };
+}
+/** * Input Handling */
+function getEventPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+    const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+    return {x, y};
+}
+function onDown(e) {
+    if (state.screen !== 'PLAYING' || state.inputLocked) {
+        if (state.screen === 'GAMEOVER') backToTitle();
+        return;
+    }
+    const pos = getEventPos(e);
+    // 1. Grid Interaction (Click Door OR Item)
+    const gridW = state.width * 0.9;
+    const cellW = gridW / GRID_COLS;
+    const cellH = cellW * 0.8;
+    const startX = (state.width - gridW) / 2;
+    const startY = 20;
+    // Grid bounding box check
+    if (pos.y > startY && pos.y < startY + GRID_ROWS * cellH && pos.x > startX && pos.x < startX + GRID_COLS * cellW) {
+        let col = Math.floor((pos.x - startX) / cellW);
+        let row = Math.floor((pos.y - startY) / cellH);
+        let idx = row * GRID_COLS + col;
+        if (state.grid[idx]) {
+            let cell = state.grid[idx];
+            
+            // Only interact if visible
+            if (!cell.isVisible) return;
+            if (!cell.isEnemy) {
+                // Check Door
+                if (cell.item === 'DOOR') {
+                    if (state.keysFound >= state.keysNeeded) {
+                        ui.confirmDialog.classList.remove('hidden');
+                    } else {
+                        state.particles.push(new Particle(pos.x, pos.y, "カギがたりない", '#f39c12', 'text'));
+                    }
+                    return;
+                }
+                // Check New Items
+                if (cell.item && cell.item.startsWith('ITEM_')) {
+                    collectItem(cell, idx);
+                    return;
+                }
+            }
+        }
+    }
+    // 2. Card Drag
+    for (let i = 4; i >= 0; i--) {
+        const c = state.cards[i];
+        if (c && pos.x >= c.x && pos.x <= c.x + c.width && pos.y >= c.y && pos.y <= c.y + c.height) {
+            state.dragInfo = { slotIndex: i, offsetX: pos.x - c.x, offsetY: pos.y - c.y };
+            c.isDragging = true;
+            break;
+        }
+    }
+}
+function onMove(e) {
+    if (!state.dragInfo) return;
+    const pos = getEventPos(e);
+    const c = state.cards[state.dragInfo.slotIndex];
+    if (c) {
+        c.x = pos.x - state.dragInfo.offsetX;
+        c.y = pos.y - state.dragInfo.offsetY;
+    }
+}
+function onUp(e) {
+    if (!state.dragInfo) return;
+    const idx = state.dragInfo.slotIndex;
+    const card = state.cards[idx];
+    if (!card) { state.dragInfo = null; return; }
+    const cx = card.x + card.width / 2;
+    const cy = card.y + card.height / 2;
+    let actionDone = false;
+    // 1. Grid (Attack)
+    const gridW = state.width * 0.9;
+    const cellW = gridW / GRID_COLS;
+    const cellH = cellW * 0.8;
+    const startX = (state.width - gridW) / 2;
+    const startY = 20;
+    if (cy < startY + GRID_ROWS * cellH + 50) { // Dropped near grid
+        // Find cell
+        let col = Math.floor((cx - startX) / cellW);
+        let row = Math.floor((cy - startY) / cellH);
+        if (col >= 0 && col < GRID_COLS && row >= 0 && row < GRID_ROWS) {
+            let cellIdx = row * GRID_COLS + col;
+            let cell = state.grid[cellIdx];
+            
+            // Only Attack Visible Enemies
+            if (cell.isVisible && cell.isEnemy) {
+                if (card.value === cell.value) {
+                    // Attack Success
+                    const gain = card.stackCount * cell.gemCount * 10;
+                    state.score += gain;
+                    
+                    // Stats Update
+                    state.enemiesDefeated++;
+                    
+                    // 修正: 最大スコア更新ロジック
+                    if (gain > state.maxSingleScore) state.maxSingleScore = gain;
+                    
+                    // Recovery Logic
+                    // 修正: Base +1 (以前は2)
+                    let scoreBonus = Math.floor(gain / 50);
+                    if (scoreBonus > 20) scoreBonus = 20;
+                    let rec = 1 + scoreBonus;
+                    
+                    state.time += rec;
+                    checkPraise(gain, cx, cy);
+                    state.particles.push(new Particle(cx, cy, `+${gain}`, '#f1c40f', 'text'));
+                    state.particles.push(new Particle(cx, cy+40, `Time+${rec}`, '#2ecc71', 'text'));
+                    // Kill
+                    cell.isEnemy = false;
+                    revealUnknown(row, col); // Reveal neighbors
+                    
+                    // Check Item (Instant Key pickup, or leave item)
+                    if (cell.item === 'KEY') {
+                        state.keysFound++;
+                        state.particles.push(new Particle(cx, cy-40, "カギ GET!", '#e67e22', 'text'));
+                        // バグ防止: 敵撃破時にカギを取得したらアイテムを消す
+                        cell.item = null;
+                    } 
+                    // Other items remain on the ground to be clicked
+                    state.cards[idx] = null;
+                    actionDone = true;
+                } else {
+                    // Miss - No Time Penalty
+                    state.particles.push(new Particle(cx, cy, "ミス！", '#95a5a6', 'text'));
+                }
+            }
+        }
+    }
+    // 2. Stack (Multiply)
+    if (!actionDone) {
+        for (let i = 0; i < 5; i++) {
+            if (i === idx) continue;
+            const target = state.cards[i];
+            if (!target) continue;
+            const dx = cx - (target.x + target.width / 2);
+            const dy = cy - (target.y + target.height / 2);
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < card.width * 0.8) {
+                const newValue = target.value * card.value; // MULTIPLY
+                target.value = newValue;
+                target.stackCount += card.stackCount;
+                state.cards[idx] = null;
+                consumeTime(); // Count Action
+                actionDone = true;
+                state.particles.push(new Particle(target.x + target.width / 2, target.y + target.height / 2, "x", '#3498db', 'circle'));
+                break;
+            }
+        }
+    }
+    // 3. Trash
+    if (!actionDone) {
+        if (cy > state.height * 0.85) {
+            // 捨てたカードの値を覚えておく
+            const oldVal = state.cards[idx].value;
+            // 異なる値を引数で渡して生成
+            state.cards[idx] = new Card(idx, oldVal);
+            
+            consumeTime(); // Count Action
+            actionDone = true; 
+        }
+    }
+    if (actionDone) {
+        refillCards();
+        updateUI();
+    } else {
+        card.isDragging = false;
+    }
+    state.dragInfo = null;
+}
+// Skills
+function useGem() {
+    state.gems--;
+    updateUI();
+}
+ui.btnSkillDoor.addEventListener('click', () => {
+    if (state.gems > 0 && !state.doorRevealed) {
+        useGem();
+        state.doorRevealed = true;
+        // Effect
+        state.particles.push(new Particle(state.width/2, state.height/2, "ドアをかんち！", '#9b59b6', 'text'));
+    } else if (state.gems > 0) {
+        // すでに発見済みでもボタンが押せる仕様なので、無駄打ちの演出
+        useGem();
+        state.particles.push(new Particle(state.width/2, state.height/2, "ドアはもうみえている", '#7f8c8d', 'text'));
+    }
+});
+
+// 修正: カギ発見スキル (ランダムで1つ発見)
+ui.btnSkillKey.addEventListener('click', () => {
+    if (state.gems > 0) {
+        useGem();
+        
+        // 未発見（敵の下にある、かつスキルでまだ見ていない）のカギを探す
+        // バグ修正: !c.isVisible を削除し、c.isEnemy を追加。見えていても敵がいれば対象。
+        let candidateCells = [];
+        state.grid.forEach(c => {
+            if (c.item === 'KEY' && c.isEnemy && !c.isKeyRevealed) {
+                candidateCells.push(c);
+            }
+        });
+
+        if (candidateCells.length > 0) {
+            // ランダムで1つ選ぶ
+            let target = candidateCells[Math.floor(Math.random() * candidateCells.length)];
+            target.isKeyRevealed = true;
+            state.particles.push(new Particle(state.width/2, state.height/2, "カギをかんち！", '#9b59b6', 'text'));
+        } else {
+            // 全て発見済みの場合
+             state.particles.push(new Particle(state.width/2, state.height/2, "カギはもうないようだ", '#7f8c8d', 'text'));
+        }
+        updateUI();
+    }
+});
+ui.btnSkillChange.addEventListener('click', () => {
+    if (state.gems > 0) {
+        useGem();
+        state.cards = [null, null, null, null, null];
+        refillCards(true);
+        state.particles.push(new Particle(state.width/2, state.height/2, "手札チェンジ！", '#9b59b6', 'text'));
+        updateUI();
+    }
+});
+// Dialog Logic
+ui.btnYes.addEventListener('click', () => {
+    ui.confirmDialog.classList.add('hidden');
+    if (state.floor < MAX_FLOOR) {
+        state.floor++;
+        state.time += 5; // Floor Clear Bonus
+        state.particles.push(new Particle(state.width/2, state.height/2, "Floor Clear! Time+5", '#2ecc71', 'text'));
+        initFloor();
+    } else {
+        // Game Clear
+        state.time += 100; // Final Bonus
+        gameClear();
+    }
+});
+ui.btnNo.addEventListener('click', () => {
+    ui.confirmDialog.classList.add('hidden');
+});
+// Canvas Listeners
+canvas.addEventListener('mousedown', onDown);
+window.addEventListener('mousemove', onMove);
+window.addEventListener('mouseup', onUp);
+canvas.addEventListener('touchstart', (e) => { e.preventDefault(); onDown(e); }, { passive: false });
+window.addEventListener('touchmove', (e) => { e.preventDefault(); onMove(e); }, { passive: false });
+window.addEventListener('touchend', (e) => { e.preventDefault(); onUp(e); }, { passive: false });
+/** * Main Loop */
+function gameLoop() {
+    if (state.screen !== 'PLAYING') return;
+    ctx.clearRect(0, 0, state.width, state.height);
+    drawGrid(ctx);
+    // Trash Area Text
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#7f8c8d';
+    ctx.font = 'bold 20px sans-serif';
+    ctx.fillText("ゴミすてば", state.width / 2, state.height - 20);
+    // Cards
+    state.cards.forEach(c => { if (c) c.draw(ctx); });
+    if (state.dragInfo) {
+        const c = state.cards[state.dragInfo.slotIndex];
+        if (c) c.draw(ctx);
+    }
+    // Particles
+    for (let i = state.particles.length - 1; i >= 0; i--) {
+        let p = state.particles[i];
+        p.update();
+        p.draw(ctx);
+        if (p.life <= 0) state.particles.splice(i, 1);
+    }
+    requestAnimationFrame(gameLoop);
+}
+// UI Binds
+function bindBtn(btn, callback) {
+    if (btn) {
+        btn.addEventListener('click', (e) => { e.preventDefault(); callback(); });
+        btn.addEventListener('touchstart', (e) => { e.preventDefault(); callback(); }, { passive: false });
+    }
+}
+bindBtn(ui.btnEasy, () => { state.difficulty = 'EASY'; CONFIG = Object.assign({}, PRESET_EASY); initGame(); });
+bindBtn(ui.btnNormal, () => { state.difficulty = 'NORMAL'; CONFIG = Object.assign({}, PRESET_NORMAL); initGame(); });
+bindBtn(ui.btnHard, () => { state.difficulty = 'HARD'; CONFIG = Object.assign({}, PRESET_HARD); initGame(); });
+bindBtn(ui.btnViewRanking, () => showRankingScreen());
+bindBtn(ui.btnCloseRanking, () => ui.rankingScreen.classList.add('hidden'));
+bindBtn(ui.btnToTitle, () => backToTitle());
+bindBtn(ui.btnIndex, () => window.location.href = 'index.html');
+</script></body></html>
