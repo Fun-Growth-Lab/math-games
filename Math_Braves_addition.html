@@ -397,20 +397,25 @@
 
         try {
             const scoresRef = collection(db, "scores_math_braves_addition");
+            // 複合インデックス未作成でも動作するように、クライアントサイドでソートを行う
             const q = query(
                 scoresRef, 
-                where("difficulty", "==", difficulty), 
-                orderBy("score", "desc"), 
-                limit(10)
+                where("difficulty", "==", difficulty)
+                // orderBy("score", "desc"), // インデックスが必要になるため削除
+                // limit(10) // ソートせずにlimitすると正しい順位にならないため削除
             );
             
             const querySnapshot = await getDocs(q);
-            const ranking = [];
+            let ranking = [];
             querySnapshot.forEach((doc) => {
                 const d = doc.data();
                 ranking.push(d);
             });
-            return ranking;
+            
+            // クライアントサイドでソートと件数制限を行う
+            ranking.sort((a, b) => b.score - a.score);
+            return ranking.slice(0, 10);
+            
         } catch (error) {
             console.error("[Error] ランキング取得エラー:", error);
             return [];
