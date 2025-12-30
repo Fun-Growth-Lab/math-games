@@ -1093,9 +1093,15 @@ function drawTitle() {
     }
     drawText(advName, 480, 245, 24, "#fff", "center", "DotGothic16", true);
 
+    // ★追加: ログイン中のメールアドレス表示 (冒険者名の下)
+    if (currentUser) {
+        drawText(`ログイン中: ${currentUser.email}`, 480, 275, 18, "#bbb", "center", "DotGothic16", true);
+    }
+
     const btnBg = "#4e342e"; 
     const btnTxt = "#fff8e1"; 
-    const btnStartY = 285;
+    // ★修正: アドレス表示のために開始位置を下に調整 (285 -> 300)
+    const btnStartY = 300;
     const btnGap = 60;
 
     if (gameState.titleState === 0) {
@@ -1104,7 +1110,16 @@ function drawTitle() {
         drawMcButton(330, btnStartY + btnGap, 300, 50, "冒険者を選ぶ", "#4caf50", "#fff");
         drawMcButton(330, btnStartY + btnGap*2, 140, 50, "ランキング", "#039be5", "#fff");
         drawMcButton(490, btnStartY + btnGap*2, 140, 50, "コレクション", "#795548", "#fff");
-        drawMcButton(330, btnStartY + btnGap*3, 300, 50, "Googleでログイン", "#e53935", "#fff"); 
+        
+        // ★修正: ログイン状態に応じてボタンのテキストと色を変更
+        let loginText = "Googleでログイン";
+        let loginColor = "#e53935";
+        if (currentUser) {
+            loginText = "ログアウト";
+            loginColor = "#555"; 
+        }
+        drawMcButton(330, btnStartY + btnGap*3, 300, 50, loginText, loginColor, "#fff"); 
+        
         drawMcButton(330, btnStartY + btnGap*4, 300, 50, "INDEXへ", "#607d8b", "#fff");
 
         if (gameState.warningMsg) {
@@ -1114,11 +1129,17 @@ function drawTitle() {
 
     } else if (gameState.titleState === 1) {
         // 難易度選択
-        drawText("なんいど を えらんで ください", 480, 285, 20, "#3e2723", "center", "DotGothic16", false); 
-        drawMcButton(330, 320, 300, 50, "しょきゅう (10F)", "#8d6e63", btnTxt); 
-        drawMcButton(330, 390, 300, 50, "ちゅうきゅう (20F)", "#81c784", btnTxt); 
-        drawMcButton(330, 460, 300, 50, "じょうきゅう (30F)", "#e57373", btnTxt); 
-        drawMcButton(330, 530, 300, 50, "もどる", "#555", "#fff");
+        // ★修正: アドレス表示と被らないようにテキスト位置を下に調整
+        drawText("なんいど を えらんで ください", 480, 320, 20, "#3e2723", "center", "DotGothic16", false); 
+        
+        // ★修正: ボタン位置を調整 (間隔を詰めつつ下に配置)
+        const diffBtnStart = 350;
+        const diffBtnGap = 60;
+        
+        drawMcButton(330, diffBtnStart, 300, 50, "しょきゅう (10F)", "#8d6e63", btnTxt); 
+        drawMcButton(330, diffBtnStart + diffBtnGap, 300, 50, "ちゅうきゅう (20F)", "#81c784", btnTxt); 
+        drawMcButton(330, diffBtnStart + diffBtnGap*2, 300, 50, "じょうきゅう (30F)", "#e57373", btnTxt); 
+        drawMcButton(330, diffBtnStart + diffBtnGap*3 + 10, 300, 50, "もどる", "#555", "#fff");
 
     } else if (gameState.titleState === 2) {
         // 冒険者選択リスト
@@ -1137,19 +1158,17 @@ function drawTitle() {
                 color = isSelected ? "#ffff00" : "#fff";
             }
             
-            // ★修正: レイアウトを3分割に変更 (選択/変更/削除)
-            
-            // 1. 選択/新規ボタン (幅 380 -> 290)
+            // 1. 選択/新規ボタン
             drawMcButton(240, y, 290, 50, nameText, "#555", color);
             if (isSelected) {
                 drawText("★", 225, y+35, 30, "#ffff00", "center");
             }
 
-            // 2. 変更ボタン (幅 80)
+            // 2. 変更ボタン
             const canEdit = (adv !== null);
             drawMcButton(540, y, 80, 50, "変更", canEdit ? "#7b1fa2" : "#333", canEdit ? "#fff" : "#777", canEdit);
 
-            // 3. 削除ボタン (幅 80)
+            // 3. 削除ボタン
             const delBtnColor = adv ? "#d32f2f" : "#333";
             const delBtnTextCol = adv ? "#fff" : "#555";
             drawMcButton(630, y, 80, 50, "削除", delBtnColor, delBtnTextCol);
@@ -1159,7 +1178,6 @@ function drawTitle() {
     } else if (gameState.titleState === 3) {
         // 新規登録・編集画面
         drawMcWindowTransparent(180, 30, 600, 580);
-        // タイトルを状況に応じて変更
         const titleText = (gameState.regTemp.slot !== undefined && adventurerList[gameState.regTemp.slot]) ? "冒険者を変更" : "新規登録";
         drawText(titleText, 480, 70, 30, "#fff", "center");
 
@@ -1953,7 +1971,8 @@ canvas.addEventListener('mousedown', e => {
     const y = (e.clientY - rect.top) * scaleY;
 
     if (gameState.scene === SCENES.TITLE) {
-        const btnStartY = 285;
+        // ★修正: drawTitleの変更に合わせてY座標の基準を変更 (285 -> 300)
+        const btnStartY = 300;
         const btnGap = 60;
 
         if (gameState.titleState === 0) {
@@ -1980,9 +1999,15 @@ canvas.addEventListener('mousedown', e => {
                 gameState.scene = SCENES.COLLECTION;
                 gameState.collection.scrollY = 0;
             }
-            // Googleでログイン
+            // ★修正: ログイン / ログアウトの切り替え処理
             if (x > 330 && x < 630 && y > btnStartY + btnGap*3 && y < btnStartY + btnGap*3 + 50) {
-                document.getElementById('login-overlay').style.display = 'flex';
+                if (currentUser) {
+                    // ログイン中はログアウトを実行
+                    auth.signOut().catch(error => console.error("Sign Out Error", error));
+                } else {
+                    // 未ログインならログインウィンドウ表示
+                    document.getElementById('login-overlay').style.display = 'flex';
+                }
             }
             // INDEXへ
             if (x > 330 && x < 630 && y > btnStartY + btnGap*4 && y < btnStartY + btnGap*4 + 50) {
@@ -1990,11 +2015,15 @@ canvas.addEventListener('mousedown', e => {
             }
         } else if (gameState.titleState === 1) {
             // 難易度選択
+            // ★修正: drawTitleの変更に合わせてクリック判定位置を変更
+            const diffBtnStart = 350;
+            const diffBtnGap = 60;
+            
             if (x > 330 && x < 630) {
-                if (y > 320 && y < 370) startGame(0); 
-                if (y > 390 && y < 440) startGame(1); 
-                if (y > 460 && y < 510) startGame(2); 
-                if (y > 530 && y < 580) gameState.titleState = 0; 
+                if (y > diffBtnStart && y < diffBtnStart + 50) startGame(0); 
+                if (y > diffBtnStart + diffBtnGap && y < diffBtnStart + diffBtnGap + 50) startGame(1); 
+                if (y > diffBtnStart + diffBtnGap*2 && y < diffBtnStart + diffBtnGap*2 + 50) startGame(2); 
+                if (y > diffBtnStart + diffBtnGap*3 + 10 && y < diffBtnStart + diffBtnGap*3 + 60) gameState.titleState = 0; 
             }
         } else if (gameState.titleState === 2) {
             // 冒険者選択リスト
@@ -2108,9 +2137,9 @@ canvas.addEventListener('mousedown', e => {
             gameState.typing.showTable = !gameState.typing.showTable;
         }
         
-        // ★修正: 特定のGoogleアカウントログイン時のみデバッグ(Skip)発動
         if (x > 630 && x < 790 && y > 340 && y < 380) {
-            if (auth.currentUser && auth.currentUser.email === "tetsuya581231@gmail.com") {
+            // ★重要: ユーザー自身のメールアドレスに書き換えてください
+            if (auth.currentUser && auth.currentUser.email === "あなたのメールアドレス@gmail.com") {
                 const base = 800;
                 const floorBonus = Math.pow(1.1, gameState.currentFloor - 1);
                 gameState.player.gold += Math.floor(base * floorBonus);
@@ -2153,6 +2182,7 @@ canvas.addEventListener('mousedown', e => {
         handleResultClick(x, y);
     }
 });
+
 function handleResultClick(x, y) {
     if (gameState.difficulty === 2 && gameState.currentFloor === 31 && gameState.maxFloors === 30) {
         if (gameState.resultPhase === 0) {
