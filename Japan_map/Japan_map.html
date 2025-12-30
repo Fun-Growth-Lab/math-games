@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>日本地図クイズ - 16:9 Edition</title>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="map_data.js"></script>
+    <style>
+        :root {
+            --primary-color: #78c850; /* 森のグリーン */
+            --secondary-color: #ffaa00; /* フルーツのオレンジ */
+            --sky-blue: #5bc0de;
+            --wood-brown: #8d7d6a;
+            --bg-color: #ffffff;
+            --panel-bg: #fdfdfd;
+        }
+        body {
+            margin: 0; padding: 0;
+            background-color: var(--bg-color);
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            display: flex; justify-content: center; align-items: center;
+            height: 100vh; overflow: hidden;
+        }
+        canvas {
+            background-color: var(--panel-bg);
+            box-shadow: 0 10px 40px rgba(120, 200, 80, 0.15);
+            border: 12px solid #e2f0d9;
+            border-radius: 50px;
+        }
+    </style>
+</head>
+<body>
+
+<canvas id="gameCanvas"></canvas>
+
+<script>
+const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT_ID.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
+};
+if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const auth = firebase.auth();
+
+const BASE_W = 1600;
+const BASE_H = 900;
+let TOTAL_QUESTIONS = 10;
+
+const PREFECTURES = [
+    { code: 1, name: "北海道", ruby: "ほっかいどう", capital: "札幌市", c_ruby: "さっぽろし", region: "北海道", r_ruby: "ほっかいどう" },
+    { code: 2, name: "青森県", ruby: "あおもりけん", capital: "青森市", c_ruby: "あおもりし", region: "東北", r_ruby: "とうほく" },
+    { code: 3, name: "岩手県", ruby: "いわてけん", capital: "盛岡市", c_ruby: "もりおかし", region: "東北", r_ruby: "とうほく" },
+    { code: 4, name: "宮城県", ruby: "みやぎけん", capital: "仙台市", c_ruby: "sendai", region: "東北", r_ruby: "とうほく" },
+    { code: 5, name: "秋田県", ruby: "あきたけん", capital: "秋田市", c_ruby: "あきたし", region: "東北", r_ruby: "とうほく" },
+    { code: 6, name: "山形県", ruby: "やまがたけん", capital: "山形市", c_ruby: "やまがたし", region: "東北", r_ruby: "とうほく" },
+    { code: 7, name: "福島県", ruby: "ふくしまけん", capital: "福島市", c_ruby: "ふくしまし", region: "東北", r_ruby: "とうほく" },
+    { code: 8, name: "茨城県", ruby: "いばらきけん", capital: "水戸市", c_ruby: "みとし", region: "関東", r_ruby: "かんとう" },
+    { code: 9, name: "栃木県", ruby: "とちぎけん", capital: "宇都宮市", c_ruby: "うつのみやし", region: "関東", r_ruby: "かんとう" },
+    { code: 10, name: "群馬県", ruby: "ぐんまけん", capital: "前橋市", c_ruby: "まえばしし", region: "関東", r_ruby: "かんとう" },
+    { code: 11, name: "埼玉県", ruby: "さいたまけん", capital: "さいたま市", c_ruby: "さいたまし", region: "関東", r_ruby: "かんとう" },
+    { code: 12, name: "千葉県", ruby: "ちばけん", capital: "千葉市", c_ruby: "ちばし", region: "関東", r_ruby: "かんとう" },
+    { code: 13, name: "東京都", ruby: "とうきょうと", capital: "新宿区", c_ruby: "しんじゅくく", region: "関東", r_ruby: "かんとう" },
+    { code: 14, name: "神奈川県", ruby: "かながわけん", capital: "横浜市", c_ruby: "よこはまし", region: "関東", r_ruby: "かんとう" },
+    { code: 15, name: "新潟県", ruby: "にいがたけん", capital: "新潟市", c_ruby: "にいがたし", region: "中部", r_ruby: "ちゅうぶ" },
+    { code: 16, name: "富山県", ruby: "とやまけん", capital: "富山市", c_ruby: "とやまし", region: "中部", r_ruby: "ちゅうぶ" },
+    { code: 17, name: "石川県", ruby: "いしかわけん", capital: "金沢市", c_ruby: "かなざわし", region: "中部", r_ruby: "ちゅうぶ" },
+    { code: 18, name: "福井県", ruby: "ふくいけん", capital: "福井市", c_ruby: "ふくいし", region: "中部", r_ruby: "ちゅうぶ" },
+    { code: 19, name: "山梨県", ruby: "やまなしけん", capital: "甲府市", c_ruby: "こうふし", region: "中部", r_ruby: "ちゅうぶ" },
+    { code: 20, name: "長野県", ruby: "ながのけん", capital: "長野市", c_ruby: "ながのし", region: "中部", r_ruby: "ちゅうぶ" },
+    { code: 21, name: "岐阜県", ruby: "ぎふけん", capital: "岐阜市", c_ruby: "ぎふし", region: "中部", r_ruby: "ちゅうぶ" },
+    { code: 22, name: "静岡県", ruby: "しずおかけん", capital: "静岡市", c_ruby: "しずおかし", region: "中部", r_ruby: "ちゅうぶ" },
+    { code: 23, name: "愛知県", ruby: "あいちけん", capital: "名古屋市", c_ruby: "なごやし", region: "中部", r_ruby: "ちゅうぶ" },
+    { code: 24, name: "三重県", ruby: "みえけん", capital: "津市", c_ruby: "つし", region: "近畿", r_ruby: "きんき" },
+    { code: 25, name: "滋賀県", ruby: "しがけん", capital: "大津市", c_ruby: "おおつし", region: "近畿", r_ruby: "きんき" },
+    { code: 26, name: "京都府", ruby: "きょうとふ", capital: "京都市", c_ruby: "きょうとし", region: "近畿", r_ruby: "きんき" },
+    { code: 27, name: "大阪府", ruby: "おおさかふ", capital: "大阪市", c_ruby: "おおさかし", region: "近畿", r_ruby: "きんき" },
+    { code: 28, name: "兵庫県", ruby: "ひょうごけん", capital: "神戸市", c_ruby: "こうべし", region: "近畿", r_ruby: "きんき" },
+    { code: 29, name: "奈良県", ruby: "ならけん", capital: "奈良市", c_ruby: "ならし", region: "近畿", r_ruby: "きんき" },
+    { code: 30, name: "和歌山県", ruby: "わかやまけん", capital: "和歌山市", c_ruby: "わかやまし", region: "近畿", r_ruby: "きんき" },
+    { code: 31, name: "鳥取県", ruby: "とっとりけん", capital: "鳥取市", c_ruby: "とっとりし", region: "中国", r_ruby: "ちゅうごく" },
+    { code: 32, name: "島根県", ruby: "しまねけん", capital: "松江市", c_ruby: "まつえし", region: "中国", r_ruby: "ちゅうごく" },
+    { code: 33, name: "岡山県", ruby: "おかやまけん", capital: "岡山市", c_ruby: "おかやまし", region: "中国", r_ruby: "ちゅうごく" },
+    { code: 34, name: "広島県", ruby: "ひろしまけん", capital: "広島市", c_ruby: "ひろしまし", region: "中国", r_ruby: "ちゅうごく" },
+    { code: 35, name: "山口県", ruby: "やまぐchiken", capital: "山口市", c_ruby: "やまぐちし", region: "中国", r_ruby: "ちゅうごく" },
+    { code: 36, name: "徳島県", ruby: "とくしまけん", capital: "徳島市", c_ruby: "とうくしまし", region: "四国", r_ruby: "しこく" },
+    { code: 37, name: "香川県", ruby: "かがわけん", capital: "高松市", c_ruby: "たかまつし", region: "四国", r_ruby: "しこく" },
+    { code: 38, name: "愛媛県", ruby: "えひめけん", capital: "松山市", c_ruby: "まつやまし", region: "四国", r_ruby: "しこく" },
+    { code: 39, name: "高知県", ruby: "こうちけん", capital: "高知市", c_ruby: "こうちし", region: "四国", r_ruby: "しこく" },
+    { code: 40, name: "福岡県", ruby: "ふくおかけん", capital: "福岡市", c_ruby: "ふくおかし", region: "九州", r_ruby: "きゅうしゅう" },
+    { code: 41, name: "佐賀県", ruby: "さがけん", capital: "佐賀市", c_ruby: "さがし", region: "九州", r_ruby: "きゅうしゅう" },
+    { code: 42, name: "長崎県", ruby: "ながさきけん", capital: "長崎市", c_ruby: "ながさきし", region: "九州", r_ruby: "きゅうしゅう" },
+    { code: 43, name: "熊本県", ruby: "くまもとけん", capital: "熊本市", c_ruby: "くまもとし", region: "九州", r_ruby: "きゅうしゅう" },
+    { code: 44, name: "大分県", ruby: "おおいたけん", capital: "大分市", c_ruby: "おおいたし", region: "九州", r_ruby: "きゅうしゅう" },
+    { code: 45, name: "宮崎県", ruby: "みやざきけん", capital: "宮崎市", c_ruby: "みやざきし", region: "九州", r_ruby: "きゅうしゅう" },
+    { code: 46, name: "鹿児島県", ruby: "かごしまけん", capital: "鹿児島市", c_ruby: "かごしまし", region: "九州", r_ruby: "きゅうしゅう" },
+    { code: 47, name: "沖縄県", ruby: "おきなわけん", capital: "那覇市", c_ruby: "なはし", region: "九州", r_ruby: "きゅうしゅう" }
+];
+
+const REGIONS = [
+    { name: "北海道", ruby: "ほっかいどう" },
+    { name: "東北", ruby: "とうほく" },
+    { name: "関東", ruby: "かんとう" },
+    { name: "中部", ruby: "ちゅうぶ" },
+    { name: "近畿", ruby: "きんき" },
+    { name: "中国", ruby: "ちゅうごく" },
+    { name: "四国", ruby: "しこく" },
+    { name: "九州", ruby: "きゅうしゅう" }
+];
+
+let gameState = 'title';
+let currentMode = 'name'; 
+let currentLevel = 4;
+let questions = [];
+let currentIdx = 0;
+let correctCount = 0;
+let startTime, pauseTime, totalTime;
+let selectedOption = null;
+let user = null;
+let scale = 1;
+
+let cachedMapImg = null;
+let lastTargetCode = -1;
+let lastTargetCodes = [];
+let countdownMapImg = null;
+
+let rankingTab = 'local'; 
+let rankingMode = 'name';
+let rankingLv = 4;
+let rankingData = [];
+
+let countdownVal = 3;
+let countdownTimer = null;
+
+let localPlayers = JSON.parse(localStorage.getItem('japan_map_players') || '["あたらしく名前を登録","あたらしく名前を登録","あたらしく名前を登録","あたらしく名前を登録","あたらしく名前を登録"]');
+let currentPlayerIdx = parseInt(localStorage.getItem('japan_map_current_player') || '-1');
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+function init() {
+    window.addEventListener('resize', resize);
+    resize();
+    canvas.addEventListener('mousedown', handleInput);
+    window.addEventListener('keydown', handleInput);
+    auth.onAuthStateChanged(u => user = u);
+    gameLoop();
+}
+
+function resize() {
+    scale = Math.min(window.innerWidth / BASE_W, window.innerHeight / BASE_H);
+    canvas.width = BASE_W * scale;
+    canvas.height = BASE_H * scale;
+}
+
+function handleInput(e) {
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.type === 'mousedown') ? (e.clientX - rect.left) / scale : -1;
+    const y = (e.type === 'mousedown') ? (e.clientY - rect.top) / scale : -1;
+
+    if (gameState === 'title') {
+        if (x > 550 && x < 1050) {
+            if (y > 280 && y < 360) gameState = 'level_select';
+            else if (y > 380 && y < 460) gameState = 'player_select';
+            else if (y > 480 && y < 560) { gameState = 'ranking'; rankingTab = 'local'; rankingMode = 'name'; rankingLv = 4; fetchRanking(); }
+            else if (y > 580 && y < 660 && !user) login();
+            else if (y > 680 && y < 760) window.location.href = "../index.html";
+        }
+    } else if (gameState === 'player_select') {
+        if (x > 550 && x < 1050) {
+            for (let i = 0; i < 5; i++) {
+                if (y > 200 + i * 100 && y < 280 + i * 100) {
+                    if (localPlayers[i] === "あたらしく名前を登録") {
+                        let n = prompt("名前を入力してね（8文字以内）", "");
+                        if (n) {
+                            localPlayers[i] = n.substring(0, 8);
+                            localStorage.setItem('japan_map_players', JSON.stringify(localPlayers));
+                        } else return;
+                    }
+                    currentPlayerIdx = i;
+                    localStorage.setItem('japan_map_current_player', i.toString());
+                    gameState = 'title';
+                }
+            }
+        }
+        if (x > 700 && x < 900 && y > 720 && y < 800) gameState = 'title';
+    } else if (gameState === 'level_select') {
+        const modes = ['name', 'capital', 'region'];
+        const levels = [2, 4, 8];
+        const startXLevel = 600;
+        const startY = 250;
+        const rowH = 150;
+        const btnW = 280;
+        const btnH = 100;
+
+        modes.forEach((m, mi) => {
+            levels.forEach((l, li) => {
+                const bx = startXLevel + li * (btnW + 30);
+                const by = startY + mi * rowH;
+                if (x > bx && x < bx + btnW && y > by && y < by + btnH) {
+                    currentMode = m;
+                    TOTAL_QUESTIONS = (m === 'region') ? 8 : 10;
+                    startCountdown(l);
+                }
+            });
+        });
+        if (x > 700 && x < 900 && y > 780 && y < 860) gameState = 'title';
+    } else if (gameState === 'ranking') {
+        const tabW = 210; const gap = 20;
+        const leftStart = (BASE_W/2 - gap*2) / 2 - (tabW * 2 + gap)/2 + 50;
+        const rightStart = BASE_W/2 + (BASE_W/2 - (tabW * 3 + gap * 2))/2;
+
+        if (y > 140 && y < 200) {
+            if (x > leftStart && x < leftStart + tabW) { rankingTab = 'local'; fetchRanking(); }
+            if (x > leftStart + tabW + gap && x < leftStart + tabW * 2 + gap) { rankingTab = 'world'; fetchRanking(); }
+            if (x > rightStart && x < rightStart + tabW) { rankingMode = 'name'; fetchRanking(); }
+            if (x > rightStart + tabW + gap && x < rightStart + tabW * 2 + gap) { rankingMode = 'capital'; fetchRanking(); }
+            if (x > rightStart + (tabW + gap) * 2 && x < rightStart + tabW * 3 + gap * 2) { rankingMode = 'region'; fetchRanking(); }
+        }
+        if (y > 220 && y < 270) {
+            if (x > 670 && x < 770) { rankingLv = 2; fetchRanking(); }
+            if (x > 780 && x < 880) { rankingLv = 4; fetchRanking(); }
+            if (x > 890 && x < 990) { rankingLv = 8; fetchRanking(); }
+        }
+        if (x > 700 && x < 900 && y > 780 && y < 860) gameState = 'title';
+    } else if (gameState === 'playing') {
+        if (x > 1400 && y > 820) { gameState = 'title'; return; }
+        questions[currentIdx].options.forEach((opt, i) => {
+            const col = i % 2; const row = Math.floor(i / 2);
+            const bx = 1050 + col * 270; const by = 180 + row * 150;
+            if (x > bx && x < bx + 250 && y > by && y < by + 120) {
+                selectedOption = opt;
+                pauseTime = Date.now();
+                if (currentMode === 'region') {
+                    if (opt.name === questions[currentIdx].region) correctCount++;
+                } else {
+                    if (opt.code === questions[currentIdx].code) correctCount++;
+                }
+                gameState = 'waiting';
+            }
+        });
+    } else if (gameState === 'waiting') {
+        if (e.type === 'keydown' && e.code !== 'Enter' && e.code !== 'Space') return;
+        currentIdx++;
+        startTime += (Date.now() - pauseTime);
+        if (currentIdx >= TOTAL_QUESTIONS) {
+            totalTime = (Date.now() - startTime) / 1000;
+            gameState = 'result';
+            saveScore(totalTime);
+        } else {
+            gameState = 'playing';
+            lastTargetCodes = [];
+            cachedMapImg = null;
+        }
+        selectedOption = null;
+    } else if (gameState === 'result') {
+        if (y > 580 && y < 660 && x > 650 && x < 950) { gameState = 'ranking'; rankingTab = 'local'; rankingMode = currentMode; rankingLv = currentLevel; fetchRanking(); }
+        if (y > 680 && y < 760 && x > 650 && x < 950) gameState = 'title';
+    }
+}
+
+function startCountdown(level) {
+    currentLevel = level;
+    gameState = 'countdown';
+    countdownVal = 3;
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = JAPAN_MAP_SVG;
+    const svgEl = tempDiv.querySelector('svg');
+    if (svgEl) {
+        svgEl.querySelectorAll('[data-code]').forEach(el => {
+            el.style.fill = "#a0a0a0"; el.style.stroke = "#666";
+        });
+        const xml = new XMLSerializer().serializeToString(svgEl);
+        const svg64 = btoa(unescape(encodeURIComponent(xml)));
+        countdownMapImg = new Image();
+        countdownMapImg.src = 'data:image/svg+xml;base64,' + svg64;
+    }
+    if (countdownTimer) clearInterval(countdownTimer);
+    countdownTimer = setInterval(() => {
+        countdownVal--;
+        if (countdownVal <= 0) {
+            clearInterval(countdownTimer);
+            startQuiz(currentLevel);
+        }
+    }, 1000);
+}
+
+function startQuiz(level) {
+    currentIdx = 0;
+    correctCount = 0;
+    lastTargetCode = -1;
+    lastTargetCodes = [];
+    cachedMapImg = null;
+    if (currentMode === 'region') {
+        questions = [...REGIONS].sort(() => Math.random() - 0.5).map(r => {
+            const regionPrefs = PREFECTURES.filter(p => p.region === r.name);
+            return { region: r.name, ruby: r.ruby, options: REGIONS, regionPrefs: regionPrefs };
+        });
+    } else {
+        questions = [...PREFECTURES].sort(() => Math.random() - 0.5).slice(0, TOTAL_QUESTIONS)
+                    .map(q => ({...q, options: generateOptions(q)}));
+    }
+    gameState = 'playing';
+    startTime = Date.now();
+}
+
+function generateOptions(correct) {
+    let others = PREFECTURES.filter(p => p.code !== correct.code).sort(() => Math.random() - 0.5);
+    return [correct, ...others.slice(0, currentLevel - 1)].sort(() => Math.random() - 0.5);
+}
+
+function gameLoop() {
+    ctx.save();
+    ctx.scale(scale, scale);
+    ctx.clearRect(0, 0, BASE_W, BASE_H);
+    if (gameState === 'title') drawTitle();
+    else if (gameState === 'player_select') drawPlayerSelect();
+    else if (gameState === 'level_select') drawLevelSelect();
+    else if (gameState === 'ranking') drawRanking();
+    else if (gameState === 'countdown') drawCountdown();
+    else if (gameState === 'playing' || gameState === 'waiting') drawQuiz();
+    else if (gameState === 'result') drawResult();
+    ctx.restore();
+    requestAnimationFrame(gameLoop);
+}
+
+function drawCountdown() {
+    if (countdownMapImg && countdownMapImg.complete) ctx.drawImage(countdownMapImg, 20, 100, 1000, 750);
+    drawText(countdownVal, 520, 480, 200, "bold", "#ff4500");
+    drawText("ここにクイズがでるよ", 1320, 450, 36, "bold", "#000000");
+    drawButton(1420, 830, 150, 50, "やめる", "#c1e1c1", 20, "#333");
+}
+
+function drawQuiz() {
+    const q = questions[currentIdx];
+    const elapsed = (((gameState === 'waiting' ? pauseTime : Date.now()) - startTime) / 1000).toFixed(2);
+    
+    let targetCodes = [];
+    if (currentMode === 'region') {
+        if (lastTargetCodes.length === 0) {
+            if (currentLevel === 2) { 
+                targetCodes = q.regionPrefs.map(p => p.code);
+            } else if (currentLevel === 4) {
+                targetCodes = [...q.regionPrefs].sort(() => Math.random() - 0.5).slice(0, 2).map(p => p.code);
+            } else {
+                targetCodes = [q.regionPrefs[Math.floor(Math.random() * q.regionPrefs.length)].code];
+            }
+            lastTargetCodes = targetCodes;
+        } else {
+            targetCodes = lastTargetCodes;
+        }
+    } else {
+        targetCodes = [q.code];
+    }
+
+    if (!cachedMapImg) {
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = JAPAN_MAP_SVG;
+        const svgEl = tempDiv.querySelector('svg');
+        if (svgEl) {
+            svgEl.querySelectorAll('[data-code]').forEach(el => {
+                el.style.fill = "#b0b0b0"; el.style.stroke = "#444"; el.style.strokeWidth = "1";
+            });
+            targetCodes.forEach(code => {
+                const target = svgEl.querySelector(`[data-code="${code}"]`);
+                if (target) { target.style.fill = "#ff4500"; target.style.stroke = "#cc0000"; target.style.strokeWidth = "2"; }
+            });
+            const xml = new XMLSerializer().serializeToString(svgEl);
+            const svg64 = btoa(unescape(encodeURIComponent(xml)));
+            cachedMapImg = new Image();
+            cachedMapImg.src = 'data:image/svg+xml;base64,' + svg64;
+            if (currentMode !== 'region') lastTargetCode = q.code;
+        }
+    }
+
+    if (cachedMapImg && cachedMapImg.complete) ctx.drawImage(cachedMapImg, 20, 100, 1000, 750);
+    drawText(`${currentIdx + 1} / ${TOTAL_QUESTIONS}`, 100, 80, 40, "bold", "#000000", "left");
+    drawText(`${elapsed}`, 1500, 80, 40, "bold", "#000000", "right");
+    
+    let qTxt = currentMode === 'capital' ? "この都道府県の県庁所在地は？" : (currentMode === 'region' ? "この都道府県（地方）の地方区分は？" : "この都道府県の名前は？");
+    drawText(qTxt, 550, 80, 36, "bold", "#000000");
+
+    q.options.forEach((opt, i) => {
+        const col = i % 2; const row = Math.floor(i / 2);
+        const bx = 1050 + col * 270; const by = 180 + row * 150;
+        let color = "#ffffff";
+        if (gameState === 'waiting') {
+            const isCorrect = (currentMode === 'region') ? opt.name === q.region : opt.code === q.code;
+            if (isCorrect) {
+                color = "#ff4500"; 
+            } else if (selectedOption === opt) {
+                color = "#4682b4"; 
+            }
+        }
+        const label = currentMode === 'capital' ? opt.capital : opt.name;
+        const ruby = currentMode === 'capital' ? opt.c_ruby : opt.ruby;
+        drawQuizButton(bx, by, 250, 120, label, ruby, color);
+    });
+    drawButton(1420, 830, 150, 50, "やめる", "#c1e1c1", 20, "#000000");
+    if (gameState === 'waiting') {
+        const isCorrect = (currentMode === 'region') ? selectedOption.name === q.region : selectedOption.code === q.code;
+        ctx.fillStyle = "rgba(0, 0, 0, 0.2)"; ctx.fillRect(0, 0, BASE_W, BASE_H);
+        drawText(isCorrect ? "正解！" : "不正解", BASE_W/2, 400, 120, "bold", isCorrect ? "#ff4500" : "#4682b4");
+        drawText("クリックまたはキー入力で次へ", BASE_W/2, 520, 40, "bold", "#ffffff");
+    }
+}
+
+function drawTitle() {
+    drawText("日本地図クイズ", BASE_W/2, 160, 100, "bold", "#78c850");
+    let pName = currentPlayerIdx === -1 ? "選択されていません" : localPlayers[currentPlayerIdx];
+    drawText(`プレーヤー名：${pName}`, BASE_W/2, 240, 48, "bold", "#8d7d6a");
+
+    const menu = [
+        { t: "はじめる", c: "#78c850" },
+        { t: "プレーヤー選択", c: "#ffaa00" },
+        { t: "ランキング", c: "#5bc0de" },
+        { t: user ? "ログイン中" : "Googleでログイン", c: "#ea4335" },
+        { t: "INDEXへ", c: "#8d7d6a" }
+    ];
+    menu.forEach((m, i) => {
+        const py = 280 + i * 100;
+        drawButton(550, py, 500, 80, m.t, m.c, 32);
+    });
+}
+
+function drawPlayerSelect() {
+    drawText("プレーヤーをえらんでね", BASE_W/2, 150, 60, "bold", "#8d7d6a");
+    for (let i = 0; i < 5; i++) {
+        let isCurrent = (i === currentPlayerIdx);
+        drawButton(550, 200 + i * 100, 500, 80, localPlayers[i], isCurrent ? "#ffaa00" : "#e2f0d9", 28, isCurrent ? "#fff" : "#333");
+    }
+    drawButton(700, 720, 200, 80, "もどる", "#c1e1c1", 32, "#000");
+}
+
+function drawLevelSelect() {
+    drawText("モードと難易度を選んでね", BASE_W/2, 120, 70, "bold", "#78c850");
+    
+    const modes = [
+        { t: "都道府県", r: "とどうふけん", c: "#78c850" },
+        { t: "県庁所在地", r: "けんちょうしょざいち", c: "#ffaa00" },
+        { t: "地方区分", r: "ちほうくぶん", c: "#5bc0de" }
+    ];
+    const levels = [
+        { t: "初級", r: "しょきゅう", c: "#78c850" },
+        { t: "中級", r: "ちゅうきゅう", c: "#5bc0de" },
+        { t: "上級", r: "じょうきゅう", c: "#ffaa00" }
+    ];
+
+    const startXMode = 150;
+    const startXLevel = 600;
+    const startY = 250;
+    const rowH = 150;
+    const btnW = 280;
+    const btnH = 100;
+
+    modes.forEach((m, i) => {
+        const py = startY + i * rowH;
+        // モードはボタンではなくテキストとして描画
+        const mainSize = 40; const rubySize = 18; const gap = 6;
+        const totalH = mainSize + rubySize + gap;
+        const txtY = py + (btnH - totalH) / 2;
+        drawText(m.r, startXMode + 200, txtY + rubySize / 1.1, rubySize, "bold", "#8d7d6a");
+        drawText(m.t, startXMode + 200, txtY + rubySize + gap + mainSize / 1.1, mainSize, "bold", m.c);
+        
+        levels.forEach((l, li) => {
+            drawBalancedButton(startXLevel + li * (btnW + 30), py, btnW, btnH, l.t, l.r, l.c);
+        });
+    });
+
+    drawButton(700, 780, 200, 80, "もどる", "#c1e1c1", 32, "#000");
+}
+
+function drawRanking() {
+    drawText("ランキング", BASE_W/2, 80, 80, "bold", "#78c850");
+    
+    const tabW = 210; const gap = 20;
+    const leftTotalW = tabW * 2 + gap;
+    const leftStart = (BASE_W/2 - gap*2) / 2 - leftTotalW/2 + 50;
+    drawButton(leftStart, 140, tabW, 60, "ローカル", rankingTab === 'local' ? "#78c850" : "#e2f0d9", 22, rankingTab === 'local' ? "#fff" : "#8d7d6a");
+    drawButton(leftStart + tabW + gap, 140, tabW, 60, "ワールド", rankingTab === 'world' ? "#78c850" : "#e2f0d9", 22, rankingTab === 'world' ? "#fff" : "#8d7d6a");
+
+    const rightTotalW = tabW * 3 + gap * 2;
+    const rightStart = BASE_W/2 + (BASE_W/2 - rightTotalW)/2;
+    drawButton(rightStart, 140, tabW, 60, "都道府県", rankingMode === 'name' ? "#ffaa00" : "#e2f0d9", 22, rankingMode === 'name' ? "#fff" : "#8d7d6a");
+    drawButton(rightStart + tabW + gap, 140, tabW, 60, "県庁所在地", rankingMode === 'capital' ? "#ffaa00" : "#e2f0d9", 22, rankingMode === 'capital' ? "#fff" : "#8d7d6a");
+    drawButton(rightStart + (tabW + gap) * 2, 140, tabW, 60, "地方区分", rankingMode === 'region' ? "#ffaa00" : "#e2f0d9", 22, rankingMode === 'region' ? "#fff" : "#8d7d6a");
+    
+    drawText("難易度:", 630, 255, 24, "bold", "#8d7d6a", "right");
+    drawButton(670, 220, 100, 50, "初級", rankingLv === 2 ? "#5bc0de" : "#e2f0d9", 20, rankingLv === 2 ? "#fff" : "#8d7d6a");
+    drawButton(780, 220, 100, 50, "中級", rankingLv === 4 ? "#5bc0de" : "#e2f0d9", 20, rankingLv === 4 ? "#fff" : "#8d7d6a");
+    drawButton(890, 220, 100, 50, "上級", rankingLv === 8 ? "#5bc0de" : "#e2f0d9", 20, rankingLv === 8 ? "#fff" : "#8d7d6a");
+
+    const startX = 300; const startY = 320; const rowH = 45;
+    ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.roundRect(startX, startY - 40, 1000, 480, 40); ctx.fill();
+    ctx.strokeStyle = "#e2f0d9"; ctx.lineWidth = 4; ctx.stroke();
+    const cols = [100, 350, 650, 850];
+    const headers = ["順位", "なまえ", "正解", "タイム"];
+    headers.forEach((h, i) => drawText(h, startX + cols[i], startY, 28, "bold", "#78c850"));
+    if (rankingTab === 'world' && !user) {
+        drawText("ログインすると表示されます", BASE_W/2, 540, 36, "bold", "#ff4500");
+    } else {
+        rankingData.filter(d => d.level == rankingLv && d.mode == rankingMode).slice(0, 10).forEach((d, i) => {
+            const py = startY + 50 + i * rowH;
+            const name = d.name || 'ゲスト';
+            drawText(i + 1, startX + cols[0], py, 26, "", "#000000");
+            drawText(name, startX + cols[1], py, 26, "", "#000000");
+            drawText(`${d.correct || 0}問`, startX + cols[2], py, 26, "", "#000000");
+            drawText(`${parseFloat(d.time).toFixed(2)}秒`, startX + cols[3], py, 26, "", "#000000");
+        });
+    }
+    drawButton(700, 810, 200, 60, "タイトルへ", "#c1e1c1", 26, "#000");
+}
+
+function drawResult() {
+    drawText("終了", BASE_W/2, 250, 120, "bold", "#78c850");
+    drawText(`正解数：${correctCount}／${TOTAL_QUESTIONS}問`, BASE_W/2, 380, 60, "bold", "#000000");
+    drawText(`タイム：${totalTime.toFixed(2)} 秒`, BASE_W/2, 460, 60, "bold", "#000000");
+    drawButton(650, 580, 300, 80, "ランキング", "#c39bd3", 32, "#fff");
+    drawButton(650, 680, 300, 80, "タイトルへ", "#c1e1c1", 32, "#000");
+}
+
+function drawText(txt, x, y, size, weight = "", color = "#000", align = "center") {
+    ctx.fillStyle = color; ctx.font = `${weight} ${size}px 'M PLUS Rounded 1c'`;
+    ctx.textAlign = align; ctx.fillText(txt, x, y);
+}
+
+function drawButton(x, y, w, h, txt, color, size = 32, textColor = "#fff") {
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.1)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 4;
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, 30);
+    ctx.fillStyle = color; ctx.fill();
+    ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+    drawText(txt, x + w/2, y + h/2 + size/3.5, size, "bold", textColor);
+}
+
+function drawBalancedButton(x, y, w, h, txt, ruby, color) {
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.1)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 4;
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, 30);
+    ctx.fillStyle = color; ctx.fill();
+    ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+    const mainSize = 34; const rubySize = 16; const gap = 6;
+    const totalContentHeight = mainSize + rubySize + gap;
+    const startY = y + (h - totalContentHeight) / 2 - 4;
+    drawText(ruby, x + w/2, startY + rubySize / 1.1, rubySize, "bold", "rgba(255,255,255,0.95)");
+    drawText(txt, x + w/2, startY + rubySize + gap + mainSize / 1.1, mainSize, "bold", "#fff");
+}
+
+function drawQuizButton(x, y, w, h, txt, ruby, color) {
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, 40);
+    ctx.fillStyle = color; ctx.fill();
+    ctx.strokeStyle = "#8d7d6a"; ctx.lineWidth = 4; ctx.stroke();
+    const mainSize = 44; const rubySize = 22; const gap = 8;
+    const totalH = mainSize + rubySize + gap;
+    const startY = y + (h - totalH) / 2;
+    drawText(ruby, x + w/2, startY + rubySize / 1.1, rubySize, "bold", "#333333");
+    drawText(txt, x + w/2, startY + rubySize + gap + mainSize / 1.1, mainSize, "bold", "#000000");
+}
+
+async function login() {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    await auth.signInWithPopup(provider);
+}
+
+async function saveScore(time) {
+    let localName = currentPlayerIdx === -1 ? 'ゲスト' : localPlayers[currentPlayerIdx];
+    let worldName = user ? (user.displayName || user.email.split('@')[0]) : 'ゲスト';
+    
+    const scoreObj = { 
+        uid: user?.uid || 'guest', 
+        name: localName, 
+        time: parseFloat(time), 
+        mode: currentMode, 
+        level: currentLevel, 
+        correct: correctCount, 
+        date: Date.now() 
+    };
+    
+    let localScores = JSON.parse(localStorage.getItem('japan_map_scores') || '[]');
+    localScores.push(scoreObj);
+    localScores.sort((a,b) => (b.correct !== a.correct) ? b.correct - a.correct : a.time - b.time);
+    localStorage.setItem('japan_map_scores', JSON.stringify(localScores.slice(0, 100)));
+    
+    if (user) {
+        await db.collection("scores_japan_map").add({ 
+            ...scoreObj, 
+            name: worldName,
+            date: firebase.firestore.FieldValue.serverTimestamp() 
+        });
+    }
+}
+
+async function fetchRanking() {
+    if (rankingTab === 'local') {
+        let localScores = JSON.parse(localStorage.getItem('japan_map_scores') || '[]');
+        rankingData = localScores.sort((a,b) => (b.correct !== a.correct) ? b.correct - a.correct : a.time - b.time);
+    } else {
+        if (!user) { rankingData = []; return; }
+        let q = db.collection("scores_japan_map").where("level", "==", rankingLv).where("mode", "==", rankingMode).orderBy("correct", "desc").orderBy("time", "asc").limit(20);
+        const snap = await q.get();
+        rankingData = snap.docs.map(doc => doc.data());
+    }
+}
+
+init();
+</script>
+</body>
+</html>
