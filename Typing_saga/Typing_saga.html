@@ -376,9 +376,9 @@ function getPlusMultiplier(plus) {
 // コレクション保存用
 function saveCollection() {
     // ローカル保存
-    saveCollection();
+    localStorage.setItem('ts_collection', JSON.stringify(gameState.collection));
 
-    // ★追加: クラウド保存 (ログイン時のみ)
+    // クラウド保存 (ログイン時のみ)
     if (currentUser) {
         db.collection("users").doc(currentUser.uid).set({
             collection: gameState.collection,
@@ -2117,6 +2117,7 @@ canvas.addEventListener('mousedown', e => {
             // ランキング
             if (x > 330 && x < 470 && y > btnStartY + btnGap*2 && y < btnStartY + btnGap*2 + 50) {
                 gameState.scene = SCENES.RANKING;
+                // ★修正: ランキング画面に移動する直前にデータをロード
                 loadRanking(0, 'local'); 
             }
             // コレクション
@@ -2307,6 +2308,41 @@ canvas.addEventListener('mousedown', e => {
         handleResultClick(x, y);
     }
 });
+
+// イベントリスナーの追加
+canvas.addEventListener('touchstart', e => {
+    if (gameState.scene !== SCENES.COLLECTION) return;
+    e.preventDefault();
+    const p = getPoint(e);
+    startCollectionInput(p.x, p.y, e.changedTouches[0].identifier);
+}, {passive: false});
+
+canvas.addEventListener('touchmove', e => {
+    if (gameState.scene !== SCENES.COLLECTION) return;
+    e.preventDefault(); 
+    const p = getPoint(e);
+    moveCollectionInput(p.x, p.y, e.changedTouches[0].identifier);
+}, {passive: false});
+
+canvas.addEventListener('touchend', e => {
+    if (gameState.scene !== SCENES.COLLECTION) return;
+    endCollectionInput();
+});
+
+canvas.addEventListener('mousemove', e => {
+    if (gameState.scene !== SCENES.COLLECTION) return;
+    const p = getPoint(e);
+    moveCollectionInput(p.x, p.y);
+});
+
+canvas.addEventListener('mouseup', () => endCollectionInput());
+canvas.addEventListener('mouseleave', () => endCollectionInput());
+
+// ホイール操作
+canvas.addEventListener('wheel', e => {
+    if (gameState.scene !== SCENES.COLLECTION) return;
+    updateCollectionScroll(e.deltaY);
+}, {passive: true});
 
 function handleResultClick(x, y) {
     if (gameState.difficulty === 2 && gameState.currentFloor === 31 && gameState.maxFloors === 30) {
