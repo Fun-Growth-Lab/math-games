@@ -983,22 +983,9 @@ function gameClear() {
 }
 
 function saveScore() {
-    console.log("【DEBUG: saveScore開始】");
-    console.log("現在のプレイヤー名(gameState.player.name):", gameState.player.name);
-
     // --- ローカル保存 (配列として追加保存) ---
-    // 既存のローカルランキングを取得
-    let rawLocal = localStorage.getItem('myGame_localRanking');
-    console.log("既存のlocalStorageデータ(生):", rawLocal);
-    
-    let localRanking = [];
-    try {
-        localRanking = JSON.parse(rawLocal) || [];
-    } catch(e) {
-        console.error("JSONパースエラー(初期化します):", e);
-        localRanking = [];
-    }
-    console.log("既存のランキング配列:", localRanking);
+    // 既存のローカルランキングを取得（なければ空配列）
+    let localRanking = JSON.parse(localStorage.getItem('myGame_localRanking')) || [];
 
     // ローカル用データを作成（冒険者名を使用）
     const localScoreData = {
@@ -1008,7 +995,6 @@ function saveScore() {
         difficulty: gameState.difficulty,
         dateString: new Date().toLocaleString()
     };
-    console.log("これから追加するデータ:", localScoreData);
 
     // リストに追加
     localRanking.push(localScoreData);
@@ -1017,10 +1003,7 @@ function saveScore() {
     localRanking.sort((a, b) => b.floor - a.floor);
 
     // 保存実行
-    const jsonToSave = JSON.stringify(localRanking);
-    localStorage.setItem('myGame_localRanking', jsonToSave);
-    console.log("localStorageに保存しました:", jsonToSave);
-    
+    localStorage.setItem('myGame_localRanking', JSON.stringify(localRanking));
     // (互換性のためlastScoreも更新)
     localStorage.setItem('myGame_lastScore', JSON.stringify(localScoreData));
 
@@ -1047,11 +1030,9 @@ function saveScore() {
             console.error("Error adding document: ", error);
         });
     }
-    console.log("【DEBUG: saveScore終了】");
 }
 
 async function loadRanking(diff, mode) {
-    console.log(`【DEBUG: loadRanking開始】 diff:${diff}, mode:${mode}`);
     rankingState.data = [];
     
     if (mode === 'local') {
@@ -1059,22 +1040,14 @@ async function loadRanking(diff, mode) {
         try {
             // ★修正: 新しい保存先 'myGame_localRanking' (配列) を読み込む
             const saved = localStorage.getItem('myGame_localRanking');
-            console.log("読み込んだlocalStorage(生):", saved);
-
             if (saved) {
                 localData = JSON.parse(saved);
-                // 万が一配列でない場合の対処
-                if (!Array.isArray(localData)) {
-                    console.warn("データが配列ではありませんでした。配列に変換します:", localData);
-                    localData = [localData];
-                }
+                // 万が一配列でない場合の救済
+                if (!Array.isArray(localData)) localData = [localData];
             }
         } catch(e) {
-            console.error("読み込みエラー:", e);
             localData = [];
         }
-        
-        console.log("フィルタリング前の全ローカルデータ:", localData);
         
         // 難易度でフィルタリングしてソート
         const filtered = localData.filter(d => d.difficulty === diff);
@@ -1085,19 +1058,11 @@ async function loadRanking(diff, mode) {
         });
         
         // 上位10件を表示用に整形
-        rankingState.data = filtered.slice(0, 10).map((d, index) => {
-            // 名前チェック
-            if (!d.name) {
-                console.warn(`[警告] ${index}番目のデータに名前がありません!`, d);
-            }
-            return {
-                name: d.name || "Unknown",
-                floor: d.floor,
-                gold: (d.gold !== undefined) ? d.gold : 0
-            };
-        });
-        
-        console.log("最終的に表示するデータ:", rankingState.data);
+        rankingState.data = filtered.slice(0, 10).map(d => ({
+            name: d.name || "Unknown",
+            floor: d.floor,
+            gold: (d.gold !== undefined) ? d.gold : 0
+        }));
         
     } else {
         // Firebase (World)
@@ -2173,7 +2138,11 @@ canvas.addEventListener('mousedown', e => {
             // ランキング
             if (x > 330 && x < 470 && y > btnStartY + btnGap*2 && y < btnStartY + btnGap*2 + 50) {
                 gameState.scene = SCENES.RANKING;
-                // ★修正: ランキング画面に移動する直前にデータをロード
+                
+                // ★修正: 画面を開くときに、ボタンの選択状態も「初級・ローカル」にリセットする
+                rankingState.difficulty = 0;
+                rankingState.mode = 'local';
+                
                 loadRanking(0, 'local'); 
             }
             // コレクション
