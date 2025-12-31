@@ -983,14 +983,30 @@ function gameClear() {
 }
 
 function saveScore() {
+    // --- 制圧階層の計算 ---
+    // 基本ルール: 到達階 - 1 (1F到達で倒れたら0F制圧)
+    let recordFloor = gameState.currentFloor - 1;
+    if (recordFloor < 0) recordFloor = 0;
+
+    // 例外ルール: 各難易度のボス(10F, 20F, 30F)を倒してクリアした場合のみ、その階を制圧とする
+    const maxFloors = [10, 20, 30];
+    const currentMax = maxFloors[gameState.difficulty];
+    
+    // 条件: 「最終階層」かつ「生存(HP>0)」かつ「敵(ボス)を撃破済み」
+    if (gameState.currentFloor === currentMax && 
+        gameState.player.hp > 0 && 
+        gameState.enemy && gameState.enemy.hp <= 0) {
+        recordFloor = gameState.currentFloor;
+    }
+
     // --- ローカル保存 (配列として追加保存) ---
     // 既存のローカルランキングを取得（なければ空配列）
     let localRanking = JSON.parse(localStorage.getItem('myGame_localRanking')) || [];
 
-    // ローカル用データを作成（冒険者名を使用）
+    // ローカル用データを作成（計算した制圧階層 recordFloor を使用）
     const localScoreData = {
         name: gameState.player.name || "名無し", 
-        floor: gameState.currentFloor,
+        floor: recordFloor, // ★修正
         gold: gameState.player.gold,
         difficulty: gameState.difficulty,
         dateString: new Date().toLocaleString()
@@ -1016,7 +1032,7 @@ function saveScore() {
         db.collection("scores_typing_saga").add({
             uid: currentUser.uid,
             name: mailId, // WorldはGoogle ID
-            floor: gameState.currentFloor,
+            floor: recordFloor, // ★修正: 計算した制圧階層を使用
             gold: gameState.player.gold,
             difficulty: gameState.difficulty,
             mode: 'world',
