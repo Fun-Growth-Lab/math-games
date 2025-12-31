@@ -2479,40 +2479,26 @@ window.addEventListener('keydown', e => {
 });
 
 function saveScore() {
-    // ローカル保存 (履歴として追記する形に修正)
-    let localData = [];
-    try {
-        const saved = localStorage.getItem('myGame_lastScore');
-        if (saved) {
-            localData = JSON.parse(saved);
-            // もし過去のデータが配列でない場合（単一オブジェクトだった場合）の救済措置
-            if (!Array.isArray(localData)) localData = [localData];
-        }
-    } catch(e) {
-        localData = [];
-    }
-
-    const newScore = {
-        name: gameState.player.name, // startGameで設定された名前を使用
+    // ローカル保存
+    const localScore = {
         floor: gameState.currentFloor,
         gold: gameState.player.gold,
-        difficulty: gameState.difficulty,
-        date: new Date().toLocaleString()
+        difficulty: gameState.difficulty
     };
-    
-    // 配列に追加して保存
-    localData.push(newScore);
-    localStorage.setItem('myGame_lastScore', JSON.stringify(localData));
+    localStorage.setItem('myGame_lastScore', JSON.stringify(localScore));
 
     // Firebase保存
     if (currentUser) {
+        // ★修正: メールアドレスの@より前をIDとして取得
+        const mailId = currentUser.email ? currentUser.email.split('@')[0] : "名無し";
+
         db.collection("scores_typing_saga").add({
             uid: currentUser.uid,
-            name: gameState.player.name || currentUser.displayName || "名無し",
+            name: mailId, // ★修正: ゲーム内の名前ではなく、メールIDを強制的に使用
             floor: gameState.currentFloor,
             gold: gameState.player.gold,
             difficulty: gameState.difficulty,
-            mode: 'local',
+            mode: 'world', // ★修正: 'local' と固定されていたのを 'world' に変更
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             dateString: new Date().toLocaleString()
         })
