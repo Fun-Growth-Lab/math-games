@@ -983,26 +983,43 @@ function gameClear() {
 }
 
 function saveScore() {
-    // ローカル保存
-    const localScore = {
+    // --- ローカル保存 (配列として追加保存) ---
+    // 既存のローカルランキングを取得（なければ空配列）
+    let localRanking = JSON.parse(localStorage.getItem('myGame_localRanking')) || [];
+
+    // ローカル用データを作成（冒険者名を使用）
+    const localScoreData = {
+        name: gameState.player.name || "名無し", 
         floor: gameState.currentFloor,
         gold: gameState.player.gold,
-        difficulty: gameState.difficulty
+        difficulty: gameState.difficulty,
+        dateString: new Date().toLocaleString()
     };
-    localStorage.setItem('myGame_lastScore', JSON.stringify(localScore));
 
-    // Firebase保存
+    // リストに追加
+    localRanking.push(localScoreData);
+
+    // スコア順（階層の深い順）にソート
+    localRanking.sort((a, b) => b.floor - a.floor);
+
+    // 保存実行
+    localStorage.setItem('myGame_localRanking', JSON.stringify(localRanking));
+    // (互換性のためlastScoreも更新)
+    localStorage.setItem('myGame_lastScore', JSON.stringify(localScoreData));
+
+
+    // --- Firebase保存 (World / Google ID) ---
     if (currentUser) {
-        // ★修正: メールアドレスの@より前をIDとして取得
+        // メールアドレスの@より前をIDとして取得
         const mailId = currentUser.email ? currentUser.email.split('@')[0] : "名無し";
 
         db.collection("scores_typing_saga").add({
             uid: currentUser.uid,
-            name: mailId, // ★修正: ゲーム内名ではなくメールIDを使用するように変更
+            name: mailId, // WorldはGoogle ID
             floor: gameState.currentFloor,
             gold: gameState.player.gold,
             difficulty: gameState.difficulty,
-            mode: 'local',
+            mode: 'world',
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             dateString: new Date().toLocaleString()
         })
@@ -1021,9 +1038,11 @@ async function loadRanking(diff, mode) {
     if (mode === 'local') {
         let localData = [];
         try {
-            const saved = localStorage.getItem('myGame_lastScore');
+            // ★修正: 新しい保存先 'myGame_localRanking' (配列) を読み込む
+            const saved = localStorage.getItem('myGame_localRanking');
             if (saved) {
                 localData = JSON.parse(saved);
+                // 万が一配列でない場合の対処
                 if (!Array.isArray(localData)) localData = [localData];
             }
         } catch(e) {
@@ -1038,6 +1057,7 @@ async function loadRanking(diff, mode) {
             return (b.gold || 0) - (a.gold || 0);
         });
         
+        // 上位10件を表示用に整形
         rankingState.data = filtered.slice(0, 10).map(d => ({
             name: d.name || "Unknown",
             floor: d.floor,
@@ -1067,8 +1087,6 @@ async function loadRanking(diff, mode) {
             
         } catch (e) {
             console.error("Ranking Error:", e);
-            // ★重要: Worldランキングが出ない場合、F12コンソールを確認してください。
-            // "The query requires an index..." という赤文字のリンクをクリックしてインデックスを作成する必要があります。
             if (e.code === 'failed-precondition') {
                 console.log("%c▼▼▼ このURLをクリックしてインデックスを作成してください ▼▼▼", "color:red; font-size:16px; font-weight:bold;");
                 console.log(e.message); 
@@ -2477,39 +2495,6 @@ window.addEventListener('keydown', e => {
         typingEngine.handleInput(e.key);
     }
 });
-
-function saveScore() {
-    // ローカル保存
-    const localScore = {
-        floor: gameState.currentFloor,
-        gold: gameState.player.gold,
-        difficulty: gameState.difficulty
-    };
-    localStorage.setItem('myGame_lastScore', JSON.stringify(localScore));
-
-    // Firebase保存
-    if (currentUser) {
-        // ★修正: メールアドレスの@より前をIDとして取得
-        const mailId = currentUser.email ? currentUser.email.split('@')[0] : "名無し";
-
-        db.collection("scores_typing_saga").add({
-            uid: currentUser.uid,
-            name: mailId, // ★修正: ゲーム内の名前ではなく、メールIDを強制的に使用
-            floor: gameState.currentFloor,
-            gold: gameState.player.gold,
-            difficulty: gameState.difficulty,
-            mode: 'world', // ★修正: 'local' と固定されていたのを 'world' に変更
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            dateString: new Date().toLocaleString()
-        })
-        .then(() => {
-            console.log("Score saved to Firestore!");
-        })
-        .catch((error) => {
-            console.error("Error adding document: ", error);
-        });
-    }
-}
 
 function handleShopClick(x, y) {
     if (x>10 && x<130 && y>10 && y<50) {
