@@ -980,20 +980,27 @@ async function loadRanking(diff, mode) {
     rankingState.data = [];
     
     if (mode === 'local') {
-        let localData = JSON.parse(localStorage.getItem('myGame_lastScore') || '[]');
-        if (!Array.isArray(localData)) localData = [localData];
+        let localData = [];
+        try {
+            const saved = localStorage.getItem('myGame_lastScore');
+            if (saved) {
+                localData = JSON.parse(saved);
+                if (!Array.isArray(localData)) localData = [localData];
+            }
+        } catch(e) {
+            localData = [];
+        }
         
-        // ローカルデータのソートと整形
+        // 難易度でフィルタリングしてソート
         const filtered = localData.filter(d => d.difficulty === diff);
         filtered.sort((a,b) => {
+            // 到達階層優先、次に所持金
             if (b.floor !== a.floor) return b.floor - a.floor;
-            // goldで比較（なければ0）
             return (b.gold || 0) - (a.gold || 0);
         });
         
-        // drawRankingが読みやすい形式に変換
         rankingState.data = filtered.slice(0, 10).map(d => ({
-            name: d.name || "You",
+            name: d.name || "Unknown",
             floor: d.floor,
             gold: (d.gold !== undefined) ? d.gold : 0
         }));
@@ -1014,16 +1021,17 @@ async function loadRanking(diff, mode) {
                 list.push({
                     name: d.name,
                     floor: d.floor,
-                    gold: d.gold // Firestoreには必ずgoldがあるはず
+                    gold: d.gold 
                 });
             });
             rankingState.data = list;
             
         } catch (e) {
             console.error("Ranking Error:", e);
-            // ★重要: インデックスエラーの場合、コンソールに出るURLをクリックしてください
+            // ★重要: Worldランキングが出ない場合、F12コンソールを確認してください。
+            // "The query requires an index..." という赤文字のリンクをクリックしてインデックスを作成する必要があります。
             if (e.code === 'failed-precondition') {
-                console.log("%c▼▼▼ このURLをクリックしてインデックスを作成してください ▼▼▼", "color:red; font-size:14px;");
+                console.log("%c▼▼▼ このURLをクリックしてインデックスを作成してください ▼▼▼", "color:red; font-size:16px; font-weight:bold;");
                 console.log(e.message); 
             }
         }
@@ -1303,7 +1311,7 @@ function drawRanking() {
 
     drawText("順位", 100, 210, 20, "#aaa");
     drawText("名前", 200, 210, 20, "#aaa");
-    drawText("スコア", 500, 210, 20, "#aaa");
+    drawText("スコア(G)", 500, 210, 20, "#aaa");
     drawText("制圧階層", 700, 210, 20, "#aaa");
     
     ctx.strokeStyle = "#777";
@@ -1323,12 +1331,11 @@ function drawRanking() {
             else if (i===2) rankColor = "#cd7f32";
             
             drawText(`${i+1}`, 120, y, 20, rankColor, "center");
-            drawText(d.name || "You", 200, y, 20, "#fff");
+            drawText(d.name || "Unknown", 200, y, 20, "#fff");
             
-            // ★修正: d.score ではなく d.gold を表示するように変更
-            // (古いデータでgoldがない場合は0を表示)
-            const displayGold = (d.gold !== undefined) ? d.gold : 0;
-            drawText(`${displayGold}G`, 500, y, 20, "#ffeb3b");
+            // ★修正: d.score ではなく d.gold を表示
+            const val = (d.gold !== undefined) ? d.gold : 0;
+            drawText(`${val}G`, 500, y, 20, "#ffeb3b");
             
             drawText(`${d.floor}F`, 740, y, 20, "#fff", "center");
         });
@@ -2396,34 +2403,51 @@ window.addEventListener('keydown', e => {
     }
 });
 
-function startGame(diff) {
-    gameState.difficulty = diff;
-    gameState.maxFloors = (diff + 1) * 10;
-    gameState.currentFloor = 1;
-    gameState.player.hp = 500; gameState.player.maxHp = 500; 
-    gameState.player.atk = 10; gameState.player.def = 10;
-    gameState.typingScore = 0; 
-    gameState.player.hpUpCount = 0; 
-    
-    // ★追加: 一時停止フラグの初期化
-    gameState.typing.isPaused = false;
-    
-    if (currentAdventurer) {
-        gameState.player.imgId = currentAdventurer.imgId;
-    } else {
-        gameState.player.imgId = 0; 
+function saveScore() {
+    // ローカル保存 (履歴として追記する形に修正)
+    let localData = [];
+    try {
+        const saved = localStorage.getItem('myGame_lastScore');
+        if (saved) {
+            localData = JSON.parse(saved);
+            // もし過去のデータが配列でない場合（単一オブジェクトだった場合）の救済措置
+            if (!Array.isArray(localData)) localData = [localData];
+        }
+    } catch(e) {
+        localData = [];
     }
 
-    if (diff === 0) gameState.player.gold = 1000;
-    else if (diff === 1) gameState.player.gold = 500;
-    else gameState.player.gold = 0;
-
-    gameState.player.weapon = { name: "きのえだ", atk: 3, crit: 0, hit: 100, plus: 0 };
-    gameState.player.armor = { name: "ふだんぎ", def: 1, guardHalf: 0, guardFull: 0, plus: 0 };
+    const newScore = {
+        name: gameState.player.name, // startGameで設定された名前を使用
+        floor: gameState.currentFloor,
+        gold: gameState.player.gold,
+        difficulty: gameState.difficulty,
+        date: new Date().toLocaleString()
+    };
     
-    gameState.scene = SCENES.TYPING;
-    typingEngine.refillDeck(); 
-    typingEngine.reset();
+    // 配列に追加して保存
+    localData.push(newScore);
+    localStorage.setItem('myGame_lastScore', JSON.stringify(localData));
+
+    // Firebase保存
+    if (currentUser) {
+        db.collection("scores_typing_saga").add({
+            uid: currentUser.uid,
+            name: gameState.player.name || currentUser.displayName || "名無し",
+            floor: gameState.currentFloor,
+            gold: gameState.player.gold,
+            difficulty: gameState.difficulty,
+            mode: 'local',
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            dateString: new Date().toLocaleString()
+        })
+        .then(() => {
+            console.log("Score saved to Firestore!");
+        })
+        .catch((error) => {
+            console.error("Error adding document: ", error);
+        });
+    }
 }
 
 function handleShopClick(x, y) {
