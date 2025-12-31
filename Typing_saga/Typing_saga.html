@@ -131,9 +131,16 @@ auth.onAuthStateChanged(user => {
     
     if (user) {
         if(loginBtn) loginBtn.style.display = 'none';
+        
+        // ★修正: メールアドレスのID部分(@より前)を取得
+        const mailId = user.email ? user.email.split('@')[0] : 'Guest';
+        // ★修正: currentUserにIDを紐付けておく
+        currentUser.mailId = mailId;
+
         if(welcome) {
             welcome.style.display = 'block';
-            welcome.textContent = `Welcome, ${user.displayName}!`;
+            // ★修正: 表示名をメールIDに変更
+            welcome.textContent = `Welcome, ${mailId}!`;
         }
 
         // ★重要: クラウドからコレクションを取得してローカルと統合
@@ -148,13 +155,20 @@ auth.onAuthStateChanged(user => {
                     if (typeof gameState !== 'undefined' && gameState.collection) {
                         currentLocal = gameState.collection;
                     } else {
-                        const saved = localStorage.getItem('myGame_collection');
+                        // ★修正: キー名を ts_collection に統一
+                        const saved = localStorage.getItem('ts_collection');
                         if (saved) currentLocal = JSON.parse(saved);
                     }
 
                     // 2. マージ (重複排除)
-                    const mergedWeapons = Array.from(new Set([...currentLocal.weapons, ...cloudData.collection.weapons]));
-                    const mergedArmors = Array.from(new Set([...currentLocal.armors, ...cloudData.collection.armors]));
+                    // ★修正: 配列が存在しない場合のエラー防止
+                    const localWeapons = currentLocal.weapons || [];
+                    const cloudWeapons = cloudData.collection.weapons || [];
+                    const localArmors = currentLocal.armors || [];
+                    const cloudArmors = cloudData.collection.armors || [];
+
+                    const mergedWeapons = Array.from(new Set([...localWeapons, ...cloudWeapons]));
+                    const mergedArmors = Array.from(new Set([...localArmors, ...cloudArmors]));
                     
                     const newCollection = { weapons: mergedWeapons, armors: mergedArmors };
 
@@ -162,9 +176,23 @@ auth.onAuthStateChanged(user => {
                     if (typeof gameState !== 'undefined') {
                         gameState.collection = newCollection;
                     }
-                    localStorage.setItem('myGame_collection', JSON.stringify(newCollection));
+                    // ★修正: キー名を ts_collection に統一
+                    localStorage.setItem('ts_collection', JSON.stringify(newCollection));
                     
                     console.log("Collection synced and saved to local.");
+
+                    // 4. ★追加: マージした完全版データをクラウドにも書き戻す (双方向同期)
+                    db.collection("users").doc(user.uid).set({
+                        collection: newCollection,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    }, { merge: true })
+                    .then(() => console.log("Merged collection synced back to cloud."))
+                    .catch(err => console.error("Error syncing back to cloud:", err));
+                }
+            } else {
+                // クラウドにデータがない場合は、現在のローカルデータを初回保存
+                if (typeof gameState !== 'undefined' && gameState.collection) {
+                    saveCollection();
                 }
             }
         });
@@ -172,6 +200,7 @@ auth.onAuthStateChanged(user => {
     } else {
         if(loginBtn) loginBtn.style.display = 'block';
         if(welcome) welcome.style.display = 'none';
+        currentUser = null;
     }
 });
 
