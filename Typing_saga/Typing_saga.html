@@ -120,8 +120,38 @@ if (!firebase.apps.length) {
     auth = firebase.auth();
 }
 
+// ログイン状態の監視とコレクションの読み込み
 auth.onAuthStateChanged(user => {
     currentUser = user;
+
+    if (user) {
+        // ★追加: ログイン時にクラウドからコレクションをロードしてマージ
+        db.collection("users").doc(user.uid).get().then((doc) => {
+            if (doc.exists) {
+                const data = doc.data();
+                if (data.collection) {
+                    // ローカルとクラウドのコレクションを統合（重複排除）
+                    // ※ gameState変数がまだ定義されていないタイミングで呼ばれる可能性があるためチェックを入れています
+                    if (typeof gameState !== 'undefined' && gameState.collection) {
+                        const mergedWeapons = Array.from(new Set([...gameState.collection.weapons, ...data.collection.weapons]));
+                        const mergedArmors = Array.from(new Set([...gameState.collection.armors, ...data.collection.armors]));
+                        
+                        gameState.collection.weapons = mergedWeapons;
+                        gameState.collection.armors = mergedArmors;
+                        
+                        // 統合結果をローカルにも保存
+                        localStorage.setItem('ts_collection', JSON.stringify({
+                            weapons: gameState.collection.weapons,
+                            armors: gameState.collection.armors
+                        }));
+                        console.log("Collection synced from cloud.");
+                    }
+                }
+            }
+        }).catch(error => {
+            console.error("Error loading collection:", error);
+        });
+    }
 });
 
 // --- Game State ---
@@ -288,10 +318,22 @@ function getPlusMultiplier(plus) {
 
 // コレクション保存用
 function saveCollection() {
-    localStorage.setItem('ts_collection', JSON.stringify({
-        weapons: gameState.collection.weapons,
-        armors: gameState.collection.armors
-    }));
+    // ローカル保存
+    saveCollection();
+
+    // ★追加: クラウド保存 (ログイン時のみ)
+    if (currentUser) {
+        db.collection("users").doc(currentUser.uid).set({
+            collection: gameState.collection,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true })
+        .then(() => {
+            console.log("Collection saved to cloud.");
+        })
+        .catch((error) => {
+            console.error("Error saving collection to cloud: ", error);
+        });
+    }
 }
 
 class TypingEngine {
@@ -884,68 +926,69 @@ function gameClear() {
 }
 
 function saveScore() {
-    // 1. ローカルランキング保存用データを作成
-    // ★修正: ローカルでは「冒険者名」を使用する
-    const localName = currentAdventurer ? currentAdventurer.name : "You";
-    
-    const localScoreData = {
-        score: gameState.typingScore,
-        floor: gameState.currentFloor - 1,
-        difficulty: gameState.difficulty,
-        timestamp: Date.now(),
-        name: localName
+    // ローカル保存
+    const localScore = {
+        floor: gameState.currentFloor,
+        gold: gameState.player.gold,
+        difficulty: gameState.difficulty
     };
+    localStorage.setItem('myGame_lastScore', JSON.stringify(localScore));
 
-    // ローカルストレージに保存
-    let localData = JSON.parse(localStorage.getItem('ts_ranking') || '[]');
-    localData.push(localScoreData);
-    localData.sort((a,b) => {
-        if (b.score !== a.score) return b.score - a.score;
-        return b.floor - a.floor;
-    });
-    localStorage.setItem('ts_ranking', JSON.stringify(localData));
-
-    // 2. ワールドランキング保存用データを作成（ログイン時のみ）
-    // ★維持: こちらはGoogleアカウント情報を使用（変更なし）
+    // Firebase保存
     if (currentUser) {
-        const globalName = currentUser.displayName || "Unknown";
-        
-        const globalScoreData = {
-            score: gameState.typingScore,
-            floor: gameState.currentFloor - 1,
+        db.collection("scores_typing_saga").add({
+            uid: currentUser.uid,
+            name: gameState.player.name || currentUser.displayName || "名無し",
+            floor: gameState.currentFloor,
+            gold: gameState.player.gold,
             difficulty: gameState.difficulty,
-            timestamp: Date.now(),
-            name: globalName
-        };
-
-        db.collection('rankings').add(globalScoreData)
-          .catch(err => console.error("Error adding document: ", err));
+            mode: 'local',
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            dateString: new Date().toLocaleString()
+        })
+        .then(() => {
+            console.log("Score saved to Firestore!");
+        })
+        .catch((error) => {
+            console.error("Error adding document: ", error);
+        });
     }
 }
 
 async function loadRanking(diff, mode) {
     rankingState.data = [];
+    
+    // ローカルモードの場合（既存のコードを維持）
     if (mode === 'local') {
-        let localData = JSON.parse(localStorage.getItem('ts_ranking') || '[]');
+        let localData = JSON.parse(localStorage.getItem('myGame_lastScore') || '[]');
+        // ローカル保存形式が配列でない場合（単一オブジェクトの場合）の対応
+        if (!Array.isArray(localData)) localData = [localData];
+        
         const filtered = localData.filter(d => d.difficulty === diff);
         filtered.sort((a,b) => {
-            if (b.score !== a.score) return b.score - a.score;
-            return b.floor - a.floor;
+            if (b.floor !== a.floor) return b.floor - a.floor;
+            return b.gold - a.gold;
         });
         rankingState.data = filtered.slice(0, 10);
     } else {
+        // クラウド（Firebase）モード
         try {
-            const snapshot = await db.collection('rankings')
+            // ★修正: コレクション名を変更し、ソート対象を floor と gold に変更
+            const snapshot = await db.collection('scores_typing_saga')
                 .where('difficulty', '==', diff)
-                .orderBy('score', 'desc')
                 .orderBy('floor', 'desc')
+                .orderBy('gold', 'desc')
                 .limit(10)
                 .get();
+            
             const list = [];
             snapshot.forEach(doc => {
                 list.push(doc.data());
             });
             rankingState.data = list;
+            
+            // データ取得後に再描画が必要な場合、ここに drawRanking() などを呼ぶ必要があるかもしれません
+            // またはメインループが自動で描画してくれます
         } catch (e) {
             console.error("Firestore error:", e);
             rankingState.data = [];
