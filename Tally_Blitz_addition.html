@@ -16,15 +16,27 @@
         body {
             margin: 0;
             overflow: hidden;
-            background: var(--bg-gradient);
+            background: #333; /* レターボックス用の背景色（黒帯） */
             font-family: "M PLUS Rounded 1c", "Hiragino Kaku Gothic ProN", sans-serif;
             user-select: none;
             -webkit-user-select: none;
             touch-action: none;
             color: var(--text-color);
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
         
-        body::before {
+        /* 背景装飾用コンテナ */
+        #bg-layer {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg-gradient);
+            z-index: -2;
+        }
+        #bg-layer::before {
             content: "";
             position: absolute;
             top: -50%; left: -50%; width: 200%; height: 200%;
@@ -36,10 +48,15 @@
             opacity: 0.5;
         }
 
+        /* ゲーム全体のコンテナ：1280x720 (16:9) に完全固定 */
         #container {
+            width: 1280px;
+            height: 720px;
             display: flex;
-            width: 100vw;
-            height: 100vh;
+            position: absolute;
+            box-shadow: 0 0 50px rgba(0,0,0,0.3);
+            background-color: transparent;
+            transform-origin: center center;
         }
 
         #left-panel, #right-panel {
@@ -51,11 +68,12 @@
             flex-direction: column;
             border: 2px solid rgba(255,255,255,0.8);
         }
-        #left-panel { flex: 0.8; justify-content: center; border-right: none; }
+        
+        #left-panel { flex: 1.2; justify-content: center; border-right: none; }
         #right-panel { flex: 1.2; align-items: center; justify-content: flex-start; border-left: none; }
         
         #game-area {
-            flex: 2.5;
+            flex: 2.1;
             position: relative;
             background-color: rgba(255, 255, 255, 0.2);
             overflow: hidden;
@@ -84,13 +102,14 @@
             text-align: center;
         }
         
-        #right-panel-content { width: 100%; display: flex; flex-direction: column; align-items: center; }
+        #right-panel-content { width: 100%; display: flex; flex-direction: column; align-items: center; transition: opacity 0.3s; }
         
         #next-block-area {
             width: 100%; height: 140px;
             background: #fff; border-radius: 25px;
             margin-bottom: 20px;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center;
             position: relative;
             box-shadow: inset 0 0 15px rgba(0,0,0,0.05);
             border: 4px solid #f0f4f8;
@@ -118,6 +137,11 @@
         #disp-round { color: #84fab0; font-size: 1.5rem; }
         #disp-combo { color: #a18cd1; font-size: 2.6rem; }
         #disp-score { color: #fbc2eb; }
+
+        #target-score-container {
+            font-size: 0.9rem; color: #888; margin-top: 5px; font-weight: bold;
+            background: rgba(255,255,255,0.5); padding: 2px 8px; border-radius: 8px;
+        }
 
         .btn {
             background: linear-gradient(to bottom, #8fd3f4, #84fab0);
@@ -151,12 +175,23 @@
             display: flex; justify-content: center; align-items: center; gap: 10px;
         }
 
-        #overlay, #ranking-overlay, #round-clear-overlay {
+        #overlay, #ranking-overlay, #round-clear-overlay, #name-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(255, 255, 255, 0.4); backdrop-filter: blur(5px);
             display: flex; justify-content: center; align-items: center;
             z-index: 100; flex-direction: column; color: #555;
         }
+        
+        #title-screen {
+            position: absolute; 
+            top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center; 
+            align-items: center;
+            z-index: 10;
+        }
+        
         .overlay-content {
             background: rgba(255,255,255,0.95); padding: 25px; border-radius: 30px;
             text-align: center; width: 90%; max-width: 550px;
@@ -165,11 +200,16 @@
         }
         .hidden { display: none !important; }
 
-        .difficulty-container { display: flex; justify-content: center; gap: 10px; margin-bottom: 25px; align-items: flex-end; width: 100%; }
-        .diff-wrapper { display: flex; flex-direction: column; align-items: center; flex: 1; max-width: 120px; }
-        .diff-wrapper .btn { white-space: nowrap; width: 100%; padding: 12px 5px; font-size: 0.95rem; margin: 5px 0; }
+        #title-screen h1 { white-space: nowrap; }
+
+        .difficulty-container { 
+            display: flex; justify-content: center; gap: 8px; 
+            margin-bottom: 20px; align-items: flex-end; width: 100%; 
+        }
+        .diff-wrapper { display: flex; flex-direction: column; align-items: center; flex: 1; max-width: 140px; }
+        .diff-wrapper .btn { white-space: nowrap; width: 100%; padding: 12px 5px; font-size: 1.1rem; margin: 5px 0; }
         .crown-icon { font-size: 1.8rem; margin-bottom: 5px; visibility: hidden; }
-        .clear-count-text { font-size: 1rem; color: #888; font-weight: bold; margin-top: 5px; }
+        .clear-count-text { font-size: 1rem; color: #888; font-weight: bold; margin-top: 5px; text-shadow: 2px 2px 0 #fff; }
 
         .ranking-container { display: flex; gap: 5px; margin-bottom: 10px; height: 250px; }
         .ranking-box { background: #fff; padding: 5px; border-radius: 15px; flex: 1; overflow-y: auto; border: 2px solid #f0f0f0; }
@@ -197,39 +237,46 @@
             width: 100%; border-radius: 50px; height: 60px;
         }
 
-        @media (max-width: 768px) {
-            #container { flex-direction: column; }
-            #left-panel { display: none; }
-            #game-area { flex: 3; box-shadow: none; border-radius: 0; }
-            #right-panel { 
-                flex: 1.2; flex-direction: row; padding: 10px; align-items: center; justify-content: space-between;
-                border-top: none; background: rgba(255,255,255,0.9);
-            }
-            #right-panel-content { width: 45%; font-size: 0.8rem; align-items: flex-start; }
-            #next-block-area { 
-                width: 80px; height: 80px; margin-bottom: 0; margin-right: 10px;
-                position: absolute; top: 10px; left: 10px; display: none; border-width: 2px;
-            }
-            .info-group { display: flex; flex-direction: row; gap: 10px; margin-bottom: 0; text-align: left; }
-            .info-item { border: none; align-items: flex-start; margin-bottom: 0; }
-            .info-value { font-size: 1.4rem; text-shadow: none; }
-            #puzzle-controls { width: 50%; height: auto; gap: 8px; margin: 0; display: grid;}
-            .ctrl-btn { height: 55px; width: 55px; font-size: 1.4rem;}
-            #btn-drop { height: 55px; width: 100%;}
+        #name-list {
+            list-style: none; padding: 0; margin: 20px 0;
+            display: flex; flex-direction: column; gap: 10px;
         }
+        .name-entry {
+            display: flex; justify-content: space-between; align-items: center;
+            background: #f9f9f9; padding: 10px 15px; border-radius: 15px;
+            border: 2px solid #eee; cursor: pointer; transition: 0.2s;
+        }
+        .name-entry:hover { background: #e0f7fa; border-color: #b2ebf2; }
+        .name-entry.selected { background: #fff3e0; border-color: #ffe0b2; color: #ef6c00; font-weight: bold; }
+        .delete-name-btn {
+            background: #ffcdd2; color: #d32f2f; border: none; border-radius: 50%;
+            width: 30px; height: 30px; cursor: pointer; font-weight: bold;
+        }
+        
+        #new-name-area {
+            display: flex; gap: 10px; justify-content: center; margin-bottom: 20px;
+            padding: 15px; background: #fff; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        }
+        #new-name-input {
+            padding: 10px; border-radius: 10px; border: 2px solid #ddd;
+            width: 180px; text-align: center; font-size: 1rem;
+        }
+
     </style>
 </head>
 <body>
+
+<div id="bg-layer"></div>
 
 <div id="container">
     <div id="left-panel">
         <h2>あそびかた</h2>
         <div style="font-size: 0.95rem; line-height: 1.8; color: #666; font-weight: bold;">
-            <p>1. <span style="color:#ff9a9e">すうじ</span>をおとして<br>したのブロックと<br>たしざん するよ！</p>
-            <p>2. たして<span style="color:#a18cd1">「10」</span>に<br>なると きえるよ！</p>
-            <p>3. <strong>10より ちいさい</strong>と<br>くっついて<br>すうじが ふえるよ。</p>
-            <p>4. <strong>11いじょう</strong>は<br>おじゃまブロックに<br>なっちゃうぞ。</p>
-            <p>5. <strong>スコア達成</strong>で<br>次のラウンドへ！<br>だんだん速くなるよ。</p>
+            <p>1. <span style="color:#ff9a9e">すうじ</span>をおとして<br>したのブロックと たしざん するよ！</p>
+            <p>2. たして<span style="color:#a18cd1">「10」</span>に なると きえるよ！</p>
+            <p>3. <strong>10より ちいさい</strong>と くっついて<br>すうじが ふえるよ。</p>
+            <p>4. <strong>11いじょう</strong>は<br>おじゃまブロックに なっちゃうぞ。</p>
+            <p>5. <strong>スコア達成</strong>で 次のラウンドへ！<br>したから ブロックが<br>せりあがるのが はやくなるよ。</p>
         </div>
         <div style="margin-top:auto; text-align:center;">
             <button id="btn-to-title" class="btn btn-danger hidden">タイトルへ</button>
@@ -239,42 +286,50 @@
     <div id="game-area">
         <canvas id="gameCanvas"></canvas>
 
-        <div id="title-screen" class="overlay-content" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); z-index:10; width: 95%; max-width: 550px;">
-            <h1 style="font-size:3.5rem; margin:0 0 10px 0; color:#ff9a9e; font-family: 'M PLUS Rounded 1c', sans-serif; text-shadow: 4px 4px 0 #fff, 6px 6px 0 #fad0c4;">TALLY BLITZ</h1>
-            <p style="font-size:1.2rem; margin-top:0; margin-bottom:30px; font-weight:bold; color:#a18cd1;">- たしざんパズル -</p>
+        <div id="title-screen">
+            <h1 style="font-size:3.8rem; margin:0 0 5px 0; color:#ff9a9e; font-family: 'M PLUS Rounded 1c', sans-serif; text-shadow: 4px 4px 0 #fff, 6px 6px 0 #fad0c4; letter-spacing: 2px;">TALLY BLITZ</h1>
+            <p style="font-size:1.1rem; margin:0 0 5px 0; font-weight:bold; color:#ff9a9e; text-shadow: 1px 1px 0 #fff;">（タリーブリッツ）</p>
+            <p style="font-size:1.5rem; margin-top:0; margin-bottom:30px; font-weight:bold; color:#a18cd1; text-shadow: 2px 2px 0 #fff;">- たしざんパズル -</p>
+            
+            <div style="margin-bottom: 25px;">
+                <button id="btn-player-name" class="btn" style="background:#fff; color:#555; border:3px solid #ff9a9e; width:300px; font-size:1.2rem; border-radius:50px; box-shadow:0 5px 0 #ffcccb; padding:15px;">
+                    プレイヤー: 名無しさん
+                </button>
+            </div>
             
             <div class="difficulty-container">
                 <div class="diff-wrapper">
                     <div id="crown-easy" class="crown-icon">👑</div>
                     <button id="btn-easy" class="btn btn-success">しょきゅう</button>
                     <div id="clear-easy" class="clear-count-text">0回プレイ</div>
-                    <div style="font-size:0.75rem; color:#aaa;">3000点でクリア</div>
+                    <div style="font-size:0.8rem; color:#666; font-weight:bold; background:rgba(255,255,255,0.7); padding:2px 8px; border-radius:10px; margin-top:2px;">3000点でクリア</div>
                 </div>
                 <div class="diff-wrapper">
                     <div id="crown-normal" class="crown-icon">👑</div>
                     <button id="btn-normal" class="btn">ちゅうきゅう</button>
                     <div id="clear-normal" class="clear-count-text">0回プレイ</div>
-                    <div style="font-size:0.75rem; color:#aaa;">5000点でクリア</div>
+                    <div style="font-size:0.8rem; color:#666; font-weight:bold; background:rgba(255,255,255,0.7); padding:2px 8px; border-radius:10px; margin-top:2px;">5000点でクリア</div>
                 </div>
                 <div class="diff-wrapper">
                     <div id="crown-hard" class="crown-icon">👑</div>
                     <button id="btn-hard" class="btn btn-danger">じょうきゅう</button>
                     <div id="clear-hard" class="clear-count-text">0回プレイ</div>
-                    <div style="font-size:0.75rem; color:#aaa;">10000点でクリア</div>
+                    <div style="font-size:0.8rem; color:#666; font-weight:bold; background:rgba(255,255,255,0.7); padding:2px 8px; border-radius:10px; margin-top:2px;">10000点でクリア</div>
                 </div>
             </div>
 
-            <button id="btn-view-ranking" class="btn btn-warning" style="width: 80%; max-width: 300px; font-weight:bold;">ランキング</button>
-            
-            <div style="margin-top: 20px; border-top: 2px dashed #eee; padding-top:15px; width:100%;">
-                <p id="auth-status" style="margin: 0 0 5px 0; font-size: 0.9rem; color: #aaa; font-weight: bold;">未ログイン</p>
-                <button id="btn-login" class="btn btn-auth" style="max-width: 300px; margin: 10px auto;">
+            <div style="margin-bottom: 20px; text-align:center;">
+                <p id="auth-status" style="margin: 0 0 5px 0; font-size: 0.9rem; color: #666; font-weight: bold; background:rgba(255,255,255,0.5); padding:2px 10px; border-radius:10px; display:inline-block;">未ログイン</p>
+                <button id="btn-login" class="btn btn-auth" style="width: 280px; margin: 5px auto;">
                     <span>G</span> Googleでログイン
                 </button>
-                <button id="btn-logout" class="btn btn-danger hidden" style="width: 80%; max-width: 300px;">ログアウト</button>
+                <button id="btn-logout" class="btn btn-danger hidden" style="width: 280px; margin: 5px auto;">ログアウト</button>
             </div>
-            
-            <button id="btn-index" class="btn" style="background: #e0e0e0; color:#888; border-color:#ccc; box-shadow: 0 5px 0 #bbb; margin-top: 15px; width: 80%; max-width: 300px;">INDEXへ戻る</button>
+
+            <div style="display:flex; gap:20px; justify-content: center;">
+                <button id="btn-view-ranking" class="btn btn-warning" style="width: 160px; font-weight:bold;">ランキング</button>
+                <button id="btn-index" class="btn" style="background: #e0e0e0; color:#888; border-color:#ccc; box-shadow: 0 5px 0 #bbb; width: 160px;">INDEXへ戻る</button>
+            </div>
         </div>
 
         <div id="game-result" style="display: none; position: absolute; top:50%; left:50%; transform:translate(-50%, -50%); z-index: 20; width: 85%; max-width: 400px;"></div>
@@ -317,10 +372,30 @@
                 </div>
             </div>
         </div>
+
+        <div id="name-manage-screen" class="hidden">
+            <div id="name-overlay">
+                <div class="overlay-content">
+                    <h2 style="color:#ff9a9e; border-bottom:none;">プレイヤー選択</h2>
+                    <p style="font-size:0.9rem;">※最大5人まで登録できます</p>
+                    
+                    <div id="new-name-area">
+                        <input type="text" id="new-name-input" placeholder="ひらがなのみ" maxlength="10">
+                        <button id="btn-add-name" class="btn btn-success" style="padding: 10px 15px; margin:0; font-size:0.9rem;">登録</button>
+                    </div>
+
+                    <ul id="name-list">
+                        </ul>
+                    
+                    <button id="btn-close-name" class="btn">とじる</button>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <div id="right-panel">
-        <div id="right-panel-content">
+        <div id="right-panel-content" class="hidden">
             <div id="next-block-area">
                 <div id="next-label">つぎ</div>
                 <canvas id="nextCanvas" width="220" height="80"></canvas>
@@ -329,6 +404,7 @@
                 <div class="info-item">
                     <span class="info-label">LEVEL</span>
                     <span id="disp-level" class="info-value">-</span>
+                    <div id="target-score-container">目標: <span id="disp-target">0</span></div>
                 </div>
                 <div class="info-item">
                     <span class="info-label">ROUND</span>
@@ -347,7 +423,7 @@
 
         <div id="puzzle-controls" class="hidden">
             <div class="ctrl-btn" id="btn-left">◀</div>
-            <div class="ctrl-btn" id="btn-rotate">↻</div>
+            <div class="ctrl-btn" id="btn-rotate">⇄</div>
             <div class="ctrl-btn" id="btn-right">▶</div>
             <div class="ctrl-btn" id="btn-drop">↓</div>
         </div>
@@ -413,7 +489,7 @@
             const docId = `${userId}_${difficulty}_${Date.now()}`;
             await setDoc(doc(db, COLLECTION_NAME, docId), {
                 uid: userId,
-                name: userName,
+                name: userName, 
                 difficulty: difficulty,
                 score: score,
                 createdAt: serverTimestamp()
@@ -444,16 +520,68 @@
 const CROWN_THRESHOLDS = { BRONZE: 2000, SILVER: 5000, GOLD: 10000 };
 const CONFIGS = {
     EASY: { label: "しょきゅう", floorRows: 2, probs: [0.5, 0.8], riseInterval: 10, clearScore: 3000 },
-    NORMAL: { label: "ちゅうきゅう", floorRows: 3, probs: [0.25, 0.75], riseInterval: 7, clearScore: 5000 },
-    HARD: { label: "じょうきゅう", floorRows: 4, probs: [0.20, 0.50], riseInterval: 5, clearScore: 10000 }
+    NORMAL: { label: "ちゅうきゅう", floorRows: 2, probs: [0.25, 0.75], riseInterval: 7, clearScore: 5000 },
+    HARD: { label: "じょうきゅう", floorRows: 2, probs: [0.20, 0.50], riseInterval: 5, clearScore: 10000 }
 };
 
-// 【重要】天井裏（見えない領域）の実装
+const NG_WORDS_HIRAGANA = [
+    'しね', 'しぬ', 'しに', 'ころす', 'ころせ', 'さつがい', 'くたばれ',
+    'じさつ', 'ぎさつ', 'つるす', 'れんたん', 'しにたい',
+    'てろ', 'てろりすと', 'ばくは', 'ばくだん', 'ほうか',
+    'はんざい', 'ごうとう', 'ゆうかい', 'かんきん', 'おそう',
+    'やくざ', 'ぼうりょく', 'はんぐれ', 'ちんぴら', 'まふぃあ',
+    'たいま', 'まやく', 'かくせいざい', 'しゃぶ', 'どらっぐ', 'こかいん',
+    'へろいん', 'えくすたしー', 'だっぽう', 'きめせく',
+    'いじめ', 'ぎゃくたい',
+    'ばか', 'あほ', 'まぬけ', 'きちがい', 'き違い',
+    'うざい', 'うざ', 'きもい', 'きも', 'きしょい', 'きえろ',
+    'くず', 'ごみ', 'ごみむし', 'かす', 'ざこ', 'ぜつ',
+    'ぶす', 'でぶ', 'はげ', 'ちび', 'でっぱ', 'いなかもの',
+    'うじ', 'はいぼく', 'まけいぬ', 'おつむ', 'のうたりん',
+    'ていのう', 'ちしょう', 'しょうがい', 'がいじ', 'かたわ', 'びっこ',
+    'めくら', 'つんぼ', 'おし', 'どじん', 'えた', 'ひにん',
+    'たひ', 'たひね',
+    'うせろ', 'だまれ',
+    'ちんちん', 'ちんこ', 'ちんぽ', 'ちんか', 'まら', 'さお',
+    'まんこ', 'まんしゅう', 'まんげ', 'われめ', 'おまた',
+    'くり', 'くりとりす', 'いんしん', 'いんかく', 'びらびら',
+    'こうがん', 'たまきん', 'きんたま', 'ふぐり',
+    'おっぱい', 'ちち', 'にゅうりん', 'にゅうとう', 'きょにゅう', 'ひんにゅう',
+    'けつ', 'あなる', 'こうもん', 'けつのあな',
+    'えろ', 'えっち', 'すけべ', 'へんたい', 'むっつり', 'しこ',
+    'せっくす', 'せいこう', 'まぐわい', 'そうにゅう', 'はめる',
+    'おなにー', 'じい', 'しこしこ', 'ふぇら', 'ぱいずり', 'くんに',
+    'いらま', 'しっしん', 'なかだし', 'ごっくん', 'ぶっかけ',
+    'しおふき', 'ぜっちょう', 'いく', 'いかせろ', 'あえぎ',
+    'どうてい', 'しょじょ', 'やりまん', 'やりちん', 'びっち',
+    'せふれ', 'ぱこ', 'ぱこぱこ', 'わいせつ', 'ろり', 'しょた', 'ぺど',
+    'きんしん', 'じゅうかん', 'りょうじょく', 'らんこう', 'すかんと',
+    'のーぱん', 'ぱんちら',
+    'れいぷ', 'ごうかん', 'ちかん', 'とうさつ', 'のぞき', 'ろしゅつ',
+    'ふうぞく', 'そーぷ', 'へるす', 'でりへる', 'ぴんさろ', 'いめくら',
+    'あだると', 'えーぶい', 'えぶい', 'ぽるの', 'うらびでお', 'むしゅうせい',
+    'えんこう', 'えんじょ', 'うり', 'かいしゅん', 'ばいしゅん',
+    'ぱぱかつ', 'ままかつ', 'うりせん',
+    'うんこ', 'うんち', 'くそ', 'げり', 'べん', 'ふん',
+    'しっこ', 'しょんべん', 'にょう', 'ほうにょう',
+    'へ', 'おなら', 'げろ', 'たん',
+    'うんえい', 'こうしき', 'すたっふ', 'かんり', 'ぱとろーる',
+    'じえむ', 'げーむますたー', 'ますたー', 'あどみん', 'しすてむ',
+    'さーばー', 'あかばん', 'ばん', 'ちーと', 'ちーたー', 'ばぐ',
+    'らいん', 'かかお', 'すかいぷ', 'いんすた', 'ついったー', 'でぃすこ',
+    'でんわ', 'ばんごう', 'けいたい', 'あどれす', 'めあど', 'じゅうしょ',
+    'あお', 'あいたい', 'まちあわせ', 'ほてる', 'らぶほ', 'おふかい',
+    'ぱすわーど', 'ぱす', 'あかうんと', 'こじんじょうほう'
+];
+
+// 天井裏（見えない領域）の実装
 const COLS = 5;
 const VISIBLE_ROWS = 8;
-const EXTRA_ROWS = 4; // 天井裏の行数
-const ROWS = VISIBLE_ROWS + EXTRA_ROWS; // 全体の行数（12行）
+const EXTRA_ROWS = 4;
+const ROWS = VISIBLE_ROWS + EXTRA_ROWS;
 const BLOCK_VAL_OBSTACLE = 99;
+// スペシャルブロックID
+const BLOCK_VAL_SPECIAL = 100;
 const NEXT_BLOCK_SIZE = 50; 
 
 // Animation Speed Constants
@@ -485,6 +613,7 @@ const ui = {
     combo: document.getElementById('disp-combo'),
     level: document.getElementById('disp-level'),
     round: document.getElementById('disp-round'),
+    target: document.getElementById('disp-target'), 
     title: document.getElementById('title-screen'),
     result: document.getElementById('game-result'),
     roundClearScreen: document.getElementById('round-clear-screen'),
@@ -500,21 +629,47 @@ const ui = {
     btnNextRound: document.getElementById('btn-next-round'),
     btnQuitRound: document.getElementById('btn-quit-round'),
     btnIndex: document.getElementById('btn-index'),
+    rightPanelContent: document.getElementById('right-panel-content'),
     crowns: { EASY: document.getElementById('crown-easy'), NORMAL: document.getElementById('crown-normal'), HARD: document.getElementById('crown-hard') },
-    clears: { EASY: document.getElementById('clear-easy'), NORMAL: document.getElementById('clear-normal'), HARD: document.getElementById('clear-hard') }
+    clears: { EASY: document.getElementById('clear-easy'), NORMAL: document.getElementById('clear-normal'), HARD: document.getElementById('clear-hard') },
+    btnPlayerName: document.getElementById('btn-player-name'),
+    nameManageScreen: document.getElementById('name-manage-screen'),
+    newNameInput: document.getElementById('new-name-input'),
+    btnAddName: document.getElementById('btn-add-name'),
+    btnCloseName: document.getElementById('btn-close-name'),
+    nameList: document.getElementById('name-list')
 };
 
+function fitToScreen() {
+    const container = document.getElementById('container');
+    const baseW = 1280;
+    const baseH = 720;
+    const winW = window.innerWidth;
+    const winH = window.innerHeight;
+    const scale = Math.min(winW / baseW, winH / baseH);
+    container.style.transform = `scale(${scale})`;
+}
+window.addEventListener('resize', fitToScreen);
+fitToScreen(); 
+
 function resize() {
-    const rect = canvas.parentElement.getBoundingClientRect();
-    state.width = rect.width;
-    state.height = rect.height;
+    const baseTotalW = 1280;
+    const baseTotalH = 720;
+    const gameAreaFlex = 2.1;
+    const totalFlex = 1.2 + 2.1 + 1.2; 
+    
+    const calcW = Math.floor(baseTotalW * (gameAreaFlex / totalFlex));
+    const calcH = baseTotalH;
+
+    state.width = calcW;
+    state.height = calcH;
+    
     canvas.width = state.width;
     canvas.height = state.height;
     
     const paddingTop = 60; 
     const availableH = state.height - paddingTop;
     const availableW = state.width;
-    // サイズ計算は「見える行数」で行う
     const sizeByH = availableH / (VISIBLE_ROWS + 0.5);
     const sizeByW = availableW / (COLS + 1);
     state.blockSize = Math.min(sizeByH, sizeByW);
@@ -524,21 +679,128 @@ function resize() {
     state.boardX = (state.width - state.boardW) / 2;
     state.boardY = paddingTop + (availableH - state.boardH) / 2;
 }
-window.addEventListener('resize', resize);
-resize();
+resize(); 
 
 function randomInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
 
-// --- Storage ---
+const KEY_NAMES = 'tally_blitz_names_v2';
+const KEY_CURRENT_NAME = 'tally_blitz_current_name';
+let currentPlayerName = "名無しさん";
+
+function loadPlayerNames() {
+    const stored = localStorage.getItem(KEY_NAMES);
+    return stored ? JSON.parse(stored) : [];
+}
+function savePlayerNames(names) {
+    localStorage.setItem(KEY_NAMES, JSON.stringify(names));
+}
+function getCurrentName() {
+    return localStorage.getItem(KEY_CURRENT_NAME) || "名無しさん";
+}
+function setCurrentName(name) {
+    localStorage.setItem(KEY_CURRENT_NAME, name);
+    currentPlayerName = name;
+    ui.btnPlayerName.textContent = `プレイヤー: ${name}`;
+}
+
+currentPlayerName = getCurrentName();
+ui.btnPlayerName.textContent = `プレイヤー: ${currentPlayerName}`;
+
+ui.btnPlayerName.onclick = () => {
+    ui.nameManageScreen.classList.remove('hidden');
+    renderNameList();
+};
+ui.btnCloseName.onclick = () => {
+    ui.nameManageScreen.classList.add('hidden');
+};
+ui.btnAddName.onclick = () => {
+    const name = ui.newNameInput.value.trim();
+    const res = validateName(name);
+    if(!res.valid) {
+        alert(res.reason); return;
+    }
+    const names = loadPlayerNames();
+    if(names.length >= 5) {
+        alert("登録できるのは5人までです。"); return;
+    }
+    if(names.includes(res.name)) {
+        alert("その名前は既に登録されています。"); return;
+    }
+    names.push(res.name);
+    savePlayerNames(names);
+    ui.newNameInput.value = "";
+    renderNameList();
+};
+
+function renderNameList() {
+    const names = loadPlayerNames();
+    ui.nameList.innerHTML = '';
+    
+    if(names.length === 0) {
+        ui.nameList.innerHTML = '<li style="text-align:center; color:#999;">名前が登録されていません</li>';
+    }
+
+    names.forEach(name => {
+        const li = document.createElement('li');
+        li.className = 'name-entry';
+        if(name === currentPlayerName) li.classList.add('selected');
+        
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = name;
+        nameSpan.style.flex = "1";
+        nameSpan.onclick = () => {
+            setCurrentName(name);
+            renderNameList();
+        };
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'delete-name-btn';
+        delBtn.textContent = '×';
+        delBtn.onclick = (e) => {
+            e.stopPropagation();
+            if(confirm(`${name} を削除しますか？`)) {
+                let currentNames = loadPlayerNames();
+                currentNames = currentNames.filter(n => n !== name);
+                savePlayerNames(currentNames);
+                if(name === currentPlayerName) setCurrentName("名無しさん");
+                renderNameList();
+            }
+        };
+
+        li.appendChild(nameSpan);
+        li.appendChild(delBtn);
+        ui.nameList.appendChild(li);
+    });
+}
+
+function validateName(name) {
+    if(!name) return { valid: false, reason: "名前を入力してください。" };
+    if(!/^[ぁ-んー]+$/.test(name)) {
+        return { valid: false, reason: "名前はひらがなと「ー」のみ使用できます。" };
+    }
+    for(const ng of NG_WORDS_HIRAGANA) {
+        if(name.includes(ng)) {
+            return { valid: false, reason: "その名前は使用できません。" };
+        }
+    }
+    return { valid: true, name: name };
+}
+
 function getRankingKey(d) { return `tally_blitz_v3_rank_${d}`; }
 function getClearKey(d) { return `tally_blitz_v3_clear_${d}`; }
 function getLocalRanking(d) { return JSON.parse(localStorage.getItem(getRankingKey(d))) || []; }
 function getClearCount(d) { return parseInt(localStorage.getItem(getClearKey(d))) || 0; }
+
 function saveScore(d, s) {
     let r = getLocalRanking(d);
     r.push(s); r.sort((a,b)=>b-a); r = r.slice(0,10);
     localStorage.setItem(getRankingKey(d), JSON.stringify(r));
-    if(window.currentUser && window.saveOnlineScore) window.saveOnlineScore(window.currentUser.uid, window.currentUser.displayName, d, s);
+    
+    let currentInput = currentPlayerName;
+
+    if(window.saveOnlineScore && window.currentUser) {
+        window.saveOnlineScore(window.currentUser.uid, currentInput, d, s);
+    }
 }
 function incrementClear(d) {
     let c = getClearCount(d) + 1;
@@ -560,7 +822,6 @@ function updateTitleStats() {
     });
 }
 
-// --- Block Logic ---
 function getBlockOffsets(rot, len) {
     const offsets = [];
     for(let i=0; i<len; i++) {
@@ -578,21 +839,22 @@ function getOccupiedCells(bx, by, rot, len) {
     const offsets = getBlockOffsets(rot, len);
     const iX = Math.round(bx);
     const iY = Math.floor(by); 
-    return offsets.map(o => ({x: iX + o.dx, y: iY + o.dy}));
+    return offsets.map(o => {
+        let x = iX + o.dx;
+        x = (x % COLS + COLS) % COLS;
+        return {x: x, y: iY + o.dy};
+    });
 }
 
 function canPlace(bx, by, rot, values) {
     const cells = getOccupiedCells(bx, by, rot, values.length);
     for(let c of cells) {
-        if(c.x < 0 || c.x >= COLS) return false;
-        // 天井裏があるので、y >= 0 であれば配置可能（天井裏の上限チェックはspawn時などに）
         if(c.y >= ROWS) return false;
         if(c.y >= 0 && state.grid[c.y][c.x] !== 0) return false;
     }
     return true;
 }
 
-// --- Game Loop Logic ---
 function initGrid() {
     state.grid = Array.from({length: ROWS}, () => Array(COLS).fill(0));
     state.animOffsets = Array.from({length: ROWS}, () => Array(COLS).fill(0));
@@ -602,7 +864,7 @@ function initGrid() {
         for(let c=0; c<COLS; c++) state.grid[r][c] = BLOCK_VAL_OBSTACLE;
     }
     const numRow = ROWS - 1 - floorR;
-    if(numRow >= EXTRA_ROWS) { // 天井裏より下にのみ初期配置
+    if(numRow >= EXTRA_ROWS) {
         for(let c=0; c<COLS; c++) state.grid[numRow][c] = randomInt(1, 9);
     }
 }
@@ -623,7 +885,6 @@ function generateBlockValues() {
 function spawnBlock() {
     if(state.nextBlockValues.length === 0) state.nextBlockValues = generateBlockValues();
     const values = [...state.nextBlockValues];
-    // 出現位置を1段下げて（EXTRA_ROWS）、画面上端に見える位置にする
     state.activeBlock = { x: Math.floor(COLS/2)-1, y: EXTRA_ROWS, values: values, rot: 0, offsetY: 0 };
     state.nextBlockValues = generateBlockValues();
     state.fastDropping = false;
@@ -634,28 +895,12 @@ function spawnBlock() {
     draw(); 
 }
 
-function rotateBlock() {
+function slideBlock() {
     if(!state.activeBlock || state.inputLocked || state.fastDropping) return;
     const b = state.activeBlock;
-    const nextRot = (b.rot + 1) % 4;
-    const len = b.values.length;
-    let baseDy = 0;
-    if (b.rot === 0 && nextRot === 1) baseDy = -(len - 1);
-    else if (b.rot === 1 && nextRot === 2) baseDy = (len - 1);
-
-    const moves = [
-        {dx: 0, dy: baseDy}, {dx: 0, dy: 0},
-        {dx: -1, dy: baseDy}, {dx: 1, dy: baseDy},
-        {dx: -1, dy: 0}, {dx: 1, dy: 0},
-        {dx: -2, dy: baseDy}, {dx: 2, dy: baseDy}
-    ];
-    for(let m of moves) {
-        if(canPlace(b.x + m.dx, b.y + m.dy, nextRot, b.values)) {
-            b.x += m.dx; b.y += m.dy; b.rot = nextRot; 
-            draw(); 
-            return;
-        }
-    }
+    const v = b.values.pop();
+    b.values.unshift(v);
+    draw();
 }
 
 function moveBlock(dir) {
@@ -681,13 +926,50 @@ function lockBlock() {
     const landY = Math.round(b.y);
     const cells = getOccupiedCells(b.x, landY, b.rot, b.values.length);
     cells.forEach((c, i) => { 
-        // 負の座標（天井裏のさらに上）は無視するか、ゲームオーバーにするか
-        // ここでは配列範囲内なら格納
         if(c.y >= 0 && c.y < ROWS) state.grid[c.y][c.x] = b.values[i]; 
     });
 
     draw();
     setTimeout(() => { processTurn(); }, WAIT_AFTER_DROP); 
+}
+
+function triggerSpecialEffect(startX, startY) {
+    let toClear = new Set(); 
+    let queue = [{c: startX, r: startY}];
+    toClear.add(`${startX},${startY}`);
+
+    let processed = 0;
+    while(processed < queue.length) {
+        let curr = queue[processed++];
+        let cx = curr.c;
+        let cy = curr.r;
+
+        for(let c=0; c<COLS; c++) {
+            let key = `${c},${cy}`;
+            if(!toClear.has(key)) {
+                if(state.grid[cy][c] === BLOCK_VAL_SPECIAL) queue.push({c:c, r:cy});
+                toClear.add(key);
+            }
+        }
+        for(let r=0; r<ROWS; r++) {
+            let key = `${cx},${r}`;
+            if(!toClear.has(key)) {
+                if(state.grid[r][cx] === BLOCK_VAL_SPECIAL) queue.push({c:cx, r:r});
+                toClear.add(key);
+            }
+        }
+    }
+
+    toClear.forEach(key => {
+        let parts = key.split(',');
+        let c = parseInt(parts[0]);
+        let r = parseInt(parts[1]);
+        if(state.grid[r][c] !== 0) {
+            state.grid[r][c] = 0;
+            // 修正：キラキラエフェクト
+            spawnParticle(c, r, "✨", "#8fd3f4");
+        }
+    });
 }
 
 async function processTurn() {
@@ -705,36 +987,43 @@ async function processTurn() {
             
             let changeOccurred = false;
             for(let c=0; c<COLS; c++) {
-                // ROWS全体をスキャン
                 for(let r=ROWS-2; r>=0; r--) {
                     const upper = state.grid[r][c];
                     const lower = state.grid[r+1][c];
-                    if(upper > 0 && lower > 0 && upper !== BLOCK_VAL_OBSTACLE && lower !== BLOCK_VAL_OBSTACLE) {
+                    const isUpperNum = (upper >= 1 && upper <= 9);
+                    const isLowerNum = (lower >= 1 && lower <= 9);
+
+                    if(isUpperNum && isLowerNum) {
                         const sum = upper + lower;
                         if(sum < 10) {
                             state.grid[r+1][c] = sum; state.grid[r][c] = 0;
-                            // 天井裏ならエフェクトは出さない、またはクリップされる
                             spawnParticle(c, r+1, "合体!", "#3498db"); changeOccurred = true;
                         } else if(sum === 10) {
                             state.grid[r+1][c] = 0; state.grid[r][c] = 0;
-                            let bonus = 0;
-                            if(r+2 < ROWS && state.grid[r+2][c] === BLOCK_VAL_OBSTACLE) {
-                                state.grid[r+2][c] = 0; spawnParticle(c, r+2, "Break!", "#ff9a9e"); bonus = 10;
-                            }
-                            state.combo++; totalTens++;
                             
-                            // 【変更】スコア計算: (基礎点10 + ボーナス) * コンボ
-                            // これで単発は x1、2回目は x2...となる
+                            let bonus = 0;
+                            if(r+2 < ROWS) {
+                                let targetVal = state.grid[r+2][c];
+                                if(targetVal === BLOCK_VAL_OBSTACLE) {
+                                    state.grid[r+2][c] = 0; spawnParticle(c, r+2, "Break!", "#ff9a9e"); bonus = 10;
+                                } else if(targetVal === BLOCK_VAL_SPECIAL) {
+                                    triggerSpecialEffect(c, r+2);
+                                    bonus = 50; 
+                                }
+                            }
+
+                            state.combo++; totalTens++;
                             let point = (10 + bonus) * state.combo;
                             state.score += Math.floor(point);
-                            
                             spawnParticle(c, r+0.5, "10!", "#f6d365"); spawnParticle(2, 3, `+${Math.floor(point)}`, "#f6d365");
                             changeOccurred = true; 
-                            // コンボ演出にスコアも含める
                             showComboAnim(state.combo + " COMBO", point);
                         } else {
-                            if(lower !== BLOCK_VAL_OBSTACLE) { 
-                                state.grid[r+1][c] = BLOCK_VAL_OBSTACLE; state.grid[r][c] = sum - 10;
+                            let nextVal = BLOCK_VAL_OBSTACLE;
+                            if(Math.random() < 0.05) nextVal = BLOCK_VAL_SPECIAL;
+
+                            if(lower !== BLOCK_VAL_OBSTACLE && lower !== BLOCK_VAL_SPECIAL) { 
+                                state.grid[r+1][c] = nextVal; state.grid[r][c] = sum - 10;
                                 spawnParticle(c, r+1, "Over!", "#999"); changeOccurred = true;
                             }
                         }
@@ -757,8 +1046,6 @@ async function processTurn() {
     if(state.score >= state.targetScore) { showRoundClear(); return; }
 
     if(state.riseCounter >= state.currentRiseInterval) {
-        // 【変更】ゲームオーバー判定（せり上がり時）
-        // 可視領域最上段(EXTRA_ROWS)にブロックがあるか、全ての列(c=0を含む)をチェック
         let overflow = false;
         for(let c=0; c<COLS; c++) { if(state.grid[EXTRA_ROWS][c] !== 0) overflow = true; }
         if(overflow) { gameOver(); return; }
@@ -766,7 +1053,10 @@ async function processTurn() {
         state.riseCounter = 0;
         
         for(let r=0; r<ROWS-1; r++) { state.grid[r] = [...state.grid[r+1]]; }
-        state.grid[ROWS-1] = Array.from({length: COLS}, () => randomInt(1, 9));
+        
+        state.grid[ROWS-1] = Array.from({length: COLS}, () => {
+            return (Math.random() < 0.05) ? BLOCK_VAL_SPECIAL : randomInt(1, 9);
+        });
         
         for(let r=0; r<ROWS; r++) {
             for(let c=0; c<COLS; c++) { if(state.grid[r][c]!==0) state.animOffsets[r][c] = state.blockSize; }
@@ -779,8 +1069,6 @@ async function processTurn() {
     if(totalTens === 0) state.combo = 0;
     updateUI();
     
-    // 【変更】ゲームオーバー判定（ターン終了時）
-    // 可視領域最上段(EXTRA_ROWS)にブロックがあるか、全ての列(c=0を含む)をチェック
     for(let c=0; c<COLS; c++) { if(state.grid[EXTRA_ROWS][c] !== 0) { gameOver(); return; } }
     
     state.inputLocked = false; spawnBlock();
@@ -839,7 +1127,6 @@ function showComboAnim(text, score) {
 }
 function wait(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
-// --- Update & Draw Loop ---
 function update() {
     if(state.screen !== 'PLAYING') {
         requestAnimationFrame(update);
@@ -864,8 +1151,6 @@ function update() {
         if(p.life <= 0) state.particles.splice(i,1);
     }
     if(state.comboAnim) {
-        // フェードイン＆アウトの演出用にlifeを使う
-        // 0.02 -> 0.01 に変更して表示時間を2倍に
         state.comboAnim.life -= 0.02; 
         if(state.comboAnim.life <= 0) state.comboAnim = null;
     }
@@ -881,7 +1166,6 @@ requestAnimationFrame(update);
 
 class Particle {
     constructor(c, r, text, color) {
-        // 座標計算時に天井裏分を考慮 (visual座標)
         let visualR = r - EXTRA_ROWS;
         this.x = state.boardX + c * state.blockSize + state.blockSize/2;
         this.y = state.boardY + visualR * state.blockSize + state.blockSize/2;
@@ -889,7 +1173,6 @@ class Particle {
     }
     update() { this.y += this.vy; this.life -= 0.04; } 
     draw(ctx) {
-        // 天井裏なら描画しない
         if(this.y < state.boardY) return;
         ctx.globalAlpha = Math.max(0, this.life);
         ctx.fillStyle = this.color; ctx.strokeStyle = "white";
@@ -903,7 +1186,8 @@ function spawnParticle(c, r, text, color) { state.particles.push(new Particle(c,
 function draw() {
     ctx.clearRect(0, 0, state.width, state.height);
     
-    // 盤面エリアのクリッピング設定（天井裏を隠すため）
+    if(state.screen === 'TITLE') return;
+
     ctx.save();
     ctx.beginPath();
     ctx.rect(state.boardX - 10, state.boardY - 10, state.boardW + 20, state.boardH + 20);
@@ -914,8 +1198,7 @@ function draw() {
     ctx.roundRect(state.boardX - 5, state.boardY - 5, state.boardW + 10, state.boardH + 10, 15);
     ctx.fill();
 
-    // Grid
-    for(let r=EXTRA_ROWS; r<ROWS; r++) { // 見える範囲だけグリッド描画
+    for(let r=EXTRA_ROWS; r<ROWS; r++) { 
         let visualR = r - EXTRA_ROWS;
         for(let c=0; c<COLS; c++) {
             const x = state.boardX + c * state.blockSize;
@@ -934,7 +1217,6 @@ function draw() {
         }
     }
 
-    // Static Blocks
     for(let r=0; r<ROWS; r++) {
         for(let c=0; c<COLS; c++) {
             if(state.grid[r][c] !== 0) {
@@ -944,7 +1226,6 @@ function draw() {
         }
     }
 
-    // Ghost & Active Block
     if(state.activeBlock) {
         const b = state.activeBlock;
         let dy = 0;
@@ -958,37 +1239,33 @@ function draw() {
         cells.forEach((c, i) => {
             const offsets = getBlockOffsets(b.rot, b.values.length);
             const off = offsets[i];
-            const px = b.x + off.dx;
+            
+            const gridX = c.x; 
+            
             const py = b.y + off.dy; 
-            const gridX = px; 
             const gridY = Math.floor(py);
             const fracY = (py - gridY) * state.blockSize;
             drawBlock(ctx, gridX, gridY, b.values[i], true, false, fracY);
         });
     }
 
-    // Effects
     for(let i=state.particles.length-1; i>=0; i--) { state.particles[i].draw(ctx); }
     
-    // クリップ解除
     ctx.restore();
 
-    // コンボ演出（盤面の上に描画したいのでクリップ外）
     if(state.comboAnim) {
         const anim = state.comboAnim;
         const life = anim.life;
         
         ctx.save();
         
-        // 演出：中央から少し上に移動
         const startY = state.height/2 + 20;
         const endY = state.height/2 - 50;
-        const currentY = endY + (startY - endY) * life; // life 1->0 で上に移動
+        const currentY = endY + (startY - endY) * life;
 
-        // 演出：フェードイン＆アウト
         let alpha = 1.0;
-        if(life > 0.8) alpha = (1.0 - life) * 5.0; // 0.0 -> 1.0
-        else if(life < 0.2) alpha = life * 5.0;    // 1.0 -> 0.0
+        if(life > 0.8) alpha = (1.0 - life) * 5.0; 
+        else if(life < 0.2) alpha = life * 5.0;    
         
         ctx.translate(state.width/2, currentY);
         let scale = 1 + Math.sin(life * Math.PI) * 0.1;
@@ -996,29 +1273,22 @@ function draw() {
         
         ctx.globalAlpha = alpha;
         
-        // --- コンボ数と得点の動的サイズ計算 ---
         const comboNum = parseInt(anim.text) || 0;
-        // コンボサイズ: 基本50px + (コンボ数 * 5px)。最大+30pxまで。
         const comboSize = 50 + Math.min(30, comboNum * 5);
-        // 得点サイズ: 基本55px + (得点 / 10)。最大+25pxまで。
         const scoreSize = 55 + Math.min(25, anim.score / 10);
 
-        // コンボ数
         ctx.fillStyle = "#ffdf40"; ctx.strokeStyle = "#fff";
         ctx.font = `900 ${comboSize}px 'M PLUS Rounded 1c', sans-serif`;
         ctx.textAlign = "center"; ctx.textBaseline = "bottom"; ctx.lineWidth = 6;
         ctx.shadowColor = "rgba(0,0,0,0.2)"; ctx.shadowBlur = 10;
         
-        // 位置調整: 少し上にずらす
         ctx.strokeText(anim.text, 0, -10);
         ctx.fillText(anim.text, 0, -10);
 
-        // スコア
         ctx.fillStyle = "#fff"; 
         ctx.font = `800 ${scoreSize}px 'M PLUS Rounded 1c', sans-serif`;
         ctx.textBaseline = "top";
         
-        // 位置調整: 少し下にずらす
         ctx.strokeText(`+${anim.score}`, 0, 15);
         ctx.fillText(`+${anim.score}`, 0, 15);
 
@@ -1027,7 +1297,6 @@ function draw() {
 }
 
 function drawBlock(ctx, c, r, val, isActive=false, isGhost=false, offsetY_px=0) {
-    // 天井裏補正
     let visualR = r - EXTRA_ROWS;
     
     const x = state.boardX + c * state.blockSize;
@@ -1035,12 +1304,18 @@ function drawBlock(ctx, c, r, val, isActive=false, isGhost=false, offsetY_px=0) 
     const s = state.blockSize;
     const p = 2; 
 
-    // 天井裏より上にある場合は描画しない（クリッピングで消えるが、無駄な描画を省く）
     if (y + s < state.boardY && !isActive) return;
 
     let bg = "#ecf0f1"; let fg = "#2c3e50";
     if(val === BLOCK_VAL_OBSTACLE) { 
         bg = "#b2bec3"; 
+    } else if(val === BLOCK_VAL_SPECIAL) {
+        // 修正：スペシャルブロックのデザイン（パステル宝石風）
+        const grad = ctx.createLinearGradient(x, y, x+s, y+s);
+        grad.addColorStop(0, "#e0c3fc"); // 薄紫
+        grad.addColorStop(0.5, "#8ec5fc"); // 水色
+        grad.addColorStop(1, "#e0c3fc");
+        bg = grad;
     } else {
         const colors = [
             "#ff9a9e", "#a18cd1", "#fad0c4", "#84fab0", 
@@ -1060,12 +1335,32 @@ function drawBlock(ctx, c, r, val, isActive=false, isGhost=false, offsetY_px=0) 
 
     ctx.globalAlpha = alphaBg;
     ctx.fillStyle = bg;
-    ctx.beginPath();
-    ctx.roundRect(x+p, y+p, s-p*2, s-p*2, s*0.4); 
-    ctx.fill();
+    
+    if(val === BLOCK_VAL_SPECIAL) {
+        // スペシャルブロックの形状（ひし形）
+        ctx.shadowColor = "#8ec5fc"; ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.moveTo(x+s*0.5, y+p*2);
+        ctx.lineTo(x+s-p*2, y+s*0.5);
+        ctx.lineTo(x+s*0.5, y+s-p*2);
+        ctx.lineTo(x+p*2, y+s*0.5);
+        ctx.closePath();
+        ctx.fill();
+        
+        // ハイライト
+        ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.lineWidth = 2; ctx.shadowBlur = 0;
+        ctx.beginPath();
+        ctx.moveTo(x+s*0.5, y+p*2); ctx.lineTo(x+s*0.5, y+s-p*2);
+        ctx.moveTo(x+p*2, y+s*0.5); ctx.lineTo(x+s-p*2, y+s*0.5);
+        ctx.stroke();
+    } else {
+        ctx.beginPath();
+        ctx.roundRect(x+p, y+p, s-p*2, s-p*2, s*0.4); 
+        ctx.fill();
+    }
     ctx.shadowBlur = 0;
 
-    if(val !== BLOCK_VAL_OBSTACLE && !isGhost) {
+    if(val !== BLOCK_VAL_OBSTACLE && val !== BLOCK_VAL_SPECIAL && !isGhost) {
         ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
         ctx.beginPath();
         ctx.ellipse(x + s*0.3, y + s*0.3, s*0.15, s*0.1, Math.PI / 4, 0, Math.PI * 2);
@@ -1073,6 +1368,7 @@ function drawBlock(ctx, c, r, val, isActive=false, isGhost=false, offsetY_px=0) 
     }
 
     ctx.globalAlpha = alphaText;
+    
     if(val === BLOCK_VAL_OBSTACLE) {
         ctx.fillStyle = "#7f8c8d";
         ctx.beginPath();
@@ -1081,6 +1377,8 @@ function drawBlock(ctx, c, r, val, isActive=false, isGhost=false, offsetY_px=0) 
         ctx.fill();
         ctx.strokeStyle = "#7f8c8d"; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.arc(x+s*0.5, y+s*0.7, s*0.2, Math.PI, Math.PI*2); ctx.stroke();
+    } else if(val === BLOCK_VAL_SPECIAL) {
+        // スペシャルには文字を表示しない（デザインで表現）
     } else {
         ctx.fillStyle = fg;
         ctx.font = `800 ${s*0.6}px 'M PLUS Rounded 1c', sans-serif`;
@@ -1120,7 +1418,6 @@ function drawNextBlock() {
         nextCtx.textAlign = "center"; nextCtx.textBaseline = "middle";
         nextCtx.shadowColor = "rgba(0,0,0,0.1)"; nextCtx.shadowOffsetY = 2;
         nextCtx.fillText(val, startX + i*bSize + bSize/2, startY + bSize/2 + 2);
-        nextCtx.shadowOffsetY = 0;
     }
 }
 
@@ -1143,6 +1440,15 @@ function gameOver() {
     document.getElementById('btn-home').onclick = () => { ui.result.style.display='none'; backToTitle(); };
 }
 
+function handleStart(diff) {
+    if(currentPlayerName === "名無しさん" && !confirm("「名無しさん」のまま開始しますか？")) {
+        return;
+    }
+    state.difficulty = diff;
+    currentConfig = CONFIGS[diff];
+    startGame();
+}
+
 function startGame() {
     if(state.timerId) clearTimeout(state.timerId); state.timerId = null;
     state.screen = 'PLAYING';
@@ -1154,10 +1460,13 @@ function startGame() {
     
     state.nextBlockValues = []; state.inputLocked = false; state.fastDropping = false;
     state.particles = []; state.comboAnim = null;
+    
     ui.level.textContent = currentConfig.label;
     ui.title.classList.add('hidden'); ui.rankingScreen.classList.add('hidden');
     ui.roundClearScreen.classList.add('hidden');
     ui.controls.classList.remove('hidden'); ui.btnToTitle.classList.remove('hidden');
+    ui.rightPanelContent.classList.remove('hidden'); 
+    
     initGrid(); resize(); spawnBlock(); updateUI(); draw();
 }
 
@@ -1187,14 +1496,27 @@ function nextRound() {
 function backToTitle() {
     if(state.timerId) clearTimeout(state.timerId); state.timerId = null;
     state.screen = 'TITLE';
-    ui.title.classList.remove('hidden'); ui.controls.classList.add('hidden');
-    ui.btnToTitle.classList.add('hidden'); updateTitleStats();
+    
+    state.grid = Array.from({length: ROWS}, () => Array(COLS).fill(0));
+    state.activeBlock = null;
+    state.particles = [];
+    state.comboAnim = null;
+    ctx.clearRect(0,0, state.width, state.height);
+    nextCtx.clearRect(0,0, nextCanvas.width, nextCanvas.height);
+
+    ui.title.classList.remove('hidden'); 
+    ui.controls.classList.add('hidden');
+    ui.btnToTitle.classList.add('hidden'); 
+    ui.rightPanelContent.classList.add('hidden'); 
+    
+    updateTitleStats();
 }
 
 function updateUI() {
     ui.score.textContent = state.score;
     ui.combo.textContent = state.combo;
     ui.round.textContent = state.round;
+    if(ui.target) ui.target.textContent = state.targetScore;
 }
 
 function bind(el, fn) {
@@ -1205,23 +1527,24 @@ function bind(el, fn) {
 }
 
 bind(ui.btnToTitle, backToTitle);
-bind(ui.btnEasy, () => { state.difficulty='EASY'; currentConfig=CONFIGS.EASY; startGame(); });
-bind(ui.btnNormal, () => { state.difficulty='NORMAL'; currentConfig=CONFIGS.NORMAL; startGame(); });
-bind(ui.btnHard, () => { state.difficulty='HARD'; currentConfig=CONFIGS.HARD; startGame(); });
+
+bind(ui.btnEasy, () => handleStart('EASY'));
+bind(ui.btnNormal, () => handleStart('NORMAL'));
+bind(ui.btnHard, () => handleStart('HARD'));
 
 bind(ui.btnNextRound, nextRound);
 bind(ui.btnQuitRound, gameOver);
 
 bind(document.getElementById('btn-left'), () => moveBlock(-1));
 bind(document.getElementById('btn-right'), () => moveBlock(1));
-bind(document.getElementById('btn-rotate'), () => rotateBlock());
+bind(document.getElementById('btn-rotate'), () => slideBlock());
 bind(document.getElementById('btn-drop'), () => dropBlock());
 
 window.addEventListener('keydown', (e) => {
     if(ui.title.classList.contains('hidden') && state.screen === 'PLAYING') {
         if(e.key === 'ArrowLeft') moveBlock(-1);
         if(e.key === 'ArrowRight') moveBlock(1);
-        if(e.key === 'ArrowUp') rotateBlock();
+        if(e.key === 'ArrowUp') slideBlock();
         if(e.key === 'ArrowDown' || e.key === ' ') dropBlock();
     }
 });
@@ -1241,7 +1564,9 @@ bind(ui.btnRanking, () => {
             const list = getLocalRanking(d.toUpperCase());
             ul.innerHTML = '';
             if(!list.length) ul.innerHTML = '<li>なし</li>';
-            list.forEach((s,i) => { ul.innerHTML += `<li><span>${i+1}. あなた</span><span>${s}</span></li>`; });
+            list.forEach((s,i) => { 
+                ul.innerHTML += `<li><span>${i+1}. あなた</span><span>${s}</span></li>`; 
+            });
         }
     });
 });
