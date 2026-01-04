@@ -1,0 +1,1409 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>分数スロット - Math Braves</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --accent-color: #f1c40f;
+            --danger-color: #e74c3c;
+            --success-color: #2ecc71;
+            /* ベースカラー変更: 目に優しく温かみのあるアースオレンジ(Peru) */
+            --bg-color: #CD853F; 
+            --text-color: #2d3436;
+        }
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #222;
+            font-family: "M PLUS Rounded 1c", "Hiragino Kaku Gothic ProN", sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            width: 100vw;
+        }
+        #container {
+            width: 1280px;
+            height: 720px;
+            flex-shrink: 0;
+            display: flex;
+            background-color: #fdf5e6; /* OldLace: 落ち着いたクリーム色 */
+            box-shadow: 0 0 30px rgba(0,0,0,0.8);
+            transform-origin: center center;
+            position: relative;
+        }
+        
+        #left-panel, #right-panel {
+            flex: 0 0 280px;
+            width: 280px;
+            background-color: var(--bg-color);
+            color: white;
+            padding: 20px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            z-index: 10;
+            box-shadow: 0 0 10px rgba(0,0,0,0.2);
+        }
+
+        #game-area {
+            flex: 1;
+            position: relative;
+            background-color: #fffaf0; /* FloralWhite */
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0; left: 0;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        /* UI Components */
+        h2 { margin-top: 0; border-bottom: 2px solid rgba(255,255,255,0.5); padding-bottom: 10px; font-size: 1.2rem; }
+        
+        /* 情報画面: 白背景 */
+        .info-item { 
+            margin-bottom: 15px; 
+            font-size: 1.0rem;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .info-value { font-size: 1.6rem; font-weight: bold; color: #d35400; text-shadow: 1px 1px 0 rgba(0,0,0,0.1); }
+        .info-label { font-size: 0.85rem; color: #636e72; margin-bottom: 5px; font-weight: bold; }
+        
+        .btn {
+            background-color: #3498db; color: white; border: none; padding: 10px 20px;
+            border-radius: 8px; cursor: pointer; font-size: 1rem; margin: 5px;
+            transition: background 0.2s;
+            box-shadow: 0 4px 0 rgba(0,0,0,0.2);
+            font-family: inherit; font-weight: bold;
+        }
+        .btn:hover { transform: translateY(2px); box-shadow: 0 2px 0 rgba(0,0,0,0.2); }
+        .btn:active { transform: translateY(4px); box-shadow: none; }
+        .btn-danger { background-color: #e74c3c; }
+        .btn-success { background-color: #2ecc71; }
+        .btn-warning { background-color: #f1c40f; color: #333; }
+        .btn-change { background: #e67e22; display: flex; flex-direction: column; align-items: center; font-size: 0.9rem; padding: 8px 15px; }
+
+        /* ランキングボタンのアクティブ状態 */
+        .btn.active {
+            background-color: #d35400 !important;
+            color: white !important;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.3);
+            pointer-events: none;
+        }
+        .btn.inactive {
+            background-color: #95a5a6 !important;
+            color: white !important;
+        }
+
+        .hidden { display: none !important; }
+        .invisible { visibility: hidden; }
+
+        /* Game Elements */
+        .ap-display-container {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.95);
+            padding: 10px 40px;
+            border-radius: 30px;
+            border: 4px solid var(--bg-color);
+            color: var(--text-color);
+            text-align: center;
+            z-index: 20;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            min-width: 120px;
+        }
+        .ap-label { font-size: 1rem; color: #636e72; display: block; line-height: 1; margin-bottom: 5px; }
+        .ap-value { font-size: 2.5rem; font-weight: 800; color: var(--bg-color); line-height: 1; }
+        .ap-value.low { color: #e74c3c; }
+
+        /* Stats Row (Coins & Combo) */
+        .stats-row-container {
+            position: absolute;
+            top: 110px;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            gap: 200px;
+            z-index: 15;
+            pointer-events: none;
+        }
+        .stat-box {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 5px 20px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            min-width: 100px;
+        }
+        .stat-label { font-size: 0.8rem; font-weight: bold; color: #636e72; display: block; }
+        .stat-val { font-size: 1.5rem; font-weight: 800; }
+        
+        .coin-val { color: #f1c40f; text-shadow: 1px 1px 0 #d35400; }
+        .combo-val-blue { color: #3498db; }
+
+        .slot-machine-frame {
+            background: transparent;
+            padding: 30px 50px;
+            border: none;
+            box-shadow: none;
+            margin-bottom: 10px;
+            margin-top: 120px;
+            position: relative;
+            z-index: 10;
+        }
+        .cakes-container {
+            display: flex;
+            gap: 40px;
+            justify-content: center;
+            align-items: flex-start;
+        }
+        .cake-unit {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+        .cake-wrapper {
+            position: relative;
+            width: 180px;
+            height: 180px;
+            background: white;
+            border-radius: 50%;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }
+        .cake-wrapper.matched {
+            box-shadow: 0 0 20px #f1c40f;
+            transform: scale(1.05);
+        }
+        .cake-label {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--text-color);
+            background: rgba(255,255,255,0.8);
+            padding: 2px 10px;
+            border-radius: 10px;
+        }
+
+        /* Hand Area */
+        .hand-area {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            background: rgba(255,255,255,0.9);
+            padding: 15px 30px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            z-index: 10;
+            margin-top: 10px;
+        }
+        .cards-container {
+            display: flex;
+            gap: 15px;
+            min-width: 350px;
+            justify-content: center;
+            min-height: 110px;
+        }
+        
+        /* Card Styles */
+        .card {
+            width: 70px;
+            height: 100px;
+            background: white;
+            border: 2px solid #2d3436;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column; /* 縦並び */
+            justify-content: center;
+            align-items: center;
+            font-size: 1.6rem; 
+            font-weight: bold;
+            color: #2d3436;
+            cursor: grab;
+            box-shadow: 0 4px 0 #b2bec3;
+            transition: transform 0.1s;
+            user-select: none;
+            position: relative;
+            padding-top: 15px; /* コインスペース */
+        }
+        .card:active { cursor: grabbing; transform: translateY(2px); box-shadow: 0 2px 0 #b2bec3; }
+        .card.dragging { opacity: 0.5; }
+        .card.integer { background: #f1c40f; border-color: #d35400; color: #fff; text-shadow: 1px 1px 0 rgba(0,0,0,0.2); }
+        
+        /* コイン表示 */
+        .card-coins {
+            position: absolute;
+            top: 4px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            font-size: 0.7rem;
+            line-height: 1;
+            text-shadow: 0 0 2px rgba(0,0,0,0.3);
+            letter-spacing: -1px;
+        }
+
+        /* Vertical Fraction Display */
+        .fraction-view {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            line-height: 1;
+        }
+        .frac-num { border-bottom: 2px solid currentColor; padding-bottom: 2px; margin-bottom: 2px; display: block; width: 100%; text-align: center; }
+        .frac-den { display: block; width: 100%; text-align: center; }
+
+        /* Overlays */
+        #title-screen, #result-overlay, #ranking-screen, #player-manager-overlay, #round-clear-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 100;
+            color: #2d3436;
+        }
+        
+        /* オーバーレイの中身: 背景白で見やすく */
+        .overlay-content {
+            background: #fff; /* 白背景 */
+            padding: 30px; border-radius: 10px;
+            text-align: center; 
+            max-width: 95%; 
+            width: 1100px; /* 幅を広げて3列並びやすく */
+            border: 4px solid var(--bg-color);
+            color: #2d3436; /* 濃い文字色 */
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+
+        /* ランキングリストの見やすさ改善・自然な描画・横並び調整 */
+        #ranking-lists {
+            display: flex;
+            flex-direction: row; /* 横並び強制 */
+            flex-wrap: nowrap; /* 折り返さない */
+            justify-content: space-between;
+            gap: 15px;
+            align-items: flex-start;
+            height: auto;
+            max-height: 65vh;
+            overflow-y: auto;
+            padding: 5px;
+        }
+
+        .rank-list-wrapper {
+            flex: 1;
+            width: 32%; /* 3列均等 */
+            min-width: 200px;
+            background: rgba(0,0,0,0.02);
+            border-radius: 8px;
+            padding: 5px;
+        }
+        .rank-list-header {
+            color: #2d3436; margin: 0; padding: 8px;
+            border-bottom: 2px solid var(--bg-color);
+            font-size: 1.1rem;
+            font-weight: bold;
+        }
+        .rank-list {
+            list-style: none; padding: 0; margin: 0;
+            text-align: left;
+        }
+        .rank-list li {
+            display: flex; justify-content: space-between;
+            align-items: center;
+            padding: 6px 10px; /* 少しコンパクトに */
+            border-bottom: 1px dashed #ccc;
+            color: #2d3436;
+            font-size: 0.85rem; /* 文字サイズ調整して全体が入るように */
+        }
+        /* プレーヤー名の省略表示設定 */
+        .rank-list li span:first-child {
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            text-align: left;
+            margin-right: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        /* スコア部分 */
+        .rank-list li span:last-child {
+            flex-shrink: 0;
+            font-weight: 800;
+            color: #d35400;
+        }
+        .rank-list li:nth-child(odd) { background-color: #f9f9f9; }
+        .rank-list li:first-child { 
+            background-color: #fff7e6; 
+            border-left: 5px solid #f1c40f;
+        }
+
+        /* SVG Styles */
+        .grid-line { stroke: #636e72; stroke-width: 1; stroke-dasharray: 4 2; fill: none; }
+        .circle-outline { stroke: #2d3436; stroke-width: 2; fill: none; }
+        .slice { fill: none; stroke: none; transition: fill 0.2s; }
+
+        /* Target Display in Right Panel */
+        .target-container {
+            display: flex; flex-direction: column; align-items: center;
+            margin: 10px 0; padding: 10px; 
+            background: transparent; 
+            border-radius: 10px;
+        }
+        #target-svg-container { width: 120px; height: 120px; margin-bottom: 5px; }
+        
+        .round-display { font-size: 2rem; font-weight: 800; color: #d35400; }
+
+    </style>
+</head>
+<body>
+
+<svg style="display: none;">
+    <defs>
+        <g id="cake-template">
+            <g class="coloring-layer-target"></g>
+            <circle cx="100" cy="100" r="90" class="circle-outline" />
+            <g class="grid-lines"></g>
+        </g>
+    </defs>
+</svg>
+
+<div id="container">
+    <div id="left-panel">
+        <h2>あそびかた</h2>
+        <div style="font-size: 0.95rem; line-height: 1.6;">
+            <p>1. <strong>カード</strong>を ケーキにのせて<br>数を たしていこう。</p>
+            <p>2. <strong>「1」をこえる</strong>と<br>のこりが つぎの 数になるよ。<br><span style="color:#c0392b; font-weight:bold; font-size:0.85rem;">(例: 5/4 は 1/4 になる)</span></p>
+            <p>3. <strong>3つの ケーキ</strong>の 大きさを<br>ぴったり そろえよう！</p>
+            <p>4. <strong>「1」</strong>の ケーキができると<br>コンボがつながるよ！</p>
+            <p>5. <strong>AP(スタミナ)</strong>が なくなると<br>ゲームオーバーだよ。</p>
+            <p>6. <strong>⭐(スター)</strong>つきの カードは<br>クリアしたときの 点数が<br>ふえるよ！(1こ +10点)</p>
+        </div>
+        <div style="margin-top:auto; text-align:center;">
+            <button id="btn-to-title" class="btn btn-danger hidden">タイトルへ もどる</button>
+        </div>
+    </div>
+
+    <div id="game-area">
+        <canvas id="effect-canvas"></canvas>
+        
+        <div id="title-screen">
+            <h1 style="font-size:4rem; color:#CD853F; text-shadow: 2px 2px 0 #d35400; margin-bottom:10px; letter-spacing:2px;">MATH BRAVES</h1>
+            <h2 style="border:none; color:#636e72;">- ぶんすう -</h2>
+
+            <div style="margin-bottom: 20px; background: rgba(0,0,0,0.05); padding: 10px 20px; border-radius: 20px; display: flex; align-items: center; gap: 10px;">
+                <span>プレーヤー:</span>
+                <span id="title-player-name" style="font-weight: bold; color: #d35400; font-size: 1.2rem;">ななしさん</span>
+                <button id="btn-player-select" class="btn" style="padding: 4px 10px; font-size: 0.8rem; background: #636e72;">変更</button>
+            </div>
+
+            <div style="display: flex; gap: 20px; margin-bottom: 20px;">
+                <div style="text-align:center;">
+                    <div id="crown-easy" style="font-size:1.5rem; visibility:hidden;">👑</div>
+                    <button id="btn-easy" class="btn btn-success" style="width: 140px; padding:15px;">しょきゅう</button>
+                    <div id="clear-easy" style="font-size:0.9rem; color:#636e72;">0回クリア</div>
+                </div>
+                <div style="text-align:center;">
+                    <div id="crown-normal" style="font-size:1.5rem; visibility:hidden;">👑</div>
+                    <button id="btn-normal" class="btn" style="width: 140px; padding:15px;">ちゅうきゅう</button>
+                    <div id="clear-normal" style="font-size:0.9rem; color:#636e72;">0回クリア</div>
+                </div>
+                <div style="text-align:center;">
+                    <div id="crown-hard" style="font-size:1.5rem; visibility:hidden;">👑</div>
+                    <button id="btn-hard" class="btn btn-danger" style="width: 140px; padding:15px;">じょうきゅう</button>
+                    <div id="clear-hard" style="font-size:0.9rem; color:#636e72;">0回クリア</div>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 30px; display:flex; gap:10px;">
+                <button id="btn-login" class="btn" style="background:#e74c3c; font-size:0.9rem; padding:8px 15px;">Googleログイン</button>
+                <button id="btn-logout" class="btn hidden" style="background:#636e72; font-size:0.9rem; padding:8px 15px;">ログアウト</button>
+            </div>
+
+            <div style="display:flex; gap:15px;">
+                <button id="btn-view-ranking" class="btn btn-warning" style="width:160px;">🏆 ランキング</button>
+                <button id="btn-index" class="btn" style="background-color: #636e72; width:160px;">🏠 INDEXへ</button>
+            </div>
+            
+            <div id="auth-status" style="font-size: 0.8rem; margin-top: 5px; color: #b2bec3;"></div>
+        </div>
+
+        <div id="game-ui-layer" class="hidden" style="width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+            
+            <div class="ap-display-container">
+                <span class="ap-label">のこりAP</span>
+                <span id="disp-ap" class="ap-value">10</span>
+            </div>
+
+            <div class="stats-row-container">
+                <div class="stat-box" style="margin-right:auto; margin-left: 20px;">
+                    <span class="stat-label">⭐</span>
+                    <span id="disp-round-coins" class="stat-val coin-val">0</span>
+                </div>
+                <div class="stat-box" style="margin-left:auto; margin-right: 20px;">
+                    <span class="stat-label">コンボ</span>
+                    <span id="disp-combo" class="stat-val combo-val-blue">0</span>
+                </div>
+            </div>
+
+            <div class="slot-machine-frame">
+                <div class="cakes-container">
+                    <div class="cake-unit">
+                        <div class="cake-wrapper" id="cake-0"></div>
+                        <div class="cake-label" id="label-cake-0">0</div>
+                    </div>
+                    <div class="cake-unit">
+                        <div class="cake-wrapper" id="cake-1"></div>
+                        <div class="cake-label" id="label-cake-1">0</div>
+                    </div>
+                    <div class="cake-unit">
+                        <div class="cake-wrapper" id="cake-2"></div>
+                        <div class="cake-label" id="label-cake-2">0</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="hand-area">
+                <div id="hand-cards" class="cards-container"></div>
+                <div style="border-left: 2px solid #b2bec3; height: 80px; margin: 0 10px;"></div>
+                <button id="btn-change-hand" class="btn btn-change">
+                    <span>チェンジ</span>
+                    <span style="font-size:0.8rem;">(AP -1)</span>
+                </button>
+            </div>
+        </div>
+
+        <div id="result-overlay" class="hidden">
+            <div class="overlay-content" style="max-width: 600px;">
+                <h2 style="font-size: 3rem; color: #f1c40f; margin-bottom: 20px;">GAME CLEAR!</h2>
+                
+                <div id="result-calc-container" style="font-size: 1.2rem; margin: 0 auto 20px auto; width: 100%; max-width: 400px; background: rgba(0,0,0,0.05); padding: 20px; border-radius: 10px; box-sizing: border-box;">
+                    <div style="display:flex; justify-content:space-between;">
+                        <span>累計スコア</span>
+                        <span id="res-base-score" style="font-weight:bold;">0</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; color:#e67e22;">
+                        <span>のこりAPボーナス</span>
+                        <span>+ <span id="res-ap-bonus" style="font-weight:bold;">0</span></span>
+                    </div>
+                    <div style="border-bottom: 2px solid #bdc3c7; margin: 10px 0;"></div>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-weight:bold;">最終スコア</span>
+                        <span id="result-score" style="font-size: 2.2rem; font-weight: bold; color: #2ecc71;">0</span>
+                    </div>
+                </div>
+
+                <div id="new-record-msg" style="color: #e74c3c; font-weight: bold; font-size: 1.2rem; margin-bottom: 20px;"></div>
+                <button id="btn-result-ok" class="btn btn-success" style="padding: 10px 40px; font-size: 1.2rem;">OK</button>
+            </div>
+        </div>
+
+        <div id="round-clear-overlay" class="hidden">
+            <div class="overlay-content" style="max-width: 600px;">
+                <h2 style="color:#d35400;">ROUND CLEAR!</h2>
+                <div style="font-size:1.2rem; margin:20px 0;">
+                    <div style="display:flex; justify-content:center; align-items:center; gap:10px;">
+                        <span style="color:#e67e22;">(きそてん)</span>
+                        <span>×</span>
+                        <span style="color:#3498db;">(コンボ倍率)</span>
+                        <span>＝</span>
+                        <span style="color:#2ecc71;">(獲得)</span>
+                    </div>
+                    <div style="font-size:2rem; font-weight:bold; margin-top:10px;">
+                        <span id="rc-base">100</span> × <span id="rc-rate">1.5</span> ＝ <span id="rc-total" style="color:#d35400;">150</span>
+                    </div>
+                </div>
+                <button id="btn-round-next" class="btn btn-success" style="font-size:1.2rem; padding:10px 40px;">次へ</button>
+            </div>
+        </div>
+
+        <div id="player-manager-overlay" class="hidden">
+            <div class="overlay-content" style="width: 400px;">
+                <h2 style="color: #d35400;">プレーヤー選択</h2>
+                <div style="display:flex; gap:10px; justify-content:center; margin:20px 0;">
+                    <input type="text" id="input-new-player" placeholder="なまえ(ひらがな)" style="padding:8px; font-size:1rem; border-radius:5px; border:1px solid #ccc; width:180px;">
+                    <button id="btn-add-player" class="btn btn-success">追加</button>
+                </div>
+                <ul id="player-list-ul" style="list-style:none; padding:0; margin:0; max-height:200px; overflow-y:auto; text-align:left;"></ul>
+                <button id="btn-close-player" class="btn" style="margin-top:20px; background:#7f8c8d;">閉じる</button>
+            </div>
+        </div>
+
+        <div id="ranking-screen" class="hidden">
+            <div class="overlay-content">
+                <h2 style="color:#d35400;">ランキング</h2>
+                <div style="display:flex; justify-content:center; gap:10px; margin-bottom:20px;">
+                    <button id="btn-rank-local" class="btn btn-warning">ローカル</button>
+                    <button id="btn-rank-world" class="btn btn-change">オンライン</button>
+                </div>
+                <div id="ranking-lists"></div>
+                <button id="btn-close-ranking" class="btn" style="margin-top:20px; background:#7f8c8d;">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="right-panel">
+        <div id="right-panel-content" class="invisible">
+            <div class="info-item">
+                <div class="info-label">プレーヤー</div>
+                <div class="info-value" id="disp-player-name" style="font-size:1.2rem;"></div>
+            </div>
+            
+            <div class="info-item">
+                <div class="info-label">ラウンド</div>
+                <div class="info-value"><span id="disp-round" class="round-display">1</span><span style="font-size:1.2rem; color:#d35400;"> / 10</span></div>
+            </div>
+            
+            <div class="info-item">
+                <div class="info-label">ターゲット(200点!)</div>
+                <div class="target-container">
+                    <div id="target-svg-container"></div>
+                    <div class="cake-label" id="label-target">0</div>
+                </div>
+            </div>
+
+            <div class="info-item">
+                <div class="info-label">スコア</div>
+                <div id="disp-score" class="info-value">0</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import { getFirestore, collection, doc, setDoc, serverTimestamp, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBCg5dCEM89UmYYhfGqVeRf_VrUlg8_o-4",
+      authDomain: "math-braves.firebaseapp.com",
+      projectId: "math-braves",
+      storageBucket: "math-braves.firebasestorage.app",
+      messagingSenderId: "217117619290",
+      appId: "1:217117619290:web:d227feb603970d3948d463"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const provider = new GoogleAuthProvider();
+
+    window.currentUser = null;
+
+    window.handleLogin = () => {
+        signInWithPopup(auth, provider).catch(e => alert("ログイン失敗: " + e.message));
+    };
+    window.handleLogout = () => signOut(auth);
+
+    onAuthStateChanged(auth, (user) => {
+        window.currentUser = user ? { uid: user.uid, displayName: user.displayName } : null;
+        updateAuthUI();
+    });
+
+    function updateAuthUI() {
+        const status = document.getElementById('auth-status');
+        const btnLogin = document.getElementById('btn-login');
+        const btnLogout = document.getElementById('btn-logout');
+        
+        if (window.currentUser) {
+            status.textContent = `ログイン中: ${window.currentUser.displayName}`;
+            btnLogin.classList.add('hidden');
+            btnLogout.classList.remove('hidden');
+        } else {
+            status.textContent = "ログインしていません";
+            btnLogin.classList.remove('hidden');
+            btnLogout.classList.add('hidden');
+        }
+    }
+
+    window.saveOnlineScore = async (diff, score) => {
+        if (!window.currentUser) return;
+        try {
+            const id = `${window.currentUser.uid}_${diff}_${Date.now()}`;
+            await setDoc(doc(db, "scores_math_braves_fraction", id), {
+                uid: window.currentUser.uid,
+                name: window.game.playerName, 
+                difficulty: diff,
+                score: score,
+                createdAt: serverTimestamp()
+            });
+        } catch(e) { console.error(e); }
+    };
+
+    window.fetchOnlineRanking = async (diff) => {
+        try {
+            const q = query(collection(db, "scores_math_braves_fraction"), where("difficulty", "==", diff));
+            const snap = await getDocs(q);
+            let list = [];
+            snap.forEach(d => list.push(d.data()));
+            list.sort((a,b) => b.score - a.score);
+            return list.slice(0, 10);
+        } catch(e) { return []; }
+    };
+</script>
+
+<script>
+/**
+ * Game Configuration
+ */
+const UNIT_MAX = 24;
+const CONFIG = {
+    EASY: {
+        id: 'EASY', label: 'しょきゅう',
+        handSize: 3,
+        cardTypes: [6, 12, 18, 24], // 1/4, 1/2, 3/4, 1
+        gridDiv: 4, apHeal: 2
+    },
+    NORMAL: {
+        id: 'NORMAL', label: 'ちゅうきゅう',
+        handSize: 4,
+        cardTypes: [3, 6, 9, 12, 15, 18, 21, 24], // 1/8刻み
+        gridDiv: 8, apHeal: 3
+    },
+    HARD: {
+        id: 'HARD', label: 'じょうきゅう',
+        handSize: 5,
+        cardTypes: [2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24], // 1/12刻み
+        gridDiv: 12, apHeal: 4
+    }
+};
+
+const NG_WORDS = ['しね', 'ころす', 'ばか', 'あほ', 'くず', 'うんこ', 'ちんちん', 'まんこ', 'せっくす', 'しにたい', '殺', '死'];
+
+// Global Game State
+window.game = {
+    config: null,
+    ap: 10,
+    round: 1,
+    score: 0,
+    cakes: [0, 0, 0],
+    hand: [], 
+    targetValue: 0,
+    combo: 0,
+    roundCoins: 0, // Coins collected in current round
+    playerName: "ななしさん",
+    dragItem: null,
+    dragClone: null
+};
+
+/**
+ * Initialization
+ */
+document.addEventListener('DOMContentLoaded', () => {
+    resize();
+    window.addEventListener('resize', resize);
+    
+    // Bind Buttons
+    document.getElementById('btn-easy').onclick = () => startGame('EASY');
+    document.getElementById('btn-normal').onclick = () => startGame('NORMAL');
+    document.getElementById('btn-hard').onclick = () => startGame('HARD');
+    document.getElementById('btn-to-title').onclick = backToTitle;
+    document.getElementById('btn-result-ok').onclick = backToTitle;
+    document.getElementById('btn-change-hand').onclick = changeHand;
+    
+    document.getElementById('btn-player-select').onclick = openPlayerManager;
+    document.getElementById('btn-add-player').onclick = addPlayer;
+    document.getElementById('btn-close-player').onclick = () => document.getElementById('player-manager-overlay').classList.add('hidden');
+    
+    document.getElementById('btn-view-ranking').onclick = () => showRanking('LOCAL');
+    document.getElementById('btn-rank-local').onclick = () => showRanking('LOCAL');
+    document.getElementById('btn-rank-world').onclick = () => showRanking('WORLD');
+    document.getElementById('btn-close-ranking').onclick = () => document.getElementById('ranking-screen').classList.add('hidden');
+    document.getElementById('btn-index').onclick = () => window.location.href = "index.html";
+
+    if(document.getElementById('btn-login')) document.getElementById('btn-login').onclick = () => window.handleLogin && window.handleLogin();
+    if(document.getElementById('btn-logout')) document.getElementById('btn-logout').onclick = () => window.handleLogout && window.handleLogout();
+
+    loadPlayerName();
+    updateTitleStats();
+    
+    // Canvas Effect Init
+    initEffectCanvas();
+    loopEffect();
+});
+
+function resize() {
+    const container = document.getElementById('container');
+    const BASE_WIDTH = 1280;
+    const BASE_HEIGHT = 720;
+    const scale = Math.min(window.innerWidth / BASE_WIDTH, window.innerHeight / BASE_HEIGHT);
+    container.style.transform = `scale(${scale})`;
+}
+
+function backToTitle() {
+    document.getElementById('game-ui-layer').classList.add('hidden');
+    document.getElementById('result-overlay').classList.add('hidden');
+    document.getElementById('title-screen').classList.remove('hidden');
+    document.getElementById('btn-to-title').classList.add('hidden');
+    document.getElementById('right-panel-content').classList.add('invisible');
+    
+    // Reset Canvas
+    particles = []; 
+    textParticles = [];
+
+    updateTitleStats();
+}
+
+/**
+ * Game Logic
+ */
+function startGame(difficulty) {
+    window.game.config = CONFIG[difficulty];
+    window.game.ap = 10;
+    window.game.round = 1;
+    window.game.score = 0;
+    window.game.combo = 0;
+    window.game.roundCoins = 0;
+    window.game.hand = [];
+    
+    document.getElementById('title-screen').classList.add('hidden');
+    document.getElementById('game-ui-layer').classList.remove('hidden');
+    document.getElementById('btn-to-title').classList.remove('hidden');
+    document.getElementById('right-panel-content').classList.remove('invisible');
+    
+    initSVGs();
+    nextRound(true);
+}
+
+function initSVGs() {
+    // Generate Slices (24 pieces)
+    let slicesHTML = '';
+    for (let i = 0; i < 24; i++) {
+        // -90deg (12 o'clock)
+        const startAngle = -90 + (i * 15);
+        const endAngle = startAngle + 15;
+        const d = describeArc(100, 100, 90, startAngle, endAngle);
+        slicesHTML += `<path id="slice-${i}" class="slice" d="${d}" />`;
+    }
+
+    // Generate Grid Lines
+    let linesHTML = '';
+    const div = window.game.config.gridDiv;
+    const step = 360 / div;
+    for (let i = 0; i < div; i++) {
+        const deg = -90 + (i * step);
+        const rad = (deg * Math.PI) / 180;
+        const x2 = 100 + 90 * Math.cos(rad);
+        const y2 = 100 + 90 * Math.sin(rad);
+        linesHTML += `<line x1="100" y1="100" x2="${x2}" y2="${y2}" class="grid-line" />`;
+    }
+
+    // Apply to Cakes
+    for(let i=0; i<3; i++) {
+        const wrapper = document.getElementById(`cake-${i}`);
+        wrapper.innerHTML = `
+            <svg width="180" height="180" viewBox="0 0 200 200">
+                <g class="coloring-layer-target">${slicesHTML}</g>
+                <circle cx="100" cy="100" r="90" class="circle-outline" />
+                <g>${linesHTML}</g>
+            </svg>
+        `;
+    }
+    
+    // Setup Target SVG
+    document.getElementById('target-svg-container').innerHTML = `
+        <svg width="120" height="120" viewBox="0 0 200 200">
+            <g class="coloring-layer-target">${slicesHTML}</g>
+            <circle cx="100" cy="100" r="90" class="circle-outline" />
+            <g>${linesHTML}</g>
+        </svg>
+    `;
+}
+
+function describeArc(x, y, radius, startAngle, endAngle){
+    const start = polarToCartesian(x, y, radius, endAngle);
+    const end = polarToCartesian(x, y, radius, startAngle);
+    const largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
+    return ["M", x, y, "L", start.x, start.y, "A", radius, radius, 0, largeArcFlag, 0, end.x, end.y, "L", x, y, "Z"].join(" ");
+}
+function polarToCartesian(centerX, centerY, radius, angleInDegrees) {
+    const rad = angleInDegrees * Math.PI / 180.0;
+    return { x: centerX + (radius * Math.cos(rad)), y: centerY + (radius * Math.sin(rad)) };
+}
+
+function nextRound(isFirst = false) {
+    if (!isFirst && window.game.round > 10) {
+        finishGame(true);
+        return;
+    }
+    window.game.combo = 0; 
+    window.game.roundCoins = 0; 
+
+    // Determine Target
+    const types = window.game.config.cardTypes;
+    window.game.targetValue = types[Math.floor(Math.random() * types.length)];
+
+    // Initialize Cakes (Random, Not aligned)
+    while(true) {
+        for(let i=0; i<3; i++) {
+            window.game.cakes[i] = types[Math.floor(Math.random() * types.length)];
+        }
+        const c = window.game.cakes;
+        if (c[0] !== c[1] || c[1] !== c[2]) break;
+    }
+    
+    if (isFirst) {
+        fillHand();
+    }
+    
+    updateCakes();
+    updateTargetDisplay();
+    updateHUD();
+}
+
+function createCardData() {
+    // 24 (1) is excluded for hand
+    const types = window.game.config.cardTypes.filter(v => v !== 24);
+    const val = types[Math.floor(Math.random() * types.length)];
+    
+    // Coin Probability: 1(60%), 2(30%), 3(10%)
+    const rand = Math.random();
+    let coinCount = 1;
+    if (rand >= 0.90) coinCount = 3;
+    else if (rand >= 0.60) coinCount = 2;
+    
+    return { val: val, coinCount: coinCount };
+}
+
+function fillHand() {
+    window.game.hand = [];
+    const size = window.game.config.handSize;
+    for(let i=0; i<size; i++) {
+        window.game.hand.push(createCardData());
+    }
+    renderHand();
+}
+
+function changeHand() {
+    if (window.game.ap <= 0) return;
+    window.game.ap--;
+    
+    fillHand();
+    checkGameOver();
+    updateHUD();
+    spawnParticles(640, 600, 20, '#bdc3c7'); 
+}
+
+function updateCakes() {
+    for(let i=0; i<3; i++) {
+        const val = window.game.cakes[i];
+        const wrapper = document.getElementById(`cake-${i}`);
+        updateSvgColor(wrapper, val);
+        
+        // ラベル更新
+        const label = document.getElementById(`label-cake-${i}`);
+        label.innerHTML = val === 24 ? "1" : formatFractionHTML(val);
+    }
+    
+    // Check Match
+    const c = window.game.cakes;
+    if (c[0] === c[1] && c[1] === c[2] && c[0] > 0) {
+        setTimeout(roundClear, 500);
+    }
+}
+
+function updateTargetDisplay() {
+    const val = window.game.targetValue;
+    const wrapper = document.getElementById('target-svg-container');
+    updateSvgColor(wrapper, val);
+    
+    // ターゲットラベル更新
+    document.getElementById('label-target').innerHTML = val === 24 ? "1" : formatFractionHTML(val);
+}
+
+function updateSvgColor(wrapper, val) {
+    for(let s=0; s<24; s++) {
+        const slice = wrapper.querySelector(`#slice-${s}`);
+        if (!slice) continue;
+        if (s < val) {
+            const color = getCakeColor(val);
+            slice.style.fill = color;
+            // 白線（隙間）を消すため、同じ色でstrokeを設定
+            slice.style.stroke = color;
+            slice.style.strokeWidth = '1px';
+        } else {
+            slice.style.fill = 'none';
+            slice.style.stroke = 'none';
+        }
+    }
+}
+
+function getCakeColor(val) {
+    if (val === 24) return '#e67e22'; // Max (Orange)
+    if (val >= 18) return '#e74c3c'; // Large (Red)
+    if (val >= 12) return '#f39c12'; // Medium (Dark Yellow)
+    if (val >= 6) return '#f1c40f'; // Small (Yellow)
+    return '#2ecc71'; // Tiny (Green)
+}
+
+function formatFractionHTML(val) {
+    if (val === 24) return "1";
+    let num = val;
+    let den = 24;
+    const gcd = (a, b) => b==0 ? a : gcd(b, a%b);
+    const d = gcd(num, den);
+    const n = num/d;
+    const de = den/d;
+    return `<div class="fraction-view"><span class="frac-num">${n}</span><span class="frac-den">${de}</span></div>`;
+}
+
+function roundClear() {
+    // Score Calculation
+    const matchVal = window.game.cakes[0];
+    const isTarget = (matchVal === window.game.targetValue);
+    
+    // 基礎点 = (100 or 200) + ⭐数*10
+    let base = (isTarget ? 200 : 100) + (window.game.roundCoins * 10);
+    let rate = 1 + (window.game.combo * 0.5);
+    let total = Math.floor(base * rate);
+    
+    // 演出を先に実行（揃った瞬間）
+    spawnConfetti();
+    document.querySelectorAll('.cake-wrapper').forEach(el => el.classList.add('matched'));
+    if (isTarget) spawnTextParticle(640, 200, "TARGET BONUS!", "#f1c40f", 40);
+    
+    // ポップアップ表示
+    setTimeout(() => {
+        const overlay = document.getElementById('round-clear-overlay');
+        document.getElementById('rc-base').textContent = base;
+        document.getElementById('rc-rate').textContent = rate.toFixed(1);
+        document.getElementById('rc-total').textContent = total;
+        
+        overlay.classList.remove('hidden');
+        
+        document.getElementById('btn-round-next').onclick = () => {
+            overlay.classList.add('hidden');
+            document.querySelectorAll('.cake-wrapper').forEach(el => el.classList.remove('matched'));
+            
+            window.game.score += total;
+            const heal = window.game.config.apHeal;
+            gainAp(heal);
+            
+            // 即座に次へ
+            window.game.round++;
+            nextRound();
+        };
+    }, 800);
+}
+
+function gainAp(amount) {
+    window.game.ap += amount;
+    spawnTextParticle(640, 100, `AP +${amount}`, "#2ecc71", 60);
+    updateHUD();
+}
+
+function finishGame(isClear) {
+    const currentScore = window.game.score;
+    const ap = Math.max(0, window.game.ap);
+    const apBonus = ap * 100;
+    const finalScore = currentScore + apBonus;
+    
+    // UI Update
+    const titleEl = document.querySelector('#result-overlay h2');
+    if(isClear) {
+        titleEl.textContent = "GAME CLEAR!";
+        titleEl.style.color = "#f1c40f";
+    } else {
+        titleEl.textContent = "GAME OVER";
+        titleEl.style.color = "#95a5a6";
+    }
+    
+    document.getElementById('res-base-score').textContent = currentScore;
+    document.getElementById('res-ap-bonus').textContent = apBonus;
+    document.getElementById('result-score').textContent = finalScore;
+    
+    const isNew = saveScore(window.game.config.id, finalScore);
+    document.getElementById('new-record-msg').textContent = isNew ? "自己ベスト更新！" : "";
+
+    document.getElementById('result-overlay').classList.remove('hidden');
+}
+
+function checkGameOver() {
+    const c = window.game.cakes;
+    const isAligned = (c[0] === c[1] && c[1] === c[2]);
+    if (window.game.ap <= 0 && !isAligned) {
+        finishGame(false); // Game Over
+    }
+}
+
+/**
+ * Hand & Drag Logic
+ */
+function renderHand() {
+    const container = document.getElementById('hand-cards');
+    container.innerHTML = '';
+    
+    window.game.hand.forEach((cardData, idx) => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        
+        // Coins display
+        let coinsHtml = '';
+        for(let c=0; c<cardData.coinCount; c++) coinsHtml += '⭐';
+        
+        card.innerHTML = `<div class="card-coins">${coinsHtml}</div>` + 
+            (cardData.val === 24 ? "1" : formatFractionHTML(cardData.val));
+        
+        if (cardData.val === 24) card.classList.add('integer');
+        
+        card.dataset.index = idx;
+        
+        card.addEventListener('mousedown', onDragStart);
+        card.addEventListener('touchstart', onDragStart, {passive: false});
+        
+        container.appendChild(card);
+    });
+}
+
+function onDragStart(e) {
+    if (window.game.ap <= 0) return;
+    
+    e.preventDefault();
+    const target = e.currentTarget;
+    const rect = target.getBoundingClientRect();
+    const idx = parseInt(target.dataset.index);
+    const cardData = window.game.hand[idx];
+    
+    const clone = target.cloneNode(true);
+    clone.style.position = 'absolute';
+    clone.style.width = rect.width + 'px';
+    clone.style.height = rect.height + 'px';
+    clone.style.zIndex = 1000;
+    clone.classList.add('dragging');
+    document.body.appendChild(clone);
+    
+    window.game.dragClone = clone;
+    window.game.dragItem = { ...cardData, idx: idx, startX: e.touches?e.touches[0].clientX:e.clientX, startY: e.touches?e.touches[0].clientY:e.clientY, rect: rect };
+    
+    moveClone(window.game.dragItem.startX, window.game.dragItem.startY);
+    
+    document.addEventListener('mousemove', onDragMove);
+    document.addEventListener('touchmove', onDragMove, {passive: false});
+    document.addEventListener('mouseup', onDragEnd);
+    document.addEventListener('touchend', onDragEnd);
+}
+
+function onDragMove(e) {
+    e.preventDefault();
+    const cx = e.touches ? e.touches[0].clientX : e.clientX;
+    const cy = e.touches ? e.touches[0].clientY : e.clientY;
+    moveClone(cx, cy);
+}
+
+function moveClone(cx, cy) {
+    if (!window.game.dragClone) return;
+    const r = window.game.dragItem.rect;
+    window.game.dragClone.style.left = (cx - r.width/2) + 'px';
+    window.game.dragClone.style.top = (cy - r.height/2) + 'px';
+}
+
+function onDragEnd(e) {
+    document.removeEventListener('mousemove', onDragMove);
+    document.removeEventListener('touchmove', onDragMove);
+    document.removeEventListener('mouseup', onDragEnd);
+    document.removeEventListener('touchend', onDragEnd);
+    
+    const cx = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
+    const cy = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
+    
+    let hitIndex = -1;
+    for(let i=0; i<3; i++) {
+        const cake = document.getElementById(`cake-${i}`);
+        const r = cake.getBoundingClientRect();
+        if (cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom) {
+            hitIndex = i;
+            break;
+        }
+    }
+    
+    if (hitIndex !== -1) {
+        applyCardToCake(hitIndex, window.game.dragItem);
+        
+        // Replenish Hand
+        window.game.hand[window.game.dragItem.idx] = createCardData();
+        renderHand();
+        
+        window.game.ap--;
+        checkGameOver();
+        updateHUD();
+    }
+    
+    if (window.game.dragClone) window.game.dragClone.remove();
+    window.game.dragClone = null;
+    window.game.dragItem = null;
+}
+
+function applyCardToCake(cakeIdx, cardData) {
+    let current = window.game.cakes[cakeIdx];
+    let next = current + cardData.val;
+    
+    let justOne = false;
+    if (next > 24) {
+        next = next - 24; 
+    } else if (next === 24) {
+        next = 24;
+        justOne = true;
+    }
+    
+    window.game.cakes[cakeIdx] = next;
+    
+    // Add Coins
+    window.game.roundCoins += cardData.coinCount;
+    spawnTextParticle(640, 400, `+${cardData.coinCount}⭐`, "#f1c40f", 30);
+
+    updateCakes();
+    
+    // Effects & Combo
+    const r = document.getElementById(`cake-${cakeIdx}`).getBoundingClientRect();
+    spawnParticles(r.left + r.width/2, r.top + r.height/2, 10, '#f1c40f');
+    
+    if (justOne) {
+        window.game.combo++;
+        // Removed AP Gain logic for justOne
+        spawnTextParticle(r.left + r.width/2, r.top, `${window.game.combo} COMBO!`, "#e74c3c", 30);
+    }
+    updateHUD();
+}
+
+function updateHUD() {
+    document.getElementById('disp-round').textContent = window.game.round;
+    document.getElementById('disp-score').textContent = window.game.score;
+    document.getElementById('disp-ap').textContent = window.game.ap;
+    document.getElementById('disp-combo').textContent = window.game.combo;
+    
+    // Update Coins Display
+    document.getElementById('disp-round-coins').textContent = window.game.roundCoins;
+    
+    // Update Player Name
+    document.getElementById('disp-player-name').textContent = window.game.playerName;
+    
+    const apEl = document.getElementById('disp-ap');
+    if (window.game.ap <= 3) apEl.classList.add('low'); else apEl.classList.remove('low');
+}
+
+/**
+ * LocalStorage & Player
+ */
+const KEY_PLAYER = 'math_braves_player_list';
+const KEY_SCORE = 'math_braves_fraction_scores';
+const KEY_CLEARS = 'math_braves_fraction_clears';
+
+function loadPlayerName() {
+    const list = JSON.parse(localStorage.getItem(KEY_PLAYER)) || [];
+    const idx = parseInt(localStorage.getItem('math_braves_selected_idx')) || 0;
+    if (list.length > 0 && list[idx]) window.game.playerName = list[idx];
+    document.getElementById('title-player-name').textContent = window.game.playerName;
+}
+
+function openPlayerManager() {
+    const list = JSON.parse(localStorage.getItem(KEY_PLAYER)) || [];
+    const ul = document.getElementById('player-list-ul');
+    ul.innerHTML = '';
+    list.forEach((name, i) => {
+        const li = document.createElement('li');
+        li.innerHTML = `<button onclick="selectPlayer(${i})" style="margin-right:10px;">選択</button> ${name} <button onclick="deletePlayer(${i})" style="float:right;color:red;">×</button>`;
+        li.style.padding = '5px';
+        ul.appendChild(li);
+    });
+    document.getElementById('player-manager-overlay').classList.remove('hidden');
+}
+
+window.selectPlayer = (i) => {
+    localStorage.setItem('math_braves_selected_idx', i);
+    loadPlayerName();
+    document.getElementById('player-manager-overlay').classList.add('hidden');
+};
+window.deletePlayer = (i) => {
+    const list = JSON.parse(localStorage.getItem(KEY_PLAYER)) || [];
+    list.splice(i, 1);
+    localStorage.setItem(KEY_PLAYER, JSON.stringify(list));
+    openPlayerManager();
+};
+
+function addPlayer() {
+    const name = document.getElementById('input-new-player').value.trim();
+    if(!name) return;
+    for(let ng of NG_WORDS) if(name.includes(ng)) { alert("その名前は使えません"); return; }
+    
+    const list = JSON.parse(localStorage.getItem(KEY_PLAYER)) || [];
+    if(list.length>=5) { alert("登録は5人まで"); return; }
+    list.push(name);
+    localStorage.setItem(KEY_PLAYER, JSON.stringify(list));
+    window.selectPlayer(list.length-1);
+}
+
+function saveScore(diff, score) {
+    const key = `${KEY_SCORE}_${diff}`;
+    let ranks = JSON.parse(localStorage.getItem(key)) || [];
+    ranks.push({name: window.game.playerName, score: score});
+    ranks.sort((a,b) => b.score - a.score);
+    ranks = ranks.slice(0, 10);
+    localStorage.setItem(key, JSON.stringify(ranks));
+    
+    const cKey = KEY_CLEARS;
+    let clears = JSON.parse(localStorage.getItem(cKey)) || {EASY:0, NORMAL:0, HARD:0};
+    clears[diff]++;
+    localStorage.setItem(cKey, JSON.stringify(clears));
+    
+    window.saveOnlineScore(diff, score);
+    
+    return (ranks.length > 0 && ranks[0].score === score);
+}
+
+function updateTitleStats() {
+    const clears = JSON.parse(localStorage.getItem(KEY_CLEARS)) || {EASY:0, NORMAL:0, HARD:0};
+    ['EASY','NORMAL','HARD'].forEach(k => {
+        document.getElementById(`clear-${k.toLowerCase()}`).textContent = `${clears[k]}回クリア`;
+        if(clears[k]>0) document.getElementById(`crown-${k.toLowerCase()}`).style.visibility = 'visible';
+    });
+}
+
+function showRanking(mode) {
+    document.getElementById('ranking-screen').classList.remove('hidden');
+    const container = document.getElementById('ranking-lists');
+    container.innerHTML = '読み込み中...';
+    
+    // Toggle Button Styles
+    const btnLocal = document.getElementById('btn-rank-local');
+    const btnWorld = document.getElementById('btn-rank-world');
+    
+    if (mode === 'LOCAL') {
+        btnLocal.classList.add('active'); btnLocal.classList.remove('inactive');
+        btnWorld.classList.add('inactive'); btnWorld.classList.remove('active');
+    } else {
+        btnWorld.classList.add('active'); btnWorld.classList.remove('inactive');
+        btnLocal.classList.add('inactive'); btnLocal.classList.remove('active');
+    }
+    
+    let html = '';
+    const renderList = (title, list) => {
+        let h = `<div class="rank-list-wrapper"><h3 class="rank-list-header">${title}</h3><ul class="rank-list">`;
+        if(list.length===0) h+=`<li style="padding:10px;">記録なし</li>`;
+        list.forEach((d,i) => {
+            h += `<li><span title="${d.name}">${i+1}. ${d.name}</span><span>${d.score}</span></li>`;
+        });
+        h += '</ul></div>';
+        return h;
+    };
+
+    if (mode === 'LOCAL') {
+        ['EASY','NORMAL','HARD'].forEach(d => {
+            const list = JSON.parse(localStorage.getItem(`${KEY_SCORE}_${d}`)) || [];
+            html += renderList(d, list);
+        });
+        container.innerHTML = html;
+    } else {
+        Promise.all([
+            window.fetchOnlineRanking('EASY'),
+            window.fetchOnlineRanking('NORMAL'),
+            window.fetchOnlineRanking('HARD')
+        ]).then(results => {
+            html += renderList('EASY', results[0]);
+            html += renderList('NORMAL', results[1]);
+            html += renderList('HARD', results[2]);
+            container.innerHTML = html;
+        });
+    }
+}
+
+/**
+ * Canvas Effects
+ */
+let ctx, particles = [], textParticles = [];
+function initEffectCanvas() {
+    const c = document.getElementById('effect-canvas');
+    c.width = 1280; c.height = 720;
+    ctx = c.getContext('2d');
+}
+function spawnParticles(x, y, count, color) {
+    for(let i=0; i<count; i++) {
+        particles.push({
+            x: x, y: y,
+            vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10,
+            life: 1.0, color: color
+        });
+    }
+}
+function spawnTextParticle(x, y, text, color, size) {
+    textParticles.push({
+        x: x, y: y,
+        text: text, color: color, size: size,
+        life: 1.5, vy: -2
+    });
+}
+function spawnConfetti() {
+    for(let i=0; i<100; i++) {
+        particles.push({
+            x: 640, y: 720,
+            vx: (Math.random()-0.5)*20, vy: -Math.random()*20 - 10,
+            life: 2.0, color: `hsl(${Math.random()*360}, 100%, 50%)`,
+            gravity: 0.5
+        });
+    }
+}
+function loopEffect() {
+    ctx.clearRect(0,0,1280,720);
+    
+    // Particles
+    for(let i=particles.length-1; i>=0; i--) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        if(p.gravity) p.vy += p.gravity;
+        p.life -= 0.02;
+        ctx.globalAlpha = Math.max(0, p.life);
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 5, 0, Math.PI*2);
+        ctx.fill();
+        if(p.life<=0) particles.splice(i,1);
+    }
+
+    // Text Particles
+    for(let i=textParticles.length-1; i>=0; i--) {
+        const tp = textParticles[i];
+        tp.y += tp.vy;
+        tp.life -= 0.02;
+        ctx.globalAlpha = Math.max(0, tp.life);
+        ctx.font = `800 ${tp.size}px "M PLUS Rounded 1c", sans-serif`;
+        ctx.fillStyle = tp.color;
+        ctx.strokeStyle = '#2c3e50';
+        ctx.lineWidth = 4;
+        ctx.textAlign = 'center';
+        ctx.strokeText(tp.text, tp.x, tp.y);
+        ctx.fillText(tp.text, tp.x, tp.y);
+        if(tp.life<=0) textParticles.splice(i,1);
+    }
+    
+    ctx.globalAlpha = 1.0;
+    requestAnimationFrame(loopEffect);
+}
+</script>
+</body>
+</html>
