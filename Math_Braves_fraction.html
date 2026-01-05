@@ -580,7 +580,11 @@
             </div>
             
             <div class="info-item">
-                <div class="info-label">ターゲット(200点!)</div>
+                <div class="info-label">
+                    ターゲット<br>
+                    <span id="disp-target-type" style="font-weight:bold; color:#e67e22; font-size:0.9rem;">チャンス</span><br>
+                    (<span id="disp-target-pts">200</span>点)
+                </div>
                 <div class="target-container">
                     <div id="target-svg-container"></div>
                     <div class="cake-label" id="label-target">0</div>
@@ -705,6 +709,7 @@ window.game = {
     cakes: [0, 0, 0],
     hand: [], 
     targetValue: 0,
+    targetBaseScore: 200, // 新設
     combo: 0,
     roundCoins: 0, // Coins collected in current round
     playerName: "ななしさん",
@@ -781,6 +786,7 @@ function startGame(difficulty) {
     window.game.combo = 0;
     window.game.roundCoins = 0;
     window.game.hand = [];
+    window.game.targetBaseScore = 200;
     
     document.getElementById('title-screen').classList.add('hidden');
     document.getElementById('game-ui-layer').classList.remove('hidden');
@@ -855,9 +861,47 @@ function nextRound(isFirst = false) {
     window.game.combo = 0; 
     window.game.roundCoins = 0; 
 
-    // Determine Target
+    // Determine Target Value
     const types = window.game.config.cardTypes;
     window.game.targetValue = types[Math.floor(Math.random() * types.length)];
+
+    // Determine Target Score Type
+    let tScore = 200;
+    let tLabel = "チャンス";
+    let tColor = "#2d3436"; // Default greyish
+
+    if (window.game.round === 1) {
+        // Round 1 is always normal Chance (Anti-reroll)
+        tScore = 200;
+        tLabel = "チャンス";
+        tColor = "#2d3436";
+    } else {
+        const rndScore = Math.random();
+        if (rndScore < 0.05) { // 5%
+            tScore = 500;
+            tLabel = "スーパービッグチャンス";
+            tColor = "#e056fd"; // Purple/Pink
+        } else if (rndScore < 0.15) { // 10% (0.05 + 0.10)
+            tScore = 400;
+            tLabel = "ビッグチャンス";
+            tColor = "#e74c3c"; // Red
+        } else if (rndScore < 0.30) { // 15% (0.15 + 0.15)
+            tScore = 300;
+            tLabel = "グッドチャンス";
+            tColor = "#f1c40f"; // Gold
+        } else { // 70%
+            tScore = 200;
+            tLabel = "チャンス";
+            tColor = "#2d3436";
+        }
+    }
+    window.game.targetBaseScore = tScore;
+    
+    // Update UI
+    const typeEl = document.getElementById('disp-target-type');
+    typeEl.textContent = tLabel;
+    typeEl.style.color = tColor;
+    document.getElementById('disp-target-pts').textContent = tScore;
 
     // Initialize Cakes (Random, Not aligned)
     while(true) {
@@ -978,8 +1022,8 @@ function roundClear() {
     const matchVal = window.game.cakes[0];
     const isTarget = (matchVal === window.game.targetValue);
     
-    // 基礎点 = (100 or 200) + ⭐数*10
-    let base = (isTarget ? 200 : 100) + (window.game.roundCoins * 10);
+    // 基礎点 = (targetBaseScore or 100) + ⭐数*10
+    let base = (isTarget ? window.game.targetBaseScore : 100) + (window.game.roundCoins * 10);
     let rate = 1 + (window.game.combo * 0.5);
     let total = Math.floor(base * rate);
     
