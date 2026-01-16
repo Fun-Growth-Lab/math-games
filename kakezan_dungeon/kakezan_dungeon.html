@@ -422,7 +422,7 @@
             <div id="current-player-display">プレーヤーをえらんでね</div>
             <button class="btn btn-success" id="start-btn-trigger">はじめる</button>
             <button class="btn" onclick="openPlayerModal()">プレーヤーせんたく</button>
-            <button class="btn btn-google" onclick="alert('Googleログイン機能は設定が必要です')">Googleでログイン</button>
+            <button class="btn btn-google" id="google-btn" onclick="handleGoogleAuth()">Googleでログイン</button>
             <button class="btn btn-warning" onclick="showRanking()">ランキング</button>
             <button class="btn btn-index" onclick="location.href='index.html'">INDEXへ</button>
         </div>
@@ -527,7 +527,7 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
     import { getFirestore, collection, addDoc, query, where, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
-    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
+    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyBCg5dCEM89UmYYhfGqVeRf_VrUlg8_o-4",
@@ -543,10 +543,7 @@
         const db = getFirestore(app);
         const auth = getAuth(app);
         
-        signInAnonymously(auth).catch((e) => {
-            console.warn("Firebase Auth Error: ログインできませんでした", e.code);
-        });
-
+        // グローバルに公開
         window.dbInstance = db;
         window.collection = collection;
         window.addDoc = addDoc;
@@ -555,6 +552,52 @@
         window.orderBy = orderBy;
         window.limit = limit;
         window.getDocs = getDocs;
+
+        // 認証状態の監視
+        onAuthStateChanged(auth, (user) => {
+            const btn = document.getElementById('google-btn');
+            if (user && !user.isAnonymous) {
+                // Googleログイン済み
+                btn.textContent = "ログアウト";
+                btn.classList.remove("btn-google");
+                btn.classList.add("btn-index"); // ログアウト用の色（グレー系）
+                
+                // プレーヤー情報を更新
+                window.updateGooglePlayer(user);
+            } else {
+                // 未ログイン または 匿名
+                btn.textContent = "Googleでログイン";
+                btn.classList.remove("btn-index");
+                btn.classList.add("btn-google");
+                
+                if(!user) {
+                    signInAnonymously(auth).catch(console.error);
+                }
+            }
+        });
+
+        // ログイン処理
+        window.handleGoogleAuth = async function() {
+            const btn = document.getElementById('google-btn');
+            if (auth.currentUser && !auth.currentUser.isAnonymous) {
+                // ログアウト処理
+                try {
+                    await signOut(auth);
+                    window.resetToLocalPlayer();
+                } catch(e) {
+                    alert("ログアウトに失敗しました: " + e.message);
+                }
+            } else {
+                // ログイン処理
+                const provider = new GoogleAuthProvider();
+                try {
+                    await signInWithPopup(auth, provider);
+                } catch(e) {
+                    alert("ログインに失敗しました: " + e.message);
+                }
+            }
+        };
+
     } catch (err) {
         console.error("Firebase Init Error:", err);
     }
@@ -699,6 +742,23 @@
         }
     }
 
+    // Googleログイン時の処理
+    window.updateGooglePlayer = function(user) {
+        currentPlayer = {
+            id: user.uid,
+            name: user.displayName || "Googleユーザー",
+            isGoogle: true
+        };
+        updatePlayerDisplay();
+    };
+
+    // ログアウト時の処理
+    window.resetToLocalPlayer = function() {
+        currentPlayer = null;
+        updatePlayerDisplay();
+        alert("ログアウトしました");
+    };
+
     function renderPlayerList() {
         const container = document.getElementById('player-list-container');
         container.innerHTML = "";
@@ -822,7 +882,7 @@
                 .slice(0, 10);
         } else {
             try {
-                if(window.dbInstance) {
+                if(window.dbInstance && window.getDocs) {
                     const q = window.query(
                         window.collection(window.dbInstance, "scores_kakezan_dungeon"),
                         window.where("difficulty", "==", rankDiff),
