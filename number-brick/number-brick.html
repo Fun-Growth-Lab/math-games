@@ -206,25 +206,6 @@
             white-space: nowrap;
         }
 
-        /* 回転ボタン */
-        .rotate-btn {
-            width: 90px;
-            height: 90px;
-            border-radius: 50%;
-            background: #FFD54F;
-            border: 4px solid #fff;
-            box-shadow: 0 5px 0 #FFA000;
-            font-size: 40px;
-            color: #fff;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            cursor: pointer;
-            transition: all 0.1s;
-            margin-top: 20px; 
-        }
-        .rotate-btn:active { transform: translateY(4px); box-shadow: none; }
-
         .bottom-buttons {
             display: flex;
             gap: 20px;
@@ -248,6 +229,9 @@
         .btn-secondary { background: var(--secondary-color); box-shadow: 0 5px 0 #0277BD; }
         .btn-danger { background: #EF5350; box-shadow: 0 5px 0 #C62828; }
         .btn-accent { background: #66BB6A; box-shadow: 0 5px 0 #2E7D32; }
+        
+        /* 難易度ボタン用のアクティブ色（紫） */
+        .btn-diff-active { background: #9C27B0; box-shadow: 0 5px 0 #7B1FA2; }
 
         /* モーダル */
         .ui-layer {
@@ -407,7 +391,6 @@
                             </div>
                         <div class="box-label">てもち</div>
                     </div>
-                    <div class="rotate-btn" id="rotate-btn">↻</div>
                 </div>
 
                 <div class="piece-box">
@@ -489,10 +472,10 @@
             </div>
             <div style="margin-bottom:15px; display:flex; justify-content:center; gap:10px;">
                 <button id="rank-btn-easy" class="btn btn-grey" onclick="Game.setRankingDiff('EASY')" style="padding:5px 15px; font-size:16px;">かんたん</button>
-                <button id="rank-btn-normal" class="btn btn-secondary" onclick="Game.setRankingDiff('NORMAL')" style="padding:5px 15px; font-size:16px;">ふつう</button>
+                <button id="rank-btn-normal" class="btn btn-diff-active" onclick="Game.setRankingDiff('NORMAL')" style="padding:5px 15px; font-size:16px;">ふつう</button>
                 <button id="rank-btn-hard" class="btn btn-grey" onclick="Game.setRankingDiff('HARD')" style="padding:5px 15px; font-size:16px;">むずかしい</button>
             </div>
-            <p style="font-size:14px; color:#777;">到達ステージが多い順、タイムが速い順</p>
+            <p style="font-size:14px; color:#777;">到達ステージが多い順、タイム(平均)が速い順</p>
             <div id="ranking-list" style="height:300px; overflow-y:auto; border:2px solid #eee; border-radius:10px; padding:10px;"></div>
         </div>
     </div>
@@ -647,8 +630,6 @@ const Game = {
 
         window.addEventListener('resize', () => this.resize());
         
-        document.getElementById('rotate-btn').addEventListener('click', () => this.rotatePiece());
-
         this.updateTitleScreen();
         this.resize();
         
@@ -731,9 +712,9 @@ const Game = {
         const bN = document.getElementById('rank-btn-normal');
         const bH = document.getElementById('rank-btn-hard');
         
-        bE.className = (diff === 'EASY') ? "btn btn-secondary" : "btn btn-grey";
-        bN.className = (diff === 'NORMAL') ? "btn btn-secondary" : "btn btn-grey";
-        bH.className = (diff === 'HARD') ? "btn btn-secondary" : "btn btn-grey";
+        bE.className = (diff === 'EASY') ? "btn btn-diff-active" : "btn btn-grey";
+        bN.className = (diff === 'NORMAL') ? "btn btn-diff-active" : "btn btn-grey";
+        bH.className = (diff === 'HARD') ? "btn btn-diff-active" : "btn btn-grey";
         
         this.loadRanking();
     },
@@ -751,7 +732,24 @@ const Game = {
               .orderBy('avgTime', 'asc')
               .limit(10).get()
               .then(snap => this.renderRankingTable(snap.docs.map(d => d.data())))
-              .catch(e => { console.error(e); listDiv.innerHTML = "よみこみエラー"; });
+              .catch(e => {
+                  console.error(e);
+                  // エラーメッセージにインデックス作成用リンクが含まれているかチェック
+                  if (e.message.includes('index')) {
+                      // リンクURLを抽出 (https://...)
+                      const match = e.message.match(/https:\/\/console\.firebase\.google\.com[^\s]*/);
+                      if (match) {
+                          listDiv.innerHTML = `<div style="padding:10px; color:red; font-size:16px;">
+                              エラー: インデックスが必要です。<br>
+                              <a href="${match[0]}" target="_blank" style="color:blue; text-decoration:underline;">
+                              ここをクリックしてインデックスを作成してください
+                              </a>
+                          </div>`;
+                          return;
+                      }
+                  }
+                  listDiv.innerHTML = "よみこみエラー";
+              });
         } else {
             let localScores = JSON.parse(localStorage.getItem('nb_scores_timeattack')) || [];
             localScores = localScores.filter(s => s.difficulty === selectedDiff);
@@ -1059,8 +1057,6 @@ const Game = {
         if(domEl) domEl.style.opacity = '1';
 
         // Check for click (tap) to rotate
-        // マウスアップ/タッチエンドの座標は e.changedTouches 等で取る必要があるが、
-        // 簡易的に「グリッド上になければ回転」または「移動距離が短ければ回転」とする
         let endX, endY;
         if(e.changedTouches && e.changedTouches.length > 0) {
             endX = e.changedTouches[0].clientX;
@@ -1149,6 +1145,7 @@ const Game = {
         const now = performance.now();
         const stageTime = (now - this.startTime) / 1000;
         this.accumulatedTime += stageTime;
+        const avg = this.accumulatedTime / this.stage;
 
         // クリア画面のUI構築
         const overlay = document.getElementById('result-screen');
@@ -1158,13 +1155,13 @@ const Game = {
         const btnArea = document.getElementById('res-btn-area');
         
         titleEl.textContent = "ゲームクリア";
-        msgEl.innerHTML = `Time: <span class="quota-highlight">${this.elapsedTime.toFixed(2)}</span>秒<br>（合計: ${this.accumulatedTime.toFixed(2)}秒）`;
+        msgEl.innerHTML = `Time: <span class="quota-highlight">${this.elapsedTime.toFixed(2)}</span>秒<br>（平均: ${avg.toFixed(2)}秒）`;
         btnArea.innerHTML = "";
 
         if (this.stage >= 99) {
              // 全クリア
-             msgEl.innerHTML = `全ステージクリア！<br>平均Time: ${(this.accumulatedTime/99).toFixed(2)}秒`;
-             this.saveScoreData(99, this.accumulatedTime/99);
+             msgEl.innerHTML = `全ステージクリア！<br>平均Time: ${avg.toFixed(2)}秒`;
+             this.saveScoreData(99, avg);
              
              const btnTitle = document.createElement('button');
              btnTitle.className = "btn btn-primary";
@@ -1191,7 +1188,6 @@ const Game = {
             btnEnd.textContent = "おわる";
             btnEnd.onclick = () => {
                 // ここで終了する場合もスコア保存（現在のステージまでクリア扱い）
-                let avg = this.accumulatedTime / this.stage;
                 this.saveScoreData(this.stage, avg);
                 overlay.style.display='none';
                 this.toTitle();
@@ -1274,9 +1270,16 @@ const Game = {
     },
 
     confirmQuit() {
-        if (confirm("タイトルに もどりますか？")) {
-            this.stopTimer();
-            this.toTitle();
+        if (this.stage > 1) {
+            if (confirm("タイトルへもどりますか？\nゲームオーバーになります。")) {
+                this.stopTimer();
+                this.finishGame(false);
+            }
+        } else {
+            if (confirm("タイトルに もどりますか？")) {
+                this.stopTimer();
+                this.toTitle();
+            }
         }
     },
 
