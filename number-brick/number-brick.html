@@ -683,13 +683,22 @@ const Game = {
     hideHelp() { document.getElementById('help-screen').style.display = 'none'; },
 
     loginGoogle() {
+        // プロトコルチェック: file:// ではFirebase Authは動作しない
+        if (window.location.protocol === 'file:') {
+            alert("エラー：\nこのゲームを「HTMLファイルのダブルクリック」で開いていませんか？\n\nGoogleログイン等のセキュリティ機能は、Webサーバー経由(http/https)でないと動作しません。\nVSCodeのLive Server機能などを使って開いてください。");
+            return;
+        }
+
         const provider = new firebase.auth.GoogleAuthProvider();
         firebase.auth().signInWithPopup(provider)
             .then(res => {
                 this.googleUser = res.user;
                 alert("ログインしました！\nワールドランキングに 記録されるように なったよ！");
             })
-            .catch(e => alert("エラー: " + e.message));
+            .catch(e => {
+                console.error(e);
+                alert("エラー: " + e.message);
+            });
     },
     showRanking() { 
         this.hideAll(); 
@@ -734,21 +743,21 @@ const Game = {
               .then(snap => this.renderRankingTable(snap.docs.map(d => d.data())))
               .catch(e => {
                   console.error(e);
-                  // エラーメッセージにインデックス作成用リンクが含まれているかチェック
-                  if (e.message.includes('index')) {
-                      // リンクURLを抽出 (https://...)
-                      const match = e.message.match(/https:\/\/console\.firebase\.google\.com[^\s]*/);
-                      if (match) {
-                          listDiv.innerHTML = `<div style="padding:10px; color:red; font-size:16px;">
-                              エラー: インデックスが必要です。<br>
-                              <a href="${match[0]}" target="_blank" style="color:blue; text-decoration:underline;">
-                              ここをクリックしてインデックスを作成してください
-                              </a>
-                          </div>`;
-                          return;
-                      }
+                  // エラーメッセージからURLを抽出 (https://...)
+                  // Firebase V8のエラーメッセージ例: "The query requires an index. You can create it here: https://..."
+                  const match = e.message.match(/https:\/\/console\.firebase\.google\.com[^\s]*/);
+                  if (match || e.code === 'failed-precondition') {
+                      let url = match ? match[0] : '#';
+                      listDiv.innerHTML = `<div style="padding:15px; color:#D32F2F; font-size:16px; background:#FFEBEE; border-radius:10px;">
+                          <strong>インデックスが必要です</strong><br><br>
+                          DBの設定が必要です。以下のリンクをクリックして、インデックスを作成してください。<br><br>
+                          <a href="${url}" target="_blank" style="color:#1976D2; font-weight:bold; text-decoration:underline; word-break:break-all;">
+                          ＞ インデックス作成画面へ移動 ＜
+                          </a>
+                      </div>`;
+                      return;
                   }
-                  listDiv.innerHTML = "よみこみエラー";
+                  listDiv.innerHTML = "よみこみエラー: " + e.message;
               });
         } else {
             let localScores = JSON.parse(localStorage.getItem('nb_scores_timeattack')) || [];
