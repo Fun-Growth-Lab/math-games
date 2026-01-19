@@ -9,10 +9,6 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap" rel="stylesheet">
 
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-
     <style>
         :root {
             --font-family: 'M PLUS Rounded 1c', sans-serif;
@@ -230,6 +226,8 @@
         .btn-danger { background: #EF5350; box-shadow: 0 5px 0 #C62828; }
         .btn-accent { background: #66BB6A; box-shadow: 0 5px 0 #2E7D32; }
         
+        .btn-google { background: #4285F4; box-shadow: 0 5px 0 #0D47A1; } /* Google色 */
+        
         /* 難易度ボタン用のアクティブ色（紫） */
         .btn-diff-active { background: #9C27B0; box-shadow: 0 5px 0 #7B1FA2; }
 
@@ -354,6 +352,89 @@
         }
 
     </style>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, query, where, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+        import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBCg5dCEM89UmYYhfGqVeRf_VrUlg8_o-4",
+            authDomain: "math-braves.firebaseapp.com",
+            projectId: "math-braves",
+            storageBucket: "math-braves.firebasestorage.app",
+            messagingSenderId: "217117619290",
+            appId: "1:217117619290:web:d227feb603970d3948d463"
+        };
+
+        try {
+            const app = initializeApp(firebaseConfig);
+            const db = getFirestore(app);
+            const auth = getAuth(app);
+            
+            // グローバルに公開
+            window.dbInstance = db;
+            window.collection = collection;
+            window.addDoc = addDoc;
+            window.query = query;
+            window.where = where;
+            window.orderBy = orderBy;
+            window.limit = limit;
+            window.getDocs = getDocs;
+
+            // 認証状態の監視
+            onAuthStateChanged(auth, (user) => {
+                const btn = document.getElementById('google-btn');
+                if (user && !user.isAnonymous) {
+                    // Googleログイン済み
+                    if(btn) {
+                        btn.textContent = "ログアウト";
+                        btn.classList.remove("btn-google");
+                        btn.classList.add("btn-grey"); // ログアウト用
+                    }
+                    window.currentUser = user;
+                } else {
+                    // 未ログイン または 匿名
+                    if(btn) {
+                        btn.textContent = "Googleでログイン";
+                        btn.classList.remove("btn-grey");
+                        btn.classList.add("btn-google");
+                    }
+                    window.currentUser = null;
+                    if(!user) {
+                        signInAnonymously(auth).catch(console.error);
+                    }
+                }
+            });
+
+            // ログイン処理
+            window.handleGoogleAuth = async function() {
+                const btn = document.getElementById('google-btn');
+                if (auth.currentUser && !auth.currentUser.isAnonymous) {
+                    // ログアウト処理
+                    try {
+                        await signOut(auth);
+                        alert("ログアウトしました");
+                    } catch(e) {
+                        alert("ログアウトに失敗しました: " + e.message);
+                    }
+                } else {
+                    // ログイン処理
+                    const provider = new GoogleAuthProvider();
+                    try {
+                        await signInWithPopup(auth, provider);
+                        alert("ログインしました！\nワールドランキングに 記録されるように なったよ！");
+                    } catch(e) {
+                        alert("ログインに失敗しました: " + e.message);
+                    }
+                }
+            };
+
+        } catch (err) {
+            console.error("Firebase Init Error:", err);
+        }
+    </script>
+
 </head>
 <body>
 
@@ -429,7 +510,8 @@
 
             <button class="btn btn-primary" onclick="Game.tryStartGame()">はじめる</button>
             <button class="btn btn-secondary" onclick="Game.toPlayerSelect()">プレーヤーを えらぶ</button>
-            <button class="btn btn-danger" onclick="Game.loginGoogle()">Googleでログイン</button>
+            <button id="google-btn" class="btn btn-google" onclick="Game.loginGoogle()">Googleでログイン</button>
+            
             <button class="btn btn-accent" onclick="Game.showRanking()">ランキング</button>
             <button class="btn btn-grey" onclick="Game.toIndex()">INDEXへ</button>
         </div>
@@ -500,21 +582,6 @@
 </div>
 
 <script>
-/** Firebase Config (Placeholder) */
-const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT_ID.appspot.com",
-    messagingSenderId: "SENDER_ID",
-    appId: "APP_ID"
-};
-if (!firebase.apps.length) {
-    try { firebase.initializeApp(firebaseConfig); } catch(e) {}
-}
-let db = null;
-try { db = firebase.firestore(); } catch(e) {}
-
 /** Constants */
 const CONFIG = {
     COLLECTION_NAME: 'scores_nb_timeattack',
@@ -592,7 +659,7 @@ class PlayerManager {
 const Game = {
     canvas: null, ctx: null,
     currentPlayer: null,
-    googleUser: null,
+    // Google Userは window.currentUser で管理
     state: 'TITLE',
     
     stage: 1, difficulty: 'NORMAL',
@@ -683,22 +750,11 @@ const Game = {
     hideHelp() { document.getElementById('help-screen').style.display = 'none'; },
 
     loginGoogle() {
-        // プロトコルチェック: file:// ではFirebase Authは動作しない
-        if (window.location.protocol === 'file:') {
-            alert("エラー：\nこのゲームを「HTMLファイルのダブルクリック」で開いていませんか？\n\nGoogleログイン等のセキュリティ機能は、Webサーバー経由(http/https)でないと動作しません。\nVSCodeのLive Server機能などを使って開いてください。");
-            return;
+        if (window.handleGoogleAuth) {
+            window.handleGoogleAuth();
+        } else {
+            alert("Firebase読み込み中です。少々お待ち下さい。");
         }
-
-        const provider = new firebase.auth.GoogleAuthProvider();
-        firebase.auth().signInWithPopup(provider)
-            .then(res => {
-                this.googleUser = res.user;
-                alert("ログインしました！\nワールドランキングに 記録されるように なったよ！");
-            })
-            .catch(e => {
-                console.error(e);
-                alert("エラー: " + e.message);
-            });
     },
     showRanking() { 
         this.hideAll(); 
@@ -727,38 +783,44 @@ const Game = {
         
         this.loadRanking();
     },
-    loadRanking() {
+    async loadRanking() {
         const listDiv = document.getElementById('ranking-list');
         listDiv.innerHTML = "よみこみちゅう...";
         
         const selectedDiff = this.rankingDiff;
 
         if (this.rankingMode === 'WORLD') {
-            if (!db) { listDiv.innerHTML = "DBみせつぞく"; return; }
-            db.collection(CONFIG.COLLECTION_NAME)
-              .where('difficulty', '==', selectedDiff)
-              .orderBy('stage', 'desc')
-              .orderBy('avgTime', 'asc')
-              .limit(10).get()
-              .then(snap => this.renderRankingTable(snap.docs.map(d => d.data())))
-              .catch(e => {
-                  console.error(e);
-                  // エラーメッセージからURLを抽出 (https://...)
-                  // Firebase V8のエラーメッセージ例: "The query requires an index. You can create it here: https://..."
-                  const match = e.message.match(/https:\/\/console\.firebase\.google\.com[^\s]*/);
-                  if (match || e.code === 'failed-precondition') {
-                      let url = match ? match[0] : '#';
-                      listDiv.innerHTML = `<div style="padding:15px; color:#D32F2F; font-size:16px; background:#FFEBEE; border-radius:10px;">
-                          <strong>インデックスが必要です</strong><br><br>
-                          DBの設定が必要です。以下のリンクをクリックして、インデックスを作成してください。<br><br>
-                          <a href="${url}" target="_blank" style="color:#1976D2; font-weight:bold; text-decoration:underline; word-break:break-all;">
-                          ＞ インデックス作成画面へ移動 ＜
-                          </a>
-                      </div>`;
-                      return;
-                  }
-                  listDiv.innerHTML = "よみこみエラー: " + e.message;
-              });
+            if (!window.dbInstance) { listDiv.innerHTML = "DBみせつぞく"; return; }
+            
+            try {
+                const q = window.query(
+                    window.collection(window.dbInstance, CONFIG.COLLECTION_NAME),
+                    window.where('difficulty', '==', selectedDiff),
+                    window.orderBy('stage', 'desc'),
+                    window.orderBy('avgTime', 'asc'),
+                    window.limit(10)
+                );
+                const querySnapshot = await window.getDocs(q);
+                const data = querySnapshot.docs.map(doc => doc.data());
+                this.renderRankingTable(data);
+                
+            } catch (e) {
+                console.error(e);
+                // Firebase v9のエラーメッセージからURL抽出
+                const match = e.message.match(/https:\/\/console\.firebase\.google\.com[^\s]*/);
+                if (match || e.code === 'failed-precondition') {
+                    let url = match ? match[0] : '#';
+                    listDiv.innerHTML = `<div style="padding:15px; color:#D32F2F; font-size:16px; background:#FFEBEE; border-radius:10px;">
+                        <strong>インデックスが必要です</strong><br><br>
+                        DBの設定が必要です。以下のリンクをクリックして、インデックスを作成してください。<br><br>
+                        <a href="${url}" target="_blank" style="color:#1976D2; font-weight:bold; text-decoration:underline; word-break:break-all;">
+                        ＞ インデックス作成画面へ移動 ＜
+                        </a>
+                    </div>`;
+                } else {
+                    listDiv.innerHTML = "よみこみエラー: " + e.message;
+                }
+            }
         } else {
             let localScores = JSON.parse(localStorage.getItem('nb_scores_timeattack')) || [];
             localScores = localScores.filter(s => s.difficulty === selectedDiff);
@@ -1260,14 +1322,14 @@ const Game = {
         locals.push(scoreData);
         localStorage.setItem('nb_scores_timeattack', JSON.stringify(locals));
         
-        if (db && this.googleUser) {
-            db.collection(CONFIG.COLLECTION_NAME).add({
+        if (window.dbInstance && window.currentUser && window.addDoc && window.collection) {
+            window.addDoc(window.collection(window.dbInstance, CONFIG.COLLECTION_NAME), {
                 name: this.currentPlayer,
                 stage: stage,
                 avgTime: parseFloat(avgTime.toFixed(2)),
                 difficulty: this.difficulty,
-                date: firebase.firestore.FieldValue.serverTimestamp()
-            });
+                date: new Date() // Firestore Timestamp is handled by SDK
+            }).catch(e => console.error(e));
         }
     },
 
