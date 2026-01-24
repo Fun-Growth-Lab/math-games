@@ -1,0 +1,1500 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>タステン！</title>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap" rel="stylesheet">
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #4E342E; /* 外側の背景：濃い茶色 */
+            overflow: hidden;
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            touch-action: none;
+        }
+        #game-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 1280px;
+            height: 720px;
+            background-color: #FFF8E1; /* ゲーム背景：クリーム色 */
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+        }
+        .overlay-input {
+            position: absolute;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            z-index: 100;
+            border: 4px solid #FF9800;
+        }
+        input[type="text"] {
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            font-size: 24px;
+            padding: 10px;
+            border: 3px solid #FF9800;
+            border-radius: 10px;
+            text-align: center;
+            margin-bottom: 15px;
+            outline: none;
+            background-color: #FFF3E0;
+        }
+        button.ui-btn {
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            font-size: 20px;
+            padding: 10px 20px;
+            background-color: #FF9800;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            box-shadow: 0 4px #E65100;
+            transition: transform 0.1s;
+        }
+        button.ui-btn:active {
+            transform: translateY(4px);
+            box-shadow: none;
+        }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas" width="1280" height="720"></canvas>
+    
+    <div id="playerInputOverlay" class="overlay-input" style="top: 50%; left: 50%; transform: translate(-50%, -50%); width: 400px;">
+        <h3 style="margin-top:0; color:#5D4037;">なまえをいれてね</h3>
+        <p style="font-size:14px; color:#666;">ひらがな 8もじ まで</p>
+        <input type="text" id="playerNameInput" maxlength="8" placeholder="ひらがなのみ">
+        <div style="display:flex; gap:10px;">
+            <button class="ui-btn" onclick="Game.registerPlayer()">とうろく</button>
+            <button class="ui-btn" style="background-color:#90A4AE; box-shadow:0 4px #546E7A;" onclick="Game.closePlayerInput()">やめる</button>
+        </div>
+        <p id="inputError" style="color:red; font-size:14px; margin-bottom:0; min-height:20px;"></p>
+    </div>
+</div>
+
+<script>
+/**
+ * 定数・設定
+ */
+// ---------------- Firebase設定 (使用時は自身のconfigに書き換えてください) ----------------
+const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT_ID.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
+};
+// --------------------------------------------------------------------------------
+
+let db = null;
+let auth = null;
+try {
+    if (typeof firebase !== 'undefined' && firebase.apps.length === 0) {
+        firebase.initializeApp(firebaseConfig);
+    }
+    if (typeof firebase !== 'undefined') {
+        db = firebase.firestore();
+        auth = firebase.auth();
+    }
+} catch (e) {
+    console.warn("Firebase config error:", e);
+}
+
+const COLLECTION_NAME = "scores_tasuten";
+
+// NGワードリスト
+const NG_WORDS_HIRAGANA = [
+    'しね', 'しぬ', 'しに', 'ころす', 'ころせ', 'さつがい', 'くたばれ',
+    'じさつ', 'ぎさつ', 'つるす', 'れんたん', 'しにたい',
+    'てろ', 'てろりすと', 'ばくは', 'ばくだん', 'ほうか',
+    'はんざい', 'ごうとう', 'ゆうかい', 'かんきん', 'おそう',
+    'やくざ', 'ぼうりょく', 'はんぐれ', 'ちんぴら', 'まふぃあ',
+    'たいま', 'まやく', 'かくせいざい', 'しゃぶ', 'どらっぐ', 'こかいん',
+    'へろいん', 'えくすたしー', 'だっぽう', 'きめせく',
+    'いじめ', 'ぎゃくたい',
+    'ばか', 'あほ', 'まぬけ', 'きちがい', 'き違い',
+    'うざい', 'うざ', 'きもい', 'きも', 'きしょい', 'きえろ',
+    'くず', 'ごみ', 'ごみむし', 'かす', 'ざこ', 'ぜつ',
+    'ぶす', 'でぶ', 'はげ', 'ちび', 'でっぱ', 'いなかもの',
+    'うじ', 'はいぼく', 'まけいぬ', 'おつむ', 'のうたりん',
+    'ていのう', 'ちしょう', 'しょうがい', 'がいじ', 'かたわ', 'びっこ',
+    'めくら', 'つんぼ', 'おし', 'どじん', 'えた', 'ひにん',
+    'たひ', 'たひね',
+    'うせろ', 'だまれ',
+    'ちんちん', 'ちんこ', 'ちんぽ', 'ちんか', 'まら', 'さお',
+    'まんこ', 'まんしゅう', 'まんげ', 'われめ', 'おまた',
+    'くり', 'くりとりす', 'いんしん', 'いんかく', 'びらびら',
+    'こうがん', 'たまきん', 'きんたま', 'ふぐり',
+    'おっぱい', 'ちち', 'にゅうりん', 'にゅうとう', 'きょにゅう', 'ひんにゅう',
+    'けつ', 'あなる', 'こうもん', 'けつのあな',
+    'えろ', 'えっち', 'すけべ', 'へんたい', 'むっつり', 'しこ',
+    'せっくす', 'せいこう', 'まぐわい', 'そうにゅう', 'はめる',
+    'おなにー', 'じい', 'しこしこ', 'ふぇら', 'ぱいずり', 'くんに',
+    'いらま', 'しっしん', 'なかだし', 'ごっくん', 'ぶっかけ',
+    'しおふき', 'ぜっちょう', 'いく', 'いかせろ', 'あえぎ',
+    'どうてい', 'しょじょ', 'やりまん', 'やりちん', 'びっち',
+    'せふれ', 'ぱこ', 'ぱこぱこ', 'わいせつ', 'ろり', 'しょた', 'ぺど',
+    'きんしん', 'じゅうかん', 'りょうじょく', 'らんこう', 'すかんと',
+    'のーぱん', 'ぱんちら',
+    'れいぷ', 'ごうかん', 'ちかん', 'とうさつ', 'のぞき', 'ろしゅつ',
+    'ふうぞく', 'そーぷ', 'へるす', 'でりへる', 'ぴんさろ', 'いめくら',
+    'あだると', 'えーぶい', 'えぶい', 'ぽるの', 'うらびでお', 'むしゅうせい',
+    'えんこう', 'えんじょ', 'うり', 'かいしゅん', 'ばいしゅん',
+    'ぱぱかつ', 'ままかつ', 'うりせん',
+    'うんこ', 'うんち', 'くそ', 'げり', 'べん', 'ふん',
+    'しっこ', 'しょんべん', 'にょう', 'ほうにょう',
+    'へ', 'おなら', 'げろ', 'たん',
+    'うんえい', 'こうしき', 'すたっふ', 'かんり', 'ぱとろーる',
+    'じえむ', 'げーむますたー', 'ますたー', 'あどみん', 'しすてむ',
+    'さーばー', 'あかばん', 'ばん', 'ちーと', 'ちーたー', 'ばぐ',
+    'らいん', 'かかお', 'すかいぷ', 'いんすた', 'ついったー', 'でぃすこ',
+    'でんわ', 'ばんごう', 'けいたい', 'あどれす', 'めあど', 'じゅうしょ',
+    'あお', 'あいたい', 'まちあわせ', 'ほてる', 'らぶほ', 'おふかい',
+    'ぱすわーど', 'ぱす', 'あかうんと', 'こじんじょうほう'
+];
+
+/**
+ * ゲームエンジン
+ */
+const Game = (function() {
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    // 画像読み込み
+    const bgImage = new Image();
+    bgImage.src = 'images/title.png';
+    
+    // ゲーム状態
+    const STATE = {
+        TITLE: 0,
+        PLAYER_SELECT: 1,
+        DIFFICULTY_SELECT: 2,
+        PLAYING: 3,
+        ANIMATING: 4,
+        GAME_OVER: 5,
+        RANKING: 6
+    };
+    
+    let currentState = STATE.TITLE;
+    
+    const BASE_WIDTH = 1280;
+    const BASE_HEIGHT = 720;
+    
+    // グリッド設定（中央に配置）
+    const GRID_ROWS = 5;
+    const GRID_COLS = 5;
+    const CELL_SIZE = 110;
+    // 中央エリアの計算
+    const GRID_OFFSET_X = (BASE_WIDTH - CELL_SIZE * GRID_COLS) / 2;
+    const GRID_OFFSET_Y = (BASE_HEIGHT - CELL_SIZE * GRID_ROWS) / 2 + 10;
+    
+    // ゲームデータ
+    let grid = [];
+    let score = 0;
+    let turnCount = 0;
+    let difficulty = 'normal';
+    let matchGroupsQueue = [];
+    let animationTimer = 0;
+    let selectedCell = null;
+    let isDragging = false;
+    let currentChain = 0; // コンボ（連鎖）数
+    
+    // アイテム（流れ星）
+    let starStock = 0;
+    let isSelectingStar = false; // 流れ星アイテム使用時の番号選択モード
+    
+    // ステージ・ミッション管理
+    let currentStage = 1;
+    let nextStageScore = 2000;
+    let stageMonsterRateBonus = 0;
+
+    // エフェクト管理用
+    let effects = [];
+    
+    // プレーヤー管理
+    let players = [];
+    let currentPlayerIndex = -1;
+    
+    // ランキング用
+    let rankingData = [];
+    let rankingScope = 'local';
+    let rankingTab = 'easy'; 
+    
+    // マウス/タッチ座標
+    const inputState = { x: 0, y: 0, isDown: false };
+
+    // パネルの背景色（数字ごと）
+    const NUMBER_BG_COLORS = [
+        "#E53935", // 1: 赤
+        "#1E88E5", // 2: 青
+        "#43A047", // 3: 緑
+        "#8E24AA", // 4: 紫
+        "#FB8C00", // 5: オレンジ
+        "#00ACC1", // 6: シアン
+        "#D81B60", // 7: ピンク
+        "#7CB342", // 8: 黄緑
+        "#6D4C41"  // 9: 茶
+    ];
+    
+    // 初期化
+    function init() {
+        resize();
+        window.addEventListener('resize', resize);
+        
+        canvas.addEventListener('mousedown', handleInputStart);
+        canvas.addEventListener('mousemove', handleInputMove);
+        canvas.addEventListener('mouseup', handleInputEnd);
+        canvas.addEventListener('touchstart', (e) => { e.preventDefault(); handleInputStart(e.touches[0]); }, {passive: false});
+        canvas.addEventListener('touchmove', (e) => { e.preventDefault(); handleInputMove(e.touches[0]); }, {passive: false});
+        canvas.addEventListener('touchend', handleInputEnd);
+        
+        loadPlayers();
+        requestAnimationFrame(loop);
+    }
+    
+    function resize() {
+        const scaleX = window.innerWidth / BASE_WIDTH;
+        const scaleY = window.innerHeight / BASE_HEIGHT;
+        const scale = Math.min(scaleX, scaleY);
+        const container = document.getElementById('game-container');
+        container.style.transform = `translate(-50%, -50%) scale(${scale})`;
+    }
+
+    // ------------------ 確率・抽選ロジック ------------------
+    
+    function getWeightedRandomVal() {
+        const rand = Math.random() * 100;
+        if (rand < 18) return 1;
+        if (rand < 34) return 2;
+        if (rand < 48) return 3;
+        if (rand < 60) return 4;
+        if (rand < 70) return 5;
+        if (rand < 79) return 6;
+        if (rand < 87) return 7;
+        if (rand < 94) return 8;
+        return 9;
+    }
+
+    function getSpecialTileType() {
+        const rand = Math.random() * 100;
+        
+        // 1%の確率で流れ星
+        if (rand < 1) return 'star';
+
+        let monsterRate, coinRate, bagRate;
+
+        if (difficulty === 'easy') {
+            monsterRate = 5; coinRate = 4; bagRate = 1;
+        } else if (difficulty === 'normal') {
+            monsterRate = 10; coinRate = 4; bagRate = 1;
+        } else { // hard
+            monsterRate = 15; coinRate = 4; bagRate = 1;
+        }
+
+        monsterRate += stageMonsterRateBonus;
+        if (monsterRate > 75) monsterRate = 75;
+
+        // 残りの99%の中で判定するためにスケール
+        const subRand = Math.random() * 100;
+        if (subRand < monsterRate) return 'monster';
+        if (subRand < monsterRate + coinRate) return 'coin';
+        if (subRand < monsterRate + coinRate + bagRate) return 'bag';
+        return null;
+    }
+    
+    // ------------------ ゲームロジック ------------------
+    
+    function startNewGame(diff) {
+        difficulty = diff;
+        score = 0;
+        turnCount = 0;
+        currentStage = 1;
+        nextStageScore = 2000;
+        stageMonsterRateBonus = 0;
+        currentChain = 0;
+        starStock = 0;
+        isSelectingStar = false;
+
+        grid = Array(GRID_ROWS).fill(null).map(() => Array(GRID_COLS).fill(null));
+        effects = [];
+        spawnNumbers(5, true); 
+        currentState = STATE.PLAYING;
+    }
+    
+    function spawnNumbers(count, isInitial) {
+        let emptySpots = [];
+        for(let r=0; r<GRID_ROWS; r++) {
+            for(let c=0; c<GRID_COLS; c++) {
+                if(!grid[r][c]) emptySpots.push({r, c});
+            }
+        }
+        
+        if (emptySpots.length === 0 && !isInitial) {
+            checkGameOver();
+            return;
+        }
+
+        emptySpots.sort(() => Math.random() - 0.5);
+        let spawnCount = Math.min(count, emptySpots.length);
+        
+        for(let i=0; i<spawnCount; i++) {
+            let pos = emptySpots[i];
+            let specialType = getSpecialTileType();
+
+            if (specialType === 'star') {
+                grid[pos.r][pos.c] = { type: 'star', val: -1, life: 1, id: Date.now() + Math.random() };
+            } else if (specialType === 'monster') {
+                grid[pos.r][pos.c] = { type: 'monster', val: -1, id: Date.now() + Math.random() };
+            } else if (specialType === 'coin') {
+                grid[pos.r][pos.c] = { type: 'coin', val: -1, life: 1, id: Date.now() + Math.random() };
+            } else if (specialType === 'bag') {
+                grid[pos.r][pos.c] = { type: 'bag', val: -1, life: 1, id: Date.now() + Math.random() };
+            } else {
+                // 安全な数値が出るまで抽選（組み合わせ的に必ず１つは入る数値がある）
+                let val;
+                let valid = false;
+                
+                do {
+                    val = getWeightedRandomVal();
+                    let creates10 = false;
+                    
+                    // 横方向のチェック
+                    // その行の、新しい数値(pos.c)を含む全ての部分列を検査
+                    for(let start = 0; start <= pos.c; start++) {
+                        for(let end = pos.c; end < GRID_COLS; end++) {
+                            let sum = 0;
+                            let possible = true;
+                            for(let k = start; k <= end; k++) {
+                                let v;
+                                if(k === pos.c) {
+                                    v = val;
+                                } else {
+                                    let cell = grid[pos.r][k];
+                                    if(cell && cell.type === 'number') {
+                                        v = cell.val;
+                                    } else {
+                                        // 数値以外（空・アイテム等）が挟まると連続しない
+                                        possible = false;
+                                        break;
+                                    }
+                                }
+                                sum += v;
+                            }
+                            if(possible && sum === 10) {
+                                creates10 = true;
+                                break;
+                            }
+                        }
+                        if(creates10) break;
+                    }
+
+                    if(!creates10) {
+                        // 縦方向のチェック
+                        for(let start = 0; start <= pos.r; start++) {
+                            for(let end = pos.r; end < GRID_ROWS; end++) {
+                                let sum = 0;
+                                let possible = true;
+                                for(let k = start; k <= end; k++) {
+                                    let v;
+                                    if(k === pos.r) {
+                                        v = val;
+                                    } else {
+                                        let cell = grid[k][pos.c];
+                                        if(cell && cell.type === 'number') {
+                                            v = cell.val;
+                                        } else {
+                                            possible = false;
+                                            break;
+                                        }
+                                    }
+                                    sum += v;
+                                }
+                                if(possible && sum === 10) {
+                                    creates10 = true;
+                                    break;
+                                }
+                            }
+                            if(creates10) break;
+                        }
+                    }
+                    
+                    if(!creates10) valid = true;
+                    
+                } while(!valid);
+
+                grid[pos.r][pos.c] = { type: 'number', val: val, id: Date.now() + Math.random() };
+            }
+        }
+        
+        if (!isInitial) {
+            let full = true;
+            for(let r=0; r<GRID_ROWS; r++) {
+                for(let c=0; c<GRID_COLS; c++) {
+                    if(!grid[r][c]) full = false;
+                }
+            }
+        }
+    }
+    
+    function findMatches() {
+        let groups = [];
+        // 横
+        for(let r=0; r<GRID_ROWS; r++) {
+            let rowCells = [];
+            for(let c=0; c<GRID_COLS; c++) {
+                if(grid[r][c] && grid[r][c].type === 'number') {
+                    rowCells.push({val: grid[r][c].val, r, c});
+                } else {
+                    rowCells.push(null); 
+                }
+            }
+            checkLine(rowCells, groups);
+        }
+        // 縦
+        for(let c=0; c<GRID_COLS; c++) {
+            let colCells = [];
+            for(let r=0; r<GRID_ROWS; r++) {
+                if(grid[r][c] && grid[r][c].type === 'number') {
+                    colCells.push({val: grid[r][c].val, r, c});
+                } else {
+                    colCells.push(null);
+                }
+            }
+            checkLine(colCells, groups);
+        }
+
+        // 周囲巻き込み処理
+        groups.forEach(group => {
+            let extrasToAdd = [];
+            let checkSet = new Set(); 
+            group.forEach(cell => {
+                const neighbors = [
+                    {r: cell.r-1, c: cell.c}, {r: cell.r+1, c: cell.c},
+                    {r: cell.r, c: cell.c-1}, {r: cell.r, c: cell.c+1}
+                ];
+                neighbors.forEach(n => {
+                    if(n.r >= 0 && n.r < GRID_ROWS && n.c >= 0 && n.c < GRID_COLS) {
+                        let target = grid[n.r][n.c];
+                        // 流れ星(star)も巻き込み対象に追加
+                        if(target && (target.type === 'monster' || target.type === 'coin' || target.type === 'bag' || target.type === 'star')) {
+                            let key = `${n.r},${n.c}`;
+                            if(!checkSet.has(key)) {
+                                checkSet.add(key);
+                                extrasToAdd.push({r: n.r, c: n.c, type: target.type}); 
+                            }
+                        }
+                    }
+                });
+            });
+            extrasToAdd.forEach(m => group.push(m));
+        });
+
+        return groups;
+    }
+    
+    function checkLine(line, groups) {
+        for(let start=0; start<line.length; start++) {
+            if(line[start] === null) continue;
+            let sum = 0;
+            let currentGroup = [];
+            
+            for(let end=start; end<line.length; end++) {
+                if(line[end] === null) break;
+                sum += line[end].val;
+                currentGroup.push({r: line[end].r, c: line[end].c, type: 'number'});
+                
+                if(sum === 10) {
+                    if(currentGroup.length >= 2) {
+                        groups.push([...currentGroup]);
+                    }
+                }
+                if(sum > 10) break;
+            }
+        }
+    }
+    
+    // マッチ判定とスコア計算、ライフ消費を統括する関数
+    function resolveMatches(consumeLife) {
+        const matches = findMatches();
+        let uniqueRemovedKeys = new Set();
+
+        if(matches.length > 0) {
+            // コンボ数（そのアクションで何種類の和が10を作れたか＝成立したグループ数）を加算
+            currentChain += matches.length;
+            
+            let weightedPointTotal = 0;
+            
+            matches.forEach(group => {
+                group.forEach(cell => {
+                    const key = `${cell.r},${cell.c}`;
+                    if(!uniqueRemovedKeys.has(key)) {
+                        uniqueRemovedKeys.add(key);
+                        const actualCell = grid[cell.r][cell.c];
+                        if (actualCell) {
+                            // 得点計算（重み付け）
+                            if (actualCell.type === 'number') {
+                                weightedPointTotal += 1;
+                            } else if (actualCell.type === 'coin') {
+                                weightedPointTotal += 3;
+                            } else if (actualCell.type === 'bag') {
+                                weightedPointTotal += 10;
+                            } else if (actualCell.type === 'monster') {
+                                weightedPointTotal += 0;
+                            } else if (actualCell.type === 'star') {
+                                // 流れ星を獲得（点数は0扱い）
+                                starStock++;
+                                effects.push({
+                                    x: GRID_OFFSET_X + cell.c * CELL_SIZE + CELL_SIZE/2,
+                                    y: GRID_OFFSET_Y + cell.r * CELL_SIZE + CELL_SIZE/2,
+                                    text: "GET!",
+                                    life: 50,
+                                    maxLife: 50,
+                                    color: "#FFD700",
+                                    scale: 0.8
+                                });
+                            }
+                        }
+                    }
+                });
+            });
+            
+            if (weightedPointTotal > 0) {
+                // スコア計算: (重み付けした消去パネル点数) * (コンボ数) * 100
+                let pts = weightedPointTotal * currentChain * 100;
+                score += pts;
+                
+                // --- コンボ・スコア演出（タイミング調整） ---
+                
+                // 1. まず枠が囲まれる（currentStateがANIMATINGになり、updateで描画される）
+                // 2. コンボ表示 (少し遅れて表示)
+                setTimeout(() => {
+                    effects.push({
+                        x: BASE_WIDTH / 2,
+                        y: BASE_HEIGHT / 2 - 50,
+                        text: `x${currentChain} COMBO!`,
+                        life: 75, // 半分に短縮
+                        maxLife: 75,
+                        color: "#FF6D00", // 濃いオレンジで見やすく
+                        scale: 1.5,
+                        stroke: "#FFF" // 白縁取り
+                    });
+                }, 400); // 枠表示が見えてから
+                
+                // 3. スコア表示 (コンボの後に表示)
+                setTimeout(() => {
+                    effects.push({
+                         x: BASE_WIDTH / 2,
+                         y: BASE_HEIGHT / 2 + 60,
+                         text: `+${pts}`,
+                         life: 60, // 半分に短縮
+                         maxLife: 60,
+                         color: "#FFFFFF",
+                         scale: 1.2,
+                         stroke: "#000" // 黒縁取り
+                    });
+                }, 900); // コンボ表示からさらに遅れて
+
+                checkStageClear();
+            }
+
+            matchGroupsQueue = matches;
+            currentState = STATE.ANIMATING;
+            animationTimer = performance.now();
+        } else {
+            // マッチ無し
+            if (consumeLife) {
+                // プレイヤー操作後の場合、リフィルへ
+                processRefill();
+            } else {
+                // リフィル後の自動チェックでマッチ無し＝連鎖終了
+                // ここでゲームオーバー判定
+                checkGameOver();
+            }
+        }
+
+        // ライフ消費処理（プレイヤー操作時のみ）
+        if (consumeLife) {
+            turnCount++;
+            for(let r=0; r<GRID_ROWS; r++) {
+                for(let c=0; c<GRID_COLS; c++) {
+                    if(uniqueRemovedKeys.has(`${r},${c}`)) continue;
+                    let cell = grid[r][c];
+                    if(cell && (cell.type === 'coin' || cell.type === 'bag')) {
+                        cell.life--;
+                        if(cell.life <= 0) grid[r][c] = null;
+                    }
+                }
+            }
+        }
+    }
+    
+    function useStarItem(targetVal) {
+        starStock--;
+        let removed = false;
+        
+        // 指定された数字を全て消去
+        for(let r=0; r<GRID_ROWS; r++) {
+            for(let c=0; c<GRID_COLS; c++) {
+                if(grid[r][c] && grid[r][c].type === 'number' && grid[r][c].val === targetVal) {
+                    grid[r][c] = null;
+                    removed = true;
+                    // エフェクト
+                    effects.push({
+                        x: GRID_OFFSET_X + c * CELL_SIZE + CELL_SIZE/2,
+                        y: GRID_OFFSET_Y + r * CELL_SIZE + CELL_SIZE/2,
+                        text: "★",
+                        life: 40,
+                        maxLife: 40,
+                        color: "#FFF",
+                        scale: 1.0
+                    });
+                }
+            }
+        }
+        
+        isSelectingStar = false;
+        if(removed) {
+            currentChain = 0;
+            // リフィルを呼ばずに終了
+        }
+    }
+
+    function checkStageClear() {
+        if(score >= nextStageScore) {
+            currentStage++;
+            nextStageScore += Math.floor(nextStageScore * 1.5);
+            stageMonsterRateBonus += 2;
+            
+            // ステージクリア豪華演出
+            setTimeout(() => {
+                effects.push({
+                    x: BASE_WIDTH / 2,
+                    y: BASE_HEIGHT / 2,
+                    text: `STAGE ${currentStage-1} CLEAR!!`,
+                    life: 180,
+                    maxLife: 180,
+                    color: "#FFEB3B", // 黄色
+                    subText: "👑",
+                    isBig: true
+                });
+            }, 1000); // スコア表示後くらいに出す
+        }
+    }
+
+    function processRefill() {
+        // 出現パラメーターXの計算
+        let spawnParamX = 0;
+        
+        // 基本値の設定
+        if(difficulty === 'easy') spawnParamX = 2.5;
+        else if(difficulty === 'normal') spawnParamX = 3.0;
+        else spawnParamX = 3.5; // hard
+        
+        // ステージ進行による増加 (ステージ1からスタートなので -1 してから 0.1 を掛ける)
+        spawnParamX += (currentStage - 1) * 0.1;
+        
+        // 確定数（整数部分）
+        let count = Math.floor(spawnParamX);
+        
+        // 確率変動（小数部分）
+        let probability = spawnParamX - count;
+        
+        // 確率判定
+        if(Math.random() < probability) {
+            count++;
+        }
+        
+        spawnNumbers(count, false);
+        
+        // 出現直後にマッチしているかチェック（連鎖判定、ライフ消費なし）
+        resolveMatches(false);
+    }
+    
+    function checkGameOver() {
+        let full = true;
+        for(let r=0; r<GRID_ROWS; r++) {
+            for(let c=0; c<GRID_COLS; c++) {
+                if(!grid[r][c]) full = false;
+            }
+        }
+        if(full) {
+            currentState = STATE.GAME_OVER;
+            saveScore();
+        }
+    }
+    
+    function update() {
+        // エフェクト更新
+        for(let i = effects.length - 1; i >= 0; i--) {
+            effects[i].life--;
+            effects[i].y -= 0.2; // ゆっくり上昇（表示時間が長いので速度を落とす）
+            if(effects[i].life <= 0) {
+                effects.splice(i, 1);
+            }
+        }
+
+        if (currentState === STATE.ANIMATING) {
+            const now = performance.now();
+            if (matchGroupsQueue.length > 0) {
+                if (now - animationTimer > 300) {
+                    const group = matchGroupsQueue.shift();
+                    applyScoreAndRemove(group);
+                    animationTimer = now;
+                    
+                    if (matchGroupsQueue.length === 0) {
+                        // アニメーション終了後、リフィルへ（連鎖中なら再度resolveMatchesが呼ばれることになる）
+                        setTimeout(() => {
+                            currentState = STATE.PLAYING;
+                            processRefill();
+                        }, 100);
+                    }
+                }
+            }
+        }
+    }
+    
+    function applyScoreAndRemove(group) {
+        let uniqueGroup = [];
+        let seen = new Set();
+        group.forEach(pos => {
+            let key = `${pos.r},${pos.c}`;
+            if(!seen.has(key)) {
+                seen.add(key);
+                uniqueGroup.push(pos);
+            }
+        });
+        uniqueGroup.forEach(pos => {
+            if(grid[pos.r][pos.c]) grid[pos.r][pos.c] = null;
+        });
+    }
+    
+    // ------------------ 描画 ------------------
+    
+    function draw() {
+        ctx.fillStyle = "#FFF8E1";
+        ctx.fillRect(0, 0, BASE_WIDTH, BASE_HEIGHT);
+        
+        switch(currentState) {
+            case STATE.TITLE: drawTitle(); break;
+            case STATE.PLAYER_SELECT: drawPlayerSelect(); break;
+            case STATE.DIFFICULTY_SELECT: drawDifficultySelect(); break;
+            case STATE.PLAYING:
+            case STATE.ANIMATING:
+            case STATE.GAME_OVER:
+                drawGame();
+                if(currentState === STATE.GAME_OVER) drawGameOver();
+                break;
+            case STATE.RANKING: drawRanking(); break;
+        }
+    }
+    
+    function drawTitle() {
+        if (bgImage.complete && bgImage.naturalWidth !== 0) {
+            ctx.drawImage(bgImage, 0, 0, BASE_WIDTH, BASE_HEIGHT);
+            ctx.fillStyle = "rgba(255, 243, 224, 0.8)"; 
+            ctx.fillRect(0, 0, BASE_WIDTH, BASE_HEIGHT);
+        } else {
+            ctx.fillStyle = "#FFF3E0";
+            ctx.fillRect(0, 0, BASE_WIDTH, BASE_HEIGHT);
+        }
+        
+        ctx.fillStyle = "#FF6F00";
+        ctx.font = "bold 130px 'M PLUS Rounded 1c'";
+        ctx.textAlign = "center";
+        ctx.fillText("タステン！", BASE_WIDTH/2, 150);
+        
+        ctx.fillStyle = "#5D4037";
+        ctx.font = "bold 40px 'M PLUS Rounded 1c'";
+        ctx.fillText("〜10をつくろう〜", BASE_WIDTH/2, 220);
+
+        const startY = 320;
+        const gap = 75;
+        
+        const buttons = [
+            { text: "はじめる", y: startY, action: "start", color: "#FF9800" },
+            { text: "プレーヤーせんたく", y: startY + gap, action: "player", color: "#8D6E63" },
+            { text: "ログアウト" + (auth && auth.currentUser ? "" : "(Googleログイン)"), y: startY + gap*2, action: "login", color: "#4285F4" },
+            { text: "ランキング", y: startY + gap*3, action: "ranking", color: "#7CB342" },
+            { text: "INDEXへ", y: startY + gap*4, action: "index", color: "#9E9E9E" }
+        ];
+        
+        buttons.forEach(btn => {
+            // Googleログインボタンのテキストはauthの状態によるが、描画時に判定
+            let t = btn.text;
+            if(btn.action === "login") t = auth && auth.currentUser ? "ログアウト" : "Googleでログイン";
+            drawButton(BASE_WIDTH/2, btn.y, 320, 55, t, btn.color);
+        });
+        
+        ctx.fillStyle = "#5D4037";
+        ctx.font = "24px 'M PLUS Rounded 1c'";
+        ctx.textAlign = "left";
+        let pname = currentPlayerIndex >= 0 ? players[currentPlayerIndex] : "未選択";
+        ctx.fillText("プレーヤー: " + pname, 30, 40);
+    }
+    
+    function drawPlayerSelect() {
+        if (bgImage.complete && bgImage.naturalWidth !== 0) {
+            ctx.drawImage(bgImage, 0, 0, BASE_WIDTH, BASE_HEIGHT);
+            ctx.fillStyle = "rgba(255, 243, 224, 0.9)"; 
+            ctx.fillRect(0, 0, BASE_WIDTH, BASE_HEIGHT);
+        } else {
+            ctx.fillStyle = "#FFF3E0";
+            ctx.fillRect(0,0,BASE_WIDTH, BASE_HEIGHT);
+        }
+        
+        ctx.fillStyle = "#5D4037";
+        ctx.font = "bold 50px 'M PLUS Rounded 1c'";
+        ctx.textAlign = "center";
+        ctx.fillText("プレーヤーをえらんでね", BASE_WIDTH/2, 100);
+        
+        players.forEach((p, i) => {
+            let y = 180 + i * 80;
+            let isSelected = (i === currentPlayerIndex);
+            drawButton(BASE_WIDTH/2, y, 400, 60, p, isSelected ? "#7CB342" : "#fff", isSelected ? "#fff" : "#5D4037");
+            drawButton(BASE_WIDTH/2 + 250, y, 60, 60, "×", "#E57373");
+        });
+        
+        if(players.length < 5) {
+            drawButton(BASE_WIDTH/2, 180 + players.length * 80, 400, 60, "＋ あたらしいプレーヤー", "#FFB74D", "#5D4037");
+        }
+        drawButton(BASE_WIDTH/2, 650, 200, 50, "もどる", "#B0BEC5");
+    }
+
+    function drawDifficultySelect() {
+        if (bgImage.complete && bgImage.naturalWidth !== 0) {
+            ctx.drawImage(bgImage, 0, 0, BASE_WIDTH, BASE_HEIGHT);
+            ctx.fillStyle = "rgba(78, 52, 46, 0.7)"; 
+            ctx.fillRect(0, 0, BASE_WIDTH, BASE_HEIGHT);
+        } else {
+            ctx.fillStyle = "rgba(78, 52, 46, 0.8)";
+            ctx.fillRect(0,0,BASE_WIDTH, BASE_HEIGHT);
+        }
+        
+        ctx.fillStyle = "#fff";
+        ctx.font = "bold 50px 'M PLUS Rounded 1c'";
+        ctx.textAlign = "center";
+        ctx.fillText("なんいどをえらんでね", BASE_WIDTH/2, 200);
+        
+        drawButton(BASE_WIDTH/2, 300, 300, 70, "やさしい", "#AED581", "#33691E");
+        drawButton(BASE_WIDTH/2, 400, 300, 70, "ふつう", "#FFB74D", "#E65100");
+        drawButton(BASE_WIDTH/2, 500, 300, 70, "むずかしい", "#E57373", "#B71C1C");
+        drawButton(BASE_WIDTH/2, 620, 200, 50, "やめる", "#B0BEC5");
+    }
+    
+    function drawGame() {
+        // ギリギリ演出
+        let emptyCount = 0;
+        for(let r=0; r<GRID_ROWS; r++) {
+            for(let c=0; c<GRID_COLS; c++) {
+                if(!grid[r][c]) emptyCount++;
+            }
+        }
+        if (emptyCount <= 3 && currentState === STATE.PLAYING) {
+            let alpha = 0.3 + 0.2 * Math.sin(Date.now() / 150);
+            ctx.lineWidth = 15;
+            ctx.strokeStyle = `rgba(255, 0, 0, ${alpha})`;
+            ctx.strokeRect(0, 0, BASE_WIDTH, BASE_HEIGHT);
+        }
+
+        // 左側：遊び方
+        ctx.fillStyle = "#D7CCC8";
+        ctx.fillRect(0, 0, 300, BASE_HEIGHT);
+        
+        ctx.fillStyle = "#5D4037";
+        ctx.font = "bold 32px 'M PLUS Rounded 1c'";
+        ctx.textAlign = "center";
+        ctx.fillText("あそびかた", 150, 60);
+
+        ctx.font = "20px 'M PLUS Rounded 1c'";
+        ctx.textAlign = "left";
+        const helpText = [
+            "たて か よこ で", "１０ をつくろう。", "１０ができると", "きえるよ。", "",
+            "連続で消して", "コンボを狙おう！", "",
+            "👾はおじゃま", "まわりをけすと", "きえるよ。", "",
+            "🌠はすごいアイテム", "まわりを消して", "ストックしよう！", "",
+            "🪙💰はボーナス", "1アクションで", "すぐにきえるよ！"
+        ];
+        let helpY = 120;
+        helpText.forEach(line => {
+            ctx.fillText(line, 20, helpY);
+            helpY += 28;
+        });
+
+        // 右側：情報表示
+        ctx.fillStyle = "#EFEBE9";
+        ctx.fillRect(980, 0, 300, BASE_HEIGHT);
+
+        ctx.textAlign = "center";
+        
+        ctx.fillStyle = "#5D4037";
+        ctx.font = "bold 24px 'M PLUS Rounded 1c'";
+        let pname = currentPlayerIndex >= 0 ? players[currentPlayerIndex] : "ゲスト";
+        ctx.fillText(pname, 1130, 60);
+
+        ctx.fillStyle = "#E65100";
+        ctx.font = "bold 36px 'M PLUS Rounded 1c'";
+        ctx.fillText("STAGE " + currentStage, 1130, 110);
+
+        ctx.fillStyle = "#5D4037";
+        ctx.font = "bold 30px 'M PLUS Rounded 1c'";
+        ctx.fillText("SCORE", 1130, 160);
+
+        ctx.fillStyle = "#D81B60"; 
+        ctx.font = "800 60px 'M PLUS Rounded 1c'";
+        ctx.fillText(score, 1130, 220);
+
+        // 次の目標（強調）
+        ctx.fillStyle = "#5D4037";
+        ctx.font = "bold 24px 'M PLUS Rounded 1c'";
+        ctx.fillText("つぎの目標", 1130, 280);
+        ctx.fillStyle = "#D32F2F"; // 赤色で強調
+        ctx.font = "800 40px 'M PLUS Rounded 1c'";
+        ctx.fillText(nextStageScore, 1130, 330);
+        
+        // アイテム表示
+        ctx.fillStyle = "#5D4037";
+        ctx.font = "bold 24px 'M PLUS Rounded 1c'";
+        ctx.fillText("アイテム", 1130, 400);
+        
+        ctx.fillStyle = "#FFD700";
+        ctx.font = "40px sans-serif";
+        ctx.fillText("🌠", 1080, 440);
+        ctx.fillStyle = "#333";
+        ctx.font = "bold 30px 'M PLUS Rounded 1c'";
+        ctx.fillText("x " + starStock, 1130, 440);
+        
+        // アイテム使用ボタン
+        if(starStock > 0 && !isSelectingStar) {
+            drawButton(1130, 490, 160, 50, "つかう", "#FFC107", "#5D4037");
+        } else if (isSelectingStar) {
+            ctx.fillStyle = "#FF9800";
+            ctx.font = "bold 20px 'M PLUS Rounded 1c'";
+            ctx.fillText("すうじをえらんでね", 1130, 490);
+        } else {
+            // グレーアウト風
+            ctx.fillStyle = "#BDBDBD";
+            roundRect(ctx, 1130-80, 490-25, 160, 50, 10, true, false);
+            ctx.fillStyle = "#757575";
+            ctx.font = "bold 24px 'M PLUS Rounded 1c'";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText("つかう", 1130, 490);
+        }
+
+        ctx.fillStyle = "#5D4037";
+        ctx.textBaseline = "alphabetic"; // 戻す
+        ctx.font = "bold 20px 'M PLUS Rounded 1c'";
+        ctx.fillText("ターン: " + turnCount, 1130, 560);
+
+        let diffText = difficulty === 'easy' ? 'やさしい' : difficulty === 'normal' ? 'ふつう' : 'むずかしい';
+        ctx.fillText("難易度: " + diffText, 1130, 600);
+
+        drawButton(1130, 660, 220, 50, "タイトルへ", "#B0BEC5");
+
+        // 中央：グリッド
+        ctx.fillStyle = "#FFFFFF"; 
+        ctx.fillRect(GRID_OFFSET_X - 10, GRID_OFFSET_Y - 10, CELL_SIZE * GRID_COLS + 20, CELL_SIZE * GRID_ROWS + 20);
+        
+        for(let r=0; r<GRID_ROWS; r++) {
+            for(let c=0; c<GRID_COLS; c++) {
+                let x = GRID_OFFSET_X + c * CELL_SIZE;
+                let y = GRID_OFFSET_Y + r * CELL_SIZE;
+                
+                ctx.strokeStyle = "#EEE";
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x, y, CELL_SIZE, CELL_SIZE);
+                
+                let cell = grid[r][c];
+                
+                if (currentState === STATE.ANIMATING && matchGroupsQueue.length > 0) {
+                    let currentGroup = matchGroupsQueue[0];
+                    let isHighlighted = currentGroup.some(p => p.r === r && p.c === c);
+                    if(isHighlighted) {
+                        ctx.fillStyle = "rgba(255, 167, 38, 0.5)";
+                        ctx.fillRect(x, y, CELL_SIZE, CELL_SIZE);
+                        ctx.lineWidth = 5;
+                        ctx.strokeStyle = "#FF9800";
+                        ctx.strokeRect(x+2, y+2, CELL_SIZE-4, CELL_SIZE-4);
+                    }
+                }
+
+                if (cell) {
+                    if(isDragging && selectedCell && selectedCell.r === r && selectedCell.c === c) continue;
+                    drawCellContent(x, y, cell);
+                }
+            }
+        }
+        
+        if(isDragging && selectedCell) {
+            let cell = grid[selectedCell.r][selectedCell.c];
+            if(cell) {
+                drawCellContent(inputState.x - CELL_SIZE/2, inputState.y - CELL_SIZE/2, cell, true);
+            }
+        }
+        
+        // アイテム選択オーバーレイ
+        if(isSelectingStar) {
+            ctx.fillStyle = "rgba(0,0,0,0.6)";
+            ctx.fillRect(0,0, BASE_WIDTH, BASE_HEIGHT);
+            
+            ctx.fillStyle = "#FFF";
+            roundRect(ctx, BASE_WIDTH/2 - 200, BASE_HEIGHT/2 - 250, 400, 500, 20, true, false);
+            
+            ctx.fillStyle = "#5D4037";
+            ctx.font = "bold 30px 'M PLUS Rounded 1c'";
+            ctx.textAlign = "center";
+            ctx.fillText("けす すうじ をえらんでね", BASE_WIDTH/2, BASE_HEIGHT/2 - 200);
+            
+            for(let i=1; i<=9; i++) {
+                let r = Math.floor((i-1)/3);
+                let c = (i-1)%3;
+                let btnX = BASE_WIDTH/2 - 100 + c * 100;
+                let btnY = BASE_HEIGHT/2 - 120 + r * 100;
+                
+                drawButton(btnX, btnY, 80, 80, i, NUMBER_BG_COLORS[i-1]);
+            }
+            
+            drawButton(BASE_WIDTH/2, BASE_HEIGHT/2 + 180, 150, 50, "やめる", "#B0BEC5");
+        }
+        
+        // エフェクト描画
+        effects.forEach(ef => {
+            ctx.save();
+            ctx.globalAlpha = Math.min(1, ef.life / 20); // フェードアウト
+            
+            // ステージクリアなどの大演出
+            if (ef.isBig) {
+                ctx.fillStyle = "rgba(0,0,0,0.7)"; // 背景暗転
+                ctx.fillRect(0, 0, BASE_WIDTH, BASE_HEIGHT);
+                ctx.globalAlpha = 1;
+                
+                ctx.shadowColor = "black";
+                ctx.shadowBlur = 20;
+                ctx.font = "900 80px 'M PLUS Rounded 1c'";
+                ctx.fillStyle = ef.color;
+                ctx.textAlign = "center";
+                ctx.fillText(ef.text, ef.x, ef.y);
+                
+                if(ef.subText) {
+                    ctx.font = "100px sans-serif";
+                    ctx.fillText(ef.subText, ef.x, ef.y - 100);
+                }
+            } else {
+                // 通常エフェクト
+                let scale = ef.scale || 1.0;
+                ctx.translate(ef.x, ef.y);
+                ctx.scale(scale, scale);
+                
+                ctx.font = "bold 60px 'M PLUS Rounded 1c'";
+                ctx.textAlign = "center";
+                
+                // 縁取り（視認性向上）
+                if (ef.stroke) {
+                    ctx.strokeStyle = ef.stroke;
+                    ctx.lineWidth = 4;
+                    ctx.strokeText(ef.text, 0, 0);
+                } else {
+                    // 指定がない場合のデフォルト縁取り
+                    ctx.strokeStyle = "rgba(0,0,0,0.5)";
+                    ctx.lineWidth = 4;
+                    ctx.strokeText(ef.text, 0, 0);
+                }
+                
+                ctx.fillStyle = ef.color || "#D84315";
+                ctx.fillText(ef.text, 0, 0);
+            }
+            ctx.restore();
+        });
+    }
+    
+    function drawCellContent(x, y, cell, shadow=false) {
+        if(cell.type === 'monster' || cell.type === 'coin' || cell.type === 'bag' || cell.type === 'star') {
+            ctx.fillStyle = "#FFFFFF";
+        } else {
+            ctx.fillStyle = NUMBER_BG_COLORS[cell.val - 1] || "#333";
+        }
+        
+        if(shadow) {
+            ctx.shadowColor = "rgba(0,0,0,0.3)";
+            ctx.shadowBlur = 10;
+        } else {
+            ctx.shadowBlur = 0;
+        }
+        
+        roundRect(ctx, x+5, y+5, CELL_SIZE-10, CELL_SIZE-10, 15, true, false);
+        ctx.shadowBlur = 0;
+        
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+
+        if (cell.type === 'monster') {
+            ctx.font = "80px sans-serif";
+            ctx.fillText("👾", x + CELL_SIZE/2, y + CELL_SIZE/2);
+        } else if (cell.type === 'coin') {
+            ctx.font = "80px sans-serif";
+            ctx.fillText("🪙", x + CELL_SIZE/2, y + CELL_SIZE/2);
+        } else if (cell.type === 'bag') {
+            ctx.font = "80px sans-serif";
+            ctx.fillText("💰", x + CELL_SIZE/2, y + CELL_SIZE/2);
+        } else if (cell.type === 'star') {
+            ctx.font = "80px sans-serif";
+            ctx.fillText("🌠", x + CELL_SIZE/2, y + CELL_SIZE/2);
+        } else {
+            ctx.fillStyle = "#FFFFFF";
+            ctx.font = "bold 65px 'M PLUS Rounded 1c'";
+            ctx.fillText(cell.val, x + CELL_SIZE/2, y + CELL_SIZE/2 + 5);
+        }
+    }
+    
+    function drawGameOver() {
+        ctx.fillStyle = "rgba(78, 52, 46, 0.9)";
+        ctx.fillRect(0, 0, BASE_WIDTH, BASE_HEIGHT);
+        
+        ctx.fillStyle = "#fff";
+        ctx.font = "bold 80px 'M PLUS Rounded 1c'";
+        ctx.textAlign = "center";
+        ctx.fillText("ゲームオーバー！", BASE_WIDTH/2, 250);
+        
+        ctx.font = "bold 50px 'M PLUS Rounded 1c'";
+        ctx.fillText("スコア: " + score, BASE_WIDTH/2, 350);
+        ctx.fillText("到達ステージ: " + currentStage, BASE_WIDTH/2, 420);
+        
+        drawButton(BASE_WIDTH/2, 550, 300, 60, "タイトルへ", "#FF9800");
+    }
+    
+    function drawRanking() {
+        if (bgImage.complete && bgImage.naturalWidth !== 0) {
+            ctx.drawImage(bgImage, 0, 0, BASE_WIDTH, BASE_HEIGHT);
+            ctx.fillStyle = "rgba(255, 243, 224, 0.9)"; 
+            ctx.fillRect(0, 0, BASE_WIDTH, BASE_HEIGHT);
+        } else {
+            ctx.fillStyle = "#FFF3E0";
+            ctx.fillRect(0, 0, BASE_WIDTH, BASE_HEIGHT);
+        }
+        
+        ctx.fillStyle = "#5D4037";
+        ctx.font = "bold 50px 'M PLUS Rounded 1c'";
+        ctx.textAlign = "center";
+        ctx.fillText("ランキング (TOP 10)", BASE_WIDTH/2, 70);
+        
+        const scopeY = 120;
+        drawButton(BASE_WIDTH/2 - 150, scopeY, 280, 45, "ローカル", rankingScope==='local' ? "#8D6E63" : "#E0E0E0", rankingScope==='local' ? "#FFF" : "#9E9E9E");
+        drawButton(BASE_WIDTH/2 + 150, scopeY, 280, 45, "ワールド (ネット)", rankingScope==='world' ? "#4285F4" : "#E0E0E0", rankingScope==='world' ? "#FFF" : "#9E9E9E");
+
+        const tabY = 180;
+        const tabW = 200;
+        const tabH = 50;
+        
+        drawButton(BASE_WIDTH/2 - 220, tabY, tabW, tabH, "やさしい", rankingTab==='easy' ? "#AED581" : "#E0E0E0", rankingTab==='easy' ? "#33691E" : "#9E9E9E");
+        drawButton(BASE_WIDTH/2, tabY, tabW, tabH, "ふつう", rankingTab==='normal' ? "#FFB74D" : "#E0E0E0", rankingTab==='normal' ? "#E65100" : "#9E9E9E");
+        drawButton(BASE_WIDTH/2 + 220, tabY, tabW, tabH, "むずかしい", rankingTab==='hard' ? "#E57373" : "#E0E0E0", rankingTab==='hard' ? "#B71C1C" : "#9E9E9E");
+
+        ctx.font = "28px 'M PLUS Rounded 1c'";
+        ctx.textAlign = "left";
+        let startY = 250;
+        
+        if(rankingData.length === 0) {
+            ctx.fillStyle = "#5D4037";
+            ctx.textAlign = "center";
+            ctx.fillText(rankingScope === 'world' ? "データ読み込み中..." : "データがありません", BASE_WIDTH/2, 350);
+        } else {
+            rankingData.forEach((d, i) => {
+                ctx.fillStyle = i < 3 ? "#E65100" : "#5D4037";
+                ctx.textAlign = "left";
+                ctx.fillText(`${i+1}. ${d.name}`, 300, startY + i*45);
+                ctx.textAlign = "right";
+                ctx.fillText(`${d.score} 点`, 980, startY + i*45);
+            });
+        }
+        drawButton(BASE_WIDTH/2, 650, 200, 50, "もどる", "#B0BEC5");
+    }
+    
+    function drawButton(x, y, w, h, text, color, textColor="#fff") {
+        ctx.save();
+        ctx.translate(x - w/2, y - h/2);
+        ctx.fillStyle = color;
+        roundRect(ctx, 0, 0, w, h, 10, true, false);
+        ctx.fillStyle = textColor;
+        ctx.font = "bold 24px 'M PLUS Rounded 1c'";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(text, w/2, h/2);
+        ctx.restore();
+    }
+    
+    function roundRect(ctx, x, y, w, h, r, fill, stroke) {
+        ctx.beginPath();
+        ctx.moveTo(x+r, y);
+        ctx.arcTo(x+w, y, x+w, y+h, r);
+        ctx.arcTo(x+w, y+h, x, y+h, r);
+        ctx.arcTo(x, y+h, x, y, r);
+        ctx.arcTo(x, y, x+w, y, r);
+        ctx.closePath();
+        if (fill) ctx.fill();
+        if (stroke) ctx.stroke();
+    }
+    
+    // ------------------ 入力処理 ------------------
+    
+    function handleInputStart(e) {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        inputState.x = ( (e.clientX || e.pageX) - rect.left) * scaleX;
+        inputState.y = ( (e.clientY || e.pageY) - rect.top) * scaleY;
+        inputState.isDown = true;
+        
+        if(currentState === STATE.TITLE) checkTitleClick(inputState.x, inputState.y);
+        else if(currentState === STATE.PLAYER_SELECT) checkPlayerSelectClick(inputState.x, inputState.y);
+        else if(currentState === STATE.DIFFICULTY_SELECT) checkDifficultyClick(inputState.x, inputState.y);
+        else if(currentState === STATE.PLAYING) checkGameClick(inputState.x, inputState.y);
+        else if(currentState === STATE.GAME_OVER) checkGameOverClick(inputState.x, inputState.y);
+        else if(currentState === STATE.RANKING) checkRankingClick(inputState.x, inputState.y);
+    }
+    
+    function handleInputMove(e) {
+        if(!inputState.isDown) return;
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        inputState.x = ( (e.clientX || e.pageX) - rect.left) * scaleX;
+        inputState.y = ( (e.clientY || e.pageY) - rect.top) * scaleY;
+        if(currentState === STATE.PLAYING && selectedCell) isDragging = true;
+    }
+    
+    function handleInputEnd(e) {
+        inputState.isDown = false;
+        if(currentState === STATE.PLAYING && isDragging && selectedCell) {
+            let c = Math.floor((inputState.x - GRID_OFFSET_X) / CELL_SIZE);
+            let r = Math.floor((inputState.y - GRID_OFFSET_Y) / CELL_SIZE);
+            if(r >= 0 && r < GRID_ROWS && c >= 0 && c < GRID_COLS) {
+                if(!grid[r][c]) {
+                    grid[r][c] = grid[selectedCell.r][selectedCell.c];
+                    grid[selectedCell.r][selectedCell.c] = null;
+                    // 移動完了：コンボカウントリセットしてマッチ判定へ
+                    currentChain = 0;
+                    resolveMatches(true); // true = プレイヤー操作なのでライフ消費あり
+                }
+            }
+        }
+        selectedCell = null;
+        isDragging = false;
+    }
+    
+    function isBtnClicked(mx, my, x, y, w, h) {
+        return mx >= x - w/2 && mx <= x + w/2 && my >= y - h/2 && my <= y + h/2;
+    }
+    
+    function checkTitleClick(x, y) {
+        const startY = 320;
+        const gap = 75;
+        if(isBtnClicked(x, y, BASE_WIDTH/2, startY, 320, 55)) {
+            if(currentPlayerIndex === -1) alert("プレーヤーを選択してね");
+            else currentState = STATE.DIFFICULTY_SELECT;
+        }
+        else if(isBtnClicked(x, y, BASE_WIDTH/2, startY+gap, 320, 55)) currentState = STATE.PLAYER_SELECT;
+        else if(isBtnClicked(x, y, BASE_WIDTH/2, startY+gap*2, 320, 55)) {
+            if(auth) {
+                if(auth.currentUser) auth.signOut();
+                else {
+                    const provider = new firebase.auth.GoogleAuthProvider();
+                    auth.signInWithPopup(provider).catch(e => alert(e.message));
+                }
+            }
+        }
+        else if(isBtnClicked(x, y, BASE_WIDTH/2, startY+gap*3, 320, 55)) {
+            rankingScope = 'local'; rankingTab = 'easy'; updateRankingView(); currentState = STATE.RANKING;
+        }
+        else if(isBtnClicked(x, y, BASE_WIDTH/2, startY+gap*4, 320, 55)) window.location.href = '../index.html';
+    }
+    
+    function checkPlayerSelectClick(x, y) {
+        if(isBtnClicked(x, y, BASE_WIDTH/2, 650, 200, 50)) { currentState = STATE.TITLE; return; }
+        for(let i=0; i<players.length; i++) {
+            let by = 180 + i * 80;
+            if(isBtnClicked(x, y, BASE_WIDTH/2, by, 400, 60)) { currentPlayerIndex = i; localStorage.setItem('tasuten_last_player', i); }
+            if(isBtnClicked(x, y, BASE_WIDTH/2 + 250, by, 60, 60)) {
+                players.splice(i, 1);
+                if(currentPlayerIndex === i) currentPlayerIndex = -1;
+                else if(currentPlayerIndex > i) currentPlayerIndex--;
+                savePlayers();
+                return;
+            }
+        }
+        if(players.length < 5) {
+            let by = 180 + players.length * 80;
+            if(isBtnClicked(x, y, BASE_WIDTH/2, by, 400, 60)) {
+                document.getElementById('playerInputOverlay').style.display = 'flex';
+                document.getElementById('inputError').innerText = "";
+                document.getElementById('playerNameInput').value = "";
+            }
+        }
+    }
+    
+    function checkDifficultyClick(x, y) {
+        if(isBtnClicked(x, y, BASE_WIDTH/2, 300, 300, 70)) startNewGame('easy');
+        else if(isBtnClicked(x, y, BASE_WIDTH/2, 400, 300, 70)) startNewGame('normal');
+        else if(isBtnClicked(x, y, BASE_WIDTH/2, 500, 300, 70)) startNewGame('hard');
+        else if(isBtnClicked(x, y, BASE_WIDTH/2, 620, 200, 50)) currentState = STATE.TITLE;
+    }
+    
+    function checkGameClick(x, y) {
+        // アイテム選択中のクリック処理
+        if(isSelectingStar) {
+            for(let i=1; i<=9; i++) {
+                let r = Math.floor((i-1)/3);
+                let c = (i-1)%3;
+                let btnX = BASE_WIDTH/2 - 100 + c * 100;
+                let btnY = BASE_HEIGHT/2 - 120 + r * 100;
+                if(isBtnClicked(x, y, btnX, btnY, 80, 80)) {
+                    useStarItem(i);
+                }
+            }
+            // やめるボタン
+            if(isBtnClicked(x, y, BASE_WIDTH/2, BASE_HEIGHT/2 + 180, 150, 50)) {
+                isSelectingStar = false;
+            }
+            return; // 選択中は盤面操作無効
+        }
+
+        if(isBtnClicked(x, y, 1130, 660, 220, 50)) {
+            if(confirm("タイトルへ戻りますか？ゲームオーバーになります")) {
+                currentState = STATE.GAME_OVER; saveScore();
+            }
+            return;
+        }
+        
+        // アイテムボタン
+        if(starStock > 0 && isBtnClicked(x, y, 1130, 490, 160, 50)) {
+            isSelectingStar = true;
+            return;
+        }
+
+        let c = Math.floor((x - GRID_OFFSET_X) / CELL_SIZE);
+        let r = Math.floor((y - GRID_OFFSET_Y) / CELL_SIZE);
+        if(r >= 0 && r < GRID_ROWS && c >= 0 && c < GRID_COLS) {
+            if(grid[r][c]) selectedCell = {r, c};
+        }
+    }
+    
+    function checkGameOverClick(x, y) {
+        if(isBtnClicked(x, y, BASE_WIDTH/2, 550, 300, 60)) currentState = STATE.TITLE;
+    }
+    
+    function checkRankingClick(x, y) {
+        if(isBtnClicked(x, y, BASE_WIDTH/2, 650, 200, 50)) { currentState = STATE.TITLE; return; }
+        const scopeY = 120;
+        if(isBtnClicked(x, y, BASE_WIDTH/2 - 150, scopeY, 280, 45)) { if(rankingScope !== 'local') { rankingScope = 'local'; updateRankingView(); } }
+        else if(isBtnClicked(x, y, BASE_WIDTH/2 + 150, scopeY, 280, 45)) { if(rankingScope !== 'world') { rankingScope = 'world'; updateRankingView(); } }
+        const tabY = 180;
+        if(isBtnClicked(x, y, BASE_WIDTH/2 - 220, tabY, 200, 50)) { if(rankingTab !== 'easy') { rankingTab = 'easy'; updateRankingView(); } }
+        else if(isBtnClicked(x, y, BASE_WIDTH/2, tabY, 200, 50)) { if(rankingTab !== 'normal') { rankingTab = 'normal'; updateRankingView(); } }
+        else if(isBtnClicked(x, y, BASE_WIDTH/2 + 220, tabY, 200, 50)) { if(rankingTab !== 'hard') { rankingTab = 'hard'; updateRankingView(); } }
+    }
+
+    // ------------------ プレーヤー管理 ------------------
+    
+    function loadPlayers() {
+        const data = localStorage.getItem('tasuten_players');
+        if(data) players = JSON.parse(data);
+        const last = localStorage.getItem('tasuten_last_player');
+        if(last !== null) { currentPlayerIndex = parseInt(last); if(currentPlayerIndex >= players.length) currentPlayerIndex = -1; }
+    }
+    
+    function savePlayers() {
+        localStorage.setItem('tasuten_players', JSON.stringify(players));
+        if(currentPlayerIndex >= 0) localStorage.setItem('tasuten_last_player', currentPlayerIndex);
+    }
+    
+    function registerPlayer() {
+        const input = document.getElementById('playerNameInput');
+        const err = document.getElementById('inputError');
+        const name = input.value.trim();
+        if(!name) { err.innerText = "なまえをいれてね"; return; }
+        if(name.length > 8) { err.innerText = "8もじいないにしてね"; return; }
+        if(!/^[ぁ-んー]+$/.test(name)) { err.innerText = "ひらがなだけでいれてね"; return; }
+        for(let ng of NG_WORDS_HIRAGANA) { if(name.includes(ng)) { err.innerText = "つかえないことばがふくまれています"; return; } }
+        players.push(name);
+        currentPlayerIndex = players.length - 1;
+        savePlayers();
+        document.getElementById('playerInputOverlay').style.display = 'none';
+    }
+    
+    function closePlayerInput() { document.getElementById('playerInputOverlay').style.display = 'none'; }
+    
+    // ------------------ データ保存・ランキング ------------------
+    
+    function saveScore() {
+        if(currentPlayerIndex === -1) return;
+        const playerName = players[currentPlayerIndex];
+        const scoreData = { name: playerName, score: score, difficulty: difficulty, stage: currentStage, date: Date.now() };
+        let localScores = JSON.parse(localStorage.getItem('tasuten_scores') || "[]");
+        localScores.push(scoreData);
+        localStorage.setItem('tasuten_scores', JSON.stringify(localScores));
+        if(db) {
+            db.collection(COLLECTION_NAME).add({
+                name: playerName, score: score, difficulty: difficulty, stage: currentStage,
+                uid: auth && auth.currentUser ? auth.currentUser.uid : "guest",
+                date: firebase.firestore.FieldValue.serverTimestamp()
+            }).catch(err => console.error("Score save error", err));
+        }
+    }
+    
+    function updateRankingView() {
+        rankingData = [];
+        if(rankingScope === 'local') fetchLocalRanking(rankingTab);
+        else fetchWorldRanking(rankingTab);
+    }
+
+    function fetchLocalRanking(diff) {
+        let localScores = JSON.parse(localStorage.getItem('tasuten_scores') || "[]");
+        rankingData = localScores.filter(d => d.difficulty === diff).sort((a, b) => b.score - a.score).slice(0, 10);
+    }
+    
+    function fetchWorldRanking(diff) {
+        if(!db) return;
+        db.collection(COLLECTION_NAME).where("difficulty", "==", diff).orderBy("score", "desc").limit(10).get()
+            .then(snapshot => {
+                rankingData = [];
+                snapshot.forEach(doc => rankingData.push(doc.data()));
+            })
+            .catch(err => {
+                console.error("Ranking fetch error", err);
+                if(err.code === 'failed-precondition') {
+                     db.collection(COLLECTION_NAME).orderBy("score", "desc").limit(50).get().then(snapshot => {
+                            let temp = []; snapshot.forEach(doc => temp.push(doc.data()));
+                            rankingData = temp.filter(d => d.difficulty === diff).slice(0, 10);
+                        });
+                }
+            });
+    }
+
+    function loop() { update(); draw(); requestAnimationFrame(loop); }
+    window.onload = init;
+    return { registerPlayer: registerPlayer, closePlayerInput: closePlayerInput };
+})();
+</script>
+</body>
+</html>
