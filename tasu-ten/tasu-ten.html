@@ -3,12 +3,75 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>タステン！</title>
+    <title>たすてん！</title>
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap" rel="stylesheet">
     
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, query, where, orderBy, limit, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+        import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBCg5dCEM89UmYYhfGqVeRf_VrUlg8_o-4",
+            authDomain: "math-braves.firebaseapp.com",
+            projectId: "math-braves",
+            storageBucket: "math-braves.firebasestorage.app",
+            messagingSenderId: "217117619290",
+            appId: "1:217117619290:web:d227feb603970d3948d463"
+        };
+
+        try {
+            const app = initializeApp(firebaseConfig);
+            const db = getFirestore(app);
+            const auth = getAuth(app);
+            
+            // グローバルに公開（Gameロジックからアクセスするため）
+            window.dbInstance = db;
+            window.authInstance = auth;
+            window.collection = collection;
+            window.addDoc = addDoc;
+            window.query = query;
+            window.where = where;
+            window.orderBy = orderBy;
+            window.limit = limit;
+            window.getDocs = getDocs;
+            window.serverTimestamp = serverTimestamp;
+
+            // 認証状態の監視
+            onAuthStateChanged(auth, (user) => {
+                window.currentUser = user;
+                // タイトル画面の場合、描画更新（ボタンの表示切り替えのため）
+                if(window.GameInstance && window.GameInstance.isInTitle()) {
+                    // 再描画のトリガーが必要ならここで行うが、requestAnimationFrameで回っているので自動反映される
+                }
+            });
+
+            // ログイン処理
+            window.handleGoogleAuth = async function() {
+                if (auth.currentUser && !auth.currentUser.isAnonymous) {
+                    // ログアウト処理
+                    try {
+                        await signOut(auth);
+                        alert("ログアウトしました");
+                    } catch(e) {
+                        alert("ログアウトに失敗しました: " + e.message);
+                    }
+                } else {
+                    // ログイン処理
+                    const provider = new GoogleAuthProvider();
+                    try {
+                        await signInWithPopup(auth, provider);
+                        alert("ログインしました！\nワールドランキングに 記録されるように なったよ！");
+                    } catch(e) {
+                        alert("ログインに失敗しました: " + e.message);
+                    }
+                }
+            };
+
+        } catch (err) {
+            console.error("Firebase Init Error:", err);
+        }
+    </script>
 
     <style>
         body {
@@ -45,6 +108,23 @@
             box-shadow: 0 10px 25px rgba(0,0,0,0.3);
             z-index: 100;
             border: 4px solid #FF9800;
+        }
+        /* インデックス作成エラー表示用 */
+        #dbErrorOverlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 600px;
+            background: #FFEBEE;
+            border: 4px solid #D32F2F;
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            display: none;
+            flex-direction: column;
+            z-index: 200;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
         input[type="text"] {
             font-family: 'M PLUS Rounded 1c', sans-serif;
@@ -91,37 +171,24 @@
         </div>
         <p id="inputError" style="color:red; font-size:14px; margin-bottom:0; min-height:20px;"></p>
     </div>
+
+    <div id="dbErrorOverlay">
+        <h3 style="color:#D32F2F; margin-top:0;">システム設定が必要です</h3>
+        <p style="color:#555; text-align:left;">
+            ランキングを表示するには、データベースのインデックス設定が必要です。<br>
+            開発者の方は以下のリンクをクリックして設定を作成してください。
+        </p>
+        <a id="dbErrorLink" href="#" target="_blank" style="color:#1565C0; font-weight:bold; font-size:18px; text-decoration:underline; word-break:break-all; display:block; margin:20px 0;">
+            ＞ インデックス作成画面へ ＜
+        </a>
+        <button class="ui-btn" style="background-color:#90A4AE;" onclick="document.getElementById('dbErrorOverlay').style.display='none'">とじる</button>
+    </div>
 </div>
 
 <script>
 /**
  * 定数・設定
  */
-// ---------------- Firebase設定 (使用時は自身のconfigに書き換えてください) ----------------
-const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT_ID.appspot.com",
-    messagingSenderId: "YOUR_SENDER_ID",
-    appId: "YOUR_APP_ID"
-};
-// --------------------------------------------------------------------------------
-
-let db = null;
-let auth = null;
-try {
-    if (typeof firebase !== 'undefined' && firebase.apps.length === 0) {
-        firebase.initializeApp(firebaseConfig);
-    }
-    if (typeof firebase !== 'undefined') {
-        db = firebase.firestore();
-        auth = firebase.auth();
-    }
-} catch (e) {
-    console.warn("Firebase config error:", e);
-}
-
 const COLLECTION_NAME = "scores_tasuten";
 
 // NGワードリスト
@@ -272,6 +339,11 @@ const Game = (function() {
         
         loadPlayers();
         requestAnimationFrame(loop);
+        
+        // グローバルにインスタンスを公開（AuthListenerからアクセス用）
+        window.GameInstance = {
+            isInTitle: () => currentState === STATE.TITLE
+        };
     }
     
     function resize() {
@@ -300,8 +372,8 @@ const Game = (function() {
     function getSpecialTileType() {
         const rand = Math.random() * 100;
         
-        // 1%の確率で流れ星
-        if (rand < 1) return 'star';
+        // 0.5%の確率で流れ星
+        if (rand < 0.5) return 'star';
 
         let monsterRate, coinRate, bagRate;
 
@@ -316,7 +388,7 @@ const Game = (function() {
         monsterRate += stageMonsterRateBonus;
         if (monsterRate > 75) monsterRate = 75;
 
-        // 残りの99%の中で判定するためにスケール
+        // 残りの99.5%の中で判定するためにスケール
         const subRand = Math.random() * 100;
         if (subRand < monsterRate) return 'monster';
         if (subRand < monsterRate + coinRate) return 'coin';
@@ -684,7 +756,8 @@ const Game = (function() {
     function checkStageClear() {
         if(score >= nextStageScore) {
             currentStage++;
-            nextStageScore += Math.floor(nextStageScore * 1.5);
+            // 修正：1つ前の目標の0.5倍を足す（=1.5倍にする）
+            nextStageScore = Math.floor(nextStageScore * 1.5);
             stageMonsterRateBonus += 2;
             
             // ステージクリア豪華演出
@@ -749,7 +822,8 @@ const Game = (function() {
         // エフェクト更新
         for(let i = effects.length - 1; i >= 0; i--) {
             effects[i].life--;
-            effects[i].y -= 0.2; // ゆっくり上昇（表示時間が長いので速度を落とす）
+            // 修正：動きをなめらかに（0.2から0.6へ速度アップ）
+            effects[i].y -= 0.6; 
             if(effects[i].life <= 0) {
                 effects.splice(i, 1);
             }
@@ -813,45 +887,45 @@ const Game = (function() {
     function drawTitle() {
         if (bgImage.complete && bgImage.naturalWidth !== 0) {
             ctx.drawImage(bgImage, 0, 0, BASE_WIDTH, BASE_HEIGHT);
-            ctx.fillStyle = "rgba(255, 243, 224, 0.8)"; 
-            ctx.fillRect(0, 0, BASE_WIDTH, BASE_HEIGHT);
+            // 修正：ぼかし（オーバーレイ）を削除
         } else {
             ctx.fillStyle = "#FFF3E0";
             ctx.fillRect(0, 0, BASE_WIDTH, BASE_HEIGHT);
         }
         
         ctx.fillStyle = "#FF6F00";
-        ctx.font = "bold 130px 'M PLUS Rounded 1c'";
+        // 修正：タイトル変更「たすてん」
+        ctx.font = "bold 150px 'M PLUS Rounded 1c'";
         ctx.textAlign = "center";
-        ctx.fillText("タステン！", BASE_WIDTH/2, 150);
+        ctx.fillText("たすてん", BASE_WIDTH/2, 200);
         
         ctx.fillStyle = "#5D4037";
-        ctx.font = "bold 40px 'M PLUS Rounded 1c'";
-        ctx.fillText("〜10をつくろう〜", BASE_WIDTH/2, 220);
+        // 修正：サブタイトル変更「～Let's make 10～」
+        ctx.font = "bold 50px 'M PLUS Rounded 1c'";
+        ctx.fillText("～Let's make 10～", BASE_WIDTH/2, 280);
 
-        const startY = 320;
-        const gap = 75;
+        const startY = 380;
+        const gap = 80;
         
+        // 修正：プレーヤー名を表示（はじめるボタンの上）
+        ctx.fillStyle = "#3E2723";
+        ctx.font = "800 36px 'M PLUS Rounded 1c'"; // 太く、大きく
+        let pname = currentPlayerIndex >= 0 ? players[currentPlayerIndex] : "未選択";
+        ctx.fillText("プレーヤー: " + pname, BASE_WIDTH/2, startY - 20);
+
         const buttons = [
             { text: "はじめる", y: startY, action: "start", color: "#FF9800" },
             { text: "プレーヤーせんたく", y: startY + gap, action: "player", color: "#8D6E63" },
-            { text: "ログアウト" + (auth && auth.currentUser ? "" : "(Googleログイン)"), y: startY + gap*2, action: "login", color: "#4285F4" },
+            { text: "ログアウト" + (window.currentUser ? "" : "(Googleログイン)"), y: startY + gap*2, action: "login", color: "#4285F4" },
             { text: "ランキング", y: startY + gap*3, action: "ranking", color: "#7CB342" },
             { text: "INDEXへ", y: startY + gap*4, action: "index", color: "#9E9E9E" }
         ];
         
         buttons.forEach(btn => {
-            // Googleログインボタンのテキストはauthの状態によるが、描画時に判定
             let t = btn.text;
-            if(btn.action === "login") t = auth && auth.currentUser ? "ログアウト" : "Googleでログイン";
-            drawButton(BASE_WIDTH/2, btn.y, 320, 55, t, btn.color);
+            if(btn.action === "login") t = window.currentUser ? "ログアウト" : "Googleでログイン";
+            drawButton(BASE_WIDTH/2, btn.y, 320, 60, t, btn.color);
         });
-        
-        ctx.fillStyle = "#5D4037";
-        ctx.font = "24px 'M PLUS Rounded 1c'";
-        ctx.textAlign = "left";
-        let pname = currentPlayerIndex >= 0 ? players[currentPlayerIndex] : "未選択";
-        ctx.fillText("プレーヤー: " + pname, 30, 40);
     }
     
     function drawPlayerSelect() {
@@ -923,11 +997,11 @@ const Game = (function() {
         ctx.fillRect(0, 0, 300, BASE_HEIGHT);
         
         ctx.fillStyle = "#5D4037";
-        ctx.font = "bold 32px 'M PLUS Rounded 1c'";
+        ctx.font = "800 36px 'M PLUS Rounded 1c'"; // 修正：太く
         ctx.textAlign = "center";
         ctx.fillText("あそびかた", 150, 60);
 
-        ctx.font = "20px 'M PLUS Rounded 1c'";
+        ctx.font = "bold 22px 'M PLUS Rounded 1c'"; // 修正：大きく太く
         ctx.textAlign = "left";
         const helpText = [
             "たて か よこ で", "１０ をつくろう。", "１０ができると", "きえるよ。", "",
@@ -1218,7 +1292,9 @@ const Game = (function() {
         if(rankingData.length === 0) {
             ctx.fillStyle = "#5D4037";
             ctx.textAlign = "center";
-            ctx.fillText(rankingScope === 'world' ? "データ読み込み中..." : "データがありません", BASE_WIDTH/2, 350);
+            let msg = "データがありません";
+            if(rankingScope === 'world') msg = "読み込み中 または データなし";
+            ctx.fillText(msg, BASE_WIDTH/2, 350);
         } else {
             rankingData.forEach((d, i) => {
                 ctx.fillStyle = i < 3 ? "#E65100" : "#5D4037";
@@ -1308,26 +1384,21 @@ const Game = (function() {
     }
     
     function checkTitleClick(x, y) {
-        const startY = 320;
-        const gap = 75;
-        if(isBtnClicked(x, y, BASE_WIDTH/2, startY, 320, 55)) {
+        const startY = 380;
+        const gap = 80;
+        if(isBtnClicked(x, y, BASE_WIDTH/2, startY, 320, 60)) {
             if(currentPlayerIndex === -1) alert("プレーヤーを選択してね");
             else currentState = STATE.DIFFICULTY_SELECT;
         }
-        else if(isBtnClicked(x, y, BASE_WIDTH/2, startY+gap, 320, 55)) currentState = STATE.PLAYER_SELECT;
-        else if(isBtnClicked(x, y, BASE_WIDTH/2, startY+gap*2, 320, 55)) {
-            if(auth) {
-                if(auth.currentUser) auth.signOut();
-                else {
-                    const provider = new firebase.auth.GoogleAuthProvider();
-                    auth.signInWithPopup(provider).catch(e => alert(e.message));
-                }
-            }
+        else if(isBtnClicked(x, y, BASE_WIDTH/2, startY+gap, 320, 60)) currentState = STATE.PLAYER_SELECT;
+        else if(isBtnClicked(x, y, BASE_WIDTH/2, startY+gap*2, 320, 60)) {
+            if(window.handleGoogleAuth) window.handleGoogleAuth();
+            else alert("読み込み中...");
         }
-        else if(isBtnClicked(x, y, BASE_WIDTH/2, startY+gap*3, 320, 55)) {
+        else if(isBtnClicked(x, y, BASE_WIDTH/2, startY+gap*3, 320, 60)) {
             rankingScope = 'local'; rankingTab = 'easy'; updateRankingView(); currentState = STATE.RANKING;
         }
-        else if(isBtnClicked(x, y, BASE_WIDTH/2, startY+gap*4, 320, 55)) window.location.href = '../index.html';
+        else if(isBtnClicked(x, y, BASE_WIDTH/2, startY+gap*4, 320, 60)) window.location.href = '../index.html';
     }
     
     function checkPlayerSelectClick(x, y) {
@@ -1453,11 +1524,13 @@ const Game = (function() {
         let localScores = JSON.parse(localStorage.getItem('tasuten_scores') || "[]");
         localScores.push(scoreData);
         localStorage.setItem('tasuten_scores', JSON.stringify(localScores));
-        if(db) {
-            db.collection(COLLECTION_NAME).add({
+        
+        // 修正：Firebase v9対応
+        if(window.dbInstance && window.addDoc) {
+            window.addDoc(window.collection(window.dbInstance, COLLECTION_NAME), {
                 name: playerName, score: score, difficulty: difficulty, stage: currentStage,
-                uid: auth && auth.currentUser ? auth.currentUser.uid : "guest",
-                date: firebase.firestore.FieldValue.serverTimestamp()
+                uid: window.currentUser ? window.currentUser.uid : "guest",
+                date: window.serverTimestamp()
             }).catch(err => console.error("Score save error", err));
         }
     }
@@ -1474,19 +1547,31 @@ const Game = (function() {
     }
     
     function fetchWorldRanking(diff) {
-        if(!db) return;
-        db.collection(COLLECTION_NAME).where("difficulty", "==", diff).orderBy("score", "desc").limit(10).get()
+        if(!window.dbInstance) return;
+        
+        // 修正：Firebase v9対応 & エラーハンドリング（インデックス用）
+        const q = window.query(
+            window.collection(window.dbInstance, COLLECTION_NAME),
+            window.where("difficulty", "==", diff),
+            window.orderBy("score", "desc"),
+            window.limit(10)
+        );
+
+        window.getDocs(q)
             .then(snapshot => {
                 rankingData = [];
                 snapshot.forEach(doc => rankingData.push(doc.data()));
             })
             .catch(err => {
                 console.error("Ranking fetch error", err);
-                if(err.code === 'failed-precondition') {
-                     db.collection(COLLECTION_NAME).orderBy("score", "desc").limit(50).get().then(snapshot => {
-                            let temp = []; snapshot.forEach(doc => temp.push(doc.data()));
-                            rankingData = temp.filter(d => d.difficulty === diff).slice(0, 10);
-                        });
+                
+                // インデックスエラーの場合の処理（リンクをオーバーレイ表示）
+                const match = err.message.match(/https:\/\/console\.firebase\.google\.com[^\s]*/);
+                if (err.code === 'failed-precondition' || match) {
+                    let url = match ? match[0] : '#';
+                    const link = document.getElementById('dbErrorLink');
+                    link.href = url;
+                    document.getElementById('dbErrorOverlay').style.display = 'flex';
                 }
             });
     }
