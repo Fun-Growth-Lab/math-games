@@ -296,6 +296,8 @@ const Game = (function() {
     let currentStage = 1;
     let nextStageScore = 2000;
     let stageMonsterRateBonus = 0;
+    let isEndlessMode = false; // ステージ10以降を続けるかどうかのフラグ
+    let isGameClear = false;   // ステージ10で終わった場合のフラグ
 
     // エフェクト管理用
     let effects = [];
@@ -372,8 +374,11 @@ const Game = (function() {
     function getSpecialTileType() {
         const rand = Math.random() * 100;
         
-        // 0.5%の確率で流れ星
+        // 修正：流れ星を0.5%に戻す
         if (rand < 0.5) return 'star';
+        
+        // 花火(fireworks)を1.0%で追加（0.5〜1.5%の範囲）
+        if (rand < 1.5) return 'fireworks';
 
         let monsterRate, coinRate, bagRate;
 
@@ -388,7 +393,7 @@ const Game = (function() {
         monsterRate += stageMonsterRateBonus;
         if (monsterRate > 75) monsterRate = 75;
 
-        // 残りの99.5%の中で判定するためにスケール
+        // 残りの98.5%の中で判定するためにスケール
         const subRand = Math.random() * 100;
         if (subRand < monsterRate) return 'monster';
         if (subRand < monsterRate + coinRate) return 'coin';
@@ -408,10 +413,13 @@ const Game = (function() {
         currentChain = 0;
         starStock = 0;
         isSelectingStar = false;
+        isEndlessMode = false;
+        isGameClear = false;
 
         grid = Array(GRID_ROWS).fill(null).map(() => Array(GRID_COLS).fill(null));
         effects = [];
-        spawnNumbers(5, true); 
+        // 初期配置を10マス
+        spawnNumbers(10, true); 
         currentState = STATE.PLAYING;
     }
     
@@ -437,6 +445,8 @@ const Game = (function() {
 
             if (specialType === 'star') {
                 grid[pos.r][pos.c] = { type: 'star', val: -1, life: 1, id: Date.now() + Math.random() };
+            } else if (specialType === 'fireworks') {
+                grid[pos.r][pos.c] = { type: 'fireworks', val: -1, id: Date.now() + Math.random() };
             } else if (specialType === 'monster') {
                 grid[pos.r][pos.c] = { type: 'monster', val: -1, id: Date.now() + Math.random() };
             } else if (specialType === 'coin') {
@@ -570,7 +580,8 @@ const Game = (function() {
                     if(n.r >= 0 && n.r < GRID_ROWS && n.c >= 0 && n.c < GRID_COLS) {
                         let target = grid[n.r][n.c];
                         // 流れ星(star)も巻き込み対象に追加
-                        if(target && (target.type === 'monster' || target.type === 'coin' || target.type === 'bag' || target.type === 'star')) {
+                        // ダイヤ(diamond)も巻き込み対象に追加
+                        if(target && (target.type === 'monster' || target.type === 'coin' || target.type === 'bag' || target.type === 'star' || target.type === 'diamond')) {
                             let key = `${n.r},${n.c}`;
                             if(!checkSet.has(key)) {
                                 checkSet.add(key);
@@ -610,13 +621,49 @@ const Game = (function() {
     // マッチ判定とスコア計算、ライフ消費を統括する関数
     function resolveMatches(consumeLife) {
         const matches = findMatches();
+        
+        let fireworksToExplode = [];
+        let matchKeys = new Set();
+        matches.forEach(group => {
+            group.forEach(cell => {
+                matchKeys.add(`${cell.r},${cell.c}`);
+                // 隣接する花火を探す
+                const neighbors = [
+                    {r: cell.r-1, c: cell.c}, {r: cell.r+1, c: cell.c},
+                    {r: cell.r, c: cell.c-1}, {r: cell.r, c: cell.c+1}
+                ];
+                neighbors.forEach(n => {
+                    if(n.r >= 0 && n.r < GRID_ROWS && n.c >= 0 && n.c < GRID_COLS) {
+                        if(grid[n.r][n.c] && grid[n.r][n.c].type === 'fireworks') {
+                            fireworksToExplode.push(n);
+                        }
+                    }
+                });
+            });
+        });
+
+        // ライフ消費（プレイヤー操作時のみ）
+        if (consumeLife) {
+            turnCount++;
+            for(let r=0; r<GRID_ROWS; r++) {
+                for(let c=0; c<GRID_COLS; c++) {
+                    if(matchKeys.has(`${r},${c}`)) continue;
+                    let cell = grid[r][c];
+                    // ダイヤもライフ消費対象
+                    if(cell && (cell.type === 'coin' || cell.type === 'bag' || cell.type === 'diamond')) {
+                        cell.life--;
+                        if(cell.life <= 0) grid[r][c] = null;
+                    }
+                }
+            }
+        }
+
         let uniqueRemovedKeys = new Set();
+        let weightedPointTotal = 0;
 
         if(matches.length > 0) {
             // コンボ数（そのアクションで何種類の和が10を作れたか＝成立したグループ数）を加算
             currentChain += matches.length;
-            
-            let weightedPointTotal = 0;
             
             matches.forEach(group => {
                 group.forEach(cell => {
@@ -634,6 +681,8 @@ const Game = (function() {
                                 weightedPointTotal += 10;
                             } else if (actualCell.type === 'monster') {
                                 weightedPointTotal += 0;
+                            } else if (actualCell.type === 'diamond') {
+                                weightedPointTotal += 20;
                             } else if (actualCell.type === 'star') {
                                 // 流れ星を獲得（点数は0扱い）
                                 starStock++;
@@ -651,49 +700,83 @@ const Game = (function() {
                     }
                 });
             });
+        }
+
+        // 花火の効果実行（十字消去）
+        if (fireworksToExplode.length > 0) {
+            fireworksToExplode.forEach(fw => {
+                // 花火自体も消える
+                if(!uniqueRemovedKeys.has(`${fw.r},${fw.c}`)) {
+                    uniqueRemovedKeys.add(`${fw.r},${fw.c}`);
+                    effects.push({
+                        x: GRID_OFFSET_X + fw.c * CELL_SIZE + CELL_SIZE/2,
+                        y: GRID_OFFSET_Y + fw.r * CELL_SIZE + CELL_SIZE/2,
+                        text: "🎆",
+                        life: 60, maxLife: 60, color: "#FF4081", scale: 2.0
+                    });
+                }
+
+                // 横一列
+                for(let c=0; c<GRID_COLS; c++) {
+                    let key = `${fw.r},${c}`;
+                    if(!uniqueRemovedKeys.has(key)) {
+                        if(grid[fw.r][c]) {
+                            uniqueRemovedKeys.add(key);
+                            weightedPointTotal += 1; // 花火で消えたものは一律1点換算とする
+                        }
+                    }
+                }
+                // 縦一列
+                for(let r=0; r<GRID_ROWS; r++) {
+                    let key = `${r},${fw.c}`;
+                    if(!uniqueRemovedKeys.has(key)) {
+                        if(grid[r][fw.c]) {
+                            uniqueRemovedKeys.add(key);
+                            weightedPointTotal += 1;
+                        }
+                    }
+                }
+            });
+        }
+
+        // 削除対象をmatchGroupsQueue形式に変換してアニメーションへ
+        if(uniqueRemovedKeys.size > 0) {
+            let group = [];
+            uniqueRemovedKeys.forEach(k => {
+                let [r, c] = k.split(',').map(Number);
+                group.push({r, c});
+            });
             
-            if (weightedPointTotal > 0) {
-                // スコア計算: (重み付けした消去パネル点数) * (コンボ数) * 100
-                let pts = weightedPointTotal * currentChain * 100;
-                score += pts;
-                
-                // --- コンボ・スコア演出（タイミング調整） ---
-                
-                // 1. まず枠が囲まれる（currentStateがANIMATINGになり、updateで描画される）
-                // 2. コンボ表示 (少し遅れて表示)
+            // スコア計算
+            let pts = weightedPointTotal * (currentChain > 0 ? currentChain : 1) * 100;
+            score += pts;
+
+            // 演出
+            if(pts > 0) {
                 setTimeout(() => {
                     effects.push({
                         x: BASE_WIDTH / 2,
                         y: BASE_HEIGHT / 2 - 50,
-                        text: `x${currentChain} COMBO!`,
-                        life: 75, // 半分に短縮
-                        maxLife: 75,
-                        color: "#FF6D00", // 濃いオレンジで見やすく
-                        scale: 1.5,
-                        stroke: "#FFF" // 白縁取り
+                        text: currentChain > 1 ? `x${currentChain} COMBO!` : "FIRE!",
+                        life: 75, maxLife: 75, color: "#FF6D00", scale: 1.5, stroke: "#FFF"
                     });
-                }, 400); // 枠表示が見えてから
-                
-                // 3. スコア表示 (コンボの後に表示)
+                }, 400);
                 setTimeout(() => {
                     effects.push({
                          x: BASE_WIDTH / 2,
                          y: BASE_HEIGHT / 2 + 60,
                          text: `+${pts}`,
-                         life: 60, // 半分に短縮
-                         maxLife: 60,
-                         color: "#FFFFFF",
-                         scale: 1.2,
-                         stroke: "#000" // 黒縁取り
+                         life: 60, maxLife: 60, color: "#FFFFFF", scale: 1.2, stroke: "#000"
                     });
-                }, 900); // コンボ表示からさらに遅れて
-
-                checkStageClear();
+                }, 900);
             }
 
-            matchGroupsQueue = matches;
+            matchGroupsQueue.push(group); // まとめて1つのグループとして処理
             currentState = STATE.ANIMATING;
             animationTimer = performance.now();
+            
+            checkStageClear();
+
         } else {
             // マッチ無し
             if (consumeLife) {
@@ -703,21 +786,6 @@ const Game = (function() {
                 // リフィル後の自動チェックでマッチ無し＝連鎖終了
                 // ここでゲームオーバー判定
                 checkGameOver();
-            }
-        }
-
-        // ライフ消費処理（プレイヤー操作時のみ）
-        if (consumeLife) {
-            turnCount++;
-            for(let r=0; r<GRID_ROWS; r++) {
-                for(let c=0; c<GRID_COLS; c++) {
-                    if(uniqueRemovedKeys.has(`${r},${c}`)) continue;
-                    let cell = grid[r][c];
-                    if(cell && (cell.type === 'coin' || cell.type === 'bag')) {
-                        cell.life--;
-                        if(cell.life <= 0) grid[r][c] = null;
-                    }
-                }
             }
         }
     }
@@ -753,37 +821,102 @@ const Game = (function() {
         }
     }
 
+    // ゲームクリア機能
+    function gameClear() {
+        currentState = STATE.GAME_OVER;
+        isGameClear = true;
+        saveScore();
+    }
+
     function checkStageClear() {
         if(score >= nextStageScore) {
-            currentStage++;
-            // 修正：1つ前の目標の0.5倍を足す（=1.5倍にする）
-            nextStageScore = Math.floor(nextStageScore * 1.5);
-            stageMonsterRateBonus += 2;
-            
-            // ステージクリア豪華演出
-            setTimeout(() => {
-                effects.push({
-                    x: BASE_WIDTH / 2,
-                    y: BASE_HEIGHT / 2,
-                    text: `STAGE ${currentStage-1} CLEAR!!`,
-                    life: 180,
-                    maxLife: 180,
-                    color: "#FFEB3B", // 黄色
-                    subText: "👑",
-                    isBig: true
-                });
-            }, 1000); // スコア表示後くらいに出す
+            // ステージ10クリア時の分岐
+            if(currentStage === 10 && !isEndlessMode) {
+                // アニメーションなどで描画が更新されるのを待つため少し遅延させる
+                setTimeout(() => {
+                    if(confirm("ゲームクリアしました！\nさらにハイスコアをめざしますか？\n（キャンセルで終了）")) {
+                        isEndlessMode = true;
+                        proceedToNextStage();
+                    } else {
+                        gameClear();
+                    }
+                }, 500);
+            } else {
+                proceedToNextStage();
+            }
+        }
+    }
+
+    function proceedToNextStage() {
+        currentStage++;
+        // 修正：ステージ目標スコア計算式の変更 (例: 2000 -> 5000 -> 9000 -> 14000 ...)
+        // 現在の目標 + (新しいステージ番号+1) * 1000
+        nextStageScore += (currentStage + 1) * 1000;
+        stageMonsterRateBonus += 2;
+        
+        // ステージクリア豪華演出
+        setTimeout(() => {
+            effects.push({
+                x: BASE_WIDTH / 2,
+                y: BASE_HEIGHT / 2,
+                text: `STAGE ${currentStage-1} CLEAR!!`,
+                life: 180,
+                maxLife: 180,
+                color: "#FFEB3B", // 黄色
+                subText: "👑",
+                isBig: true
+            });
+        }, 1000); 
+    }
+
+    // ダイヤモンド生成関数（モンスター能力）
+    function produceDiamonds() {
+        for(let r=0; r<GRID_ROWS; r++) {
+            for(let c=0; c<GRID_COLS; c++) {
+                if(grid[r][c] && grid[r][c].type === 'monster') {
+                    // 周囲の空きマスを探す
+                    let emptyNeighbors = [];
+                    const neighbors = [
+                        {r: r-1, c: c}, {r: r+1, c: c},
+                        {r: r, c: c-1}, {r: r, c: c+1}
+                    ];
+                    neighbors.forEach(n => {
+                        if(n.r >= 0 && n.r < GRID_ROWS && n.c >= 0 && n.c < GRID_COLS) {
+                            if(!grid[n.r][n.c]) emptyNeighbors.push(n);
+                        }
+                    });
+                    
+                    if(emptyNeighbors.length > 0) {
+                        // 2%の確率
+                        if(Math.random() < 0.02) {
+                            let target = emptyNeighbors[Math.floor(Math.random() * emptyNeighbors.length)];
+                            // life: 1 で生成。次のプレイヤー操作で消える
+                            grid[target.r][target.c] = { type: 'diamond', val: -1, life: 1, id: Date.now() + Math.random() };
+                            
+                            // エフェクト
+                            effects.push({
+                                x: GRID_OFFSET_X + target.c * CELL_SIZE + CELL_SIZE/2,
+                                y: GRID_OFFSET_Y + target.r * CELL_SIZE + CELL_SIZE/2,
+                                text: "💎",
+                                life: 40, maxLife: 40, color: "#fff", scale: 1.2
+                            });
+                        }
+                    }
+                }
+            }
         }
     }
 
     function processRefill() {
-        // 出現パラメーターXの計算
+        // 補充前にダイヤ生成を実行
+        produceDiamonds();
+
+        // 出現パラメーター（2, 3, 4）
         let spawnParamX = 0;
         
-        // 基本値の設定
-        if(difficulty === 'easy') spawnParamX = 2.5;
-        else if(difficulty === 'normal') spawnParamX = 3.0;
-        else spawnParamX = 3.5; // hard
+        if(difficulty === 'easy') spawnParamX = 2.0; // 2
+        else if(difficulty === 'normal') spawnParamX = 3.0; // 3
+        else spawnParamX = 4.0; // 4 (hard)
         
         // ステージ進行による増加 (ステージ1からスタートなので -1 してから 0.1 を掛ける)
         spawnParamX += (currentStage - 1) * 0.1;
@@ -892,26 +1025,40 @@ const Game = (function() {
             ctx.fillStyle = "#FFF3E0";
             ctx.fillRect(0, 0, BASE_WIDTH, BASE_HEIGHT);
         }
-        
-        ctx.fillStyle = "#FF6F00";
-        // 修正：タイトル変更「たすてん」
-        ctx.font = "bold 150px 'M PLUS Rounded 1c'";
-        ctx.textAlign = "center";
-        ctx.fillText("たすてん", BASE_WIDTH/2, 200);
-        
-        ctx.fillStyle = "#5D4037";
-        // 修正：サブタイトル変更「～Let's make 10～」
-        ctx.font = "bold 50px 'M PLUS Rounded 1c'";
-        ctx.fillText("～Let's make 10～", BASE_WIDTH/2, 280);
 
-        const startY = 380;
-        const gap = 80;
+        // 修正：配置ズレ防止のためにベースラインをリセット
+        ctx.textBaseline = "alphabetic";
+
+        // 半透明ボックスを拡大（縦方向全体、幅狭く）
+        ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+        roundRect(ctx, BASE_WIDTH/2 - 300, 20, 600, 670, 20, true, false);
         
-        // 修正：プレーヤー名を表示（はじめるボタンの上）
-        ctx.fillStyle = "#3E2723";
-        ctx.font = "800 36px 'M PLUS Rounded 1c'"; // 太く、大きく
+        ctx.textAlign = "center";
+
+        // タイトル「たすてん」さらに小さく、位置上げ
+        ctx.font = "bold 100px 'M PLUS Rounded 1c'";
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 8;
+        ctx.strokeText("たすてん", BASE_WIDTH/2, 140);
+        ctx.fillStyle = "#FF6F00";
+        ctx.fillText("たすてん", BASE_WIDTH/2, 140);
+        
+        // サブタイトル プレーヤー名と重ならないように位置調整
+        ctx.font = "bold 40px 'M PLUS Rounded 1c'";
+        ctx.lineWidth = 5;
+        ctx.strokeText("～Let's make 10～", BASE_WIDTH/2, 210);
+        ctx.fillStyle = "#EC407A"; // ピンク系
+        ctx.fillText("～Let's make 10～", BASE_WIDTH/2, 210);
+
+        // ボタン位置をさらに上に（340 -> 320）
+        const startY = 320;
+        const gap = 75;
+        
+        // プレーヤー名を表示、位置上げ、色変更
+        ctx.fillStyle = "#00695C"; // 深緑
+        ctx.font = "800 36px 'M PLUS Rounded 1c'"; 
         let pname = currentPlayerIndex >= 0 ? players[currentPlayerIndex] : "未選択";
-        ctx.fillText("プレーヤー: " + pname, BASE_WIDTH/2, startY - 20);
+        ctx.fillText("プレーヤー: " + pname, BASE_WIDTH/2, startY - 40);
 
         const buttons = [
             { text: "はじめる", y: startY, action: "start", color: "#FF9800" },
@@ -1008,7 +1155,7 @@ const Game = (function() {
             "連続で消して", "コンボを狙おう！", "",
             "👾はおじゃま", "まわりをけすと", "きえるよ。", "",
             "🌠はすごいアイテム", "まわりを消して", "ストックしよう！", "",
-            "🪙💰はボーナス", "1アクションで", "すぐにきえるよ！"
+            "🪙💰💎はボーナス", "🎆は十字消し！", "1アクションで", "すぐにきえるよ！"
         ];
         let helpY = 120;
         helpText.forEach(line => {
@@ -1016,75 +1163,73 @@ const Game = (function() {
             helpY += 28;
         });
 
-        // 右側：情報表示
+        // 右側：情報表示（ごちゃごちゃ解消）
         ctx.fillStyle = "#EFEBE9";
         ctx.fillRect(980, 0, 300, BASE_HEIGHT);
 
         ctx.textAlign = "center";
-        
         ctx.fillStyle = "#5D4037";
+        
+        // プレーヤー
         ctx.font = "bold 24px 'M PLUS Rounded 1c'";
         let pname = currentPlayerIndex >= 0 ? players[currentPlayerIndex] : "ゲスト";
-        ctx.fillText(pname, 1130, 60);
+        ctx.fillText(pname, 1130, 50);
 
+        // ステージ
         ctx.fillStyle = "#E65100";
         ctx.font = "bold 36px 'M PLUS Rounded 1c'";
-        ctx.fillText("STAGE " + currentStage, 1130, 110);
+        ctx.fillText("STAGE " + currentStage, 1130, 100);
 
+        // スコア（大きく）
         ctx.fillStyle = "#5D4037";
-        ctx.font = "bold 30px 'M PLUS Rounded 1c'";
-        ctx.fillText("SCORE", 1130, 160);
-
+        ctx.font = "bold 24px 'M PLUS Rounded 1c'";
+        ctx.fillText("SCORE", 1130, 150);
         ctx.fillStyle = "#D81B60"; 
-        ctx.font = "800 60px 'M PLUS Rounded 1c'";
-        ctx.fillText(score, 1130, 220);
+        ctx.font = "800 70px 'M PLUS Rounded 1c'";
+        // 修正：スコアが枠からはみ出ないように最大幅を指定
+        ctx.fillText(score, 1130, 220, 280);
 
-        // 次の目標（強調）
+        // 次の目標
         ctx.fillStyle = "#5D4037";
-        ctx.font = "bold 24px 'M PLUS Rounded 1c'";
-        ctx.fillText("つぎの目標", 1130, 280);
-        ctx.fillStyle = "#D32F2F"; // 赤色で強調
-        ctx.font = "800 40px 'M PLUS Rounded 1c'";
-        ctx.fillText(nextStageScore, 1130, 330);
+        ctx.font = "bold 20px 'M PLUS Rounded 1c'";
+        ctx.fillText("つぎの目標: " + nextStageScore, 1130, 270);
         
-        // アイテム表示
-        ctx.fillStyle = "#5D4037";
-        ctx.font = "bold 24px 'M PLUS Rounded 1c'";
-        ctx.fillText("アイテム", 1130, 400);
-        
+        // アイテム（「アイテム」文字削除、シンプルに）
+        // 🌠と数
         ctx.fillStyle = "#FFD700";
-        ctx.font = "40px sans-serif";
-        ctx.fillText("🌠", 1080, 440);
+        ctx.font = "50px sans-serif";
+        ctx.fillText("🌠", 1070, 350);
         ctx.fillStyle = "#333";
-        ctx.font = "bold 30px 'M PLUS Rounded 1c'";
-        ctx.fillText("x " + starStock, 1130, 440);
+        ctx.font = "bold 40px 'M PLUS Rounded 1c'";
+        ctx.fillText("× " + starStock, 1160, 350);
         
-        // アイテム使用ボタン
+        // つかうボタン
         if(starStock > 0 && !isSelectingStar) {
-            drawButton(1130, 490, 160, 50, "つかう", "#FFC107", "#5D4037");
+            drawButton(1130, 420, 160, 50, "つかう", "#FFC107", "#5D4037");
         } else if (isSelectingStar) {
             ctx.fillStyle = "#FF9800";
             ctx.font = "bold 20px 'M PLUS Rounded 1c'";
-            ctx.fillText("すうじをえらんでね", 1130, 490);
+            ctx.fillText("すうじをえらんでね", 1130, 420);
         } else {
             // グレーアウト風
             ctx.fillStyle = "#BDBDBD";
-            roundRect(ctx, 1130-80, 490-25, 160, 50, 10, true, false);
+            roundRect(ctx, 1130-80, 420-25, 160, 50, 10, true, false);
             ctx.fillStyle = "#757575";
             ctx.font = "bold 24px 'M PLUS Rounded 1c'";
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            ctx.fillText("つかう", 1130, 490);
+            ctx.fillText("つかう", 1130, 420);
         }
 
+        // ターン
         ctx.fillStyle = "#5D4037";
-        ctx.textBaseline = "alphabetic"; // 戻す
-        ctx.font = "bold 20px 'M PLUS Rounded 1c'";
-        ctx.fillText("ターン: " + turnCount, 1130, 560);
+        ctx.textBaseline = "alphabetic"; 
+        ctx.font = "bold 24px 'M PLUS Rounded 1c'";
+        ctx.fillText("ターン: " + turnCount, 1130, 520);
 
+        // 難易度
         let diffText = difficulty === 'easy' ? 'やさしい' : difficulty === 'normal' ? 'ふつう' : 'むずかしい';
-        ctx.fillText("難易度: " + diffText, 1130, 600);
+        ctx.fillText("難易度: " + diffText, 1130, 570);
 
+        // タイトルへ
         drawButton(1130, 660, 220, 50, "タイトルへ", "#B0BEC5");
 
         // 中央：グリッド
@@ -1202,9 +1347,9 @@ const Game = (function() {
             ctx.restore();
         });
     }
-    
+
     function drawCellContent(x, y, cell, shadow=false) {
-        if(cell.type === 'monster' || cell.type === 'coin' || cell.type === 'bag' || cell.type === 'star') {
+        if(cell.type === 'monster' || cell.type === 'coin' || cell.type === 'bag' || cell.type === 'star' || cell.type === 'diamond' || cell.type === 'fireworks') {
             ctx.fillStyle = "#FFFFFF";
         } else {
             ctx.fillStyle = NUMBER_BG_COLORS[cell.val - 1] || "#333";
@@ -1235,6 +1380,12 @@ const Game = (function() {
         } else if (cell.type === 'star') {
             ctx.font = "80px sans-serif";
             ctx.fillText("🌠", x + CELL_SIZE/2, y + CELL_SIZE/2);
+        } else if (cell.type === 'diamond') {
+            ctx.font = "80px sans-serif";
+            ctx.fillText("💎", x + CELL_SIZE/2, y + CELL_SIZE/2);
+        } else if (cell.type === 'fireworks') {
+            ctx.font = "80px sans-serif";
+            ctx.fillText("🎆", x + CELL_SIZE/2, y + CELL_SIZE/2);
         } else {
             ctx.fillStyle = "#FFFFFF";
             ctx.font = "bold 65px 'M PLUS Rounded 1c'";
@@ -1249,7 +1400,9 @@ const Game = (function() {
         ctx.fillStyle = "#fff";
         ctx.font = "bold 80px 'M PLUS Rounded 1c'";
         ctx.textAlign = "center";
-        ctx.fillText("ゲームオーバー！", BASE_WIDTH/2, 250);
+        
+        let titleText = isGameClear ? "ゲームクリア！" : "ゲームオーバー！";
+        ctx.fillText(titleText, BASE_WIDTH/2, 250);
         
         ctx.font = "bold 50px 'M PLUS Rounded 1c'";
         ctx.fillText("スコア: " + score, BASE_WIDTH/2, 350);
@@ -1384,8 +1537,8 @@ const Game = (function() {
     }
     
     function checkTitleClick(x, y) {
-        const startY = 380;
-        const gap = 80;
+        const startY = 320;
+        const gap = 75;
         if(isBtnClicked(x, y, BASE_WIDTH/2, startY, 320, 60)) {
             if(currentPlayerIndex === -1) alert("プレーヤーを選択してね");
             else currentState = STATE.DIFFICULTY_SELECT;
@@ -1458,7 +1611,7 @@ const Game = (function() {
         }
         
         // アイテムボタン
-        if(starStock > 0 && isBtnClicked(x, y, 1130, 490, 160, 50)) {
+        if(starStock > 0 && isBtnClicked(x, y, 1130, 420, 160, 50)) {
             isSelectingStar = true;
             return;
         }
