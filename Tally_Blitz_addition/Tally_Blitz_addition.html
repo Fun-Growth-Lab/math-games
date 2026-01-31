@@ -1,0 +1,1579 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>足し算パズル - Tally Blitz (Final Ver.)</title>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(135deg, #ffdee9 0%, #b5fffc 100%);
+            --panel-bg: rgba(255, 255, 255, 0.6);
+            --text-color: #5d5d5d;
+            --accent-color: #ff9a9e;
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #333; /* レターボックス用の背景色（黒帯） */
+            font-family: "M PLUS Rounded 1c", "Hiragino Kaku Gothic ProN", sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+            color: var(--text-color);
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        /* 背景装飾用コンテナ */
+        #bg-layer {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg-gradient);
+            z-index: -2;
+        }
+        #bg-layer::before {
+            content: "";
+            position: absolute;
+            top: -50%; left: -50%; width: 200%; height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.4) 10%, transparent 20%),
+                        radial-gradient(circle, rgba(255,255,255,0.4) 10%, transparent 20%);
+            background-size: 100px 100px;
+            background-position: 0 0, 50px 50px;
+            z-index: -1;
+            opacity: 0.5;
+        }
+
+        /* ゲーム全体のコンテナ：1280x720 (16:9) に完全固定 */
+        #container {
+            width: 1280px;
+            height: 720px;
+            display: flex;
+            position: absolute;
+            box-shadow: 0 0 50px rgba(0,0,0,0.3);
+            background-color: transparent;
+            transform-origin: center center;
+        }
+
+        #left-panel, #right-panel {
+            background-color: var(--panel-bg);
+            backdrop-filter: blur(10px);
+            padding: 15px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            border: 2px solid rgba(255,255,255,0.8);
+        }
+        
+        #left-panel { flex: 1.2; justify-content: center; border-right: none; }
+        #right-panel { flex: 1.2; align-items: center; justify-content: flex-start; border-left: none; }
+        
+        #game-area {
+            flex: 2.1;
+            position: relative;
+            background-color: rgba(255, 255, 255, 0.2);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 30px rgba(255, 154, 158, 0.2);
+        }
+
+        canvas {
+            display: block;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            background-color: rgba(255, 255, 255, 0.85);
+            border-radius: 20px;
+            border: 8px solid #fff;
+        }
+
+        h2 { 
+            margin-top: 0; 
+            border-bottom: 3px dashed var(--accent-color); 
+            padding-bottom: 5px; 
+            font-size: 1.3rem; 
+            width: 100%; 
+            color: var(--accent-color);
+            text-align: center;
+        }
+        
+        #right-panel-content { width: 100%; display: flex; flex-direction: column; align-items: center; transition: opacity 0.3s; }
+        
+        #next-block-area {
+            width: 100%; height: 140px;
+            background: #fff; border-radius: 25px;
+            margin-bottom: 20px;
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center;
+            position: relative;
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.05);
+            border: 4px solid #f0f4f8;
+        }
+        #next-label { 
+            font-size: 1.1rem; color: var(--accent-color); 
+            position: absolute; top: 5px; left: 15px; font-weight: 800;
+            background: #fff; padding: 0 10px; border-radius: 10px;
+        }
+        #next-canvas { margin-top: 15px; }
+
+        .info-group { width: 100%; margin-bottom: 10px; text-align: center; }
+        .info-item { 
+            margin-bottom: 15px; 
+            display: flex; flex-direction: column; align-items: center;
+            border-bottom: 2px dotted #ffc3a0; padding-bottom: 5px;
+        }
+        .info-label { font-size: 0.9rem; color: #aaa; margin-bottom: 2px; font-weight: bold; }
+        .info-value { 
+            font-size: 2.2rem; font-weight: 800; line-height: 1; 
+            text-shadow: 2px 2px 0 #fff; color: #666;
+        }
+        
+        #disp-level { color: #ff9a9e; }
+        #disp-round { color: #84fab0; font-size: 1.5rem; }
+        #disp-combo { color: #a18cd1; font-size: 2.6rem; }
+        #disp-score { color: #fbc2eb; }
+
+        #target-score-container {
+            font-size: 0.9rem; color: #888; margin-top: 5px; font-weight: bold;
+            background: rgba(255,255,255,0.5); padding: 2px 8px; border-radius: 8px;
+        }
+
+        .btn {
+            background: linear-gradient(to bottom, #8fd3f4, #84fab0);
+            color: white; border: 2px solid white; 
+            padding: 12px 20px; border-radius: 50px; 
+            cursor: pointer; font-size: 1rem; margin: 5px;
+            box-shadow: 0 5px 0 #6dd5ed, 0 8px 10px rgba(0,0,0,0.1);
+            font-weight: 800; text-shadow: 1px 1px 0 rgba(0,0,0,0.1);
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+        .btn:active { transform: translateY(4px); box-shadow: 0 1px 0 #6dd5ed; }
+        .btn-danger { 
+            background: linear-gradient(to bottom, #ff9a9e, #fecfef); 
+            box-shadow: 0 5px 0 #ff758c, 0 8px 10px rgba(0,0,0,0.1);
+        }
+        .btn-danger:active { box-shadow: 0 1px 0 #ff758c; }
+        .btn-success { 
+            background: linear-gradient(to bottom, #a1c4fd, #c2e9fb); 
+            box-shadow: 0 5px 0 #89b0ea, 0 8px 10px rgba(0,0,0,0.1);
+        }
+        .btn-success:active { box-shadow: 0 1px 0 #89b0ea; }
+        .btn-warning { 
+            background: linear-gradient(to bottom, #f6d365, #fda085); 
+            box-shadow: 0 5px 0 #f5c065, 0 8px 10px rgba(0,0,0,0.1); color: white;
+        }
+        .btn-warning:active { box-shadow: 0 1px 0 #f5c065; }
+        
+        .btn-auth {
+            background-color: #4285F4; box-shadow: 0 4px 0 #2a56c6; color: white; 
+            padding: 12px; font-weight: bold; width: 100%; margin-top: 10px; border-radius: 50px;
+            display: flex; justify-content: center; align-items: center; gap: 10px;
+        }
+
+        #overlay, #ranking-overlay, #round-clear-overlay, #name-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 255, 255, 0.4); backdrop-filter: blur(5px);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 100; flex-direction: column; color: #555;
+        }
+        
+        #title-screen {
+            position: absolute; 
+            top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center; 
+            align-items: center;
+            z-index: 10;
+        }
+        
+        .overlay-content {
+            background: rgba(255,255,255,0.95); padding: 25px; border-radius: 30px;
+            text-align: center; width: 90%; max-width: 550px;
+            max-height: 90vh; overflow-y: auto;
+            border: 6px solid #b5fffc; box-shadow: 0 15px 35px rgba(100,100,100,0.1);
+        }
+        .hidden { display: none !important; }
+
+        #title-screen h1 { white-space: nowrap; }
+
+        .difficulty-container { 
+            display: flex; justify-content: center; gap: 8px; 
+            margin-bottom: 20px; align-items: flex-end; width: 100%; 
+        }
+        .diff-wrapper { display: flex; flex-direction: column; align-items: center; flex: 1; max-width: 140px; }
+        .diff-wrapper .btn { white-space: nowrap; width: 100%; padding: 12px 5px; font-size: 1.1rem; margin: 5px 0; }
+        .crown-icon { font-size: 1.8rem; margin-bottom: 5px; visibility: hidden; }
+        .clear-count-text { font-size: 1rem; color: #888; font-weight: bold; margin-top: 5px; text-shadow: 2px 2px 0 #fff; }
+
+        .ranking-container { display: flex; gap: 5px; margin-bottom: 10px; height: 250px; }
+        .ranking-box { background: #fff; padding: 5px; border-radius: 15px; flex: 1; overflow-y: auto; border: 2px solid #f0f0f0; }
+        .ranking-list { list-style: none; padding: 0; margin: 0; font-size: 0.8rem; text-align: left; }
+        .ranking-list li { border-bottom: 1px dashed #ffd1ff; padding: 5px; display:flex; justify-content:space-between; color: #666; }
+
+        #puzzle-controls {
+            display: grid; grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr 1fr;
+            gap: 12px; margin-top: auto; width: 100%; max-width: 280px;
+        }
+        .ctrl-btn {
+            background: #fff; border: none; color: #a18cd1; border-radius: 50%;
+            font-size: 1.8rem; display: flex; justify-content: center; align-items: center;
+            cursor: pointer; height: 65px; width: 65px; margin: 0 auto;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05), inset 0 -4px 0 rgba(0,0,0,0.05); font-weight: bold;
+        }
+        .ctrl-btn:active { transform: scale(0.9); background: #f0f0f0; }
+        #btn-left { grid-column: 1; grid-row: 1; }
+        #btn-rotate { grid-column: 2; grid-row: 1; color: #fff; background: linear-gradient(to bottom, #fbc2eb, #a6c1ee); }
+        #btn-right { grid-column: 3; grid-row: 1; }
+        #btn-drop { 
+            grid-column: 1 / span 3; grid-row: 2; 
+            background: linear-gradient(to bottom, #ff9a9e, #fecfef); 
+            border-color: #fff; color: white; font-weight: bold; font-size: 1.5rem;
+            width: 100%; border-radius: 50px; height: 60px;
+        }
+
+        #name-list {
+            list-style: none; padding: 0; margin: 20px 0;
+            display: flex; flex-direction: column; gap: 10px;
+        }
+        .name-entry {
+            display: flex; justify-content: space-between; align-items: center;
+            background: #f9f9f9; padding: 10px 15px; border-radius: 15px;
+            border: 2px solid #eee; cursor: pointer; transition: 0.2s;
+        }
+        .name-entry:hover { background: #e0f7fa; border-color: #b2ebf2; }
+        .name-entry.selected { background: #fff3e0; border-color: #ffe0b2; color: #ef6c00; font-weight: bold; }
+        .delete-name-btn {
+            background: #ffcdd2; color: #d32f2f; border: none; border-radius: 50%;
+            width: 30px; height: 30px; cursor: pointer; font-weight: bold;
+        }
+        
+        #new-name-area {
+            display: flex; gap: 10px; justify-content: center; margin-bottom: 20px;
+            padding: 15px; background: #fff; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        }
+        #new-name-input {
+            padding: 10px; border-radius: 10px; border: 2px solid #ddd;
+            width: 180px; text-align: center; font-size: 1rem;
+        }
+
+    </style>
+</head>
+<body>
+
+<div id="bg-layer"></div>
+
+<div id="container">
+    <div id="left-panel">
+        <h2>あそびかた</h2>
+        <div style="font-size: 0.95rem; line-height: 1.8; color: #666; font-weight: bold;">
+            <p>1. <span style="color:#ff9a9e">すうじ</span>をおとして<br>したのブロックと たしざん するよ！</p>
+            <p>2. たして<span style="color:#a18cd1">「10」</span>に なると きえるよ！</p>
+            <p>3. <strong>10より ちいさい</strong>と くっついて<br>すうじが ふえるよ。</p>
+            <p>4. <strong>11いじょう</strong>は<br>おじゃまブロックに なっちゃうぞ。</p>
+            <p>5. <strong>スコア達成</strong>で 次のラウンドへ！<br>したから ブロックが<br>せりあがるのが はやくなるよ。</p>
+        </div>
+        <div style="margin-top:auto; text-align:center;">
+            <button id="btn-to-title" class="btn btn-danger hidden">タイトルへ</button>
+        </div>
+    </div>
+
+    <div id="game-area">
+        <canvas id="gameCanvas"></canvas>
+
+        <div id="title-screen">
+            <h1 style="font-size:3.8rem; margin:0 0 5px 0; color:#ff9a9e; font-family: 'M PLUS Rounded 1c', sans-serif; text-shadow: 4px 4px 0 #fff, 6px 6px 0 #fad0c4; letter-spacing: 2px;">TALLY BLITZ</h1>
+            <p style="font-size:1.1rem; margin:0 0 5px 0; font-weight:bold; color:#ff9a9e; text-shadow: 1px 1px 0 #fff;">（タリーブリッツ）</p>
+            <p style="font-size:1.5rem; margin-top:0; margin-bottom:30px; font-weight:bold; color:#a18cd1; text-shadow: 2px 2px 0 #fff;">- たしざんパズル -</p>
+            
+            <div style="margin-bottom: 25px;">
+                <button id="btn-player-name" class="btn" style="background:#fff; color:#555; border:3px solid #ff9a9e; width:300px; font-size:1.2rem; border-radius:50px; box-shadow:0 5px 0 #ffcccb; padding:15px;">
+                    プレイヤー: 名無しさん
+                </button>
+            </div>
+            
+            <div class="difficulty-container">
+                <div class="diff-wrapper">
+                    <div id="crown-easy" class="crown-icon">👑</div>
+                    <button id="btn-easy" class="btn btn-success">しょきゅう</button>
+                    <div id="clear-easy" class="clear-count-text">0回プレイ</div>
+                    <div style="font-size:0.8rem; color:#666; font-weight:bold; background:rgba(255,255,255,0.7); padding:2px 8px; border-radius:10px; margin-top:2px;">3000点でクリア</div>
+                </div>
+                <div class="diff-wrapper">
+                    <div id="crown-normal" class="crown-icon">👑</div>
+                    <button id="btn-normal" class="btn">ちゅうきゅう</button>
+                    <div id="clear-normal" class="clear-count-text">0回プレイ</div>
+                    <div style="font-size:0.8rem; color:#666; font-weight:bold; background:rgba(255,255,255,0.7); padding:2px 8px; border-radius:10px; margin-top:2px;">5000点でクリア</div>
+                </div>
+                <div class="diff-wrapper">
+                    <div id="crown-hard" class="crown-icon">👑</div>
+                    <button id="btn-hard" class="btn btn-danger">じょうきゅう</button>
+                    <div id="clear-hard" class="clear-count-text">0回プレイ</div>
+                    <div style="font-size:0.8rem; color:#666; font-weight:bold; background:rgba(255,255,255,0.7); padding:2px 8px; border-radius:10px; margin-top:2px;">10000点でクリア</div>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 20px; text-align:center;">
+                <p id="auth-status" style="margin: 0 0 5px 0; font-size: 0.9rem; color: #666; font-weight: bold; background:rgba(255,255,255,0.5); padding:2px 10px; border-radius:10px; display:inline-block;">未ログイン</p>
+                <button id="btn-login" class="btn btn-auth" style="width: 280px; margin: 5px auto;">
+                    <span>G</span> Googleでログイン
+                </button>
+                <button id="btn-logout" class="btn btn-danger hidden" style="width: 280px; margin: 5px auto;">ログアウト</button>
+            </div>
+
+            <div style="display:flex; gap:20px; justify-content: center;">
+                <button id="btn-view-ranking" class="btn btn-warning" style="width: 160px; font-weight:bold;">ランキング</button>
+                <button id="btn-index" class="btn" style="background: #e0e0e0; color:#888; border-color:#ccc; box-shadow: 0 5px 0 #bbb; width: 160px;">INDEXへ戻る</button>
+            </div>
+        </div>
+
+        <div id="game-result" style="display: none; position: absolute; top:50%; left:50%; transform:translate(-50%, -50%); z-index: 20; width: 85%; max-width: 400px;"></div>
+
+        <div id="round-clear-screen" class="hidden">
+            <div id="round-clear-overlay">
+                <div class="overlay-content">
+                    <h2 style="color:#ff9a9e; font-size:2rem; border-bottom:none;">ROUND CLEAR!</h2>
+                    <p style="font-size:1.1rem; font-weight:bold;">おめでとう！</p>
+                    <p>つぎのラウンドにすすみますか？<br><span style="color:#a18cd1; font-size:0.9rem;">(ブロックがせりあがるのが はやくなるよ！)</span></p>
+                    <div style="margin: 20px 0; padding: 10px; background: #fff0f5; border-radius: 10px;">
+                        <p style="margin:5px;">つぎのもくひょう</p>
+                        <span id="next-target-score" style="color:#f6d365; font-weight:800; font-size:1.5rem;">6000</span><span style="font-weight:bold;"> 点</span>
+                    </div>
+                    <button id="btn-next-round" class="btn btn-success" style="width:80%;">つづける</button>
+                    <button id="btn-quit-round" class="btn btn-danger" style="width:80%;">やめる</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="ranking-screen" class="hidden">
+            <div id="ranking-overlay">
+                <div class="overlay-content">
+                    <h2 id="ranking-header-title" style="color: #f6d365; border-bottom-color: #f6d365;">ランキング</h2>
+                    <div class="ranking-container">
+                        <div class="ranking-box">
+                            <div style="color:#84fab0; font-weight:bold;">初級</div>
+                            <ul id="rank-list-easy" class="ranking-list"></ul>
+                        </div>
+                        <div class="ranking-box">
+                            <div style="color:#8fd3f4; font-weight:bold;">中級</div>
+                            <ul id="rank-list-normal" class="ranking-list"></ul>
+                        </div>
+                        <div class="ranking-box">
+                            <div style="color:#ff9a9e; font-weight:bold;">上級</div>
+                            <ul id="rank-list-hard" class="ranking-list"></ul>
+                        </div>
+                    </div>
+                    <button id="btn-close-ranking" class="btn">とじる</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="name-manage-screen" class="hidden">
+            <div id="name-overlay">
+                <div class="overlay-content">
+                    <h2 style="color:#ff9a9e; border-bottom:none;">プレイヤー選択</h2>
+                    <p style="font-size:0.9rem;">※最大5人まで登録できます</p>
+                    
+                    <div id="new-name-area">
+                        <input type="text" id="new-name-input" placeholder="ひらがなのみ" maxlength="10">
+                        <button id="btn-add-name" class="btn btn-success" style="padding: 10px 15px; margin:0; font-size:0.9rem;">登録</button>
+                    </div>
+
+                    <ul id="name-list">
+                        </ul>
+                    
+                    <button id="btn-close-name" class="btn">とじる</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <div id="right-panel">
+        <div id="right-panel-content" class="hidden">
+            <div id="next-block-area">
+                <div id="next-label">つぎ</div>
+                <canvas id="nextCanvas" width="220" height="80"></canvas>
+            </div>
+            <div class="info-group">
+                <div class="info-item">
+                    <span class="info-label">LEVEL</span>
+                    <span id="disp-level" class="info-value">-</span>
+                    <div id="target-score-container">目標: <span id="disp-target">0</span></div>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">ROUND</span>
+                    <span id="disp-round" class="info-value">1</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">COMBO</span>
+                    <span id="disp-combo" class="info-value">0</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">SCORE</span>
+                    <span id="disp-score" class="info-value">0</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="puzzle-controls" class="hidden">
+            <div class="ctrl-btn" id="btn-left">◀</div>
+            <div class="ctrl-btn" id="btn-rotate">⇄</div>
+            <div class="ctrl-btn" id="btn-right">▶</div>
+            <div class="ctrl-btn" id="btn-drop">↓</div>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import { getFirestore, collection, doc, setDoc, serverTimestamp, query, where, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBCg5dCEM89UmYYhfGqVeRf_VrUlg8_o-4",
+      authDomain: "math-braves.firebaseapp.com",
+      projectId: "math-braves",
+      storageBucket: "math-braves.firebasestorage.app",
+      messagingSenderId: "217117619290",
+      appId: "1:217117619290:web:d227feb603970d3948d463"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const provider = new GoogleAuthProvider();
+
+    window.currentUser = null; 
+
+    const btnLogin = document.getElementById('btn-login');
+    const btnLogout = document.getElementById('btn-logout');
+    const authStatus = document.getElementById('auth-status');
+
+    window.handleLogin = function() {
+        signInWithPopup(auth, provider)
+            .then((result) => { console.log("Login Success"); })
+            .catch((error) => { console.error("Login Error", error); alert("ログイン失敗"); });
+    };
+
+    window.handleLogout = function() {
+        signOut(auth).then(() => { console.log("Logout Success"); });
+    };
+
+    if(btnLogin) btnLogin.onclick = window.handleLogin;
+    if(btnLogout) btnLogout.onclick = window.handleLogout;
+
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            window.currentUser = { uid: user.uid, displayName: user.displayName || '名無しさん' };
+            if(authStatus) authStatus.textContent = `Login: ${window.currentUser.displayName}`;
+            if(btnLogin) btnLogin.classList.add('hidden');
+            if(btnLogout) btnLogout.classList.remove('hidden');
+        } else {
+            window.currentUser = null;
+            if(authStatus) authStatus.textContent = '未ログイン';
+            if(btnLogin) btnLogin.classList.remove('hidden');
+            if(btnLogout) btnLogout.classList.add('hidden');
+        }
+    });
+
+    const COLLECTION_NAME = "scores_Tally_Blitz_addition";
+
+    window.saveOnlineScore = async (userId, userName, difficulty, score) => {
+        try {
+            const docId = `${userId}_${difficulty}_${Date.now()}`;
+            await setDoc(doc(db, COLLECTION_NAME, docId), {
+                uid: userId,
+                name: userName, 
+                difficulty: difficulty,
+                score: score,
+                createdAt: serverTimestamp()
+            });
+        } catch (error) { console.error(error); }
+    };
+
+    window.fetchOnlineRanking = async (difficulty) => {
+        if (!window.currentUser) return [];
+        try {
+            const scoresRef = collection(db, COLLECTION_NAME);
+            const q = query(
+                scoresRef, 
+                where("difficulty", "==", difficulty), 
+                orderBy("score", "desc"), 
+                limit(10)
+            );
+            const querySnapshot = await getDocs(q);
+            const ranking = [];
+            querySnapshot.forEach((doc) => ranking.push(doc.data()));
+            return ranking;
+        } catch (error) { console.error(error); return []; }
+    };
+</script>
+
+<script>
+// --- Game Config ---
+const CROWN_THRESHOLDS = { BRONZE: 2000, SILVER: 5000, GOLD: 10000 };
+const CONFIGS = {
+    EASY: { label: "しょきゅう", floorRows: 2, probs: [0.5, 0.8], riseInterval: 10, clearScore: 3000 },
+    NORMAL: { label: "ちゅうきゅう", floorRows: 2, probs: [0.25, 0.75], riseInterval: 7, clearScore: 5000 },
+    HARD: { label: "じょうきゅう", floorRows: 2, probs: [0.20, 0.50], riseInterval: 5, clearScore: 10000 }
+};
+
+const NG_WORDS_HIRAGANA = [
+    'しね', 'しぬ', 'しに', 'ころす', 'ころせ', 'さつがい', 'くたばれ',
+    'じさつ', 'ぎさつ', 'つるす', 'れんたん', 'しにたい',
+    'てろ', 'てろりすと', 'ばくは', 'ばくだん', 'ほうか',
+    'はんざい', 'ごうとう', 'ゆうかい', 'かんきん', 'おそう',
+    'やくざ', 'ぼうりょく', 'はんぐれ', 'ちんぴら', 'まふぃあ',
+    'たいま', 'まやく', 'かくせいざい', 'しゃぶ', 'どらっぐ', 'こかいん',
+    'へろいん', 'えくすたしー', 'だっぽう', 'きめせく',
+    'いじめ', 'ぎゃくたい',
+    'ばか', 'あほ', 'まぬけ', 'きちがい', 'き違い',
+    'うざい', 'うざ', 'きもい', 'きも', 'きしょい', 'きえろ',
+    'くず', 'ごみ', 'ごみむし', 'かす', 'ざこ', 'ぜつ',
+    'ぶす', 'でぶ', 'はげ', 'ちび', 'でっぱ', 'いなかもの',
+    'うじ', 'はいぼく', 'まけいぬ', 'おつむ', 'のうたりん',
+    'ていのう', 'ちしょう', 'しょうがい', 'がいじ', 'かたわ', 'びっこ',
+    'めくら', 'つんぼ', 'おし', 'どじん', 'えた', 'ひにん',
+    'たひ', 'たひね',
+    'うせろ', 'だまれ',
+    'ちんちん', 'ちんこ', 'ちんぽ', 'ちんか', 'まら', 'さお',
+    'まんこ', 'まんしゅう', 'まんげ', 'われめ', 'おまた',
+    'くり', 'くりとりす', 'いんしん', 'いんかく', 'びらびら',
+    'こうがん', 'たまきん', 'きんたま', 'ふぐり',
+    'おっぱい', 'ちち', 'にゅうりん', 'にゅうとう', 'きょにゅう', 'ひんにゅう',
+    'けつ', 'あなる', 'こうもん', 'けつのあな',
+    'えろ', 'えっち', 'すけべ', 'へんたい', 'むっつり', 'しこ',
+    'せっくす', 'せいこう', 'まぐわい', 'そうにゅう', 'はめる',
+    'おなにー', 'じい', 'しこしこ', 'ふぇら', 'ぱいずり', 'くんに',
+    'いらま', 'しっしん', 'なかだし', 'ごっくん', 'ぶっかけ',
+    'しおふき', 'ぜっちょう', 'いく', 'いかせろ', 'あえぎ',
+    'どうてい', 'しょじょ', 'やりまん', 'やりちん', 'びっち',
+    'せふれ', 'ぱこ', 'ぱこぱこ', 'わいせつ', 'ろり', 'しょた', 'ぺど',
+    'きんしん', 'じゅうかん', 'りょうじょく', 'らんこう', 'すかんと',
+    'のーぱん', 'ぱんちら',
+    'れいぷ', 'ごうかん', 'ちかん', 'とうさつ', 'のぞき', 'ろしゅつ',
+    'ふうぞく', 'そーぷ', 'へるす', 'でりへる', 'ぴんさろ', 'いめくら',
+    'あだると', 'えーぶい', 'えぶい', 'ぽるの', 'うらびでお', 'むしゅうせい',
+    'えんこう', 'えんじょ', 'うり', 'かいしゅん', 'ばいしゅん',
+    'ぱぱかつ', 'ままかつ', 'うりせん',
+    'うんこ', 'うんち', 'くそ', 'げり', 'べん', 'ふん',
+    'しっこ', 'しょんべん', 'にょう', 'ほうにょう',
+    'へ', 'おなら', 'げろ', 'たん',
+    'うんえい', 'こうしき', 'すたっふ', 'かんり', 'ぱとろーる',
+    'じえむ', 'げーむますたー', 'ますたー', 'あどみん', 'しすてむ',
+    'さーばー', 'あかばん', 'ばん', 'ちーと', 'ちーたー', 'ばぐ',
+    'らいん', 'かかお', 'すかいぷ', 'いんすた', 'ついったー', 'でぃすこ',
+    'でんわ', 'ばんごう', 'けいたい', 'あどれす', 'めあど', 'じゅうしょ',
+    'あお', 'あいたい', 'まちあわせ', 'ほてる', 'らぶほ', 'おふかい',
+    'ぱすわーど', 'ぱす', 'あかうんと', 'こじんじょうほう'
+];
+
+// 天井裏（見えない領域）の実装
+const COLS = 5;
+const VISIBLE_ROWS = 8;
+const EXTRA_ROWS = 4;
+const ROWS = VISIBLE_ROWS + EXTRA_ROWS;
+const BLOCK_VAL_OBSTACLE = 99;
+// スペシャルブロックID
+const BLOCK_VAL_SPECIAL = 100;
+const NEXT_BLOCK_SIZE = 50; 
+
+// Animation Speed Constants
+const ANIM_SPEED_DROP_Y = 0.8;
+const ANIM_SPEED_FALL = 20; 
+const WAIT_AFTER_DROP = 50; 
+const WAIT_AFTER_CLEAR = 150; 
+
+let currentConfig = CONFIGS.NORMAL;
+let state = {
+    screen: 'TITLE', difficulty: 'NORMAL',
+    score: 0, combo: 0, dropCount: 0, riseCounter: 0,
+    round: 1, targetScore: 0, currentRiseInterval: 0,
+    grid: [], 
+    animOffsets: [], 
+    activeBlock: null, nextBlockValues: [],
+    particles: [], comboAnim: null, inputLocked: false,
+    width: 0, height: 0, blockSize: 40, boardX: 0, boardY: 0,
+    timerId: null,
+    fastDropping: false
+};
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const nextCanvas = document.getElementById('nextCanvas');
+const nextCtx = nextCanvas.getContext('2d');
+const ui = {
+    score: document.getElementById('disp-score'),
+    combo: document.getElementById('disp-combo'),
+    level: document.getElementById('disp-level'),
+    round: document.getElementById('disp-round'),
+    target: document.getElementById('disp-target'), 
+    title: document.getElementById('title-screen'),
+    result: document.getElementById('game-result'),
+    roundClearScreen: document.getElementById('round-clear-screen'),
+    nextTargetScore: document.getElementById('next-target-score'),
+    rankingScreen: document.getElementById('ranking-screen'),
+    controls: document.getElementById('puzzle-controls'),
+    btnToTitle: document.getElementById('btn-to-title'),
+    btnEasy: document.getElementById('btn-easy'),
+    btnNormal: document.getElementById('btn-normal'),
+    btnHard: document.getElementById('btn-hard'),
+    btnRanking: document.getElementById('btn-view-ranking'),
+    btnCloseRank: document.getElementById('btn-close-ranking'),
+    btnNextRound: document.getElementById('btn-next-round'),
+    btnQuitRound: document.getElementById('btn-quit-round'),
+    btnIndex: document.getElementById('btn-index'),
+    rightPanelContent: document.getElementById('right-panel-content'),
+    crowns: { EASY: document.getElementById('crown-easy'), NORMAL: document.getElementById('crown-normal'), HARD: document.getElementById('crown-hard') },
+    clears: { EASY: document.getElementById('clear-easy'), NORMAL: document.getElementById('clear-normal'), HARD: document.getElementById('clear-hard') },
+    btnPlayerName: document.getElementById('btn-player-name'),
+    nameManageScreen: document.getElementById('name-manage-screen'),
+    newNameInput: document.getElementById('new-name-input'),
+    btnAddName: document.getElementById('btn-add-name'),
+    btnCloseName: document.getElementById('btn-close-name'),
+    nameList: document.getElementById('name-list')
+};
+
+function fitToScreen() {
+    const container = document.getElementById('container');
+    const baseW = 1280;
+    const baseH = 720;
+    const winW = window.innerWidth;
+    const winH = window.innerHeight;
+    const scale = Math.min(winW / baseW, winH / baseH);
+    container.style.transform = `scale(${scale})`;
+}
+window.addEventListener('resize', fitToScreen);
+fitToScreen(); 
+
+function resize() {
+    const baseTotalW = 1280;
+    const baseTotalH = 720;
+    const gameAreaFlex = 2.1;
+    const totalFlex = 1.2 + 2.1 + 1.2; 
+    
+    const calcW = Math.floor(baseTotalW * (gameAreaFlex / totalFlex));
+    const calcH = baseTotalH;
+
+    state.width = calcW;
+    state.height = calcH;
+    
+    canvas.width = state.width;
+    canvas.height = state.height;
+    
+    const paddingTop = 60; 
+    const availableH = state.height - paddingTop;
+    const availableW = state.width;
+    const sizeByH = availableH / (VISIBLE_ROWS + 0.5);
+    const sizeByW = availableW / (COLS + 1);
+    state.blockSize = Math.min(sizeByH, sizeByW);
+
+    state.boardW = state.blockSize * COLS;
+    state.boardH = state.blockSize * VISIBLE_ROWS;
+    state.boardX = (state.width - state.boardW) / 2;
+    state.boardY = paddingTop + (availableH - state.boardH) / 2;
+}
+resize(); 
+
+function randomInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+const KEY_NAMES = 'tally_blitz_names_v2';
+const KEY_CURRENT_NAME = 'tally_blitz_current_name';
+let currentPlayerName = "名無しさん";
+
+function loadPlayerNames() {
+    const stored = localStorage.getItem(KEY_NAMES);
+    return stored ? JSON.parse(stored) : [];
+}
+function savePlayerNames(names) {
+    localStorage.setItem(KEY_NAMES, JSON.stringify(names));
+}
+function getCurrentName() {
+    return localStorage.getItem(KEY_CURRENT_NAME) || "名無しさん";
+}
+function setCurrentName(name) {
+    localStorage.setItem(KEY_CURRENT_NAME, name);
+    currentPlayerName = name;
+    ui.btnPlayerName.textContent = `プレイヤー: ${name}`;
+}
+
+currentPlayerName = getCurrentName();
+ui.btnPlayerName.textContent = `プレイヤー: ${currentPlayerName}`;
+
+ui.btnPlayerName.onclick = () => {
+    ui.nameManageScreen.classList.remove('hidden');
+    renderNameList();
+};
+ui.btnCloseName.onclick = () => {
+    ui.nameManageScreen.classList.add('hidden');
+};
+ui.btnAddName.onclick = () => {
+    const name = ui.newNameInput.value.trim();
+    const res = validateName(name);
+    if(!res.valid) {
+        alert(res.reason); return;
+    }
+    const names = loadPlayerNames();
+    if(names.length >= 5) {
+        alert("登録できるのは5人までです。"); return;
+    }
+    if(names.includes(res.name)) {
+        alert("その名前は既に登録されています。"); return;
+    }
+    names.push(res.name);
+    savePlayerNames(names);
+    ui.newNameInput.value = "";
+    renderNameList();
+};
+
+function renderNameList() {
+    const names = loadPlayerNames();
+    ui.nameList.innerHTML = '';
+    
+    if(names.length === 0) {
+        ui.nameList.innerHTML = '<li style="text-align:center; color:#999;">名前が登録されていません</li>';
+    }
+
+    names.forEach(name => {
+        const li = document.createElement('li');
+        li.className = 'name-entry';
+        if(name === currentPlayerName) li.classList.add('selected');
+        
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = name;
+        nameSpan.style.flex = "1";
+        nameSpan.onclick = () => {
+            setCurrentName(name);
+            renderNameList();
+        };
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'delete-name-btn';
+        delBtn.textContent = '×';
+        delBtn.onclick = (e) => {
+            e.stopPropagation();
+            if(confirm(`${name} を削除しますか？`)) {
+                let currentNames = loadPlayerNames();
+                currentNames = currentNames.filter(n => n !== name);
+                savePlayerNames(currentNames);
+                if(name === currentPlayerName) setCurrentName("名無しさん");
+                renderNameList();
+            }
+        };
+
+        li.appendChild(nameSpan);
+        li.appendChild(delBtn);
+        ui.nameList.appendChild(li);
+    });
+}
+
+function validateName(name) {
+    if(!name) return { valid: false, reason: "名前を入力してください。" };
+    if(!/^[ぁ-んー]+$/.test(name)) {
+        return { valid: false, reason: "名前はひらがなと「ー」のみ使用できます。" };
+    }
+    for(const ng of NG_WORDS_HIRAGANA) {
+        if(name.includes(ng)) {
+            return { valid: false, reason: "その名前は使用できません。" };
+        }
+    }
+    return { valid: true, name: name };
+}
+
+function getRankingKey(d) { return `tally_blitz_v3_rank_${d}`; }
+function getClearKey(d) { return `tally_blitz_v3_clear_${d}`; }
+function getLocalRanking(d) { return JSON.parse(localStorage.getItem(getRankingKey(d))) || []; }
+function getClearCount(d) { return parseInt(localStorage.getItem(getClearKey(d))) || 0; }
+
+function saveScore(d, s) {
+    let r = getLocalRanking(d);
+    r.push(s); r.sort((a,b)=>b-a); r = r.slice(0,10);
+    localStorage.setItem(getRankingKey(d), JSON.stringify(r));
+    
+    let currentInput = currentPlayerName;
+
+    if(window.saveOnlineScore && window.currentUser) {
+        window.saveOnlineScore(window.currentUser.uid, currentInput, d, s);
+    }
+}
+function incrementClear(d) {
+    let c = getClearCount(d) + 1;
+    localStorage.setItem(getClearKey(d), c);
+    return c;
+}
+function updateTitleStats() {
+    ['EASY','NORMAL','HARD'].forEach(d => {
+        const c = getClearCount(d);
+        ui.clears[d].textContent = `${c}回プレイ`;
+        const best = getLocalRanking(d)[0] || 0;
+        const crown = ui.crowns[d];
+        const th = CONFIGS[d].thresholds || CROWN_THRESHOLDS;
+        crown.style.visibility = 'visible';
+        if(best >= th.GOLD) { crown.textContent='👑'; crown.style.color='gold'; crown.style.filter='drop-shadow(0 0 5px gold)'; }
+        else if(best >= th.SILVER) { crown.textContent='👑'; crown.style.color='silver'; crown.style.filter='drop-shadow(0 0 5px silver)'; }
+        else if(best >= th.BRONZE) { crown.textContent='👑'; crown.style.color='#cd7f32'; }
+        else crown.style.visibility = 'hidden';
+    });
+}
+
+function getBlockOffsets(rot, len) {
+    const offsets = [];
+    for(let i=0; i<len; i++) {
+        let dx = 0, dy = 0;
+        if(rot === 0) { dx = i; dy = 0; }
+        else if(rot === 1) { dx = 0; dy = i; }
+        else if(rot === 2) { dx = -i; dy = 0; }
+        else if(rot === 3) { dx = 0; dy = -i; }
+        offsets.push({dx, dy});
+    }
+    return offsets;
+}
+
+function getOccupiedCells(bx, by, rot, len) {
+    const offsets = getBlockOffsets(rot, len);
+    const iX = Math.round(bx);
+    const iY = Math.floor(by); 
+    return offsets.map(o => {
+        let x = iX + o.dx;
+        x = (x % COLS + COLS) % COLS;
+        return {x: x, y: iY + o.dy};
+    });
+}
+
+function canPlace(bx, by, rot, values) {
+    const cells = getOccupiedCells(bx, by, rot, values.length);
+    for(let c of cells) {
+        if(c.y >= ROWS) return false;
+        if(c.y >= 0 && state.grid[c.y][c.x] !== 0) return false;
+    }
+    return true;
+}
+
+function initGrid() {
+    state.grid = Array.from({length: ROWS}, () => Array(COLS).fill(0));
+    state.animOffsets = Array.from({length: ROWS}, () => Array(COLS).fill(0));
+    const floorR = currentConfig.floorRows;
+    for(let i=0; i<floorR; i++) {
+        const r = ROWS - 1 - i;
+        for(let c=0; c<COLS; c++) state.grid[r][c] = BLOCK_VAL_OBSTACLE;
+    }
+    const numRow = ROWS - 1 - floorR;
+    if(numRow >= EXTRA_ROWS) {
+        for(let c=0; c<COLS; c++) state.grid[numRow][c] = randomInt(1, 9);
+    }
+}
+
+function generateBlockValues() {
+    state.dropCount++;
+    const r = Math.random();
+    let size = 2;
+    const p = currentConfig.probs;
+    if(r < p[0]) size = 2;
+    else if(r < p[1]) size = 3;
+    else size = 4;
+    const arr = [];
+    for(let i=0; i<size; i++) arr.push(randomInt(1,9));
+    return arr;
+}
+
+function spawnBlock() {
+    if(state.nextBlockValues.length === 0) state.nextBlockValues = generateBlockValues();
+    const values = [...state.nextBlockValues];
+    state.activeBlock = { x: Math.floor(COLS/2)-1, y: EXTRA_ROWS, values: values, rot: 0, offsetY: 0 };
+    state.nextBlockValues = generateBlockValues();
+    state.fastDropping = false;
+    drawNextBlock();
+    if(!canPlace(state.activeBlock.x, state.activeBlock.y, state.activeBlock.rot, state.activeBlock.values)) {
+        gameOver();
+    }
+    draw(); 
+}
+
+function slideBlock() {
+    if(!state.activeBlock || state.inputLocked || state.fastDropping) return;
+    const b = state.activeBlock;
+    const v = b.values.pop();
+    b.values.unshift(v);
+    draw();
+}
+
+function moveBlock(dir) {
+    if(!state.activeBlock || state.inputLocked || state.fastDropping) return;
+    const b = state.activeBlock;
+    if(canPlace(b.x + dir, b.y, b.rot, b.values)) {
+        b.x += dir;
+        draw(); 
+    }
+}
+
+function dropBlock() {
+    if(!state.activeBlock || state.inputLocked || state.fastDropping) return;
+    state.fastDropping = true; 
+}
+
+function lockBlock() {
+    if(!state.activeBlock) return;
+    const b = state.activeBlock;
+    state.activeBlock = null; 
+    state.fastDropping = false;
+    
+    const landY = Math.round(b.y);
+    const cells = getOccupiedCells(b.x, landY, b.rot, b.values.length);
+    cells.forEach((c, i) => { 
+        if(c.y >= 0 && c.y < ROWS) state.grid[c.y][c.x] = b.values[i]; 
+    });
+
+    draw();
+    setTimeout(() => { processTurn(); }, WAIT_AFTER_DROP); 
+}
+
+function triggerSpecialEffect(startX, startY) {
+    let toClear = new Set(); 
+    let queue = [{c: startX, r: startY}];
+    toClear.add(`${startX},${startY}`);
+
+    let processed = 0;
+    while(processed < queue.length) {
+        let curr = queue[processed++];
+        let cx = curr.c;
+        let cy = curr.r;
+
+        for(let c=0; c<COLS; c++) {
+            let key = `${c},${cy}`;
+            if(!toClear.has(key)) {
+                if(state.grid[cy][c] === BLOCK_VAL_SPECIAL) queue.push({c:c, r:cy});
+                toClear.add(key);
+            }
+        }
+        for(let r=0; r<ROWS; r++) {
+            let key = `${cx},${r}`;
+            if(!toClear.has(key)) {
+                if(state.grid[r][cx] === BLOCK_VAL_SPECIAL) queue.push({c:cx, r:r});
+                toClear.add(key);
+            }
+        }
+    }
+
+    toClear.forEach(key => {
+        let parts = key.split(',');
+        let c = parseInt(parts[0]);
+        let r = parseInt(parts[1]);
+        if(state.grid[r][c] !== 0) {
+            state.grid[r][c] = 0;
+            // 修正：キラキラエフェクト
+            spawnParticle(c, r, "✨", "#8fd3f4");
+        }
+    });
+}
+
+async function processTurn() {
+    state.inputLocked = true;
+    state.riseCounter++;
+    let totalTens = 0;
+
+    const runPhysics = async () => {
+        let anyChange = false;
+        outerLoop:
+        while(true) {
+            if(applyGravityLogic()) { 
+                await animateGravity(); 
+            }
+            
+            let changeOccurred = false;
+            for(let c=0; c<COLS; c++) {
+                for(let r=ROWS-2; r>=0; r--) {
+                    const upper = state.grid[r][c];
+                    const lower = state.grid[r+1][c];
+                    const isUpperNum = (upper >= 1 && upper <= 9);
+                    const isLowerNum = (lower >= 1 && lower <= 9);
+
+                    if(isUpperNum && isLowerNum) {
+                        const sum = upper + lower;
+                        if(sum < 10) {
+                            state.grid[r+1][c] = sum; state.grid[r][c] = 0;
+                            spawnParticle(c, r+1, "合体!", "#3498db"); changeOccurred = true;
+                        } else if(sum === 10) {
+                            state.grid[r+1][c] = 0; state.grid[r][c] = 0;
+                            
+                            let bonus = 0;
+                            if(r+2 < ROWS) {
+                                let targetVal = state.grid[r+2][c];
+                                if(targetVal === BLOCK_VAL_OBSTACLE) {
+                                    state.grid[r+2][c] = 0; spawnParticle(c, r+2, "Break!", "#ff9a9e"); bonus = 10;
+                                } else if(targetVal === BLOCK_VAL_SPECIAL) {
+                                    triggerSpecialEffect(c, r+2);
+                                    bonus = 50; 
+                                }
+                            }
+
+                            state.combo++; totalTens++;
+                            let point = (10 + bonus) * state.combo;
+                            state.score += Math.floor(point);
+                            spawnParticle(c, r+0.5, "10!", "#f6d365"); spawnParticle(2, 3, `+${Math.floor(point)}`, "#f6d365");
+                            changeOccurred = true; 
+                            showComboAnim(state.combo + " COMBO", point);
+                        } else {
+                            let nextVal = BLOCK_VAL_OBSTACLE;
+                            if(Math.random() < 0.05) nextVal = BLOCK_VAL_SPECIAL;
+
+                            if(lower !== BLOCK_VAL_OBSTACLE && lower !== BLOCK_VAL_SPECIAL) { 
+                                state.grid[r+1][c] = nextVal; state.grid[r][c] = sum - 10;
+                                spawnParticle(c, r+1, "Over!", "#999"); changeOccurred = true;
+                            }
+                        }
+                        if(changeOccurred) { 
+                            draw(); updateUI(); 
+                            await wait(WAIT_AFTER_CLEAR); 
+                            continue outerLoop; 
+                        }
+                    }
+                }
+            }
+            if(!changeOccurred) break; 
+            anyChange = true;
+        }
+        return anyChange;
+    };
+
+    await runPhysics();
+
+    if(state.score >= state.targetScore) { showRoundClear(); return; }
+
+    if(state.riseCounter >= state.currentRiseInterval) {
+        let overflow = false;
+        for(let c=0; c<COLS; c++) { if(state.grid[EXTRA_ROWS][c] !== 0) overflow = true; }
+        if(overflow) { gameOver(); return; }
+
+        state.riseCounter = 0;
+        
+        for(let r=0; r<ROWS-1; r++) { state.grid[r] = [...state.grid[r+1]]; }
+        
+        state.grid[ROWS-1] = Array.from({length: COLS}, () => {
+            return (Math.random() < 0.05) ? BLOCK_VAL_SPECIAL : randomInt(1, 9);
+        });
+        
+        for(let r=0; r<ROWS; r++) {
+            for(let c=0; c<COLS; c++) { if(state.grid[r][c]!==0) state.animOffsets[r][c] = state.blockSize; }
+        }
+        await animateGravity();
+        await runPhysics();
+        if(state.score >= state.targetScore) { showRoundClear(); return; }
+    }
+
+    if(totalTens === 0) state.combo = 0;
+    updateUI();
+    
+    for(let c=0; c<COLS; c++) { if(state.grid[EXTRA_ROWS][c] !== 0) { gameOver(); return; } }
+    
+    state.inputLocked = false; spawnBlock();
+}
+
+function applyGravityLogic() {
+    let moved = false;
+    for(let c=0; c<COLS; c++) {
+        for(let r=ROWS-2; r>=0; r--) {
+            if(state.grid[r][c] !== 0) {
+                let fallDist = 0;
+                let k = r;
+                while(k+1 < ROWS && state.grid[k+1][c] === 0) {
+                    k++; fallDist++;
+                }
+                if(fallDist > 0) {
+                    state.grid[k][c] = state.grid[r][c];
+                    state.grid[r][c] = 0;
+                    state.animOffsets[k][c] = -fallDist * state.blockSize;
+                    moved = true;
+                }
+            }
+        }
+    }
+    return moved;
+}
+
+function animateGravity() {
+    return new Promise(resolve => {
+        const loop = () => {
+            let stillAnimating = false;
+            for(let r=0; r<ROWS; r++) {
+                for(let c=0; c<COLS; c++) {
+                    if(state.animOffsets[r][c] !== 0) {
+                        if(state.animOffsets[r][c] < 0) {
+                            state.animOffsets[r][c] += ANIM_SPEED_FALL;
+                            if(state.animOffsets[r][c] > 0) state.animOffsets[r][c] = 0;
+                        } else {
+                            state.animOffsets[r][c] -= ANIM_SPEED_FALL;
+                            if(state.animOffsets[r][c] < 0) state.animOffsets[r][c] = 0;
+                        }
+                        stillAnimating = true;
+                    }
+                }
+            }
+            draw();
+            if(stillAnimating) requestAnimationFrame(loop);
+            else resolve();
+        };
+        loop();
+    });
+}
+
+function showComboAnim(text, score) { 
+    state.comboAnim = { text: text, score: score, life: 1.0 }; 
+}
+function wait(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+function update() {
+    if(state.screen !== 'PLAYING') {
+        requestAnimationFrame(update);
+        return;
+    }
+
+    if(state.activeBlock && state.fastDropping) {
+        const b = state.activeBlock;
+        if(canPlace(b.x, b.y + ANIM_SPEED_DROP_Y, b.rot, b.values)) {
+            b.y += ANIM_SPEED_DROP_Y;
+        } else {
+            let finalY = Math.floor(b.y);
+            while(canPlace(b.x, finalY + 1, b.rot, b.values)) finalY++;
+            b.y = finalY;
+            lockBlock(); 
+        }
+        draw();
+    }
+    
+    for(let i=state.particles.length-1; i>=0; i--) {
+        let p = state.particles[i]; p.update(); 
+        if(p.life <= 0) state.particles.splice(i,1);
+    }
+    if(state.comboAnim) {
+        state.comboAnim.life -= 0.02; 
+        if(state.comboAnim.life <= 0) state.comboAnim = null;
+    }
+    
+    if(state.particles.length > 0 || state.comboAnim || state.fastDropping) {
+        draw();
+    }
+    
+    requestAnimationFrame(update);
+}
+requestAnimationFrame(update);
+
+
+class Particle {
+    constructor(c, r, text, color) {
+        let visualR = r - EXTRA_ROWS;
+        this.x = state.boardX + c * state.blockSize + state.blockSize/2;
+        this.y = state.boardY + visualR * state.blockSize + state.blockSize/2;
+        this.text = text; this.color = color; this.life = 1.0; this.vy = -2; 
+    }
+    update() { this.y += this.vy; this.life -= 0.04; } 
+    draw(ctx) {
+        if(this.y < state.boardY) return;
+        ctx.globalAlpha = Math.max(0, this.life);
+        ctx.fillStyle = this.color; ctx.strokeStyle = "white";
+        ctx.font = "800 24px 'M PLUS Rounded 1c', sans-serif";
+        ctx.lineWidth = 4; ctx.strokeText(this.text, this.x, this.y); ctx.fillText(this.text, this.x, this.y);
+        ctx.globalAlpha = 1.0;
+    }
+}
+function spawnParticle(c, r, text, color) { state.particles.push(new Particle(c, r, text, color)); }
+
+function draw() {
+    ctx.clearRect(0, 0, state.width, state.height);
+    
+    if(state.screen === 'TITLE') return;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(state.boardX - 10, state.boardY - 10, state.boardW + 20, state.boardH + 20);
+    ctx.clip();
+
+    ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+    ctx.beginPath();
+    ctx.roundRect(state.boardX - 5, state.boardY - 5, state.boardW + 10, state.boardH + 10, 15);
+    ctx.fill();
+
+    for(let r=EXTRA_ROWS; r<ROWS; r++) { 
+        let visualR = r - EXTRA_ROWS;
+        for(let c=0; c<COLS; c++) {
+            const x = state.boardX + c * state.blockSize;
+            const y = state.boardY + visualR * state.blockSize;
+            const s = state.blockSize;
+            const p = 3;
+            
+            ctx.fillStyle = "rgba(0, 0, 0, 0.06)"; 
+            ctx.beginPath();
+            ctx.roundRect(x+p, y+p, s-p*2, s-p*2, 6);
+            ctx.fill();
+
+            ctx.strokeStyle = "rgba(0, 0, 0, 0.15)";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+    }
+
+    for(let r=0; r<ROWS; r++) {
+        for(let c=0; c<COLS; c++) {
+            if(state.grid[r][c] !== 0) {
+                const dy = state.animOffsets[r][c] || 0;
+                drawBlock(ctx, c, r, state.grid[r][c], false, false, dy);
+            }
+        }
+    }
+
+    if(state.activeBlock) {
+        const b = state.activeBlock;
+        let dy = 0;
+        const iY = Math.floor(b.y);
+        while(canPlace(b.x, iY + dy + 1, b.rot, b.values)) dy++;
+        
+        const ghostCells = getOccupiedCells(b.x, iY + dy, b.rot, b.values.length);
+        ghostCells.forEach((c, i) => drawBlock(ctx, c.x, c.y, b.values[i], false, true));
+
+        const cells = getOccupiedCells(b.x, 0, b.rot, b.values.length); 
+        cells.forEach((c, i) => {
+            const offsets = getBlockOffsets(b.rot, b.values.length);
+            const off = offsets[i];
+            
+            const gridX = c.x; 
+            
+            const py = b.y + off.dy; 
+            const gridY = Math.floor(py);
+            const fracY = (py - gridY) * state.blockSize;
+            drawBlock(ctx, gridX, gridY, b.values[i], true, false, fracY);
+        });
+    }
+
+    for(let i=state.particles.length-1; i>=0; i--) { state.particles[i].draw(ctx); }
+    
+    ctx.restore();
+
+    if(state.comboAnim) {
+        const anim = state.comboAnim;
+        const life = anim.life;
+        
+        ctx.save();
+        
+        const startY = state.height/2 + 20;
+        const endY = state.height/2 - 50;
+        const currentY = endY + (startY - endY) * life;
+
+        let alpha = 1.0;
+        if(life > 0.8) alpha = (1.0 - life) * 5.0; 
+        else if(life < 0.2) alpha = life * 5.0;    
+        
+        ctx.translate(state.width/2, currentY);
+        let scale = 1 + Math.sin(life * Math.PI) * 0.1;
+        ctx.scale(scale, scale);
+        
+        ctx.globalAlpha = alpha;
+        
+        const comboNum = parseInt(anim.text) || 0;
+        const comboSize = 50 + Math.min(30, comboNum * 5);
+        const scoreSize = 55 + Math.min(25, anim.score / 10);
+
+        ctx.fillStyle = "#ffdf40"; ctx.strokeStyle = "#fff";
+        ctx.font = `900 ${comboSize}px 'M PLUS Rounded 1c', sans-serif`;
+        ctx.textAlign = "center"; ctx.textBaseline = "bottom"; ctx.lineWidth = 6;
+        ctx.shadowColor = "rgba(0,0,0,0.2)"; ctx.shadowBlur = 10;
+        
+        ctx.strokeText(anim.text, 0, -10);
+        ctx.fillText(anim.text, 0, -10);
+
+        ctx.fillStyle = "#fff"; 
+        ctx.font = `800 ${scoreSize}px 'M PLUS Rounded 1c', sans-serif`;
+        ctx.textBaseline = "top";
+        
+        ctx.strokeText(`+${anim.score}`, 0, 15);
+        ctx.fillText(`+${anim.score}`, 0, 15);
+
+        ctx.restore();
+    }
+}
+
+function drawBlock(ctx, c, r, val, isActive=false, isGhost=false, offsetY_px=0) {
+    let visualR = r - EXTRA_ROWS;
+    
+    const x = state.boardX + c * state.blockSize;
+    const y = state.boardY + visualR * state.blockSize + offsetY_px; 
+    const s = state.blockSize;
+    const p = 2; 
+
+    if (y + s < state.boardY && !isActive) return;
+
+    let bg = "#ecf0f1"; let fg = "#2c3e50";
+    if(val === BLOCK_VAL_OBSTACLE) { 
+        bg = "#b2bec3"; 
+    } else if(val === BLOCK_VAL_SPECIAL) {
+        // 修正：スペシャルブロックのデザイン（パステル宝石風）
+        const grad = ctx.createLinearGradient(x, y, x+s, y+s);
+        grad.addColorStop(0, "#e0c3fc"); // 薄紫
+        grad.addColorStop(0.5, "#8ec5fc"); // 水色
+        grad.addColorStop(1, "#e0c3fc");
+        bg = grad;
+    } else {
+        const colors = [
+            "#ff9a9e", "#a18cd1", "#fad0c4", "#84fab0", 
+            "#a1c4fd", "#fbc2eb", "#f6d365", "#ff9a9e", "#c2e9fb"
+        ];
+        if(val >= 1 && val <= 9) bg = colors[val-1];
+        fg = "#fff";
+    }
+
+    const alphaBg = isGhost ? 0.3 : 1.0;
+    const alphaText = isGhost ? 0.8 : 1.0;
+
+    ctx.save();
+    if(isActive) {
+        ctx.shadowColor = "rgba(0,0,0,0.2)"; ctx.shadowBlur = 15; ctx.zIndex = 10;
+    }
+
+    ctx.globalAlpha = alphaBg;
+    ctx.fillStyle = bg;
+    
+    if(val === BLOCK_VAL_SPECIAL) {
+        // スペシャルブロックの形状（ひし形）
+        ctx.shadowColor = "#8ec5fc"; ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.moveTo(x+s*0.5, y+p*2);
+        ctx.lineTo(x+s-p*2, y+s*0.5);
+        ctx.lineTo(x+s*0.5, y+s-p*2);
+        ctx.lineTo(x+p*2, y+s*0.5);
+        ctx.closePath();
+        ctx.fill();
+        
+        // ハイライト
+        ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.lineWidth = 2; ctx.shadowBlur = 0;
+        ctx.beginPath();
+        ctx.moveTo(x+s*0.5, y+p*2); ctx.lineTo(x+s*0.5, y+s-p*2);
+        ctx.moveTo(x+p*2, y+s*0.5); ctx.lineTo(x+s-p*2, y+s*0.5);
+        ctx.stroke();
+    } else {
+        ctx.beginPath();
+        ctx.roundRect(x+p, y+p, s-p*2, s-p*2, s*0.4); 
+        ctx.fill();
+    }
+    ctx.shadowBlur = 0;
+
+    if(val !== BLOCK_VAL_OBSTACLE && val !== BLOCK_VAL_SPECIAL && !isGhost) {
+        ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+        ctx.beginPath();
+        ctx.ellipse(x + s*0.3, y + s*0.3, s*0.15, s*0.1, Math.PI / 4, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    ctx.globalAlpha = alphaText;
+    
+    if(val === BLOCK_VAL_OBSTACLE) {
+        ctx.fillStyle = "#7f8c8d";
+        ctx.beginPath();
+        ctx.arc(x+s*0.35, y+s*0.4, s*0.08, 0, Math.PI*2);
+        ctx.arc(x+s*0.65, y+s*0.4, s*0.08, 0, Math.PI*2);
+        ctx.fill();
+        ctx.strokeStyle = "#7f8c8d"; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(x+s*0.5, y+s*0.7, s*0.2, Math.PI, Math.PI*2); ctx.stroke();
+    } else if(val === BLOCK_VAL_SPECIAL) {
+        // スペシャルには文字を表示しない（デザインで表現）
+    } else {
+        ctx.fillStyle = fg;
+        ctx.font = `800 ${s*0.6}px 'M PLUS Rounded 1c', sans-serif`;
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        if(!isGhost) {
+            ctx.shadowColor = "rgba(0,0,0,0.1)"; ctx.shadowBlur = 2; ctx.shadowOffsetY = 2;
+        }
+        ctx.fillText(val, x+s/2, y+s/2+2);
+    }
+    ctx.restore();
+}
+
+function drawNextBlock() {
+    nextCtx.clearRect(0,0,nextCanvas.width, nextCanvas.height);
+    const vals = state.nextBlockValues;
+    if(!vals || vals.length===0) return;
+    const bSize = NEXT_BLOCK_SIZE; 
+    const totalW = vals.length * bSize;
+    const startX = (nextCanvas.width - totalW)/2;
+    const startY = (nextCanvas.height - bSize)/2;
+
+    for(let i=0; i<vals.length; i++) {
+        let val = vals[i];
+        const colors = ["#ff9a9e", "#a18cd1", "#fad0c4", "#84fab0", "#a1c4fd", "#fbc2eb", "#f6d365", "#ff9a9e", "#c2e9fb"];
+        nextCtx.fillStyle = colors[val-1] || "#ecf0f1";
+        nextCtx.beginPath();
+        nextCtx.roundRect(startX + i*bSize + 2, startY+2, bSize-4, bSize-4, 20);
+        nextCtx.fill();
+        
+        nextCtx.fillStyle = "rgba(255,255,255,0.4)";
+        nextCtx.beginPath();
+        nextCtx.ellipse(startX + i*bSize + bSize*0.3, startY + bSize*0.3, bSize*0.15, bSize*0.1, Math.PI/4, 0, Math.PI*2);
+        nextCtx.fill();
+
+        nextCtx.fillStyle = "#fff";
+        nextCtx.font = "800 32px 'M PLUS Rounded 1c', sans-serif";
+        nextCtx.textAlign = "center"; nextCtx.textBaseline = "middle";
+        nextCtx.shadowColor = "rgba(0,0,0,0.1)"; nextCtx.shadowOffsetY = 2;
+        nextCtx.fillText(val, startX + i*bSize + bSize/2, startY + bSize/2 + 2);
+    }
+}
+
+// --- Control Handlers ---
+function gameOver() {
+    state.screen = 'GAMEOVER';
+    if(state.timerId) clearTimeout(state.timerId); state.timerId = null;
+    ui.controls.classList.add('hidden'); ui.btnToTitle.classList.add('hidden');
+    saveScore(state.difficulty, state.score); incrementClear(state.difficulty);
+    ui.result.innerHTML = `
+        <div style="background:#fff; padding:25px; border-radius:25px; border:5px solid #ff9a9e; color:#555; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
+            <h2 style="color:#ff9a9e; border:none; font-size: 2rem;">GAME OVER</h2>
+            <div style="font-size:1.5rem; margin:20px 0;">SCORE: <span style="color:#f6d365; font-weight:800; text-shadow:1px 1px 0 #ddd;">${state.score}</span></div>
+            <button id="btn-retry" class="btn btn-success" style="width:100%; margin-bottom:10px;">もういちど</button>
+            <button id="btn-home" class="btn" style="background:#eee; color:#777; width:100%;">タイトルへ</button>
+        </div>
+    `;
+    ui.result.style.display = 'block';
+    document.getElementById('btn-retry').onclick = () => { ui.result.style.display='none'; startGame(); };
+    document.getElementById('btn-home').onclick = () => { ui.result.style.display='none'; backToTitle(); };
+}
+
+function handleStart(diff) {
+    if(currentPlayerName === "名無しさん" && !confirm("「名無しさん」のまま開始しますか？")) {
+        return;
+    }
+    state.difficulty = diff;
+    currentConfig = CONFIGS[diff];
+    startGame();
+}
+
+function startGame() {
+    if(state.timerId) clearTimeout(state.timerId); state.timerId = null;
+    state.screen = 'PLAYING';
+    state.score = 0; state.combo = 0; state.dropCount = 0; state.riseCounter = 0;
+    
+    state.round = 1;
+    state.targetScore = currentConfig.clearScore;
+    state.currentRiseInterval = currentConfig.riseInterval;
+    
+    state.nextBlockValues = []; state.inputLocked = false; state.fastDropping = false;
+    state.particles = []; state.comboAnim = null;
+    
+    ui.level.textContent = currentConfig.label;
+    ui.title.classList.add('hidden'); ui.rankingScreen.classList.add('hidden');
+    ui.roundClearScreen.classList.add('hidden');
+    ui.controls.classList.remove('hidden'); ui.btnToTitle.classList.remove('hidden');
+    ui.rightPanelContent.classList.remove('hidden'); 
+    
+    initGrid(); resize(); spawnBlock(); updateUI(); draw();
+}
+
+function showRoundClear() {
+    state.screen = 'ROUND_CLEAR';
+    if(state.timerId) clearTimeout(state.timerId);
+    state.timerId = null;
+
+    ui.nextTargetScore.textContent = state.targetScore + currentConfig.clearScore;
+    ui.roundClearScreen.classList.remove('hidden');
+    ui.controls.classList.add('hidden');
+}
+
+function nextRound() {
+    state.round++;
+    state.targetScore += currentConfig.clearScore;
+    state.currentRiseInterval = Math.max(2, state.currentRiseInterval - 1);
+    
+    ui.roundClearScreen.classList.add('hidden');
+    ui.controls.classList.remove('hidden');
+    state.screen = 'PLAYING';
+    state.inputLocked = false;
+    updateUI();
+    spawnBlock();
+}
+
+function backToTitle() {
+    if(state.timerId) clearTimeout(state.timerId); state.timerId = null;
+    state.screen = 'TITLE';
+    
+    state.grid = Array.from({length: ROWS}, () => Array(COLS).fill(0));
+    state.activeBlock = null;
+    state.particles = [];
+    state.comboAnim = null;
+    ctx.clearRect(0,0, state.width, state.height);
+    nextCtx.clearRect(0,0, nextCanvas.width, nextCanvas.height);
+
+    ui.title.classList.remove('hidden'); 
+    ui.controls.classList.add('hidden');
+    ui.btnToTitle.classList.add('hidden'); 
+    ui.rightPanelContent.classList.add('hidden'); 
+    
+    updateTitleStats();
+}
+
+function updateUI() {
+    ui.score.textContent = state.score;
+    ui.combo.textContent = state.combo;
+    ui.round.textContent = state.round;
+    if(ui.target) ui.target.textContent = state.targetScore;
+}
+
+function bind(el, fn) {
+    if(!el) return;
+    const handler = (e) => { e.preventDefault(); fn(); };
+    el.addEventListener('mousedown', handler);
+    el.addEventListener('touchstart', handler, {passive:false});
+}
+
+bind(ui.btnToTitle, backToTitle);
+
+bind(ui.btnEasy, () => handleStart('EASY'));
+bind(ui.btnNormal, () => handleStart('NORMAL'));
+bind(ui.btnHard, () => handleStart('HARD'));
+
+bind(ui.btnNextRound, nextRound);
+bind(ui.btnQuitRound, gameOver);
+
+bind(document.getElementById('btn-left'), () => moveBlock(-1));
+bind(document.getElementById('btn-right'), () => moveBlock(1));
+bind(document.getElementById('btn-rotate'), () => slideBlock());
+bind(document.getElementById('btn-drop'), () => dropBlock());
+
+window.addEventListener('keydown', (e) => {
+    if(ui.title.classList.contains('hidden') && state.screen === 'PLAYING') {
+        if(e.key === 'ArrowLeft') moveBlock(-1);
+        if(e.key === 'ArrowRight') moveBlock(1);
+        if(e.key === 'ArrowUp') slideBlock();
+        if(e.key === 'ArrowDown' || e.key === ' ') dropBlock();
+    }
+});
+
+bind(ui.btnRanking, () => {
+    ui.rankingScreen.classList.remove('hidden');
+    ['easy','normal','hard'].forEach(d => {
+        const ul = document.getElementById(`rank-list-${d}`);
+        ul.innerHTML = '<li>読み込み中...</li>';
+        if(window.currentUser) {
+            window.fetchOnlineRanking(d.toUpperCase()).then(list => {
+                ul.innerHTML = '';
+                if(!list.length) ul.innerHTML = '<li>なし</li>';
+                list.forEach((x,i) => { ul.innerHTML += `<li><span>${i+1}. ${x.name}</span><span>${x.score}</span></li>`; });
+            });
+        } else {
+            const list = getLocalRanking(d.toUpperCase());
+            ul.innerHTML = '';
+            if(!list.length) ul.innerHTML = '<li>なし</li>';
+            list.forEach((s,i) => { 
+                ul.innerHTML += `<li><span>${i+1}. あなた</span><span>${s}</span></li>`; 
+            });
+        }
+    });
+});
+bind(ui.btnCloseRank, () => ui.rankingScreen.classList.add('hidden'));
+bind(ui.btnIndex, () => window.location.href="index.html");
+
+backToTitle();
+</script>
+</body>
+</html>

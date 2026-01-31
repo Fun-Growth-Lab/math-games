@@ -1,0 +1,1493 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Math Sugoroku - Fun & Growth Lab</title>
+    
+    <style>
+        /* --- 基本設定 --- */
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+            font-family: 'M PLUS Rounded 1c', 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
+            background-color: #333; /* 背景色 */
+            user-select: none; touch-action: none;
+            position: relative;
+        }
+
+        /* ゲーム全体のコンテナ（1280x720 固定解像度・絶対配置） */
+        #game-root {
+            width: 1280px; 
+            height: 720px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            /* transformはJSで制御 */
+            
+            background-color: #FFF9C4; /* 明るいカスタードクリーム色 */
+            background-image: radial-gradient(#FFCC80 20%, transparent 20%);
+            background-size: 20px 20px; /* ドット柄 */
+            color: #5D4037; 
+            box-shadow: 0 0 50px rgba(0,0,0,0.5); /* 浮き出し効果 */
+            overflow: hidden;
+        }
+
+        /* メインレイアウト（ルート内で100%） */
+        #main-wrapper { 
+            display: flex; 
+            width: 100%; height: 100%; 
+            padding: 6px; box-sizing: border-box; gap: 6px; 
+        }
+
+        /* --- 左パネル：あそびかた --- */
+        #side-panel-left {
+            flex: 19; /* 全体の約19% */
+            background-color: #ffffff; 
+            border: 3px solid #FFAB91;
+            border-radius: 12px; 
+            color: #5D4037;
+            padding: 8px;
+            box-sizing: border-box; display: flex; flex-direction: column;
+            z-index: 10;
+            font-size: 11px;
+            overflow: hidden;
+            box-shadow: 2px 2px 0px rgba(255, 171, 145, 0.4);
+        }
+        #side-panel-left h2 { 
+            margin-top: 2px; font-size: 16px;
+            color: #FF7043;
+            text-align: center;
+            border-bottom: 2px dashed #FFCC80;
+            padding-bottom: 4px; margin-bottom: 6px;
+            text-shadow: 1px 1px 0 #fff;
+        }
+        #side-panel-left ul { padding-left: 14px; line-height: 1.4; margin: 6px 0; }
+        #side-panel-left li { margin-bottom: 3px; list-style-type: '🍩'; padding-left: 2px; }
+        #side-panel-left li::marker { color: #FFA726; font-size: 10px;}
+
+        .instruction-box { 
+            background: #FFF3E0; 
+            padding: 8px; 
+            border-radius: 8px; 
+            margin-bottom: 6px; 
+            text-align: center;
+            border: 2px solid #FFE0B2;
+        }
+        hr { border: 0; border-top: 2px dashed #FFCC80; width: 100%; margin: 6px 0; }
+        #side-panel-left p { margin: 4px 0; font-weight: bold; color: #E64A19; text-align: center; }
+
+        /* --- 中央パネル：ゲーム画面 --- */
+        #game-container {
+            flex: 60; /* 全体の約60% */
+            display: flex; flex-direction: column;
+            background-color: #E1F5FE;
+            border: 3px solid #4FC3F7;
+            border-radius: 15px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 3px 3px 0px rgba(79, 195, 247, 0.4);
+        }
+
+        /* キャンバス */
+        #game-canvas {
+            background-color: transparent; 
+            width: 100%; flex-grow: 1;
+        }
+
+        /* 残り時間表示 */
+        #top-timer-container {
+            position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
+            background: #FFEB3B;
+            padding: 4px 30px;
+            border-radius: 30px; 
+            box-shadow: 0 3px 0 #FBC02D, 0 4px 8px rgba(0,0,0,0.1); 
+            text-align: center; z-index: 50; 
+            border: 3px solid #fff;
+            min-width: 120px;
+        }
+        #top-timer-label { font-size: 12px; color: #F57F17; font-weight: bold; letter-spacing: 1px;}
+        #top-timer-value { font-size: 38px; font-weight: 900; color: #E65100; line-height: 1; font-family: 'M PLUS Rounded 1c', sans-serif; text-shadow: 2px 2px 0 #fff;}
+
+        /* メッセージエリア */
+        #central-message-area {
+            position: absolute; 
+            bottom: 220px; 
+            top: auto;
+            left: 50%; transform: translateX(-50%); width: 90%;
+            pointer-events: none; text-align: center; z-index: 60;
+            height: 60px; display: flex; justify-content: center; align-items: center;
+        }
+        #central-message-text {
+            font-size: 24px; font-weight: 900; color: #fff;
+            background: #FF4081;
+            padding: 15px 40px;
+            border-radius: 50px; 
+            box-shadow: 0 4px 0 #C2185B, 0 8px 15px rgba(0,0,0,0.2);
+            white-space: nowrap; opacity: 0; transition: transform 0.2s, opacity 0.2s;
+            border: 4px solid #fff;
+            transform: scale(0.5);
+        }
+        #central-message-text.visible { opacity: 1; transform: scale(1); }
+
+        /* --- 右パネル：情報とスキル --- */
+        #side-panel-right {
+            flex: 21; /* 全体の約21% */
+            background-color: #ffffff; 
+            border: 3px solid #4DD0E1; 
+            border-radius: 12px;
+            color: #5D4037;
+            padding: 10px;
+            box-sizing: border-box; display: flex; flex-direction: column;
+            z-index: 20; overflow: hidden;
+            box-shadow: 2px 2px 0px rgba(77, 208, 225, 0.4);
+        }
+
+        .panel-section { margin-bottom: 12px; border-bottom: 2px dashed #B2EBF2; padding-bottom: 8px; }
+        .panel-title { font-size: 12px; font-weight: bold; color: #0097A7; margin-bottom: 8px; display: flex; align-items: center; gap: 4px; letter-spacing: 0.5px;}
+        
+        .status-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; font-size: 12px; }
+        .status-val { font-size: 18px; font-weight: 900; color: #5D4037; font-family: 'M PLUS Rounded 1c', monospace; }
+        #point-val { color: #FF9800; text-shadow: 1px 1px 0 #FFE0B2; }
+        #gem-val { color: #00BCD4; text-shadow: 1px 1px 0 #E0F7FA; }
+
+        .skill-btn {
+            display: block; width: 100%; padding: 8px 10px; margin-bottom: 8px;
+            background: #fff; 
+            border: 2px solid #26C6DA; border-bottom-width: 4px;
+            color: #00838F;
+            border-radius: 10px; 
+            font-size: 11px; font-weight: bold; cursor: pointer;
+            text-align: left; 
+            transition: all 0.1s;
+            position: relative;
+        }
+        .skill-btn:hover { background-color: #E0F7FA; transform: translateY(-1px); }
+        .skill-btn:active { transform: translateY(3px); border-bottom-width: 1px; }
+        .skill-btn:disabled {
+            background: #ECEFF1; border-color: #CFD8DC; color: #B0BEC5; cursor: not-allowed; transform: none; border-bottom-width: 3px;
+        }
+        .skill-cost { float: right; font-size: 10px; background: #26C6DA; color: white; padding: 1px 6px; border-radius: 8px; font-weight: bold;}
+        .skill-btn:disabled .skill-cost { background: #B0BEC5; }
+
+        #collection-grid {
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;
+            padding: 0 2px;
+        }
+        .collection-item {
+            width: 100%; aspect-ratio: 1; 
+            background: #FAFAFA;
+            border: 1px solid #EEEEEE;
+            border-radius: 6px;
+            display: flex; justify-content: center; align-items: center; 
+            font-size: 16px;
+            opacity: 0.5; filter: grayscale(80%); transition: all 0.3s;
+        }
+        .collection-item.collected {
+            opacity: 1; filter: grayscale(0%); 
+            background: #FFF8E1; 
+            border: 1px solid #FFC107;
+            box-shadow: 0 2px 0 #FFC107;
+            transform: translateY(-1px);
+        }
+
+        /* 手札エリア (高さ調整) */
+        #hand-area {
+            height: 200px;
+            width: 100%; background-color: rgba(255,255,255,0.8);
+            border-top: 3px solid #4FC3F7;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center; z-index: 20;
+            position: relative;
+            backdrop-filter: blur(5px);
+        }
+
+        #hand-message { 
+            font-size: 30px;
+            color: #5D4037; margin-bottom: 15px; font-weight: 900; 
+            background: #fff; 
+            padding: 8px 40px; border-radius: 50px;
+            font-family: 'M PLUS Rounded 1c', monospace; 
+            border: 4px solid #FFAB91;
+            min-width: 150px; text-align: center;
+            box-shadow: 0 4px 0 #FFAB91;
+        }
+        #hand-cards-container { display: flex; gap: 15px; padding: 5px; align-items: center; }
+
+        .card {
+            width: 70px; height: 90px;
+            background-color: white; 
+            background-image: repeating-linear-gradient(45deg, #fff, #fff 10px, #FAFAFA 10px, #FAFAFA 20px);
+            border: 3px solid #8D6E63; 
+            border-radius: 12px; display: flex; justify-content: center; align-items: center;
+            font-size: 36px; font-weight: 900; color: #5D4037; cursor: pointer;
+            box-shadow: 0 6px 0 #6D4C41; 
+            transition: transform 0.1s;
+            user-select: none;
+            position: relative;
+        }
+        .card::after { content:''; position:absolute; top:3px; left:3px; right:3px; bottom:3px; border: 2px dashed #D7CCC8; border-radius: 8px; pointer-events: none;}
+        .card:active { transform: translateY(6px); box-shadow: none; border-color: #8D6E63;}
+        .card:hover { border-color: #FF7043; color: #FF7043; box-shadow: 0 6px 0 #E64A19; top: -3px; }
+
+        /* --- オーバーレイ共通 --- */
+        .overlay { position: absolute; top:0; left:0; width:100%; height:100%; background:rgba(255, 249, 196, 0.9); display:flex; justify-content:center; align-items:center; z-index:100; backdrop-filter: blur(5px);}
+        
+        #result-screen .overlay-content {
+            text-align: center; 
+            background:#fff; padding: 30px 50px; 
+            border-radius: 30px; 
+            box-shadow: 0 10px 0 #E0E0E0, 0 20px 40px rgba(0,0,0,0.1); 
+            max-width: 600px; width: 90%;
+            border: 5px solid #FFCC80; 
+            max-height: 90vh; overflow-y: auto;
+        }
+
+        /* ランキング画面用スタイル */
+        #ranking-screen {
+            position: absolute; top:0; left:0; width:100%; height:100%; 
+            background:#FFF3E0; 
+            display:flex; justify-content:center; align-items:center; z-index:110;
+        }
+        #ranking-content {
+            width: 80%; max-width: 1000px; height: 85%;
+            display: flex; flex-direction: column;
+            color: #5D4037;
+        }
+        .ranking-header { text-align: center; margin-bottom: 20px; font-size: 32px; color: #FF9800; font-weight: 900; letter-spacing: 2px; text-shadow: 2px 2px 0 #fff; -webkit-text-stroke: 1px #E65100;}
+        
+        /* ランキングタブ */
+        .ranking-tabs { display: flex; justify-content: center; gap: 15px; margin-bottom: 20px; }
+        .rank-tab {
+            padding: 10px 30px; border-radius: 30px; border: 3px solid #B0BEC5;
+            background: #fff; color: #90A4AE; cursor: pointer; font-weight: bold; font-size: 14px;
+            transition: all 0.2s; box-shadow: 0 4px 0 #CFD8DC;
+        }
+        .rank-tab:active { transform: translateY(4px); box-shadow: none; }
+        .rank-tab.active {
+            background: #FFCA28; color: #fff; border-color: #FFCA28;
+            box-shadow: 0 4px 0 #FFB300;
+        }
+
+        .ranking-columns { display: flex; justify-content: space-between; gap: 15px; height: 100%; overflow: hidden; }
+        
+        .ranking-col {
+            flex: 1; 
+            background: #fff;
+            border: 4px solid #eee;
+            border-radius: 20px;
+            display: flex; flex-direction: column;
+            padding: 15px;
+            box-shadow: 0 5px 0 #ddd;
+        }
+        /* 級ごとの色分け */
+        #rank-col-easy { border-color: #A5D6A7; }
+        #rank-col-easy .rank-col-header { color: #4CAF50; border-bottom: 2px dashed #A5D6A7; }
+        #rank-col-normal { border-color: #90CAF9; }
+        #rank-col-normal .rank-col-header { color: #2196F3; border-bottom: 2px dashed #90CAF9; }
+        #rank-col-hard { border-color: #EF9A9A; }
+        #rank-col-hard .rank-col-header { color: #F44336; border-bottom: 2px dashed #EF9A9A; }
+
+        .rank-col-header {
+            text-align: center; font-size: 20px; font-weight: 900; padding-bottom: 10px; margin-bottom: 10px;
+        }
+
+        .rank-list { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex-grow: 1; }
+        .rank-item {
+            display: flex; justify-content: space-between; padding: 10px 5px;
+            border-bottom: 2px dotted #eee; font-size: 14px;
+        }
+        .rank-item:last-child { border-bottom: none; }
+        .rank-num { width: 25px; color: #90A4AE; font-weight: bold; }
+        .rank-score { font-weight: 900; color: #5D4037; text-align: right; flex-grow: 1; }
+        .rank-name { font-size: 12px; color: #795548; width: 70px; text-align: right; margin-left: 5px; display: flex; align-items: center; justify-content: flex-end; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;}
+        .rank-date { font-size: 10px; color: #B0BEC5; width: 70px; text-align: right; margin-left: 5px; display: flex; align-items: center; justify-content: flex-end;}
+
+        #title-screen { background: rgba(255,255,255,0.5); }
+        #title-screen .overlay-content {
+            text-align: center; max-width: 900px; width: 100%; padding: 20px; box-shadow: none; border: none; background: transparent;
+        }
+
+        #char-screen .overlay-content {
+            text-align: center; background:#fff; padding: 25px;
+            border-radius: 25px; box-shadow: 0 10px 0 #eee;
+            max-width: 500px; width: 90%;
+            border: 4px solid #FFAB91;
+        }
+
+        .hidden { display: none !important; }
+        
+        /* ポップなボタン共通 */
+        .btn { 
+            padding: 12px 0; font-size: 18px; border: 3px solid #fff; border-radius: 30px; 
+            cursor: pointer; color: white; margin: 5px; font-weight: 900; width: 100%; 
+            transition: transform 0.1s; 
+            box-shadow: 0 5px 0 rgba(0,0,0,0.1); 
+            text-shadow: 1px 1px 0 rgba(0,0,0,0.2);
+            position: relative;
+        }
+        .btn:active { transform: translateY(5px); box-shadow: none; border-bottom-width: 3px;}
+        
+        .btn-easy { background: #66BB6A; box-shadow: 0 5px 0 #2E7D32; border-color:#81C784; }
+        .btn-normal { background: #42A5F5; box-shadow: 0 5px 0 #1565C0; border-color:#64B5F6; }
+        .btn-hard { background: #EF5350; box-shadow: 0 5px 0 #C62828; border-color:#E57373; }
+        .btn-gray { background: #B0BEC5; color: white; box-shadow: 0 5px 0 #78909C; border-color:#CFD8DC; }
+        .btn-yellow { background-color: #FFCA28; color: #5D4037; box-shadow: 0 5px 0 #FF6F00; border-color:#FFD54F; text-shadow:none;}
+        .btn-google { background-color: #DB4437; box-shadow: 0 5px 0 #8F251D; border-color:#E57373; }
+
+        .title-header { margin-bottom: 40px; transform: rotate(-2deg); }
+        .title-main { 
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            font-weight: 900;
+            font-size: 80px; color: #FFEB3B; margin: 0; text-transform: uppercase; letter-spacing: 2px;
+            -webkit-text-stroke: 4px #FF7043;
+            text-shadow: 5px 5px 0 rgba(0,0,0,0.1); 
+        }
+        .title-sub { font-size: 20px; color: #5D4037; margin-top: 15px; font-weight: 900; background: #fff; display: inline-block; padding: 6px 25px; border-radius: 20px; border: 3px solid #FF7043;}
+        
+        .level-select-container { display: flex; justify-content: center; gap: 20px; margin: 30px 0; }
+        .level-box { display: flex; flex-direction: column; align-items: center; width: 140px; }
+        .clear-count-label { margin-top: 8px; font-size: 13px; color: #795548; font-weight: bold; background: #FFF3E0; padding: 4px 12px; border-radius: 10px;}
+
+        .bottom-actions { display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: 320px; margin: 0 auto; }
+        .action-row { display: flex; gap: 10px; width: 100%; justify-content: center; margin-top: 5px; }
+
+        #login-status-text { font-size:13px; color:#795548; margin-top:5px; font-weight: bold; }
+
+        #char-grid {
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 15px auto; 
+            max-width: 320px; justify-content: center;
+        }
+        .char-btn {
+            width: 70px; height: 70px; font-size: 40px; padding: 0;
+            border: 3px solid #eee; border-radius: 15px; background: #fff; cursor: pointer;
+            transition: transform 0.1s, background 0.2s; box-shadow: 0 4px 0 #ddd;
+            display: flex; justify-content: center; align-items: center;
+        }
+        .char-btn:hover { background: #FFF3E0; border-color: #FFB74D; box-shadow: 0 4px 0 #FFB74D; }
+        .char-btn:active { transform: translateY(4px); box-shadow: none; }
+
+        /* 名前入力フィールド */
+        #name-input-container { margin-bottom: 15px; }
+        #nickname-input {
+            font-size: 20px; padding: 10px; text-align: center;
+            border: 3px solid #FFAB91; border-radius: 15px;
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            color: #5D4037; width: 80%; outline: none;
+        }
+        #nickname-input::placeholder { color: #D7CCC8; }
+        
+        .result-row { display: flex; justify-content: space-between; font-size: 20px; margin-bottom: 12px; border-bottom: 2px dashed #FFE0B2; padding-bottom: 8px;}
+        .result-label { color: #8D6E63; font-weight: bold;}
+        .result-val { font-weight: 900; color: #5D4037; }
+        .result-total { display: flex; justify-content: space-between; font-size: 40px; color: #E91E63; margin-top: 25px; border-top: 5px solid #FFD54F; padding-top: 15px; text-shadow: 2px 2px 0 rgba(0,0,0,0.1);}
+
+    </style>
+</head>
+<body>
+
+    <div id="game-root">
+        <div id="main-wrapper">
+            <div id="side-panel-left">
+                <h2>あそびかた</h2>
+                <div class="instruction-box">
+                    <strong style="color:#E64A19; font-size:14px;">100までいったらゴール！</strong>
+                </div>
+                <ul>
+                    <li><strong>じかんぎれになると<br>ゲームオーバー</strong></li>
+                </ul>
+                <p><strong>いろいろなマス</strong></p>
+                <ul>
+                    <li>⏰: じかんかいふく</li>
+                    <li>🎁: ポイント</li>
+                    <li>👻: おばけ(マイナス)</li>
+                    <li>💎: ほうせき</li>
+                </ul>
+                <hr>
+                <p><strong>ボーナス！</strong></p>
+                <ul>
+                    <li>10,20…をこえると<br><strong style="color:#FF9800;">+100ポイント</strong></li>
+                    <li>ぴったりとまると<br><strong style="color:#E91E63;">+200ポイント</strong></li>
+                    <li>ゴールぴったりは<br><strong style="color:#E91E63;">+1000ポイント!</strong></li>
+                </ul>
+                <hr>
+                <ul>
+                    <li><strong>16しゅるいのアイテム<br>いくつひろえるかな？</strong></li>
+                    <li><strong>💎があれば<br>とくしゅのうりょくが<br>つかえるぞ！</strong></li>
+                </ul>
+                <button class="btn btn-gray" onclick="location.reload()" style="margin-top:auto; width:95%; font-size:12px; padding:8px;">タイトルへ</button>
+            </div>
+
+            <div id="game-container">
+                <div id="top-timer-container">
+                    <div id="top-timer-label">のこりじかん</div>
+                    <div id="top-timer-value">10</div>
+                </div>
+
+                <canvas id="game-canvas"></canvas>
+                
+                <div id="central-message-area">
+                    <div id="central-message-text"></div>
+                </div>
+
+                <div id="hand-area">
+                    <div id="hand-message" style="font-size:24px; min-width:280px;">ここにけいさんがひょうじされるよ</div>
+                    <div id="hand-cards-container"></div>
+                </div>
+
+                <div id="title-screen" class="overlay">
+                    <div class="overlay-content">
+                        <div class="title-header">
+                            <h1 class="title-main">Math Sugoroku</h1>
+                            <div class="title-sub">たしざんしながら１００をめざせ！<br>いろんなマスやアイテムがでてくるよ！</div>
+                        </div>
+
+                        <div class="level-select-container">
+                            <div class="level-box">
+                                <button class="btn btn-easy" onclick="selectLevel('easy')">しょきゅう</button>
+                                <div class="clear-count-label"><span id="clear-easy">0</span>回クリア</div>
+                            </div>
+                            <div class="level-box">
+                                <button class="btn btn-normal" onclick="selectLevel('normal')">ちゅうきゅう</button>
+                                <div class="clear-count-label"><span id="clear-normal">0</span>回クリア</div>
+                            </div>
+                            <div class="level-box">
+                                <button class="btn btn-hard" onclick="selectLevel('hard')">じょうきゅう</button>
+                                <div class="clear-count-label"><span id="clear-hard">0</span>回クリア</div>
+                            </div>
+                        </div>
+
+                        <div class="bottom-actions">
+                            <div id="login-status-text">ログインしていません</div>
+                            <button id="btn-login-google" class="btn btn-google" onclick="handleGoogleLogin()">Googleでログイン</button>
+                            
+                            <div class="action-row">
+                                <button class="btn btn-yellow" onclick="showFullRanking()" style="flex:1;">スコアをみる</button>
+                                <button class="btn btn-gray" onclick="window.location.href='index.html'" style="flex:1;">INDEXへ</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="char-screen" class="overlay hidden">
+                    <div class="overlay-content">
+                        <h2 style="color:#5D4037; margin-top:0;">おなまえとキャラクターをえらんでね</h2>
+                        
+                        <div id="name-input-container">
+                            <input type="text" id="nickname-input" placeholder="おなまえ (8もじまで)" maxlength="8">
+                        </div>
+                        <p style="font-size:12px; color:#E64A19;">※ひらがな と 「ー」 だけ つかえます</p>
+
+                        <div id="char-grid"></div>
+                        <div style="display:flex; flex-direction:column; align-items:center; gap:10px; margin-top:20px;">
+                            <button class="btn btn-normal" onclick="pickRandomChar()" style="width:200px;">🎲 おまかせ</button>
+                            <button class="btn btn-gray" onclick="backToTitle()" style="width:200px;">戻る</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="result-screen" class="overlay hidden">
+                    <div class="overlay-content">
+                        <h1 id="result-title" style="font-size:50px; margin:0 0 20px 0; color:#E91E63; -webkit-text-stroke: 2px #fff; text-shadow: 3px 3px 0 rgba(0,0,0,0.1);">ゲームセット</h1>
+                        
+                        <div style="text-align:left; width:100%; margin-bottom:20px;">
+                            <div class="result-row">
+                                <span class="result-label">かくとくポイント</span>
+                                <span class="result-val" id="res-base">0</span>
+                            </div>
+                            <div class="result-row">
+                                <span class="result-label">アイテムボーナス <span id="res-item-cnt" style="font-size:0.8em;">(0個)</span></span>
+                                <span class="result-val" style="color:#FF9800;" id="res-item">0</span>
+                            </div>
+                            <div class="result-row">
+                                <span class="result-label">タイムボーナス <span id="res-time-cnt" style="font-size:0.8em;">(0s)</span></span>
+                                <span class="result-val" style="color:#4CAF50;" id="res-time">0</span>
+                            </div>
+                            <div class="result-row">
+                                <span class="result-label">ほうせきボーナス <span id="res-gem-cnt" style="font-size:0.8em;">(0個)</span></span>
+                                <span class="result-val" style="color:#00BCD4;" id="res-gem">0</span>
+                            </div>
+                            
+                            <div class="result-total">
+                                <span>ごうけい</span>
+                                <span id="res-final" style="font-weight:900;">0</span>
+                            </div>
+                        </div>
+
+                        <div style="margin-bottom:20px;">
+                             <button class="btn btn-yellow" onclick="showFullRanking()">ランキングをみる</button>
+                        </div>
+
+                        <button class="btn btn-normal" onclick="location.reload()" style="width:220px; font-size:20px; padding:12px;">タイトルへもどる</button>
+                    </div>
+                </div>
+
+                <div id="ranking-screen" class="hidden">
+                    <div id="ranking-content">
+                        <div class="ranking-header">★ ランキング ★</div>
+                        
+                        <div class="ranking-tabs">
+                            <button id="tab-local" class="rank-tab active" onclick="switchRankingMode('local')">ローカル</button>
+                            <button id="tab-online" class="rank-tab" onclick="switchRankingMode('online')">オンライン</button>
+                        </div>
+
+                        <div class="ranking-columns">
+                            <div class="ranking-col" id="rank-col-easy">
+                                <div class="rank-col-header">しょきゅう</div>
+                                <ul class="rank-list" id="rank-list-easy"></ul>
+                            </div>
+                            <div class="ranking-col" id="rank-col-normal">
+                                <div class="rank-col-header">ちゅうきゅう</div>
+                                <ul class="rank-list" id="rank-list-normal"></ul>
+                            </div>
+                            <div class="ranking-col" id="rank-col-hard">
+                                <div class="rank-col-header">じょうきゅう</div>
+                                <ul class="rank-list" id="rank-list-hard"></ul>
+                            </div>
+                        </div>
+                        <div style="text-align:center; margin-top:20px;">
+                            <button class="btn btn-normal" onclick="closeRanking()" style="width:200px;">とじる</button>
+                        </div>
+                    </div>
+                </div>
+            
+            </div>
+
+            <div id="side-panel-right">
+                <div class="panel-section">
+                    <div class="panel-title">ステータス</div>
+                    <div class="status-row">
+                        <span>レベル</span> <span id="level-val" style="font-weight:bold;">-</span>
+                    </div>
+                    <div class="status-row">
+                        <span>ポイント</span> <span id="point-val">0</span>
+                    </div>
+                    <div class="status-row">
+                        <span>💎 ほうせき</span> <span id="gem-val">0</span>
+                    </div>
+                </div>
+
+                <div class="panel-section">
+                    <div class="panel-title">とくしゅのうりょく (💎消費)</div>
+                    <button class="skill-btn" onclick="useAbility('change')" id="btn-change" disabled>
+                        🃏 手札チェンジ <span class="skill-cost">💎1</span>
+                    </button>
+                    <button class="skill-btn" onclick="useAbility('move1')" id="btn-move1" disabled>
+                        🟢 1マスすすむ <span class="skill-cost">💎1</span>
+                    </button>
+                    <button class="skill-btn" onclick="useAbility('time5')" id="btn-time5" disabled>
+                        ⏰ じかん +5 <span class="skill-cost">💎1</span>
+                    </button>
+                </div>
+
+                <div class="panel-section" style="border-bottom:none;">
+                    <div class="panel-title">コレクション (<span id="collected-count">0</span>/16)</div>
+                    <div id="collection-grid"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, collection, query, where, getDocs, setDoc, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        // NGワードリスト（ひらがな）
+        const NG_WORDS_HIRAGANA = [
+            // --- 【重要】殺害・自殺・テロ・犯罪 ---
+            'しね', 'しぬ', 'しに', 'ころす', 'ころせ', 'さつがい', 'くたばれ',
+            'じさつ', 'ぎさつ', 'つるす', 'れんたん', 'しにたい',
+            'てろ', 'てろりすと', 'ばくは', 'ばくだん', 'ほうか',
+            'はんざい', 'ごうとう', 'ゆうかい', 'かんきん', 'おそう',
+            'やくざ', 'ぼうりょく', 'はんぐれ', 'ちんぴら', 'まふぃあ',
+            'たいま', 'まやく', 'かくせいざい', 'しゃぶ', 'どらっぐ', 'こかいん',
+            'へろいん', 'えくすたしー', 'だっぽう', 'きめせく',
+            'いじめ', 'ぎゃくたい',
+
+            // --- 攻撃・暴言・誹謗中傷 ---
+            'ばか', 'あほ', 'まぬけ', 'きちがい', 'き違い',
+            'うざい', 'うざ', 'きもい', 'きも', 'きしょい', 'きえろ',
+            'くず', 'ごみ', 'ごみむし', 'かす', 'ざこ', 'ぜつ',
+            'ぶす', 'でぶ', 'はげ', 'ちび', 'でっぱ', 'いなかもの',
+            'うじ', 'はいぼく', 'まけいぬ', 'おつむ', 'のうたりん',
+            'ていのう', 'ちしょう', 'しょうがい', 'がいじ', 'かたわ', 'びっこ',
+            'めくら', 'つんぼ', 'おし', 'どじん', 'えた', 'ひにん',
+            'たひ', 'たひね', // 「死ね」の隠語
+            'うせろ', 'だまれ',
+
+            // --- 性的（身体部位） ---
+            'ちんちん', 'ちんこ', 'ちんぽ', 'ちんか', 'まら', 'さお',
+            'まんこ', 'まんしゅう', 'まんげ', 'われめ', 'おまた',
+            'くり', 'くりとりす', 'いんしん', 'いんかく', 'びらびら',
+            'こうがん', 'たまきん', 'きんたま', 'ふぐり',
+            'おっぱい', 'ちち', 'にゅうりん', 'にゅうとう', 'きょにゅう', 'ひんにゅう',
+            'けつ', 'あなる', 'こうもん', 'けつのあな',
+
+            // --- 性的（行為・状態） ---
+            'えろ', 'えっち', 'すけべ', 'へんたい', 'むっつり', 'しこ',
+            'せっくす', 'せいこう', 'まぐわい', 'そうにゅう', 'はめる',
+            'おなにー', 'じい', 'しこしこ', 'ふぇら', 'ぱいずり', 'くんに',
+            'いらま', 'しっしん', 'なかだし', 'ごっくん', 'ぶっかけ',
+            'しおふき', 'ぜっちょう', 'いく', 'いかせろ', 'あえぎ',
+            'どうてい', 'しょじょ', 'やりまん', 'やりちん', 'びっち',
+            'せふれ', 'ぱこ', 'ぱこぱこ', 'わいせつ', 'ろり', 'しょた', 'ぺど',
+            'きんしん', 'じゅうかん', 'りょうじょく', 'らんこう', 'すかんと',
+            'のーぱん', 'ぱんちら',
+
+            // --- 性的（産業・犯罪・隠語） ---
+            'れいぷ', 'ごうかん', 'ちかん', 'とうさつ', 'のぞき', 'ろしゅつ',
+            'ふうぞく', 'そーぷ', 'へるす', 'でりへる', 'ぴんさろ', 'いめくら',
+            'あだると', 'えーぶい', 'えぶい', 'ぽるの', 'うらびでお', 'むしゅうせい',
+            'えんこう', 'えんじょ', 'うり', 'かいしゅん', 'ばいしゅん',
+            'ぱぱかつ', 'ままかつ', 'うりせん',
+
+            // --- 排泄・汚物 ---
+            'うんこ', 'うんち', 'くそ', 'げり', 'べん', 'ふん',
+            'しっこ', 'しょんべん', 'にょう', 'ほうにょう',
+            'へ', 'おなら', 'げろ', 'たん',
+
+            // --- 運営なりすまし・システム ---
+            'うんえい', 'こうしき', 'すたっふ', 'かんり', 'ぱとろーる',
+            'じえむ', 'げーむますたー', 'ますたー', 'あどみん', 'しすてむ',
+            'さーばー', 'あかばん', 'ばん', 'ちーと', 'ちーたー', 'ばぐ',
+
+            // --- 個人情報・出会い・外部誘導 ---
+            'らいん', 'かかお', 'すかいぷ', 'いんすた', 'ついったー', 'でぃすこ',
+            'でんわ', 'ばんごう', 'けいたい', 'あどれす', 'めあど', 'じゅうしょ',
+            'あお', 'あいたい', 'まちあわせ', 'ほてる', 'らぶほ', 'おふかい',
+            'ぱすわーど', 'ぱす', 'あかうんと', 'こじんじょうほう'
+        ];
+
+        // --- Firebase設定 ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyBCg5dCEM89UmYYhfGqVeRf_VrUlg8_o-4",
+            authDomain: "math-braves.firebaseapp.com",
+            projectId: "math-braves",
+            storageBucket: "math-braves.firebasestorage.app",
+            messagingSenderId: "217117619290",
+            appId: "1:217117619290:web:d227feb603970d3948d463"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        let currentUser = null;
+
+        // --- Firebase関連関数 ---
+        function handleGoogleLogin() {
+            if (currentUser) {
+                signOut(auth).then(() => {
+                    alert("ログアウトしました");
+                }).catch((error) => {
+                    console.error(error);
+                });
+            } else {
+                const provider = new GoogleAuthProvider();
+                signInWithPopup(auth, provider)
+                    .then((result) => {
+                        console.log("Logged in:", result.user);
+                    }).catch((error) => {
+                        console.error("Login failed:", error);
+                        alert("ログインに失敗しました: " + error.message);
+                    });
+            }
+        }
+
+        onAuthStateChanged(auth, (user) => {
+            currentUser = user;
+            const statusText = document.getElementById("login-status-text");
+            const loginBtn = document.getElementById("btn-login-google");
+
+            if (user) {
+                statusText.innerText = `ログイン中: ${user.displayName}`;
+                statusText.style.color = "#43A047";
+                statusText.style.fontWeight = "bold";
+                loginBtn.innerText = "ログアウト";
+                loginBtn.classList.remove("btn-google");
+                loginBtn.classList.add("btn-gray");
+            } else {
+                statusText.innerText = "ログインしていません";
+                statusText.style.color = "#8D6E63";
+                statusText.style.fontWeight = "normal";
+                loginBtn.innerText = "Googleでログイン";
+                loginBtn.classList.remove("btn-gray");
+                loginBtn.classList.add("btn-google");
+            }
+        });
+
+        // --- 定数・変数 ---
+        const ITEMS = ["🛼","🏍️","🚲","🚀","🚁","🚩","🗼","🌈","🤖","👓","💍","🧸","🎻","🍜","🍹","☃️"];
+        const CHARACTERS = ["🐱","😄","😎","🐶","🐰","🐼","🐻‍❄️","🐣","🦁","🐯","🐮","🐸","🔴","🟢","🔵","🟠"];
+
+        const GOAL_POS = 100;
+        const TILES_PER_ROW = 10;
+        const TILES_PER_PAGE = 20; 
+        
+        // ベース解像度（16:9固定）
+        const BASE_WIDTH = 1280;
+        const BASE_HEIGHT = 720;
+
+        let gameState = "title"; 
+        let currentPos = 0;
+        let points = 0;
+        let gems = 0;
+        let timeLeft = 10;
+        let difficulty = "normal";
+        let hand = [];
+        let mapData = []; 
+        let cameraOffset = 0;
+        let collectedItems = [];
+        let playerChar = "🐱";
+        let selectedLevel = "normal";
+        let currentPlayerName = "名無しさん";
+
+        let scrollAnim = { active: false, progress: 0, startOff: 0, targetOff: 0 };
+        let messageQueue = [];
+        let isDisplayingMessage = false;
+
+        let currentRankingMode = 'local';
+
+        const canvas = document.getElementById("game-canvas");
+        const ctx = canvas.getContext("2d");
+        const handContainer = document.getElementById("hand-cards-container");
+        const msgText = document.getElementById("central-message-text");
+        
+        const ui = {
+            time: document.getElementById("top-timer-value"),
+            point: document.getElementById("point-val"),
+            gem: document.getElementById("gem-val"),
+            level: document.getElementById("level-val"),
+            count: document.getElementById("collected-count"),
+            grid: document.getElementById("collection-grid"),
+            btns: {
+                change: document.getElementById("btn-change"),
+                move1: document.getElementById("btn-move1"),
+                time5: document.getElementById("btn-time5")
+            }
+        };
+
+        // --- 画面調整ロジック (完全固定比率・絶対配置) ---
+        function adjustLayout() {
+            const root = document.getElementById('game-root');
+            // ウィンドウサイズとベースサイズの比率
+            const winW = window.innerWidth;
+            const winH = window.innerHeight;
+            
+            // 縦横どちらかがはみ出ないように最小のスケールを採用
+            const scale = Math.min(winW / BASE_WIDTH, winH / BASE_HEIGHT);
+            
+            // translate(-50%, -50%) で画面中央に配置し、そこからスケールさせる
+            root.style.transform = `translate(-50%, -50%) scale(${scale})`;
+        }
+
+        function resizeCanvas() {
+            // 固定解像度内のキャンバスサイズに合わせる
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            if(gameState !== 'title' && gameState !== 'char_select' && gameState !== 'ranking') drawGame();
+        }
+
+        window.addEventListener("resize", () => {
+            adjustLayout();
+            // resizeCanvasは呼ばない（固定解像度内でのサイズは不変のため）
+        });
+
+        window.onload = () => { 
+            adjustLayout();
+            resizeCanvas(); 
+            initCollectionGrid(); 
+            initCharGrid(); 
+            loadClearCounts(); 
+        };
+
+        function initCollectionGrid() {
+            ui.grid.innerHTML = "";
+            ITEMS.forEach((icon, idx) => {
+                const div = document.createElement("div");
+                div.className = "collection-item";
+                div.id = `col-item-${idx}`;
+                div.textContent = icon;
+                ui.grid.appendChild(div);
+            });
+        }
+
+        function initCharGrid() {
+            const grid = document.getElementById("char-grid");
+            CHARACTERS.forEach(char => {
+                const btn = document.createElement("div");
+                btn.className = "char-btn";
+                btn.textContent = char;
+                btn.onclick = () => startGameWithChar(char);
+                grid.appendChild(btn);
+            });
+        }
+
+        function loadClearCounts() {
+            const data = JSON.parse(localStorage.getItem('mathSugorokuClears')) || { easy: 0, normal: 0, hard: 0 };
+            document.getElementById('clear-easy').innerText = data.easy;
+            document.getElementById('clear-normal').innerText = data.normal;
+            document.getElementById('clear-hard').innerText = data.hard;
+        }
+
+        function saveClearCount(level) {
+            const data = JSON.parse(localStorage.getItem('mathSugorokuClears')) || { easy: 0, normal: 0, hard: 0 };
+            if(data[level] !== undefined) {
+                data[level]++;
+                localStorage.setItem('mathSugorokuClears', JSON.stringify(data));
+            }
+        }
+
+        // --- ゲームフロー ---
+        function selectLevel(level) {
+            selectedLevel = level;
+            document.getElementById("title-screen").classList.add("hidden");
+            document.getElementById("char-screen").classList.remove("hidden");
+            gameState = "char_select";
+        }
+
+        function backToTitle() {
+            document.getElementById("char-screen").classList.add("hidden");
+            document.getElementById("title-screen").classList.remove("hidden");
+            gameState = "title";
+        }
+
+        function pickRandomChar() {
+            const r = Math.floor(Math.random() * CHARACTERS.length);
+            startGameWithChar(CHARACTERS[r]);
+        }
+
+        function startGameWithChar(char) {
+            // 名前の取得とバリデーション
+            const inputName = document.getElementById("nickname-input").value.trim();
+            
+            if (inputName) {
+                // ひらがな・長音符チェック
+                if (!/^[ぁ-んー]+$/.test(inputName)) {
+                    alert("おなまえは ひらがな と 「ー」 だけで かいてね！");
+                    return;
+                }
+                
+                // NGワードチェック
+                for (const ng of NG_WORDS_HIRAGANA) {
+                    if (inputName.includes(ng)) {
+                        alert("そのおなまえは つかえません。べつの おなまえに してね。");
+                        return;
+                    }
+                }
+                currentPlayerName = inputName;
+            } else {
+                currentPlayerName = "名無しさん";
+            }
+            
+            playerChar = char;
+            document.getElementById("char-screen").classList.add("hidden");
+            startGame(selectedLevel);
+        }
+
+        function startGame(level) {
+            difficulty = level;
+            timeLeft = (level === 'easy' ? 15 : level === 'normal' ? 10 : 5);
+            ui.level.innerText = (level === 'easy' ? "しょきゅう" : level === 'normal' ? "ちゅうきゅう" : "じょうきゅう");
+
+            currentPos = 0;
+            points = 0;
+            gems = 0;
+            cameraOffset = 0;
+            hand = [];
+            collectedItems = [];
+            messageQueue = [];
+            isDisplayingMessage = false;
+            scrollAnim.active = false;
+            
+            ITEMS.forEach((_, i) => document.getElementById(`col-item-${i}`).className = "collection-item");
+            msgText.classList.remove("visible");
+
+            generateMap();
+            fillHandInitial();
+            
+            gameState = "playing";
+            updateUI();
+            drawGame();
+        }
+
+        // --- ゲームロジック ---
+        function generateMap() {
+            mapData = new Array(GOAL_POS + 1).fill(0);
+            let available = [];
+            for(let i=11; i<GOAL_POS; i++) available.push(i);
+            
+            for (let i = available.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [available[i], available[j]] = [available[j], available[i]];
+            }
+
+            for(let k=0; k<16; k++) {
+                if(k < available.length) mapData[available[k]] = 100 + k;
+            }
+
+            let probs = (difficulty === 'easy') ? [0.3, 0.55, 0.75, 0.85, 0.90, 1.0] 
+                      : (difficulty === 'hard') ? [0.25, 0.35, 0.45, 0.60, 0.85, 1.0] 
+                      : [0.30, 0.45, 0.60, 0.75, 0.85, 1.0];
+
+            for(let i=1; i<GOAL_POS; i++) {
+                if(mapData[i] >= 100) continue; 
+                let r = Math.random();
+                if(r < probs[0]) mapData[i] = 0; 
+                else if(r < probs[1]) mapData[i] = 1; 
+                else if(r < probs[2]) mapData[i] = 2; 
+                else if(r < probs[3]) mapData[i] = 3; 
+                else if(r < probs[4]) mapData[i] = 4; 
+                else mapData[i] = 5; 
+            }
+        }
+
+        function getRandomCard() { return Math.floor(Math.random() * 9) + 1; }
+
+        function fillHandInitial() {
+            hand = [];
+            for(let i=0; i<5; i++) hand.push(getRandomCard());
+            renderHand();
+        }
+
+        function updateUI() {
+            ui.time.innerText = timeLeft;
+            ui.point.innerText = points;
+            ui.gem.innerText = gems;
+            ui.count.innerText = collectedItems.length;
+
+            const active = (gameState === "playing" && timeLeft > 0 && gems > 0 && !isDisplayingMessage && !scrollAnim.active);
+            ui.btns.change.disabled = !active;
+            ui.btns.move1.disabled = !active;
+            ui.btns.time5.disabled = !active;
+        }
+
+        // --- 描画 (変更なし) ---
+        function drawGame() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.save();
+            const marginX = 20;
+            const tileW = (canvas.width - marginX * 2) / TILES_PER_ROW;
+            const tileH = tileW * 1.3; 
+            const marginY = 15; 
+            const totalBoardH = tileH * 2 + marginY;
+            let startY = (canvas.height - totalBoardH) / 2 + 10; // 少し上に
+            const minStartY = tileH + marginY + 10;
+            if(startY < minStartY) startY = minStartY;
+
+            // マス目の色をポップ系に変更
+            const zoneColors = ["#C5E1A5", "#FFF59D", "#FFCC80", "#80DEEA", "#F48FB1"];
+
+            let yShift = 0;
+            let drawOffset = cameraOffset;
+            let drawCount = TILES_PER_PAGE;
+            if (scrollAnim.active) {
+                yShift = -scrollAnim.progress * (tileH + marginY);
+                drawOffset = scrollAnim.startOff;
+                drawCount = 30; 
+            }
+            ctx.translate(0, yShift);
+
+            if (drawOffset === 0) {
+                let zRow = -1; let zCol = 0;
+                let zx = marginX + zCol * tileW;
+                let zy = startY + zRow * (tileH + marginY);
+                ctx.fillStyle = "#FFB74D"; 
+                drawRoundedRect(ctx, zx + 5, zy + 5, tileW - 10, tileH - 10, 15);
+                ctx.fill();
+                ctx.strokeStyle = "#fff"; ctx.lineWidth=3; ctx.stroke();
+                ctx.fillStyle = "#E65100";
+                ctx.font = "900 12px 'M PLUS Rounded 1c', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline="bottom";
+                ctx.fillText("START", zx + tileW/2, zy + tileH - 8);
+                if (currentPos === 0) drawPlayer(zx + tileW/2, zy + tileH/2, tileW);
+            }
+
+            for (let i = 0; i < drawCount; i++) {
+                let tileNum = drawOffset + i + 1;
+                if (tileNum > GOAL_POS + 1) continue;
+                let row = Math.floor(i / 10);
+                let col = i % 10;
+                let x = marginX + col * tileW;
+                let y = startY + row * (tileH + marginY);
+                let type = mapData[tileNum];
+                let zoneIndex = Math.floor((tileNum - 1) / 10) % zoneColors.length;
+                ctx.fillStyle = (tileNum === GOAL_POS) ? "#FDD835" : zoneColors[zoneIndex];
+                drawRoundedRect(ctx, x + 2, y + 2, tileW - 4, tileH - 4, 10); 
+                ctx.fill();
+                
+                // 枠線を太く白くしてステッカー風に
+                ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.stroke();
+                
+                let isPassed = (tileNum <= currentPos);
+                if (isPassed && tileNum <= GOAL_POS) {
+                    ctx.fillStyle = "#E0E0E0";
+                    drawRoundedRect(ctx, x + 2, y + 2, tileW - 4, tileH - 4, 10);
+                    ctx.fill();
+                }
+                if (!isPassed && tileNum <= GOAL_POS) {
+                    if (type >= 100) {
+                        const borderX = x + 4; const borderY = y + 4;
+                        const borderW = tileW - 8; const borderH = tileH - 8;
+                        ctx.fillStyle = "#fff"; ctx.fillRect(borderX, borderY, borderW, borderH);
+                        ctx.strokeStyle = "#FF9800"; ctx.lineWidth = 2; ctx.strokeRect(borderX, borderY, borderW, borderH); 
+                        ctx.lineWidth = 1;
+                        let icon = ITEMS[type - 100];
+                        ctx.fillStyle = "#333";
+                        ctx.font = `${tileW * 0.5}px Arial`;
+                        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+                        ctx.fillText(icon, x + tileW/2, y + tileH * 0.4);
+                    } else {
+                        let icon = "";
+                        switch(type) {
+                            case 1: icon = "⏰"; break;
+                            case 2: icon = "🎁"; break;
+                            case 3: icon = "❓"; break;
+                            case 4: icon = "👻"; break;
+                            case 5: icon = "💎"; break;
+                        }
+                        if (icon) {
+                            ctx.fillStyle = "#333";
+                            ctx.font = `${tileW * 0.5}px Arial`;
+                            ctx.textAlign = "center"; ctx.textBaseline = "middle";
+                            ctx.fillText(icon, x + tileW/2, y + tileH * 0.35);
+                        }
+                    }
+                }
+                if (tileNum <= GOAL_POS) {
+                    ctx.fillStyle = "#5D4037"; // 文字色はチョコ色
+                    let isKiri = (tileNum % 10 === 0);
+                    let fontSize = isKiri ? tileW * 0.55 : tileW * 0.5; 
+                    let fontWeigth = isKiri ? "900" : "bold"; 
+                    ctx.font = `${fontWeigth} ${fontSize}px 'M PLUS Rounded 1c', sans-serif`;
+                    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+                    if(isKiri) ctx.fillStyle = "#E91E63"; // キリ番はピンク
+                    ctx.fillText(tileNum, x + tileW/2, y + tileH * 0.75);
+                }
+                if (tileNum === currentPos) {
+                    drawPlayer(x + tileW/2, y + tileH * 0.35, tileW);
+                }
+            }
+            ctx.restore();
+        }
+
+        function drawPlayer(x, y, tileSize) {
+            const offsetY = y - (tileSize * 0.2); // 少し高めに浮かす
+            ctx.font = `${tileSize * 0.75}px Arial`;
+            ctx.textAlign = "center"; ctx.textBaseline = "middle";
+            ctx.fillStyle = "rgba(0,0,0,0.2)"; // 影
+            ctx.fillText(playerChar, x + 2, offsetY + 4); 
+            ctx.fillStyle = "#fff"; 
+            ctx.fillText(playerChar, x, offsetY);
+        }
+
+        function drawRoundedRect(ctx, x, y, w, h, r) {
+            ctx.beginPath();
+            ctx.moveTo(x+r, y); ctx.lineTo(x+w-r, y);
+            ctx.quadraticCurveTo(x+w, y, x+w, y+r); ctx.lineTo(x+w, y+h-r);
+            ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h); ctx.lineTo(x+r, y+h);
+            ctx.quadraticCurveTo(x, y+h, x, y+h-r); ctx.lineTo(x, y+r);
+            ctx.quadraticCurveTo(x, y, x+r, y); ctx.closePath();
+        }
+
+        // --- メッセージシステム ---
+        function enqueueMessage(text) {
+            messageQueue.push(text);
+            processMessageQueue();
+        }
+
+        function processMessageQueue() {
+            if (isDisplayingMessage || messageQueue.length === 0) {
+                if (messageQueue.length === 0 && !isDisplayingMessage && gameState !== "title" && gameState !== "char_select" && gameState !== "ranking" && !scrollAnim.active) {
+                    onTurnMessagesFinished();
+                }
+                return;
+            }
+            isDisplayingMessage = true;
+            updateUI(); 
+            const text = messageQueue.shift();
+            msgText.innerText = text;
+            msgText.classList.add("visible");
+            setTimeout(() => {
+                if (gameState !== 'goal_waiting') {
+                    msgText.classList.remove("visible");
+                    setTimeout(() => {
+                        isDisplayingMessage = false;
+                        processMessageQueue();
+                    }, 200); 
+                }
+            }, 1000); 
+        }
+
+        function onTurnMessagesFinished() {
+            if(gameState === "playing") {
+                checkSlide();
+                if(!scrollAnim.active && timeLeft <= 0) gameOver();
+                updateUI(); 
+            }
+        }
+
+        // --- アクション ---
+        function playCard(index) {
+            if (gameState !== "playing" || timeLeft <= 0 || isDisplayingMessage || scrollAnim.active) return;
+            let moveVal = hand[index];
+            timeLeft--;
+            const equation = `<span style="color:#795548">${currentPos}</span> + <span style="color:#E91E63">${moveVal}</span> = ${(currentPos + moveVal)}`;
+            const hm = document.getElementById('hand-message');
+            hm.style.fontSize = "38px"; hm.style.minWidth = "150px"; hm.innerHTML = equation;
+            hand[index] = getRandomCard();
+            renderHand();
+            if (timeLeft < 0) { timeLeft = 0; gameOver(); return; }
+            animateMove(currentPos, currentPos + moveVal, moveVal);
+        }
+
+        function useAbility(type) {
+            if (gameState !== "playing" || gems <= 0 || isDisplayingMessage || scrollAnim.active) return;
+            if (type === 'change') {
+                gems--; hand = []; for(let i=0; i<5; i++) hand.push(getRandomCard());
+                renderHand(); enqueueMessage("💎 てふだチェンジ！"); updateUI();
+            } else if (type === 'time5') {
+                gems--; timeLeft += 5; enqueueMessage("💎 じかん ＋5！"); updateUI();
+            } else if (type === 'move1') {
+                gems--; updateUI(); animateMove(currentPos, currentPos + 1, 1);
+            }
+        }
+
+        function animateMove(start, end, steps) {
+            gameState = "animation";
+            let current = start;
+            let count = 0;
+            const timer = setInterval(() => {
+                current++; count++; currentPos = current;
+                if (current % 10 === 0 && current < end && current <= 90) {
+                    points += 100; enqueueMessage(`${current}通過! +100pt`);
+                }
+                drawGame();
+                if (current >= GOAL_POS) {
+                    clearInterval(timer);
+                    currentPos = GOAL_POS;
+                    if (end > GOAL_POS) { points += 500; enqueueMessage("ゴール通過! +500pt"); } 
+                    else { points += 1000; }
+                    msgText.innerText = "ゴール！";
+                    msgText.classList.add("visible");
+                    gameState = "goal_waiting";
+                    const clickHandler = () => {
+                        document.removeEventListener('click', clickHandler);
+                        document.removeEventListener('touchstart', clickHandler);
+                        finishGame(true, (end === GOAL_POS));
+                    };
+                    setTimeout(() => {
+                        document.addEventListener('click', clickHandler);
+                        document.addEventListener('touchstart', clickHandler);
+                    }, 500);
+                    return;
+                }
+                if (count >= steps) {
+                    clearInterval(timer);
+                    if (current % 10 === 0 && current <= 90) {
+                        points += 200; enqueueMessage(`ぴったり! +200pt`);
+                    }
+                    gameState = "playing";
+                    handleEvent(current);
+                }
+            }, 200);
+        }
+
+        function handleEvent(pos) {
+            let type = mapData[pos];
+            if (type >= 100) {
+                let itemIdx = type - 100;
+                if (!collectedItems.includes(itemIdx)) {
+                    collectedItems.push(itemIdx);
+                    document.getElementById(`col-item-${itemIdx}`).classList.add("collected");
+                    enqueueMessage(`${ITEMS[itemIdx]} ゲット！`);
+                } else { enqueueMessage("すでにもっている！"); }
+            } else {
+                switch(type) {
+                    case 1: 
+                        let t = Math.floor(Math.random()*2)+1; timeLeft += t; enqueueMessage(`じかん ＋${t}`); break;
+                    case 2:
+                        let p = (Math.floor(Math.random()*3)+1)*50; points += p; enqueueMessage(`ポイント ＋${p}`); break;
+                    case 3: 
+                        if(Math.random()<0.5) { points+=200; enqueueMessage("ラッキー! +200pt"); } 
+                        else { points = Math.max(0, points-100); enqueueMessage("アンラッキー... -100pt"); }
+                        break;
+                    case 4: 
+                        if(Math.random()<0.5) { timeLeft=Math.max(0, timeLeft-2); enqueueMessage("👻 じかん -2"); } 
+                        else { points=Math.max(0, points-50); enqueueMessage("👻 ポイント -50"); }
+                        break;
+                    case 5:
+                        gems++; enqueueMessage("💎 ほうせきゲット！"); break;
+                    default:
+                        processMessageQueue(); break;
+                }
+            }
+        }
+
+        function checkSlide() {
+            if (currentPos > 0 && currentPos <= 90) {
+                let row = Math.floor((currentPos - 1) / 10);
+                let target = row * 10;
+                if (target > cameraOffset) {
+                    gameState = "sliding";
+                    scrollAnim.active = true;
+                    scrollAnim.startOff = cameraOffset;
+                    scrollAnim.targetOff = target;
+                    scrollAnim.progress = 0;
+                    const slideTimer = setInterval(() => {
+                        scrollAnim.progress += 0.05;
+                        if (scrollAnim.progress >= 1.0) {
+                            scrollAnim.progress = 0; scrollAnim.active = false;
+                            cameraOffset = scrollAnim.targetOff;
+                            clearInterval(slideTimer);
+                            gameState = "playing";
+                            if(timeLeft <= 0) gameOver();
+                            updateUI(); 
+                        }
+                        drawGame();
+                    }, 20);
+                }
+            }
+        }
+
+        function renderHand() {
+            handContainer.innerHTML = "";
+            hand.forEach((num, idx) => {
+                let div = document.createElement("div");
+                div.className = "card";
+                div.innerText = num;
+                div.onclick = () => playCard(idx);
+                handContainer.appendChild(div);
+            });
+        }
+        
+        function recordScore(score, level) {
+            saveLocalScore(score, level);
+            if (currentUser) {
+                const diffUpper = level.toUpperCase();
+                // プレイヤー名として、入力されたものを使用
+                saveOnlineScore(currentUser.uid, currentPlayerName, diffUpper, score);
+            }
+        }
+
+        async function saveOnlineScore(userId, userName, difficulty, score) {
+            console.log(`[Debug] saveOnlineScore: ${difficulty}, ${score}pt, Name:${userName}`);
+            try {
+                const docId = `${userId}_${difficulty}_${Date.now()}`;
+                
+                await setDoc(doc(db, "scores_sugoroku", docId), {
+                    uid: userId,
+                    name: userName, // 入力名を使用
+                    difficulty: difficulty, 
+                    score: score,
+                    createdAt: serverTimestamp() 
+                });
+                console.log("[Debug] Saved to scores_sugoroku!");
+            } catch (error) {
+                console.error("[Error] Save failed:", error);
+            }
+        }
+
+        function gameOver() {
+            gameState = "result";
+            document.getElementById("result-screen").classList.remove("hidden");
+            document.getElementById("result-title").innerText = "ゲームオーバー...";
+            document.getElementById("result-title").style.color = "#7f8c8d";
+            document.getElementById("res-base").innerText = points;
+            document.getElementById("res-item").innerText = 0; document.getElementById("res-item-cnt").innerText = "";
+            document.getElementById("res-time").innerText = 0; document.getElementById("res-time-cnt").innerText = "";
+            document.getElementById("res-gem").innerText = 0; document.getElementById("res-gem-cnt").innerText = "";
+            document.getElementById("res-final").innerText = points;
+            
+            recordScore(points, difficulty);
+        }
+
+        function finishGame(cleared, isPerfectGoal) {
+            gameState = "result";
+            msgText.classList.remove("visible"); 
+            let count = collectedItems.length;
+            let bonusItem = count * 300; 
+            let bonusTime = timeLeft * 50;
+            let bonusGem = gems * 300;
+            let final = points + bonusItem + bonusTime + bonusGem;
+
+            if (cleared) {
+                saveClearCount(difficulty);
+                recordScore(final, difficulty);
+            }
+
+            document.getElementById("result-screen").classList.remove("hidden");
+            if (isPerfectGoal) {
+                 document.getElementById("result-title").innerText = "ぴったりゴール！";
+                 document.getElementById("result-title").style.color = "#E91E63";
+            } else {
+                 document.getElementById("result-title").innerText = "ゴール！";
+                 document.getElementById("result-title").style.color = "#FF9800";
+            }
+            document.getElementById("res-base").innerText = points;
+            document.getElementById("res-item").innerText = `+${bonusItem}`; document.getElementById("res-item-cnt").innerText = `(${count}個)`;
+            document.getElementById("res-time").innerText = `+${bonusTime}`; document.getElementById("res-time-cnt").innerText = `(${timeLeft}秒)`;
+            document.getElementById("res-gem").innerText = `+${bonusGem}`; document.getElementById("res-gem-cnt").innerText = `(${gems}個)`;
+            document.getElementById("res-final").innerText = final;
+        }
+
+        // --- ローカルランキング ---
+        const LOCAL_RANKING_KEY = 'mathSugorokuRankingByLevel';
+
+        function saveLocalScore(score, level) {
+            let rankingData = JSON.parse(localStorage.getItem(LOCAL_RANKING_KEY)) || { easy: [], normal: [], hard: [] };
+            if(Array.isArray(rankingData)) rankingData = { easy: [], normal: [], hard: [] }; 
+            if (!rankingData[level]) rankingData[level] = [];
+
+            // 入力された名前で保存
+            rankingData[level].push({ score: score, name: currentPlayerName, date: new Date().toLocaleDateString() });
+            rankingData[level].sort((a, b) => b.score - a.score);
+            rankingData[level] = rankingData[level].slice(0, 10); 
+            
+            localStorage.setItem(LOCAL_RANKING_KEY, JSON.stringify(rankingData));
+        }
+
+        function loadLocalRankingColumn(level, elementId) {
+            const list = document.getElementById(elementId);
+            list.innerHTML = "";
+            let rankingData = JSON.parse(localStorage.getItem(LOCAL_RANKING_KEY)) || { easy: [], normal: [], hard: [] };
+            if(Array.isArray(rankingData)) rankingData = { easy: [], normal: [], hard: [] };
+            
+            const data = rankingData[level] || [];
+            renderRankingList(data, list);
+        }
+
+        // --- オンラインランキング (Firestore) ---
+        async function fetchOnlineRanking(difficulty) {
+             console.log(`[Debug] fetchOnlineRanking: ${difficulty}`);
+             try {
+                const q = query(
+                    collection(db, "scores_sugoroku"), 
+                    where("difficulty", "==", difficulty)
+                );
+                
+                const querySnapshot = await getDocs(q);
+                let ranking = [];
+                
+                querySnapshot.forEach((doc) => {
+                    const d = doc.data();
+                    if (d.score !== undefined) {
+                        ranking.push(d);
+                    }
+                });
+
+                ranking.sort((a, b) => b.score - a.score);
+                return ranking.slice(0, 10);
+
+            } catch (error) {
+                console.error("[Error] Fetch ranking failed:", error);
+                return [];
+            }
+        }
+
+        function renderRankingList(data, listElement) {
+            listElement.innerHTML = "";
+            if (data.length === 0) {
+                listElement.innerHTML = "<li style='text-align:center; color:#B0BEC5; margin-top:10px;'>記録なし</li>";
+                return;
+            }
+            data.forEach((entry, idx) => {
+                const li = document.createElement("li");
+                li.className = "rank-item";
+                
+                let rankColor = "#5D4037";
+                if(idx === 0) rankColor = "#FFD700"; 
+                else if(idx === 1) rankColor = "#C0C0C0";
+                else if(idx === 2) rankColor = "#CD7F32";
+                
+                let dispName = entry.name || "Unknown";
+                
+                const isMe = (currentUser && entry.uid === currentUser.uid);
+                const nameStyle = isMe ? 'color: #E91E63; font-weight: bold;' : 'color: #8D6E63;';
+                const displayNameHtml = `<span class="rank-name" style="${nameStyle}">${dispName}</span>`;
+
+                let dateStr = "";
+                if (entry.date) {
+                    dateStr = entry.date;
+                } else if (entry.createdAt && entry.createdAt.toDate) {
+                    dateStr = entry.createdAt.toDate().toLocaleDateString();
+                }
+
+                li.innerHTML = `
+                    <span class="rank-num">${idx + 1}.</span>
+                    <span class="rank-score" style="color:${rankColor}">${entry.score}</span>
+                    ${displayNameHtml}
+                    <span class="rank-date">${dateStr}</span>
+                `;
+                listElement.appendChild(li);
+            });
+        }
+        
+        // --- ランキング切り替え ---
+        async function switchRankingMode(mode) {
+            currentRankingMode = mode;
+            document.getElementById("tab-local").classList.toggle("active", mode === 'local');
+            document.getElementById("tab-online").classList.toggle("active", mode === 'online');
+
+            ['rank-list-easy', 'rank-list-normal', 'rank-list-hard'].forEach(id => {
+               document.getElementById(id).innerHTML = "<li style='text-align:center; padding:10px;'>読み込み中...</li>";
+            });
+
+            if (mode === 'local') {
+                loadLocalRankingColumn('easy', 'rank-list-easy');
+                loadLocalRankingColumn('normal', 'rank-list-normal');
+                loadLocalRankingColumn('hard', 'rank-list-hard');
+            } else {
+                if(!currentUser) {
+                    ['rank-list-easy', 'rank-list-normal', 'rank-list-hard'].forEach(id => {
+                       document.getElementById(id).innerHTML = "<li style='text-align:center; color:#aaa; padding:10px;'>ログインが必要です</li>";
+                    });
+                    return;
+                }
+                
+                const [easyData, normalData, hardData] = await Promise.all([
+                    fetchOnlineRanking('EASY'),
+                    fetchOnlineRanking('NORMAL'),
+                    fetchOnlineRanking('HARD')
+                ]);
+
+                renderRankingList(easyData, document.getElementById('rank-list-easy'));
+                renderRankingList(normalData, document.getElementById('rank-list-normal'));
+                renderRankingList(hardData, document.getElementById('rank-list-hard'));
+            }
+        }
+
+        function showFullRanking() {
+            document.getElementById("title-screen").classList.add("hidden");
+            document.getElementById("result-screen").classList.add("hidden");
+            document.getElementById("ranking-screen").classList.remove("hidden");
+            gameState = "ranking";
+            switchRankingMode('local');
+        }
+
+        function closeRanking() {
+            document.getElementById("ranking-screen").classList.add("hidden");
+            if (timeLeft <= 0 || currentPos >= GOAL_POS) {
+                document.getElementById("result-screen").classList.remove("hidden");
+                gameState = "result";
+            } else {
+                document.getElementById("title-screen").classList.remove("hidden");
+                gameState = "title";
+            }
+        }
+
+        // --- Windowへの公開 ---
+        window.selectLevel = selectLevel;
+        window.backToTitle = backToTitle;
+        window.pickRandomChar = pickRandomChar;
+        window.startGameWithChar = startGameWithChar;
+        window.startGame = startGame;
+        window.playCard = playCard;
+        window.useAbility = useAbility;
+        window.showFullRanking = showFullRanking;
+        window.closeRanking = closeRanking;
+        window.handleGoogleLogin = handleGoogleLogin;
+        window.switchRankingMode = switchRankingMode;
+        window.fetchOnlineRanking = fetchOnlineRanking;
+
+    </script>
+</body>
+</html>
