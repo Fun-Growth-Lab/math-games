@@ -343,7 +343,7 @@
                 <p>2. <strong>ブロックのすうじ</strong>と<br>おなじかずを つくって<strong>ぶつけよう！</strong></p>
                 <p>3. カードをうごかすと<br><strong>のこりAPがへるよ！</strong></p>
                 <p>4. <strong>ブロック</strong>をこわすとアイテム！<br>たまに<strong>テキ</strong>もでるぞ。</p>
-                <p>5. 💎(ジェム)をあつめて<br><strong>スキルをつかおう！</strong></p>
+                <p>5. 💎をあつめて<br><strong>スキルをつかおう！</strong></p>
                 <p>6. いらないカードは <strong>カードすてば</strong>へ。</p>
                 <p style="color:var(--accent-pink);">7. カギをひろって ドアをあけよう！さいごの<strong>フロア</strong>には ボスがいる…！？</p>
                 
@@ -650,9 +650,9 @@ const PRESET_EASY = {
     label: "しょきゅう",
     weights: { 2: 15, 3: 12, 4: 3, 5: 9 },
     enemyList: [4,6,8,9,10,12,15,16,18,20,24,25,27,30],
-    initTime: 10,
+    initTime: 20,
     thresholds: CROWN_THRESHOLDS,
-    dropRates: { time: 20, score: 50, gem: 10, creature: 20 },
+    dropRates: { time: 30, score: 45, gem: 15, creature: 10 },
     bossHpList: [100, 120, 150, 160, 180, 200]
 };
 
@@ -660,9 +660,9 @@ const PRESET_NORMAL = {
     label: "ちゅうきゅう",
     weights: { 2: 25, 3: 18, 4: 5, 5: 11, 6: 3, 7: 11, 8: 2, 9: 2 },
     enemyList: [4,6,8,9,10,12,14,15,16,18,20,21,24,25,27,28,30,32,35,36,40,42,45,48,49],
-    initTime: 15,
+    initTime: 20,
     thresholds: CROWN_THRESHOLDS,
-    dropRates: { time: 25, score: 35, gem: 10, creature: 30 },
+    dropRates: { time: 30, score: 35, gem: 15, creature: 20 },
     bossHpList: [200, 210, 240, 250, 270, 280, 300]
 };
 
@@ -672,7 +672,7 @@ const PRESET_HARD = {
     enemyList: [4,6,8,9,10,12,14,15,16,18,20,21,24,25,27,28,30,32,35,36,40,42,45,48,49,54,56,63,64,72,81],
     initTime: 20,
     thresholds: CROWN_THRESHOLDS,
-    dropRates: { time: 30, score: 20, gem: 10, creature: 40 },
+    dropRates: { time: 30, score: 25, gem: 15, creature: 30 },
     bossHpList: [300, 320, 350, 360, 400, 420, 450, 480, 500]
 };
 
@@ -1313,9 +1313,22 @@ function initFloor() {
         cumulative += rates.gem;
         if (rnd < cumulative) { cells[idx].item = 'ITEM_GEM'; continue; }
 
-        cells[idx].item = 'CREATURE';
-        cells[idx].creatureValue = generateEnemyValue();
-        cells[idx].creatureIcon = CREATURE_ICONS[Math.floor(Math.random() * CREATURE_ICONS.length)];
+        cumulative += rates.creature;
+        if (rnd < cumulative) {
+            cells[idx].item = 'CREATURE';
+            cells[idx].creatureValue = generateEnemyValue();
+            
+            // バグ修正：ブロック(value)と中身(creatureValue)が同じだと貫通してしまうのを防ぐ
+            while (cells[idx].creatureValue === cells[idx].value) {
+                cells[idx].creatureValue = generateEnemyValue();
+            }
+            
+            cells[idx].creatureIcon = CREATURE_ICONS[Math.floor(Math.random() * CREATURE_ICONS.length)];
+            continue;
+        }
+        
+        // どれにも当たらなければ空
+        cells[idx].item = null;
     }
 
     state.grid = cells;
@@ -1852,7 +1865,23 @@ bindBtn(ui.btnSkillKey, () => {
     }
 });
 bindBtn(ui.btnSkillChange, () => {
-    if (state.gems > 0) { state.gems--; state.cards = [null, null, null, null, null]; refillCards(true); state.particles.push(new Particle(state.width/2, state.height/2, "手札チェンジ！", '#ba68c8', 'text')); updateUI(); }
+    if (state.gems > 0) {
+        state.gems--;
+        state.grid.forEach(cell => {
+            if (cell.isEnemy) {
+                cell.value = generateEnemyValue();
+                let r = Math.random();
+                let gems = 1;
+                if (r > 0.95) gems = 5;
+                else if (r > 0.85) gems = 4;
+                else if (r > 0.70) gems = 3;
+                else if (r > 0.40) gems = 2;
+                cell.gemCount = gems;
+            }
+        });
+        state.particles.push(new Particle(state.width/2, state.height/2, "ばんめんチェンジ！", '#ba68c8', 'text'));
+        updateUI();
+    }
 });
 
 ui.btnYes.addEventListener('click', (e) => { e.preventDefault(); confirmAction(); });
