@@ -237,6 +237,18 @@
             width: 100%;
             font-size: 18px;
             padding: 8px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        button.btn-logout {
+            background: #757575; /* ログアウト時はグレー */
+            width: 100%;
+            font-size: 16px;
+            padding: 8px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         /* ランキング: アメジスト */
@@ -429,6 +441,29 @@
         #screen-result h2 { font-size: 80px; margin-bottom: 20px; color: #ffca28; text-shadow: 4px 4px 0 #000; }
         #screen-result p { font-size: 32px; margin: 10px 0; font-weight: bold; color: #fff; text-shadow: 2px 2px 0 #000; }
         
+        /* ゲーム内ポップアップ（モーダル） */
+        .modal-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6); z-index: 1000;
+            display: flex; justify-content: center; align-items: center;
+        }
+        .modal-box {
+            background: #fff8e1; border: 4px solid #8d6e63;
+            border-radius: 15px; padding: 20px; width: 400px;
+            text-align: center; color: #3e2723;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+        .modal-msg { font-size: 24px; font-weight: bold; margin-bottom: 20px; white-space: pre-wrap; }
+        .modal-buttons { display: flex; justify-content: center; gap: 20px; }
+        .modal-btn {
+            font-size: 20px; padding: 8px 25px; border-radius: 30px;
+            border: 2px solid rgba(0,0,0,0.1); cursor: pointer; color: #fff;
+            min-width: 100px; box-shadow: 0 4px 0 rgba(0,0,0,0.2);
+        }
+        .modal-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 rgba(0,0,0,0.2); }
+        .btn-yes { background: #42a5f5; }
+        .btn-no { background: #ef5350; }
+        
         /* アニメーション */
         @keyframes pop { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
         .pop-anim { animation: pop 0.3s ease-out; }
@@ -477,7 +512,7 @@
                     <button class="btn-red" onclick="Game.startGame('HARD')">むずかしい</button>
                 </div>
 
-                <button class="btn-google" onclick="Auth.loginGoogle()">Googleでログイン</button>
+                <button id="btn-google" class="btn-google" onclick="Auth.handleClick()">Googleでログイン</button>
                 
                 <div style="display:flex; gap:10px; margin-top:5px; width:100%; justify-content: center;">
                     <button class="btn-ranking" onclick="Ranking.show()">ランキング</button>
@@ -587,7 +622,6 @@
  */
 // NGワードリスト（ひらがな）
 const NG_WORDS_HIRAGANA = [
-    // --- 【重要】殺害・自殺・テロ・犯罪 ---
     'しね', 'しぬ', 'しに', 'ころす', 'ころせ', 'さつがい', 'くたばれ',
     'じさつ', 'ぎさつ', 'つるす', 'れんたん', 'しにたい',
     'てろ', 'てろりすと', 'ばくは', 'ばくだん', 'ほうか',
@@ -596,7 +630,6 @@ const NG_WORDS_HIRAGANA = [
     'たいま', 'まやく', 'かくせいざい', 'しゃぶ', 'どらっぐ', 'こかいん',
     'へろいん', 'えくすたしー', 'だっぽう', 'きめせく',
     'いじめ', 'ぎゃくたい',
-    // --- 攻撃・暴言・誹謗中傷 ---
     'ばか', 'あほ', 'まぬけ', 'きちがい', 'き違い',
     'うざい', 'うざ', 'きもい', 'きも', 'きしょい', 'きえろ',
     'くず', 'ごみ', 'ごみむし', 'かす', 'ざこ', 'ぜつ',
@@ -604,16 +637,14 @@ const NG_WORDS_HIRAGANA = [
     'うじ', 'はいぼく', 'まけいぬ', 'おつむ', 'のうたりん',
     'ていのう', 'ちしょう', 'しょうがい', 'がいじ', 'かたわ', 'びっこ',
     'めくら', 'つんぼ', 'おし', 'どじん', 'えた', 'ひにん',
-    'たひ', 'たひね', // 「死ね」の隠語
+    'たひ', 'たひね',
     'うせろ', 'だまれ',
-    // --- 性的（身体部位） ---
     'ちんちん', 'ちんこ', 'ちんぽ', 'ちんか', 'まら', 'さお',
     'まんこ', 'まんしゅう', 'まんげ', 'われめ', 'おまた',
     'くり', 'くりとりす', 'いんしん', 'いんかく', 'びらびら',
     'こうがん', 'たまきん', 'きんたま', 'ふぐり',
     'おっぱい', 'ちち', 'にゅうりん', 'にゅうとう', 'きょにゅう', 'ひんにゅう',
     'けつ', 'あなる', 'こうもん', 'けつのあな',
-    // --- 性的（行為・状態） ---
     'えろ', 'えっち', 'すけべ', 'へんたい', 'むっつり', 'しこ',
     'せっくす', 'せいこう', 'まぐわい', 'そうにゅう', 'はめる',
     'おなにー', 'じい', 'しこしこ', 'ふぇら', 'ぱいずり', 'くんに',
@@ -623,21 +654,17 @@ const NG_WORDS_HIRAGANA = [
     'せふれ', 'ぱこ', 'ぱこぱこ', 'わいせつ', 'ろり', 'しょた', 'ぺど',
     'きんしん', 'じゅうかん', 'りょうじょく', 'らんこう', 'すかんと',
     'のーぱん', 'ぱんちら',
-    // --- 性的（産業・犯罪・隠語） ---
     'れいぷ', 'ごうかん', 'ちかん', 'とうさつ', 'のぞき', 'ろしゅつ',
     'ふうぞく', 'そーぷ', 'へるす', 'でりへる', 'ぴんさろ', 'いめくら',
     'あだると', 'えーぶい', 'えぶい', 'ぽるの', 'うらびでお', 'むしゅうせい',
     'えんこう', 'えんじょ', 'うり', 'かいしゅん', 'ばいしゅん',
     'ぱぱかつ', 'ままかつ', 'うりせん',
-    // --- 排泄・汚物 ---
     'うんこ', 'うんち', 'くそ', 'げり', 'べん', 'ふん',
     'しっこ', 'しょんべん', 'にょう', 'ほうにょう',
     'へ', 'おなら', 'げろ', 'たん',
-    // --- 運営なりすまし・システム ---
     'うんえい', 'こうしき', 'すたっふ', 'かんり', 'ぱとろーる',
     'じえむ', 'げーむますたー', 'ますたー', 'あどみん', 'しすてむ',
     'さーばー', 'あかばん', 'ばん', 'ちーと', 'ちーたー', 'ばぐ',
-    // --- 個人情報・出会い・外部誘導 ---
     'らいん', 'かかお', 'すかいぷ', 'いんすた', 'ついったー', 'でぃすこ',
     'でんわ', 'ばんごう', 'けいたい', 'あどれす', 'めあど', 'じゅうしょ',
     'あお', 'あいたい', 'まちあわせ', 'ほてる', 'らぶほ', 'おふかい',
@@ -689,9 +716,8 @@ window.onload = () => {
         auth = firebase.auth();
         googleProvider = new firebase.auth.GoogleAuthProvider();
         
-        auth.onAuthStateChanged(user => {
-            if (user) console.log("Logged in:", user.displayName);
-        });
+        // 認証初期化
+        Auth.init();
     } catch (e) {
         console.warn("Firebase Init Error (Local mode):", e);
     }
@@ -735,15 +761,45 @@ function loadImages() {
  * 認証・ランキングクラス
  */
 class Auth {
-    static loginGoogle() {
-        if (!auth) return alert("Firebase設定が必要です");
-        auth.signInWithPopup(googleProvider)
-            .then(res => {
-                alert("ログインしました: " + res.user.displayName);
-                Ranking.switchMode('WORLD');
-            })
-            .catch(e => alert("ログインエラー: " + e.message));
+    static init() {
+        if (!auth) return;
+        auth.onAuthStateChanged(user => {
+            const btn = document.getElementById('btn-google');
+            if (user) {
+                // ログイン済み：名前を表示し、ログアウトボタン化
+                const name = user.displayName || user.email;
+                btn.textContent = name;
+                btn.className = "btn-logout"; // クラス変更で色を変える
+            } else {
+                // 未ログイン
+                btn.textContent = "Googleでログイン";
+                btn.className = "btn-google";
+            }
+        });
     }
+
+    static handleClick() {
+        if (!auth) return alert("Firebase設定が必要です");
+        const btn = document.getElementById('btn-google');
+        
+        if (auth.currentUser) {
+            // ログアウト処理
+            if(confirm("ログアウトしますか？")) {
+                auth.signOut().then(() => alert("ログアウトしました"));
+            }
+        } else {
+            // ログイン処理
+            auth.signInWithPopup(googleProvider)
+                .then(res => {
+                    alert("ログインしました: " + res.user.displayName);
+                    Ranking.switchMode('WORLD');
+                })
+                .catch(e => alert("ログインエラー: " + e.message));
+        }
+    }
+    
+    // loginGoogleメソッドは handleClick に統合したため削除（後方互換で残してもよいが使わない）
+    static loginGoogle() { this.handleClick(); }
 }
 
 class Ranking {
@@ -800,7 +856,6 @@ class Ranking {
                 });
             } catch (e) {
                 console.error(e);
-                // インデックスが必要な場合に自動でリンクを開く処理を追加
                 if (e.message && e.message.includes("indexes?create_composite_index=")) {
                     const urlMatch = e.message.match(/https:\/\/console\.firebase\.google\.com[^\s]*/);
                     if (urlMatch) {
@@ -995,11 +1050,8 @@ class Game {
         this.state = 'TITLE';
         this.showScreen('screen-title');
         this.hideHUD();
-        // あきらめるボタン非表示
         document.getElementById('btn-giveup').style.display = 'none';
-        // 右パネルの情報非表示
         document.getElementById('right-panel-game-info').style.display = 'none';
-        // 難易度表示クリア
         document.getElementById('difficulty-display').textContent = "";
     }
 
@@ -1022,7 +1074,6 @@ class Game {
         
         document.getElementById('stage-max').textContent = this.maxStage;
 
-        // 難易度表示の更新
         let diffText = "";
         if (difficulty === 'EASY') diffText = "かんたん";
         else if (difficulty === 'NORMAL') diffText = "ふつう";
@@ -1032,9 +1083,7 @@ class Game {
         this.startStage();
         this.showScreen(null);
         this.showHUD();
-        // あきらめるボタン表示
         document.getElementById('btn-giveup').style.display = 'block';
-        // 右パネル情報表示
         document.getElementById('right-panel-game-info').style.display = 'block';
     }
     
@@ -1049,7 +1098,6 @@ class Game {
         const n = this.stage;
         this.divisor = n + 1;
         
-        // 難易度別の配当（dividend）計算ロジック
         let minRate, maxRate;
         if (this.difficulty === 'EASY') {
             minRate = 4; maxRate = 6;
@@ -1069,7 +1117,6 @@ class Game {
         
         this.generateMap();
         
-        // アイテム効果消費はgenerateMapで判定後に行う
         if (this.hasMap) this.hasMap = false;
         if (this.hasAmulet) this.hasAmulet = false;
 
@@ -1189,7 +1236,6 @@ class Game {
             break; 
         }
         
-        // --- 宝石セット処理 (累積確率分布) ---
         let probTreasure = 0;
         let probMonster = 0;
         let probNone = 0;
@@ -1219,7 +1265,6 @@ class Game {
             probMonster = 0;
         }
 
-        // 宝石の確率分布
         let pD, pR, pS, pE, pT;
         if (this.hasMap) {
             pD = 0.04; pR = 0.08; pS = 0.12; pE = 0.16; pT = 0.20;
@@ -1373,7 +1418,6 @@ class Game {
                 const total = price * count;
                 earnedAmount += total;
 
-                // 変更: 金額ではなく個数(+1)を表示
                 const info = GEM_INFO[gemId];
                 this.floatingTexts.push(new FloatingText(cx, cy, `+${count}`, info.color));
             }
@@ -1391,57 +1435,112 @@ class Game {
         this.updateHUD();
 
         if (!hasMonster && treasureCount > 0) {
+            // 非同期で再帰呼び出しするために少し遅延
             setTimeout(() => this.processTreasure(treasureCount), 100);
         } else {
             this.checkGameState();
         }
     }
     
+    // ゲーム内ポップアップ表示用メソッド
+    static showDialog(message, type, callback) {
+        // 既存のダイアログがあれば削除
+        const old = document.querySelector('.modal-overlay');
+        if(old) old.remove();
+
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay';
+        
+        const box = document.createElement('div');
+        box.className = 'modal-box';
+        
+        const msg = document.createElement('div');
+        msg.className = 'modal-msg';
+        msg.textContent = message;
+        
+        const btnContainer = document.createElement('div');
+        btnContainer.className = 'modal-buttons';
+        
+        if (type === 'CONFIRM') {
+            const yes = document.createElement('button');
+            yes.className = 'modal-btn btn-yes';
+            yes.textContent = 'はい';
+            yes.onclick = () => { overlay.remove(); callback(true); };
+            
+            const no = document.createElement('button');
+            no.className = 'modal-btn btn-no';
+            no.textContent = 'いいえ';
+            no.onclick = () => { overlay.remove(); callback(false); };
+            
+            btnContainer.appendChild(yes);
+            btnContainer.appendChild(no);
+        } else {
+            // ALERT
+            const ok = document.createElement('button');
+            ok.className = 'modal-btn btn-yes';
+            ok.textContent = 'OK';
+            ok.onclick = () => { overlay.remove(); callback(true); };
+            btnContainer.appendChild(ok);
+        }
+        
+        box.appendChild(msg);
+        box.appendChild(btnContainer);
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
+    }
+
     static processTreasure(count) {
         if (count <= 0) {
             this.checkGameState();
             return;
         }
 
-        if (!confirm("宝箱をあけますか？")) {
-            setTimeout(() => this.processTreasure(count - 1), 100);
-            return;
-        }
+        // ゲーム内ポップアップを使用（CONFIRM）
+        this.showDialog("宝箱をあけますか？", 'CONFIRM', (result) => {
+            if (!result) {
+                // いいえの場合、次の宝箱へ
+                setTimeout(() => this.processTreasure(count - 1), 100);
+                return;
+            }
 
-        const rnd = Math.random() * 100; // 0-100
-        let msg = "";
-        
-        if (rnd < 30) {
-            msg = "からっぽだった...";
-        } else if (rnd < 80) {
-            const gemIndex = Math.floor((rnd - 30) / 10);
-            const subRnd = (rnd - 30) % 10;
-            let gemCount = 0;
-            if (subRnd < 4) gemCount = 1;
-            else if (subRnd < 7) gemCount = 5;
-            else if (subRnd < 9) gemCount = 10;
-            else gemCount = 20;
+            // はいの場合、抽選ロジック
+            const rnd = Math.random() * 100;
+            let msg = "";
+            
+            if (rnd < 30) {
+                msg = "からっぽだった...";
+            } else if (rnd < 80) {
+                const gemIndex = Math.floor((rnd - 30) / 10);
+                const subRnd = (rnd - 30) % 10;
+                let gemCount = 0;
+                if (subRnd < 4) gemCount = 1;
+                else if (subRnd < 7) gemCount = 5;
+                else if (subRnd < 9) gemCount = 10;
+                else gemCount = 20;
 
-            const targetGem = GEM_IDS[gemIndex];
-            this.gemCounts[targetGem] += gemCount;
+                const targetGem = GEM_IDS[gemIndex];
+                this.gemCounts[targetGem] += gemCount;
+                
+                const price = GEM_INFO[targetGem].score;
+                const earned = price * gemCount;
+                this.score += earned;
+                
+                msg = `${GEM_INFO[targetGem].name}が ${gemCount}個 入っていた！`;
+                this.updateHUD();
+            } else if (rnd < 90) {
+                this.hasMap = true; 
+                msg = "宝の地図だ！次のステージでレア宝石の確率アップ！";
+            } else {
+                this.hasAmulet = true; 
+                msg = "まよけのおまもりだ！次のステージでモンスターが出ない！";
+            }
             
-            const price = GEM_INFO[targetGem].score;
-            const earned = price * gemCount;
-            this.score += earned;
-            
-            // 変更: メッセージから金額削除
-            msg = `${GEM_INFO[targetGem].name}が ${gemCount}個 入っていた！`;
-            this.updateHUD();
-        } else if (rnd < 90) {
-            this.hasMap = true; 
-            msg = "宝の地図だ！次のステージでレア宝石の確率アップ！";
-        } else {
-            this.hasAmulet = true; 
-            msg = "まよけのおまもりだ！次のステージでモンスターが出ない！";
-        }
-        
-        alert(msg);
-        setTimeout(() => this.processTreasure(count - 1), 100);
+            // 結果表示ポップアップ（ALERT）
+            this.showDialog(msg, 'ALERT', () => {
+                // OKを押したら次の宝箱へ
+                setTimeout(() => this.processTreasure(count - 1), 100);
+            });
+        });
     }
 
     static checkGameState() {
@@ -1492,7 +1591,6 @@ class Game {
         void guide.offsetWidth; 
         guide.classList.add('pop-anim');
 
-        // 変更: 売上表示削除
         const content = document.getElementById('result-content');
         content.innerHTML = `
             <h2>ステージクリア！</h2>
