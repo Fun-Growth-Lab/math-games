@@ -176,7 +176,7 @@ let craftTabLevel = 1;
 let shopTab = "COMMON";
 let shopPage = 0;
 
-let exploreData = { stage: null, currentFloor: 0, maxFloor: 0, maxPossibleFloor: 0 };
+let exploreData = { stage: null, currentFloor: 0, maxFloor: 0, maxPossibleFloor: 0, gainedExpTotal: 0 };
 let showHelp = false;
 let activePopup = null; 
 let restEffect = { active: false, alpha: 0, phase: 'in' }; 
@@ -337,7 +337,7 @@ function checkLevelUp() {
     while(gameData.exp >= reqExp) {
         gameData.exp -= reqExp;
         gameData.level++;
-        gameData.maxAp += 2;
+        gameData.maxAp += 1;
         
         let upAtk = Math.floor(Math.random() * 3) + 1;
         let upDef = Math.floor(Math.random() * 3) + 1;
@@ -346,7 +346,7 @@ function checkLevelUp() {
         gameData.baseStatus.def += upDef;
         gameData.baseStatus.mag += upMag;
 
-        addMessage(`レベルアップ！Lv${gameData.level}に！最大AP+2 (攻+${upAtk}/防+${upDef}/魔+${upMag})`);
+        addMessage(`レベルアップ！Lv${gameData.level}に！最大AP+1 (攻+${upAtk}/防+${upDef}/魔+${upMag})`);
         reqExp = getNextExp(gameData.level);
     }
 }
@@ -603,9 +603,13 @@ function drawStatusPanel(x, y) {
     let mStat = eq.accessory ? getActualStat(getInvItem(eq.accessory)) : 0;
     let magTotal = mStat + gameData.baseStatus.mag;
 
-    drawText(`攻撃力: ${atkTotal} (基本${gameData.baseStatus.atk} + 装備${wStat})`, x+20, cy, 18, '#2980b9'); cy += 30;
-    drawText(`防御力: ${defTotal} (基本${gameData.baseStatus.def} + 装備${defEqTotal})`, x+20, cy, 18, '#27ae60'); cy += 30;
-    drawText(`魔法力: ${magTotal} (基本${gameData.baseStatus.mag} + 装備${mStat})`, x+20, cy, 18, '#8e44ad'); cy += 40;
+    let atkFSize = atkTotal >= 1000 ? 14 : 18;
+    let defFSize = defTotal >= 1000 ? 14 : 18;
+    let magFSize = magTotal >= 1000 ? 14 : 18;
+
+    drawText(`攻撃力: ${atkTotal} (基本${gameData.baseStatus.atk} + 装備${wStat})`, x+20, cy, atkFSize, '#2980b9'); cy += 30;
+    drawText(`防御力: ${defTotal} (基本${gameData.baseStatus.def} + 装備${defEqTotal})`, x+20, cy, defFSize, '#27ae60'); cy += 30;
+    drawText(`魔法力: ${magTotal} (基本${gameData.baseStatus.mag} + 装備${mStat})`, x+20, cy, magFSize, '#8e44ad'); cy += 40;
 
     const slots = [
         {key:'weapon', icon:'buki'}, {key:'shield', icon:'tate'},
@@ -632,7 +636,9 @@ function drawStatusPanel(x, y) {
         
         let iconSize = 24;
         drawImageRect(s.icon, x+15, cy-12, iconSize, iconSize);
-        drawText(itemStr, x+45, cy-8, 18, color);
+        let fSize = 18;
+        if (itemStr.length > 12) fSize = 13;
+        drawText(itemStr, x+45, cy-8, fSize, color);
         if (starStr) {
             drawText(starStr, x+45, cy+10, 12, color);
         }
@@ -754,6 +760,17 @@ function drawRightPanel(x, y) {
     else renderInventoryList(x, y, cy);
 }
 
+function confirmSellAll(inv, master) {
+    activePopup = {
+        text: `このアイテムを全て売りますか？`,
+        subtext: `${master.name} x${inv.count} (+${master.price * inv.count}G)`,
+        onYes: () => {
+            sellItem(inv, master, true);
+            addMessage(`${master.name}を全て売却した。`);
+        }
+    };
+}
+
 function renderInventoryList(x, y, cy) {
     let list = gameData.inventory;
     const itemsPerPage = 10; 
@@ -795,22 +812,35 @@ function renderInventoryList(x, y, cy) {
 
         let isEquipped = Object.values(gameData.equipment).includes(inv.uid);
 
-        if(isEquip || isPotion) {
+        if(isEquip) {
             if(isEquipped) {
                 drawBtn("装備中", x+320, cy-15, 60, 30, '#e74c3c', () => {}, true);
             } else {
                 drawBtn("装備", x+320, cy-15, 60, 30, '#2ecc71', () => equipItem(inv));
             }
             drawBtn("売却", x+390, cy-15, 50, 30, '#e67e22', () => sellItem(inv, master));
+        } else if (isPotion) {
+            if(isEquipped) {
+                drawBtn("装備中", x+310, cy-15, 50, 30, '#e74c3c', () => {}, true);
+            } else {
+                drawBtn("装備", x+310, cy-15, 50, 30, '#2ecc71', () => equipItem(inv));
+            }
+            drawBtn("売", x+365, cy-15, 35, 30, '#e67e22', () => sellItem(inv, master));
+            if (inv.count > 1) {
+                drawBtn("all", x+405, cy-15, 35, 30, '#d35400', () => confirmSellAll(inv, master));
+            }
         } else {
-            drawBtn("売却", x+360, cy-15, 80, 30, '#e67e22', () => sellItem(inv, master));
+            drawBtn("売却", x+350, cy-15, 45, 30, '#e67e22', () => sellItem(inv, master));
+            if (inv.count > 1) {
+                drawBtn("all", x+400, cy-15, 40, 30, '#d35400', () => confirmSellAll(inv, master));
+            }
         }
         cy += 45; 
     });
 
-    drawText(`${invPage+1} / ${maxPage+1}`, x+230, y+640, 18, '#2c3e50', 'center');
-    if(invPage > 0) drawBtn("＜", x+110, y+625, 50, 35, '#34495e', () => invPage--);
-    if(invPage < maxPage) drawBtn("＞", x+300, y+625, 50, 35, '#34495e', () => invPage++);
+    drawText(`${invPage+1} / ${maxPage+1}`, x+230, y+650, 18, '#2c3e50', 'center');
+    if(invPage > 0) drawBtn("＜", x+110, y+635, 50, 35, '#34495e', () => invPage--);
+    if(invPage < maxPage) drawBtn("＞", x+300, y+635, 50, 35, '#34495e', () => invPage++);
 }
 
 function equipItem(inv) {
@@ -820,9 +850,11 @@ function equipItem(inv) {
     if(key) { gameData.equipment[key] = inv.uid; addMessage(`${m.name}を装備した。`); }
 }
 
-function sellItem(inv, master) {
+function sellItem(inv, master, sellAll = false) {
     for(let k in gameData.equipment) { if(gameData.equipment[k] === inv.uid) return addMessage("装備中は売却できません。"); }
-    gameData.gold += master.price; removeItem(inv.itemId, 1);
+    let amount = sellAll ? inv.count : 1;
+    gameData.gold += master.price * amount; 
+    removeItem(inv.itemId, amount);
     if(master.type >= 1 && master.type <= 4) gameData.inventory = gameData.inventory.filter(i => i.uid !== inv.uid);
 }
 
@@ -888,9 +920,9 @@ function renderCraftList(x, y, cy) {
         cy += 65; 
     });
 
-    drawText(`${invPage+1} / ${maxPage+1}`, x+230, y+640, 18, '#2c3e50', 'center');
-    if(invPage > 0) drawBtn("＜", x+110, y+625, 50, 35, '#34495e', () => invPage--);
-    if(invPage < maxPage) drawBtn("＞", x+300, y+625, 50, 35, '#34495e', () => invPage++);
+    drawText(`${invPage+1} / ${maxPage+1}`, x+230, y+650, 18, '#2c3e50', 'center');
+    if(invPage > 0) drawBtn("＜", x+110, y+635, 50, 35, '#34495e', () => invPage--);
+    if(invPage < maxPage) drawBtn("＞", x+300, y+635, 50, 35, '#34495e', () => invPage++);
 }
 
 function renderEnhanceList(x, y, cy) {
@@ -937,13 +969,17 @@ function renderEnhanceList(x, y, cy) {
         cy += 45; 
     });
 
-    drawText(`${invPage+1} / ${maxPage+1}`, x+230, y+640, 18, '#2c3e50', 'center');
-    if(invPage > 0) drawBtn("＜", x+110, y+625, 50, 35, '#34495e', () => invPage--);
-    if(invPage < maxPage) drawBtn("＞", x+300, y+625, 50, 35, '#34495e', () => invPage++);
+    drawText(`${invPage+1} / ${maxPage+1}`, x+230, y+650, 18, '#2c3e50', 'center');
+    if(invPage > 0) drawBtn("＜", x+110, y+635, 50, 35, '#34495e', () => invPage--);
+    if(invPage < maxPage) drawBtn("＞", x+300, y+635, 50, 35, '#34495e', () => invPage++);
 }
 
 // --- 探索・お店 ---
 function finishExploration(isClear) {
+    if (exploreData && exploreData.gainedExpTotal > 0) {
+        addMessage(`探索終了。経験値 ${exploreData.gainedExpTotal} を獲得した！`);
+    }
+
     if (gameData.equipment.potion) {
         let pUid = gameData.equipment.potion;
         let pInv = getInvItem(pUid);
@@ -1017,7 +1053,8 @@ function renderExploreSelect(x, y) {
                 stage: stg,
                 currentFloor: 0,
                 maxFloor: maxFloor,
-                maxPossibleFloor: reachedF
+                maxPossibleFloor: reachedF,
+                gainedExpTotal: 0
             };
 
             if (gameData.equipment.potion) {
@@ -1071,7 +1108,9 @@ function advanceFloor(isSkip) {
         
         let stg = exploreData.stage;
         let gainedExp = getStageFloorDifficulty(stg.lv, exploreData.currentFloor);
-        gameData.exp += Math.floor(gainedExp);
+        let actualGainedExp = Math.floor(gainedExp);
+        gameData.exp += actualGainedExp;
+        exploreData.gainedExpTotal += actualGainedExp;
 
         let pool = ITEMS.filter(i => i.lv === stg.lv && i.prob > 0);
         if (pool.length > 0) {
@@ -1146,7 +1185,7 @@ function renderShop(x, y) {
         if (item.name.length >= 15) fSize = 13;
         else if (item.name.length >= 11) fSize = 15;
 
-        drawText(`${item.name} (${item.price}G)`, x+15, cy, fSize, isSoldOut ? '#95a5a6' : canBuy ? getItemColor(item) : '#e74c3c');
+        drawText(`${item.price}G ${item.name}`, x+15, cy, fSize, isSoldOut ? '#95a5a6' : canBuy ? getItemColor(item) : '#e74c3c');
         
         let btnX = x+330;
         let btnY = cy-15;
@@ -1169,10 +1208,10 @@ function renderShop(x, y) {
         cy += 65;
     });
 
-    drawText(`${shopPage+1} / ${Math.max(0, Math.ceil(shopItems.length/7)-1)+1}`, x+205, y+640, 20, '#2c3e50', 'center');
-    if(shopPage > 0) drawBtn("＜", x+110, y+620, 50, 40, '#34495e', () => shopPage--);
-    if(shopPage < Math.ceil(shopItems.length/7)-1) drawBtn("＞", x+250, y+620, 50, 40, '#34495e', () => shopPage++);
-    drawBtn("戻る", x+20, y+620, 80, 40, '#7f8c8d', () => { GAME_STATE = "MAIN"; });
+    drawText(`${shopPage+1} / ${Math.max(0, Math.ceil(shopItems.length/7)-1)+1}`, x+205, y+650, 20, '#2c3e50', 'center');
+    if(shopPage > 0) drawBtn("＜", x+110, y+630, 50, 40, '#34495e', () => shopPage--);
+    if(shopPage < Math.ceil(shopItems.length/7)-1) drawBtn("＞", x+250, y+630, 50, 40, '#34495e', () => shopPage++);
+    drawBtn("戻る", x+20, y+630, 80, 40, '#7f8c8d', () => { GAME_STATE = "MAIN"; });
 }
 
 // --- リザルト・ランキング・ポップアップ ---
