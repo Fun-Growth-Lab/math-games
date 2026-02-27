@@ -40,10 +40,25 @@
 </div>
 
 <script>
+// レシピ価格の一括変更処理
+setTimeout(() => {
+    if (typeof ITEMS !== 'undefined') {
+        ITEMS.forEach(item => {
+            if (item.type === 10) {
+                if (item.lv === 2) item.price = 100;
+                if (item.lv === 3) item.price = 500;
+                if (item.lv === 4) item.price = 2500;
+                if (item.lv === 5) item.price = 10000;
+                if (item.lv === 6) item.price = 50000;
+                if (item.lv === 7) item.price = 250000;
+            }
+        });
+    }
+}, 100);
+
 // ==========================================
 // 1. 定数・初期設定
 // ==========================================
-// ※実際のプロジェクト設定に書き換えてください
 const firebaseConfig = {
     apiKey: "AIzaSyBCg5dCEM89UmYYhfGqVeRf_VrUlg8_o-4",
     authDomain: "math-braves.firebaseapp.com",
@@ -92,8 +107,14 @@ loadImg('map4', 'images/map4.png', '#bdc3c7', '銀の廃都');
 loadImg('map5', 'images/map5.png', '#f1c40f', '黄金の神殿');
 loadImg('map6', 'images/map6.png', '#2980b9', '天空の砦');
 loadImg('map7', 'images/map7.png', '#c0392b', '竜の火口');
-imgs['shop'] = { loaded: false, error: true, color: '#8e44ad', text: 'お店' };
 loadImg('rest', 'images/rest.png', '#16a085', '休む');
+
+loadImg('buki', 'images/buki.png', '#2980b9', '武');
+loadImg('tate', 'images/tate.png', '#2980b9', '盾');
+loadImg('yoroi', 'images/yoroi.png', '#2980b9', '鎧');
+loadImg('yubiwa', 'images/yubiwa.png', '#2980b9', '飾');
+loadImg('kusuri', 'images/kusuri.png', '#2980b9', '薬');
+loadImg('clear', 'images/clear.png', '#f1c40f', 'クリア');
 
 function drawImageRect(key, x, y, w, h) {
     if (imgs[key] && imgs[key].loaded && !imgs[key].error) {
@@ -202,14 +223,13 @@ function calcCombatPower() {
     if (eq.accessory) mag = getActualStat(getInvItem(eq.accessory));
     if (eq.potion) potionLv = getObjById(ITEMS, getInvItem(eq.potion).itemId).lv;
     
-    let accMultiplier = 0.5 + Math.random() * 1.5;
-    
     let baseAtk = gameData.baseStatus.atk;
     let baseDef = gameData.baseStatus.def;
     let baseMag = gameData.baseStatus.mag;
     
-    let totalAtkVal = (atk + baseAtk) * 2;
-    let totalDefVal = defShield + (defCloth * 3) + (baseDef * 2); 
+    let totalAtkVal = atk + baseAtk;
+    let totalDefVal = defShield + defCloth + baseDef;
+    let accMultiplier = 0.5 + Math.random() * 1.5;
     let totalMagVal = (mag + baseMag) * accMultiplier;
 
     let basePower = totalAtkVal + totalDefVal + totalMagVal;
@@ -219,14 +239,14 @@ function calcCombatPower() {
 function getInvItem(uid) { return gameData.inventory.find(i => i.uid === uid); }
 function countItem(itemId) {
     const t = getObjById(ITEMS, itemId).type;
-    if(t >= 1 && t <= 5) return gameData.inventory.filter(i => i.itemId === itemId).length;
+    if(t >= 1 && t <= 4) return gameData.inventory.filter(i => i.itemId === itemId).length;
     const i = gameData.inventory.find(i => i.itemId === itemId);
     return i ? i.count : 0;
 }
 
 function addItem(itemId, stat = 0, count = 1) {
     const itemMaster = getObjById(ITEMS, itemId);
-    if(itemMaster.type >= 1 && itemMaster.type <= 5) {
+    if(itemMaster.type >= 1 && itemMaster.type <= 4) {
         for(let i=0; i<count; i++) gameData.inventory.push({ uid: gameData.uidCounter++, itemId: itemId, stat: stat, upgrade: 0, count: 1 });
     } else {
         let exist = gameData.inventory.find(i => i.itemId === itemId);
@@ -237,7 +257,7 @@ function addItem(itemId, stat = 0, count = 1) {
 
 function removeItem(itemId, count = 1) {
     const itemMaster = getObjById(ITEMS, itemId);
-    if(itemMaster.type < 1 || itemMaster.type > 5) {
+    if(itemMaster.type < 1 || itemMaster.type > 4) {
         let exist = gameData.inventory.find(i => i.itemId === itemId);
         if (exist) {
             exist.count -= count;
@@ -277,23 +297,28 @@ function getLootRarityCoin(prob) {
 function getStageFloorDifficulty(n, m) {
     const TARGET_CP = [
         0,
-        (5*7),
-        (15*7)*1.2,
-        (40*7)*1.3,
-        (100*7)*1.4,
-        (250*7)*1.5,
-        (600*7)*1.6,
-        (1500*7)*1.7
+        (5*7)*1.1*1.1,
+        (15*7)*1.2*1.2,
+        (40*7)*1.3*1.3,
+        (100*7)*1.4*1.4,
+        (250*7)*1.5*1.5,
+        (600*7)*1.6*1.6,
+        (1500*7)*1.7*1.7
     ];
+    let maxM = n * 5 + 5;
+    let targetCP = TARGET_CP[n];
+    
     if (n === 1) {
-        if (m <= 2) return 0;
-        return TARGET_CP[1] * ((m - 2) / 8);
+        if (m <= 3) return 0;
+        return targetCP * ((m - 3) / (maxM - 3));
     } else {
-        let prevC = TARGET_CP[n - 1];
-        let currC = TARGET_CP[n];
-        let maxM = n * 5 + 5;
-        let val = prevC + (currC - prevC) * (m - 3) / (maxM - 3);
-        return Math.max(0, val);
+        let prevTargetCP = TARGET_CP[n - 1];
+        if (m <= 3) {
+            let startCP = TARGET_CP[n - 1] * 0.8;
+            return startCP + (prevTargetCP - startCP) * ((m - 1) / 2);
+        } else {
+            return prevTargetCP + (targetCP - prevTargetCP) * ((m - 3) / (maxM - 3));
+        }
     }
 }
 
@@ -303,8 +328,12 @@ function calculateTotalAssets() {
     return assets;
 }
 
+function getNextExp(level) {
+    return Math.floor(50 * Math.pow(1.5, level));
+}
+
 function checkLevelUp() {
-    let nextExp = gameData.level * gameData.level * 25 + 25;
+    let nextExp = getNextExp(gameData.level);
     while(gameData.exp >= nextExp) {
         gameData.level++;
         gameData.maxAp += 2;
@@ -317,7 +346,7 @@ function checkLevelUp() {
         gameData.baseStatus.mag += upMag;
 
         addMessage(`レベルアップ！Lv${gameData.level}に！最大AP+2 (攻+${upAtk}/防+${upDef}/魔+${upMag})`);
-        nextExp = gameData.level * gameData.level * 25 + 25;
+        nextExp = getNextExp(gameData.level);
     }
 }
 
@@ -358,19 +387,6 @@ function drawText(text, x, y, size, color, align="left", weight="bold") {
     ctx.textAlign = align;
     ctx.textBaseline = "middle";
     ctx.fillText(text, x, y);
-}
-
-function drawTextWithStar(text, star, x, y, size, color) {
-    ctx.fillStyle = color;
-    ctx.font = `bold ${size}px "M PLUS Rounded 1c"`;
-    ctx.textAlign = "left";
-    ctx.textBaseline = "middle";
-    ctx.fillText(text, x, y);
-    if(star) {
-        let txtWidth = ctx.measureText(text).width;
-        ctx.font = `normal ${Math.floor(size * 0.7)}px "M PLUS Rounded 1c"`;
-        ctx.fillText(" " + star, x + txtWidth, y);
-    }
 }
 
 function drawBtn(text, x, y, w, h, color, onClick, disabled=false) {
@@ -560,8 +576,15 @@ function drawStatusPanel(x, y) {
     let cy = y + 70;
     drawText(`名前: ${currentPlayerName}`, x+20, cy, 24, '#2c3e50'); cy += 40;
     
-    let nextExp = gameData.level * gameData.level * 25 + 25;
-    drawText(`Lv: ${gameData.level}  (EXP: ${gameData.exp} / ${nextExp})`, x+20, cy, 22, '#2c3e50'); cy += 40;
+    let nextExp = getNextExp(gameData.level);
+    drawText(`Lv: ${gameData.level}`, x+20, cy, 22, '#2c3e50'); cy += 30;
+    
+    let expStr = `EXP: ${gameData.exp} / ${nextExp}`;
+    let expFontSize = 20;
+    if (gameData.exp >= 1000000 || nextExp >= 1000000) expFontSize = 14;
+    else if (gameData.exp >= 100000 || nextExp >= 100000) expFontSize = 16;
+    drawText(expStr, x+20, cy, expFontSize, '#2c3e50'); cy += 40;
+    
     drawText(`AP: ${gameData.ap} / ${gameData.maxAp}`, x+20, cy, 24, '#d35400'); cy += 40;
     drawText(`日数: ${gameData.day}日目`, x+20, cy, 24, '#2c3e50'); cy += 50;
 
@@ -575,8 +598,8 @@ function drawStatusPanel(x, y) {
     drawText(`魔法力: ${mag}`, x+20, cy, 22, '#8e44ad'); cy += 50;
 
     const slots = [
-        {key:'weapon', name:'武器'}, {key:'shield', name:'盾'},
-        {key:'armor', name:'鎧'}, {key:'accessory', name:'装飾品'}, {key:'potion', name:'薬'}
+        {key:'weapon', icon:'buki'}, {key:'shield', icon:'tate'},
+        {key:'armor', icon:'yoroi'}, {key:'accessory', icon:'yubiwa'}, {key:'potion', icon:'kusuri'}
     ];
     slots.forEach(s => {
         let itemStr = "なし";
@@ -596,7 +619,13 @@ function drawStatusPanel(x, y) {
             else if(m.type === 5) itemStr = m.name;
             color = getItemColor(m);
         }
-        drawTextWithStar(`${s.name}: ${itemStr}`, starStr, x+15, cy, 18, color);
+        
+        let iconSize = 24;
+        drawImageRect(s.icon, x+15, cy-12, iconSize, iconSize);
+        drawText(itemStr, x+45, cy-8, 18, color);
+        if (starStr) {
+            drawText(starStr, x+45, cy+10, 12, color);
+        }
         
         if(eq[s.key]) {
             drawBtn("外す", x+270, cy-14, 45, 28, '#e74c3c', () => { eq[s.key] = null; });
@@ -611,7 +640,14 @@ function drawCenterPanel(x, y) {
     drawPanel(x, y, 410, 680, "");
     
     let imgKey = GAME_STATE === "SHOP" ? 'shop' : 'rest';
-    drawImageRect(imgKey, x+10, y+10, 390, 219);
+    if (imgKey === 'shop') {
+        ctx.fillStyle = '#8e44ad'; ctx.fillRect(x+10, y+10, 390, 219);
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 30px "M PLUS Rounded 1c"';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('お店', x+205, y+119);
+    } else {
+        drawImageRect(imgKey, x+10, y+10, 390, 219);
+    }
 
     ctx.fillStyle = '#ecf0f1'; ctx.fillRect(x+10, y+240, 390, 250);
     ctx.strokeStyle = '#bdc3c7'; ctx.strokeRect(x+10, y+240, 390, 250);
@@ -640,7 +676,21 @@ function drawCenterPanel(x, y) {
 function drawRightPanel(x, y) {
     drawPanel(x, y, 460, 680, "持ち物・クラフト");
     let cy = y + 60;
-    drawText(`所持金: ${gameData.gold} G`, x+20, cy, 22, '#f39c12'); cy += 40;
+    
+    drawText(`所持金: ${gameData.gold} G`, x+20, cy, 22, '#f39c12');
+    
+    drawBtn("整理", x+375, cy-15, 65, 30, '#3498db', () => {
+        const typeOrder = {1:1, 2:2, 3:3, 4:4, 5:5, 9:6, 6:7, 7:8, 8:9};
+        gameData.inventory.sort((a, b) => {
+            let m1 = getObjById(ITEMS, a.itemId);
+            let m2 = getObjById(ITEMS, b.itemId);
+            if (typeOrder[m1.type] !== typeOrder[m2.type]) return typeOrder[m1.type] - typeOrder[m2.type];
+            return a.itemId - b.itemId;
+        });
+        addMessage("道具を整理した。");
+    });
+    
+    cy += 40;
 
     drawBtn("全て", x+20, cy, 70, 35, currentInvTab==="ALL" ? '#3498db' : '#bdc3c7', () => {currentInvTab="ALL"; invPage=0;});
     drawBtn("合成", x+95, cy, 70, 35, currentInvTab==="CRAFT" ? '#3498db' : '#bdc3c7', () => {currentInvTab="CRAFT"; invPage=0;});
@@ -721,7 +771,11 @@ function renderInventoryList(x, y, cy) {
         let textColor = getItemColor(master);
 
         let currentX = x + 15;
-        drawTextWithStar(nameTxt, star, currentX, cy, 18, textColor);
+        
+        drawText(nameTxt, currentX, cy-8, 18, textColor);
+        if (star) {
+            drawText(star, currentX, cy+10, 12, textColor);
+        }
 
         if(!isEquip) {
             drawText(`x${inv.count}`, x + 240, cy, 18, '#2c3e50', 'right');
@@ -759,7 +813,7 @@ function equipItem(inv) {
 function sellItem(inv, master) {
     for(let k in gameData.equipment) { if(gameData.equipment[k] === inv.uid) return addMessage("装備中は売却できません。"); }
     gameData.gold += master.price; removeItem(inv.itemId, 1);
-    if(master.type >= 1 && master.type <= 5) gameData.inventory = gameData.inventory.filter(i => i.uid !== inv.uid);
+    if(master.type >= 1 && master.type <= 4) gameData.inventory = gameData.inventory.filter(i => i.uid !== inv.uid);
 }
 
 function renderCraftList(x, y, cy) {
@@ -771,7 +825,7 @@ function renderCraftList(x, y, cy) {
             invPage = 0;
         });
     }
-    cy += 55;
+    cy += 65;
 
     let craftableIds = Object.keys(CRAFT_RULES).map(Number).filter(id => {
         let isUnlocked = gameData.unlockedRecipes.includes(CRAFT_RULES[id].recipeId);
@@ -851,7 +905,10 @@ function renderEnhanceList(x, y, cy) {
         else if(master.type === 2 || master.type === 3) nameTxt += ` (防${actualStat})`;
         else if(master.type === 4) nameTxt += ` (魔${actualStat})`;
 
-        drawTextWithStar(nameTxt, star, x + 15, cy, 18, getItemColor(master));
+        drawText(nameTxt, x + 15, cy-8, 18, getItemColor(master));
+        if (star) {
+            drawText(star, x + 15, cy+10, 12, getItemColor(master));
+        }
 
         let cost = master.price * 2;
         let canEnhance = gameData.gold >= cost && upg < 10;
@@ -879,12 +936,43 @@ function renderEnhanceList(x, y, cy) {
 function finishExploration(isClear) {
     if (gameData.equipment.potion) {
         let pUid = gameData.equipment.potion;
+        let pInv = getInvItem(pUid);
         gameData.equipment.potion = null;
-        gameData.inventory = gameData.inventory.filter(i => i.uid !== pUid);
+        if (pInv) {
+            pInv.count--;
+            if (pInv.count <= 0) {
+                gameData.inventory = gameData.inventory.filter(i => i.uid !== pUid);
+            }
+        }
         addMessage("装備していた薬を消費した。");
     }
+    
     if (isClear && exploreData.stage.lv === 7) {
-        GAME_STATE = "RESULT";
+        let assets = calculateTotalAssets();
+        let scoreData = { name: currentPlayerName, days: gameData.day, assets: assets, isClear: true };
+        
+        let localRank = JSON.parse(localStorage.getItem('fgl_local_ranking')) || [];
+        localRank.push(scoreData);
+        localRank.sort((a, b) => a.days - b.days || b.assets - a.assets);
+        localStorage.setItem('fgl_local_ranking', JSON.stringify(localRank));
+        
+        activePopup = {
+            isClearPopup: true,
+            assets: assets,
+            level: gameData.level,
+            days: gameData.day,
+            saving: true
+        };
+        
+        if(firebase.apps.length > 0 && firebaseConfig.apiKey !== "YOUR_API_KEY") {
+            db.collection(FIRESTORE_COLLECTION).add({
+                ...scoreData, timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            }).then(() => { if(activePopup && activePopup.isClearPopup) activePopup.saving = false; })
+              .catch(() => { if(activePopup && activePopup.isClearPopup) activePopup.saving = false; });
+        } else {
+            setTimeout(() => { if(activePopup && activePopup.isClearPopup) activePopup.saving = false; }, 1000);
+        }
+        GAME_STATE = "MAIN";
     } else {
         GAME_STATE = "MAIN";
     }
@@ -1048,7 +1136,12 @@ function renderShop(x, y) {
         if (item.name.length >= 15) fSize = 13;
         else if (item.name.length >= 11) fSize = 15;
 
-        drawText(`${item.name} (${item.price}G)`, x+15, cy, fSize, isSoldOut ? '#95a5a6' : canBuy ? getItemColor(item) : '#e74c3c');
+        let nameToDraw = item.name;
+        if (item.type === 9) {
+            nameToDraw += ` (所持:${countItem(item.id)})`;
+        }
+
+        drawText(`${nameToDraw} (${item.price}G)`, x+15, cy, fSize, isSoldOut ? '#95a5a6' : canBuy ? getItemColor(item) : '#e74c3c');
         
         let btnX = x+330;
         let btnY = cy-15;
@@ -1218,6 +1311,11 @@ function renderPopup() {
     ctx.fillRect(0,0,1280,720);
     
     let px = 340, py = 260, pw = 600, ph = 200;
+    
+    if (activePopup.isClearPopup) {
+        py = 100; ph = 520;
+    }
+
     ctx.save();
     ctx.beginPath(); ctx.roundRect(px, py, pw, ph, 15); ctx.clip();
     ctx.fillStyle = '#ecf0f1'; ctx.fill();
@@ -1226,7 +1324,24 @@ function renderPopup() {
     ctx.strokeStyle = '#34495e'; ctx.lineWidth = 4;
     ctx.beginPath(); ctx.roundRect(px, py, pw, ph, 15); ctx.stroke();
     
-    if(activePopup.isPrompt) {
+    if (activePopup.isClearPopup) {
+        drawText("ゲームクリア！", px + pw/2, py + 40, 30, '#f1c40f', 'center', '900');
+        drawImageRect('clear', px + 40, py + 70, 520, 292);
+        
+        let cy = py + 390;
+        drawText(`総資産: ${activePopup.assets} G`, px + pw/2, cy, 22, '#f39c12', 'center'); cy += 30;
+        drawText(`最終レベル: Lv.${activePopup.level}`, px + pw/2, cy, 20, '#2c3e50', 'center'); cy += 30;
+        drawText(`クリア日数: ${activePopup.days}日`, px + pw/2, cy, 20, '#2c3e50', 'center'); cy += 40;
+        
+        if (activePopup.saving) {
+            drawText("ランキングデータ送信中...", px + pw/2, cy, 16, '#7f8c8d', 'center');
+        } else {
+            drawBtn("タイトルへ戻る", px + pw/2 - 100, cy - 20, 200, 50, '#3498db', () => {
+                activePopup = null;
+                GAME_STATE = "TITLE";
+            });
+        }
+    } else if(activePopup.isPrompt) {
         drawText(activePopup.text, px + pw/2, py + 40, 22, '#2c3e50', 'center');
         if (activePopup.subtext) {
             drawText(activePopup.subtext, px + pw/2, py + 120, 16, '#e74c3c', 'center');
