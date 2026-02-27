@@ -426,6 +426,16 @@ function drawPanel(x, y, w, h, title) {
     ctx.stroke();
 }
 
+function unequipItemByUid(uid) {
+    for(let k in gameData.equipment) {
+        if(gameData.equipment[k] === uid) {
+            gameData.equipment[k] = null;
+            addMessage("装備を外した。");
+            break;
+        }
+    }
+}
+
 // --- タイトル画面 ---
 function renderTitle() {
     drawImageRect('title', 0, 0, 1280, 720);
@@ -644,7 +654,7 @@ function drawStatusPanel(x, y) {
         }
         
         if(eq[s.key]) {
-            drawBtn("外す", x+270, cy-14, 45, 28, '#e74c3c', () => { eq[s.key] = null; });
+            drawBtn("外す", x+270, cy-14, 45, 28, '#e74c3c', () => { unequipItemByUid(eq[s.key]); });
         }
         cy += 45;
     });
@@ -691,11 +701,11 @@ function drawCenterPanel(x, y) {
 
 function drawRightPanel(x, y) {
     drawPanel(x, y, 460, 680, "持ち物・クラフト");
-    let cy = y + 60;
+    let cy = y + 70;
     
-    drawText(`所持金: ${gameData.gold} G`, x+20, cy, 22, '#f39c12');
+    drawText(`所持金: ${gameData.gold} G`, x+20, cy, 24, '#f39c12');
     
-    drawBtn("整理", x+360, cy-20, 80, 40, '#1abc9c', () => {
+    drawBtn("整理", x+360, cy-20, 80, 40, '#0097e6', () => {
         const typeOrder = {1:1, 2:2, 3:3, 4:4, 5:5, 9:6, 6:7, 7:8, 8:9};
         gameData.inventory.sort((a, b) => {
             let m1 = getObjById(ITEMS, a.itemId);
@@ -760,17 +770,6 @@ function drawRightPanel(x, y) {
     else renderInventoryList(x, y, cy);
 }
 
-function confirmSellAll(inv, master) {
-    activePopup = {
-        text: `このアイテムを全て売りますか？`,
-        subtext: `${master.name} x${inv.count} (+${master.price * inv.count}G)`,
-        onYes: () => {
-            sellItem(inv, master, true);
-            addMessage(`${master.name}を全て売却した。`);
-        }
-    };
-}
-
 function renderInventoryList(x, y, cy) {
     let list = gameData.inventory;
     const itemsPerPage = 10; 
@@ -812,28 +811,15 @@ function renderInventoryList(x, y, cy) {
 
         let isEquipped = Object.values(gameData.equipment).includes(inv.uid);
 
-        if(isEquip) {
+        if(isEquip || isPotion) {
             if(isEquipped) {
-                drawBtn("装備中", x+320, cy-15, 60, 30, '#e74c3c', () => {}, true);
+                drawBtn("装備中", x+320, cy-15, 60, 30, '#e74c3c', () => unequipItemByUid(inv.uid));
             } else {
                 drawBtn("装備", x+320, cy-15, 60, 30, '#2ecc71', () => equipItem(inv));
             }
             drawBtn("売却", x+390, cy-15, 50, 30, '#e67e22', () => sellItem(inv, master));
-        } else if (isPotion) {
-            if(isEquipped) {
-                drawBtn("装備中", x+310, cy-15, 50, 30, '#e74c3c', () => {}, true);
-            } else {
-                drawBtn("装備", x+310, cy-15, 50, 30, '#2ecc71', () => equipItem(inv));
-            }
-            drawBtn("売", x+365, cy-15, 35, 30, '#e67e22', () => sellItem(inv, master));
-            if (inv.count > 1) {
-                drawBtn("all", x+405, cy-15, 35, 30, '#d35400', () => confirmSellAll(inv, master));
-            }
         } else {
-            drawBtn("売却", x+350, cy-15, 45, 30, '#e67e22', () => sellItem(inv, master));
-            if (inv.count > 1) {
-                drawBtn("all", x+400, cy-15, 40, 30, '#d35400', () => confirmSellAll(inv, master));
-            }
+            drawBtn("売却", x+360, cy-15, 80, 30, '#e67e22', () => sellItem(inv, master));
         }
         cy += 45; 
     });
@@ -850,11 +836,10 @@ function equipItem(inv) {
     if(key) { gameData.equipment[key] = inv.uid; addMessage(`${m.name}を装備した。`); }
 }
 
-function sellItem(inv, master, sellAll = false) {
+function sellItem(inv, master) {
     for(let k in gameData.equipment) { if(gameData.equipment[k] === inv.uid) return addMessage("装備中は売却できません。"); }
-    let amount = sellAll ? inv.count : 1;
-    gameData.gold += master.price * amount; 
-    removeItem(inv.itemId, amount);
+    gameData.gold += master.price; 
+    removeItem(inv.itemId, 1);
     if(master.type >= 1 && master.type <= 4) gameData.inventory = gameData.inventory.filter(i => i.uid !== inv.uid);
 }
 
@@ -980,6 +965,8 @@ function finishExploration(isClear) {
         addMessage(`探索終了。経験値 ${exploreData.gainedExpTotal} を獲得した！`);
     }
 
+    checkLevelUp();
+
     if (gameData.equipment.potion) {
         let pUid = gameData.equipment.potion;
         let pInv = getInvItem(pUid);
@@ -999,7 +986,11 @@ function finishExploration(isClear) {
         
         let localRank = JSON.parse(localStorage.getItem('fgl_local_ranking')) || [];
         localRank.push(scoreData);
-        localRank.sort((a, b) => a.days - b.days || b.assets - a.assets);
+        localRank.sort((a, b) => {
+            if (a.isClear !== b.isClear) return b.isClear ? 1 : -1;
+            if (a.isClear) return a.days - b.days || b.assets - a.assets;
+            return b.assets - a.assets;
+        });
         localStorage.setItem('fgl_local_ranking', JSON.stringify(localRank));
         
         activePopup = {
@@ -1144,8 +1135,6 @@ function advanceFloor(isSkip) {
             addMessage(`${exploreData.currentFloor}階: 何も見つからなかった。`);
         }
 
-        checkLevelUp();
-
         if(exploreData.currentFloor >= exploreData.maxFloor) {
             addMessage(`${stg.name}の最深部を制覇した！`);
             if(gameData.maxStageLv === stg.lv) { gameData.maxStageLv++; addMessage(`新エリア解放！`); }
@@ -1222,7 +1211,11 @@ function finishGame(isClear) {
 
     let localRank = JSON.parse(localStorage.getItem('fgl_local_ranking')) || [];
     localRank.push(scoreData);
-    localRank.sort((a, b) => a.days - b.days || b.assets - a.assets);
+    localRank.sort((a, b) => {
+        if (a.isClear !== b.isClear) return b.isClear ? 1 : -1;
+        if (a.isClear) return a.days - b.days || b.assets - a.assets;
+        return b.assets - a.assets;
+    });
     localStorage.setItem('fgl_local_ranking', JSON.stringify(localRank));
 
     if(firebase.apps.length > 0 && firebaseConfig.apiKey !== "YOUR_API_KEY") {
@@ -1252,8 +1245,17 @@ function renderRanking() {
     drawBtn("ワールド", 690, 120, 150, 40, rankingTab==="WORLD" ? '#3498db' : '#bdc3c7', () => {
         rankingTab="WORLD";
         if(!rankingDataWorld && firebaseConfig.apiKey !== "YOUR_API_KEY") {
-            db.collection(FIRESTORE_COLLECTION).orderBy("days", "asc").orderBy("assets", "desc").limit(10).get()
-              .then(snap => { rankingDataWorld = []; snap.forEach(doc => rankingDataWorld.push(doc.data())); })
+            db.collection(FIRESTORE_COLLECTION).get()
+              .then(snap => { 
+                  let data = []; 
+                  snap.forEach(doc => data.push(doc.data())); 
+                  data.sort((a, b) => {
+                      if (a.isClear !== b.isClear) return b.isClear ? 1 : -1;
+                      if (a.isClear) return a.days - b.days || b.assets - a.assets;
+                      return b.assets - a.assets;
+                  });
+                  rankingDataWorld = data.slice(0, 10); 
+              })
               .catch(error => { 
                   console.error("ランキング取得エラー:", error);
                   if(error.message && error.message.includes("index")) {
