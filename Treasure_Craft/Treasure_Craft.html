@@ -329,12 +329,13 @@ function calculateTotalAssets() {
 }
 
 function getNextExp(level) {
-    return Math.floor(50 * Math.pow(1.5, level));
+    return 10 * Math.pow(level, 2);
 }
 
 function checkLevelUp() {
-    let nextExp = getNextExp(gameData.level);
-    while(gameData.exp >= nextExp) {
+    let reqExp = getNextExp(gameData.level);
+    while(gameData.exp >= reqExp) {
+        gameData.exp -= reqExp;
         gameData.level++;
         gameData.maxAp += 2;
         
@@ -346,7 +347,7 @@ function checkLevelUp() {
         gameData.baseStatus.mag += upMag;
 
         addMessage(`レベルアップ！Lv${gameData.level}に！最大AP+2 (攻+${upAtk}/防+${upDef}/魔+${upMag})`);
-        nextExp = getNextExp(gameData.level);
+        reqExp = getNextExp(gameData.level);
     }
 }
 
@@ -460,7 +461,8 @@ function renderTitle() {
     drawBtn("INDEXへ", rightX, row2Y, bW, bH, '#e2f0cb', () => { window.location.href = "../index.html"; });
 
     if(googleUser) {
-        drawText(`(GoogleIDでログイン中)`, 1260, 690, 20, '#ecf0f1', 'right');
+        let dispName = googleUser.displayName || googleUser.email || "ユーザー";
+        drawText(`(${dispName}でログイン中)`, 1260, 690, 20, '#ecf0f1', 'right');
     }
 }
 
@@ -576,26 +578,34 @@ function drawStatusPanel(x, y) {
     let cy = y + 70;
     drawText(`名前: ${currentPlayerName}`, x+20, cy, 24, '#2c3e50'); cy += 40;
     
-    let nextExp = getNextExp(gameData.level);
+    let reqExp = getNextExp(gameData.level);
+    let expLeft = reqExp - gameData.exp;
     drawText(`Lv: ${gameData.level}`, x+20, cy, 22, '#2c3e50'); cy += 30;
     
-    let expStr = `EXP: ${gameData.exp} / ${nextExp}`;
-    let expFontSize = 20;
-    if (gameData.exp >= 1000000 || nextExp >= 1000000) expFontSize = 14;
-    else if (gameData.exp >= 100000 || nextExp >= 100000) expFontSize = 16;
+    let expStr = `次のレベルまであと: ${expLeft} exp`;
+    let expFontSize = 18;
+    if (expLeft >= 1000000) expFontSize = 14;
+    else if (expLeft >= 100000) expFontSize = 16;
     drawText(expStr, x+20, cy, expFontSize, '#2c3e50'); cy += 40;
     
     drawText(`AP: ${gameData.ap} / ${gameData.maxAp}`, x+20, cy, 24, '#d35400'); cy += 40;
     drawText(`日数: ${gameData.day}日目`, x+20, cy, 24, '#2c3e50'); cy += 50;
 
     let eq = gameData.equipment;
-    let atk = (eq.weapon ? getActualStat(getInvItem(eq.weapon)) : 0) + gameData.baseStatus.atk;
-    let def = (eq.shield ? getActualStat(getInvItem(eq.shield)) : 0) + (eq.armor ? getActualStat(getInvItem(eq.armor)) : 0) + gameData.baseStatus.def;
-    let mag = (eq.accessory ? getActualStat(getInvItem(eq.accessory)) : 0) + gameData.baseStatus.mag;
+    let wStat = eq.weapon ? getActualStat(getInvItem(eq.weapon)) : 0;
+    let atkTotal = wStat + gameData.baseStatus.atk;
+    
+    let sStat = eq.shield ? getActualStat(getInvItem(eq.shield)) : 0;
+    let aStat = eq.armor ? getActualStat(getInvItem(eq.armor)) : 0;
+    let defEqTotal = sStat + aStat;
+    let defTotal = defEqTotal + gameData.baseStatus.def;
+    
+    let mStat = eq.accessory ? getActualStat(getInvItem(eq.accessory)) : 0;
+    let magTotal = mStat + gameData.baseStatus.mag;
 
-    drawText(`攻撃力: ${atk}`, x+20, cy, 22, '#2980b9'); cy += 35;
-    drawText(`防御力: ${def}`, x+20, cy, 22, '#27ae60'); cy += 35;
-    drawText(`魔法力: ${mag}`, x+20, cy, 22, '#8e44ad'); cy += 50;
+    drawText(`攻撃力: ${atkTotal} (基本${gameData.baseStatus.atk} + 装備${wStat})`, x+20, cy, 18, '#2980b9'); cy += 30;
+    drawText(`防御力: ${defTotal} (基本${gameData.baseStatus.def} + 装備${defEqTotal})`, x+20, cy, 18, '#27ae60'); cy += 30;
+    drawText(`魔法力: ${magTotal} (基本${gameData.baseStatus.mag} + 装備${mStat})`, x+20, cy, 18, '#8e44ad'); cy += 40;
 
     const slots = [
         {key:'weapon', icon:'buki'}, {key:'shield', icon:'tate'},
@@ -679,7 +689,7 @@ function drawRightPanel(x, y) {
     
     drawText(`所持金: ${gameData.gold} G`, x+20, cy, 22, '#f39c12');
     
-    drawBtn("整理", x+375, cy-15, 65, 30, '#3498db', () => {
+    drawBtn("整理", x+360, cy-20, 80, 40, '#1abc9c', () => {
         const typeOrder = {1:1, 2:2, 3:3, 4:4, 5:5, 9:6, 6:7, 7:8, 8:9};
         gameData.inventory.sort((a, b) => {
             let m1 = getObjById(ITEMS, a.itemId);
@@ -1136,17 +1146,16 @@ function renderShop(x, y) {
         if (item.name.length >= 15) fSize = 13;
         else if (item.name.length >= 11) fSize = 15;
 
-        let nameToDraw = item.name;
-        if (item.type === 9) {
-            nameToDraw += ` (所持:${countItem(item.id)})`;
-        }
-
-        drawText(`${nameToDraw} (${item.price}G)`, x+15, cy, fSize, isSoldOut ? '#95a5a6' : canBuy ? getItemColor(item) : '#e74c3c');
+        drawText(`${item.name} (${item.price}G)`, x+15, cy, fSize, isSoldOut ? '#95a5a6' : canBuy ? getItemColor(item) : '#e74c3c');
         
         let btnX = x+330;
         let btnY = cy-15;
         let btnW = 60;
         let btnH = 35;
+
+        if (item.type === 9) {
+            drawText(`所持:${countItem(item.id)}`, btnX - 10, cy, 14, '#2c3e50', 'right');
+        }
 
         if (isSoldOut) {
             drawBtn("売切", btnX, btnY, btnW, btnH, '#bdc3c7', () => {}, true);
