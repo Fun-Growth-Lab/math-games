@@ -1,0 +1,1327 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>トレジャー＆クラフト ～7つの秘境と幻の竜～</title>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;900&display=swap" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="data.js"></script>
+
+    <style>
+        body {
+            margin: 0; padding: 0; background-color: #2c3e50;
+            overflow: hidden; display: flex; justify-content: center;
+            align-items: center; height: 100vh;
+            font-family: 'M PLUS Rounded 1c', sans-serif; touch-action: none;
+        }
+        #gameContainer {
+            position: relative; width: 1280px; height: 720px;
+            transform-origin: center center; box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            background-color: #ecf0f1; flex-shrink: 0;
+        }
+        canvas { display: block; width: 100%; height: 100%; outline: none; }
+        
+        #nameInput {
+            display: none; position: absolute; left: 490px; top: 335px; width: 300px; height: 40px;
+            font-size: 20px; text-align: center; font-family: 'M PLUS Rounded 1c', sans-serif;
+            border: 2px solid #34495e; border-radius: 5px; outline: none; z-index: 10;
+            background: #fff; color: #2c3e50;
+        }
+    </style>
+</head>
+<body>
+
+<div id="gameContainer">
+    <canvas id="gameCanvas" width="1280" height="720"></canvas>
+    <input type="text" id="nameInput" maxlength="8">
+</div>
+
+<script>
+// ==========================================
+// 1. 定数・初期設定
+// ==========================================
+// ※実際のプロジェクト設定に書き換えてください
+const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_AUTH_DOMAIN",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_STORAGE_BUCKET",
+    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+    appId: "YOUR_APP_ID"
+};
+if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+}
+const db = firebase.firestore();
+const FIRESTORE_COLLECTION = "scores_treasure_craft";
+
+const cvs = document.getElementById("gameCanvas");
+const ctx = cvs.getContext("2d");
+
+// ==========================================
+// 2. レスポンシブ
+// ==========================================
+function resize() {
+    const ww = window.innerWidth;
+    const wh = window.innerHeight;
+    const aspect = 1280 / 720;
+    let scale = ww / wh < aspect ? ww / 1280 : wh / 720;
+    document.getElementById("gameContainer").style.transform = `scale(${scale})`;
+}
+window.addEventListener("resize", resize);
+resize();
+
+// ==========================================
+// 3. 画像管理 (フォールバック対応)
+// ==========================================
+const imgs = {};
+function loadImg(key, src, fallbackColor, fallbackText) {
+    imgs[key] = { img: new Image(), loaded: false, error: false, color: fallbackColor, text: fallbackText };
+    imgs[key].img.onload = () => imgs[key].loaded = true;
+    imgs[key].img.onerror = () => imgs[key].error = true;
+    imgs[key].img.src = src;
+}
+loadImg('title', 'images/title.png', '#34495e', 'タイトル画像');
+loadImg('map1', 'images/map1.png', '#27ae60', 'はじまりの森');
+loadImg('map2', 'images/map2.png', '#d35400', '銅の鉱山');
+loadImg('map3', 'images/map3.png', '#7f8c8d', '鉄の岩壁');
+loadImg('map4', 'images/map4.png', '#bdc3c7', '銀の廃都');
+loadImg('map5', 'images/map5.png', '#f1c40f', '黄金の神殿');
+loadImg('map6', 'images/map6.png', '#2980b9', '天空の砦');
+loadImg('map7', 'images/map7.png', '#c0392b', '竜の火口');
+loadImg('shop', 'images/shop.png', '#8e44ad', 'お店');
+loadImg('rest', 'images/rest.png', '#16a085', '休む');
+
+function drawImageRect(key, x, y, w, h) {
+    if (imgs[key] && imgs[key].loaded && !imgs[key].error) {
+        ctx.drawImage(imgs[key].img, x, y, w, h);
+    } else {
+        ctx.fillStyle = imgs[key] ? imgs[key].color : '#7f8c8d';
+        ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 30px "M PLUS Rounded 1c"';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(imgs[key] ? imgs[key].text : key, x + w / 2, y + h / 2);
+    }
+}
+
+// ==========================================
+// 4. システム状態・変数
+// ==========================================
+const NG_WORDS_HIRAGANA = [
+    'しね', 'しぬ', 'しに', 'ころす', 'ころせ', 'さつがい', 'くたばれ', 'じさつ', 'ぎさつ', 'つるす', 'れんたん', 'しにたい',
+    'てろ', 'てろりすと', 'ばくは', 'ばくだん', 'ほうか', 'はんざい', 'ごうとう', 'ゆうかい', 'かんきん', 'おそう', 'やくざ', 'ぼうりょく',
+    'はんぐれ', 'ちんぴら', 'まふぃあ', 'たいま', 'まやく', 'かくせいざい', 'しゃぶ', 'どらっぐ', 'こかいん', 'へろいん', 'えくすたしー',
+    'だっぽう', 'きめせく', 'いじめ', 'ぎゃくたい', 'ばか', 'あほ', 'まぬけ', 'きちがい', 'き違い', 'うざい', 'うざ', 'きもい', 'きも',
+    'きしょい', 'きえろ', 'くず', 'ごみ', 'ごみむし', 'かす', 'ざこ', 'ぜつ', 'ぶす', 'でぶ', 'はげ', 'ちび', 'でっぱ', 'いなかもの',
+    'うじ', 'はいぼく', 'まけいぬ', 'おつむ', 'のうたりん', 'ていのう', 'ちしょう', 'しょうがい', 'がいじ', 'かたわ', 'びっこ', 'めくら',
+    'つんぼ', 'おし', 'どじん', 'えた', 'ひにん', 'たひ', 'たひね', 'うせろ', 'だまれ', 'ちんちん', 'ちんこ', 'ちんぽ', 'ちんか',
+    'まら', 'さお', 'まんこ', 'まんしゅう', 'まんげ', 'われめ', 'おまた', 'くり', 'くりとりす', 'いんしん', 'いんかく', 'びらびら',
+    'こうがん', 'たまきん', 'きんたま', 'ふぐり', 'おっぱい', 'ちち', 'にゅうりん', 'にゅうとう', 'きょにゅう', 'ひんにゅう',
+    'けつ', 'あなる', 'こうもん', 'けつのあな', 'えろ', 'えっち', 'すけべ', 'へんたい', 'むっつり', 'しこ', 'せっくす', 'せいこう',
+    'まぐわい', 'そうにゅう', 'はめる', 'おなにー', 'じい', 'しこしこ', 'ふぇら', 'ぱいずり', 'くんに', 'いらま', 'しっしん', 'なかだし',
+    'ごっくん', 'ぶっかけ', 'しおふき', 'ぜっちょう', 'いく', 'いかせろ', 'あえぎ', 'どうてい', 'しょじょ', 'やりまん', 'やりちん',
+    'びっち', 'せふれ', 'ぱこ', 'ぱこぱこ', 'わいせつ', 'ろり', 'しょた', 'ぺど', 'きんしん', 'じゅうかん', 'りょうじょく', 'らんこう',
+    'すかんと', 'のーぱん', 'ぱんちら', 'れいぷ', 'ごうかん', 'ちかん', 'とうさつ', 'のぞき', 'ろしゅつ', 'ふうぞく', 'そーぷ',
+    'へるす', 'でりへる', 'ぴんさろ', 'いめくら', 'あだると', 'えーぶい', 'えぶい', 'ぽるの', 'うらびでお', 'むしゅうせい', 'えんこう',
+    'えんじょ', 'うり', 'かいしゅん', 'ばいしゅん', 'ぱぱかつ', 'ままかつ', 'うりせん', 'うんこ', 'うんち', 'くそ', 'げり', 'べん',
+    'ふん', 'しっこ', 'しょんべん', 'にょう', 'ほうにょう', 'へ', 'おなら', 'げろ', 'たん', 'うんえい', 'こうしき', 'すたっふ',
+    'かんり', 'ぱとろーる', 'じえむ', 'げーむますたー', 'ますたー', 'あどみん', 'しすてむ', 'さーばー', 'あかばん', 'ばん', 'ちーと',
+    'ちーたー', 'ばぐ', 'らいん', 'かかお', 'すかいぷ', 'いんすた', 'ついったー', 'でぃすこ', 'でんわ', 'ばんごう', 'けいたい',
+    'あどれす', 'めあど', 'じゅうしょ', 'あお', 'あいたい', 'まちあわせ', 'ほてる', 'らぶほ', 'おふかい', 'ぱすわーど', 'ぱす',
+    'あかうんと', 'こじんじょうほう'
+];
+let GAME_STATE = "TITLE"; 
+let clickZones = [];
+let localPlayers = JSON.parse(localStorage.getItem('fgl_players')) || [];
+let currentPlayerName = "ゲスト";
+let googleUser = null;
+
+let gameData = {
+    day: 1, ap: 10, maxAp: 10, level: 1, exp: 0, gold: 0, maxStageLv: 1,
+    inventory: [], equipment: { weapon: null, shield: null, armor: null, accessory: null, potion: null },
+    unlockedRecipes: [], messages: ["新しい冒険が始まります。"], uidCounter: 1,
+    baseStatus: { atk: 0, def: 0, mag: 0 }
+};
+
+let currentInvTab = "ALL"; 
+let invPage = 0;
+let craftTabLevel = 1; 
+
+let shopTab = "COMMON";
+let shopPage = 0;
+
+let exploreData = { stage: null, currentFloor: 0, maxFloor: 0, maxPossibleFloor: 0 };
+let showHelp = false;
+let activePopup = null; 
+let restEffect = { active: false, alpha: 0, phase: 'in' }; 
+
+let rankingTab = "LOCAL"; 
+let rankingDataWorld = null;
+
+// ==========================================
+// 5. ロジックヘルパー
+// ==========================================
+function getObjById(arr, id) { return arr.find(o => o.id === id); }
+
+function getItemColor(master) {
+    let t = master.type;
+    if (t >= 1 && t <= 5) return '#2980b9'; // Weapon, Shield, Armor, Acc, Potion
+    if (t === 6 || t === 7) return '#27ae60'; // Processed, Raw
+    if (t === 8) return '#7f8c8d'; // Trash
+    if (t === 9) return '#8e44ad'; // Part
+    if (t === 10) return '#d35400'; // Recipe
+    return '#2c3e50';
+}
+
+function addMessage(msg) {
+    let maxLen = 26;
+    for (let i = 0; i < msg.length; i += maxLen) {
+        gameData.messages.push(msg.substring(i, i + maxLen));
+    }
+    if (gameData.messages.length > 10) {
+        gameData.messages.splice(0, gameData.messages.length - 10);
+    }
+}
+
+function getActualStat(invItem) {
+    let upg = invItem.upgrade || 0;
+    return Math.floor(invItem.stat * (1 + 0.1 * upg));
+}
+
+function calcCombatPower() {
+    let atk = 0, defCloth = 0, defShield = 0, mag = 0, potionLv = 0;
+    const eq = gameData.equipment;
+    if (eq.weapon) atk = getActualStat(getInvItem(eq.weapon));
+    if (eq.shield) defShield = getActualStat(getInvItem(eq.shield));
+    if (eq.armor) defCloth = getActualStat(getInvItem(eq.armor));
+    if (eq.accessory) mag = getActualStat(getInvItem(eq.accessory));
+    if (eq.potion) potionLv = getObjById(ITEMS, getInvItem(eq.potion).itemId).lv;
+    
+    let accMultiplier = 0.5 + Math.random() * 1.5;
+    
+    let baseAtk = gameData.baseStatus.atk;
+    let baseDef = gameData.baseStatus.def;
+    let baseMag = gameData.baseStatus.mag;
+    
+    let totalAtkVal = (atk + baseAtk) * 2;
+    let totalDefVal = defShield + (defCloth * 3) + (baseDef * 2); 
+    let totalMagVal = (mag + baseMag) * accMultiplier;
+
+    let basePower = totalAtkVal + totalDefVal + totalMagVal;
+    return Math.floor(basePower * (1 + potionLv * 0.1));
+}
+
+function getInvItem(uid) { return gameData.inventory.find(i => i.uid === uid); }
+function countItem(itemId) {
+    const t = getObjById(ITEMS, itemId).type;
+    if(t >= 1 && t <= 5) return gameData.inventory.filter(i => i.itemId === itemId).length;
+    const i = gameData.inventory.find(i => i.itemId === itemId);
+    return i ? i.count : 0;
+}
+
+function addItem(itemId, stat = 0, count = 1) {
+    const itemMaster = getObjById(ITEMS, itemId);
+    if(itemMaster.type >= 1 && itemMaster.type <= 5) {
+        for(let i=0; i<count; i++) gameData.inventory.push({ uid: gameData.uidCounter++, itemId: itemId, stat: stat, upgrade: 0, count: 1 });
+    } else {
+        let exist = gameData.inventory.find(i => i.itemId === itemId);
+        if (exist) exist.count += count;
+        else gameData.inventory.push({ uid: gameData.uidCounter++, itemId: itemId, stat: 0, count: count });
+    }
+}
+
+function removeItem(itemId, count = 1) {
+    const itemMaster = getObjById(ITEMS, itemId);
+    if(itemMaster.type < 1 || itemMaster.type > 5) {
+        let exist = gameData.inventory.find(i => i.itemId === itemId);
+        if (exist) {
+            exist.count -= count;
+            if (exist.count <= 0) gameData.inventory = gameData.inventory.filter(i => i.itemId !== itemId);
+        }
+    }
+}
+
+function getGaussianStat(baseStat) {
+    if (baseStat === 0) return 0;
+    let u = 0, v = 0;
+    while(u === 0) u = Math.random();
+    while(v === 0) v = Math.random();
+    let num = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+    let multiplier = 1 + (num * 0.15);
+    return Math.max(1, Math.floor(baseStat * multiplier));
+}
+
+function getEquipRarityStar(stat, baseStat) {
+    if(baseStat === 0) return "";
+    let Z = (stat / baseStat - 1) / 0.15;
+    if(Z <= -1.28) return "⭐";
+    if(Z <= -0.385) return "⭐⭐";
+    if(Z <= 0.385) return "⭐⭐⭐";
+    if(Z <= 1.28) return "⭐⭐⭐⭐";
+    return "⭐⭐⭐⭐⭐";
+}
+
+function getLootRarityCoin(prob) {
+    if(prob <= 2) return "🪙🪙🪙🪙🪙";
+    if(prob <= 4) return "🪙🪙🪙🪙";
+    if(prob <= 6) return "🪙🪙🪙";
+    if(prob <= 8) return "🪙🪙";
+    return "🪙";
+}
+
+function getStageFloorDifficulty(n, m) {
+    const TARGET_CP = [
+        0,
+        (5*7),
+        (15*7)*1.2,
+        (40*7)*1.3,
+        (100*7)*1.4,
+        (250*7)*1.5,
+        (600*7)*1.6,
+        (1500*7)*1.7
+    ];
+    if (n === 1) {
+        if (m <= 2) return 0;
+        return TARGET_CP[1] * ((m - 2) / 8);
+    } else {
+        let prevC = TARGET_CP[n - 1];
+        let currC = TARGET_CP[n];
+        let maxM = n * 5 + 5;
+        let val = prevC + (currC - prevC) * (m - 3) / (maxM - 3);
+        return Math.max(0, val);
+    }
+}
+
+function calculateTotalAssets() {
+    let assets = gameData.gold;
+    gameData.inventory.forEach(inv => { assets += (getObjById(ITEMS, inv.itemId).price * inv.count); });
+    return assets;
+}
+
+function checkLevelUp() {
+    let nextExp = gameData.level * gameData.level * 25 + 25;
+    while(gameData.exp >= nextExp) {
+        gameData.level++;
+        gameData.maxAp += 2;
+        
+        let upAtk = Math.floor(Math.random() * 3) + 1;
+        let upDef = Math.floor(Math.random() * 3) + 1;
+        let upMag = Math.floor(Math.random() * 3) + 1;
+        gameData.baseStatus.atk += upAtk;
+        gameData.baseStatus.def += upDef;
+        gameData.baseStatus.mag += upMag;
+
+        addMessage(`レベルアップ！Lv${gameData.level}に！最大AP+2 (攻+${upAtk}/防+${upDef}/魔+${upMag})`);
+        nextExp = gameData.level * gameData.level * 25 + 25;
+    }
+}
+
+function initializeGame() {
+    gameData = {
+        day: 1, ap: 10, maxAp: 10, level: 1, exp: 0, gold: 100, maxStageLv: 1,
+        inventory: [], equipment: { weapon: null, shield: null, armor: null, accessory: null, potion: null },
+        unlockedRecipes: [], messages: ["冒険が始まります。"], uidCounter: 1,
+        baseStatus: { atk: 0, def: 0, mag: 0 }
+    };
+    let wood = ITEMS.find(i => i.name === '木');
+    if(wood) addItem(wood.id, 0, 1);
+    GAME_STATE = "MAIN";
+}
+
+function getRecipeRequirements(targetMaster, rule) {
+    let baseName = "", matCount = 1;
+    if(targetMaster.type === 1) { baseName = "棒"; matCount = 2; }
+    else if(targetMaster.type === 2) { baseName = "ひも"; matCount = 1; }
+    else if(targetMaster.type === 3) { baseName = "布"; matCount = 3; }
+    else if(targetMaster.type === 4) { baseName = "指輪"; matCount = 1; }
+    else if(targetMaster.type === 5) { baseName = "水"; matCount = 1; }
+    else return null; 
+    
+    let baseItem = ITEMS.find(i => i.name === baseName);
+    let matItem = getObjById(ITEMS, rule.mat1Id);
+    return { baseItem, matItem, matCount };
+}
+
+// ==========================================
+// 6. メインループと描画
+// ==========================================
+function addZone(x, y, w, h, onClick) { clickZones.push({ x, y, w, h, onClick }); }
+
+function drawText(text, x, y, size, color, align="left", weight="bold") {
+    ctx.fillStyle = color;
+    ctx.font = `${weight} ${size}px "M PLUS Rounded 1c"`;
+    ctx.textAlign = align;
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, x, y);
+}
+
+function drawTextWithStar(text, star, x, y, size, color) {
+    ctx.fillStyle = color;
+    ctx.font = `bold ${size}px "M PLUS Rounded 1c"`;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, x, y);
+    if(star) {
+        let txtWidth = ctx.measureText(text).width;
+        ctx.font = `normal ${Math.floor(size * 0.7)}px "M PLUS Rounded 1c"`;
+        ctx.fillText(" " + star, x + txtWidth, y);
+    }
+}
+
+function drawBtn(text, x, y, w, h, color, onClick, disabled=false) {
+    ctx.fillStyle = disabled ? '#95a5a6' : color;
+    if (disabled && text === "装備中" || text === "売切") {
+        ctx.fillStyle = text === "装備中" ? '#e74c3c' : '#7f8c8d';
+    }
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, 10); ctx.fill();
+    ctx.strokeStyle = '#2c3e50'; ctx.lineWidth = 3; ctx.stroke();
+    let fSize = Math.min(22, Math.floor(h * 0.5));
+    drawText(text, x + w/2, y + h/2, fSize, '#fff', 'center');
+    if (!disabled) addZone(x, y, w, h, onClick);
+}
+
+function drawPanel(x, y, w, h, title) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, 15);
+    ctx.clip(); 
+
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.fill();
+
+    if(title) {
+        ctx.fillStyle = '#34495e';
+        ctx.fillRect(x, y, w, 40); 
+        drawText(title, x + w/2, y + 20, 22, '#fff', 'center');
+    }
+
+    ctx.restore();
+
+    ctx.strokeStyle = '#34495e'; 
+    ctx.lineWidth = 4;
+    ctx.beginPath(); 
+    ctx.roundRect(x, y, w, h, 15); 
+    ctx.stroke();
+}
+
+// --- タイトル画面 ---
+function renderTitle() {
+    drawImageRect('title', 0, 0, 1280, 720);
+    ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0,0,1280,720);
+    
+    drawText("トレジャー＆クラフト", 640, 120, 80, '#f1c40f', 'center', '900');
+    drawText("～7つの秘境と幻の竜～", 640, 210, 40, '#ecf0f1', 'center');
+
+    let startY = 320;
+    let bW = 260; 
+    let bH = 60;
+    let gapX = 40;
+    let gapY = 40;
+    
+    let leftX = 640 - bW - (gapX / 2);
+    let rightX = 640 + (gapX / 2);
+
+    let row1Y = startY;
+    let row2Y = startY + bH + gapY;
+
+    drawBtn("はじめる", leftX, row1Y, bW, bH, '#ffb3ba', () => { GAME_STATE = "PLAYER_SELECT"; });
+    
+    let loginTxt = googleUser ? "ログアウト" : "Googleでログイン";
+    let loginCol = googleUser ? '#d3d3d3' : '#bae1ff';
+    drawBtn(loginTxt, rightX, row1Y, bW, bH, loginCol, () => { 
+        if(googleUser) logout(); else loginWithGoogle(); 
+    });
+
+    drawBtn("ランキング", leftX, row2Y, bW, bH, '#ffd8b1', () => { 
+        rankingTab = "LOCAL"; rankingDataWorld = null; GAME_STATE = "RANKING"; 
+    });
+
+    drawBtn("INDEXへ", rightX, row2Y, bW, bH, '#e2f0cb', () => { window.location.href = "../index.html"; });
+
+    if(googleUser) {
+        drawText(`(GoogleIDでログイン中)`, 1260, 690, 20, '#ecf0f1', 'right');
+    }
+}
+
+function loginWithGoogle() {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    firebase.auth().signInWithPopup(provider).then((result) => {
+        googleUser = result.user;
+        activePopup = { text: `${googleUser.displayName}さん、ようこそ！`, isAlert: true };
+    }).catch((error) => {
+        activePopup = { text: "ログインに失敗しました。", isAlert: true };
+    });
+}
+
+function logout() {
+    firebase.auth().signOut().then(() => {
+        googleUser = null;
+        activePopup = { text: "ログアウトしました。", isAlert: true };
+    });
+}
+
+function showPrompt(title, defaultVal, callback) {
+    const inp = document.getElementById("nameInput");
+    inp.value = defaultVal || "";
+    inp.style.display = "block";
+    inp.focus();
+    
+    activePopup = {
+        isPrompt: true,
+        text: title,
+        onYes: () => {
+            let val = inp.value;
+            inp.style.display = "none";
+            callback(val);
+        },
+        onNo: () => {
+            inp.style.display = "none";
+            activePopup = null;
+        }
+    };
+}
+
+function handleNameRegistration(val, index = -1) {
+    if (!val) { activePopup = null; return; }
+    if (!/^[ぁ-んー]{1,8}$/.test(val)) {
+        activePopup = { text: "ひらがな・長音のみ、1〜8文字で入力してください。", isAlert: true };
+        return;
+    }
+    for(let w of NG_WORDS_HIRAGANA) {
+        if(val.includes(w)) {
+            activePopup = { text: "使用できない言葉が含まれています。", isAlert: true };
+            return;
+        }
+    }
+    
+    if (index >= 0) {
+        localPlayers[index] = val;
+        localStorage.setItem('fgl_players', JSON.stringify(localPlayers));
+        activePopup = null;
+    } else {
+        localPlayers.push(val);
+        localStorage.setItem('fgl_players', JSON.stringify(localPlayers));
+        currentPlayerName = val; 
+        activePopup = null;
+        initializeGame();
+    }
+}
+
+function renderPlayerSelect() {
+    drawImageRect('title', 0, 0, 1280, 720);
+    ctx.fillStyle = 'rgba(236, 240, 241, 0.85)'; 
+    ctx.fillRect(0,0,1280,720);
+    drawText("プレイヤー選択", 640, 80, 40, '#2c3e50', 'center');
+
+    for (let i = 0; i < 5; i++) {
+        let py = 150 + i * 70;
+        if (i < localPlayers.length) {
+            drawBtn(`${localPlayers[i]} で開始`, 470, py, 340, 50, '#3498db', () => {
+                currentPlayerName = localPlayers[i]; initializeGame();
+            });
+            drawBtn("変更", 830, py, 100, 50, '#f39c12', () => {
+                showPrompt("新しいプレイヤー名", localPlayers[i], (val) => {
+                    handleNameRegistration(val, i);
+                });
+            });
+            drawBtn("消去", 950, py, 100, 50, '#e74c3c', () => {
+                activePopup = {
+                    text: `${localPlayers[i]} を消去してよろしいですか？`,
+                    subtext: "※この操作は取り消せません",
+                    onYes: () => {
+                        localPlayers.splice(i, 1);
+                        localStorage.setItem('fgl_players', JSON.stringify(localPlayers));
+                    }
+                };
+            });
+        } else if (i === localPlayers.length) {
+            drawBtn("新しく登録", 470, py, 340, 50, '#2ecc71', () => {
+                showPrompt("新しいプレイヤー名", "", (val) => {
+                    handleNameRegistration(val, -1);
+                });
+            });
+        } else {
+            drawBtn("（あき）", 470, py, 340, 50, '#bdc3c7', () => {});
+        }
+    }
+    
+    drawText("※ひらがな・長音(ー)のみ入力可能、最大8文字（NGワードチェックあり）", 640, 550, 20, '#e74c3c', 'center');
+    drawBtn("タイトルへ戻る", 540, 620, 200, 50, '#7f8c8d', () => { GAME_STATE = "TITLE"; });
+}
+
+// --- メインUI ---
+function drawStatusPanel(x, y) {
+    drawPanel(x, y, 330, 680, "ステータス");
+    let cy = y + 70;
+    drawText(`名前: ${currentPlayerName}`, x+20, cy, 24, '#2c3e50'); cy += 40;
+    
+    let nextExp = gameData.level * gameData.level * 25 + 25;
+    drawText(`Lv: ${gameData.level}  (EXP: ${gameData.exp} / ${nextExp})`, x+20, cy, 22, '#2c3e50'); cy += 40;
+    drawText(`AP: ${gameData.ap} / ${gameData.maxAp}`, x+20, cy, 24, '#d35400'); cy += 40;
+    drawText(`日数: ${gameData.day}日目`, x+20, cy, 24, '#2c3e50'); cy += 50;
+
+    let eq = gameData.equipment;
+    let atk = (eq.weapon ? getActualStat(getInvItem(eq.weapon)) : 0) + gameData.baseStatus.atk;
+    let def = (eq.shield ? getActualStat(getInvItem(eq.shield)) : 0) + (eq.armor ? getActualStat(getInvItem(eq.armor)) : 0) + gameData.baseStatus.def;
+    let mag = (eq.accessory ? getActualStat(getInvItem(eq.accessory)) : 0) + gameData.baseStatus.mag;
+
+    drawText(`攻撃力: ${atk}`, x+20, cy, 22, '#2980b9'); cy += 35;
+    drawText(`防御力: ${def}`, x+20, cy, 22, '#27ae60'); cy += 35;
+    drawText(`魔法力: ${mag}`, x+20, cy, 22, '#8e44ad'); cy += 50;
+
+    const slots = [
+        {key:'weapon', name:'武器'}, {key:'shield', name:'盾'},
+        {key:'armor', name:'鎧'}, {key:'accessory', name:'装飾品'}, {key:'potion', name:'薬'}
+    ];
+    slots.forEach(s => {
+        let itemStr = "なし";
+        let starStr = "";
+        let color = '#7f8c8d';
+        if(eq[s.key]) {
+            let invItem = getInvItem(eq[s.key]);
+            let m = getObjById(ITEMS, invItem.itemId);
+            let actualStat = getActualStat(invItem);
+            let upgStr = (invItem.upgrade || 0) > 0 ? `+${invItem.upgrade}` : "";
+            
+            if (m.type >= 1 && m.type <= 4) starStr = getEquipRarityStar(invItem.stat, m.stat);
+            
+            if(m.type === 1) itemStr = `${m.name}${upgStr} (攻${actualStat})`;
+            else if(m.type === 2 || m.type === 3) itemStr = `${m.name}${upgStr} (防${actualStat})`;
+            else if(m.type === 4) itemStr = `${m.name}${upgStr} (魔${actualStat})`;
+            else if(m.type === 5) itemStr = m.name;
+            color = getItemColor(m);
+        }
+        drawTextWithStar(`${s.name}: ${itemStr}`, starStr, x+15, cy, 18, color);
+        
+        if(eq[s.key]) {
+            drawBtn("外す", x+270, cy-14, 45, 28, '#e74c3c', () => { eq[s.key] = null; });
+        }
+        cy += 45;
+    });
+
+    drawBtn("ヘルプ", x+20, y+620, 290, 40, '#f39c12', () => { showHelp = true; });
+}
+
+function drawCenterPanel(x, y) {
+    drawPanel(x, y, 410, 680, "");
+    
+    let imgKey = GAME_STATE === "SHOP" ? 'shop' : 'rest';
+    drawImageRect(imgKey, x+10, y+10, 390, 219);
+
+    ctx.fillStyle = '#ecf0f1'; ctx.fillRect(x+10, y+240, 390, 250);
+    ctx.strokeStyle = '#bdc3c7'; ctx.strokeRect(x+10, y+240, 390, 250);
+    for(let i=0; i<gameData.messages.length; i++) drawText(gameData.messages[i], x+20, y+265 + i*22, 16, '#2c3e50');
+
+    drawBtn("探索", x+20, y+510, 175, 60, '#2ecc71', () => { GAME_STATE = "EXPLORE_SELECT"; });
+    drawBtn("お店", x+215, y+510, 175, 60, '#9b59b6', () => { GAME_STATE = "SHOP"; });
+    drawBtn("休む", x+20, y+590, 175, 60, '#f1c40f', () => {
+        activePopup = {
+            text: "休みますか？",
+            subtext: "APが回復して次の日になります。",
+            onYes: () => {
+                restEffect.active = true; restEffect.alpha = 0; restEffect.phase = 'in';
+            }
+        };
+    });
+    drawBtn("終了", x+215, y+590, 175, 60, '#e74c3c', () => {
+        activePopup = {
+            text: "ここで冒険を終了して本当によろしいですか？",
+            subtext: "※セーブはされません。",
+            onYes: () => finishGame(false)
+        };
+    });
+}
+
+function drawRightPanel(x, y) {
+    drawPanel(x, y, 460, 680, "持ち物・クラフト");
+    let cy = y + 60;
+    drawText(`所持金: ${gameData.gold} G`, x+20, cy, 22, '#f39c12'); cy += 40;
+
+    drawBtn("全て", x+20, cy, 70, 35, currentInvTab==="ALL" ? '#3498db' : '#bdc3c7', () => {currentInvTab="ALL"; invPage=0;});
+    drawBtn("合成", x+95, cy, 70, 35, currentInvTab==="CRAFT" ? '#3498db' : '#bdc3c7', () => {currentInvTab="CRAFT"; invPage=0;});
+    drawBtn("強化", x+170, cy, 70, 35, currentInvTab==="ENHANCE" ? '#3498db' : '#bdc3c7', () => {currentInvTab="ENHANCE"; invPage=0;});
+    
+    if(currentInvTab === "ALL") {
+        drawBtn("換金物の一括売却", x+245, cy, 195, 35, '#e67e22', () => {
+            let lootItems = [];
+            let totalVal = 0;
+            gameData.inventory.forEach(inv => {
+                let m = getObjById(ITEMS, inv.itemId);
+                let isMat = false;
+                if(typeof CRAFT_RULES !== 'undefined') {
+                    for(let k in CRAFT_RULES) {
+                        if(CRAFT_RULES[k].mat1Id === m.id || CRAFT_RULES[k].mat2Id === m.id) { isMat = true; break; }
+                    }
+                }
+                let isEquip = m.type >= 1 && m.type <= 4;
+                let isPotion = m.type === 5;
+                let isShopItem = m.type === 9 || m.type === 10;
+                let isLoot = !isEquip && !isPotion && !isShopItem && !isMat;
+                
+                if(isLoot) {
+                    lootItems.push(inv);
+                    totalVal += m.price * inv.count;
+                }
+            });
+            
+            if(lootItems.length === 0) {
+                addMessage("一括売却できる換金物はありません。");
+                return;
+            }
+            activePopup = {
+                text: `換金物を全て売却して ${totalVal} G に換えます。`,
+                subtext: "よろしいですか？",
+                onYes: () => {
+                    lootItems.forEach(inv => {
+                        gameData.gold += getObjById(ITEMS, inv.itemId).price * inv.count;
+                        gameData.inventory = gameData.inventory.filter(i => i.uid !== inv.uid);
+                    });
+                    addMessage(`換金物を一括売却し、${totalVal} G 得た。`);
+                }
+            };
+        });
+    }
+    
+    cy += 70; 
+
+    if(currentInvTab === "CRAFT") renderCraftList(x, y, cy);
+    else if(currentInvTab === "ENHANCE") renderEnhanceList(x, y, cy);
+    else renderInventoryList(x, y, cy);
+}
+
+function renderInventoryList(x, y, cy) {
+    let list = gameData.inventory;
+    const itemsPerPage = 10; 
+    let maxPage = Math.max(0, Math.ceil(list.length / itemsPerPage) - 1);
+    let pageItems = list.slice(invPage * itemsPerPage, (invPage + 1) * itemsPerPage);
+
+    pageItems.forEach(inv => {
+        let master = getObjById(ITEMS, inv.itemId);
+        
+        let isEquip = master.type >= 1 && master.type <= 4;
+        let isPotion = master.type === 5;
+        
+        let star = "";
+        if (isEquip) star = getEquipRarityStar(inv.stat, master.stat);
+        else if (master.type === 8 && master.prob) star = getLootRarityCoin(master.prob);
+
+        let upgStr = (inv.upgrade || 0) > 0 ? `+${inv.upgrade}` : "";
+        let nameTxt = master.name + upgStr;
+        let actualStat = getActualStat(inv);
+
+        if(master.type === 1) nameTxt += ` (攻${actualStat})`;
+        else if(master.type === 2 || master.type === 3) nameTxt += ` (防${actualStat})`;
+        else if(master.type === 4) nameTxt += ` (魔${actualStat})`;
+
+        let textColor = getItemColor(master);
+
+        let currentX = x + 15;
+        drawTextWithStar(nameTxt, star, currentX, cy, 18, textColor);
+
+        if(!isEquip) {
+            drawText(`x${inv.count}`, x + 240, cy, 18, '#2c3e50', 'right');
+        }
+
+        drawText(`${master.price}G`, x + 310, cy, 18, '#f39c12', 'right');
+
+        let isEquipped = Object.values(gameData.equipment).includes(inv.uid);
+
+        if(isEquip || isPotion) {
+            if(isEquipped) {
+                drawBtn("装備中", x+320, cy-15, 60, 30, '#e74c3c', () => {}, true);
+            } else {
+                drawBtn("装備", x+320, cy-15, 60, 30, '#2ecc71', () => equipItem(inv));
+            }
+            drawBtn("売却", x+390, cy-15, 50, 30, '#e67e22', () => sellItem(inv, master));
+        } else {
+            drawBtn("売却", x+360, cy-15, 80, 30, '#e67e22', () => sellItem(inv, master));
+        }
+        cy += 45; 
+    });
+
+    drawText(`${invPage+1} / ${maxPage+1}`, x+230, y+640, 18, '#2c3e50', 'center');
+    if(invPage > 0) drawBtn("＜", x+110, y+625, 50, 35, '#34495e', () => invPage--);
+    if(invPage < maxPage) drawBtn("＞", x+300, y+625, 50, 35, '#34495e', () => invPage++);
+}
+
+function equipItem(inv) {
+    let m = getObjById(ITEMS, inv.itemId), key = "";
+    if(m.type === 1) key = 'weapon'; if(m.type === 2) key = 'shield';
+    if(m.type === 3) key = 'armor'; if(m.type === 4) key = 'accessory'; if(m.type === 5) key = 'potion';
+    if(key) { gameData.equipment[key] = inv.uid; addMessage(`${m.name}を装備した。`); }
+}
+
+function sellItem(inv, master) {
+    for(let k in gameData.equipment) { if(gameData.equipment[k] === inv.uid) return addMessage("装備中は売却できません。"); }
+    gameData.gold += master.price; removeItem(inv.itemId, 1);
+    if(master.type >= 1 && master.type <= 5) gameData.inventory = gameData.inventory.filter(i => i.uid !== inv.uid);
+}
+
+function renderCraftList(x, y, cy) {
+    let tabCy = cy - 10;
+    for(let i=1; i<=7; i++) {
+        let btnX = x + 20 + (i-1)*55;
+        drawBtn(`Lv${i}`, btnX, tabCy, 50, 30, craftTabLevel===i ? '#e67e22' : '#bdc3c7', () => {
+            craftTabLevel = i;
+            invPage = 0;
+        });
+    }
+    cy += 40;
+
+    let craftableIds = Object.keys(CRAFT_RULES).map(Number).filter(id => {
+        let isUnlocked = gameData.unlockedRecipes.includes(CRAFT_RULES[id].recipeId);
+        let m = getObjById(ITEMS, id);
+        return isUnlocked && m.lv === craftTabLevel;
+    });
+
+    const itemsPerPage = 7; 
+    let maxPage = Math.max(0, Math.ceil(craftableIds.length / itemsPerPage) - 1);
+    let pageItems = craftableIds.slice(invPage * itemsPerPage, (invPage + 1) * itemsPerPage);
+
+    pageItems.forEach(targetId => {
+        let rule = CRAFT_RULES[targetId];
+        let targetMaster = getObjById(ITEMS, targetId);
+        let tColor = getItemColor(targetMaster);
+        
+        let reqs = getRecipeRequirements(targetMaster, rule);
+        if (reqs && reqs.baseItem && reqs.matItem) {
+            let cBase = countItem(reqs.baseItem.id);
+            let cMat = countItem(reqs.matItem.id);
+            let canCraft = (cBase >= 1) && (cMat >= reqs.matCount);
+            
+            drawText(targetMaster.name, x+15, cy-15, 20, canCraft ? tColor : '#95a5a6');
+            drawText(`${reqs.baseItem.name}(${cBase}/1) + ${reqs.matItem.name}(${cMat}/${reqs.matCount})`, x+15, cy+15, 16, '#7f8c8d');
+            
+            drawBtn("作成", x+350, cy-20, 80, 40, canCraft ? '#3498db' : '#bdc3c7', () => {
+                if(gameData.ap < 1) return addMessage("APが足りません。");
+                removeItem(reqs.baseItem.id, 1);
+                removeItem(reqs.matItem.id, reqs.matCount);
+                gameData.ap -= 1;
+                addItem(targetId, targetMaster.type <= 4 ? getGaussianStat(targetMaster.stat) : 0, 1);
+                addMessage(`${targetMaster.name}を作成した！`);
+            }, !canCraft);
+        } else {
+            let m1 = getObjById(ITEMS, rule.mat1Id), m2 = rule.mat2Id ? getObjById(ITEMS, rule.mat2Id) : null;
+            let c1 = countItem(rule.mat1Id), c2 = m2 ? countItem(rule.mat2Id) : 0;
+            let canCraft = (c1 > 0) && (!m2 || c2 > 0);
+
+            drawText(targetMaster.name, x+15, cy-15, 20, canCraft ? tColor : '#95a5a6');
+            drawText(`${m1.name}(${c1}/1)` + (m2 ? ` + ${m2.name}(${c2}/1)` : ""), x+15, cy+15, 16, '#7f8c8d');
+            
+            drawBtn("作成", x+350, cy-20, 80, 40, canCraft ? '#3498db' : '#bdc3c7', () => {
+                if(gameData.ap < 1) return addMessage("APが足りません。");
+                removeItem(rule.mat1Id, 1); if(rule.mat2Id) removeItem(rule.mat2Id, 1);
+                gameData.ap -= 1;
+                addItem(targetId, targetMaster.type <= 4 ? getGaussianStat(targetMaster.stat) : 0, 1);
+                addMessage(`${targetMaster.name}を作成した！`);
+            }, !canCraft);
+        }
+        cy += 65; 
+    });
+
+    drawText(`${invPage+1} / ${maxPage+1}`, x+230, y+640, 18, '#2c3e50', 'center');
+    if(invPage > 0) drawBtn("＜", x+110, y+625, 50, 35, '#34495e', () => invPage--);
+    if(invPage < maxPage) drawBtn("＞", x+300, y+625, 50, 35, '#34495e', () => invPage++);
+}
+
+function renderEnhanceList(x, y, cy) {
+    let list = gameData.inventory.filter(inv => {
+        let m = getObjById(ITEMS, inv.itemId);
+        return m.type >= 1 && m.type <= 4;
+    });
+    const itemsPerPage = 10; 
+    let maxPage = Math.max(0, Math.ceil(list.length / itemsPerPage) - 1);
+    let pageItems = list.slice(invPage * itemsPerPage, (invPage + 1) * itemsPerPage);
+
+    pageItems.forEach(inv => {
+        let master = getObjById(ITEMS, inv.itemId);
+        let star = getEquipRarityStar(inv.stat, master.stat);
+        let upg = inv.upgrade || 0;
+        let upgStr = upg > 0 ? `+${upg}` : "";
+        
+        let nameTxt = master.name + upgStr;
+        let actualStat = getActualStat(inv);
+
+        if(master.type === 1) nameTxt += ` (攻${actualStat})`;
+        else if(master.type === 2 || master.type === 3) nameTxt += ` (防${actualStat})`;
+        else if(master.type === 4) nameTxt += ` (魔${actualStat})`;
+
+        drawTextWithStar(nameTxt, star, x + 15, cy, 18, getItemColor(master));
+
+        let cost = master.price * 2;
+        let canEnhance = gameData.gold >= cost && upg < 10;
+        let costTxt = upg >= 10 ? "MAX" : `${cost}G`;
+
+        drawText(costTxt, x + 300, cy, 18, '#f39c12', 'right');
+
+        drawBtn("強化", x+320, cy-15, 120, 30, canEnhance ? '#9b59b6' : '#bdc3c7', () => {
+            if (upg >= 10) return addMessage("これ以上強化できません。");
+            if (gameData.gold < cost) return addMessage("お金が足りません。");
+            gameData.gold -= cost;
+            inv.upgrade = upg + 1;
+            addMessage(`${master.name}を強化した！`);
+        }, !canEnhance);
+        
+        cy += 45; 
+    });
+
+    drawText(`${invPage+1} / ${maxPage+1}`, x+230, y+640, 18, '#2c3e50', 'center');
+    if(invPage > 0) drawBtn("＜", x+110, y+625, 50, 35, '#34495e', () => invPage--);
+    if(invPage < maxPage) drawBtn("＞", x+300, y+625, 50, 35, '#34495e', () => invPage++);
+}
+
+// --- 探索・お店 ---
+function finishExploration(isClear) {
+    if (gameData.equipment.potion) {
+        let pUid = gameData.equipment.potion;
+        gameData.equipment.potion = null;
+        gameData.inventory = gameData.inventory.filter(i => i.uid !== pUid);
+        addMessage("装備していた薬を消費した。");
+    }
+    if (isClear && exploreData.stage.lv === 7) {
+        GAME_STATE = "RESULT";
+    } else {
+        GAME_STATE = "MAIN";
+    }
+}
+
+function renderExploreSelect(x, y) {
+    drawPanel(x, y, 410, 680, "探索エリア選択");
+    let cy = y + 80;
+    STAGES.forEach(stg => {
+        let isUnlock = stg.lv <= gameData.maxStageLv;
+        let maxFloor = stg.lv * 5 + 5; 
+
+        drawText(`Lv.${stg.lv} ${stg.name} (最大${maxFloor}階)`, x+20, cy, 18, isUnlock ? '#2c3e50' : '#95a5a6');
+        drawBtn("探索", x+300, cy-15, 90, 40, isUnlock ? '#e74c3c' : '#bdc3c7', () => {
+            if(gameData.ap < 1) return addMessage("APが足りません！");
+            
+            let cp = calcCombatPower();
+            let n = stg.lv;
+            let maxF = 0;
+            
+            for(let f = 1; f <= maxFloor; f++) {
+                if(cp >= getStageFloorDifficulty(n, f)) maxF = f;
+                else break;
+            }
+            
+            let r = Math.random();
+            let drop = r < 0.5 ? 0 : r < 0.75 ? 1 : r < 0.9 ? 2 : 3;
+            let reachedF = maxF - drop;
+            if(maxF >= 1 && reachedF < 1) reachedF = 1; 
+
+            exploreData = {
+                stage: stg,
+                currentFloor: 0,
+                maxFloor: maxFloor,
+                maxPossibleFloor: reachedF
+            };
+
+            if (gameData.equipment.potion) {
+                addMessage("薬の力で探索が有利になる！");
+            }
+            addMessage(`${stg.name}の探索を開始した。`);
+
+            GAME_STATE = "EXPLORING";
+        }, !isUnlock);
+        cy += 75;
+    });
+    drawBtn("戻る", x+145, y+620, 120, 50, '#7f8c8d', () => { GAME_STATE = "MAIN"; });
+}
+
+function renderExploring(x, y) {
+    drawPanel(x, y, 410, 680, "");
+    let imgKey = 'map' + exploreData.stage.lv;
+    drawImageRect(imgKey, x+10, y+10, 390, 219);
+
+    ctx.fillStyle = '#ecf0f1'; ctx.fillRect(x+10, y+240, 390, 250);
+    ctx.strokeStyle = '#bdc3c7'; ctx.strokeRect(x+10, y+240, 390, 250);
+    for(let i=0; i<gameData.messages.length; i++) drawText(gameData.messages[i], x+20, y+265 + i*22, 16, '#2c3e50');
+
+    drawText(`${exploreData.stage.name} - 現在 ${exploreData.currentFloor} / ${exploreData.maxFloor}階`, x+205, y+520, 20, '#2c3e50', 'center');
+
+    drawBtn("進む", x+20, y+560, 115, 60, '#3498db', () => advanceFloor(false));
+    drawBtn("SKIP", x+145, y+560, 115, 60, '#e67e22', () => advanceFloor(true));
+    drawBtn("帰る", x+270, y+560, 115, 60, '#95a5a6', () => { 
+        addMessage("探索を切り上げて帰還した。"); 
+        finishExploration(false); 
+    });
+}
+
+function advanceFloor(isSkip) {
+    do {
+        if(gameData.ap < 1) {
+            addMessage("APが足りない！帰還した。");
+            finishExploration(false);
+            break;
+        }
+
+        if(exploreData.currentFloor >= exploreData.maxPossibleFloor) {
+            addMessage("敵が強すぎて進めない！逃げ帰った...");
+            gameData.ap -= 1; 
+            finishExploration(false);
+            break;
+        }
+
+        exploreData.currentFloor++;
+        gameData.ap -= 1;
+        
+        let stg = exploreData.stage;
+        let gainedExp = getStageFloorDifficulty(stg.lv, exploreData.currentFloor);
+        gameData.exp += Math.floor(gainedExp);
+
+        let pool = ITEMS.filter(i => i.lv === stg.lv && i.prob > 0);
+        if (pool.length > 0) {
+            let dropCount = Math.floor(Math.random() * 4) + 1;
+            let drops = {};
+            for(let k = 0; k < dropCount; k++) {
+                let tProb = pool.reduce((s, i) => s + i.prob, 0);
+                let rnd = Math.random() * tProb, cur = 0, droppedItem = null;
+                for(let item of pool) {
+                    cur += item.prob;
+                    if(rnd <= cur) { droppedItem = item; break; }
+                }
+                if(droppedItem) {
+                    drops[droppedItem.id] = (drops[droppedItem.id] || 0) + 1;
+                }
+            }
+            
+            let dropMsgs = [];
+            for(let id in drops) {
+                let count = drops[id];
+                let itemMaster = getObjById(ITEMS, parseInt(id));
+                addItem(itemMaster.id, 0, count);
+                dropMsgs.push(`${itemMaster.name}×${count}`);
+            }
+            if(dropMsgs.length > 0) {
+                addMessage(`${exploreData.currentFloor}階: ${dropMsgs.join('、')} をGET！`);
+            } else {
+                addMessage(`${exploreData.currentFloor}階: 何も見つからなかった。`);
+            }
+        } else {
+            addMessage(`${exploreData.currentFloor}階: 何も見つからなかった。`);
+        }
+
+        checkLevelUp();
+
+        if(exploreData.currentFloor >= exploreData.maxFloor) {
+            addMessage(`${stg.name}の最深部を制覇した！`);
+            if(gameData.maxStageLv === stg.lv) { gameData.maxStageLv++; addMessage(`新エリア解放！`); }
+            finishExploration(true);
+            break;
+        }
+
+    } while(isSkip);
+}
+
+function renderShop(x, y) {
+    drawPanel(x, y, 410, 680, "お店 (共通パーツ・レシピ)");
+    drawText(`所持金: ${gameData.gold} G`, x+20, y+70, 24, '#f39c12');
+    
+    drawBtn("共通", x+20, y+100, 50, 30, shopTab==="COMMON" ? '#e67e22' : '#bdc3c7', () => {shopTab="COMMON"; shopPage=0;});
+    for(let i=1; i<=7; i++) {
+        drawBtn(`Lv${i}`, x+75 + (i-1)*45, y+100, 40, 30, shopTab===`LV${i}` ? '#e67e22' : '#bdc3c7', () => {shopTab=`LV${i}`; shopPage=0;});
+    }
+
+    let shopItems = ITEMS.filter(i => {
+        if (shopTab === "COMMON") return i.type === 9;
+        if (shopTab.startsWith("LV")) {
+            let lv = parseInt(shopTab.replace("LV", ""));
+            return i.type === 10 && i.lv === lv;
+        }
+        return false;
+    }); 
+    
+    let pageItems = shopItems.slice(shopPage * 7, (shopPage + 1) * 7);
+    let cy = y+165;
+    pageItems.forEach(item => {
+        let isRecipe = item.type === 10;
+        let isSoldOut = isRecipe && gameData.unlockedRecipes.includes(item.id);
+        let canBuy = !isSoldOut && gameData.gold >= item.price;
+
+        let fSize = 18;
+        if (item.name.length >= 15) fSize = 13;
+        else if (item.name.length >= 11) fSize = 15;
+
+        drawText(`${item.name} (${item.price}G)`, x+15, cy, fSize, isSoldOut ? '#95a5a6' : canBuy ? getItemColor(item) : '#e74c3c');
+        
+        let btnX = x+330;
+        let btnY = cy-15;
+        let btnW = 60;
+        let btnH = 35;
+
+        if (isSoldOut) {
+            drawBtn("売切", btnX, btnY, btnW, btnH, '#bdc3c7', () => {}, true);
+        } else {
+            drawBtn("購入", btnX, btnY, btnW, btnH, canBuy ? '#3498db' : '#bdc3c7', () => {
+                gameData.gold -= item.price;
+                if(item.type === 10) { gameData.unlockedRecipes.push(item.id); addMessage(`レシピ習得！`); }
+                else { addItem(item.id, 0, 1); addMessage(`${item.name}を購入。`); }
+            }, !canBuy);
+        }
+        cy += 65;
+    });
+
+    drawText(`${shopPage+1} / ${Math.max(0, Math.ceil(shopItems.length/7)-1)+1}`, x+205, y+640, 20, '#2c3e50', 'center');
+    if(shopPage > 0) drawBtn("＜", x+110, y+620, 50, 40, '#34495e', () => shopPage--);
+    if(shopPage < Math.ceil(shopItems.length/7)-1) drawBtn("＞", x+250, y+620, 50, 40, '#34495e', () => shopPage++);
+    drawBtn("戻る", x+20, y+620, 80, 40, '#7f8c8d', () => { GAME_STATE = "MAIN"; });
+}
+
+// --- リザルト・ランキング・ポップアップ ---
+function finishGame(isClear) {
+    GAME_STATE = "RESULT";
+    let assets = calculateTotalAssets();
+    let scoreData = { name: currentPlayerName, days: gameData.day, assets: assets, isClear: isClear };
+
+    let localRank = JSON.parse(localStorage.getItem('fgl_local_ranking')) || [];
+    localRank.push(scoreData);
+    localRank.sort((a, b) => a.days - b.days || b.assets - a.assets);
+    localStorage.setItem('fgl_local_ranking', JSON.stringify(localRank));
+
+    if(firebase.apps.length > 0 && firebaseConfig.apiKey !== "YOUR_API_KEY") {
+        db.collection(FIRESTORE_COLLECTION).add({
+            ...scoreData, timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        }).then(() => setTimeout(() => { rankingTab="LOCAL"; GAME_STATE="RANKING"; }, 2000))
+          .catch(() => setTimeout(() => { rankingTab="LOCAL"; GAME_STATE="RANKING"; }, 2000));
+    } else {
+        setTimeout(() => { rankingTab="LOCAL"; GAME_STATE="RANKING"; }, 2000);
+    }
+}
+
+function renderResult() {
+    ctx.fillStyle = '#ecf0f1'; ctx.fillRect(0,0,1280,720);
+    drawText("ゲーム終了", 640, 200, 60, '#2c3e50', 'center');
+    drawText(`総資産: ${calculateTotalAssets()} G`, 640, 360, 30, '#f39c12', 'center');
+    drawText("データ処理中...", 640, 500, 20, '#7f8c8d', 'center');
+}
+
+function renderRanking() {
+    drawImageRect('title', 0, 0, 1280, 720);
+    ctx.fillStyle = 'rgba(236, 240, 241, 0.85)'; 
+    ctx.fillRect(0,0,1280,720);
+    drawText("🏆 ランキング 🏆", 640, 60, 50, '#f39c12', 'center');
+
+    drawBtn("ローカル", 440, 120, 150, 40, rankingTab==="LOCAL" ? '#e74c3c' : '#bdc3c7', () => rankingTab="LOCAL");
+    drawBtn("ワールド", 690, 120, 150, 40, rankingTab==="WORLD" ? '#3498db' : '#bdc3c7', () => {
+        rankingTab="WORLD";
+        if(!rankingDataWorld && firebaseConfig.apiKey !== "YOUR_API_KEY") {
+            db.collection(FIRESTORE_COLLECTION).orderBy("days", "asc").orderBy("assets", "desc").limit(10).get()
+              .then(snap => { rankingDataWorld = []; snap.forEach(doc => rankingDataWorld.push(doc.data())); })
+              .catch(() => { rankingDataWorld = []; });
+        }
+    });
+
+    let displayData = [];
+    if(rankingTab === "LOCAL") {
+        displayData = JSON.parse(localStorage.getItem('fgl_local_ranking')) || [];
+    } else {
+        displayData = rankingDataWorld;
+    }
+
+    let startY = 200;
+    let tableX = 240, tableW = 800;
+
+    if(displayData && displayData.length > 0) {
+        ctx.fillStyle = '#34495e'; ctx.fillRect(tableX, startY, tableW, 40);
+        drawText("順位", tableX+50, startY+20, 20, '#fff', 'center');
+        drawText("名前", tableX+120, startY+20, 20, '#fff', 'left');
+        drawText("日数", tableX+440, startY+20, 20, '#fff', 'center');
+        drawText("総資産", tableX+580, startY+20, 20, '#fff', 'right');
+        drawText("結果", tableX+700, startY+20, 20, '#fff', 'center');
+
+        let cy = startY + 60;
+        displayData.slice(0, 10).forEach((d, idx) => {
+            if(idx % 2 === 1) {
+                ctx.fillStyle = 'rgba(189, 195, 199, 0.3)';
+                ctx.fillRect(tableX, cy - 20, tableW, 40);
+            }
+            let clr = d.isClear ? "★クリア" : "リタイア";
+            let tColor = '#2c3e50';
+            drawText(`${idx+1}位`, tableX+50, cy, 20, tColor, 'center');
+            drawText(d.name, tableX+120, cy, 20, tColor, 'left');
+            drawText(`${d.days}日`, tableX+440, cy, 20, tColor, 'center');
+            drawText(`${d.assets} G`, tableX+580, cy, 20, '#f39c12', 'right');
+            drawText(clr, tableX+700, cy, 20, d.isClear ? '#e74c3c' : '#7f8c8d', 'center');
+            
+            ctx.strokeStyle = '#bdc3c7'; ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(tableX, cy+20); ctx.lineTo(tableX+tableW, cy+20); ctx.stroke();
+            cy += 40;
+        });
+        
+        ctx.strokeStyle = '#34495e'; ctx.lineWidth = 2;
+        ctx.strokeRect(tableX, startY, tableW, cy - startY);
+    } else {
+        drawText(rankingTab==="WORLD" && !rankingDataWorld ? "読み込み中..." : "データがありません", 640, 300, 24, '#2c3e50', 'center');
+    }
+
+    drawBtn("タイトルへ戻る", 540, 640, 200, 50, '#2c3e50', () => { GAME_STATE = "TITLE"; });
+}
+
+function renderHelpPopup() {
+    clickZones = []; 
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(0,0,1280,720);
+    
+    let px = 240, py = 40, pw = 800, ph = 640;
+    ctx.save();
+    ctx.beginPath(); ctx.roundRect(px, py, pw, ph, 15); ctx.clip();
+    ctx.fillStyle = '#ecf0f1'; ctx.fill();
+    ctx.fillStyle = '#34495e'; ctx.fillRect(px, py, pw, 50);
+    drawText("序盤の進め方", px + pw/2, py + 25, 24, '#fff', 'center');
+    ctx.restore();
+    ctx.strokeStyle = '#34495e'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.roundRect(px, py, pw, ph, 15); ctx.stroke();
+    
+    let lines = [
+        "最初に、次のことをやってみよう",
+        "①お店に行ってみよう。",
+        "②「ひも」と「木の盾のレシピ」を購入しよう。",
+        "③木の盾を合成して装備しよう。",
+        "④探索ボタンを押して、始まりの森を探索しよう。",
+        "⑤GETしたアイテムを売って、レシピを購入して新しい装備を作ってみよう。",
+        "⑥APがなくなったら休むと回復するよ。",
+        "「竜の火口」の最深部を目指そう！",
+        "",
+        "その他のワンポイントアドバイス",
+        "・換金物はとくに使い道はないので売ってしまおう。🪙の数が多いほど価値が高いよ。",
+        "・レシピは一度買えば作り方は覚えるよ。",
+        "・装備は強いものと弱いものがランダムで作成されるよ。⭐の数でだいたいの強さがわかるよ。",
+        "・薬は一回の探索でなくなってしまうけど、探索の成功率が高くなるよ。",
+        "・セーブは出来ないよ。",
+        "・クリア時の日数と総資産が記録されるよ。良い成績ならランキングに載るよ。"
+    ];
+    
+    let cy = py + 80;
+    for (let line of lines) {
+        drawText(line, px + 30, cy, 18, '#2c3e50', 'left', 'normal');
+        cy += 28;
+    }
+    
+    drawBtn("閉じる", px + pw/2 - 75, py + 570, 150, 50, '#e74c3c', () => { showHelp = false; });
+}
+
+function renderPopup() {
+    clickZones = []; 
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(0,0,1280,720);
+    
+    let px = 340, py = 260, pw = 600, ph = 200;
+    ctx.save();
+    ctx.beginPath(); ctx.roundRect(px, py, pw, ph, 15); ctx.clip();
+    ctx.fillStyle = '#ecf0f1'; ctx.fill();
+    ctx.restore();
+    
+    ctx.strokeStyle = '#34495e'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.roundRect(px, py, pw, ph, 15); ctx.stroke();
+    
+    if(activePopup.isPrompt) {
+        drawText(activePopup.text, px + pw/2, py + 40, 22, '#2c3e50', 'center');
+        if (activePopup.subtext) {
+            drawText(activePopup.subtext, px + pw/2, py + 120, 16, '#e74c3c', 'center');
+        }
+        drawBtn("決定", px + 100, py + 140, 150, 45, '#3498db', () => {
+            if(activePopup.onYes) activePopup.onYes();
+        });
+        drawBtn("キャンセル", px + 350, py + 140, 150, 45, '#7f8c8d', () => {
+            if(activePopup.onNo) activePopup.onNo();
+        });
+    } else {
+        drawText(activePopup.text, px + pw/2, py + 60, 22, '#2c3e50', 'center');
+        if (activePopup.subtext) {
+            drawText(activePopup.subtext, px + pw/2, py + 95, 18, '#e74c3c', 'center');
+        }
+        
+        if(activePopup.isAlert) {
+            drawBtn("確認", px + pw/2 - 75, py + 130, 150, 45, '#3498db', () => { activePopup = null; });
+        } else {
+            drawBtn("はい", px + 100, py + 130, 150, 45, '#e74c3c', () => {
+                let onYes = activePopup.onYes;
+                activePopup = null;
+                if(onYes) onYes();
+            });
+            drawBtn("いいえ", px + 350, py + 130, 150, 45, '#7f8c8d', () => {
+                activePopup = null;
+            });
+        }
+    }
+}
+
+function loop() {
+    ctx.clearRect(0, 0, cvs.width, cvs.height);
+    clickZones = [];
+    switch(GAME_STATE) {
+        case "TITLE": renderTitle(); break;
+        case "PLAYER_SELECT": renderPlayerSelect(); break;
+        case "MAIN": drawStatusPanel(20, 20); drawCenterPanel(370, 20); drawRightPanel(800, 20); break;
+        case "EXPLORE_SELECT": drawStatusPanel(20, 20); renderExploreSelect(370, 20); drawRightPanel(800, 20); break;
+        case "EXPLORING": drawStatusPanel(20, 20); renderExploring(370, 20); drawRightPanel(800, 20); break;
+        case "SHOP": drawStatusPanel(20, 20); renderShop(370, 20); drawRightPanel(800, 20); break;
+        case "RESULT": renderResult(); break;
+        case "RANKING": renderRanking(); break;
+    }
+
+    if (showHelp) {
+        renderHelpPopup();
+    } else if (activePopup) {
+        renderPopup();
+    }
+
+    if (restEffect.active) {
+        ctx.fillStyle = `rgba(0, 0, 0, ${restEffect.alpha})`;
+        ctx.fillRect(0, 0, 1280, 720);
+        
+        if (restEffect.phase === 'in') {
+            restEffect.alpha += 0.05;
+            if (restEffect.alpha >= 1) {
+                restEffect.alpha = 1;
+                restEffect.phase = 'out';
+                gameData.day++;
+                gameData.ap = gameData.maxAp;
+                addMessage(`${gameData.day}日目になった。AP全回復！`);
+            }
+        } else {
+            restEffect.alpha -= 0.05;
+            if (restEffect.alpha <= 0) {
+                restEffect.alpha = 0;
+                restEffect.active = false;
+            }
+        }
+    }
+
+    requestAnimationFrame(loop);
+}
+
+cvs.addEventListener("click", (e) => {
+    const rect = cvs.getBoundingClientRect();
+    const scaleX = 1280 / rect.width;
+    const scaleY = 720 / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
+    for (let i = clickZones.length - 1; i >= 0; i--) {
+        let z = clickZones[i];
+        if (x >= z.x && x <= z.x + z.w && y >= z.y && y <= z.y + z.h) { z.onClick(); break; }
+    }
+});
+
+requestAnimationFrame(loop); 
+
+if (firebase.apps.length > 0 && firebaseConfig.apiKey !== "YOUR_API_KEY") {
+    firebase.auth().onAuthStateChanged((user) => {
+        if (user && !user.isAnonymous) {
+            googleUser = user;
+        } else {
+            googleUser = null;
+        }
+    });
+    firebase.auth().signInAnonymously().catch(e => console.warn("Auth Info: ", e.message));
+}
+
+</script>
+</body>
+</html>
