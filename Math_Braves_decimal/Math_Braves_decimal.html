@@ -162,6 +162,12 @@
             border: 4px solid #FFECB3;
         }
 
+        /* 視認性向上のための白背景指定 */
+        #screen-ranking .panel,
+        #screen-result .title-container {
+            background: #ffffff;
+        }
+
         .player-list { display: flex; flex-direction: column; gap: 10px; margin: 20px 0; }
         .player-item {
             display: flex; justify-content: space-between; align-items: center;
@@ -216,10 +222,11 @@
             <div id="current-player-display">現在のプレーヤー: ゲスト</div>
             <button class="menu-btn green" onclick="goToDifficulty()">はじめる</button>
             <button class="menu-btn blue" onclick="showScreen('screen-player')">プレーヤー選択</button>
-            <button class="menu-btn red" onclick="loginGoogle()">Googleでログイン</button>
+            <button id="btn-google-login" class="menu-btn red" onclick="loginGoogle()">Googleでログイン</button>
             <button class="menu-btn yellow" onclick="showRanking()">ランキング</button>
             <button class="menu-btn gray" onclick="location.href='../index.html'">INDEXへ戻る</button>
         </div>
+        <div id="login-info" style="position: absolute; bottom: 20px; right: 30px; color: var(--text-dark); font-size: 20px; font-weight: bold; background: rgba(255,255,255,0.9); padding: 8px 20px; border-radius: 15px; border: 3px solid #FFECB3; display: none;"></div>
     </div>
 
     <div id="screen-difficulty" class="ui-layer hidden">
@@ -252,8 +259,8 @@
         <div class="panel" style="width: 1000px;">
             <h2 style="font-size: 30px; margin-top: 0;">ランキング</h2>
             <div class="tabs">
-                <button class="tab-btn active" id="tab-world" onclick="switchRankTab('world')">ワールド</button>
                 <button class="tab-btn" id="tab-local" onclick="switchRankTab('local')">ローカル</button>
+                <button class="tab-btn active" id="tab-world" onclick="switchRankTab('world')">ワールド</button>
             </div>
             <div class="tabs" style="font-size: 16px;">
                 <button class="tab-btn active" id="tab-easy" onclick="switchRankDiff('やさしい')">やさしい</button>
@@ -475,6 +482,7 @@
        Player Management & Auth
     ========================================= */
     function updateCurrentPlayerDisplay() {
+        if (!currentPlayer) currentPlayer = "ゲスト"; // undefined防止
         document.getElementById('current-player-display').innerText = `現在のプレーヤー: ${currentPlayer}`;
     }
 
@@ -519,12 +527,44 @@
         renderPlayerList();
     }
 
+    /* =========================================
+       Auth Logic
+    ========================================= */
+    let currentUserEmail = "";
+
+    auth.onAuthStateChanged((user) => {
+        const btn = document.getElementById('btn-google-login');
+        const loginInfo = document.getElementById('login-info');
+        if (user) {
+            currentUserEmail = user.email || user.displayName || "ゲスト";
+            btn.innerText = "ログアウト";
+            btn.onclick = logoutGoogle;
+            btn.classList.remove('red');
+            btn.classList.add('gray');
+            loginInfo.innerText = `${currentUserEmail} がログイン中`;
+            loginInfo.style.display = 'block';
+        } else {
+            currentUserEmail = "";
+            btn.innerText = "Googleでログイン";
+            btn.onclick = loginGoogle;
+            btn.classList.remove('gray');
+            btn.classList.add('red');
+            loginInfo.style.display = 'none';
+        }
+    });
+
     function loginGoogle() {
         const provider = new firebase.auth.GoogleAuthProvider();
         auth.signInWithPopup(provider).then((result) => {
-            systemAlert(`Googleアカウント連携完了！\n※ランキング送信時は選択中のプレーヤー名(${currentPlayer})が使用されます。`);
+            systemAlert(`Googleアカウント連携完了！\n※ランキング送信時は選択中のプレーヤー名(${currentPlayer || 'ゲスト'})が使用されます。`);
         }).catch((error) => {
             systemAlert("ログインに失敗しました。");
+        });
+    }
+
+    function logoutGoogle() {
+        auth.signOut().then(() => {
+            systemAlert("ログアウトしました。");
         });
     }
 
@@ -569,7 +609,19 @@
                 renderRankingTable(data.slice(0, 10));
             }).catch(err => {
                 document.getElementById('ranking-loading').style.display = 'none';
-                systemAlert("ランキングの取得に失敗しました。");
+                if (err.message && err.message.includes('FAILED_PRECONDITION')) {
+                    const match = err.message.match(/(https:\/\/console\.firebase\.google\.com[^\s]+)/);
+                    if (match) {
+                        console.error("Firebaseインデックスを作成してください: \n" + match[0]);
+                        systemAlert("ランキングを表示するためのデータベース設定(インデックス)が完了していません。\n開発者はブラウザのコンソールを開き、リンクから作成してください。");
+                    } else {
+                        console.error(err);
+                        systemAlert("ランキングの取得に失敗しました。");
+                    }
+                } else {
+                    console.error(err);
+                    systemAlert("ランキングの取得に失敗しました。");
+                }
             });
         }
     }
@@ -585,7 +637,7 @@
 
     function saveScore(cleared) {
         const scoreData = {
-            playerName: currentPlayer,
+            playerName: currentPlayer || "ゲスト",
             difficulty: gameState.difficulty,
             clearedStages: cleared ? gameState.stage : gameState.stage - 1,
             score: gameState.score,
@@ -626,7 +678,7 @@
        Game Initialization & Flow
     ========================================= */
     function goToDifficulty() {
-        if(currentPlayer === "ゲスト") systemAlert("プレーヤーが登録されていません。\n「ゲスト」としてプレイします。");
+        if(!currentPlayer || currentPlayer === "ゲスト") systemAlert("プレーヤーが登録されていません。\n「ゲスト」としてプレイします。");
         showScreen('screen-difficulty');
     }
 
@@ -719,7 +771,7 @@
                 stageAvailableSnacks.splice(idx, 1);
             }
 
-            let width = type === 'enemy' ? 0.9 : (type === 'snack' ? 0.2 : 0.4);
+            let width = type === 'enemy' ? 0.8 : (type === 'snack' ? 0.2 : 0.4);
             let sInt = Math.round(z.start * 10);
             let eInt = Math.round(z.end * 10);
             let wInt = Math.round(width * 10);
@@ -816,7 +868,7 @@
                 stageAvailableSnacks.splice(idx, 1);
             }
 
-            let width = type === 'enemy' ? 0.9 : (type === 'snack' ? 0.2 : 0.4);
+            let width = type === 'enemy' ? 0.8 : (type === 'snack' ? 0.2 : 0.4);
             let sInt = Math.round(z.start * 10);
             let eInt = Math.round(z.end * 10);
             let wInt = Math.round(width * 10);
@@ -1000,7 +1052,7 @@
     function processGameClear() {
         appState = 'RESULT';
         let snackCount = gameState.snacksCollected.length;
-        let snackBonus = snackCount * snackCount * 200;
+        let snackBonus = snackCount * snackCount * 100;
         let hpBonus = Math.floor(10000 * (Math.max(0, gameState.hp) / gameState.maxHp));
         let totalScore = gameState.score + snackBonus + hpBonus;
         
@@ -1013,7 +1065,7 @@
     function processGameOver() {
         appState = 'RESULT';
         let snackCount = gameState.snacksCollected.length;
-        let snackBonus = snackCount * snackCount * 200;
+        let snackBonus = snackCount * snackCount * 100;
         let hpBonus = Math.floor(10000 * (Math.max(0, gameState.hp) / gameState.maxHp));
         let totalScore = gameState.score + snackBonus + hpBonus;
         
@@ -1156,8 +1208,8 @@
 
         gameState.events.forEach(ev => {
             if(!ev.cleared) {
-                let sX = rX + (ev.start / 5.0) * rW;
-                let eX = rX + (ev.end / 5.0) * rW;
+                let sX = rX + ((ev.start - 0.05) / 5.0) * rW;
+                let eX = rX + ((ev.end + 0.05) / 5.0) * rW;
                 let w = eX - sX;
                 let centerX = sX + w/2;
                 
