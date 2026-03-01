@@ -260,10 +260,10 @@
             <h2 style="font-size: 30px; margin-top: 0;">ランキング</h2>
             <div class="tabs">
                 <button class="tab-btn" id="tab-local" onclick="switchRankTab('local')">ローカル</button>
-                <button class="tab-btn active" id="tab-world" onclick="switchRankTab('world')">ワールド</button>
+                <button class="tab-btn" id="tab-world" onclick="switchRankTab('world')">ワールド</button>
             </div>
             <div class="tabs" style="font-size: 16px;">
-                <button class="tab-btn active" id="tab-easy" onclick="switchRankDiff('やさしい')">やさしい</button>
+                <button class="tab-btn" id="tab-easy" onclick="switchRankDiff('やさしい')">やさしい</button>
                 <button class="tab-btn" id="tab-normal" onclick="switchRankDiff('ふつう')">ふつう</button>
                 <button class="tab-btn" id="tab-hard" onclick="switchRankDiff('むずかしい')">むずかしい</button>
             </div>
@@ -571,21 +571,38 @@
     /* =========================================
        Ranking
     ========================================= */
-    let currentRankTab = 'world';
-    let currentRankDiff = 'ふつう';
+    let currentRankTab = localStorage.getItem('math_braves_rank_tab') || 'local';
+    let currentRankDiff = localStorage.getItem('math_braves_rank_diff') || 'やさしい';
 
-    function showRanking() { showScreen('screen-ranking'); loadRanking(); }
-    function switchRankTab(tab) {
-        currentRankTab = tab;
+    function updateRankTabUI() {
         document.querySelectorAll('#screen-ranking .tabs:nth-child(2) .tab-btn').forEach(btn => btn.classList.remove('active'));
-        document.getElementById(`tab-${tab}`).classList.add('active');
-        loadRanking();
+        document.getElementById(`tab-${currentRankTab}`).classList.add('active');
     }
-    function switchRankDiff(diff) {
-        currentRankDiff = diff;
+
+    function updateRankDiffUI() {
         const diffMap = {'やさしい':'easy', 'ふつう':'normal', 'むずかしい':'hard'};
         document.querySelectorAll('#screen-ranking .tabs:nth-child(3) .tab-btn').forEach(btn => btn.classList.remove('active'));
-        document.getElementById(`tab-${diffMap[diff]}`).classList.add('active');
+        document.getElementById(`tab-${diffMap[currentRankDiff]}`).classList.add('active');
+    }
+
+    function showRanking() { 
+        showScreen('screen-ranking');
+        updateRankTabUI();
+        updateRankDiffUI();
+        loadRanking(); 
+    }
+
+    function switchRankTab(tab) {
+        currentRankTab = tab;
+        localStorage.setItem('math_braves_rank_tab', tab);
+        updateRankTabUI();
+        loadRanking();
+    }
+
+    function switchRankDiff(diff) {
+        currentRankDiff = diff;
+        localStorage.setItem('math_braves_rank_diff', diff);
+        updateRankDiffUI();
         loadRanking();
     }
 
@@ -981,9 +998,14 @@
             
             let msg = `🍰おかしを発見！\n${ev.icon} を GET！`;
             if (gameState.snacksCollected.length === 12) {
-                msg += `\n\nすごい！おかしをぜんぶ集めた！！\n${ALL_SNACKS.join('')}`;
+                showGameMessage(msg, () => {
+                    showGameMessage(`すごい！おかしをぜんぶあつめた！！\n${ALL_SNACKS.join('')}`, () => {
+                        ev.cleared = true;
+                    });
+                });
+            } else {
+                showGameMessage(msg, () => { ev.cleared = true; });
             }
-            showGameMessage(msg, () => { ev.cleared = true; });
             
         } else if (ev.type === 'enemy') {
             createParticles(px, py, '#E57373', 50);
@@ -1350,7 +1372,7 @@
                 "（アドバイス）",
                 "・敵👾🐲にとまると手札が封印されるよ。",
                 "・財宝🪙💰にとまるとスコアがアップするよ。",
-                "・とったダイヤ💎をつかうと手札を全部チェンジできるよ。",
+                "・とったダイヤ💎をつかうと、手札や場をチェンジできるよ。",
                 "・ジョーカー🃏は好きな数字を選べるよ。",
                 "・おかしはたくさん集めるほど最後にスコアが高くなるよ！"
             ];
