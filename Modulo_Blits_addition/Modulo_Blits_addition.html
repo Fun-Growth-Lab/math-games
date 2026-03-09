@@ -321,11 +321,11 @@
     </div>
 </div>
 
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-    import { getFirestore, collection, doc, setDoc, serverTimestamp, query, where, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
+<script>
     const firebaseConfig = {
       apiKey: "AIzaSyBCg5dCEM89UmYYhfGqVeRf_VrUlg8_o-4",
       authDomain: "math-braves.firebaseapp.com",
@@ -335,18 +335,25 @@
       appId: "1:217117619290:web:d227feb603970d3948d463"
     };
 
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
-    const provider = new GoogleAuthProvider();
+    if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+    }
+    const db = firebase.firestore();
+    const auth = firebase.auth();
     const FIREBASE_COLLECTION_NAME = "scores_modulo"; 
 
     window.currentUser = null; 
 
-    window.handleLogin = function() { signInWithPopup(auth, provider).catch(()=>customAlert("ログインに失敗しました")); };
-    window.handleLogout = function() { signOut(auth); };
+    window.handleLogin = function() { 
+        const provider = new firebase.auth.GoogleAuthProvider();
+        auth.signInWithPopup(provider).catch(()=>customAlert("ログインに失敗しました")); 
+    };
+    
+    window.handleLogout = function() { 
+        auth.signOut(); 
+    };
 
-    onAuthStateChanged(auth, (user) => {
+    auth.onAuthStateChanged((user) => {
         const authStatus = document.getElementById('auth-status');
         const btnLogin = document.getElementById('btn-title-login');
         const btnLogout = document.getElementById('btn-title-logout');
@@ -365,25 +372,28 @@
 
     window.saveOnlineScore = async (userId, userName, difficulty, score) => {
         try {
-            const docId = `${userId}_${difficulty}_${Date.now()}`;
-            await setDoc(doc(db, FIREBASE_COLLECTION_NAME, docId), {
-                uid: userId, name: userName, difficulty: difficulty, score: score, createdAt: serverTimestamp()
+            await db.collection(FIREBASE_COLLECTION_NAME).add({
+                uid: userId, 
+                name: userName, 
+                difficulty: difficulty, 
+                score: score, 
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
         } catch (error) { console.error(error); }
     };
 
-    window.fetchOnlineRanking = async (difficulty) => {
+    window.fetchOnlineRankingGlobal = async (difficulty) => {
         if (!window.currentUser) return [];
         try {
-            const scoresRef = collection(db, FIREBASE_COLLECTION_NAME);
-            const q = query(scoresRef, where("difficulty", "==", difficulty), orderBy("score", "desc"), limit(10));
-            const querySnapshot = await getDocs(q);
+            const snap = await db.collection(FIREBASE_COLLECTION_NAME)
+                .where("difficulty", "==", difficulty)
+                .get();
             const ranking = [];
-            querySnapshot.forEach((doc) => ranking.push(doc.data()));
-            return ranking;
-        } catch (error) { return []; }
+            snap.forEach((doc) => ranking.push(doc.data()));
+            ranking.sort((a,b) => b.score - a.score);
+            return ranking.slice(0, 10);
+        } catch (error) { console.error(error); return []; }
     };
-    window.fetchOnlineRankingGlobal = window.fetchOnlineRanking;
 </script>
 
 <script>
@@ -578,16 +588,6 @@ function getClearCount(difficulty) { return parseInt(localStorage.getItem(getCle
 function incrementClearCount(difficulty) {
     let count = getClearCount(difficulty); count++; localStorage.setItem(getClearCountKey(difficulty), count); return count;
 }
-function saveScore(difficulty, score) {
-    if (!state.isRankEligible) return false;
-    let ranking = getLocalRanking(difficulty);
-    ranking.push({ score: score, name: localPlayers[currentPlayerIndex] });
-    ranking.sort((a, b) => b.score - a.score); ranking = ranking.slice(0, 10);
-    localStorage.setItem(getRankingKey(difficulty), JSON.stringify(ranking));
-    const isNewRecord = (ranking.length > 0 && ranking[0].score === score);
-    if (window.currentUser && window.saveOnlineScore) window.saveOnlineScore(window.currentUser.uid, localPlayers[currentPlayerIndex], difficulty, score);
-    return isNewRecord;
-}
 
 class Cell { constructor(value) { this.value = value; this.isMatch = false; this.drawOffsetY = 0; this.type = 'NORMAL'; this.hp = 0; this.bossIndex = 0; } }
 
@@ -624,13 +624,13 @@ class Particle {
     constructor(x, y, text, color, type = 'text', size = 0) {
         this.x = x; this.y = y; this.text = text; this.color = color; this.type = type;
         this.life = 1.0; this.size = size; this.vy = -1.5;
-        if (type === 'combo') { this.vy = -0.5; this.life = 1.0; } // 寿命短縮
-        else if (type === 'sparkle') { this.vx = (Math.random()-0.5)*2; this.vy = (Math.random()-0.5)*2; this.life = 0.8; }
+        if (type === 'combo') { this.vy = -0.5; this.life = 1.5; } // 表示時間1.5倍に
+        else if (type === 'sparkle') { this.vx = (Math.random()-0.5)*2; this.vy = (Math.random()-0.5)*2; this.life = 1.2; }
     }
     update(dt) {
-        if (this.type === 'sparkle') { this.x += this.vx; this.y += this.vy; this.life -= 0.066; } 
-        else if (this.type === 'text' || this.type === 'combo') { this.y += this.vy; this.life -= (this.type==='combo'?0.026:0.04); } 
-        else { this.size += 5; this.life -= 0.04; }
+        if (this.type === 'sparkle') { this.x += this.vx; this.y += this.vy; this.life -= 0.044; } 
+        else if (this.type === 'text' || this.type === 'combo') { this.y += this.vy; this.life -= (this.type==='combo'?0.017:0.026); } 
+        else { this.size += 5; this.life -= 0.026; }
     }
     draw(ctx) {
         ctx.globalAlpha = Math.max(0, Math.min(1, this.life));
@@ -1095,7 +1095,6 @@ async function applyCard(r, c, card) {
     if (card.slotIndex !== -1) {
         card.value = randomInt(CONFIG.handMin, CONFIG.handMax); 
     }
-    state.actions -= 1;
     
     await handleMatching(); 
 
@@ -1175,7 +1174,7 @@ window.useDiamondAct = function(num) {
     const totalW = (cardWidth * 3) + gap * 2; 
     const startX = (1280 - totalW) / 2;
     
-    state.specialCard.baseX = startX + (cardWidth + gap) * 3.1; 
+    state.specialCard.baseX = startX - cardWidth - gap - 30; // 手札の左側に移動、余白を調整
     state.specialCard.baseY = 580;
     state.specialCard.x = state.specialCard.baseX;
     state.specialCard.y = state.specialCard.baseY;
