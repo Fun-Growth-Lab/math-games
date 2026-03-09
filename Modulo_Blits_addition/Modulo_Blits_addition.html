@@ -588,6 +588,16 @@ function getClearCount(difficulty) { return parseInt(localStorage.getItem(getCle
 function incrementClearCount(difficulty) {
     let count = getClearCount(difficulty); count++; localStorage.setItem(getClearCountKey(difficulty), count); return count;
 }
+function saveScore(difficulty, score) {
+    if (!state.isRankEligible) return false;
+    let ranking = getLocalRanking(difficulty);
+    ranking.push({ score: score, name: localPlayers[currentPlayerIndex] });
+    ranking.sort((a, b) => b.score - a.score); ranking = ranking.slice(0, 10);
+    localStorage.setItem(getRankingKey(difficulty), JSON.stringify(ranking));
+    const isNewRecord = (ranking.length > 0 && ranking[0].score === score);
+    if (window.currentUser && window.saveOnlineScore) window.saveOnlineScore(window.currentUser.uid, localPlayers[currentPlayerIndex], difficulty, score);
+    return isNewRecord;
+}
 
 class Cell { constructor(value) { this.value = value; this.isMatch = false; this.drawOffsetY = 0; this.type = 'NORMAL'; this.hp = 0; this.bossIndex = 0; } }
 
@@ -624,13 +634,13 @@ class Particle {
     constructor(x, y, text, color, type = 'text', size = 0) {
         this.x = x; this.y = y; this.text = text; this.color = color; this.type = type;
         this.life = 1.0; this.size = size; this.vy = -1.5;
-        if (type === 'combo') { this.vy = -0.5; this.life = 1.5; } // 表示時間1.5倍に
-        else if (type === 'sparkle') { this.vx = (Math.random()-0.5)*2; this.vy = (Math.random()-0.5)*2; this.life = 1.2; }
+        if (type === 'combo') { this.vy = -0.5; this.life = 1.0; } // 寿命短縮
+        else if (type === 'sparkle') { this.vx = (Math.random()-0.5)*2; this.vy = (Math.random()-0.5)*2; this.life = 0.8; }
     }
     update(dt) {
-        if (this.type === 'sparkle') { this.x += this.vx; this.y += this.vy; this.life -= 0.044; } 
-        else if (this.type === 'text' || this.type === 'combo') { this.y += this.vy; this.life -= (this.type==='combo'?0.017:0.026); } 
-        else { this.size += 5; this.life -= 0.026; }
+        if (this.type === 'sparkle') { this.x += this.vx; this.y += this.vy; this.life -= 0.066; } 
+        else if (this.type === 'text' || this.type === 'combo') { this.y += this.vy; this.life -= (this.type==='combo'?0.026:0.04); } 
+        else { this.size += 5; this.life -= 0.04; }
     }
     draw(ctx) {
         ctx.globalAlpha = Math.max(0, Math.min(1, this.life));
@@ -1095,6 +1105,7 @@ async function applyCard(r, c, card) {
     if (card.slotIndex !== -1) {
         card.value = randomInt(CONFIG.handMin, CONFIG.handMax); 
     }
+    state.actions -= 1;
     
     await handleMatching(); 
 
