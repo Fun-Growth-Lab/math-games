@@ -347,6 +347,32 @@
             width: 180px; text-align: center; font-size: 1rem;
         }
 
+        /* ボス演出 */
+        #boss-frame {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            box-sizing: border-box; border: 8px solid #e74c3c;
+            box-shadow: inset 0 0 50px rgba(231,76,60,0.6);
+            pointer-events: none; z-index: 5;
+            animation: pulse-boss-frame 1s infinite alternate;
+        }
+        @keyframes pulse-boss-frame {
+            0%   { border-color: rgba(231,76,60,0.5); box-shadow: inset 0 0 25px rgba(231,76,60,0.3); }
+            100% { border-color: rgba(231,76,60,1);   box-shadow: inset 0 0 60px rgba(231,76,60,0.8); }
+        }
+        #danger-warning {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; justify-content: center; align-items: center;
+            background: rgba(231, 76, 60, 0.35);
+            font-size: 3.5rem; font-weight: 800; color: #c0392b;
+            text-shadow: 0 0 20px #fff, 2px 2px 0 #fff;
+            z-index: 60; pointer-events: none;
+            animation: flash-danger 0.4s infinite alternate;
+        }
+        @keyframes flash-danger {
+            0%   { opacity: 0.3; }
+            100% { opacity: 1.0; }
+        }
+
         /* ダイヤモンドボタン */
         .btn-diamond {
             background: linear-gradient(to bottom, #d4a8ff, #9b59b6);
@@ -454,15 +480,9 @@
                 <span class="info-label">LEVEL</span>
                 <span id="disp-level" class="info-value" style="color:#ff9a9e;">-</span>
             </div>
-            <div class="info-item" style="background:rgba(161,140,209,0.15); border-radius:15px; padding:8px; border-bottom:none; margin-bottom:10px;">
-                <span class="info-label">もくひょう</span>
-                <div id="target-score-big">0</div>
-                <span style="font-size:0.9rem; color:#a18cd1; font-weight:bold;">点</span>
-                <span id="disp-target" style="display:none;">0</span>
-            </div>
-            <div class="info-item">
-                <span class="info-label">ROUND</span>
-                <span id="disp-round" class="info-value" style="color:#84fab0; font-size:1.5rem;">1</span>
+            <div class="info-item" style="background:rgba(231,76,60,0.12); border-radius:15px; padding:8px; border-bottom:none; margin-bottom:10px;">
+                <span class="info-label" style="color:#e74c3c;">BOSS</span>
+                <span id="disp-boss" class="info-value" style="color:#e74c3c; font-size:2rem;">0 / 3</span>
             </div>
             <div class="info-item">
                 <span class="info-label">COMBO</span>
@@ -472,33 +492,33 @@
                 <span class="info-label">SCORE</span>
                 <span id="disp-score" class="info-value" style="color:#fbc2eb;">0</span>
             </div>
+            <div class="info-item" style="border-top: 2px dashed rgba(246,211,101,0.4); margin-top:4px; padding-top:6px;">
+                <span class="info-label" style="color:#f6d365;">TENS</span>
+                <span id="disp-tens" class="info-value" style="color:#f6d365; font-size:2rem;">0</span>
+            </div>
+            <div style="text-align:right; font-size:0.72rem; color:#aaa; padding-right:6px; margin-top:-4px;">
+                next boss: <span id="disp-next-boss-at" style="color:#e74c3c; font-weight:800;">20</span>
+            </div>
         </div>
     </div>
 
     <div id="game-area">
+        <!-- ボスバトル演出 -->
+        <div id="boss-frame" class="hidden"></div>
+        <div id="danger-warning" class="hidden">⚠️ WARNING! ⚠️</div>
+
         <canvas id="gameCanvas"></canvas>
 
         <div id="game-result" style="display: none;
         position: absolute; top:50%; left:50%; transform:translate(-50%, -50%); z-index: 20; width: 85%;
         max-width: 400px;"></div>
 
-        <div id="round-clear-screen" class="hidden">
+        <!-- ボス撃破・ゲームクリア通知 -->
+        <div id="boss-clear-screen" class="hidden">
             <div id="round-clear-overlay">
                 <div class="overlay-content">
-                    <h2 style="color:#ff9a9e;
-                    font-size:2rem; border-bottom:none;">ROUND CLEAR!</h2>
-                    <p style="font-size:1.1rem;
-                    font-weight:bold;">おめでとう！</p>
-                    <p>つぎのラウンドにすすみますか？<br><span style="color:#a18cd1;
-                    font-size:0.9rem;">(ブロックがせりあがるのが はやくなるよ！)</span></p>
-                    <div style="margin: 20px 0;
-                    padding: 10px; background: #fff0f5; border-radius: 10px;">
-                        <p style="margin:5px;">つぎのもくひょう</p>
-                        <span id="next-target-score" style="color:#f6d365;
-                        font-weight:800; font-size:1.5rem;">6000</span><span style="font-weight:bold;"> 点</span>
-                    </div>
-                    <button id="btn-next-round" class="btn btn-success" style="width:80%;">つづける</button>
-                    <button id="btn-quit-round" class="btn btn-danger" style="width:80%;">やめる</button>
+                    <h2 id="boss-clear-title" style="color:#ff9a9e; font-size:2rem; border-bottom:none;">BOSS 撃破！</h2>
+                    <p id="boss-clear-msg" style="font-size:1.1rem; font-weight:bold;"></p>
                 </div>
             </div>
         </div>
@@ -704,10 +724,15 @@
 // --- Game Config ---
 const CROWN_THRESHOLDS = { BRONZE: 2000, SILVER: 5000, GOLD: 10000 };
 const CONFIGS = {
-    EASY: { label: "しょきゅう", floorRows: 2, probs: [0.5, 0.8], riseInterval: 10, clearScore: 3000 },
-    NORMAL: { label: "ちゅうきゅう", floorRows: 2, probs: [0.25, 0.75], riseInterval: 7, clearScore: 5000 },
-    HARD: { label: "じょうきゅう", floorRows: 2, probs: [0.20, 0.50], riseInterval: 5, clearScore: 10000 }
+    EASY:   { label: "しょきゅう",   floorRows: 2, probs: [0.5,  0.8],  riseInterval: 10, maxBosses: 3 },
+    NORMAL: { label: "ちゅうきゅう", floorRows: 2, probs: [0.25, 0.75], riseInterval: 7,  maxBosses: 4 },
+    HARD:   { label: "じょうきゅう", floorRows: 2, probs: [0.20, 0.50], riseInterval: 5,  maxBosses: 5 }
 };
+
+// ボスシステム定数
+const BOSS_THRESHOLDS = [20, 50, 90, 140, 200]; // 累計「10」達成回数の閾値
+const BOSS_EMOJIS     = ['👾', '👻', '🤖', '🐦‍🔥', '🐲'];
+const BLOCK_VAL_BOSS  = 200;
 
 const NG_WORDS_HIRAGANA = [
     'しね', 'しぬ', 'しに', 'ころす', 'ころせ', 'さつがい', 'くたばれ', 'じさつ', 'ぎさつ', 'つるす', 'れんたん', 'しにたい',
@@ -761,10 +786,9 @@ let state = {
     combo: 0,
     dropCount: 0,
     riseCounter: 0,
-    round: 1,
-    targetScore: 0,
     currentRiseInterval: 0,
     grid: [],
+    bossGrid: [],      // parallel grid: null or {hp, bossIndex}
     animOffsets: [],
     activeBlock: null,
     nextBlockValues: [],
@@ -778,8 +802,15 @@ let state = {
     boardY: 0,
     timerId: null,
     fastDropping: false,
-    rankingMode: 'LOCAL', // LOCAL or WORLD
-    diamondStock: 0
+    rankingMode: 'LOCAL',
+    diamondStock: 0,
+    // ボス関連
+    totalTens: 0,          // 累計「10」達成回数
+    maxBosses: 3,          // 難易度ごとのボス数
+    bossesDefeated: 0,     // 倒したボス数
+    nextBossIndex: 0,      // 次に出るボスのインデックス (0始まり)
+    bossSpawnPending: false, // trueのとき次のブロックがボスになる
+    showDangerWarning: false
 };
 
 const canvas = document.getElementById('gameCanvas');
@@ -831,8 +862,10 @@ const ui = {
     
     // Game Screens
     result: document.getElementById('game-result'),
-    roundClearScreen: document.getElementById('round-clear-screen'),
-    nextTargetScore: document.getElementById('next-target-score'),
+    bossClearScreen: document.getElementById('boss-clear-screen'),
+    bossClearTitle: document.getElementById('boss-clear-title'),
+    bossClearMsg:   document.getElementById('boss-clear-msg'),
+    bossFrame:      document.getElementById('boss-frame'),
     
     // In-Game UI
     rightPanelContent: document.getElementById('right-panel-content'),
@@ -840,11 +873,12 @@ const ui = {
     level: document.getElementById('disp-level'),
     score: document.getElementById('disp-score'),
     combo: document.getElementById('disp-combo'),
-    round: document.getElementById('disp-round'),
-    target: document.getElementById('disp-target'),
-    targetBig: document.getElementById('target-score-big'),
+    dispBoss: document.getElementById('disp-boss'),
+    dispTens: document.getElementById('disp-tens'),
     dispDiamond: document.getElementById('disp-diamond'),
     dispPlayer: document.getElementById('disp-player'),
+    dangerWarning: document.getElementById('danger-warning'),
+    dispNextBossAt: document.getElementById('disp-next-boss-at'),
 
     // How-to-play popup
     howToPlayScreen: document.getElementById('how-to-play-screen'),
@@ -858,9 +892,7 @@ const ui = {
 
     // Controls
     controls: document.getElementById('puzzle-controls'),
-    btnToTitle: document.getElementById('btn-to-title'),
-    btnNextRound: document.getElementById('btn-next-round'),
-    btnQuitRound: document.getElementById('btn-quit-round')
+    btnToTitle: document.getElementById('btn-to-title')
 };
 
 function fitToScreen() {
@@ -1107,6 +1139,7 @@ function canPlace(bx, by, rot, values) {
 
 function initGrid() {
     state.grid = Array.from({length: ROWS}, () => Array(COLS).fill(0));
+    state.bossGrid = Array.from({length: ROWS}, () => Array(COLS).fill(null));
     state.animOffsets = Array.from({length: ROWS}, () => Array(COLS).fill(0));
     const floorR = currentConfig.floorRows;
     for(let i=0; i<floorR; i++) {
@@ -1121,6 +1154,11 @@ function initGrid() {
 
 function generateBlockValues() {
     state.dropCount++;
+    // ボス出現チェック
+    if(state.bossSpawnPending) {
+        state.bossSpawnPending = false;
+        return [BLOCK_VAL_BOSS];
+    }
     const r = Math.random();
     let size = 2;
     const p = currentConfig.probs;
@@ -1128,7 +1166,11 @@ function generateBlockValues() {
     else if(r < p[1]) size = 3;
     else size = 4;
     const arr = [];
-    for(let i=0; i<size; i++) arr.push(randomInt(1,9));
+    for(let i=0; i<size; i++) {
+        // 1%の確率でダイヤモンドブロック（通常の数値抽選より先に判定）
+        if(Math.random() < 0.05) arr.push(BLOCK_VAL_DIAMOND);
+        else arr.push(randomInt(1,9));
+    }
     return arr;
 }
 
@@ -1175,8 +1217,15 @@ function lockBlock() {
     
     const landY = Math.round(b.y);
     const cells = getOccupiedCells(b.x, landY, b.rot, b.values.length);
-    cells.forEach((c, i) => { 
-        if(c.y >= 0 && c.y < ROWS) state.grid[c.y][c.x] = b.values[i]; 
+    cells.forEach((c, i) => {
+        if(c.y >= 0 && c.y < ROWS) {
+            state.grid[c.y][c.x] = b.values[i];
+            // ボスブロックが着地したときにbossGridを初期化
+            if(b.values[i] === BLOCK_VAL_BOSS) {
+                const bIdx = state.nextBossIndex - 1;
+                state.bossGrid[c.y][c.x] = { hp: bIdx + 3, bossIndex: bIdx };
+            }
+        }
     });
 
     draw();
@@ -1214,9 +1263,10 @@ function triggerSpecialEffect(startX, startY) {
         let parts = key.split(',');
         let c = parseInt(parts[0]);
         let r = parseInt(parts[1]);
-        if(state.grid[r][c] !== 0) {
+        if(state.grid[r][c] === BLOCK_VAL_BOSS) {
+            damageBoss(r, c); // スペシャルがボスに当たればダメージ
+        } else if(state.grid[r][c] !== 0) {
             state.grid[r][c] = 0;
-            // 修正：キラキラエフェクト
             spawnParticle(c, r, "✨", "#8fd3f4");
         }
     });
@@ -1231,10 +1281,10 @@ async function processTurn(skipRise = false) {
         let anyChange = false;
         outerLoop:
         while(true) {
-            if(applyGravityLogic()) { 
-                await animateGravity(); 
+            if(applyGravityLogic()) {
+                await animateGravity();
             }
-            
+
             let changeOccurred = false;
             for(let c=0; c<COLS; c++) {
                 for(let r=ROWS-2; r>=0; r--) {
@@ -1250,8 +1300,9 @@ async function processTurn(skipRise = false) {
                             spawnParticle(c, r+1, "合体!", "#3498db"); changeOccurred = true;
                         } else if(sum === 10) {
                             state.grid[r+1][c] = 0; state.grid[r][c] = 0;
-                            
+
                             let bonus = 0;
+                            // 真下 (r+2) のブロックへの効果
                             if(r+2 < ROWS) {
                                 let targetVal = state.grid[r+2][c];
                                 if(targetVal === BLOCK_VAL_OBSTACLE) {
@@ -1264,34 +1315,46 @@ async function processTurn(skipRise = false) {
                                     state.diamondStock++;
                                     spawnParticle(c, r+2, "💎GET!", "#a18cd1");
                                     bonus = 30;
-                                    updateUI();
+                                } else if(targetVal === BLOCK_VAL_BOSS) {
+                                    damageBoss(r+2, c);
+                                    bonus = 20;
+                                }
+                            }
+                            // 隣接するボスへのダメージ（左右 + 上）
+                            for(const [dr, dc] of [[-1,0],[0,-1],[0,1],[1,-1],[1,1]]) {
+                                const nr = r + dr, nc = c + dc;
+                                if(nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS) {
+                                    if(state.grid[nr][nc] === BLOCK_VAL_BOSS) damageBoss(nr, nc);
                                 }
                             }
 
                             state.combo++; totalTens++;
+                            state.totalTens++;  // 累計カウント
                             let point = (10 + bonus) * state.combo;
                             state.score += Math.floor(point);
-                            spawnParticle(c, r+0.5, "10!", "#f6d365"); spawnParticle(2, 3, `+${Math.floor(point)}`, "#f6d365");
-                            changeOccurred = true; 
+                            spawnParticle(c, r+0.5, "10!", "#f6d365");
+                            spawnParticle(2, 3, `+${Math.floor(point)}`, "#f6d365");
+                            changeOccurred = true;
                             showComboAnim(state.combo + " COMBO", point);
                         } else {
                             let nextVal = BLOCK_VAL_OBSTACLE;
                             if(Math.random() < 0.05) nextVal = BLOCK_VAL_SPECIAL;
 
-                            if(lower !== BLOCK_VAL_OBSTACLE && lower !== BLOCK_VAL_SPECIAL && lower !== BLOCK_VAL_DIAMOND) {
+                            if(lower !== BLOCK_VAL_OBSTACLE && lower !== BLOCK_VAL_SPECIAL &&
+                               lower !== BLOCK_VAL_DIAMOND  && lower !== BLOCK_VAL_BOSS) {
                                 state.grid[r+1][c] = nextVal; state.grid[r][c] = sum - 10;
                                 spawnParticle(c, r+1, "Over!", "#999"); changeOccurred = true;
                             }
                         }
-                        if(changeOccurred) { 
-                            draw(); updateUI(); 
-                            await wait(WAIT_AFTER_CLEAR); 
-                            continue outerLoop; 
+                        if(changeOccurred) {
+                            draw(); updateUI();
+                            await wait(WAIT_AFTER_CLEAR);
+                            continue outerLoop;
                         }
                     }
                 }
             }
-            if(!changeOccurred) break; 
+            if(!changeOccurred) break;
             anyChange = true;
         }
         return anyChange;
@@ -1299,7 +1362,20 @@ async function processTurn(skipRise = false) {
 
     await runPhysics();
 
-    if(state.score >= state.targetScore) { showRoundClear(); return; }
+    // ボス閾値チェック（runPhysics後に判定）
+    if(!state.bossSpawnPending && state.nextBossIndex < state.maxBosses &&
+       state.totalTens >= BOSS_THRESHOLDS[state.nextBossIndex]) {
+        state.nextBossIndex++;
+        // DANGER! 演出
+        if(ui.dangerWarning) {
+            ui.dangerWarning.classList.remove('hidden');
+            if(ui.dangerWarning.parentElement) ui.dangerWarning.parentElement.classList.remove('hidden');
+        }
+        draw(); updateUI();
+        await wait(2500);
+        if(ui.dangerWarning) ui.dangerWarning.classList.add('hidden');
+        state.bossSpawnPending = true;
+    }
 
     if(!skipRise && state.riseCounter >= state.currentRiseInterval) {
         let overflow = false;
@@ -1307,22 +1383,23 @@ async function processTurn(skipRise = false) {
         if(overflow) { gameOver(); return; }
 
         state.riseCounter = 0;
-        
-        for(let r=0; r<ROWS-1; r++) { state.grid[r] = [...state.grid[r+1]]; }
-        
+
+        // bossGridも一緒にせり上がらせる
+        for(let r=0; r<ROWS-1; r++) {
+            state.grid[r] = [...state.grid[r+1]];
+            state.bossGrid[r] = [...state.bossGrid[r+1]];
+        }
+
         state.grid[ROWS-1] = Array.from({length: COLS}, () => {
-            const rng = Math.random();
-            if(rng < 0.01) return BLOCK_VAL_DIAMOND;
-            if(rng < 0.06) return BLOCK_VAL_SPECIAL;
-            return randomInt(1, 9);
+            return (Math.random() < 0.05) ? BLOCK_VAL_SPECIAL : randomInt(1, 9);
         });
-        
+        state.bossGrid[ROWS-1] = Array(COLS).fill(null);
+
         for(let r=0; r<ROWS; r++) {
             for(let c=0; c<COLS; c++) { if(state.grid[r][c]!==0) state.animOffsets[r][c] = state.blockSize; }
         }
         await animateGravity();
         await runPhysics();
-        if(state.score >= state.targetScore) { showRoundClear(); return; }
     }
 
     if(totalTens === 0) state.combo = 0;
@@ -1346,6 +1423,11 @@ function applyGravityLogic() {
                 if(fallDist > 0) {
                     state.grid[k][c] = state.grid[r][c];
                     state.grid[r][c] = 0;
+                    // bossGridも一緒に移動
+                    if(state.bossGrid[r][c] !== null) {
+                        state.bossGrid[k][c] = state.bossGrid[r][c];
+                        state.bossGrid[r][c] = null;
+                    }
                     state.animOffsets[k][c] = -fallDist * state.blockSize;
                     moved = true;
                 }
@@ -1582,6 +1664,13 @@ function drawBlock(ctx, c, r, val, isActive=false, isGhost=false, offsetY_px=0) 
         grad.addColorStop(0.4, "#9b59b6");
         grad.addColorStop(1, "#6c3483");
         bg = grad;
+    } else if(val === BLOCK_VAL_BOSS) {
+        // ボスブロック（赤黒グラデーション）
+        const grad = ctx.createLinearGradient(x, y, x+s, y+s);
+        grad.addColorStop(0, "#e74c3c");
+        grad.addColorStop(0.5, "#c0392b");
+        grad.addColorStop(1, "#7b241c");
+        bg = grad;
     } else {
         const colors = [
             "#ff9a9e", "#a18cd1", "#fad0c4", "#84fab0", 
@@ -1638,7 +1727,7 @@ function drawBlock(ctx, c, r, val, isActive=false, isGhost=false, offsetY_px=0) 
     }
     ctx.shadowBlur = 0;
 
-    if(val !== BLOCK_VAL_OBSTACLE && val !== BLOCK_VAL_SPECIAL && val !== BLOCK_VAL_DIAMOND && !isGhost) {
+    if(val !== BLOCK_VAL_OBSTACLE && val !== BLOCK_VAL_SPECIAL && val !== BLOCK_VAL_DIAMOND && val !== BLOCK_VAL_BOSS && !isGhost) {
         ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
         ctx.beginPath();
         ctx.ellipse(x + s*0.3, y + s*0.3, s*0.15, s*0.1, Math.PI / 4, 0, Math.PI * 2);
@@ -1661,6 +1750,36 @@ function drawBlock(ctx, c, r, val, isActive=false, isGhost=false, offsetY_px=0) 
         ctx.font = `${s*0.55}px sans-serif`;
         ctx.textAlign = "center"; ctx.textBaseline = "middle";
         ctx.fillText("💎", x+s/2, y+s/2);
+    } else if(val === BLOCK_VAL_BOSS) {
+        // ボス絵文字
+        const bossData = (state.bossGrid[r] && state.bossGrid[r][c]) ? state.bossGrid[r][c] : null;
+        const bIdx = bossData ? bossData.bossIndex : 0;
+        const hp   = bossData ? bossData.hp        : 0;
+        const maxHp = bIdx + 3;
+        const emoji = BOSS_EMOJIS[bIdx] || '👾';
+
+        ctx.font = `${s*0.52}px sans-serif`;
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText(emoji, x+s/2, y+s*0.46);
+
+        // HPバー
+        const barH  = s * 0.12;
+        const barY  = y + s - barH - 3;
+        const barW  = s - 8;
+        const barX  = x + 4;
+        ctx.fillStyle = "rgba(0,0,0,0.4)";
+        ctx.beginPath(); ctx.roundRect(barX, barY, barW, barH, 3); ctx.fill();
+        const ratio = Math.max(0, hp / maxHp);
+        const hue = Math.round(ratio * 120); // 緑→黄→赤
+        ctx.fillStyle = `hsl(${hue},90%,50%)`;
+        ctx.beginPath(); ctx.roundRect(barX, barY, barW * ratio, barH, 3); ctx.fill();
+
+        // HP数値
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = "#fff";
+        ctx.font = `bold ${s*0.22}px sans-serif`;
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText(`HP ${hp}`, x+s/2, barY + barH/2);
     } else {
         ctx.fillStyle = fg;
         ctx.font = `800 ${s*0.6}px 'M PLUS Rounded 1c', sans-serif`;
@@ -1685,22 +1804,106 @@ function drawNextBlock() {
     for(let i=0; i<vals.length; i++) {
         let val = vals[i];
         const colors = ["#ff9a9e", "#a18cd1", "#fad0c4", "#84fab0", "#a1c4fd", "#fbc2eb", "#f6d365", "#ff9a9e", "#c2e9fb"];
-        nextCtx.fillStyle = colors[val-1] || "#ecf0f1";
+        const bx = startX + i*bSize;
+
+        // 背景色
+        if(val === BLOCK_VAL_BOSS) {
+            const grad = nextCtx.createLinearGradient(bx, startY, bx+bSize, startY+bSize);
+            grad.addColorStop(0, "#e74c3c"); grad.addColorStop(1, "#7b241c");
+            nextCtx.fillStyle = grad;
+        } else if(val === BLOCK_VAL_DIAMOND) {
+            const grad = nextCtx.createLinearGradient(bx, startY, bx+bSize, startY+bSize);
+            grad.addColorStop(0, "#f0c3ff"); grad.addColorStop(0.4, "#9b59b6"); grad.addColorStop(1, "#6c3483");
+            nextCtx.fillStyle = grad;
+        } else {
+            nextCtx.fillStyle = colors[val-1] || "#ecf0f1";
+        }
         nextCtx.beginPath();
-        nextCtx.roundRect(startX + i*bSize + 2, startY+2, bSize-4, bSize-4, 20);
-        nextCtx.fill();
-        
-        nextCtx.fillStyle = "rgba(255,255,255,0.4)";
-        nextCtx.beginPath();
-        nextCtx.ellipse(startX + i*bSize + bSize*0.3, startY + bSize*0.3, bSize*0.15, bSize*0.1, Math.PI/4, 0, Math.PI*2);
+        nextCtx.roundRect(bx + 2, startY+2, bSize-4, bSize-4, 20);
         nextCtx.fill();
 
-        nextCtx.fillStyle = "#fff";
-        nextCtx.font = "800 32px 'M PLUS Rounded 1c', sans-serif";
+        if(val !== BLOCK_VAL_BOSS && val !== BLOCK_VAL_DIAMOND) {
+            nextCtx.fillStyle = "rgba(255,255,255,0.4)";
+            nextCtx.beginPath();
+            nextCtx.ellipse(bx + bSize*0.3, startY + bSize*0.3, bSize*0.15, bSize*0.1, Math.PI/4, 0, Math.PI*2);
+            nextCtx.fill();
+        }
+
+        // テキスト/絵文字
         nextCtx.textAlign = "center"; nextCtx.textBaseline = "middle";
-        nextCtx.shadowColor = "rgba(0,0,0,0.1)"; nextCtx.shadowOffsetY = 2;
-        nextCtx.fillText(val, startX + i*bSize + bSize/2, startY + bSize/2 + 2);
+        if(val === BLOCK_VAL_BOSS) {
+            const bIdx = state.nextBossIndex > 0 ? state.nextBossIndex - 1 : 0;
+            nextCtx.font = `${bSize*0.52}px sans-serif`;
+            nextCtx.fillText(BOSS_EMOJIS[bIdx] || '👾', bx + bSize/2, startY + bSize/2);
+        } else if(val === BLOCK_VAL_DIAMOND) {
+            nextCtx.font = `${bSize*0.52}px sans-serif`;
+            nextCtx.fillText("💎", bx + bSize/2, startY + bSize/2);
+        } else {
+            nextCtx.fillStyle = "#fff";
+            nextCtx.font = "800 32px 'M PLUS Rounded 1c', sans-serif";
+            nextCtx.shadowColor = "rgba(0,0,0,0.1)"; nextCtx.shadowOffsetY = 2;
+            nextCtx.fillText(val, bx + bSize/2, startY + bSize/2 + 2);
+            nextCtx.shadowOffsetY = 0;
+        }
     }
+}
+
+// --- Boss Battle Logic ---
+function damageBoss(r, c) {
+    if(!state.bossGrid[r] || !state.bossGrid[r][c]) return;
+    const boss = state.bossGrid[r][c];
+    boss.hp--;
+    spawnParticle(c, r, "-1", "#e74c3c");
+    draw(); updateUI();
+
+    if(boss.hp <= 0) {
+        state.grid[r][c] = 0;
+        state.bossGrid[r][c] = null;
+        state.bossesDefeated++;
+        state.score += 500; // 撃破ボーナス
+        spawnParticle(c, r, "撃破！", "#f1c40f");
+
+        if(state.bossesDefeated >= state.maxBosses) {
+            gameClear();
+        } else {
+            // ボス撃破メッセージを短時間表示
+            const bIdx = state.bossesDefeated - 1;
+            const emoji = BOSS_EMOJIS[bIdx] || '👾';
+            if(ui.bossClearTitle) ui.bossClearTitle.textContent = `${emoji} BOSS 撃破！`;
+            if(ui.bossClearMsg)   ui.bossClearMsg.textContent   =
+                `次のBOSSまであと ${state.maxBosses - state.bossesDefeated} 体！`;
+            if(ui.bossClearScreen) {
+                ui.bossClearScreen.classList.remove('hidden');
+                setTimeout(() => ui.bossClearScreen.classList.add('hidden'), 2000);
+            }
+            // せりあがりが少し速くなる
+            state.currentRiseInterval = Math.max(2, state.currentRiseInterval - 1);
+            updateUI();
+        }
+    }
+}
+
+function gameClear() {
+    state.screen = 'GAMEOVER'; // ゲームループ停止のため同じ状態を使用
+    if(state.timerId) clearTimeout(state.timerId); state.timerId = null;
+    ui.controls.classList.add('hidden'); ui.btnToTitle.classList.add('hidden');
+    if(ui.bossFrame)       ui.bossFrame.classList.add('hidden');
+    if(ui.dangerWarning)   ui.dangerWarning.classList.add('hidden');
+    if(ui.bossClearScreen) ui.bossClearScreen.classList.add('hidden');
+
+    saveScore(state.difficulty, state.score); incrementClear(state.difficulty);
+    ui.result.innerHTML = `
+        <div style="background:#fff; padding:25px; border-radius:25px; border:5px solid #f6d365; color:#555; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
+            <h2 style="color:#f6d365; border:none; font-size:2.2rem; text-shadow:1px 1px 0 #ddd;">🎉 GAME CLEAR! 🎉</h2>
+            <div style="font-size:1.1rem; margin:8px 0; color:#e74c3c; font-weight:800;">全BOSSを撃破した！</div>
+            <div style="font-size:1.5rem; margin:16px 0;">SCORE: <span style="color:#f6d365; font-weight:800; text-shadow:1px 1px 0 #ddd;">${state.score}</span></div>
+            <button id="btn-retry" class="btn btn-success" style="width:100%; margin-bottom:10px;">もういちど</button>
+            <button id="btn-home" class="btn" style="background:#eee; color:#777; width:100%;">タイトルへ</button>
+        </div>
+    `;
+    ui.result.style.display = 'block';
+    document.getElementById('btn-retry').onclick = () => { ui.result.style.display='none'; startGame(); };
+    document.getElementById('btn-home').onclick  = () => { ui.result.style.display='none'; backToTitle(); };
 }
 
 // --- Control Handlers ---
@@ -1708,10 +1911,10 @@ function gameOver() {
     state.screen = 'GAMEOVER';
     if(state.timerId) clearTimeout(state.timerId); state.timerId = null;
     ui.controls.classList.add('hidden'); ui.btnToTitle.classList.add('hidden');
-    
-    // ラウンドクリア画面が出ていた場合は消す
-    ui.roundClearScreen.classList.add('hidden');
-    
+    if(ui.bossClearScreen) ui.bossClearScreen.classList.add('hidden');
+    if(ui.bossFrame)       ui.bossFrame.classList.add('hidden');
+    if(ui.dangerWarning)   ui.dangerWarning.classList.add('hidden');
+
     saveScore(state.difficulty, state.score); incrementClear(state.difficulty);
     ui.result.innerHTML = `
         <div style="background:#fff; padding:25px; border-radius:25px; border:5px solid #ff9a9e; color:#555; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
@@ -1749,18 +1952,25 @@ function startGame() {
     if(state.timerId) clearTimeout(state.timerId); state.timerId = null;
     state.screen = 'PLAYING';
     state.score = 0; state.combo = 0; state.dropCount = 0; state.riseCounter = 0;
-    
-    state.round = 1;
-    state.targetScore = currentConfig.clearScore;
     state.currentRiseInterval = currentConfig.riseInterval;
-    
+
+    // ボス関連リセット
+    state.totalTens       = 0;
+    state.maxBosses       = currentConfig.maxBosses;
+    state.bossesDefeated  = 0;
+    state.nextBossIndex   = 0;
+    state.bossSpawnPending = false;
+    state.showDangerWarning = false;
+
     state.nextBlockValues = []; state.inputLocked = false; state.fastDropping = false;
     state.particles = []; state.comboAnim = null;
     state.diamondStock = 0;
 
     ui.level.textContent = currentConfig.label;
     ui.title.classList.add('hidden'); ui.rankingScreen.classList.add('hidden');
-    ui.roundClearScreen.classList.add('hidden');
+    if(ui.bossClearScreen) ui.bossClearScreen.classList.add('hidden');
+    if(ui.bossFrame)       ui.bossFrame.classList.add('hidden');
+    if(ui.dangerWarning)   ui.dangerWarning.classList.add('hidden');
     ui.controls.classList.remove('hidden'); ui.btnToTitle.classList.remove('hidden');
     ui.rightPanelContent.classList.remove('hidden');
     ui.leftPanelStats.classList.remove('hidden');
@@ -1768,51 +1978,23 @@ function startGame() {
     // パネル表示
     ui.leftPanel.classList.remove('hidden');
     ui.rightPanel.classList.remove('hidden');
-    
+
     initGrid(); resize(); spawnBlock(); updateUI(); draw();
 }
 
-function showRoundClear() {
-    state.screen = 'ROUND_CLEAR';
-    if(state.timerId) clearTimeout(state.timerId);
-    state.timerId = null;
-
-    ui.nextTargetScore.textContent = state.targetScore + currentConfig.clearScore;
-    ui.roundClearScreen.classList.remove('hidden');
-    ui.controls.classList.add('hidden');
-}
-
-function nextRound() {
-    state.round++;
-    state.targetScore += currentConfig.clearScore;
-    state.currentRiseInterval = Math.max(2, state.currentRiseInterval - 1);
-    
-    ui.roundClearScreen.classList.add('hidden');
-    ui.controls.classList.remove('hidden');
-    state.screen = 'PLAYING';
-    
-    // 状態リセット
-    state.inputLocked = false;
-    state.fastDropping = false;
-    state.activeBlock = null; 
-    
-    updateUI();
-    spawnBlock();
-}
-
-// 「やめる」ボタンの挙動修正
-function quitRound() {
-    gameOver(); // ゲームオーバー処理（スコア保存など）へ移行
-}
 
 function backToTitle() {
     if(state.timerId) clearTimeout(state.timerId); state.timerId = null;
     state.screen = 'TITLE';
-    
-    state.grid = Array.from({length: ROWS}, () => Array(COLS).fill(0));
+
+    state.grid     = Array.from({length: ROWS}, () => Array(COLS).fill(0));
+    state.bossGrid = Array.from({length: ROWS}, () => Array(COLS).fill(null));
     state.activeBlock = null;
     state.particles = [];
     state.comboAnim = null;
+    if(ui.bossFrame)       ui.bossFrame.classList.add('hidden');
+    if(ui.dangerWarning)   ui.dangerWarning.classList.add('hidden');
+    if(ui.bossClearScreen) ui.bossClearScreen.classList.add('hidden');
     ctx.clearRect(0,0, state.width, state.height);
     nextCtx.clearRect(0,0, nextCanvas.width, nextCanvas.height);
 
@@ -1836,11 +2018,41 @@ function backToTitle() {
 function updateUI() {
     ui.score.textContent = state.score;
     ui.combo.textContent = state.combo;
-    ui.round.textContent = state.round;
-    if(ui.target) ui.target.textContent = state.targetScore;
-    if(ui.targetBig) ui.targetBig.textContent = state.targetScore;
     if(ui.dispDiamond) ui.dispDiamond.textContent = state.diamondStock;
     if(ui.dispPlayer) ui.dispPlayer.textContent = currentPlayerName;
+    if(ui.dispTens) ui.dispTens.textContent = state.totalTens;
+    if(ui.dispBoss) ui.dispBoss.textContent = `${state.bossesDefeated} / ${state.maxBosses}`;
+    // 次のBOSS閾値表示
+    if(ui.dispNextBossAt) {
+        if(state.nextBossIndex < state.maxBosses && !state.bossSpawnPending) {
+            const nextThresh = BOSS_THRESHOLDS[state.nextBossIndex];
+            ui.dispNextBossAt.textContent = nextThresh;
+            if(ui.dispNextBossAt.parentElement) {
+                ui.dispNextBossAt.parentElement.style.display = '';
+            }
+        } else {
+            // 全BOSS出現済み or 出現待ち中は非表示
+            if(ui.dispNextBossAt.parentElement) {
+                ui.dispNextBossAt.parentElement.style.display = 'none';
+            }
+        }
+    }
+
+    // ボスがボード上にいる間はボスフレームを表示
+    const bossOnBoard = hasBossOnBoard();
+    if(ui.bossFrame) {
+        if(bossOnBoard) ui.bossFrame.classList.remove('hidden');
+        else            ui.bossFrame.classList.add('hidden');
+    }
+}
+
+function hasBossOnBoard() {
+    for(let r = 0; r < ROWS; r++) {
+        for(let c = 0; c < COLS; c++) {
+            if(state.grid[r][c] === BLOCK_VAL_BOSS) return true;
+        }
+    }
+    return false;
 }
 
 function bind(el, fn) {
@@ -1909,8 +2121,6 @@ bind(ui.btnEasy, () => handleStart('EASY'));
 bind(ui.btnNormal, () => handleStart('NORMAL'));
 bind(ui.btnHard, () => handleStart('HARD'));
 
-bind(ui.btnNextRound, nextRound);
-bind(ui.btnQuitRound, quitRound);
 
 bind(document.getElementById('btn-left'), () => moveBlock(-1));
 bind(document.getElementById('btn-right'), () => moveBlock(1));
