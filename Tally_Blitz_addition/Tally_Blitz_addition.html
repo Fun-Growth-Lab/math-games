@@ -411,9 +411,14 @@
 
         /* ダイヤモンドpicker ボタン */
         .diamond-num-btn {
-            width: 65px; height: 65px; font-size: 1.8rem;
+            width: 60px; height: 60px; font-size: 1.7rem; font-weight: 800;
             padding: 0; display: flex; justify-content: center; align-items: center;
+            border: none; border-radius: 14px; color: #fff;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.25);
+            box-shadow: 0 3px 0 rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.35);
+            cursor: pointer; transition: transform 0.1s;
         }
+        .diamond-num-btn:active { transform: scale(0.92); }
 
     </style>
 </head>
@@ -600,16 +605,20 @@
                 <div class="overlay-content">
                     <h2 style="color:#9b59b6; border-bottom-color:#9b59b6;">💎 どのすうじをけす？</h2>
                     <p style="font-size:0.9rem; color:#888; font-weight:bold; margin-top:0;">えらんだすうじのブロックが<br>ぜんぶきえるよ！</p>
-                    <div style="display:flex; flex-wrap:wrap; justify-content:center; gap:8px; margin:10px 0;">
-                        <button class="btn btn-diamond diamond-num-btn" data-num="1">1</button>
-                        <button class="btn btn-diamond diamond-num-btn" data-num="2">2</button>
-                        <button class="btn btn-diamond diamond-num-btn" data-num="3">3</button>
-                        <button class="btn btn-diamond diamond-num-btn" data-num="4">4</button>
-                        <button class="btn btn-diamond diamond-num-btn" data-num="5">5</button>
-                        <button class="btn btn-diamond diamond-num-btn" data-num="6">6</button>
-                        <button class="btn btn-diamond diamond-num-btn" data-num="7">7</button>
-                        <button class="btn btn-diamond diamond-num-btn" data-num="8">8</button>
-                        <button class="btn btn-diamond diamond-num-btn" data-num="9">9</button>
+                    <div style="display:flex; flex-direction:column; align-items:center; gap:8px; margin:10px 0;">
+                        <div style="display:flex; gap:8px;">
+                            <button class="diamond-num-btn" data-num="1" style="background:#ff9a9e;">1</button>
+                            <button class="diamond-num-btn" data-num="2" style="background:#a18cd1;">2</button>
+                            <button class="diamond-num-btn" data-num="3" style="background:#fad0c4; color:#b07878;">3</button>
+                            <button class="diamond-num-btn" data-num="4" style="background:#84fab0;">4</button>
+                            <button class="diamond-num-btn" data-num="5" style="background:#a1c4fd;">5</button>
+                        </div>
+                        <div style="display:flex; gap:8px;">
+                            <button class="diamond-num-btn" data-num="6" style="background:#fbc2eb; color:#c06898;">6</button>
+                            <button class="diamond-num-btn" data-num="7" style="background:#f6d365; color:#a07020;">7</button>
+                            <button class="diamond-num-btn" data-num="8" style="background:#ff9a9e;">8</button>
+                            <button class="diamond-num-btn" data-num="9" style="background:#c2e9fb; color:#4a8ca0;">9</button>
+                        </div>
                     </div>
                     <button id="btn-cancel-diamond" class="btn" style="background:#eee; color:#777; width:80%; margin-top:10px;">やめる</button>
                 </div>
@@ -1168,7 +1177,7 @@ function generateBlockValues() {
     const arr = [];
     for(let i=0; i<size; i++) {
         // 1%の確率でダイヤモンドブロック（通常の数値抽選より先に判定）
-        if(Math.random() < 0.05) arr.push(BLOCK_VAL_DIAMOND);
+        if(Math.random() < 0.01) arr.push(BLOCK_VAL_DIAMOND);
         else arr.push(randomInt(1,9));
     }
     return arr;
@@ -1302,29 +1311,31 @@ async function processTurn(skipRise = false) {
                             state.grid[r+1][c] = 0; state.grid[r][c] = 0;
 
                             let bonus = 0;
-                            // 真下 (r+2) のブロックへの効果
-                            if(r+2 < ROWS) {
-                                let targetVal = state.grid[r+2][c];
-                                if(targetVal === BLOCK_VAL_OBSTACLE) {
-                                    state.grid[r+2][c] = 0; spawnParticle(c, r+2, "Break!", "#ff9a9e"); bonus = 10;
-                                } else if(targetVal === BLOCK_VAL_SPECIAL) {
-                                    triggerSpecialEffect(c, r+2);
-                                    bonus = 50;
-                                } else if(targetVal === BLOCK_VAL_DIAMOND) {
-                                    state.grid[r+2][c] = 0;
+                            // 10消しの影響を受けるセルをまとめてチェック
+                            // ① 真下 (r+2, c)  ② 上の左右 (r, c±1)  ③ 下の左右 (r+1, c±1)
+                            const adjacentCells = [
+                                [r+2, c],
+                                [r,   c-1], [r,   c+1],
+                                [r+1, c-1], [r+1, c+1]
+                            ];
+                            for(const [nr, nc] of adjacentCells) {
+                                if(nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) continue;
+                                const tv = state.grid[nr][nc];
+                                if(tv === BLOCK_VAL_OBSTACLE) {
+                                    state.grid[nr][nc] = 0;
+                                    spawnParticle(nc, nr, "Break!", "#ff9a9e");
+                                    bonus += 10;
+                                } else if(tv === BLOCK_VAL_SPECIAL) {
+                                    triggerSpecialEffect(nc, nr);
+                                    bonus += 50;
+                                } else if(tv === BLOCK_VAL_DIAMOND) {
+                                    state.grid[nr][nc] = 0;
                                     state.diamondStock++;
-                                    spawnParticle(c, r+2, "💎GET!", "#a18cd1");
-                                    bonus = 30;
-                                } else if(targetVal === BLOCK_VAL_BOSS) {
-                                    damageBoss(r+2, c);
-                                    bonus = 20;
-                                }
-                            }
-                            // 隣接するボスへのダメージ（左右 + 上）
-                            for(const [dr, dc] of [[-1,0],[0,-1],[0,1],[1,-1],[1,1]]) {
-                                const nr = r + dr, nc = c + dc;
-                                if(nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS) {
-                                    if(state.grid[nr][nc] === BLOCK_VAL_BOSS) damageBoss(nr, nc);
+                                    spawnParticle(nc, nr, "💎GET!", "#a18cd1");
+                                    bonus += 30;
+                                } else if(tv === BLOCK_VAL_BOSS) {
+                                    damageBoss(nr, nc);
+                                    bonus += 20;
                                 }
                             }
 
@@ -1377,7 +1388,10 @@ async function processTurn(skipRise = false) {
         state.bossSpawnPending = true;
     }
 
-    if(!skipRise && state.riseCounter >= state.currentRiseInterval) {
+    // ボスがいる間はせり上がりを加速：n体いれば (1+0.5n) 倍速
+    const numBossesNow = countBossesOnBoard();
+    const effectiveRiseInterval = state.currentRiseInterval / (1 + 0.5 * numBossesNow);
+    if(!skipRise && state.riseCounter >= effectiveRiseInterval) {
         let overflow = false;
         for(let c=0; c<COLS; c++) { if(state.grid[EXTRA_ROWS][c] !== 0) overflow = true; }
         if(overflow) { gameOver(); return; }
@@ -1709,17 +1723,12 @@ function drawBlock(ctx, c, r, val, isActive=false, isGhost=false, offsetY_px=0) 
         ctx.moveTo(x+p*2, y+s*0.5); ctx.lineTo(x+s-p*2, y+s*0.5);
         ctx.stroke();
     } else if(val === BLOCK_VAL_DIAMOND) {
-        // ダイヤモンドブロックの形状（六角形風）
-        ctx.shadowColor = "#9b59b6"; ctx.shadowBlur = 12;
+        // ダイヤモンドブロック（シンプルな丸角四角）
+        ctx.shadowColor = "#9b59b6"; ctx.shadowBlur = 10;
         ctx.beginPath();
-        ctx.roundRect(x+p, y+p, s-p*2, s-p*2, s*0.3);
+        ctx.roundRect(x+p, y+p, s-p*2, s-p*2, s*0.4);
         ctx.fill();
-        // 内側のキラキラライン
-        ctx.strokeStyle = "rgba(255,255,255,0.7)"; ctx.lineWidth = 2; ctx.shadowBlur = 0;
-        ctx.beginPath();
-        ctx.moveTo(x+s*0.3, y+s*0.2); ctx.lineTo(x+s*0.6, y+s*0.45);
-        ctx.moveTo(x+s*0.5, y+s*0.2); ctx.lineTo(x+s*0.75, y+s*0.5);
-        ctx.stroke();
+        ctx.shadowBlur = 0;
     } else {
         ctx.beginPath();
         ctx.roundRect(x+p, y+p, s-p*2, s-p*2, s*0.4);
@@ -2053,6 +2062,16 @@ function hasBossOnBoard() {
         }
     }
     return false;
+}
+
+function countBossesOnBoard() {
+    let n = 0;
+    for(let r = 0; r < ROWS; r++) {
+        for(let c = 0; c < COLS; c++) {
+            if(state.grid[r][c] === BLOCK_VAL_BOSS) n++;
+        }
+    }
+    return n;
 }
 
 function bind(el, fn) {
