@@ -458,11 +458,11 @@ const Game = (function() {
             } else if (specialType === 'fireworks') {
                 grid[pos.r][pos.c] = { type: 'fireworks', val: -1, id: Date.now() + Math.random() };
             } else if (specialType === 'rock') {
-                grid[pos.r][pos.c] = { type: 'rock', val: -1, id: Date.now() + Math.random() };
+                grid[pos.r][pos.c] = { type: 'rock', val: -1, hp: 1, maxHp: 1, damageFlash: 0, id: Date.now() + Math.random() };
             } else if (specialType === 'coin') {
-                grid[pos.r][pos.c] = { type: 'coin', val: -1, life: 1, id: Date.now() + Math.random() };
+                grid[pos.r][pos.c] = { type: 'coin', val: -1, hp: 1, maxHp: 1, damageFlash: 0, id: Date.now() + Math.random() };
             } else if (specialType === 'bag') {
-                grid[pos.r][pos.c] = { type: 'bag', val: -1, life: 1, id: Date.now() + Math.random() };
+                grid[pos.r][pos.c] = { type: 'bag', val: -1, hp: 2, maxHp: 2, damageFlash: 0, id: Date.now() + Math.random() };
             } else {
                 // 安全な数値が出るまで抽選（組み合わせ的に必ず１つは入る数値がある）
                 let val;
@@ -591,7 +591,7 @@ const Game = (function() {
                         let target = grid[n.r][n.c];
                         // 流れ星(star)も巻き込み対象に追加
                         // ダイヤ(diamond)も巻き込み対象に追加
-                        if(target && (target.type === 'rock' || target.type === 'coin' || target.type === 'bag' || target.type === 'star' || target.type === 'diamond')) {
+                        if(target && target.type === 'star') {
                             let key = `${n.r},${n.c}`;
                             if(!checkSet.has(key)) {
                                 checkSet.add(key);
@@ -634,9 +634,11 @@ const Game = (function() {
 
         let fireworksToExplode = [];
         let matchKeys = new Set();
+        let numberMatchKeys = new Set(); // 数値タイルのみ（障害物ダメージ用）
         matches.forEach(group => {
             group.forEach(cell => {
                 matchKeys.add(`${cell.r},${cell.c}`);
+                if (cell.type === 'number') numberMatchKeys.add(`${cell.r},${cell.c}`);
                 // 隣接する花火を探す
                 const neighbors = [
                     {r: cell.r-1, c: cell.c}, {r: cell.r+1, c: cell.c},
@@ -652,19 +654,9 @@ const Game = (function() {
             });
         });
 
-        // ライフ消費（プレイヤー操作時のみ）
+        // ターンカウント
         if (consumeLife) {
             turnCount++;
-            for(let r=0; r<GRID_ROWS; r++) {
-                for(let c=0; c<GRID_COLS; c++) {
-                    if(matchKeys.has(`${r},${c}`)) continue;
-                    let cell = grid[r][c];
-                    if(cell && (cell.type === 'coin' || cell.type === 'bag' || cell.type === 'diamond')) {
-                        cell.life--;
-                        if(cell.life <= 0) grid[r][c] = null;
-                    }
-                }
-            }
         }
 
         let uniqueRemovedKeys = new Set();
@@ -682,8 +674,8 @@ const Game = (function() {
                 bossSpawnPending = true;
             }
 
-            // ボスへの隣接ダメージ判定（セル削除前に実施）
-            checkBossAdjacentDamage(matchKeys);
+            // 障害物への隣接ダメージ判定（数値タイルのみ、セル削除前に実施）
+            checkObstacleAdjacentDamage(numberMatchKeys);
 
             matches.forEach(group => {
                 group.forEach(cell => {
@@ -694,14 +686,6 @@ const Game = (function() {
                         if (actualCell) {
                             if (actualCell.type === 'number') {
                                 weightedPointTotal += 1;
-                            } else if (actualCell.type === 'coin') {
-                                weightedPointTotal += 3;
-                            } else if (actualCell.type === 'bag') {
-                                weightedPointTotal += 10;
-                            } else if (actualCell.type === 'rock') {
-                                weightedPointTotal += 0;
-                            } else if (actualCell.type === 'diamond') {
-                                weightedPointTotal += 20;
                             } else if (actualCell.type === 'star') {
                                 starStock++;
                                 effects.push({
@@ -826,6 +810,21 @@ const Game = (function() {
                         color: "#FFF",
                         scale: 1.0
                     });
+                    // 隣接する障害物に1ダメージ
+                    const neighbors = [
+                        {r: r-1, c: c}, {r: r+1, c: c},
+                        {r: r, c: c-1}, {r: r, c: c+1}
+                    ];
+                    neighbors.forEach(n => {
+                        if(n.r >= 0 && n.r < GRID_ROWS && n.c >= 0 && n.c < GRID_COLS) {
+                            const adj = grid[n.r][n.c];
+                            if(adj && adj.type === 'boss') damageBoss(n.r, n.c);
+                            else if(adj && (adj.type === 'rock' || adj.type === 'coin' ||
+                                            adj.type === 'bag' || adj.type === 'diamond')) {
+                                damageObstacle(n.r, n.c);
+                            }
+                        }
+                    });
                 }
             }
         }
@@ -837,18 +836,26 @@ const Game = (function() {
         }
     }
 
-    // ボスに隣接する10グループからのダメージ判定
-    function checkBossAdjacentDamage(matchKeys) {
+    // 障害物（ボス/岩/コイン/バッグ/ダイヤ）への隣接ダメージ判定
+    function checkObstacleAdjacentDamage(numberMatchKeys) {
         for(let r=0; r<GRID_ROWS; r++) {
             for(let c=0; c<GRID_COLS; c++) {
-                if(grid[r][c] && grid[r][c].type === 'boss') {
+                let cell = grid[r][c];
+                if(!cell) continue;
+                if(cell.type === 'boss' || cell.type === 'rock' ||
+                   cell.type === 'coin' || cell.type === 'bag' || cell.type === 'diamond') {
                     const neighbors = [
                         {r: r-1, c: c}, {r: r+1, c: c},
                         {r: r, c: c-1}, {r: r, c: c+1}
                     ];
-                    let hit = false;
-                    neighbors.forEach(n => { if(matchKeys.has(`${n.r},${n.c}`)) hit = true; });
-                    if(hit) damageBoss(r, c);
+                    let hits = 0;
+                    neighbors.forEach(n => { if(numberMatchKeys.has(`${n.r},${n.c}`)) hits++; });
+                    for(let i = 0; i < hits; i++) {
+                        cell = grid[r][c];
+                        if(!cell) break;
+                        if(cell.type === 'boss') damageBoss(r, c);
+                        else damageObstacle(r, c);
+                    }
                 }
             }
         }
@@ -873,6 +880,37 @@ const Game = (function() {
         }
     }
 
+    function damageObstacle(r, c) {
+        let cell = grid[r][c];
+        if(!cell) return;
+        cell.hp--;
+        cell.damageFlash = 20;
+        effects.push({
+            x: GRID_OFFSET_X + c * CELL_SIZE + CELL_SIZE/2,
+            y: GRID_OFFSET_Y + r * CELL_SIZE + CELL_SIZE/2,
+            text: "💥 -1",
+            life: 40, maxLife: 40,
+            color: "#FF1744", scale: 0.8, stroke: "#fff"
+        });
+        if(cell.hp <= 0) {
+            let pts = 0;
+            if(cell.type === 'coin') pts = 300;
+            else if(cell.type === 'bag') pts = 1000;
+            else if(cell.type === 'diamond') pts = 2000;
+            if(pts > 0) {
+                score += pts;
+                effects.push({
+                    x: GRID_OFFSET_X + c * CELL_SIZE + CELL_SIZE/2,
+                    y: GRID_OFFSET_Y + r * CELL_SIZE + CELL_SIZE/2,
+                    text: `+${pts}`,
+                    life: 60, maxLife: 60,
+                    color: "#FFD700", scale: 1.0, stroke: "#000"
+                });
+            }
+            grid[r][c] = null;
+        }
+    }
+
     function checkBossSpawn() {
         if(!bossSpawnPending) return;
         let emptySpots = [];
@@ -888,7 +926,8 @@ const Game = (function() {
         }
         const pos = emptySpots[Math.floor(Math.random() * emptySpots.length)];
         const bIdx = nextBossIndex - 1;
-        const hp = bIdx + 3;
+        const BOSS_HPS = [5, 7, 9, 11, 13];
+        const hp = BOSS_HPS[bIdx] || 5;
         grid[pos.r][pos.c] = { type: 'boss', val: -1, hp: hp, maxHp: hp, bossIndex: bIdx, damageFlash: 0, id: Date.now() + Math.random() };
         bossSpawnPending = false;
         effects.push({
@@ -943,7 +982,7 @@ const Game = (function() {
                     });
                     if(emptyNeighbors.length > 0 && Math.random() < 0.5) {
                         const target = emptyNeighbors[Math.floor(Math.random() * emptyNeighbors.length)];
-                        grid[target.r][target.c] = { type: 'rock', val: -1, id: Date.now() + Math.random() };
+                        grid[target.r][target.c] = { type: 'rock', val: -1, hp: 1, maxHp: 1, damageFlash: 0, id: Date.now() + Math.random() };
                         effects.push({
                             x: GRID_OFFSET_X + target.c * CELL_SIZE + CELL_SIZE/2,
                             y: GRID_OFFSET_Y + target.r * CELL_SIZE + CELL_SIZE/2,
@@ -968,12 +1007,12 @@ const Game = (function() {
 
         // 出現パラメーター
         let spawnParamX = 0;
-        if(difficulty === 'easy') spawnParamX = 2.5;
-        else if(difficulty === 'normal') spawnParamX = 3.0;
-        else spawnParamX = 3.5; // hard
+        if(difficulty === 'easy') spawnParamX = 3.0;
+        else if(difficulty === 'normal') spawnParamX = 3.5;
+        else spawnParamX = 4.0; // hard
 
-        // ステージ進行による増加（+0.25/stage）
-        spawnParamX += (currentStage - 1) * 0.25;
+        // ステージ進行による増加（+0.20/stage）
+        spawnParamX += (currentStage - 1) * 0.20;
 
         let count = Math.floor(spawnParamX);
         let probability = spawnParamX - count;
@@ -997,10 +1036,10 @@ const Game = (function() {
     }
     
     function update() {
-        // ボスのダメージフラッシュ更新（ゲーム中のみ）
+        // 全セルのダメージフラッシュ更新
         for(let r=0; r<GRID_ROWS; r++) {
             for(let c=0; c<GRID_COLS; c++) {
-                if(grid[r] && grid[r][c] && grid[r][c].type === 'boss' && grid[r][c].damageFlash > 0) {
+                if(grid[r] && grid[r][c] && grid[r][c].damageFlash > 0) {
                     grid[r][c].damageFlash--;
                 }
             }
@@ -1461,14 +1500,14 @@ const Game = (function() {
             "● １０ができたパネルは消えるよ",
             "● 連続で消してコンボを狙おう！",
             "",
-            "🪨  岩：隣りの10消しに巻き込まれると消えるよ",
+            "🪨  岩(HP1) / 🪙コイン(HP1) / 💰バッグ(HP2) / 💎ダイヤ(HP3)",
+            "     隣りの10消しでHP-1。隣接数だけ複数ダメージあり！",
             "👾👻🤖...  BOSS：隣りの10消しでHP-1。全部削って倒そう！",
             "     BOSSは岩を生み出すぞ！",
             "",
             "🌠  流れ星：隣りを消すとGET！「つかう」で",
-            "     数字を1種類まるごと全消し",
-            "🪙  コイン：スコア3倍    💰  バッグ：スコア10倍",
-            "💎  ダイヤ：スコア20倍   🎆  花火：隣り消しで十字消し！",
+            "     数字を1種類まるごと全消し＋隣接障害物に1ダメージ",
+            "🎆  花火：隣り消しで十字消し！",
             "",
             "★  全BOSSを倒すとゲームクリア！ ★",
         ];
@@ -1485,9 +1524,10 @@ const Game = (function() {
     }
 
     function drawCellContent(x, y, cell, shadow=false) {
-        if(cell.type === 'rock' || cell.type === 'coin' || cell.type === 'bag' ||
-           cell.type === 'star' || cell.type === 'diamond' || cell.type === 'fireworks') {
+        if(cell.type === 'star' || cell.type === 'fireworks') {
             ctx.fillStyle = "#FFFFFF";
+        } else if(cell.type === 'rock' || cell.type === 'coin' || cell.type === 'bag' || cell.type === 'diamond') {
+            ctx.fillStyle = cell.damageFlash > 0 ? "#FF5252" : "#FFFFFF";
         } else if(cell.type === 'boss') {
             ctx.fillStyle = cell.damageFlash > 0 ? "#FF5252" : "#FFEBEE";
         } else {
@@ -1507,9 +1547,19 @@ const Game = (function() {
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
 
-        if (cell.type === 'rock') {
-            ctx.font = "80px sans-serif";
-            ctx.fillText("🪨", x + CELL_SIZE/2, y + CELL_SIZE/2);
+        if (cell.type === 'rock' || cell.type === 'coin' || cell.type === 'bag' || cell.type === 'diamond') {
+            const emojis = { rock: "🪨", coin: "🪙", bag: "💰", diamond: "💎" };
+            const barColors = { rock: "#78909C", coin: "#FFA000", bag: "#388E3C", diamond: "#1565C0" };
+            ctx.font = "62px sans-serif";
+            ctx.fillText(emojis[cell.type], x + CELL_SIZE/2, y + CELL_SIZE/2 - 8);
+            // HPバー
+            const barW = CELL_SIZE - 18, barH = 10;
+            const barX = x + 9, barY = y + CELL_SIZE - 20;
+            ctx.fillStyle = "#EF9A9A";
+            roundRect(ctx, barX, barY, barW, barH, 4, true, false);
+            const hpRatio = (cell.hp || 0) / (cell.maxHp || 1);
+            ctx.fillStyle = barColors[cell.type] || "#888";
+            if(hpRatio > 0) roundRect(ctx, barX, barY, barW * hpRatio, barH, 4, true, false);
         } else if (cell.type === 'boss') {
             const emoji = BOSS_EMOJIS[cell.bossIndex] || '👾';
             ctx.font = "60px sans-serif";
@@ -1522,18 +1572,9 @@ const Game = (function() {
             const hpRatio = cell.hp / cell.maxHp;
             ctx.fillStyle = "#C62828";
             if(hpRatio > 0) roundRect(ctx, barX, barY, barW * hpRatio, barH, 4, true, false);
-        } else if (cell.type === 'coin') {
-            ctx.font = "80px sans-serif";
-            ctx.fillText("🪙", x + CELL_SIZE/2, y + CELL_SIZE/2);
-        } else if (cell.type === 'bag') {
-            ctx.font = "80px sans-serif";
-            ctx.fillText("💰", x + CELL_SIZE/2, y + CELL_SIZE/2);
         } else if (cell.type === 'star') {
             ctx.font = "80px sans-serif";
             ctx.fillText("🌠", x + CELL_SIZE/2, y + CELL_SIZE/2);
-        } else if (cell.type === 'diamond') {
-            ctx.font = "80px sans-serif";
-            ctx.fillText("💎", x + CELL_SIZE/2, y + CELL_SIZE/2);
         } else if (cell.type === 'fireworks') {
             ctx.font = "80px sans-serif";
             ctx.fillText("🎆", x + CELL_SIZE/2, y + CELL_SIZE/2);
