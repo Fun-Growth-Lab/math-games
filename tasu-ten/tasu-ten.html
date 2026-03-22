@@ -276,7 +276,12 @@ const Game = (function() {
     // 中央エリアの計算
     const GRID_OFFSET_X = (BASE_WIDTH - CELL_SIZE * GRID_COLS) / 2;
     const GRID_OFFSET_Y = (BASE_HEIGHT - CELL_SIZE * GRID_ROWS) / 2 + 10;
-    
+
+    // ボス定数
+    const BOSS_THRESHOLDS = [20, 50, 90, 140, 200];
+    const BOSS_EMOJIS     = ['👾', '👻', '🤖', '🐦‍🔥', '🐲'];
+    const MAX_BOSSES      = { easy: 3, normal: 4, hard: 5 };
+
     // ゲームデータ
     let grid = [];
     let score = 0;
@@ -287,17 +292,24 @@ const Game = (function() {
     let selectedCell = null;
     let isDragging = false;
     let currentChain = 0; // コンボ（連鎖）数
-    
+
     // アイテム（流れ星）
     let starStock = 0;
-    let isSelectingStar = false; // 流れ星アイテム使用時の番号選択モード
-    
-    // ステージ・ミッション管理
+    let isSelectingStar = false;
+
+    // ボス管理
+    let totalTens = 0;
+    let nextBossIndex = 0;
+    let bossesDefeated = 0;
+    let maxBosses = 3;
+    let bossSpawnPending = false;
+
+    // ステージ管理
     let currentStage = 1;
-    let nextStageScore = 2000;
-    let stageMonsterRateBonus = 0;
-    let isEndlessMode = false; // ステージ10以降を続けるかどうかのフラグ
-    let isGameClear = false;   // ステージ10で終わった場合のフラグ
+    let isGameClear = false;
+
+    // ヘルプ表示
+    let isShowingHelp = false;
 
     // エフェクト管理用
     let effects = [];
@@ -374,31 +386,24 @@ const Game = (function() {
 
     function getSpecialTileType() {
         const rand = Math.random() * 100;
-        
-        // 修正：流れ星を0.5%に戻す
+
         if (rand < 0.5) return 'star';
-        
-        // 花火(fireworks)を1.0%で追加（0.5〜1.5%の範囲）
         if (rand < 1.5) return 'fireworks';
 
-        let monsterRate, coinRate, bagRate;
+        let rockRate, coinRate, bagRate;
 
         if (difficulty === 'easy') {
-            monsterRate = 5; coinRate = 4; bagRate = 1;
+            rockRate = 5; coinRate = 4; bagRate = 1;
         } else if (difficulty === 'normal') {
-            monsterRate = 10; coinRate = 4; bagRate = 1;
+            rockRate = 10; coinRate = 4; bagRate = 1;
         } else { // hard
-            monsterRate = 15; coinRate = 4; bagRate = 1;
+            rockRate = 15; coinRate = 4; bagRate = 1;
         }
 
-        monsterRate += stageMonsterRateBonus;
-        if (monsterRate > 75) monsterRate = 75;
-
-        // 残りの98.5%の中で判定するためにスケール
         const subRand = Math.random() * 100;
-        if (subRand < monsterRate) return 'monster';
-        if (subRand < monsterRate + coinRate) return 'coin';
-        if (subRand < monsterRate + coinRate + bagRate) return 'bag';
+        if (subRand < rockRate) return 'rock';
+        if (subRand < rockRate + coinRate) return 'coin';
+        if (subRand < rockRate + coinRate + bagRate) return 'bag';
         return null;
     }
     
@@ -409,18 +414,22 @@ const Game = (function() {
         score = 0;
         turnCount = 0;
         currentStage = 1;
-        nextStageScore = 2000;
-        stageMonsterRateBonus = 0;
         currentChain = 0;
         starStock = 0;
         isSelectingStar = false;
-        isEndlessMode = false;
         isGameClear = false;
+        isShowingHelp = false;
+
+        // ボス関連リセット
+        totalTens = 0;
+        nextBossIndex = 0;
+        bossesDefeated = 0;
+        maxBosses = MAX_BOSSES[diff];
+        bossSpawnPending = false;
 
         grid = Array(GRID_ROWS).fill(null).map(() => Array(GRID_COLS).fill(null));
         effects = [];
-        // 初期配置を10マス
-        spawnNumbers(10, true); 
+        spawnNumbers(10, true);
         currentState = STATE.PLAYING;
     }
     
@@ -448,8 +457,8 @@ const Game = (function() {
                 grid[pos.r][pos.c] = { type: 'star', val: -1, life: 1, id: Date.now() + Math.random() };
             } else if (specialType === 'fireworks') {
                 grid[pos.r][pos.c] = { type: 'fireworks', val: -1, id: Date.now() + Math.random() };
-            } else if (specialType === 'monster') {
-                grid[pos.r][pos.c] = { type: 'monster', val: -1, id: Date.now() + Math.random() };
+            } else if (specialType === 'rock') {
+                grid[pos.r][pos.c] = { type: 'rock', val: -1, id: Date.now() + Math.random() };
             } else if (specialType === 'coin') {
                 grid[pos.r][pos.c] = { type: 'coin', val: -1, life: 1, id: Date.now() + Math.random() };
             } else if (specialType === 'bag') {
@@ -582,7 +591,7 @@ const Game = (function() {
                         let target = grid[n.r][n.c];
                         // 流れ星(star)も巻き込み対象に追加
                         // ダイヤ(diamond)も巻き込み対象に追加
-                        if(target && (target.type === 'monster' || target.type === 'coin' || target.type === 'bag' || target.type === 'star' || target.type === 'diamond')) {
+                        if(target && (target.type === 'rock' || target.type === 'coin' || target.type === 'bag' || target.type === 'star' || target.type === 'diamond')) {
                             let key = `${n.r},${n.c}`;
                             if(!checkSet.has(key)) {
                                 checkSet.add(key);
@@ -622,7 +631,7 @@ const Game = (function() {
     // マッチ判定とスコア計算、ライフ消費を統括する関数
     function resolveMatches(consumeLife) {
         const matches = findMatches();
-        
+
         let fireworksToExplode = [];
         let matchKeys = new Set();
         matches.forEach(group => {
@@ -650,7 +659,6 @@ const Game = (function() {
                 for(let c=0; c<GRID_COLS; c++) {
                     if(matchKeys.has(`${r},${c}`)) continue;
                     let cell = grid[r][c];
-                    // ダイヤもライフ消費対象
                     if(cell && (cell.type === 'coin' || cell.type === 'bag' || cell.type === 'diamond')) {
                         cell.life--;
                         if(cell.life <= 0) grid[r][c] = null;
@@ -663,9 +671,20 @@ const Game = (function() {
         let weightedPointTotal = 0;
 
         if(matches.length > 0) {
-            // コンボ数（そのアクションで何種類の和が10を作れたか＝成立したグループ数）を加算
+            // 10達成回数を加算
+            totalTens += matches.length;
             currentChain += matches.length;
-            
+
+            // ボス出現チェック
+            if(!bossSpawnPending && nextBossIndex < maxBosses &&
+               totalTens >= BOSS_THRESHOLDS[nextBossIndex]) {
+                nextBossIndex++;
+                bossSpawnPending = true;
+            }
+
+            // ボスへの隣接ダメージ判定（セル削除前に実施）
+            checkBossAdjacentDamage(matchKeys);
+
             matches.forEach(group => {
                 group.forEach(cell => {
                     const key = `${cell.r},${cell.c}`;
@@ -673,19 +692,17 @@ const Game = (function() {
                         uniqueRemovedKeys.add(key);
                         const actualCell = grid[cell.r][cell.c];
                         if (actualCell) {
-                            // 得点計算（重み付け）
                             if (actualCell.type === 'number') {
                                 weightedPointTotal += 1;
                             } else if (actualCell.type === 'coin') {
                                 weightedPointTotal += 3;
                             } else if (actualCell.type === 'bag') {
                                 weightedPointTotal += 10;
-                            } else if (actualCell.type === 'monster') {
+                            } else if (actualCell.type === 'rock') {
                                 weightedPointTotal += 0;
                             } else if (actualCell.type === 'diamond') {
                                 weightedPointTotal += 20;
                             } else if (actualCell.type === 'star') {
-                                // 流れ星を獲得（点数は0扱い）
                                 starStock++;
                                 effects.push({
                                     x: GRID_OFFSET_X + cell.c * CELL_SIZE + CELL_SIZE/2,
@@ -772,11 +789,9 @@ const Game = (function() {
                 }, 900);
             }
 
-            matchGroupsQueue.push(group); // まとめて1つのグループとして処理
+            matchGroupsQueue.push(group);
             currentState = STATE.ANIMATING;
             animationTimer = performance.now();
-            
-            checkStageClear();
 
         } else {
             // マッチ無し
@@ -822,60 +837,100 @@ const Game = (function() {
         }
     }
 
-    // ゲームクリア機能
+    // ボスに隣接する10グループからのダメージ判定
+    function checkBossAdjacentDamage(matchKeys) {
+        for(let r=0; r<GRID_ROWS; r++) {
+            for(let c=0; c<GRID_COLS; c++) {
+                if(grid[r][c] && grid[r][c].type === 'boss') {
+                    const neighbors = [
+                        {r: r-1, c: c}, {r: r+1, c: c},
+                        {r: r, c: c-1}, {r: r, c: c+1}
+                    ];
+                    let hit = false;
+                    neighbors.forEach(n => { if(matchKeys.has(`${n.r},${n.c}`)) hit = true; });
+                    if(hit) damageBoss(r, c);
+                }
+            }
+        }
+    }
+
+    function damageBoss(r, c) {
+        let boss = grid[r][c];
+        if(!boss || boss.type !== 'boss') return;
+        boss.hp--;
+        boss.damageFlash = 20;
+        effects.push({
+            x: GRID_OFFSET_X + c * CELL_SIZE + CELL_SIZE/2,
+            y: GRID_OFFSET_Y + r * CELL_SIZE + CELL_SIZE/2,
+            text: "💥 -1",
+            life: 40, maxLife: 40,
+            color: "#FF1744", scale: 1.0, stroke: "#fff"
+        });
+        if(boss.hp <= 0) {
+            const bIdx = boss.bossIndex;
+            grid[r][c] = null;
+            stageComplete(bIdx);
+        }
+    }
+
+    function checkBossSpawn() {
+        if(!bossSpawnPending) return;
+        let emptySpots = [];
+        for(let r=0; r<GRID_ROWS; r++) {
+            for(let c=0; c<GRID_COLS; c++) {
+                if(!grid[r][c]) emptySpots.push({r, c});
+            }
+        }
+        if(emptySpots.length === 0) {
+            currentState = STATE.GAME_OVER;
+            saveScore();
+            return;
+        }
+        const pos = emptySpots[Math.floor(Math.random() * emptySpots.length)];
+        const bIdx = nextBossIndex - 1;
+        const hp = bIdx + 3;
+        grid[pos.r][pos.c] = { type: 'boss', val: -1, hp: hp, maxHp: hp, bossIndex: bIdx, damageFlash: 0, id: Date.now() + Math.random() };
+        bossSpawnPending = false;
+        effects.push({
+            x: BASE_WIDTH / 2,
+            y: BASE_HEIGHT / 2 - 60,
+            text: `${BOSS_EMOJIS[bIdx]} BOSS 登場！`,
+            life: 90, maxLife: 90,
+            color: "#FF1744", scale: 1.4, stroke: "#fff"
+        });
+    }
+
+    function stageComplete(bossIdx) {
+        bossesDefeated++;
+        currentStage = bossesDefeated + 1;
+        const emoji = BOSS_EMOJIS[bossIdx] || '👾';
+        setTimeout(() => {
+            effects.push({
+                x: BASE_WIDTH / 2,
+                y: BASE_HEIGHT / 2,
+                text: `${emoji} 撃破！`,
+                life: 150, maxLife: 150,
+                color: "#FFEB3B",
+                subText: "👑",
+                isBig: true
+            });
+        }, 200);
+        if(bossesDefeated >= maxBosses) {
+            setTimeout(() => gameClear(), 2000);
+        }
+    }
+
     function gameClear() {
         currentState = STATE.GAME_OVER;
         isGameClear = true;
         saveScore();
     }
 
-    function checkStageClear() {
-        if(score >= nextStageScore) {
-            // ステージ10クリア時の分岐
-            if(currentStage === 10 && !isEndlessMode) {
-                // アニメーションなどで描画が更新されるのを待つため少し遅延させる
-                setTimeout(() => {
-                    if(confirm("ゲームクリアしました！\nさらにハイスコアをめざしますか？\n（キャンセルで終了）")) {
-                        isEndlessMode = true;
-                        proceedToNextStage();
-                    } else {
-                        gameClear();
-                    }
-                }, 500);
-            } else {
-                proceedToNextStage();
-            }
-        }
-    }
-
-    function proceedToNextStage() {
-        currentStage++;
-        // 修正：ステージ目標スコア計算式の変更 (例: 2000 -> 5000 -> 9000 -> 14000 ...)
-        // 現在の目標 + (新しいステージ番号+1) * 1000
-        nextStageScore += (currentStage + 1) * 1000;
-        stageMonsterRateBonus += 2;
-        
-        // ステージクリア豪華演出
-        setTimeout(() => {
-            effects.push({
-                x: BASE_WIDTH / 2,
-                y: BASE_HEIGHT / 2,
-                text: `STAGE ${currentStage-1} CLEAR!!`,
-                life: 180,
-                maxLife: 180,
-                color: "#FFEB3B", // 黄色
-                subText: "👑",
-                isBig: true
-            });
-        }, 1000); 
-    }
-
-    // ダイヤモンド生成関数（モンスター能力）
-    function produceDiamonds() {
+    // ボスが岩を生み出す（50%確率）
+    function produceBossRocks() {
         for(let r=0; r<GRID_ROWS; r++) {
             for(let c=0; c<GRID_COLS; c++) {
-                if(grid[r][c] && grid[r][c].type === 'monster') {
-                    // 周囲の空きマスを探す
+                if(grid[r][c] && grid[r][c].type === 'boss') {
                     let emptyNeighbors = [];
                     const neighbors = [
                         {r: r-1, c: c}, {r: r+1, c: c},
@@ -886,22 +941,15 @@ const Game = (function() {
                             if(!grid[n.r][n.c]) emptyNeighbors.push(n);
                         }
                     });
-                    
-                    if(emptyNeighbors.length > 0) {
-                        // 2%の確率
-                        if(Math.random() < 0.02) {
-                            let target = emptyNeighbors[Math.floor(Math.random() * emptyNeighbors.length)];
-                            // life: 1 で生成。次のプレイヤー操作で消える
-                            grid[target.r][target.c] = { type: 'diamond', val: -1, life: 1, id: Date.now() + Math.random() };
-                            
-                            // エフェクト
-                            effects.push({
-                                x: GRID_OFFSET_X + target.c * CELL_SIZE + CELL_SIZE/2,
-                                y: GRID_OFFSET_Y + target.r * CELL_SIZE + CELL_SIZE/2,
-                                text: "💎",
-                                life: 40, maxLife: 40, color: "#fff", scale: 1.2
-                            });
-                        }
+                    if(emptyNeighbors.length > 0 && Math.random() < 0.5) {
+                        const target = emptyNeighbors[Math.floor(Math.random() * emptyNeighbors.length)];
+                        grid[target.r][target.c] = { type: 'rock', val: -1, id: Date.now() + Math.random() };
+                        effects.push({
+                            x: GRID_OFFSET_X + target.c * CELL_SIZE + CELL_SIZE/2,
+                            y: GRID_OFFSET_Y + target.r * CELL_SIZE + CELL_SIZE/2,
+                            text: "🪨",
+                            life: 30, maxLife: 30, color: "#fff", scale: 1.0
+                        });
                     }
                 }
             }
@@ -909,33 +957,29 @@ const Game = (function() {
     }
 
     function processRefill() {
-        // 補充前にダイヤ生成を実行
-        produceDiamonds();
-
-        // 出現パラメーター（2, 3, 4）
-        let spawnParamX = 0;
-        
-        if(difficulty === 'easy') spawnParamX = 2.0; // 2
-        else if(difficulty === 'normal') spawnParamX = 3.0; // 3
-        else spawnParamX = 4.0; // 4 (hard)
-        
-        // ステージ進行による増加 (ステージ1からスタートなので -1 してから 0.1 を掛ける)
-        spawnParamX += (currentStage - 1) * 0.1;
-        
-        // 確定数（整数部分）
-        let count = Math.floor(spawnParamX);
-        
-        // 確率変動（小数部分）
-        let probability = spawnParamX - count;
-        
-        // 確率判定
-        if(Math.random() < probability) {
-            count++;
+        // ボス出現待ちならここで出現させる
+        if(bossSpawnPending) {
+            checkBossSpawn();
+            if(currentState === STATE.GAME_OVER) return;
         }
-        
+
+        // ボスが岩を生み出す
+        produceBossRocks();
+
+        // 出現パラメーター
+        let spawnParamX = 0;
+        if(difficulty === 'easy') spawnParamX = 2.5;
+        else if(difficulty === 'normal') spawnParamX = 3.0;
+        else spawnParamX = 3.5; // hard
+
+        // ステージ進行による増加（+0.25/stage）
+        spawnParamX += (currentStage - 1) * 0.25;
+
+        let count = Math.floor(spawnParamX);
+        let probability = spawnParamX - count;
+        if(Math.random() < probability) count++;
+
         spawnNumbers(count, false);
-        
-        // 出現直後にマッチしているかチェック（連鎖判定、ライフ消費なし）
         resolveMatches(false);
     }
     
@@ -953,11 +997,19 @@ const Game = (function() {
     }
     
     function update() {
+        // ボスのダメージフラッシュ更新
+        for(let r=0; r<GRID_ROWS; r++) {
+            for(let c=0; c<GRID_COLS; c++) {
+                if(grid[r][c] && grid[r][c].type === 'boss' && grid[r][c].damageFlash > 0) {
+                    grid[r][c].damageFlash--;
+                }
+            }
+        }
+
         // エフェクト更新
         for(let i = effects.length - 1; i >= 0; i--) {
             effects[i].life--;
-            // 修正：動きをなめらかに（0.2から0.6へ速度アップ）
-            effects[i].y -= 0.6; 
+            effects[i].y -= 0.6;
             if(effects[i].life <= 0) {
                 effects.splice(i, 1);
             }
@@ -1140,114 +1192,149 @@ const Game = (function() {
             ctx.strokeRect(0, 0, BASE_WIDTH, BASE_HEIGHT);
         }
 
-        // 左側：遊び方
+        // === 左パネル：プレイヤー情報 ===
         ctx.fillStyle = "#D7CCC8";
         ctx.fillRect(0, 0, 300, BASE_HEIGHT);
-        
-        ctx.fillStyle = "#5D4037";
-        ctx.font = "800 36px 'M PLUS Rounded 1c'"; // 修正：太く
+
+        // あそびかたボタン（左上）
+        drawButton(150, 38, 230, 48, "❓ あそびかた", "#8D6E63");
+
         ctx.textAlign = "center";
-        ctx.fillText("あそびかた", 150, 60);
 
-        ctx.font = "bold 22px 'M PLUS Rounded 1c'"; // 修正：大きく太く
-        ctx.textAlign = "left";
-        const helpText = [
-            "たて か よこ で", "１０ をつくろう。", "１０ができると", "きえるよ。", "",
-            "連続で消して", "コンボを狙おう！", "",
-            "👾はおじゃま", "まわりをけすと", "きえるよ。", "",
-            "🌠はすごいアイテム", "まわりを消して", "ストックしよう！", "",
-            "🪙💰💎はボーナス", "🎆は十字消し！", "1アクションで", "すぐにきえるよ！"
-        ];
-        let helpY = 120;
-        helpText.forEach(line => {
-            ctx.fillText(line, 20, helpY);
-            helpY += 28;
-        });
+        // プレーヤー名
+        ctx.fillStyle = "#5D4037";
+        ctx.font = "bold 20px 'M PLUS Rounded 1c'";
+        ctx.fillText("プレーヤー", 150, 110);
+        ctx.fillStyle = "#00695C";
+        ctx.font = "800 30px 'M PLUS Rounded 1c'";
+        let pname = currentPlayerIndex >= 0 ? players[currentPlayerIndex] : "ゲスト";
+        ctx.fillText(pname, 150, 145, 270);
 
-        // 右側：情報表示（ごちゃごちゃ解消）
+        // 難易度
+        ctx.fillStyle = "#5D4037";
+        ctx.font = "bold 20px 'M PLUS Rounded 1c'";
+        ctx.fillText("難易度", 150, 190);
+        let diffText = difficulty === 'easy' ? 'やさしい' : difficulty === 'normal' ? 'ふつう' : 'むずかしい';
+        let diffColor = difficulty === 'easy' ? '#558B2F' : difficulty === 'normal' ? '#E65100' : '#C62828';
+        ctx.fillStyle = diffColor;
+        ctx.font = "800 26px 'M PLUS Rounded 1c'";
+        ctx.fillText(diffText, 150, 222);
+
+        // BOSS撃破数
+        ctx.fillStyle = "#5D4037";
+        ctx.font = "bold 20px 'M PLUS Rounded 1c'";
+        ctx.fillText("BOSS撃破", 150, 265);
+        ctx.fillStyle = "#E65100";
+        ctx.font = "800 42px 'M PLUS Rounded 1c'";
+        ctx.fillText(`${bossesDefeated} / ${maxBosses}`, 150, 310);
+
+        // スコア
+        ctx.fillStyle = "#5D4037";
+        ctx.font = "bold 20px 'M PLUS Rounded 1c'";
+        ctx.fillText("SCORE", 150, 355);
+        ctx.fillStyle = "#D81B60";
+        ctx.font = "800 48px 'M PLUS Rounded 1c'";
+        ctx.fillText(score, 150, 405, 270);
+
+        // 10を作った回数
+        ctx.fillStyle = "#5D4037";
+        ctx.font = "bold 20px 'M PLUS Rounded 1c'";
+        ctx.fillText("10をつくった回数", 150, 455);
+        ctx.fillStyle = "#1565C0";
+        ctx.font = "800 42px 'M PLUS Rounded 1c'";
+        ctx.fillText(totalTens, 150, 500);
+
+        // 次のボスまで
+        ctx.font = "bold 18px 'M PLUS Rounded 1c'";
+        if(nextBossIndex < maxBosses) {
+            const nextThresh = BOSS_THRESHOLDS[nextBossIndex];
+            const remaining = Math.max(0, nextThresh - totalTens);
+            ctx.fillStyle = remaining <= 5 ? "#C62828" : "#5D4037";
+            ctx.fillText(`次のBOSSまで: あと${remaining}回`, 150, 540);
+        } else if(bossesDefeated < maxBosses) {
+            ctx.fillStyle = "#C62828";
+            ctx.fillText("BOSS 出現中！", 150, 540);
+        } else {
+            ctx.fillStyle = "#558B2F";
+            ctx.fillText("全BOSS撃破！", 150, 540);
+        }
+
+        // === 右パネル：アイテム ===
         ctx.fillStyle = "#EFEBE9";
         ctx.fillRect(980, 0, 300, BASE_HEIGHT);
 
+        // タイトルへボタン（右上）
+        drawButton(1130, 38, 230, 48, "タイトルへ", "#B0BEC5");
+
         ctx.textAlign = "center";
-        ctx.fillStyle = "#5D4037";
-        
-        // プレーヤー
-        ctx.font = "bold 24px 'M PLUS Rounded 1c'";
-        let pname = currentPlayerIndex >= 0 ? players[currentPlayerIndex] : "ゲスト";
-        ctx.fillText(pname, 1130, 50);
 
-        // ステージ
-        ctx.fillStyle = "#E65100";
-        ctx.font = "bold 36px 'M PLUS Rounded 1c'";
-        ctx.fillText("STAGE " + currentStage, 1130, 100);
-
-        // スコア（大きく）
-        ctx.fillStyle = "#5D4037";
-        ctx.font = "bold 24px 'M PLUS Rounded 1c'";
-        ctx.fillText("SCORE", 1130, 150);
-        ctx.fillStyle = "#D81B60"; 
-        ctx.font = "800 70px 'M PLUS Rounded 1c'";
-        // 修正：スコアが枠からはみ出ないように最大幅を指定
-        ctx.fillText(score, 1130, 220, 280);
-
-        // 次の目標
-        ctx.fillStyle = "#5D4037";
-        ctx.font = "bold 20px 'M PLUS Rounded 1c'";
-        ctx.fillText("つぎの目標: " + nextStageScore, 1130, 270);
-        
-        // アイテム（「アイテム」文字削除、シンプルに）
-        // 🌠と数
-        ctx.fillStyle = "#FFD700";
-        ctx.font = "50px sans-serif";
-        ctx.fillText("🌠", 1070, 350);
+        // 🌠流れ星
+        ctx.font = "60px sans-serif";
+        ctx.fillText("🌠", 1130, 175);
         ctx.fillStyle = "#333";
-        ctx.font = "bold 40px 'M PLUS Rounded 1c'";
-        ctx.fillText("× " + starStock, 1160, 350);
-        
+        ctx.font = "800 44px 'M PLUS Rounded 1c'";
+        ctx.fillText("× " + starStock, 1130, 230);
+
         // つかうボタン
         if(starStock > 0 && !isSelectingStar) {
-            drawButton(1130, 420, 160, 50, "つかう", "#FFC107", "#5D4037");
+            drawButton(1130, 300, 200, 52, "つかう", "#FFC107", "#5D4037");
         } else if (isSelectingStar) {
             ctx.fillStyle = "#FF9800";
             ctx.font = "bold 20px 'M PLUS Rounded 1c'";
-            ctx.fillText("すうじをえらんでね", 1130, 420);
+            ctx.fillText("すうじをえらんでね", 1130, 300);
         } else {
-            // グレーアウト風
             ctx.fillStyle = "#BDBDBD";
-            roundRect(ctx, 1130-80, 420-25, 160, 50, 10, true, false);
+            roundRect(ctx, 1130-100, 300-26, 200, 52, 10, true, false);
             ctx.fillStyle = "#757575";
             ctx.font = "bold 24px 'M PLUS Rounded 1c'";
-            ctx.fillText("つかう", 1130, 420);
+            ctx.textBaseline = "middle";
+            ctx.fillText("つかう", 1130, 300);
+            ctx.textBaseline = "alphabetic";
         }
 
-        // ターン
-        ctx.fillStyle = "#5D4037";
-        ctx.textBaseline = "alphabetic"; 
-        ctx.font = "bold 24px 'M PLUS Rounded 1c'";
-        ctx.fillText("ターン: " + turnCount, 1130, 520);
+        // ボスHP表示（場にボスがいる場合）
+        let bossCell = null;
+        for(let r=0; r<GRID_ROWS && !bossCell; r++) {
+            for(let c=0; c<GRID_COLS && !bossCell; c++) {
+                if(grid[r][c] && grid[r][c].type === 'boss') bossCell = grid[r][c];
+            }
+        }
+        if(bossCell) {
+            ctx.fillStyle = "#C62828";
+            ctx.font = "bold 22px 'M PLUS Rounded 1c'";
+            ctx.fillText("BOSS HP", 1130, 400);
+            const emoji = BOSS_EMOJIS[bossCell.bossIndex] || '👾';
+            ctx.font = "44px sans-serif";
+            ctx.fillText(emoji, 1130, 450);
+            const barW = 220, barH = 22;
+            const barX = 1130 - barW/2, barY = 465;
+            ctx.fillStyle = "#EF9A9A";
+            roundRect(ctx, barX, barY, barW, barH, 8, true, false);
+            const hpRatio = bossCell.hp / bossCell.maxHp;
+            ctx.fillStyle = "#C62828";
+            if(hpRatio > 0) roundRect(ctx, barX, barY, barW * hpRatio, barH, 8, true, false);
+            ctx.fillStyle = "#fff";
+            ctx.font = "bold 16px 'M PLUS Rounded 1c'";
+            ctx.textBaseline = "middle";
+            ctx.fillText(`${bossCell.hp} / ${bossCell.maxHp}`, 1130, barY + barH/2);
+            ctx.textBaseline = "alphabetic";
+        }
 
-        // 難易度
-        let diffText = difficulty === 'easy' ? 'やさしい' : difficulty === 'normal' ? 'ふつう' : 'むずかしい';
-        ctx.fillText("難易度: " + diffText, 1130, 570);
-
-        // タイトルへ
-        drawButton(1130, 660, 220, 50, "タイトルへ", "#B0BEC5");
-
-        // 中央：グリッド
-        ctx.fillStyle = "#FFFFFF"; 
+        // === 中央：グリッド ===
+        ctx.fillStyle = "#FFFFFF";
         ctx.fillRect(GRID_OFFSET_X - 10, GRID_OFFSET_Y - 10, CELL_SIZE * GRID_COLS + 20, CELL_SIZE * GRID_ROWS + 20);
-        
+
         for(let r=0; r<GRID_ROWS; r++) {
             for(let c=0; c<GRID_COLS; c++) {
                 let x = GRID_OFFSET_X + c * CELL_SIZE;
                 let y = GRID_OFFSET_Y + r * CELL_SIZE;
-                
+
                 ctx.strokeStyle = "#EEE";
                 ctx.lineWidth = 2;
                 ctx.strokeRect(x, y, CELL_SIZE, CELL_SIZE);
-                
+
                 let cell = grid[r][c];
-                
+
                 if (currentState === STATE.ANIMATING && matchGroupsQueue.length > 0) {
                     let currentGroup = matchGroupsQueue[0];
                     let isHighlighted = currentGroup.some(p => p.r === r && p.c === c);
@@ -1266,39 +1353,41 @@ const Game = (function() {
                 }
             }
         }
-        
+
         if(isDragging && selectedCell) {
             let cell = grid[selectedCell.r][selectedCell.c];
             if(cell) {
                 drawCellContent(inputState.x - CELL_SIZE/2, inputState.y - CELL_SIZE/2, cell, true);
             }
         }
-        
+
         // アイテム選択オーバーレイ
         if(isSelectingStar) {
             ctx.fillStyle = "rgba(0,0,0,0.6)";
             ctx.fillRect(0,0, BASE_WIDTH, BASE_HEIGHT);
-            
+
             ctx.fillStyle = "#FFF";
             roundRect(ctx, BASE_WIDTH/2 - 200, BASE_HEIGHT/2 - 250, 400, 500, 20, true, false);
-            
+
             ctx.fillStyle = "#5D4037";
             ctx.font = "bold 30px 'M PLUS Rounded 1c'";
             ctx.textAlign = "center";
             ctx.fillText("けす すうじ をえらんでね", BASE_WIDTH/2, BASE_HEIGHT/2 - 200);
-            
+
             for(let i=1; i<=9; i++) {
                 let r = Math.floor((i-1)/3);
                 let c = (i-1)%3;
                 let btnX = BASE_WIDTH/2 - 100 + c * 100;
                 let btnY = BASE_HEIGHT/2 - 120 + r * 100;
-                
                 drawButton(btnX, btnY, 80, 80, i, NUMBER_BG_COLORS[i-1]);
             }
-            
+
             drawButton(BASE_WIDTH/2, BASE_HEIGHT/2 + 180, 150, 50, "やめる", "#B0BEC5");
         }
         
+        // ヘルプオーバーレイ
+        if(isShowingHelp) drawHelpOverlay();
+
         // エフェクト描画
         effects.forEach(ef => {
             ctx.save();
@@ -1349,29 +1438,90 @@ const Game = (function() {
         });
     }
 
+    function drawHelpOverlay() {
+        ctx.fillStyle = "rgba(0,0,0,0.78)";
+        ctx.fillRect(0, 0, BASE_WIDTH, BASE_HEIGHT);
+
+        const pw = 660, ph = 590;
+        const px = BASE_WIDTH/2 - pw/2, py = BASE_HEIGHT/2 - ph/2;
+        ctx.fillStyle = "#FFF8E1";
+        roundRect(ctx, px, py, pw, ph, 20, true, false);
+        ctx.strokeStyle = "#FF9800";
+        ctx.lineWidth = 4;
+        roundRect(ctx, px, py, pw, ph, 20, false, true);
+
+        ctx.fillStyle = "#5D4037";
+        ctx.font = "bold 38px 'M PLUS Rounded 1c'";
+        ctx.textAlign = "center";
+        ctx.fillText("あそびかた", BASE_WIDTH/2, py + 52);
+
+        const lines = [
+            "● たて か よこ で 合計１０ をつくろう",
+            "● パネルをドラッグして移動できるよ",
+            "● １０ができたパネルは消えるよ",
+            "● 連続で消してコンボを狙おう！",
+            "",
+            "🪨  岩：隣りの10消しに巻き込まれると消えるよ",
+            "👾👻🤖...  BOSS：隣りの10消しでHP-1。全部削って倒そう！",
+            "     BOSSは岩を生み出すぞ！",
+            "",
+            "🌠  流れ星：隣りを消すとGET！「つかう」で",
+            "     数字を1種類まるごと全消し",
+            "🪙  コイン：スコア3倍    💰  バッグ：スコア10倍",
+            "💎  ダイヤ：スコア20倍   🎆  花火：隣り消しで十字消し！",
+            "",
+            "★  全BOSSを倒すとゲームクリア！ ★",
+        ];
+        ctx.font = "21px 'M PLUS Rounded 1c'";
+        ctx.textAlign = "left";
+        let ly = py + 95;
+        lines.forEach(line => {
+            ctx.fillStyle = line.startsWith("★") ? "#E65100" : "#5D4037";
+            ctx.fillText(line, px + 28, ly);
+            ly += 30;
+        });
+
+        drawButton(BASE_WIDTH/2, py + ph - 36, 200, 50, "とじる", "#FF9800");
+    }
+
     function drawCellContent(x, y, cell, shadow=false) {
-        if(cell.type === 'monster' || cell.type === 'coin' || cell.type === 'bag' || cell.type === 'star' || cell.type === 'diamond' || cell.type === 'fireworks') {
+        if(cell.type === 'rock' || cell.type === 'coin' || cell.type === 'bag' ||
+           cell.type === 'star' || cell.type === 'diamond' || cell.type === 'fireworks') {
             ctx.fillStyle = "#FFFFFF";
+        } else if(cell.type === 'boss') {
+            ctx.fillStyle = cell.damageFlash > 0 ? "#FF5252" : "#FFEBEE";
         } else {
             ctx.fillStyle = NUMBER_BG_COLORS[cell.val - 1] || "#333";
         }
-        
+
         if(shadow) {
             ctx.shadowColor = "rgba(0,0,0,0.3)";
             ctx.shadowBlur = 10;
         } else {
             ctx.shadowBlur = 0;
         }
-        
+
         roundRect(ctx, x+5, y+5, CELL_SIZE-10, CELL_SIZE-10, 15, true, false);
         ctx.shadowBlur = 0;
-        
+
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
 
-        if (cell.type === 'monster') {
+        if (cell.type === 'rock') {
             ctx.font = "80px sans-serif";
-            ctx.fillText("👾", x + CELL_SIZE/2, y + CELL_SIZE/2);
+            ctx.fillText("🪨", x + CELL_SIZE/2, y + CELL_SIZE/2);
+        } else if (cell.type === 'boss') {
+            const emoji = BOSS_EMOJIS[cell.bossIndex] || '👾';
+            ctx.font = "60px sans-serif";
+            ctx.fillText(emoji, x + CELL_SIZE/2, y + CELL_SIZE/2 - 8);
+            // HPバー
+            const barW = CELL_SIZE - 18, barH = 10;
+            const barX = x + 9, barY = y + CELL_SIZE - 20;
+            ctx.fillStyle = "#EF9A9A";
+            roundRect(ctx, barX, barY, barW, barH, 4, true, false);
+            const hpRatio = cell.hp / cell.maxHp;
+            ctx.fillStyle = "#C62828";
+            if(hpRatio > 0) roundRect(ctx, barX, barY, barW * hpRatio, barH, 4, true, false);
         } else if (cell.type === 'coin') {
             ctx.font = "80px sans-serif";
             ctx.fillText("🪙", x + CELL_SIZE/2, y + CELL_SIZE/2);
@@ -1395,21 +1545,22 @@ const Game = (function() {
     }
     
     function drawGameOver() {
-        ctx.fillStyle = "rgba(78, 52, 46, 0.9)";
+        ctx.fillStyle = "rgba(78, 52, 46, 0.92)";
         ctx.fillRect(0, 0, BASE_WIDTH, BASE_HEIGHT);
-        
+
         ctx.fillStyle = "#fff";
-        ctx.font = "bold 80px 'M PLUS Rounded 1c'";
         ctx.textAlign = "center";
-        
-        let titleText = isGameClear ? "ゲームクリア！" : "ゲームオーバー！";
-        ctx.fillText(titleText, BASE_WIDTH/2, 250);
-        
-        ctx.font = "bold 50px 'M PLUS Rounded 1c'";
-        ctx.fillText("スコア: " + score, BASE_WIDTH/2, 350);
-        ctx.fillText("到達ステージ: " + currentStage, BASE_WIDTH/2, 420);
-        
-        drawButton(BASE_WIDTH/2, 550, 300, 60, "タイトルへ", "#FF9800");
+        let titleText = isGameClear ? "🎉 ゲームクリア！ 🎉" : "ゲームオーバー！";
+        ctx.font = "bold 72px 'M PLUS Rounded 1c'";
+        ctx.fillText(titleText, BASE_WIDTH/2, 220);
+
+        ctx.font = "bold 46px 'M PLUS Rounded 1c'";
+        ctx.fillText("スコア: " + score, BASE_WIDTH/2, 320);
+        ctx.font = "bold 38px 'M PLUS Rounded 1c'";
+        ctx.fillText("10をつくった回数: " + totalTens, BASE_WIDTH/2, 385);
+        ctx.fillText(`BOSS撃破: ${bossesDefeated} / ${maxBosses}`, BASE_WIDTH/2, 445);
+
+        drawButton(BASE_WIDTH/2, 560, 300, 60, "タイトルへ", "#FF9800");
     }
     
     function drawRanking() {
@@ -1586,6 +1737,13 @@ const Game = (function() {
     }
     
     function checkGameClick(x, y) {
+        // ヘルプ表示中
+        if(isShowingHelp) {
+            const ph = 590, py = BASE_HEIGHT/2 - ph/2;
+            if(isBtnClicked(x, y, BASE_WIDTH/2, py + ph - 36, 200, 50)) isShowingHelp = false;
+            return;
+        }
+
         // アイテム選択中のクリック処理
         if(isSelectingStar) {
             for(let i=1; i<=9; i++) {
@@ -1604,15 +1762,22 @@ const Game = (function() {
             return; // 選択中は盤面操作無効
         }
 
-        if(isBtnClicked(x, y, 1130, 660, 220, 50)) {
+        // タイトルへボタン（右上）
+        if(isBtnClicked(x, y, 1130, 38, 230, 48)) {
             if(confirm("タイトルへ戻りますか？ゲームオーバーになります")) {
                 currentState = STATE.GAME_OVER; saveScore();
             }
             return;
         }
-        
-        // アイテムボタン
-        if(starStock > 0 && isBtnClicked(x, y, 1130, 420, 160, 50)) {
+
+        // あそびかたボタン（左上）
+        if(isBtnClicked(x, y, 150, 38, 230, 48)) {
+            isShowingHelp = true;
+            return;
+        }
+
+        // アイテムボタン（右パネル）
+        if(starStock > 0 && isBtnClicked(x, y, 1130, 300, 200, 52)) {
             isSelectingStar = true;
             return;
         }
