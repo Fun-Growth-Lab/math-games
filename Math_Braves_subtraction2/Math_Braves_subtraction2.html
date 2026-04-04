@@ -1,0 +1,1420 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>くりさがり２ - Math Braves</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #4fc3f7;
+            --bg-game: #0d1b2a;
+            --text-light: #e8eaf6;
+            --text-dark: #1a237e;
+            --c-great:   #ffd600;
+            --c-special: #f06292;
+            --c-good:    #4fc3f7;
+            --c-pinch:   #ef9a9a;
+            --c-gem:     #80deea;
+        }
+        body {
+            margin:0; overflow:hidden; background:#111;
+            font-family:"M PLUS Rounded 1c","Hiragino Kaku Gothic ProN",sans-serif;
+            user-select:none; -webkit-user-select:none; touch-action:none;
+            display:flex; justify-content:center; align-items:center;
+            height:100vh; width:100vw;
+        }
+        #container {
+            width:1280px; height:720px; flex-shrink:0;
+            display:flex; background:var(--bg-game);
+            box-shadow:0 0 40px rgba(79,195,247,0.3);
+            transform-origin:center center; position:relative;
+        }
+
+        /* ── PANELS ── */
+        #left-panel, #right-panel {
+            flex:0 0 210px; width:210px;
+            background:linear-gradient(180deg,#1a237e 0%,#283593 100%);
+            color:var(--text-light); padding:16px;
+            box-sizing:border-box; display:flex; flex-direction:column;
+            z-index:10; border-right:2px solid rgba(79,195,247,0.3);
+        }
+        #right-panel { border-right:none; border-left:2px solid rgba(79,195,247,0.3); }
+        .info-item {
+            margin-bottom:10px; background:rgba(0,0,0,0.3);
+            padding:10px 12px; border-radius:12px; text-align:center;
+            border:1px solid rgba(79,195,247,0.2);
+        }
+        .info-label { font-size:0.75rem; color:#90caf9; margin-bottom:3px; font-weight:bold; }
+        .info-value { font-size:1.5rem; font-weight:800; color:var(--primary); }
+
+        /* ── GAME AREA ── */
+        #game-area {
+            flex:1; position:relative; overflow:hidden;
+            display:flex; flex-direction:column; align-items:center;
+            background:radial-gradient(ellipse at center,#0d2137 0%,#0d1b2a 100%);
+        }
+        canvas {
+            display:block; width:100%; height:100%;
+            position:absolute; top:0; left:0;
+            pointer-events:none; z-index:999;
+        }
+
+        /* ── BUTTONS ── */
+        .btn {
+            background:linear-gradient(135deg,#1565c0,#1976d2);
+            color:#fff; border:none; padding:10px 20px;
+            border-radius:12px; cursor:pointer; font-size:1rem; margin:5px;
+            transition:all 0.15s; box-shadow:0 4px 0 rgba(0,0,0,0.3);
+            font-family:inherit; font-weight:bold;
+        }
+        .btn:hover { filter:brightness(1.2); transform:translateY(1px); }
+        .btn:active { transform:translateY(4px); box-shadow:none; }
+        .btn:disabled { opacity:0.45; cursor:not-allowed; transform:none; }
+        .btn-danger  { background:linear-gradient(135deg,#c62828,#e53935); }
+        .btn-success { background:linear-gradient(135deg,#2e7d32,#43a047); }
+        .btn-warning { background:linear-gradient(135deg,#e65100,#f57c00); }
+        .btn-gray    { background:linear-gradient(135deg,#424242,#616161); }
+        .btn-purple  { background:linear-gradient(135deg,#4a148c,#7b1fa2); }
+        .btn-gem     { background:linear-gradient(135deg,#006064,#00838f); }
+        .btn.active  { background:linear-gradient(135deg,#f57f17,#f9a825)!important; pointer-events:none; }
+        .btn.inactive{ background:linear-gradient(135deg,#37474f,#546e7a)!important; }
+        .hidden      { display:none!important; }
+        .invisible   { visibility:hidden; }
+
+        /* ── TITLE ── */
+        #title-screen {
+            position:absolute; top:0; left:0; width:100%; height:100%;
+            background:linear-gradient(135deg,#0d1b2a 0%,#1a237e 50%,#0d1b2a 100%);
+            display:flex; flex-direction:column; justify-content:center; align-items:center; z-index:100;
+        }
+        .title-container {
+            background:rgba(255,255,255,0.05); padding:28px 38px; border-radius:24px;
+            display:inline-flex; flex-direction:column; align-items:center;
+            box-shadow:0 10px 40px rgba(79,195,247,0.2),inset 0 1px 0 rgba(255,255,255,0.1);
+            border:1px solid rgba(79,195,247,0.3); width:fit-content;
+        }
+        h2 { margin-top:0; border-bottom:2px solid rgba(79,195,247,0.4); padding-bottom:8px; font-size:1.05rem; color:var(--primary); }
+        .title-btn { width:240px; margin-bottom:10px; padding:13px; font-size:1.1rem; display:flex; justify-content:center; align-items:center; }
+
+        /* ── OVERLAYS ── */
+        .overlay-wrap {
+            position:absolute; top:0; left:0; width:100%; height:100%;
+            background:rgba(0,0,0,0.78);
+            display:flex; flex-direction:column; justify-content:center; align-items:center; z-index:100;
+        }
+        .overlay-box {
+            background:linear-gradient(180deg,#1a237e,#283593);
+            padding:28px 36px; border-radius:20px;
+            text-align:center; max-width:95%; color:var(--text-light);
+            box-shadow:0 20px 60px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.1);
+            border:1px solid rgba(79,195,247,0.3);
+            font-family:"M PLUS Rounded 1c","Hiragino Kaku Gothic ProN",sans-serif;
+        }
+        #ranking-screen .overlay-box { width:1100px; }
+        .rank-list-wrapper { flex:1; min-width:200px; background:rgba(0,0,0,0.3); border-radius:12px; padding:10px; border:1px solid rgba(79,195,247,0.2); }
+        .rank-list-header { color:var(--primary); margin:0 0 10px; padding:8px; background:rgba(79,195,247,0.15); border-radius:8px; font-size:1rem; font-weight:bold; }
+        .rank-list { list-style:none; padding:0; margin:0; text-align:left; }
+        .rank-list li { display:flex; justify-content:space-between; align-items:center; padding:7px 10px; margin-bottom:4px; background:rgba(255,255,255,0.05); border-radius:6px; color:var(--text-light); font-size:0.9rem; }
+        .rank-list li:first-child { background:rgba(255,215,0,0.15); border-left:4px solid gold; font-weight:bold; }
+        .rank-list li span:last-child { color:var(--primary); font-weight:800; }
+        #ranking-lists { display:flex; flex-direction:row; gap:15px; justify-content:space-between; max-height:65vh; overflow-y:auto; padding:5px; }
+
+        /* ── GAME UI LAYER ── */
+        #game-ui-layer {
+            width:100%; height:100%; position:absolute; top:0; left:0;
+            display:flex; flex-direction:column; align-items:center;
+            justify-content:flex-end; padding-bottom:28px; gap:12px;
+            box-sizing:border-box;
+        }
+        #top-bar { display:none; }
+        #top-right-buttons {
+            position:absolute; top:12px; right:12px;
+            display:flex; gap:8px; align-items:center; z-index:20;
+        }
+        .top-right-btn {
+            background:rgba(0,0,0,0.6); border:1px solid rgba(79,195,247,0.4);
+            color:#90caf9; border-radius:10px; padding:7px 14px;
+            cursor:pointer; font-size:0.83rem; font-weight:bold;
+            font-family:inherit; transition:all 0.15s;
+        }
+        .top-right-btn:hover { background:rgba(79,195,247,0.2); color:#fff; }
+        .top-right-btn.danger { border-color:rgba(239,83,80,0.5); color:#ef9a9a; }
+        .top-right-btn.danger:hover { background:rgba(239,83,80,0.2); color:#fff; }
+
+        /* ── FORMULA ZONE ── */
+        #formula-zone {
+            display:flex; align-items:center; gap:8px;
+            background:rgba(0,0,0,0.4); padding:8px 18px;
+            border-radius:14px; border:1px solid rgba(79,195,247,0.2);
+        }
+        .fz-cell {
+            display:flex; flex-direction:column; align-items:center;
+            background:rgba(0,0,0,0.35); padding:6px 14px;
+            border-radius:10px; min-width:80px;
+            border:1px solid rgba(255,255,255,0.1);
+        }
+        .fz-label { font-size:0.68rem; color:#90caf9; font-weight:bold; margin-bottom:2px; }
+        .fz-val { font-size:1.45rem; font-weight:800; color:#fff; line-height:1; }
+        .fz-val.fz-combo-c { color:#ffcc02; }
+        .fz-val.fz-mult-c  { color:#f06292; }
+        .fz-op { font-size:1.4rem; font-weight:800; color:rgba(255,255,255,0.4); }
+
+        /* ── BARS AREA ── */
+        #bars-area { display:flex; gap:28px; align-items:flex-end; }
+        .bar-unit { display:flex; flex-direction:column; align-items:flex-start; }
+        .bar-wrap { display:flex; align-items:flex-end; }
+        .bar-drop-zone {
+            width:145px; height:400px;
+            background:rgba(0,0,0,0.45); border-radius:12px 12px 4px 4px;
+            position:relative; border:2px solid rgba(79,195,247,0.2);
+            overflow:hidden; cursor:crosshair;
+            transition:border-color 0.2s, box-shadow 0.2s;
+        }
+        .bar-drop-zone.drag-over { border-color:var(--primary); box-shadow:0 0 20px rgba(79,195,247,0.5); }
+        .bar-drop-zone.danger-bar { border-color:#ef5350; box-shadow:0 0 20px rgba(239,83,80,0.5); }
+        .bar-fill {
+            position:absolute; bottom:0; left:0; right:0;
+            border-radius:8px 8px 2px 2px;
+            transition:height 0.4s cubic-bezier(0.34,1.56,0.64,1), background-color 0.4s;
+            z-index:1;
+        }
+        .bar-ticks-layer {
+            position:absolute; top:0; left:0; right:0; bottom:0;
+            pointer-events:none; z-index:2;
+        }
+        .bar-inner-label {
+            position:absolute; bottom:8px; width:100%;
+            text-align:center; z-index:5; pointer-events:none;
+            font-size:2rem; font-weight:800; color:#fff;
+            text-shadow:0 0 10px rgba(0,0,0,0.9),2px 2px 0 rgba(0,0,0,0.6);
+        }
+        .bar-num-display { display:none; }
+        .bar-unit.matched .bar-drop-zone { animation:matchPulse 0.6s ease-in-out; }
+        @keyframes matchPulse { 0%{transform:scale(1)} 40%{transform:scale(1.07)} 100%{transform:scale(1)} }
+
+        /* ── BAR RIGHT MARKERS ── */
+        .bar-right-markers {
+            position:relative; width:52px; height:400px;
+            margin-left:4px;
+        }
+        .bar-marker {
+            position:absolute;
+            left:0; right:0;
+            font-size:0.72rem; font-weight:800;
+            text-align:left; padding:2px 4px;
+            border-radius:5px; white-space:nowrap;
+            line-height:1.3; cursor:default;
+        }
+
+        /* ── HAND AREA ── */
+        #hand-area {
+            display:flex; align-items:center; gap:14px;
+            background:rgba(0,0,0,0.45); padding:12px 20px;
+            border-radius:16px; border:1px solid rgba(79,195,247,0.2);
+            position:relative;
+        }
+        #hand-cards { display:flex; gap:10px; min-height:100px; align-items:center; }
+        #next-card-area { display:none; }
+        .next-label { font-size:0.65rem; color:#90caf9; font-weight:bold; }
+        .card {
+            width:64px; height:93px;
+            background:linear-gradient(145deg,#ffffff,#e3f2fd);
+            border:2px solid #90caf9; border-radius:10px;
+            display:flex; justify-content:center; align-items:center;
+            font-size:2.1rem; font-weight:800; color:var(--text-dark);
+            cursor:grab;
+            box-shadow:0 6px 0 #1565c0,0 8px 14px rgba(0,0,0,0.35);
+            transition:transform 0.12s, box-shadow 0.12s;
+        }
+        .card:hover { transform:translateY(-5px); box-shadow:0 11px 0 #1565c0,0 13px 20px rgba(0,0,0,0.4); }
+        .card:active { cursor:grabbing; transform:translateY(2px); box-shadow:0 4px 0 #1565c0; }
+        .card.dragging { opacity:0.35; }
+        .card.joker { background:linear-gradient(145deg,#4a148c,#7b1fa2); border-color:#ce93d8; color:#fff; font-size:1.6rem; cursor:pointer; }
+        .card.next-preview { width:46px; height:68px; font-size:1.4rem; cursor:default; opacity:0.75; box-shadow:0 3px 0 #1565c0; }
+        .card.next-preview:hover { transform:none; box-shadow:0 3px 0 #1565c0; }
+        .card.next-preview.joker { font-size:1.2rem; }
+
+        /* ── CHANGE BUTTON ── */
+        #btn-change { display:flex; flex-direction:column; align-items:center; gap:1px; font-size:0.82rem; padding:8px 14px; background:linear-gradient(135deg,#4a148c,#7b1fa2); }
+        #btn-change .rc { font-size:1.1rem; font-weight:800; color:#ce93d8; }
+
+        /* ── RIGHT PANEL TARGET ROWS ── */
+        .target-row {
+            display:flex; align-items:center; gap:6px;
+            padding:8px 8px; margin-bottom:0;
+            background:rgba(0,0,0,0.3); border-radius:10px;
+            border:1px solid rgba(255,255,255,0.08);
+        }
+        .tr-mult {
+            font-size:0.7rem; font-weight:800;
+            padding:2px 5px; border-radius:5px;
+            min-width:24px; text-align:center; flex-shrink:0;
+        }
+        .tr-name { flex:1; font-size:0.72rem; font-weight:bold; }
+        .tr-num  { font-size:1.5rem; font-weight:800; min-width:22px; text-align:right; }
+
+        /* ── JOKER ── */
+        .joker-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:16px 0; }
+        .joker-btn {
+            padding:13px; font-size:1.4rem; font-weight:800;
+            border-radius:10px; cursor:pointer; border:none;
+            background:linear-gradient(135deg,#1565c0,#1976d2);
+            color:#fff; font-family:inherit;
+            box-shadow:0 4px 0 rgba(0,0,0,0.3); transition:all 0.12s;
+        }
+        .joker-btn:hover { filter:brightness(1.3); transform:translateY(-2px); }
+
+        /* ── ROUND CLEAR ── */
+        .score-formula { font-size:1.3rem; font-weight:bold; margin:12px 0; display:flex; align-items:center; justify-content:center; gap:7px; flex-wrap:wrap; }
+        .f-base { color:#a5d6a7; }
+        .f-combo { color:#ffcc02; }
+        .f-mult { color:#f06292; }
+        .f-total { color:#4fc3f7; font-size:1.9rem; }
+
+        /* ── HOW TO PLAY ── */
+        #howto-overlay .overlay-box { max-width:680px; text-align:left; max-height:86vh; overflow-y:auto; }
+        .howto-section { margin-bottom:14px; }
+        .howto-title { color:var(--primary); font-weight:bold; font-size:0.98rem; border-bottom:1px solid rgba(79,195,247,0.3); padding-bottom:4px; margin-bottom:7px; }
+        .score-table { width:100%; border-collapse:collapse; font-size:0.88rem; margin-top:4px; }
+        .score-table th { background:rgba(79,195,247,0.2); padding:5px 8px; text-align:center; color:#90caf9; }
+        .score-table td { padding:4px 8px; text-align:center; border-bottom:1px solid rgba(255,255,255,0.07); color:var(--text-light); }
+        .score-table tr:last-child td { border-bottom:none; }
+
+        /* ── CHANGE CONFIRM ── */
+        #change-confirm-overlay .overlay-box { max-width:440px; }
+    </style>
+</head>
+<body>
+<div id="container">
+
+<!-- ═══ LEFT PANEL ═══ -->
+<div id="left-panel" class="hidden">
+    <div id="left-panel-content" class="invisible" style="display:flex; flex-direction:column; height:100%;">
+        <div style="flex:1; display:flex; flex-direction:column; justify-content:space-around;">
+            <div class="info-item" style="margin-bottom:0;">
+                <div class="info-label">プレーヤー</div>
+                <div class="info-value" id="disp-player-name" style="font-size:0.95rem; word-break:break-all;"></div>
+            </div>
+            <div class="info-item" style="margin-bottom:0;">
+                <div class="info-label">難易度</div>
+                <div class="info-value" id="disp-difficulty" style="font-size:1rem;"></div>
+            </div>
+            <div class="info-item" style="margin-bottom:0;">
+                <div class="info-label">ラウンド</div>
+                <div class="info-value">
+                    <span id="disp-round-l" style="font-size:1.8rem; font-weight:800; color:var(--primary);">1</span>
+                    <span style="font-size:0.9rem; color:#90caf9;"> / 7</span>
+                </div>
+            </div>
+            <div class="info-item" style="margin-bottom:0;">
+                <div class="info-label">コンボ</div>
+                <div class="info-value" id="disp-combo-l" style="color:#ffcc02; font-size:2rem;">0</div>
+            </div>
+            <div class="info-item" style="margin-bottom:0;">
+                <div class="info-label">スコア</div>
+                <div class="info-value" id="disp-score-l" style="color:#80deea; font-size:1.6rem;">0</div>
+            </div>
+        </div>
+        <!-- 左下ボタン -->
+        <div style="display:flex; flex-direction:column; gap:8px; padding-top:12px;">
+            <button id="btn-howto" class="btn" style="background:linear-gradient(135deg,#1565c0,#1976d2); padding:10px; font-size:0.9rem; margin:0;">あそびかた</button>
+            <button id="btn-to-title" class="btn btn-danger" style="padding:10px; font-size:0.9rem; margin:0;">タイトルへ</button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ GAME AREA ═══ -->
+<div id="game-area">
+    <canvas id="effect-canvas"></canvas>
+
+    <!-- TITLE -->
+    <div id="title-screen">
+        <div class="title-container">
+            <h1 style="font-family:'Dela Gothic One',sans-serif; font-size:2.8rem; color:#4fc3f7; text-shadow:3px 3px 0 #0d47a1,0 0 30px rgba(79,195,247,0.4); margin-bottom:4px; letter-spacing:2px; line-height:1.2;">MATH BRAVES</h1>
+            <h2 style="border:none; color:#90caf9; margin-top:0; margin-bottom:18px;">- くりさがり２ -</h2>
+            <div style="margin-bottom:16px; background:rgba(0,0,0,0.3); padding:9px 18px; border-radius:14px; display:flex; align-items:center; gap:10px; border:1px solid rgba(79,195,247,0.2);">
+                <span style="color:#90caf9;">プレーヤー:</span>
+                <span id="title-player-name" style="font-weight:bold; color:#4fc3f7; font-size:1.15rem;">ななしさん</span>
+            </div>
+            <button id="btn-start" class="btn btn-success title-btn">はじめる</button>
+            <button id="btn-player-select" class="btn title-btn" style="background:linear-gradient(135deg,#01579b,#0277bd);">プレーヤー選択</button>
+            <button id="btn-login" class="btn btn-danger title-btn">Googleでログイン</button>
+            <button id="btn-logout" class="btn btn-gray hidden title-btn">ログアウト</button>
+            <button id="btn-view-ranking" class="btn btn-warning title-btn">🏆 ランキング</button>
+            <button id="btn-index" class="btn btn-gray title-btn" style="margin-bottom:0;">🏠 INDEXへ</button>
+            <div id="auth-status" style="font-size:0.78rem; margin-top:12px; color:#90caf9; font-weight:bold;"></div>
+        </div>
+    </div>
+
+    <!-- DIFFICULTY -->
+    <div id="difficulty-overlay" class="overlay-wrap hidden">
+        <div class="overlay-box">
+            <h2 style="color:var(--primary); margin-bottom:18px; border:none; font-size:1.4rem;">難易度を選択</h2>
+            <div style="display:flex; gap:18px; justify-content:center; margin-bottom:18px;">
+                <div style="text-align:center;">
+                    <div id="crown-easy" style="font-size:1.4rem; visibility:hidden;">👑</div>
+                    <button id="btn-easy" class="btn btn-success" style="width:135px; padding:14px;">しょきゅう<br><small style="font-weight:normal; font-size:0.72rem;">手札 5枚</small></button>
+                    <div id="clear-easy" style="font-size:0.82rem; color:#90caf9; margin-top:5px;">0回クリア</div>
+                </div>
+                <div style="text-align:center;">
+                    <div id="crown-normal" style="font-size:1.4rem; visibility:hidden;">👑</div>
+                    <button id="btn-normal" class="btn" style="width:135px; padding:14px; background:linear-gradient(135deg,#01579b,#0277bd);">ちゅうきゅう<br><small style="font-weight:normal; font-size:0.72rem;">手札 4枚</small></button>
+                    <div id="clear-normal" style="font-size:0.82rem; color:#90caf9; margin-top:5px;">0回クリア</div>
+                </div>
+                <div style="text-align:center;">
+                    <div id="crown-hard" style="font-size:1.4rem; visibility:hidden;">👑</div>
+                    <button id="btn-hard" class="btn btn-danger" style="width:135px; padding:14px;">じょうきゅう<br><small style="font-weight:normal; font-size:0.72rem;">手札 3枚</small></button>
+                    <div id="clear-hard" style="font-size:0.82rem; color:#90caf9; margin-top:5px;">0回クリア</div>
+                </div>
+            </div>
+            <button id="btn-close-diff" class="btn btn-gray" style="padding:9px 28px;">もどる</button>
+        </div>
+    </div>
+
+    <!-- GAME UI LAYER -->
+    <div id="game-ui-layer" class="hidden">
+        <div id="top-bar"></div>
+
+        <!-- スコア計算式ゾーン -->
+        <div id="formula-zone">
+            <div class="fz-cell">
+                <span class="fz-label">基本点</span>
+                <span class="fz-val" id="fz-base">--</span>
+            </div>
+            <span class="fz-op">×</span>
+            <div class="fz-cell">
+                <span class="fz-label">コンボ</span>
+                <span class="fz-val fz-combo-c" id="fz-combo">0</span>
+            </div>
+            <span class="fz-op">×</span>
+            <div class="fz-cell">
+                <span class="fz-label">ボーナス</span>
+                <span class="fz-val fz-mult-c" id="fz-mult">--</span>
+            </div>
+        </div>
+
+        <!-- BARS -->
+        <div id="bars-area">
+            <div class="bar-unit" id="bar-unit-0">
+                <div class="bar-wrap">
+                    <div class="bar-drop-zone" id="bar-0">
+                        <div class="bar-fill" id="bar-fill-0"></div>
+                        <div class="bar-ticks-layer" id="bar-ticks-0"></div>
+                        <div class="bar-inner-label" id="bar-inner-0"></div>
+                    </div>
+                    <div class="bar-right-markers" id="bar-markers-0"></div>
+                </div>
+                <div class="bar-num-display" id="bar-num-0">--</div>
+            </div>
+            <div class="bar-unit" id="bar-unit-1">
+                <div class="bar-wrap">
+                    <div class="bar-drop-zone" id="bar-1">
+                        <div class="bar-fill" id="bar-fill-1"></div>
+                        <div class="bar-ticks-layer" id="bar-ticks-1"></div>
+                        <div class="bar-inner-label" id="bar-inner-1"></div>
+                    </div>
+                    <div class="bar-right-markers" id="bar-markers-1"></div>
+                </div>
+                <div class="bar-num-display" id="bar-num-1">--</div>
+            </div>
+            <div class="bar-unit" id="bar-unit-2">
+                <div class="bar-wrap">
+                    <div class="bar-drop-zone" id="bar-2">
+                        <div class="bar-fill" id="bar-fill-2"></div>
+                        <div class="bar-ticks-layer" id="bar-ticks-2"></div>
+                        <div class="bar-inner-label" id="bar-inner-2"></div>
+                    </div>
+                    <div class="bar-right-markers" id="bar-markers-2"></div>
+                </div>
+                <div class="bar-num-display" id="bar-num-2">--</div>
+            </div>
+        </div>
+
+        <!-- HAND AREA -->
+        <div id="hand-area">
+            <div id="hand-cards"></div>
+            <div id="next-card-area">
+                <span class="next-label">つぎ</span>
+                <div id="next-card-display"></div>
+            </div>
+            <button id="btn-change" class="btn">
+                <span>チェンジ</span>
+                <span class="rc" id="btn-change-count">3</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- JOKER -->
+    <div id="joker-overlay" class="overlay-wrap hidden">
+        <div class="overlay-box" style="max-width:360px;">
+            <h2 style="border:none; color:#ce93d8; font-size:1.4rem;">🃏 ジョーカー！</h2>
+            <p style="color:#b3c5e8; margin:0 0 4px;">使いたい数を選んでね</p>
+            <div class="joker-grid" id="joker-grid"></div>
+            <button id="btn-joker-cancel" class="btn btn-gray" style="padding:8px 26px;">キャンセル</button>
+        </div>
+    </div>
+
+    <!-- CHANGE CONFIRM -->
+    <div id="change-confirm-overlay" class="overlay-wrap hidden">
+        <div class="overlay-box" style="max-width:460px;">
+            <h2 style="border:none; color:#ce93d8; font-size:1.4rem;">チェンジ</h2>
+            <p style="color:#e8eaf6; font-size:1.05rem; margin:12px 0 18px;">チェンジ方法を選んでください</p>
+            <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:16px;">
+                <button id="btn-change-normal" class="btn btn-purple" style="padding:12px 24px; font-size:1rem; display:flex; justify-content:space-between; align-items:center; width:100%; box-sizing:border-box;">
+                    <span>通常チェンジ</span>
+                    <span style="color:#ce93d8; font-size:1.1rem;">残り <span id="cc-normal">3</span> 回</span>
+                </button>
+                <button id="btn-change-gem" class="btn btn-gem" style="padding:12px 24px; font-size:1rem; display:flex; justify-content:space-between; align-items:center; width:100%; box-sizing:border-box;">
+                    <span>💎チェンジ</span>
+                    <span style="color:#80deea; font-size:1.1rem;">💎 <span id="cc-gems">0</span> 個</span>
+                </button>
+            </div>
+            <button id="btn-change-no" class="btn btn-gray" style="padding:10px 30px;">キャンセル</button>
+        </div>
+    </div>
+
+    <!-- ROUND CLEAR -->
+    <div id="round-clear-overlay" class="overlay-wrap hidden">
+        <div class="overlay-box" style="max-width:500px;">
+            <h2 style="color:#a5d6a7; border:none; font-size:2rem;">ROUND CLEAR!</h2>
+            <div style="margin:10px 0; color:#90caf9; font-size:0.9rem;">
+                そろえた数: <strong id="rc-aligned-val" style="color:#ffcc02; font-size:1.3rem;">--</strong>
+            </div>
+            <div class="score-formula">
+                <span class="f-base">基本点 <strong id="rc-base">0</strong></span>
+                <span>×</span>
+                <span class="f-combo">コンボ <strong id="rc-combo">0</strong></span>
+                <span>×</span>
+                <span class="f-mult">倍率 <strong id="rc-mult">×1</strong></span>
+                <span>=</span>
+                <span class="f-total"><strong id="rc-total">0</strong></span>
+            </div>
+            <div id="rc-bonus-msg" style="margin-bottom:8px; font-size:1rem; font-weight:bold; min-height:2.4rem; white-space:pre-line;"></div>
+            <button id="btn-round-next" class="btn btn-success" style="font-size:1.05rem; padding:12px 38px;">つぎへ</button>
+        </div>
+    </div>
+
+    <!-- RESULT -->
+    <div id="result-overlay" class="overlay-wrap hidden">
+        <div class="overlay-box" style="max-width:520px;">
+            <h2 id="result-title" style="font-size:2.4rem; border:none; margin-bottom:18px;">GAME CLEAR!</h2>
+            <div style="background:rgba(0,0,0,0.3); padding:18px; border-radius:14px; margin-bottom:18px; border:1px solid rgba(79,195,247,0.2);">
+                <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                    <span>累計スコア</span><span id="res-base-score" style="font-weight:bold; color:#4fc3f7;">0</span>
+                </div>
+                <div style="border-bottom:1px solid rgba(255,255,255,0.1); margin:8px 0;"></div>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-weight:bold;">最終スコア</span>
+                    <span id="result-score" style="font-size:1.9rem; font-weight:bold; color:#ffcc02;">0</span>
+                </div>
+            </div>
+            <div id="new-record-msg" style="color:#f06292; font-weight:bold; font-size:1.05rem; margin-bottom:12px; min-height:1.5rem;"></div>
+            <button id="btn-result-ok" class="btn btn-success" style="padding:12px 48px; font-size:1.05rem;">OK</button>
+        </div>
+    </div>
+
+    <!-- PLAYER MANAGER -->
+    <div id="player-manager-overlay" class="overlay-wrap hidden">
+        <div class="overlay-box" style="width:400px;">
+            <h2 style="color:var(--primary); border:none;">プレーヤー選択</h2>
+            <div style="display:flex; gap:10px; justify-content:center; margin:18px 0;">
+                <input type="text" id="input-new-player" placeholder="なまえ(ひらがな)" style="padding:8px; font-size:1rem; border-radius:8px; border:1px solid #4fc3f7; background:#0d1b2a; color:#fff; width:175px; font-family:inherit;">
+                <button id="btn-add-player" class="btn btn-success">追加</button>
+            </div>
+            <ul id="player-list-ul" style="list-style:none; padding:0; margin:0; max-height:190px; overflow-y:auto; text-align:left;"></ul>
+            <button id="btn-close-player" class="btn btn-gray" style="margin-top:18px; padding:9px 28px;">閉じる</button>
+        </div>
+    </div>
+
+    <!-- RANKING -->
+    <div id="ranking-screen" class="overlay-wrap hidden">
+        <div class="overlay-box">
+            <h2 style="color:var(--primary); border:none; margin-bottom:13px;">ランキング</h2>
+            <div style="display:flex; justify-content:center; gap:10px; margin-bottom:13px;">
+                <button id="btn-rank-local" class="btn btn-warning">ローカル</button>
+                <button id="btn-rank-world" class="btn" style="background:linear-gradient(135deg,#00695c,#00897b);">オンライン</button>
+            </div>
+            <div id="ranking-lists"></div>
+            <button id="btn-close-ranking" class="btn btn-gray" style="margin-top:13px; padding:9px 28px;">閉じる</button>
+        </div>
+    </div>
+
+    <!-- HOW TO PLAY -->
+    <div id="howto-overlay" class="overlay-wrap hidden">
+        <div class="overlay-box">
+            <h2 style="color:var(--primary); text-align:center; border-bottom:2px solid rgba(79,195,247,0.4); padding-bottom:8px; margin-bottom:14px;">あそびかた</h2>
+            <div class="howto-section">
+                <div class="howto-title">🎮 ルール</div>
+                <ul style="margin:0; padding-left:1.3em; color:#b3c5e8; font-size:0.88rem; line-height:1.85;">
+                    <li>カードを棒グラフにドラッグして引き算しよう。</li>
+                    <li>３本の棒を同じ数（１〜９）で揃えたらラウンドクリア！</li>
+                    <li>棒が０以下になるとゲームオーバー。</li>
+                    <li>カードを使うと次のカードが自動補充（「つぎ」に次が見える）。</li>
+                    <li>🃏 ジョーカーはクリックで１〜９の好きな数に変えられる（出現率1%）。</li>
+                    <li>チェンジで手札を全て引き直せる（通常：1ゲームに3回 / 💎チェンジ：💎を使って追加）。</li>
+                    <li>全７ラウンドをクリアすればゲームクリア！</li>
+                </ul>
+            </div>
+            <div class="howto-section">
+                <div class="howto-title">🏆 得点計算</div>
+                <p style="color:#e8eaf6; font-size:0.92rem; margin:5px 0 3px; font-weight:bold;">
+                    <span style="color:#a5d6a7;">基本点</span> × <span style="color:#ffcc02;">コンボ</span> × <span style="color:#f06292;">ボーナス倍率</span>
+                </p>
+                <p style="color:#90caf9; font-size:0.8rem; margin:3px 0 8px;">コンボ = そのラウンドで使ったカード枚数</p>
+            </div>
+            <div class="howto-section">
+                <div class="howto-title">⚡ ボーナス一覧（バーの横のマークで確認できる）</div>
+                <table class="score-table">
+                    <tr><th>マーク</th><th>名前</th><th>効果</th></tr>
+                    <tr><td style="color:var(--c-great); font-weight:800;">×4</td><td style="color:var(--c-great);">グレート</td><td>得点×4</td></tr>
+                    <tr><td style="color:var(--c-special); font-weight:800;">×3</td><td style="color:var(--c-special);">スペシャル</td><td>得点×3</td></tr>
+                    <tr><td style="color:var(--c-good); font-weight:800;">×2</td><td style="color:var(--c-good);">グッド</td><td>得点×2</td></tr>
+                    <tr><td style="color:var(--c-pinch); font-weight:800;">×½</td><td style="color:var(--c-pinch);">ピンチ</td><td>得点×½</td></tr>
+                    <tr><td style="color:var(--c-gem); font-weight:800;">💎</td><td style="color:var(--c-gem);">ダイヤ</td><td>💎を1個獲得（得点は×1）</td></tr>
+                </table>
+                <p style="color:#90caf9; font-size:0.78rem; margin-top:6px;">※ 5つのボーナスは毎ラウンド異なる数字に設定（重複なし）</p>
+            </div>
+            <div class="howto-section">
+                <div class="howto-title">📊 基本点一覧（揃えた数 × 5 ＋ 55）</div>
+                <table class="score-table">
+                    <tr><th>揃えた数</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th></tr>
+                    <tr><td style="color:#90caf9; font-weight:bold;">基本点</td><td>60</td><td>65</td><td>70</td><td>75</td><td>80</td><td>85</td><td>90</td><td>95</td><td>100</td></tr>
+                </table>
+            </div>
+            <div style="text-align:center; margin-top:6px;">
+                <button id="btn-close-howto" class="btn btn-gray" style="padding:9px 40px;">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+</div><!-- /game-area -->
+
+<!-- ═══ RIGHT PANEL ═══ -->
+<div id="right-panel" class="hidden">
+    <div id="right-panel-content" class="invisible" style="display:flex; flex-direction:column; height:100%;">
+        <div id="target-list" style="flex:1; display:flex; flex-direction:column; justify-content:space-around;"></div>
+        <div class="info-item" style="margin-bottom:0; margin-top:10px;">
+            <div class="info-label">💎 所持数</div>
+            <div class="info-value" id="disp-diamonds" style="color:#80deea; font-size:2rem;">0</div>
+        </div>
+    </div>
+</div>
+
+</div><!-- /container -->
+
+<!-- ═══ FIREBASE ═══ -->
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import { getFirestore, collection, doc, setDoc, serverTimestamp, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyBCg5dCEM89UmYYhfGqVeRf_VrUlg8_o-4",
+        authDomain: "math-braves.firebaseapp.com",
+        projectId: "math-braves",
+        storageBucket: "math-braves.firebasestorage.app",
+        messagingSenderId: "217117619290",
+        appId: "1:217117619290:web:d227feb603970d3948d463"
+    };
+    const app  = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db   = getFirestore(app);
+    const provider = new GoogleAuthProvider();
+
+    window.currentUser = null;
+    window.handleLogin  = () => signInWithPopup(auth, provider).catch(e => alert("ログイン失敗: " + e.message));
+    window.handleLogout = () => signOut(auth);
+
+    onAuthStateChanged(auth, (user) => {
+        window.currentUser = user ? { uid: user.uid, displayName: user.displayName } : null;
+        const status    = document.getElementById('auth-status');
+        const btnLogin  = document.getElementById('btn-login');
+        const btnLogout = document.getElementById('btn-logout');
+        if (window.currentUser) {
+            status.textContent = `ログイン中: ${window.currentUser.displayName}`;
+            btnLogin.classList.add('hidden'); btnLogout.classList.remove('hidden');
+        } else {
+            status.textContent = "ログインしていません";
+            btnLogin.classList.remove('hidden'); btnLogout.classList.add('hidden');
+        }
+    });
+
+    window.saveOnlineScore = async (diff, score) => {
+        if (!window.currentUser) return;
+        try {
+            await setDoc(doc(db, "scores_math_braves_subtraction2", `${window.currentUser.uid}_${diff}_${Date.now()}`), {
+                uid: window.currentUser.uid, name: window.game.playerName,
+                difficulty: diff, score, createdAt: serverTimestamp()
+            });
+        } catch(e) { console.error(e); }
+    };
+
+    window.fetchOnlineRanking = async (diff) => {
+        try {
+            const q = query(collection(db, "scores_math_braves_subtraction2"), where("difficulty","==",diff));
+            const snap = await getDocs(q);
+            let list = [];
+            snap.forEach(d => list.push(d.data()));
+            list.sort((a,b) => b.score - a.score);
+            return list.slice(0,10);
+        } catch(e) { return []; }
+    };
+</script>
+
+<script>
+// ══════════════════════════════
+// CONSTANTS
+// ══════════════════════════════
+const MAX_ROUNDS      = 7;
+const BAR_MAX_PX      = 400;
+const BAR_DISPLAY_MAX = 19;
+const JOKER_CHANCE    = 0.01;
+const TOTAL_CHANGES   = 3;
+const HAND_SIZE       = { EASY:5, NORMAL:4, HARD:3 };
+const DIFF_LABEL      = { EASY:'しょきゅう', NORMAL:'ちゅうきゅう', HARD:'じょうきゅう' };
+const NG_WORDS        = ['しね','ころす','ばか','あほ','くず','うんこ','ちんちん','まんこ','せっくす','しにたい','殺','死'];
+const KEY_PLAYER      = 'math_braves_player_list';
+const KEY_SCORE       = 'math_braves_subtraction2_scores';
+const KEY_CLEARS      = 'math_braves_subtraction2_clears';
+
+// ボーナス定義（順序：右パネル表示順）
+const BONUS_DEFS = [
+    { key:'x4',   label:'グレート',   icon:'×4', color:'#ffd600', borderColor:'rgba(255,214,0,0.55)',   bgColor:'rgba(255,214,0,0.13)',   mult:4,   isGem:false },
+    { key:'x3',   label:'スペシャル', icon:'×3', color:'#f06292', borderColor:'rgba(240,98,146,0.55)',  bgColor:'rgba(240,98,146,0.13)',  mult:3,   isGem:false },
+    { key:'x2',   label:'グッド',     icon:'×2', color:'#4fc3f7', borderColor:'rgba(79,195,247,0.55)',  bgColor:'rgba(79,195,247,0.13)',  mult:2,   isGem:false },
+    { key:'half', label:'ピンチ',     icon:'×½', color:'#ef9a9a', borderColor:'rgba(239,154,154,0.55)', bgColor:'rgba(239,154,154,0.13)', mult:0.5, isGem:false },
+    { key:'gem',  label:'ダイヤ',     icon:'💎', color:'#80deea', borderColor:'rgba(128,222,234,0.55)', bgColor:'rgba(128,222,234,0.13)', mult:1,   isGem:true  }
+];
+
+function calcBaseScore(n) { return n * 5 + 55; }
+
+// ══════════════════════════════
+// GAME STATE
+// ══════════════════════════════
+window.game = {
+    difficulty: null, round: 1, score: 0,
+    bars: [0,0,0], hand: [], nextCardVal: 0,
+    targets: { x4:0, x3:0, x2:0, half:0, gem:0 },
+    combo: 0, changes: TOTAL_CHANGES, diamonds: 0,
+    playerName: "ななしさん",
+    dragItem: null, dragClone: null,
+    jokerCardIdx: -1, roundClearing: false
+};
+
+// ══════════════════════════════
+// INIT
+// ══════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+    resize();
+    window.addEventListener('resize', resize);
+
+    document.getElementById('btn-start').onclick         = () => document.getElementById('difficulty-overlay').classList.remove('hidden');
+    document.getElementById('btn-close-diff').onclick    = () => document.getElementById('difficulty-overlay').classList.add('hidden');
+    document.getElementById('btn-easy').onclick          = () => startGame('EASY');
+    document.getElementById('btn-normal').onclick        = () => startGame('NORMAL');
+    document.getElementById('btn-hard').onclick          = () => startGame('HARD');
+    document.getElementById('btn-to-title').onclick      = backToTitle;
+    document.getElementById('btn-result-ok').onclick     = backToTitle;
+    document.getElementById('btn-change').onclick        = openChangeConfirm;
+    document.getElementById('btn-change-normal').onclick = () => doChange('normal');
+    document.getElementById('btn-change-gem').onclick    = () => doChange('gem');
+    document.getElementById('btn-change-no').onclick     = () => document.getElementById('change-confirm-overlay').classList.add('hidden');
+    document.getElementById('btn-howto').onclick         = () => document.getElementById('howto-overlay').classList.remove('hidden');
+    document.getElementById('btn-close-howto').onclick   = () => document.getElementById('howto-overlay').classList.add('hidden');
+    document.getElementById('btn-player-select').onclick = openPlayerManager;
+    document.getElementById('btn-add-player').onclick    = addPlayer;
+    document.getElementById('btn-close-player').onclick  = () => document.getElementById('player-manager-overlay').classList.add('hidden');
+    document.getElementById('btn-view-ranking').onclick  = () => showRanking('LOCAL');
+    document.getElementById('btn-rank-local').onclick    = () => showRanking('LOCAL');
+    document.getElementById('btn-rank-world').onclick    = () => showRanking('WORLD');
+    document.getElementById('btn-close-ranking').onclick = () => document.getElementById('ranking-screen').classList.add('hidden');
+    document.getElementById('btn-index').onclick         = () => window.location.href = "../index.html";
+    document.getElementById('btn-login').onclick         = () => window.handleLogin && window.handleLogin();
+    document.getElementById('btn-logout').onclick        = () => window.handleLogout && window.handleLogout();
+    document.getElementById('btn-joker-cancel').onclick  = cancelJoker;
+
+    initBarTicks();
+    loadPlayerName();
+    updateTitleStats();
+    initEffectCanvas();
+    loopEffect();
+});
+
+function resize() {
+    const c  = document.getElementById('container');
+    const vp = window.visualViewport;
+    const s  = Math.min((vp?vp.width:window.innerWidth)/1280, (vp?vp.height:window.innerHeight)/720);
+    c.style.transform = `scale(${s})`;
+}
+
+// ══════════════════════════════
+// BAR TICKS（1刻み点線・10番は太線）
+// ══════════════════════════════
+function initBarTicks() {
+    for (let i = 0; i < 3; i++) {
+        const layer = document.getElementById(`bar-ticks-${i}`);
+        for (let v = 1; v <= 18; v++) {
+            const bottom = (v / BAR_DISPLAY_MAX) * BAR_MAX_PX;
+            const tick = document.createElement('div');
+            tick.style.cssText = [
+                'position:absolute',
+                `bottom:${bottom}px`,
+                'left:0', 'right:0',
+                v === 10 ? 'height:2px; background:rgba(255,255,255,0.55);'
+                         : 'height:0; border-top:1px dashed rgba(255,255,255,0.22);'
+            ].join(';');
+            layer.appendChild(tick);
+        }
+    }
+}
+
+// ══════════════════════════════
+// TARGET GENERATION（5つ重複なし）
+// ══════════════════════════════
+function generateTargets() {
+    const pool = [1,2,3,4,5,6,7,8,9];
+    for (let i = pool.length-1; i > 0; i--) {
+        const j = Math.floor(Math.random()*(i+1));
+        [pool[i],pool[j]] = [pool[j],pool[i]];
+    }
+    return { x4:pool[0], x3:pool[1], x2:pool[2], half:pool[3], gem:pool[4] };
+}
+
+function getMultiplierInfo(val) {
+    const t = window.game.targets;
+    for (const def of BONUS_DEFS) {
+        if (t[def.key] === val) return def;
+    }
+    return null;
+}
+
+// ══════════════════════════════
+// GAME FLOW
+// ══════════════════════════════
+function startGame(diff) {
+    const g = window.game;
+    g.difficulty = diff; g.round = 1; g.score = 0;
+    g.changes = TOTAL_CHANGES; g.diamonds = 0;
+    g.hand = []; g.roundClearing = false;
+
+    document.getElementById('difficulty-overlay').classList.add('hidden');
+    document.getElementById('title-screen').classList.add('hidden');
+    document.getElementById('left-panel').classList.remove('hidden');
+    document.getElementById('right-panel').classList.remove('hidden');
+    document.getElementById('game-ui-layer').classList.remove('hidden');
+    document.getElementById('left-panel-content').classList.remove('invisible');
+    document.getElementById('right-panel-content').classList.remove('invisible');
+    document.getElementById('disp-difficulty').textContent = DIFF_LABEL[diff];
+
+    nextRound(true);
+}
+
+function nextRound(isFirst = false) {
+    const g = window.game;
+    if (!isFirst && g.round > MAX_ROUNDS) { finishGame(true); return; }
+
+    g.combo = 0;
+    g.roundClearing = false;
+    g.targets = generateTargets();
+
+    do {
+        g.bars[0] = randInt(11,19);
+        g.bars[1] = randInt(11,19);
+        g.bars[2] = randInt(11,19);
+    } while (g.bars[0] === g.bars[1] && g.bars[1] === g.bars[2]);
+
+    if (isFirst) {
+        g.nextCardVal = createCardVal();
+        fillHand();
+    }
+
+    updateBars();
+    updateTargetDisplay();
+    updateBarMarkers();
+    updateHUD();
+    updateFormulaZone();
+}
+
+function backToTitle() {
+    ['left-panel','right-panel','game-ui-layer','result-overlay','round-clear-overlay'].forEach(id =>
+        document.getElementById(id).classList.add('hidden'));
+    document.getElementById('title-screen').classList.remove('hidden');
+    document.getElementById('left-panel-content').classList.add('invisible');
+    document.getElementById('right-panel-content').classList.add('invisible');
+    particles = []; textParticles = [];
+    updateTitleStats();
+}
+
+// ══════════════════════════════
+// CARDS
+// ══════════════════════════════
+function createCardVal() {
+    return Math.random() < JOKER_CHANCE ? 'joker' : randInt(1,9);
+}
+
+function fillHand() {
+    const g = window.game;
+    const size = HAND_SIZE[g.difficulty];
+    g.hand = [];
+    for (let i = 0; i < size; i++) {
+        const v = g.nextCardVal;
+        g.hand.push({ val:v, isJoker: v==='joker' });
+        g.nextCardVal = createCardVal();
+    }
+    renderHand();
+}
+
+function replenishCard(idx) {
+    const g = window.game;
+    const v = g.nextCardVal;
+    g.hand[idx] = { val:v, isJoker: v==='joker' };
+    g.nextCardVal = createCardVal();
+    renderHand();
+}
+
+function openChangeConfirm() {
+    const g = window.game;
+    if (g.roundClearing) return;
+    if (g.changes <= 0 && g.diamonds <= 0) return;
+
+    document.getElementById('cc-normal').textContent = g.changes;
+    document.getElementById('cc-gems').textContent   = g.diamonds;
+    document.getElementById('btn-change-normal').disabled = g.changes <= 0;
+    document.getElementById('btn-change-gem').disabled    = g.diamonds <= 0;
+    document.getElementById('change-confirm-overlay').classList.remove('hidden');
+}
+
+function doChange(type) {
+    const g = window.game;
+    document.getElementById('change-confirm-overlay').classList.add('hidden');
+    if (g.roundClearing) return;
+
+    if (type === 'normal') {
+        if (g.changes <= 0) return;
+        g.changes--;
+    } else {
+        if (g.diamonds <= 0) return;
+        g.diamonds--;
+    }
+    fillHand();
+    updateHUD();
+    const label = type === 'gem' ? '💎チェンジ！' : 'チェンジ！';
+    spawnTextParticle(420, 380, label, "#ce93d8", 38);
+}
+
+function renderHand() {
+    const g = window.game;
+    const container = document.getElementById('hand-cards');
+    container.innerHTML = '';
+    g.hand.forEach((cardData, idx) => {
+        const card = document.createElement('div');
+        card.className = 'card' + (cardData.isJoker ? ' joker' : '');
+        card.textContent = cardData.isJoker ? '🃏' : cardData.val;
+        card.dataset.index = idx;
+        if (cardData.isJoker) {
+            card.addEventListener('click', () => openJoker(idx));
+            card.style.cursor = 'pointer';
+        } else {
+            card.addEventListener('mousedown', onDragStart);
+            card.addEventListener('touchstart', onDragStart, { passive:false });
+        }
+        container.appendChild(card);
+    });
+    const nv = g.nextCardVal;
+    const nc = document.createElement('div');
+    nc.className = 'card next-preview' + (nv==='joker' ? ' joker' : '');
+    nc.textContent = nv==='joker' ? '🃏' : nv;
+    const nd = document.getElementById('next-card-display');
+    nd.innerHTML = ''; nd.appendChild(nc);
+}
+
+// ══════════════════════════════
+// JOKER
+// ══════════════════════════════
+function openJoker(idx) {
+    if (window.game.roundClearing) return;
+    window.game.jokerCardIdx = idx;
+    const grid = document.getElementById('joker-grid');
+    grid.innerHTML = '';
+    for (let n = 1; n <= 9; n++) {
+        const btn = document.createElement('button');
+        btn.className = 'joker-btn';
+        btn.textContent = n;
+        btn.onclick = () => resolveJoker(n);
+        grid.appendChild(btn);
+    }
+    document.getElementById('joker-overlay').classList.remove('hidden');
+}
+function resolveJoker(val) {
+    document.getElementById('joker-overlay').classList.add('hidden');
+    const g = window.game;
+    if (g.jokerCardIdx < 0) return;
+    g.hand[g.jokerCardIdx] = { val, isJoker:false };
+    g.jokerCardIdx = -1;
+    renderHand();
+}
+function cancelJoker() {
+    document.getElementById('joker-overlay').classList.add('hidden');
+    window.game.jokerCardIdx = -1;
+}
+
+// ══════════════════════════════
+// BARS
+// ══════════════════════════════
+function updateBars() {
+    const g = window.game;
+    for (let i = 0; i < 3; i++) {
+        const val  = g.bars[i];
+        const fill = document.getElementById(`bar-fill-${i}`);
+        const inner= document.getElementById(`bar-inner-${i}`);
+        const zone = document.getElementById(`bar-${i}`);
+
+        const hPx = val <= 0 ? 0 : Math.round((val/BAR_DISPLAY_MAX)*BAR_MAX_PX);
+        fill.style.height = hPx + 'px';
+
+        if (val <= 0) {
+            fill.style.backgroundColor = '#37474f'; zone.classList.add('danger-bar');
+        } else if (val <= 9) {
+            fill.style.backgroundColor = '#66bb6a'; zone.classList.remove('danger-bar');
+        } else if (val <= 14) {
+            fill.style.backgroundColor = '#ffa726'; zone.classList.remove('danger-bar');
+        } else {
+            fill.style.backgroundColor = '#ef5350'; zone.classList.remove('danger-bar');
+        }
+        inner.textContent = val <= 0 ? '💀' : val;
+    }
+}
+
+// バー横のボーナスマーカー
+function updateBarMarkers() {
+    const g = window.game;
+    const t = g.targets;
+    for (let i = 0; i < 3; i++) {
+        const container = document.getElementById(`bar-markers-${i}`);
+        container.innerHTML = '';
+        BONUS_DEFS.forEach(def => {
+            const val = t[def.key];
+            // マーカー中心をtick線に合わせる（高さ約20px → -10px）
+            const bottom = (val / BAR_DISPLAY_MAX) * BAR_MAX_PX - 10;
+            const marker = document.createElement('div');
+            marker.className = 'bar-marker';
+            // ◀ で境界を正確に指示
+            marker.textContent = `◀${def.icon}`;
+            marker.title = `${def.label}: ${val}`;
+            marker.style.cssText = [
+                `bottom:${bottom}px`,
+                `color:${def.color}`,
+                `background:${def.bgColor}`,
+                `border:1px solid ${def.borderColor}`
+            ].join(';');
+            container.appendChild(marker);
+        });
+    }
+}
+
+function checkRoundClear() {
+    const g = window.game;
+    if (g.roundClearing) return;
+    const b = g.bars;
+    if (b[0]===b[1] && b[1]===b[2] && b[0]>=1 && b[0]<=9) {
+        g.roundClearing = true;
+        setTimeout(roundClear, 500);
+    }
+}
+
+function checkGameOver() {
+    if (window.game.bars.some(v => v<=0)) {
+        setTimeout(() => finishGame(false), 500);
+    }
+}
+
+// ══════════════════════════════
+// FORMULA ZONE（リアルタイム計算式）
+// ══════════════════════════════
+function updateFormulaZone() {
+    const g = window.game;
+    const b = g.bars;
+    const allEqual = b[0]===b[1] && b[1]===b[2];
+    const inRange  = allEqual && b[0]>=1 && b[0]<=9;
+
+    document.getElementById('fz-combo').textContent = g.combo;
+
+    if (inRange) {
+        const base = calcBaseScore(b[0]);
+        document.getElementById('fz-base').textContent = base;
+        const def = getMultiplierInfo(b[0]);
+        if (def) {
+            const multEl = document.getElementById('fz-mult');
+            multEl.textContent  = def.isGem ? '×1+💎' : (def.mult===0.5 ? '×½' : `×${def.mult}`);
+            multEl.style.color  = def.color;
+        } else {
+            document.getElementById('fz-mult').textContent = '×1';
+            document.getElementById('fz-mult').style.color = '#90caf9';
+        }
+    } else {
+        document.getElementById('fz-base').textContent = '--';
+        document.getElementById('fz-mult').textContent = '--';
+        document.getElementById('fz-mult').style.color = '#f06292';
+    }
+}
+
+// ══════════════════════════════
+// DRAG & DROP
+// ══════════════════════════════
+function onDragStart(e) {
+    if (window.game.roundClearing) return;
+    e.preventDefault();
+    const target = e.currentTarget;
+    const rect   = target.getBoundingClientRect();
+    const idx    = parseInt(target.dataset.index);
+    const cardData = window.game.hand[idx];
+    if (!cardData || cardData.isJoker) return;
+
+    const clone = target.cloneNode(true);
+    clone.style.cssText = `position:fixed; width:${rect.width}px; height:${rect.height}px; z-index:10000; pointer-events:none; opacity:0.85; transition:none;`;
+    document.body.appendChild(clone);
+    window.game.dragClone = clone;
+    window.game.dragItem  = { ...cardData, idx, rect };
+
+    const cx = e.touches ? e.touches[0].clientX : e.clientX;
+    const cy = e.touches ? e.touches[0].clientY : e.clientY;
+    moveClone(cx, cy);
+
+    document.addEventListener('mousemove', onDragMove);
+    document.addEventListener('touchmove', onDragMove, { passive:false });
+    document.addEventListener('mouseup', onDragEnd);
+    document.addEventListener('touchend', onDragEnd);
+    for (let i=0;i<3;i++) document.getElementById(`bar-${i}`).classList.add('drag-over');
+}
+function onDragMove(e) {
+    e.preventDefault();
+    moveClone(e.touches?e.touches[0].clientX:e.clientX, e.touches?e.touches[0].clientY:e.clientY);
+}
+function moveClone(cx, cy) {
+    if (!window.game.dragClone) return;
+    const r = window.game.dragItem.rect;
+    window.game.dragClone.style.left = (cx-r.width/2)  + 'px';
+    window.game.dragClone.style.top  = (cy-r.height/2) + 'px';
+}
+function onDragEnd(e) {
+    document.removeEventListener('mousemove', onDragMove);
+    document.removeEventListener('touchmove', onDragMove);
+    document.removeEventListener('mouseup', onDragEnd);
+    document.removeEventListener('touchend', onDragEnd);
+    for (let i=0;i<3;i++) document.getElementById(`bar-${i}`).classList.remove('drag-over');
+
+    const cx = e.changedTouches?e.changedTouches[0].clientX:e.clientX;
+    const cy = e.changedTouches?e.changedTouches[0].clientY:e.clientY;
+    let hitIndex = -1;
+    for (let i=0;i<3;i++) {
+        const r = document.getElementById(`bar-${i}`).getBoundingClientRect();
+        if (cx>=r.left && cx<=r.right && cy>=r.top && cy<=r.bottom) { hitIndex=i; break; }
+    }
+    if (hitIndex !== -1 && !window.game.roundClearing) applyCard(hitIndex, window.game.dragItem);
+    if (window.game.dragClone) window.game.dragClone.remove();
+    window.game.dragClone = null; window.game.dragItem = null;
+}
+
+function applyCard(barIdx, cardData) {
+    const g = window.game;
+    g.bars[barIdx] -= cardData.val;
+    g.combo++;
+    updateBars();
+    updateHUD();
+    updateFormulaZone();
+
+    const bar  = document.getElementById(`bar-${barIdx}`);
+    const r    = bar.getBoundingClientRect();
+    const cx   = r.left + r.width/2;
+    const cy   = r.top  + r.height/2;
+    spawnParticles(cx, cy, 14, g.bars[barIdx]<=9 && g.bars[barIdx]>0 ? '#66bb6a' : '#4fc3f7');
+    // client座標 → canvas座標へ変換してテキストを表示
+    const ga    = document.getElementById('game-area').getBoundingClientRect();
+    const cont  = document.getElementById('container').getBoundingClientRect();
+    const scale = cont.width / 1280;
+    const tcx   = (cx - ga.left)       / scale;
+    const tcy   = (r.top - 10 - ga.top) / scale;
+    spawnTextParticle(tcx, tcy, `-${cardData.val}`, '#ffcc02', 36);
+    replenishCard(cardData.idx);
+
+    if (g.bars[barIdx] <= 0) checkGameOver();
+    else checkRoundClear();
+}
+
+// ══════════════════════════════
+// ROUND CLEAR
+// ══════════════════════════════
+function roundClear() {
+    const g = window.game;
+    const alignedVal = g.bars[0];
+    const def = getMultiplierInfo(alignedVal);
+
+    let mult = 1;
+    let multMsg = '';
+    let multColor = '#90caf9';
+    let gemMsg = '';
+
+    if (def && !def.isGem) {
+        mult = def.mult;
+        multMsg = def.mult === 0.5
+            ? `⚠️ ${def.label}！ ×½`
+            : `${def.icon} ${def.label}！ ×${def.mult}`;
+        multColor = def.color;
+    }
+    if (def && def.isGem) {
+        g.diamonds++;
+        gemMsg = '💎 ダイヤゲット！';
+        updateHUD();
+    }
+
+    const base  = calcBaseScore(alignedVal);
+    const total = Math.floor(base * g.combo * mult);
+    const bonusMsg = [multMsg, gemMsg].filter(Boolean).join('\n');
+
+    spawnConfetti();
+    for (let i=0;i<3;i++) document.getElementById(`bar-unit-${i}`).classList.add('matched');
+
+    if (mult >= 4)  spawnTextParticle(420, 180, "×4 グレート！！", "#ffd600", 56);
+    else if (mult >= 3) spawnTextParticle(420, 180, "×3 スペシャル！", "#f06292", 52);
+    else if (mult >= 2) spawnTextParticle(420, 180, "×2 グッド！", "#4fc3f7", 48);
+    else if (mult < 1)  spawnTextParticle(420, 180, "×½ ピンチ…", "#ef9a9a", 44);
+    if (gemMsg)         spawnTextParticle(420, 260, "💎 ゲット！", "#80deea", 42);
+
+    setTimeout(() => {
+        for (let i=0;i<3;i++) document.getElementById(`bar-unit-${i}`).classList.remove('matched');
+        document.getElementById('rc-aligned-val').textContent = alignedVal;
+        document.getElementById('rc-base').textContent  = base;
+        document.getElementById('rc-combo').textContent = g.combo;
+        document.getElementById('rc-mult').textContent  = mult===0.5 ? '×½' : `×${mult}`;
+        document.getElementById('rc-total').textContent = total;
+        const bmEl = document.getElementById('rc-bonus-msg');
+        bmEl.textContent = bonusMsg;
+        bmEl.style.color = multColor;
+        document.getElementById('round-clear-overlay').classList.remove('hidden');
+        document.getElementById('btn-round-next').onclick = () => {
+            document.getElementById('round-clear-overlay').classList.add('hidden');
+            g.score += total; g.round++;
+            updateHUD();
+            nextRound();
+        };
+    }, 900);
+}
+
+// ══════════════════════════════
+// FINISH GAME
+// ══════════════════════════════
+function finishGame(isClear) {
+    const g = window.game;
+    const titleEl = document.getElementById('result-title');
+    if (isClear) { titleEl.textContent="GAME CLEAR!"; titleEl.style.color="#ffcc02"; spawnConfetti(); }
+    else         { titleEl.textContent="GAME OVER";   titleEl.style.color="#ef9a9a"; }
+    document.getElementById('res-base-score').textContent = g.score;
+    document.getElementById('result-score').textContent   = g.score;
+    const isNew = saveScore(g.difficulty, g.score);
+    document.getElementById('new-record-msg').textContent = isNew ? "🎉 自己ベスト更新！" : "";
+    document.getElementById('result-overlay').classList.remove('hidden');
+}
+
+// ══════════════════════════════
+// HUD
+// ══════════════════════════════
+function updateHUD() {
+    const g = window.game;
+    document.getElementById('disp-round-l').textContent     = g.round;
+    document.getElementById('disp-combo-l').textContent     = g.combo;
+    document.getElementById('disp-score-l').textContent     = g.score;
+    document.getElementById('disp-player-name').textContent = g.playerName;
+    document.getElementById('disp-diamonds').textContent    = g.diamonds;
+    document.getElementById('btn-change-count').textContent = g.changes;
+    document.getElementById('btn-change').disabled = g.changes <= 0 && g.diamonds <= 0;
+}
+
+function updateTargetDisplay() {
+    const g = window.game;
+    const t = g.targets;
+    const list = document.getElementById('target-list');
+    list.innerHTML = '';
+    BONUS_DEFS.forEach(def => {
+        const val = t[def.key];
+        const row = document.createElement('div');
+        row.className = 'target-row';
+        row.innerHTML = `
+            <div class="tr-mult" style="background:${def.bgColor}; color:${def.color}; border:1px solid ${def.borderColor};">${def.icon}</div>
+            <div class="tr-name" style="color:${def.color};">${def.label}</div>
+            <div class="tr-num" style="color:${def.color};">${val}</div>
+        `;
+        list.appendChild(row);
+    });
+}
+
+// ══════════════════════════════
+// PLAYER / SCORE
+// ══════════════════════════════
+function loadPlayerName() {
+    const list = JSON.parse(localStorage.getItem(KEY_PLAYER)) || [];
+    const idx  = parseInt(localStorage.getItem('math_braves_selected_idx')) || 0;
+    if (list.length > 0 && list[idx]) window.game.playerName = list[idx];
+    document.getElementById('title-player-name').textContent = window.game.playerName;
+}
+
+function openPlayerManager() {
+    const list = JSON.parse(localStorage.getItem(KEY_PLAYER)) || [];
+    const ul = document.getElementById('player-list-ul');
+    ul.innerHTML = '';
+    list.forEach((name, i) => {
+        const li = document.createElement('li');
+        li.style.cssText = 'padding:5px; display:flex; align-items:center; gap:8px; color:#e8eaf6;';
+        li.innerHTML = `<button class="btn btn-success" onclick="selectPlayer(${i})" style="padding:5px 10px;font-size:0.83rem;">選択</button><span style="flex:1;">${name}</span><button class="btn btn-danger" onclick="deletePlayer(${i})" style="padding:5px 10px;font-size:0.83rem;">×</button>`;
+        ul.appendChild(li);
+    });
+    document.getElementById('player-manager-overlay').classList.remove('hidden');
+}
+
+window.selectPlayer = (i) => {
+    localStorage.setItem('math_braves_selected_idx', i);
+    loadPlayerName();
+    document.getElementById('player-manager-overlay').classList.add('hidden');
+};
+window.deletePlayer = (i) => {
+    const list = JSON.parse(localStorage.getItem(KEY_PLAYER)) || [];
+    list.splice(i,1);
+    localStorage.setItem(KEY_PLAYER, JSON.stringify(list));
+    openPlayerManager();
+};
+
+function addPlayer() {
+    const name = document.getElementById('input-new-player').value.trim();
+    if (!name) return;
+    for (const ng of NG_WORDS) if (name.includes(ng)) { alert("その名前は使えません"); return; }
+    const list = JSON.parse(localStorage.getItem(KEY_PLAYER)) || [];
+    if (list.length >= 5) { alert("登録は5人まで"); return; }
+    list.push(name);
+    localStorage.setItem(KEY_PLAYER, JSON.stringify(list));
+    window.selectPlayer(list.length-1);
+}
+
+function saveScore(diff, score) {
+    const key = `${KEY_SCORE}_${diff}`;
+    let ranks = JSON.parse(localStorage.getItem(key)) || [];
+    ranks.push({ name:window.game.playerName, score });
+    ranks.sort((a,b) => b.score-a.score);
+    ranks = ranks.slice(0,10);
+    localStorage.setItem(key, JSON.stringify(ranks));
+    const clears = JSON.parse(localStorage.getItem(KEY_CLEARS)) || { EASY:0, NORMAL:0, HARD:0 };
+    clears[diff]++;
+    localStorage.setItem(KEY_CLEARS, JSON.stringify(clears));
+    if (window.saveOnlineScore) window.saveOnlineScore(diff, score);
+    return ranks.length > 0 && ranks[0].score === score;
+}
+
+function updateTitleStats() {
+    const clears = JSON.parse(localStorage.getItem(KEY_CLEARS)) || { EASY:0, NORMAL:0, HARD:0 };
+    ['EASY','NORMAL','HARD'].forEach(k => {
+        document.getElementById(`clear-${k.toLowerCase()}`).textContent = `${clears[k]}回クリア`;
+        if (clears[k]>0) document.getElementById(`crown-${k.toLowerCase()}`).style.visibility = 'visible';
+    });
+}
+
+function showRanking(mode) {
+    document.getElementById('ranking-screen').classList.remove('hidden');
+    const container = document.getElementById('ranking-lists');
+    container.innerHTML = '読み込み中...';
+    const btnLocal = document.getElementById('btn-rank-local');
+    const btnWorld = document.getElementById('btn-rank-world');
+    if (mode==='LOCAL') {
+        btnLocal.classList.add('active'); btnLocal.classList.remove('inactive');
+        btnWorld.classList.add('inactive'); btnWorld.classList.remove('active');
+    } else {
+        btnWorld.classList.add('active'); btnWorld.classList.remove('inactive');
+        btnLocal.classList.add('inactive'); btnLocal.classList.remove('active');
+    }
+    const renderList = (title, list) => {
+        let h = `<div class="rank-list-wrapper"><h3 class="rank-list-header">${title}</h3><ul class="rank-list">`;
+        if (!list.length) h += `<li style="justify-content:center;color:#90caf9;">記録なし</li>`;
+        list.forEach((d,i) => { h += `<li><span>${i+1}. ${d.name}</span><span>${d.score}</span></li>`; });
+        return h+'</ul></div>';
+    };
+    if (mode==='LOCAL') {
+        container.innerHTML = ['EASY','NORMAL','HARD'].map(d =>
+            renderList(d, JSON.parse(localStorage.getItem(`${KEY_SCORE}_${d}`))||[])).join('');
+    } else {
+        Promise.all(['EASY','NORMAL','HARD'].map(d => window.fetchOnlineRanking(d))).then(results => {
+            container.innerHTML = ['EASY','NORMAL','HARD'].map((d,i) => renderList(d, results[i])).join('');
+        });
+    }
+}
+
+// ══════════════════════════════
+// UTILITIES
+// ══════════════════════════════
+function randInt(min, max) { return Math.floor(Math.random()*(max-min+1))+min; }
+
+// ══════════════════════════════
+// EFFECTS
+// ══════════════════════════════
+let ctx, particles = [], textParticles = [];
+
+function initEffectCanvas() {
+    const c = document.getElementById('effect-canvas');
+    c.width = 860; c.height = 720;
+    ctx = c.getContext('2d');
+}
+
+function spawnParticles(cx, cy, count, color) {
+    // client coords → canvas coords
+    const ga   = document.getElementById('game-area').getBoundingClientRect();
+    const cont = document.getElementById('container').getBoundingClientRect();
+    const scale = cont.width / 1280;
+    const x = (cx - ga.left) / scale;
+    const y = (cy - ga.top)  / scale;
+    for (let i=0;i<count;i++) {
+        particles.push({ x, y, vx:(Math.random()-0.5)*12, vy:(Math.random()-0.5)*12, life:1.0, color, size:5 });
+    }
+}
+
+function spawnTextParticle(x, y, text, color, size) {
+    textParticles.push({ x, y, text, color, size, life:2.5, vy:-1.2 });
+}
+
+function spawnConfetti() {
+    for (let i=0;i<120;i++) {
+        particles.push({
+            x:randInt(40,820), y:-10,
+            vx:(Math.random()-0.5)*6, vy:Math.random()*8+3,
+            life:3.0, color:`hsl(${Math.random()*360},100%,65%)`,
+            gravity:0.1, size:randInt(4,8)
+        });
+    }
+}
+
+function loopEffect() {
+    ctx.clearRect(0,0,860,720);
+    for (let i=particles.length-1;i>=0;i--) {
+        const p=particles[i];
+        p.x+=p.vx; p.y+=p.vy;
+        if(p.gravity) p.vy+=p.gravity;
+        p.life-=0.025;
+        ctx.globalAlpha=Math.max(0,Math.min(1,p.life));
+        ctx.fillStyle=p.color;
+        ctx.beginPath(); ctx.arc(p.x,p.y,p.size||5,0,Math.PI*2); ctx.fill();
+        if(p.life<=0) particles.splice(i,1);
+    }
+    for (let i=textParticles.length-1;i>=0;i--) {
+        const tp=textParticles[i];
+        tp.y+=tp.vy; tp.life-=0.012;
+        ctx.globalAlpha=Math.max(0,Math.min(1,tp.life));
+        ctx.font=`600 ${tp.size}px "M PLUS Rounded 1c","Hiragino Kaku Gothic ProN",sans-serif`;
+        ctx.fillStyle=tp.color; ctx.strokeStyle='rgba(0,0,0,0.7)'; ctx.lineWidth=5;
+        ctx.textAlign='center';
+        ctx.strokeText(tp.text,tp.x,tp.y); ctx.fillText(tp.text,tp.x,tp.y);
+        if(tp.life<=0) textParticles.splice(i,1);
+    }
+    ctx.globalAlpha=1.0;
+    requestAnimationFrame(loopEffect);
+}
+</script>
+</body>
+</html>
