@@ -1,168 +1,175 @@
-// ===== ハニカム六角形マップシステム =====
+// ===== ハニカム六角形マップシステム（フラットトップ・ダイヤモンド形）=====
 
 const MapSystem = (() => {
 
-  // ===== 定数 =====
-  // 9ステージ × 5行 = 45マス + START + BOSS
-  const NUM_STAGES = 9;
-  const NUM_ROWS   = 5;
+  // ===== 列定義（各列のアクティブ行インデックス）=====
+  // 形状: 1→2→3→4→5→4→5→4→3→2→1 = 34マス
+  // フラットトップ: 奇数列は rowSpacing/2 だけ下にずれる
+  const COLUMN_DEFS = [
+    [2],                   // col 0: START
+    [1, 2],                // col 1: 2マス
+    [1, 2, 3],             // col 2: 3マス
+    [0, 1, 2, 3],          // col 3: 4マス
+    [0, 1, 2, 3, 4],       // col 4: 5マス
+    [0, 1, 2, 3],          // col 5: 4マス
+    [0, 1, 2, 3, 4],       // col 6: 5マス
+    [0, 1, 2, 3],          // col 7: 4マス
+    [1, 2, 3],             // col 8: 3マス
+    [1, 2],                // col 9: 2マス
+    [2],                   // col 10: BOSS
+  ];
+  const NUM_COLS = COLUMN_DEFS.length; // 11
 
-  const NODE_ICONS = {
-    enemy:  '👾', elite: '💀', boss: '👹',
-    temple: '⛩',  smith: '⚒',  wizard: '🏛',
-    chest:  '🎁',  shop:  '🏪',
-  };
-  const NODE_LABEL = {
-    enemy: '敵',   elite: '強敵',  boss: 'BOSS',
-    temple:'神殿', smith: '鍛冶屋', wizard:'館',
-    chest: '宝箱', shop:  '商店',
-  };
-  const NODE_COLOR = {
-    enemy:  '#6a1818', elite: '#4a1068', boss: '#8a1010',
-    temple: '#0e5040',  smith: '#6a3010', wizard: '#104068',
-    chest:  '#6a5010',  shop:  '#106a30',
-  };
-  const NODE_COLOR_STROKE = {
-    enemy:  '#cc4040', elite: '#9040cc', boss: '#ff4040',
-    temple: '#40cc99',  smith: '#cc7030', wizard: '#40aacc',
-    chest:  '#ccaa30',  shop:  '#40cc66',
-  };
-
-  // タイププール（合計45）
+  // 通常プレイノード（col 1-9）の合計: 2+3+4+5+4+5+4+3+2 = 32
   const TYPE_POOL = [
-    ...Array(24).fill('enemy'),
-    ...Array(6).fill('elite'),
+    ...Array(18).fill('enemy'),
+    ...Array(4).fill('elite'),
     ...Array(4).fill('chest'),
     ...Array(3).fill('smith'),
-    ...Array(3).fill('temple'),
-    ...Array(3).fill('wizard'),
-    ...Array(2).fill('shop'),
-  ];
+    ...Array(1).fill('wizard'),
+    ...Array(1).fill('training'),
+    ...Array(1).fill('inn'),
+  ]; // 合計 32
 
-  // === SVG レイアウト定数 ===
-  // 六角形（ポインティ・トップ）
-  const R     = 30;   // 六角形の外接円半径
-  const HEX_W = R * Math.sqrt(3);  // 約51.96
-  const HEX_H = R * 2;             // 60
-  const COL_SPACING = HEX_W;       // 水平間隔
-  const ROW_SPACING = R * 1.5;     // 垂直間隔 = 45
+  const NODE_ICONS = {
+    enemy:'👾', elite:'💀', boss:'👹',
+    smith:'⚒', wizard:'🏛',
+    chest:'🎁', shop:'🏪', training:'🥋', inn:'🏠',
+  };
+  const NODE_LABEL = {
+    enemy:'敵', elite:'強敵', boss:'BOSS',
+    smith:'鍛冶', wizard:'館',
+    chest:'宝箱', shop:'商店', training:'修行場', inn:'宿屋',
+  };
+  const NODE_FILL = {
+    enemy:'#b05a50', elite:'#7a3a90', boss:'#c03030',
+    smith:'#505060', wizard:'#205880',
+    chest:'#a07818', shop:'#307050', training:'#405080', inn:'#506030',
+  };
+  const NODE_STROKE = {
+    enemy:'#e07060', elite:'#b060e0', boss:'#ff5050',
+    smith:'#9090a8', wizard:'#50b0e0',
+    chest:'#ffe060', shop:'#60d080', training:'#7090c0', inn:'#90b060',
+  };
 
-  // ViewBox設定
-  const VB_W = 1050;
-  const VB_H = 380;
+  // ===== フラットトップ六角形レイアウト定数 =====
+  const R            = 44;
+  const COL_SPACING  = R * 1.5;              // 66   (水平方向：中心間距離)
+  const ROW_SPACING  = R * Math.sqrt(3);     // ≈76.2 (垂直方向：中心間距離)
 
-  // マップ描画の開始座標
-  const MAP_START_X = 90;  // 一番左のステージ中心X
-  const MAP_START_Y = 60;  // 一番上の行の中心Y
+  // マップ原点
+  const OX = 58;
+  const OY = 42;
 
-  // START / BOSSノード位置
-  const START_X = 30;
-  const START_Y = MAP_START_Y + 2 * ROW_SPACING; // 中央行
-  const BOSS_X  = MAP_START_X + (NUM_STAGES) * COL_SPACING + 40;
-  const BOSS_Y  = MAP_START_Y + 2 * ROW_SPACING;
+  // ViewBox
+  const VB_W = 820;
+  const VB_H = 430;
 
   let mapData = null;
 
-  // ===== 六角形の頂点計算（ポインティ・トップ） =====
+  // ===== フラットトップ六角形の頂点 =====
+  // 角度 0°,60°,120°,180°,240°,300° から計算（フラットトップ）
   function hexPoints(cx, cy, r) {
     return Array.from({ length: 6 }, (_, i) => {
-      const a = Math.PI / 180 * (60 * i - 30);
+      const a = (Math.PI / 3) * i;
       return `${(cx + r * Math.cos(a)).toFixed(1)},${(cy + r * Math.sin(a)).toFixed(1)}`;
     }).join(' ');
   }
 
-  // ===== ノード座標計算 =====
-  // ステージが奇数なら垂直方向にオフセット（ハニカム）
-  function nodePos(stage, row) {
-    const x = MAP_START_X + stage * COL_SPACING;
-    const yOffset = stage % 2 === 1 ? ROW_SPACING / 2 : 0;
-    const y = MAP_START_Y + row * ROW_SPACING + yOffset;
+  // ===== ノード座標 =====
+  function nodePos(col, row) {
+    const x = OX + col * COL_SPACING;
+    const y = OY + row * ROW_SPACING + (col % 2 === 1 ? ROW_SPACING / 2 : 0);
     return { x, y };
+  }
+
+  // ===== 隣接行の計算 =====
+  // フラットトップのハニカム隣接（奇数列シフト）:
+  //   偶数列 → 奇数列: row r → {r-1, r} (奇数列が下にずれているため)
+  //   奇数列 → 偶数列: row r → {r, r+1}
+  function adjacentRowsInNextCol(col, row, nextColRows) {
+    let candidates;
+    if (col % 2 === 0) {
+      candidates = [row - 1, row];
+    } else {
+      candidates = [row, row + 1];
+    }
+    return candidates.filter(r => nextColRows.includes(r));
   }
 
   // ===== マップ生成 =====
   function generateMap() {
-    const nodes = [];
-    for (let s = 0; s < NUM_STAGES; s++) {
-      nodes[s] = [];
-      for (let r = 0; r < NUM_ROWS; r++) {
-        nodes[s][r] = {
-          stage: s, row: r,
+    // ノード初期化（col 0 と col 10 は特殊）
+    const nodes = {};
+    for (let c = 0; c < NUM_COLS; c++) {
+      nodes[c] = {};
+      for (const r of COLUMN_DEFS[c]) {
+        nodes[c][r] = {
+          col: c, row: r,
           type: null,
-          connections: [],
-          reachable: false,
+          connections: [],  // 次の列のrow番号リスト
           visited: false,
         };
       }
     }
 
-    // STARTから入れる行（中央3行）
-    const startRows = pickN([1, 2, 3], 2);
-    startRows.forEach(r => { nodes[0][r].reachable = true; });
+    // ── 接続生成（col 0〜9 → col 1〜10）──
+    for (let c = 0; c < NUM_COLS - 1; c++) {
+      const thisRows = COLUMN_DEFS[c];
+      const nextRows = COLUMN_DEFS[c + 1];
+      const incomingCount = Object.fromEntries(nextRows.map(r => [r, 0]));
 
-    // ステージ間接続生成
-    for (let s = 0; s < NUM_STAGES - 1; s++) {
-      for (let r = 0; r < NUM_ROWS; r++) {
-        if (!nodes[s][r].reachable) continue;
-        const adj = hexAdjacentRows(r, s);
-        const chosen = pickN(adj, Math.min(adj.length, 2));
-        nodes[s][r].connections = chosen;
-        chosen.forEach(nr => { nodes[s + 1][nr].reachable = true; });
+      // 各ノードから次列のノードへ接続（1〜2本）
+      for (const r of thisRows) {
+        const adj = adjacentRowsInNextCol(c, r, nextRows);
+        if (adj.length === 0) continue;
+        // 隣接するノード全てに接続
+        const numConn = adj.length; // 隣接するノード全てに接続
+        const chosen  = shuffle([...adj]).slice(0, numConn);
+        nodes[c][r].connections = chosen;
+        chosen.forEach(nr => { incomingCount[nr]++; });
       }
-      // 孤立ノード救済：各ステージは最低1つ到達可能に
-      const hasReachable = nodes[s + 1].some(n => n.reachable);
-      if (!hasReachable) {
-        const r = Math.floor(Math.random() * NUM_ROWS);
-        nodes[s + 1][r].reachable = true;
-        nodes[s][Math.floor(Math.random() * NUM_ROWS)].connections.push(r);
+
+      // 次列の未接続ノードに接続を追加
+      for (const nr of nextRows) {
+        if (incomingCount[nr] === 0) {
+          // 隣接している前列ノードを探して接続
+          for (const r of shuffle([...thisRows])) {
+            const adj = adjacentRowsInNextCol(c, r, nextRows);
+            if (adj.includes(nr)) {
+              if (!nodes[c][r].connections.includes(nr)) {
+                nodes[c][r].connections.push(nr);
+              }
+              incomingCount[nr]++;
+              break;
+            }
+          }
+        }
       }
     }
 
-    // タイプ割り当て
+    // ── タイプ割り当て（col 1〜9）──
     const pool = shuffle([...TYPE_POOL]);
     let idx = 0;
-    for (let s = 0; s < NUM_STAGES; s++) {
-      for (let r = 0; r < NUM_ROWS; r++) {
-        if (nodes[s][r].reachable) {
-          nodes[s][r].type = pool[idx++ % pool.length];
-        }
+    for (let c = 1; c <= NUM_COLS - 2; c++) {
+      for (const r of COLUMN_DEFS[c]) {
+        nodes[c][r].type = pool[idx++ % pool.length];
       }
     }
 
     mapData = {
       nodes,
-      startRows,
-      currentStage: -1,
-      currentRow: -1,
+      currentCol: 0,   // STARTにいる
+      currentRow: 2,
       phase: 'start',
     };
     return mapData;
   }
 
-  // ハニカム隣接行（次ステージへの接続候補）
-  function hexAdjacentRows(row, stage) {
-    const adj = [row];
-    if (row > 0)             adj.push(row - 1);
-    if (row < NUM_ROWS - 1)  adj.push(row + 1);
-    return adj;
-  }
-
-  function pickN(arr, n) {
-    return shuffle([...arr]).slice(0, n);
-  }
-
-  function shuffle(arr) {
-    for (let i = arr.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [arr[i], arr[j]] = [arr[j], arr[i]];
-    }
-    return arr;
-  }
-
-  // ===== SVGレンダリング =====
+  // ===== SVG描画 =====
   function renderMap(svgEl, onNodeClick) {
     if (!mapData) return;
-    const { nodes, startRows, currentStage, currentRow } = mapData;
+    const { nodes, currentCol, currentRow } = mapData;
     const selectable = getSelectableNodes();
 
     svgEl.setAttribute('viewBox', `0 0 ${VB_W} ${VB_H}`);
@@ -174,7 +181,7 @@ const MapSystem = (() => {
       for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
       return el;
     };
-    const mkText = (x, y, txt, attrs) => {
+    const mkTxt = (x, y, txt, attrs) => {
       const el = document.createElementNS(ns, 'text');
       el.setAttribute('x', x); el.setAttribute('y', y);
       el.setAttribute('text-anchor', 'middle');
@@ -184,185 +191,153 @@ const MapSystem = (() => {
       return el;
     };
 
-    // ── エッジ描画 ──
-    // START → ステージ0
-    for (const r of startRows) {
-      if (!nodes[0]?.[r]?.reachable) continue;
-      const p = nodePos(0, r);
-      svgEl.appendChild(mk('line', {
-        x1: START_X, y1: START_Y, x2: p.x, y2: p.y,
-        stroke: '#3a3060', 'stroke-width': 1.5, 'stroke-dasharray': '5,3',
-      }));
-    }
-
-    // ステージ間エッジ
-    for (let s = 0; s < NUM_STAGES - 1; s++) {
-      for (let r = 0; r < NUM_ROWS; r++) {
-        const node = nodes[s][r];
-        if (!node.reachable) continue;
-        const p1 = nodePos(s, r);
-        for (const nr of node.connections) {
-          const p2 = nodePos(s + 1, nr);
-          const isActive =
-            (s === currentStage && r === currentRow) ||
-            (s + 1 === currentStage && nr === currentRow);
-          svgEl.appendChild(mk('line', {
-            x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y,
-            stroke: isActive ? '#c8a43a' : '#2a2050',
-            'stroke-width': isActive ? 2.5 : 1.5,
-            opacity: node.visited ? '0.4' : '0.8',
-          }));
-        }
-      }
-    }
-
-    // 最終ステージ → BOSS
-    for (let r = 0; r < NUM_ROWS; r++) {
-      if (!nodes[NUM_STAGES - 1][r].reachable) continue;
-      const p = nodePos(NUM_STAGES - 1, r);
-      svgEl.appendChild(mk('line', {
-        x1: p.x, y1: p.y, x2: BOSS_X, y2: BOSS_Y,
-        stroke: '#aa2020', 'stroke-width': 1.5, 'stroke-dasharray': '6,4',
-      }));
-    }
-
-    // ── STARTノード ──
-    const startG = mk('g', {});
-    startG.appendChild(mk('polygon', {
-      points: hexPoints(START_X, START_Y, R - 2),
-      fill: '#0e0c1c', stroke: '#c8a43a', 'stroke-width': 2,
-    }));
-    startG.appendChild(mkText(START_X, START_Y - 3, 'S', { fill: '#c8a43a', 'font-size': '12', 'font-weight': 'bold' }));
-    startG.appendChild(mkText(START_X, START_Y + 10, 'TART', { fill: '#c8a43a', 'font-size': '7' }));
-    svgEl.appendChild(startG);
-
-    // ── BOSSノード ──
-    const bossSelectable = selectable.some(n => n.stage === 'boss');
-    const bossG = mk('g', { style: bossSelectable ? 'cursor:pointer' : '' });
-    if (bossSelectable) {
-      const pulse = mk('polygon', {
-        points: hexPoints(BOSS_X, BOSS_Y, R + 7),
-        fill: 'none', stroke: '#ff4040', 'stroke-width': 2, opacity: '0.6',
-      });
-      pulse.style.animation = 'hexPulse 1.2s ease-in-out infinite';
-      bossG.appendChild(pulse);
-    }
-    bossG.appendChild(mk('polygon', {
-      points: hexPoints(BOSS_X, BOSS_Y, R),
-      fill: '#3a0808', stroke: '#ff4040', 'stroke-width': 2.5,
-    }));
-    bossG.appendChild(mkText(BOSS_X, BOSS_Y - 2, '👹', { 'font-size': '18' }));
-    bossG.appendChild(mkText(BOSS_X, BOSS_Y + 15, 'BOSS', { fill: '#ff6060', 'font-size': '8', 'font-weight': 'bold' }));
-    if (bossSelectable && onNodeClick) {
-      bossG.addEventListener('click', () => onNodeClick('boss', 0));
-    }
-    svgEl.appendChild(bossG);
-
     // ── 通常ノード ──
-    for (let s = 0; s < NUM_STAGES; s++) {
-      for (let r = 0; r < NUM_ROWS; r++) {
-        const node = nodes[s][r];
-        if (!node.reachable) continue;
-        const { x, y } = nodePos(s, r);
+    for (let c = 0; c < NUM_COLS; c++) {
+      const isStart = c === 0;
+      const isBossCol = c === NUM_COLS - 1;
 
-        const isCurrent = s === currentStage && r === currentRow;
-        const isSelect  = selectable.some(n => n.stage === s && n.row === r);
-        const isVisited = node.visited;
+      for (const r of COLUMN_DEFS[c]) {
+        const n = nodes[c]?.[r];
+        const { x, y } = nodePos(c, r);
 
-        const g = mk('g', { style: 'cursor:' + (isSelect ? 'pointer' : 'default') });
+        const isCurrent  = c === currentCol && r === currentRow;
+        const isSelect   = selectable.some(s => s.col === c && s.row === r);
+        const isVisited  = n?.visited && !isCurrent;
 
-        // 選択可能 → パルスリング
+        const g = mk('g', { style: isSelect ? 'cursor:pointer' : 'cursor:default' });
+
+        // 選択可能カラーパルス
         if (isSelect) {
           const pulse = mk('polygon', {
             points: hexPoints(x, y, R + 6),
-            fill: 'none', stroke: '#c8a43a', 'stroke-width': 2, opacity: '0.7',
+            stroke: 'none',
           });
-          pulse.style.animation = 'hexPulse 1.2s ease-in-out infinite';
+          pulse.style.animation = isBossCol
+            ? 'hexColorPulseBoss 1.1s ease-in-out infinite'
+            : 'hexColorPulse 1.1s ease-in-out infinite';
           g.appendChild(pulse);
         }
 
         // 本体六角形
-        const fillColor = isCurrent ? '#c8a43a'
-          : isVisited ? '#1a1828'
-          : NODE_COLOR[node.type] || '#1a1428';
-        const strokeColor = isCurrent ? '#ffffff'
-          : isSelect ? '#c8a43a'
-          : isVisited ? '#2a2848'
-          : NODE_COLOR_STROKE[node.type] || '#4a4060';
+        let fill, stroke, strokeW;
+        if (isStart) {
+          fill = '#f0e4c8'; stroke = '#a07010'; strokeW = 2.5;
+        } else if (isBossCol) {
+          fill = isCurrent ? '#c03030' : (isSelect ? '#8a1010' : (isVisited ? '#c0a888' : '#a03030'));
+          stroke = isSelect ? '#ff5050' : '#e06060'; strokeW = 2.5;
+        } else if (isCurrent) {
+          fill = '#c89020'; stroke = '#fff0d0'; strokeW = 3;
+        } else if (isVisited) {
+          fill = '#d4c8a8'; stroke = 'rgba(100,70,30,0.35)'; strokeW = 1.5;
+        } else if (isSelect) {
+          fill = NODE_FILL[n?.type] || '#806040';
+          stroke = '#a07010'; strokeW = 2.5;
+        } else {
+          fill = NODE_FILL[n?.type] || '#806040';
+          stroke = NODE_STROKE[n?.type] || '#c0a060'; strokeW = 2;
+        }
+
         g.appendChild(mk('polygon', {
           points: hexPoints(x, y, R),
-          fill: fillColor,
-          stroke: strokeColor,
-          'stroke-width': isCurrent ? 3 : 2,
-          opacity: isVisited && !isCurrent ? '0.45' : '1',
+          fill,
+          stroke,
+          'stroke-width': strokeW,
+          opacity: isVisited ? '0.45' : '1',
         }));
 
-        // アイコン（絵文字）
-        g.appendChild(mkText(x, y - 3, NODE_ICONS[node.type] || '?', {
-          'font-size': '14',
-          opacity: isVisited ? '0.4' : '1',
-        }));
-
-        // ラベル
-        g.appendChild(mkText(x, y + R + 10, NODE_LABEL[node.type] || '', {
-          fill: isVisited ? '#3a3860' : '#8888aa',
-          'font-size': '9',
-        }));
+        // アイコン（上部）
+        if (isStart) {
+          g.appendChild(mkTxt(x, y - 6, 'S', { fill: '#a07010', 'font-size': '14', 'font-weight': 'bold' }));
+          g.appendChild(mkTxt(x, y + 10, 'TART', { fill: '#a07010', 'font-size': '8' }));
+        } else if (isCurrent) {
+          // 現在地にキャラクターを表示
+          g.appendChild(mkTxt(x, y - 8, '🧑', { 'font-size': '24' }));
+          g.appendChild(mkTxt(x, y + 14, NODE_LABEL[isBossCol ? 'boss' : n?.type] || '', {
+            fill: '#3a2000', 'font-size': '9', 'font-weight': 'bold',
+          }));
+        } else {
+          const iconType = isBossCol ? 'boss' : n?.type;
+          const icon = NODE_ICONS[iconType] || '?';
+          const label = NODE_LABEL[iconType] || '';
+          const labelColor = isVisited ? 'rgba(80,50,20,0.45)' : 'rgba(240,220,180,0.9)';
+          g.appendChild(mkTxt(x, y - 8, icon, {
+            'font-size': '16',
+            opacity: isVisited ? '0.5' : '1',
+          }));
+          g.appendChild(mkTxt(x, y + 11, label, {
+            fill: labelColor,
+            'font-size': '9',
+            'font-weight': 'bold',
+          }));
+        }
 
         if (isSelect && onNodeClick) {
-          g.addEventListener('click', () => onNodeClick(s, r));
+          g.addEventListener('click', () => onNodeClick(c, r));
         }
         svgEl.appendChild(g);
       }
     }
   }
 
-  // ===== 選択可能ノード取得 =====
+  // ===== 選択可能ノード =====
   function getSelectableNodes() {
     if (!mapData) return [];
-    const { nodes, startRows, currentStage, currentRow } = mapData;
+    const { nodes, currentCol, currentRow, phase } = mapData;
 
-    if (currentStage === -1) {
-      return startRows
-        .filter(r => nodes[0]?.[r]?.reachable)
-        .map(r => ({ stage: 0, row: r }));
+    if (phase === 'boss') return [];
+
+    // STARTにいる（currentCol === 0）→ col 1の全ノードを選択可能
+    if (currentCol === 0) {
+      return COLUMN_DEFS[1].map(r => ({ col: 1, row: r }));
     }
 
-    if (currentStage === NUM_STAGES - 1) {
-      return [{ stage: 'boss', row: 0 }];
+    // 最終通常列 (col 9) → BOSS (col 10)
+    if (currentCol === NUM_COLS - 2) {
+      return COLUMN_DEFS[NUM_COLS - 1].map(r => ({ col: NUM_COLS - 1, row: r }));
     }
 
-    if (currentStage === 'boss') return [];
-
-    const conns = nodes[currentStage]?.[currentRow]?.connections || [];
-    return conns
-      .filter(nr => nodes[currentStage + 1]?.[nr]?.reachable)
-      .map(nr => ({ stage: currentStage + 1, row: nr }));
+    // それ以外 → 現在ノードの接続先
+    const conns = nodes[currentCol]?.[currentRow]?.connections || [];
+    return conns.map(r => ({ col: currentCol + 1, row: r }));
   }
 
   // ===== ノード移動 =====
-  function moveToNode(stage, row) {
+  function moveToNode(col, row) {
     if (!mapData) return null;
-    const node = mapData.nodes[stage]?.[row];
+    const node = mapData.nodes[col]?.[row];
     if (!node) return null;
-    mapData.currentStage = stage;
-    mapData.currentRow   = row;
+    mapData.currentCol = col;
+    mapData.currentRow = row;
     node.visited = true;
+
+    if (col === NUM_COLS - 1) {
+      mapData.phase = 'boss';
+    }
     return node;
   }
 
   function moveToBoss() {
     if (!mapData) return;
-    mapData.currentStage = 'boss';
-    mapData.currentRow   = 0;
-    mapData.phase = 'boss';
+    mapData.currentCol = NUM_COLS - 1;
+    mapData.currentRow = 2;
+    mapData.phase      = 'boss';
   }
 
   function getMapData() { return mapData; }
 
+  // ===== ユーティリティ =====
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
   return {
     generateMap, renderMap, getSelectableNodes,
     moveToNode, moveToBoss, getMapData,
-    NODE_ICONS, NODE_LABEL, NODE_COLOR,
+    NODE_ICONS, NODE_LABEL,
+    COLUMN_DEFS,
   };
 })();

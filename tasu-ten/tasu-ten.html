@@ -464,16 +464,15 @@ const Game = (function() {
             } else if (specialType === 'bag') {
                 grid[pos.r][pos.c] = { type: 'bag', val: -1, hp: 2, maxHp: 2, damageFlash: 0, id: Date.now() + Math.random() };
             } else {
-                // 安全な数値が出るまで抽選（組み合わせ的に必ず１つは入る数値がある）
-                let val;
-                let valid = false;
-                
-                do {
-                    val = getWeightedRandomVal();
+                // 安全な数値を選ぶ（全候補を試して見つからなければスキップ）
+                // do-whileの無限ループを防ぐため、1-9をシャッフルして順番に試す
+                const candidates = [1,2,3,4,5,6,7,8,9].sort(() => Math.random() - 0.5);
+                let val = null;
+
+                for(const candidate of candidates) {
                     let creates10 = false;
-                    
+
                     // 横方向のチェック
-                    // その行の、新しい数値(pos.c)を含む全ての部分列を検査
                     for(let start = 0; start <= pos.c; start++) {
                         for(let end = pos.c; end < GRID_COLS; end++) {
                             let sum = 0;
@@ -481,7 +480,7 @@ const Game = (function() {
                             for(let k = start; k <= end; k++) {
                                 let v;
                                 if(k === pos.c) {
-                                    v = val;
+                                    v = candidate;
                                 } else {
                                     let cell = grid[pos.r][k];
                                     if(cell && cell.type === 'number') {
@@ -511,7 +510,7 @@ const Game = (function() {
                                 for(let k = start; k <= end; k++) {
                                     let v;
                                     if(k === pos.r) {
-                                        v = val;
+                                        v = candidate;
                                     } else {
                                         let cell = grid[k][pos.c];
                                         if(cell && cell.type === 'number') {
@@ -531,12 +530,17 @@ const Game = (function() {
                             if(creates10) break;
                         }
                     }
-                    
-                    if(!creates10) valid = true;
-                    
-                } while(!valid);
 
-                grid[pos.r][pos.c] = { type: 'number', val: val, id: Date.now() + Math.random() };
+                    if(!creates10) {
+                        val = candidate;
+                        break;
+                    }
+                }
+
+                // 有効な値が見つかった場合のみ配置（全値が10を作る稀なケースはスキップ）
+                if(val !== null) {
+                    grid[pos.r][pos.c] = { type: 'number', val: val, id: Date.now() + Math.random() };
+                }
             }
         }
         

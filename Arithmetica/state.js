@@ -2,7 +2,6 @@
 
 const State = (() => {
 
-  // 数字の性質テーブル
   const NUM_PROPS = {
     1: { even: false, odd: true,  prime: false, composite: false },
     2: { even: true,  odd: false, prime: true,  composite: false },
@@ -15,53 +14,47 @@ const State = (() => {
     9: { even: false, odd: true,  prime: false, composite: true  },
   };
 
-  let g = {}; // ゲームグローバル状態
+  let g = {};
 
   function init(charType, difficulty) {
     g = {
-      charType,
-      difficulty,
+      charType, difficulty,
       totalRounds: difficulty === 'easy' ? 1 : difficulty === 'normal' ? 2 : 3,
       currentRound: 1,
-      turn: 1, // マップ上の総ターン
+      turn: 0,  // 0スタート。最初の1歩でturn=1 → Lv.1
 
-      // プレイヤーステータス
-      hp: 20,
-      maxHp: 20,
-      armor: 0,
-      maxArmor: 5,
-      spirit: 0, // 闘志
+      hp: 20, maxHp: 20,
+      armor: 0, maxArmor: 5,
+      spirit: 0,
       money: 0,
 
-      // デッキ管理
-      deck: [],
-      hand: [],
-      discard: [],
+      deck: [], hand: [], discard: [],
+      skills: [],
 
-      // 戦闘状態
       inBattle: false,
       enemy: null,
       battleTurn: 0,
-      sealedCardIndex: -1, // -1なら封印なし（手札インデックス）
+      poisonTurns: 0,
+      healTicks: 0,
+      sealedCardIndex: -1,
+      battlesWon: 0,
+      battleSpiritGain: 0,
+      battleArmorGain: 0,
 
-      // 式構築状態
       formula: [
-        { cards: [null, null], op: '+' },  // 式①
-        { cards: [null, null], op: '-' },  // 式②
+        { cards: [null, null], op: '+', locked: [false, false] },
+        { cards: [null, null], op: '-', locked: [false, false] },
       ],
-      selectedHandIndex: -1, // 現在選択中の手札インデックス
-      selectingSlot: null,   // { formulaIdx, pos } 次にスロットを選んだときにここに入れる
+      selectedHandIndex: -1,
+      selectingSlot: null,
     };
-
     buildDeck();
     drawToFull();
   }
 
-  // デッキ構築: 1〜9を2枚ずつ
   function buildDeck() {
     g.deck = [];
     for (let n = 1; n <= 9; n++) {
-      g.deck.push(createCard(n));
       g.deck.push(createCard(n));
     }
     shuffle(g.deck);
@@ -72,16 +65,15 @@ const State = (() => {
       id: Math.random().toString(36).slice(2),
       num,
       props: NUM_PROPS[num],
-      abilities: [], // 特殊能力（後フェーズで実装）
+      abilities: [],
       sealed: false,
     };
   }
 
-  // 手札を5枚まで補充
   function drawToFull() {
     while (g.hand.length < 5) {
       if (g.deck.length === 0) {
-        if (g.discard.length === 0) break; // カードなし（通常起こらない）
+        if (g.discard.length === 0) break;
         g.deck = [...g.discard];
         g.discard = [];
         shuffle(g.deck);
@@ -92,14 +84,29 @@ const State = (() => {
     }
   }
 
-  // 使ったカードを捨て札へ
+  // 1枚だけ引く（ドラッグ配置直後の補充用）
+  function drawOne() {
+    if (g.deck.length === 0) {
+      if (g.discard.length === 0) return null;
+      g.deck = [...g.discard];
+      g.discard = [];
+      shuffle(g.deck);
+    }
+    if (g.deck.length > 0) {
+      const card = g.deck.pop();
+      card.sealed = false;
+      g.hand.push(card);
+      return card;
+    }
+    return null;
+  }
+
   function discardCards(cards) {
     for (const c of cards) {
       if (c) g.discard.push(c);
     }
   }
 
-  // シャッフル（Fisher-Yates）
   function shuffle(arr) {
     for (let i = arr.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -107,7 +114,6 @@ const State = (() => {
     }
   }
 
-  // 式に使われているカード（手札インデックス）一覧
   function getPlacedHandIndices() {
     const placed = new Set();
     for (const f of g.formula) {
@@ -121,12 +127,10 @@ const State = (() => {
     return placed;
   }
 
-  // 式①②が両方埋まっているか
   function isFormulaComplete() {
     return g.formula.every(f => f.cards[0] !== null && f.cards[1] !== null);
   }
 
-  // 式の計算結果
   function calcFormula(fi) {
     const f = g.formula[fi];
     if (!f.cards[0] || !f.cards[1]) return null;
@@ -135,82 +139,73 @@ const State = (() => {
     return f.op === '+' ? a + b : a - b;
   }
 
-  // 攻撃力（式①結果 + 闘志）。マイナスは0
   function getPlayerAttack() {
     const r = calcFormula(0);
     if (r === null) return 0;
     return Math.max(0, r + g.spirit);
   }
 
-  // 防御力（式②結果）。マイナスは0
   function getPlayerDefense() {
     const r = calcFormula(1);
     if (r === null) return 0;
     return Math.max(0, r);
   }
 
-  // HP変動
   function changeHp(delta) {
     g.hp = Math.max(0, Math.min(g.maxHp, g.hp + delta));
   }
 
-  // 鎧変動
   function changeArmor(delta) {
     g.armor = Math.max(0, Math.min(g.maxArmor, g.armor + delta));
   }
 
-  // プレイヤーがダメージを受ける（3層構造）
-  // returns: { defense, armorAbs, hpDmg }
   function playerTakeDamage(rawDamage, defenseValue) {
     let dmg = rawDamage;
-
-    // ①防御力で吸収
     const defAbs = Math.min(dmg, defenseValue);
     dmg -= defAbs;
-
-    // ②鎧で吸収
     const armorAbs = Math.min(dmg, g.armor);
     dmg -= armorAbs;
     if (armorAbs > 0) changeArmor(-armorAbs);
-
-    // ③残りHP直撃
     changeHp(-dmg);
-
     return { defAbs, armorAbs, hpDmg: dmg };
   }
 
-  // 式をリセット
+  // ターン後のリセット（カードは既に捨て済み）
   function clearFormula() {
     g.formula = [
-      { cards: [null, null], op: '+' },
-      { cards: [null, null], op: '-' },
+      { cards: [null, null], op: '+', locked: [false, false] },
+      { cards: [null, null], op: '-', locked: [false, false] },
     ];
     g.selectedHandIndex = -1;
     g.selectingSlot = null;
+  }
+
+  // Clearボタン用（カードを手札に戻してリセット）
+  function cancelFormula() {
+    for (const f of g.formula) {
+      for (const c of f.cards) {
+        if (c) g.hand.push(c);
+      }
+    }
+    clearFormula();
   }
 
   return {
     init,
     get g() { return g; },
     NUM_PROPS,
-    buildDeck,
-    createCard,
-    drawToFull,
-    discardCards,
-    shuffle,
+    buildDeck, createCard,
+    drawToFull, drawOne,
+    discardCards, shuffle,
     getPlacedHandIndices,
     isFormulaComplete,
     calcFormula,
-    getPlayerAttack,
-    getPlayerDefense,
-    changeHp,
-    changeArmor,
-    playerTakeDamage,
-    clearFormula,
+    getPlayerAttack, getPlayerDefense,
+    changeHp, changeArmor, playerTakeDamage,
+    clearFormula, cancelFormula,
     addCardToDeck,
   };
 
-  // 報酬カードをデッキに追加（捨て札の底に）
   function addCardToDeck(card) {
     g.discard.push(card);
   }
