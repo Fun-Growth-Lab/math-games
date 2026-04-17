@@ -203,10 +203,25 @@ const State = (() => {
     getPlayerAttack, getPlayerDefense,
     changeHp, changeArmor, playerTakeDamage,
     clearFormula, cancelFormula,
-    addCardToDeck,
+    addCardToDeck, resetDeckForBattle,
   };
 
   function addCardToDeck(card) {
     g.discard.push(card);
+  }
+
+  // 戦闘開始前にデッキをリセット（手札・捨て札・式のカードをすべて山札に戻す）
+  function resetDeckForBattle() {
+    // 式のカードを戻す
+    for (const f of g.formula) {
+      for (const c of f.cards) { if (c) g.deck.push(c); }
+    }
+    // 手札と捨て札を戻す
+    for (const c of g.hand) g.deck.push(c);
+    for (const c of g.discard) g.deck.push(c);
+    g.hand = [];
+    g.discard = [];
+    shuffle(g.deck);
+    drawToFull();
   }
 })();

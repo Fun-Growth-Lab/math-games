@@ -31,7 +31,17 @@ const Battle = (() => {
     el.classList.remove('damage-flash');
     void el.offsetWidth; // reflow
     el.classList.add('damage-flash');
-    setTimeout(() => el.classList.remove('damage-flash'), 600);
+    setTimeout(() => el.classList.remove('damage-flash'), 700);
+  }
+
+  // ===== HPバーをアニメーションして減少 =====
+  function animateHpBar(barId, textId, currentHp, maxHp) {
+    const bar  = $(barId);
+    const text = $(textId);
+    if (!bar || !text) return;
+    const pct = Math.max(0, currentHp / maxHp * 100);
+    bar.style.width = pct + '%';
+    text.textContent = `${Math.max(0, currentHp)}/${maxHp}`;
   }
 
   function flashCritical(type) {
@@ -91,6 +101,8 @@ const Battle = (() => {
     // 敵にスキル割り当て（ラウンド依存）
     Enemy.assignEnemySkills(enemy, g.currentRound, Skills.DEFS);
 
+    // 前回戦闘の手札・捨て札をすべて山札に戻してリセット
+    State.resetDeckForBattle();
     State.clearFormula();
     showScreen('battle');
     renderAll();
@@ -212,6 +224,7 @@ const Battle = (() => {
     if (dmgToEnemy >= 1) {
       enemy.hp = Math.max(0, enemy.hp - dmgToEnemy);
       flashDamage('enemy-sprite-wrap');
+      flashDamage('enemy-stat-panel');
       logs.push(`${playerName}の攻撃！ ⚔${playerAtk}―🛡${enemyDef} → <span class="log-dmg">${enemy.name}に ${dmgToEnemy} ダメージ！！</span>`);
     } else {
       logs.push(`${playerName}の攻撃！ ⚔${playerAtk}―🛡${enemyDef} → <span class="log-def">ガード！</span>`);
@@ -223,6 +236,7 @@ const Battle = (() => {
     } else if (dmgToPlayer >= 1) {
       State.changeHp(-dmgToPlayer);
       flashDamage('player-char-display');
+      flashDamage('player-stat-panel');
       logs.push(`${enemy.name}の攻撃！ ⚔${enemyAtk}―🛡${playerDef} → <span class="log-dmg">${playerName}に ${dmgToPlayer} ダメージ！！</span>`);
       // 偶数の砦スキル: 被弾時HP回復
       if (defCtx.regenOnHit > 0) {
@@ -530,15 +544,10 @@ const Battle = (() => {
     enemy.skills.forEach(skillId => {
       const def = Skills.DEFS[skillId];
       if (!def) return;
-      const triggerBadge = def.trigger === 'atk'
-        ? '<span class="ab-badge atk-badge">攻</span>'
-        : def.trigger === 'def'
-        ? '<span class="ab-badge def-badge">防</span>'
-        : '<span class="ab-badge any-badge">全</span>';
       const el = document.createElement('div');
       el.className = 'skill-slot active';
       el.innerHTML = `
-        <div style="display:flex;align-items:center;gap:4px">${triggerBadge} ${def.icon} ${def.name}</div>
+        <div style="display:flex;align-items:center;gap:4px">${def.icon} ${def.name}</div>
         <div class="skill-slot-trigger">${def.condDesc}</div>
       `;
       container.appendChild(el);
@@ -559,14 +568,11 @@ const Battle = (() => {
     skills.forEach(skillId => {
       const def = Skills.DEFS[skillId];
       if (!def) return;
-      const triggerBadge = def.trigger === 'atk' ? '<span class="ab-badge atk-badge">攻</span>'
-        : def.trigger === 'def' ? '<span class="ab-badge def-badge">防</span>'
-        : '<span class="ab-badge any-badge">全</span>';
       const el = document.createElement('div');
       el.className = 'skill-slot active';
       el.dataset.skillId = skillId;
       el.innerHTML = `
-        <div style="display:flex;align-items:center;gap:4px">${triggerBadge} ${def.icon} ${def.name}</div>
+        <div style="display:flex;align-items:center;gap:4px">${def.icon} ${def.name}</div>
         <div class="skill-slot-trigger">${def.condDesc}</div>
       `;
       // スキルクリックでツールチップ表示

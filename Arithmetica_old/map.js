@@ -206,35 +206,21 @@ const MapSystem = (() => {
 
         const g = mk('g', { style: isSelect ? 'cursor:pointer' : 'cursor:default' });
 
-        // 選択可能カラーパルス
-        if (isSelect) {
-          const pulse = mk('polygon', {
-            points: hexPoints(x, y, R + 6),
-            stroke: 'none',
-          });
-          pulse.style.animation = isBossCol
-            ? 'hexColorPulseBoss 1.1s ease-in-out infinite'
-            : 'hexColorPulse 1.1s ease-in-out infinite';
-          g.appendChild(pulse);
-        }
-
         // 本体六角形
         let fill, stroke, strokeW;
         if (isStart) {
           fill = '#f0e4c8'; stroke = '#a07010'; strokeW = 2.5;
         } else if (isBossCol) {
-          fill = isCurrent ? '#c03030' : (isSelect ? '#8a1010' : (isVisited ? '#c0a888' : '#a03030'));
+          fill = isCurrent ? '#c03030' : (isVisited ? '#c0a888' : '#a03030');
           stroke = isSelect ? '#ff5050' : '#e06060'; strokeW = 2.5;
         } else if (isCurrent) {
           fill = '#c89020'; stroke = '#fff0d0'; strokeW = 3;
         } else if (isVisited) {
           fill = '#d4c8a8'; stroke = 'rgba(100,70,30,0.35)'; strokeW = 1.5;
-        } else if (isSelect) {
-          fill = NODE_FILL[n?.type] || '#806040';
-          stroke = '#a07010'; strokeW = 2.5;
         } else {
           fill = NODE_FILL[n?.type] || '#806040';
-          stroke = NODE_STROKE[n?.type] || '#c0a060'; strokeW = 2;
+          stroke = isSelect ? '#ffdd00' : (NODE_STROKE[n?.type] || '#c0a060');
+          strokeW = isSelect ? 3 : 2;
         }
 
         g.appendChild(mk('polygon', {
@@ -244,6 +230,20 @@ const MapSystem = (() => {
           'stroke-width': strokeW,
           opacity: isVisited ? '0.45' : '1',
         }));
+
+        // 選択可能：黄色オーバーレイを本体六角形の上に追加
+        if (isSelect) {
+          const overlay = mk('polygon', {
+            points: hexPoints(x, y, R),
+            fill: isBossCol ? '#ff4444' : '#ffdd00',
+            stroke: 'none',
+          });
+          overlay.style.animation = isBossCol
+            ? 'hexYellowOverlay 0.9s ease-in-out infinite'
+            : 'hexYellowOverlay 1.0s ease-in-out infinite';
+          overlay.style.pointerEvents = 'none';
+          g.appendChild(overlay);
+        }
 
         // アイコン（上部）
         if (isStart) {
@@ -259,7 +259,7 @@ const MapSystem = (() => {
           const iconType = isBossCol ? 'boss' : n?.type;
           const icon = NODE_ICONS[iconType] || '?';
           const label = NODE_LABEL[iconType] || '';
-          const labelColor = isVisited ? 'rgba(80,50,20,0.45)' : 'rgba(240,220,180,0.9)';
+          const labelColor = isVisited ? 'rgba(80,50,20,0.45)' : (isSelect ? '#3a2000' : 'rgba(240,220,180,0.9)');
           g.appendChild(mkTxt(x, y - 8, icon, {
             'font-size': '16',
             opacity: isVisited ? '0.5' : '1',

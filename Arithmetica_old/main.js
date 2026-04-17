@@ -182,27 +182,40 @@
     const container = $('inn-delete-cards');
     container.innerHTML = '';
     const allCards = [...g.deck, ...g.discard, ...g.hand];
+    const totalCards = allCards.length;
+
     allCards.forEach(card => {
       const el = document.createElement('div');
       el.className = 'reward-card';
       const abHtml = card.abilities.map(id => {
         const def = Abilities.DEFS[id]; return def ? def.name : id;
       }).join(', ') || 'なし';
-      el.innerHTML = `<div class="rc-num">${card.num}</div><div class="rc-abilities">能力: ${abHtml}</div><div class="rc-abilities" style="color:var(--atk-color);font-size:12px">クリックで削除</div>`;
-      el.addEventListener('click', () => {
-        // Remove card from wherever it is
-        let removed = false;
-        const removeFrom = arr => {
-          const i = arr.indexOf(card);
-          if (i !== -1) { arr.splice(i, 1); removed = true; }
-        };
-        removeFrom(g.deck); removeFrom(g.discard); removeFrom(g.hand);
-        if (removed) {
-          $('overlay-inn').classList.add('hidden');
-          $('map-hint').textContent = 'カードを削除しました。';
-          proceedAfterReward();
-        }
-      });
+      const canDelete = totalCards > 5;
+      el.innerHTML = `<div class="rc-num">${card.num}</div><div class="rc-abilities">能力: ${abHtml}</div><div class="rc-abilities" style="color:${canDelete ? 'var(--atk-color)' : 'var(--text-pale)'};font-size:12px">${canDelete ? 'クリックで削除' : '(最低5枚必要)'}</div>`;
+      if (canDelete) {
+        el.addEventListener('click', () => {
+          const currentTotal = g.deck.length + g.discard.length + g.hand.length;
+          if (currentTotal <= 5) {
+            $('map-hint').textContent = 'カードは最低5枚必要です！';
+            return;
+          }
+          // Remove card from wherever it is
+          let removed = false;
+          const removeFrom = arr => {
+            const i = arr.indexOf(card);
+            if (i !== -1) { arr.splice(i, 1); removed = true; }
+          };
+          removeFrom(g.deck); removeFrom(g.discard); removeFrom(g.hand);
+          if (removed) {
+            $('overlay-inn').classList.add('hidden');
+            $('map-hint').textContent = 'カードを削除しました。';
+            proceedAfterReward();
+          }
+        });
+      } else {
+        el.style.opacity = '0.6';
+        el.style.cursor = 'default';
+      }
       container.appendChild(el);
     });
 
@@ -627,14 +640,12 @@
       const abilityLines = card.abilities.map(id => {
         const def = Abilities.DEFS[id];
         if (!def) return id;
-        const badge = def.scope === 'atk' ? '<span class="ab-badge atk-badge" style="position:static;display:inline-flex;width:18px;height:18px;font-size:10px;margin-right:3px;">攻</span>'
-          : def.scope === 'def' ? '<span class="ab-badge def-badge" style="position:static;display:inline-flex;width:18px;height:18px;font-size:10px;margin-right:3px;">防</span>'
-          : '<span class="ab-badge any-badge" style="position:static;display:inline-flex;width:18px;height:18px;font-size:10px;margin-right:3px;">全</span>';
-        return `${badge}${def.name}`;
+        return def.name;
       }).join('<br>');
+      // 数字は常に上部固定、能力は下部に表示（能力なしでも数字位置が揃う）
       el.innerHTML = `
         <div class="dc-num">${card.num}</div>
-        ${abilityLines ? `<div class="dc-ability">${abilityLines}</div>` : ''}
+        <div class="dc-ability">${abilityLines || ''}</div>
       `;
       el.addEventListener('click', () => showCardDetail(card));
       container.appendChild(el);
