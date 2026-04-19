@@ -340,6 +340,14 @@
         .res-suit-sym { font-size:1.7rem; line-height:1; }
         .res-num  { font-size:2.4rem; font-weight:800; color:#2a1505; line-height:1; height:50px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
         #result-card.empty .res-num { color:rgba(196,154,42,0.3); font-size:2rem; }
+        .res-special {
+            height:20px; width:90%;
+            font-size:0.68rem; font-weight:800;
+            display:flex; align-items:center; justify-content:center; gap:6px;
+            border-radius:4px; white-space:nowrap; flex-shrink:0;
+            color:transparent; background:transparent;
+        }
+        .res-special.has-special { color:#fff; background:rgba(0,0,0,0.50); }
 
         /* Attack button */
         #atk-btn {
@@ -724,6 +732,7 @@
                 <div id="result-card" class="empty">
                     <div class="res-suits" id="res-s"></div>
                     <div class="res-num" id="res-n">？</div>
+                    <div class="res-special" id="res-sp"></div>
                 </div>
 
                 <button id="atk-btn" disabled onclick="doAttack()">⚔️ 攻撃！</button>
@@ -1213,8 +1222,10 @@ function refreshTitleButtons(){
 function continueGame(){
     const raw = localStorage.getItem(SAVE_KEY);
     if(!raw) return startGame();
+    clearSave();          // 即座に削除→別タブからの二重ロードを防ぐ
     G = JSON.parse(raw);
     restoreGameUI();
+    autoSave();           // すぐ再セーブしてデータを保持
 }
 function restoreEnemySkillSec(){
     const e = ENEMY_LIST[G.eIdx];
@@ -1700,15 +1711,23 @@ function updateFormula(){
     const rc=document.getElementById('result-card');
     const rn=document.getElementById('res-n');
     const rs=document.getElementById('res-s');
+    const rsp = document.getElementById('res-sp');
     if(G.s1&&G.s2){
         const res=calcRes(G.s1,G.s2,G.op);
         rn.textContent=res;
         rc.classList.remove('empty');
         const allS=[...G.s1.suits,...G.s2.suits];
         rs.innerHTML=allS.map(s=>`<span class="res-suit-sym ${sc(s)}">${s}</span>`).join('');
+        // Show special icons from slot cards (side by side if both have one)
+        const spIcons={'atk':'⚔️+5','shld':'🛡️+5','heal':'♡+5'};
+        const spParts=[];
+        if(G.s1.special) spParts.push(spIcons[G.s1.special]||'');
+        if(G.s2.special) spParts.push(spIcons[G.s2.special]||'');
+        if(rsp){ rsp.textContent=spParts.join(' '); rsp.className='res-special'+(spParts.length?` has-special`:''); }
         document.getElementById('atk-btn').disabled=false;
     }else{
         rn.textContent='？'; rc.classList.add('empty'); rs.innerHTML='';
+        if(rsp){ rsp.textContent=''; rsp.className='res-special'; }
         document.getElementById('atk-btn').disabled=true;
     }
 
@@ -2183,6 +2202,7 @@ function skipCard(){
 }
 
 function openSkillReward(){
+    document.getElementById('victory-overlay').classList.add('hidden');
     // Generate options once and lock them (anti-reroll)
     if(!G.pendingSkillOptions){
         G.pendingSkillOptions = [genSkill(), genSkill(), genSkill()];
