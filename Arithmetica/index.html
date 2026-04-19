@@ -449,11 +449,10 @@
             justify-content:center; align-items:center;
             z-index:200; backdrop-filter:blur(5px);
         }
-        /* Reward overlays: no blur so skills remain visible */
+        /* Reward/bonus overlays: transparent so game state remains visible */
         .overlay-noblur { backdrop-filter:none; background:rgba(0,0,0,0.60); }
-        /* Skill reward: fully transparent background so left-panel skills are visible */
-        #skill-rew-overlay { background:rgba(0,0,0,0); pointer-events:none; }
-        #skill-rew-overlay .ov-box { pointer-events:auto; }
+        .overlay-clear  { backdrop-filter:none; background:rgba(0,0,0,0); pointer-events:none; }
+        .overlay-clear .ov-box { pointer-events:auto; }
         .ov-box {
             background:linear-gradient(180deg,#3a1e08,#2a1205);
             border:2px solid var(--bdr-gold); border-radius:18px;
@@ -632,6 +631,10 @@
             <h1 class="title-h1">ARITHMETICA</h1>
             <p class="title-sub">— カード計算バトル —</p>
             <div style="display:flex;flex-direction:column;align-items:center;">
+                <div id="btn-save-row" style="display:none;gap:8px;margin:5px 0;">
+                    <button class="btn btn-green btn-sm" style="width:138px;" onclick="continueGame()">続きから</button>
+                    <button class="btn btn-gray  btn-sm" style="width:138px;" onclick="clearSave();startGame();">初めから</button>
+                </div>
                 <button id="btn-start" class="btn btn-green">ゲームスタート</button>
                 <button id="btn-player" class="btn-player">
                     <span style="font-size:1.4rem;">👤</span>
@@ -685,7 +688,7 @@
                 <div class="srow" style="margin-bottom:0;"><span class="slabel">捨て札</span><span id="rp-disc" class="sval">0</span></div>
             </div>
 
-            <div id="turn-lbl">ターン 1</div>
+            <div id="turn-lbl">ステージ 1／10　ターン 1</div>
         </div>
 
         <!-- CENTER -->
@@ -732,7 +735,6 @@
         <!-- RIGHT PANEL -->
         <div id="right-panel">
             <div class="panel-sec">
-                <div id="stage-lbl">ステージ 1／10</div>
                 <div class="ptitle">敵の情報</div>
                 <div class="srow">
                     <span class="slabel">名前</span>
@@ -795,7 +797,7 @@
         </div>
     </div>
 
-    <div id="card-rew-overlay" class="overlay overlay-noblur hidden">
+    <div id="card-rew-overlay" class="overlay overlay-clear hidden">
         <div class="ov-box">
             <div class="ov-title">⚡ カードを選ぼう</div>
             <p class="ov-desc">1枚選んでデッキに加えよう（スキップも可）</p>
@@ -804,15 +806,15 @@
         </div>
     </div>
 
-    <div id="discard-card-overlay" class="overlay overlay-noblur hidden">
-        <div class="ov-box" style="max-width:820px;max-height:88vh;display:flex;flex-direction:column;">
+    <div id="discard-card-overlay" class="overlay overlay-clear hidden">
+        <div class="ov-box" style="max-width:820px;max-height:640px;display:flex;flex-direction:column;">
             <div class="ov-title">🗑 カードを1枚捨てる</div>
             <p class="ov-desc">デッキから1枚選んで捨ててください</p>
             <div id="discard-card-grid" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;overflow-y:auto;padding:4px 2px;flex:1;margin-bottom:12px;"></div>
         </div>
     </div>
 
-    <div id="skill-rew-overlay" class="overlay overlay-noblur hidden">
+    <div id="skill-rew-overlay" class="overlay overlay-clear hidden">
         <div class="ov-box">
             <div class="ov-title">✨ スキルを選ぼう</div>
             <p class="ov-desc">1つ選んで習得しよう（スキップも可 / 最大4つ）</p>
@@ -850,7 +852,7 @@
     </div>
 
     <!-- Power-Up Overlay -->
-    <div id="powerup-overlay" class="overlay overlay-noblur hidden">
+    <div id="powerup-overlay" class="overlay overlay-clear hidden">
         <div class="ov-box" style="text-align:center;max-width:480px;">
             <div class="ov-title">⚡ パワーアップ！</div>
             <div id="powerup-msg" style="font-size:1.45rem;font-weight:800;color:var(--gold);margin:16px 0 20px;line-height:1.7;"></div>
@@ -859,8 +861,8 @@
     </div>
 
     <!-- Deck View Overlay -->
-    <div id="deck-view-overlay" class="overlay hidden">
-        <div class="ov-box" style="max-width:820px;max-height:88vh;display:flex;flex-direction:column;">
+    <div id="deck-view-overlay" class="overlay overlay-clear hidden">
+        <div class="ov-box" style="max-width:820px;max-height:640px;display:flex;flex-direction:column;">
             <div class="ov-title">🃏 現在のデッキ</div>
             <p class="ov-desc" id="deck-view-desc" style="margin-bottom:12px;"></p>
             <div id="deck-view-cards" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;overflow-y:auto;padding:4px 2px;flex:1;"></div>
@@ -871,7 +873,7 @@
     </div>
 
     <!-- Forget Skill Overlay -->
-    <div id="forget-skill-overlay" class="overlay hidden">
+    <div id="forget-skill-overlay" class="overlay overlay-clear hidden">
         <div class="ov-box" style="max-width:680px;">
             <div class="ov-title">📚 スキルがいっぱい！</div>
             <p class="ov-desc">新しいスキルを覚えるには、1つ忘れる必要があります</p>
@@ -1184,7 +1186,110 @@ function newG() {
         handChanges: 3,
         // Hard extra skill
         eExtraSkill: null,
+        // Save state
+        saveState: 'battle',
+        pendingSkillOptions: null,
+        pendingCardOptions: null,
+        pendingDiscardCard: null,
     };
+}
+
+// ============================================================
+// AUTO-SAVE
+// ============================================================
+const SAVE_KEY = 'arith_save';
+function autoSave(state){
+    if(state) G.saveState = state;
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(G)); } catch(e){}
+}
+function hasSave(){ return !!localStorage.getItem(SAVE_KEY); }
+function clearSave(){ localStorage.removeItem(SAVE_KEY); }
+function refreshTitleButtons(){
+    const has = hasSave();
+    document.getElementById('btn-start').style.display = has ? 'none' : '';
+    const row = document.getElementById('btn-save-row');
+    if(row) row.style.display = has ? 'flex' : 'none';
+}
+function continueGame(){
+    const raw = localStorage.getItem(SAVE_KEY);
+    if(!raw) return startGame();
+    G = JSON.parse(raw);
+    restoreGameUI();
+}
+function restoreEnemySkillSec(){
+    const e = ENEMY_LIST[G.eIdx];
+    const skSec = document.getElementById('enemy-skill-sec');
+    if(!skSec) return;
+    if(e.skill || G.eExtraSkill){
+        let html = '';
+        if(e.skill){
+            html += `<div class="enemy-skill-box" id="enemy-skill-box">
+                <div class="enemy-skill-name">⚡ ${e.skill.name}</div>
+                <div class="enemy-skill-desc">${e.skill.desc}</div>
+            </div>`;
+        }
+        if(G.eExtraSkill){
+            html += `<div class="enemy-skill-box" id="enemy-skill-box2" style="margin-top:4px;">
+                <div class="enemy-skill-name">⚡ ${G.eExtraSkill.name}</div>
+                <div class="enemy-skill-desc">${G.eExtraSkill.desc}</div>
+            </div>`;
+        }
+        skSec.innerHTML = html;
+    } else { skSec.innerHTML = ''; }
+}
+function restoreGameUI(){
+    // Hide all overlays
+    ['victory-overlay','gameover-overlay','clear-overlay',
+     'card-rew-overlay','skill-rew-overlay','howto-overlay','forget-skill-overlay',
+     'deck-view-overlay','powerup-overlay','discard-card-overlay',
+     'char-select-screen','ranking-overlay'].forEach(id=>{
+        const el=document.getElementById(id); if(el) el.classList.add('hidden');
+    });
+    // Hero image
+    const heroImg = document.getElementById('hero-img');
+    heroImg.className = 'char-img';
+    heroImg.src = getHeroImgSrc(G.classIdx, G.gender, 'battle');
+    heroImg.onerror = ()=>heroImg.classList.add('err');
+    // Enemy image + info
+    const e = ENEMY_LIST[G.eIdx];
+    document.getElementById('rp-ename').textContent = e.name;
+    document.getElementById('rp-atk').textContent = G.eAtk;
+    const eimg = document.getElementById('enemy-img');
+    const eem  = document.getElementById('enemy-em');
+    eem.textContent = e.em;
+    if(e.img){
+        eimg.className='char-img'; eimg.src=e.img; eem.style.display='none';
+        eimg.onerror=()=>{eimg.classList.add('err'); eem.style.display='block';};
+        eimg.onload =()=>{eem.style.display='none';};
+    } else {
+        eimg.className='char-img err'; eimg.src=''; eem.style.display='block';
+    }
+    restoreEnemySkillSec();
+    document.getElementById('lp-name').textContent = getCurP();
+    // Restore visibility for new enemy state
+    const bonusStates = ['skillRew','cardRew','discardCard','powerup','victory'];
+    const inBonus = bonusStates.includes(G.saveState);
+    document.getElementById('enemy-wrap').style.visibility = inBonus ? 'hidden' : '';
+    document.getElementById('vs-area').style.visibility    = inBonus ? 'hidden' : '';
+    // Show battle screen
+    document.getElementById('battle-screen').classList.remove('hidden');
+    document.getElementById('title-screen').classList.add('hidden');
+    // Render all UI
+    updateHP(); renderHand(); renderSkills(); updateFormula();
+    updateHandChangeBtn(); updateStatus();
+    // Restore bonus screen if needed
+    if(G.saveState === 'victory'){
+        document.getElementById('vic-desc').textContent=`ステージ ${G.eIdx+1} クリア！`;
+        document.getElementById('victory-overlay').classList.remove('hidden');
+    } else if(G.saveState === 'skillRew'){
+        openSkillReward();
+    } else if(G.saveState === 'cardRew'){
+        openCardReward();
+    } else if(G.saveState === 'discardCard' && G.pendingDiscardCard){
+        openDiscardCard(G.pendingDiscardCard);
+    } else if(G.saveState === 'powerup'){
+        document.getElementById('powerup-overlay').classList.remove('hidden');
+    }
 }
 
 // Compute actual effect for a skill (accounts for level and type balance)
@@ -1607,7 +1712,7 @@ function updateFormula(){
         document.getElementById('atk-btn').disabled=true;
     }
 
-    document.getElementById('turn-lbl').textContent=`ターン ${G.turn}`;
+    document.getElementById('turn-lbl').textContent=`ステージ ${G.eIdx+1}／10　ターン ${G.turn}`;
     document.getElementById('rp-deck').textContent=G.deck.length;
     document.getElementById('rp-disc').textContent=G.discard.length;
 
@@ -1715,6 +1820,7 @@ function placeCard(card,slotNum){
     if(slotNum===1)G.s1=card; else G.s2=card;
     const nc=drawOne(); if(nc)G.hand.push(nc);
     renderHand(); updateFormula();
+    autoSave('battle');
 }
 
 
@@ -1873,7 +1979,8 @@ function enemyTurn(){
         renderHand(); renderSkills();
         updateHP(); G.turn++; G.totalTurns++;
         if(G.pHP<=0){setTimeout(()=>showGameover(),800); return;}
-        setTimeout(()=>{ G.phase='player'; updateFormula(); setMsg(''); updateHandChangeBtn(); },1100);
+        G.phase='player'; updateFormula(); updateHandChangeBtn();
+        setTimeout(()=>{ setMsg(''); },1100);
         return;
     }
 
@@ -1964,9 +2071,14 @@ function shakeEnemy(){
 // VICTORY / GAMEOVER
 // ============================================================
 function showVictory(){
+    // Hide enemy illustration during bonus selection
+    document.getElementById('enemy-wrap').style.visibility='hidden';
+    document.getElementById('vs-area').style.visibility='hidden';
+    autoSave('victory');
     const isLast=G.eIdx>=ENEMY_LIST.length-1;
     if(isLast){
         submitScore(10);  // game clear = 10 enemies defeated
+        clearSave();  // remove save on game clear
         document.getElementById('clear-overlay').classList.remove('hidden');
     } else {
         document.getElementById('vic-desc').textContent=`ステージ ${G.eIdx+1} クリア！`;
@@ -1975,6 +2087,7 @@ function showVictory(){
 }
 function showGameover(){
     submitScore(G.eIdx);  // enemies defeated before dying
+    clearSave();  // remove save on game over
     document.getElementById('gameover-overlay').classList.remove('hidden');
 }
 
@@ -1983,29 +2096,39 @@ function showGameover(){
 // ============================================================
 function openCardReward(){
     document.getElementById('victory-overlay').classList.add('hidden');
+    // Generate card options once and lock them (anti-reroll)
+    if(!G.pendingCardOptions){
+        G.pendingCardOptions = [];
+        for(let i=0;i<3;i++){
+            const suits=[SUITS[rnd(0,3)]];
+            const special = Math.random()<0.2 ? ['atk','shld','heal'][rnd(0,2)] : null;
+            G.pendingCardOptions.push(mkCard(rnd(1,20),suits,special));
+        }
+    }
+    autoSave('cardRew');
     const row=document.getElementById('rew-cards-row'); row.innerHTML='';
-    for(let i=0;i<3;i++){
-        const suits=[SUITS[rnd(0,3)]];
-        const special = Math.random()<0.2 ? ['atk','shld','heal'][rnd(0,2)] : null;
-        const card=mkCard(rnd(1,20),suits,special);
+    G.pendingCardOptions.forEach(card=>{
+        const s0=card.suits[0];
         const d=document.createElement('div'); d.className='rew-card';
-        const s0=suits[0];
         let specialBadge='';
-        if(special){
+        if(card.special){
             const icons={'atk':'⚔️+5','shld':'🛡️+5','heal':'♡+5'};
-            specialBadge=`<div style="margin-top:6px;font-size:0.85rem;font-weight:800;padding:2px 8px;background:rgba(0,0,0,0.35);border-radius:6px;color:#fff;">${icons[special]}</div>`;
+            specialBadge=`<div style="margin-top:6px;font-size:0.85rem;font-weight:800;padding:2px 8px;background:rgba(0,0,0,0.35);border-radius:6px;color:#fff;">${icons[card.special]}</div>`;
         }
         d.innerHTML=`<div class="c-num">${card.value}</div>
-                     <div class="c-suit ${sc(s0)}">${suits.join('')}</div>
+                     <div class="c-suit ${sc(s0)}">${card.suits.join('')}</div>
                      ${specialBadge}`;
         d.onclick=()=>{ pickRewardCard(card); };
         row.appendChild(d);
-    }
+    });
     document.getElementById('card-rew-overlay').classList.remove('hidden');
 }
 
 function pickRewardCard(card){
     document.getElementById('card-rew-overlay').classList.add('hidden');
+    G.pendingCardOptions = null;
+    G.pendingDiscardCard = card;
+    autoSave('discardCard');
     openDiscardCard(card);
 }
 
@@ -2036,6 +2159,7 @@ function openDiscardCard(newCard){
         d.onclick=()=>{
             removeCardFromDeck(c.id);
             G.discard.push(newCard);
+            G.pendingDiscardCard = null;
             document.getElementById('discard-card-overlay').classList.add('hidden');
             openPowerUp();
         };
@@ -2054,17 +2178,22 @@ function removeCardFromDeck(cardId){
 
 function skipCard(){
     document.getElementById('card-rew-overlay').classList.add('hidden');
+    G.pendingCardOptions = null;
     openPowerUp();
 }
 
 function openSkillReward(){
+    // Generate options once and lock them (anti-reroll)
+    if(!G.pendingSkillOptions){
+        G.pendingSkillOptions = [genSkill(), genSkill(), genSkill()];
+    }
+    autoSave('skillRew');
     const row=document.getElementById('rew-skills-row'); row.innerHTML='';
-    [genSkill(),genSkill(),genSkill()].forEach(sk=>{
+    G.pendingSkillOptions.forEach(sk=>{
         const d=document.createElement('div'); d.className='rew-skill';
         const icon = sk.type==='attack'?'⚔️':sk.type==='defense'?'🛡️':'🪄';
         const dmgCls = sk.type==='attack'?'':` ${sk.type}`;
         const effLabel = sk.type==='attack'?'ダメージ':sk.type==='defense'?'シールド':'回復';
-        // Compute base effect (level 1)
         const eff = sk.base;
         d.innerHTML=`<div class="rew-sk-icon">${icon}</div>
                      <div class="rew-sk-cond">${condHTML(sk.conds)}</div>
@@ -2078,6 +2207,7 @@ let pendingNewSkill = null;
 
 function pickSkill(sk){
     document.getElementById('skill-rew-overlay').classList.add('hidden');
+    G.pendingSkillOptions = null;
     const finalized = finalizeSkill(sk);
     if(G.skills.length<4){
         G.skills.push(finalized);
@@ -2090,6 +2220,7 @@ function pickSkill(sk){
 }
 function skipSkill(){
     document.getElementById('skill-rew-overlay').classList.add('hidden');
+    G.pendingSkillOptions = null;
     openCardReward();
 }
 
@@ -2103,6 +2234,7 @@ function openPowerUp(){
     // Re-roll if no skills for level-up
     if(pick==='skilllevelup'&&G.skills.length===0) pick='maxhp';
 
+    autoSave('powerup');
     renderSkills(); updateHP();
 
     const msgEl = document.getElementById('powerup-msg');
@@ -2226,10 +2358,15 @@ function nextEnemy(){
     fillHand();
 
     setupEnemyUI(nextIdx);
+    // Restore enemy illustration for next battle
+    document.getElementById('enemy-wrap').style.visibility='';
+    document.getElementById('vs-area').style.visibility='';
     updateHP();
     renderHand(); renderSkills(); updateFormula();
     updateHandChangeBtn();
+    updateStatus();
     setMsg('');
+    autoSave('battle');
 }
 
 // ============================================================
@@ -2263,6 +2400,7 @@ function doHandChange(){
     renderHand();
     updateFormula();
     updateHandChangeBtn();
+    autoSave('battle');
     setMsg('🔀 手札をチェンジした！');
 }
 
@@ -2359,19 +2497,22 @@ function setupEnemyUI(idx){
         skSec.innerHTML = html;
     } else { skSec.innerHTML=''; }
 
-    document.getElementById('stage-lbl').textContent=`ステージ ${idx+1}／10`;
+    // stage+turn shown in turn-lbl (left panel)
 }
 
 // ============================================================
 // SCREEN TRANSITIONS
 // ============================================================
 function doReturnTitle(){
+    // Save current battle state before leaving
+    if(G && G.pMaxHP) autoSave();
     ['battle-screen','victory-overlay','gameover-overlay','clear-overlay',
      'card-rew-overlay','skill-rew-overlay','howto-overlay','forget-skill-overlay',
      'deck-view-overlay','powerup-overlay','discard-card-overlay','ranking-overlay',
      'char-select-screen'].forEach(id=>
         document.getElementById(id).classList.add('hidden'));
     document.getElementById('title-screen').classList.remove('hidden');
+    refreshTitleButtons();
     pendingNewSkill=null;
 }
 
@@ -2653,6 +2794,7 @@ function closeRanking(){ document.getElementById('ranking-overlay').classList.ad
 document.getElementById('btn-start').onclick  = startGame;
 document.getElementById('btn-player').onclick = openPlayerMgr;
 refreshPDisp();
+refreshTitleButtons();
 </script>
 </body>
 </html>
