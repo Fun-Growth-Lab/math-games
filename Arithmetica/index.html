@@ -1250,6 +1250,7 @@ function newG() {
         sealedCards: [],   // [{cardId, turnsLeft}]
         sealedSkills: [],  // [{skillIdx, turnsLeft}]
         healSealed: 0,     // turns remaining for heal seal
+        chargeMultiplier: 1, // player attack multiplier for next turn (*10 skill)
         // Character selection
         classIdx: 0,
         gender: 'male',
@@ -1392,6 +1393,23 @@ function restoreGameUI(){
 function skillEffect(sk){
     const mult = sk.level===1 ? 1.0 : sk.level===2 ? 1.5 : 2.0;
     return Math.floor(sk.base * mult);
+}
+// Charge skill helpers (*10 condition → next-attack multiplier)
+function isChargeSkill(sk){ return sk.conds.includes('*10'); }
+function chargeMultForSkill(sk){
+    const suits = sk.conds.filter(c=>c[0]!=='*'&&c[0]!=='≤').length;
+    return suits===0 ? 2 : suits===1 ? 3 : 4;
+}
+// Unified display info for a skill (handles charge type)
+function skillDispInfo(sk){
+    if(isChargeSkill(sk)){
+        const m = chargeMultForSkill(sk);
+        return { icon:'⚡', effLbl:'攻撃倍化', effVal:`×${m}`, effCls:'' };
+    }
+    const icon = sk.type==='attack'?'⚔️':sk.type==='defense'?'🛡️':'🪄';
+    const effLbl = sk.type==='attack'?'ダメージ':sk.type==='defense'?'シールド':'回復';
+    const effCls = sk.type==='attack'?'':` ${sk.type}`;
+    return { icon, effLbl, effVal: String(skillEffect(sk)), effCls };
 }
 
 // ============================================================
@@ -1676,10 +1694,7 @@ function renderSkills(){
             const sk=G.skills[i];
             const sealInfo=G.sealedSkills.find(s=>s.skillIdx===i);
             const isSealed=sealInfo&&sealInfo.turnsLeft>0;
-            const icon   = sk.type==='attack'?'⚔️':sk.type==='defense'?'🛡️':'🪄';
-            const effCls = sk.type==='defense'?' defense':sk.type==='heal'?' heal':'';
-            const effLbl = sk.type==='attack'?'ダメージ':sk.type==='defense'?'シールド':'回復';
-            const eff    = skillEffect(sk);
+            const {icon,effLbl,effVal,effCls}=skillDispInfo(sk);
             d.className='skill-card'+(isSealed?' sealed-skill':''); d.id=`sk${i}`;
             d.innerHTML=
                 `<div class="sk-type-sec">
@@ -1689,7 +1704,7 @@ function renderSkills(){
                  <div class="sk-conds-sec">${skillCondsHTML(sk.conds)}</div>
                  <div class="sk-eff-sec">
                    <div class="sk-eff-lbl">${effLbl}</div>
-                   <div class="sk-eff-val${effCls}">${eff}</div>
+                   <div class="sk-eff-val${effCls}">${effVal}</div>
                  </div>`;
         }else{
             d.className='skill-card empty-slot';
@@ -1726,10 +1741,18 @@ function updateStatus(){
     // Player status
     const el = document.getElementById('lp-status');
     if(el){
-        const parts = [];
-        if(G.healSealed > 0) parts.push('回復×');
-        el.textContent = parts.length > 0 ? parts.join('・') : '正常';
-        el.style.color = parts.length > 0 ? '#e05040' : '#b8a870';
+        const badges = [];
+        if(G.healSealed > 0)
+            badges.push(`<span style="background:rgba(180,40,20,0.25);border:1px solid #cc4444;border-radius:4px;padding:0 5px;color:#ff7755;font-size:0.82rem;font-weight:800;white-space:nowrap;">回復×</span>`);
+        if((G.chargeMultiplier||1) > 1)
+            badges.push(`<span style="background:rgba(196,154,42,0.22);border:1px solid var(--gold);border-radius:4px;padding:0 5px;color:#f5e040;font-size:0.82rem;font-weight:800;white-space:nowrap;">攻撃×${G.chargeMultiplier}</span>`);
+        if(badges.length > 0){
+            el.innerHTML = `<span style="display:inline-flex;gap:4px;align-items:center;flex-wrap:wrap;">${badges.join('')}</span>`;
+            el.style.color = '';
+        } else {
+            el.textContent = '正常';
+            el.style.color = '#b8a870';
+        }
     }
     // Enemy status
     const eel = document.getElementById('rp-estatus');
@@ -1949,15 +1972,21 @@ function doAttack(){
     const res=calcRes(c1,c2,opNow);
     G.s1=null; G.s2=null;
 
+    // Consume charge multiplier (set by *10 skill on previous turn)
+    const chargeMult = G.chargeMultiplier || 1;
+    G.chargeMultiplier = 1;
+    const chargedRes = Math.floor(res * chargeMult);
+
     // Apply damage to enemy (with enemy shield)
-    const netRes=applyEnemyDamage(res);
+    const netRes=applyEnemyDamage(chargedRes);
     showDmg(netRes,'enemy-wrap','dmg-enemy');
     shakeEnemy();
     G.discard.push(c1,c2);
     updateHP(); updateFormula();
     const sym=opNow==='+'?'＋':'－';
-    const shieldMsg=(res-netRes)>0?`（シールド${res-netRes}吸収）`:'';
-    setMsg(`⚔️ ${c1.value}${sym}${c2.value}＝${res}　${netRes}ダメージ！${shieldMsg}`);
+    const shieldMsg=(chargedRes-netRes)>0?`（シールド${chargedRes-netRes}吸収）`:'';
+    const chargeNote = chargeMult>1 ? `　⚡×${chargeMult}` : '';
+    setMsg(`⚔️ ${c1.value}${sym}${c2.value}＝${res}${chargeNote}　${netRes}ダメージ！${shieldMsg}`);
 
     if(G.eHP<=0){hideEnemyNow(); setTimeout(()=>showVictory(),900); return;}
 
@@ -2010,31 +2039,43 @@ function doAttack(){
         });
         const afterAll=()=>{
             if(G.eHP<=0){hideEnemyNow(); setTimeout(()=>showVictory(),900); return;}
+            updateStatus();
             setTimeout(()=>enemyTurn(),1200);
         };
-        applyNextSkillEffect(trigList, 0, afterAll);
+        applyNextSkillEffect(trigList, 0, afterAll, chargeMult);
     });
 }
 
-function applyNextSkillEffect(list, idx, done){
+function applyNextSkillEffect(list, idx, done, chargeMult=1){
     if(idx>=list.length){done(); return;}
     setTimeout(()=>{
         const i=list[idx];
         const sk=G.skills[i];
-        if(!sk){applyNextSkillEffect(list,idx+1,done); return;}
-        const eff=skillEffect(sk);
+        if(!sk){applyNextSkillEffect(list,idx+1,done,chargeMult); return;}
         const el=document.getElementById(`sk${i}`);
         if(el){el.classList.add('triggered');setTimeout(()=>el.classList.remove('triggered'),900);}
 
-        if(sk.type==='attack'){
-            const netEff=applyEnemyDamage(eff);
+        if(isChargeSkill(sk)){
+            // *10 skill: set next-turn charge multiplier
+            const m=chargeMultForSkill(sk);
+            G.chargeMultiplier=m;
+            showFloatOnHero(`⚡×${m}`,'dmg-skill');
+            setMsg(`⚡ スキル発動！ 次のターン攻撃力 ×${m}！`);
+            updateStatus();
+        } else if(sk.type==='attack'){
+            const eff=skillEffect(sk);
+            const boostedEff=Math.floor(eff*chargeMult);
+            const netEff=applyEnemyDamage(boostedEff);
             showDmg(netEff,'enemy-wrap','dmg-skill');
-            setMsg(`⚔️ スキル発動！ ${netEff}ダメージ！`);
+            const note=chargeMult>1?`（×${chargeMult}ブースト）`:'';
+            setMsg(`⚔️ スキル発動！ ${netEff}ダメージ！${note}`);
         } else if(sk.type==='defense'){
+            const eff=skillEffect(sk);
             G.shield+=eff;
             showFloatOnHero(`🛡️+${eff}`,'dmg-shield');
             setMsg(`🛡️ スキル発動！ シールド +${eff}`);
         } else {
+            const eff=skillEffect(sk);
             if(G.healSealed>0){
                 showFloatOnHero('🪄封印','dmg-heal');
                 setMsg('🪄 回復封じ中！回復できない！');
@@ -2047,7 +2088,7 @@ function applyNextSkillEffect(list, idx, done){
         }
         updateHP();
         if(G.eHP<=0){hideEnemyNow(); setTimeout(()=>showVictory(),900); return;}
-        applyNextSkillEffect(list, idx+1, done);
+        applyNextSkillEffect(list, idx+1, done, chargeMult);
     }, 500);
 }
 
@@ -2323,10 +2364,7 @@ function openSkillReward(){
     autoSave('skillRew');
     const row=document.getElementById('rew-skills-row'); row.innerHTML='';
     G.pendingSkillOptions.forEach(sk=>{
-        const icon = sk.type==='attack'?'⚔️':sk.type==='defense'?'🛡️':'🪄';
-        const effLbl = sk.type==='attack'?'ダメージ':sk.type==='defense'?'シールド':'回復';
-        const effCls = sk.type==='attack'?'':` ${sk.type}`;
-        const eff = skillEffect(sk);
+        const {icon,effLbl,effVal,effCls}=skillDispInfo(sk);
         // Render as skill-card (same layout as left panel)
         const d=document.createElement('div');
         d.className='skill-card';
@@ -2339,7 +2377,7 @@ function openSkillReward(){
              <div class="sk-conds-sec">${skillCondsHTML(sk.conds)}</div>
              <div class="sk-eff-sec">
                <div class="sk-eff-lbl">${effLbl}</div>
-               <div class="sk-eff-val${effCls}">${eff}</div>
+               <div class="sk-eff-val${effCls}">${effVal}</div>
              </div>`;
         d.onmouseenter=()=>{ d.style.transform='translateY(-5px)'; d.style.boxShadow='0 8px 20px rgba(196,154,42,0.5)'; };
         d.onmouseleave=()=>{ d.style.transform=''; d.style.boxShadow=''; };
@@ -2574,6 +2612,7 @@ function nextEnemy(){
     G.eShield=0;
     G.atkMult=1;
     G.sealedCards=[]; G.sealedSkills=[]; G.healSealed=0;
+    G.chargeMultiplier=1;
 
     G.eIdx=nextIdx;
     G.phase='player';
@@ -2684,17 +2723,14 @@ function openSkillsView(){
         list.innerHTML='<div style="color:var(--text-dim);text-align:center;padding:10px 0;">スキルなし</div>';
     } else {
         G.skills.forEach(sk=>{
-            const icon=sk.type==='attack'?'⚔️':sk.type==='defense'?'🛡️':'🪄';
-            const effLbl=sk.type==='attack'?'ダメージ':sk.type==='defense'?'シールド':'回復';
-            const effCls=sk.type==='attack'?'':` ${sk.type}`;
-            const eff=skillEffect(sk);
+            const {icon,effLbl,effVal,effCls}=skillDispInfo(sk);
             const d=document.createElement('div');
             d.className='skill-card';
             d.style.cssText='height:54px;pointer-events:none;';
             d.innerHTML=
                 `<div class="sk-type-sec"><div class="sk-type-icon">${icon}</div><div class="sk-lv">Lv.${sk.level}</div></div>
                  <div class="sk-conds-sec">${skillCondsHTML(sk.conds)}</div>
-                 <div class="sk-eff-sec"><div class="sk-eff-lbl">${effLbl}</div><div class="sk-eff-val${effCls}">${eff}</div></div>`;
+                 <div class="sk-eff-sec"><div class="sk-eff-lbl">${effLbl}</div><div class="sk-eff-val${effCls}">${effVal}</div></div>`;
             list.appendChild(d);
         });
     }
@@ -2913,6 +2949,8 @@ function startGameWithClass(ci, diff, gender){
     heroImg.onerror=()=>heroImg.classList.add('err');
 
     setupEnemyUI(0);
+    document.getElementById('enemy-wrap').style.visibility='';
+    document.getElementById('vs-area').style.visibility='';
     document.getElementById('lp-name').textContent=getCurP();
     document.getElementById('battle-screen').classList.remove('hidden');
 
