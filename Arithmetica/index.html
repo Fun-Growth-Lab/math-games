@@ -719,7 +719,7 @@
                 <div class="srow" style="margin-bottom:0;"><span class="slabel">捨て札</span><span id="rp-disc" class="sval">0</span></div>
             </div>
 
-            <div id="turn-lbl">ステージ 1／10　ターン 1</div>
+            <div id="turn-lbl">[Normal]　ステージ 1／10　ターン 1</div>
         </div>
 
         <!-- CENTER -->
@@ -795,7 +795,7 @@
 
             <div style="margin-top:auto; display:flex; flex-direction:column; gap:6px;">
                 <div id="hand-change-sec" style="display:none; flex-direction:column; gap:4px;">
-                    <button id="hand-change-btn" class="btn btn-sm" style="width:100%;margin:0;background:linear-gradient(135deg,#5a3fa0,#8060c8);color:#fff;" onclick="doHandChange()">🔀 手札チェンジ</button>
+                    <button id="hand-change-btn" class="btn btn-sm" style="width:100%;margin:0;background:linear-gradient(135deg,#5a3fa0,#8060c8);color:#fff;" onclick="confirmHandChange()">🔀 手札チェンジ</button>
                     <div id="hand-change-cnt" style="text-align:center;font-size:0.75rem;color:var(--text-dim);"></div>
                 </div>
                 <button class="btn btn-gray btn-sm" style="width:100%;margin:0;" onclick="openDeckView()">🃏 デッキ</button>
@@ -927,6 +927,17 @@
         <div class="ov-box" style="max-width:380px;text-align:center;">
             <div id="info-popup-body" style="margin-bottom:18px;"></div>
             <button class="btn btn-green btn-sm" onclick="closeInfoPopup()">OK！</button>
+        </div>
+    </div>
+
+    <!-- Confirm Popup (yes/no) -->
+    <div id="confirm-popup-overlay" class="overlay hidden" style="z-index:225;">
+        <div class="ov-box" style="max-width:340px;text-align:center;">
+            <div id="confirm-popup-body" style="margin-bottom:20px;font-size:1.05rem;line-height:1.6;"></div>
+            <div style="display:flex;gap:14px;justify-content:center;">
+                <button class="btn btn-green btn-sm" style="width:90px;" onclick="confirmPopupYes()">はい</button>
+                <button class="btn btn-gray btn-sm" style="width:90px;" onclick="confirmPopupNo()">いいえ</button>
+            </div>
         </div>
     </div>
 
@@ -1888,7 +1899,8 @@ function updateFormula(){
         document.getElementById('atk-btn').disabled=true;
     }
 
-    document.getElementById('turn-lbl').textContent=`ステージ ${G.eIdx+1}／10　ターン ${G.turn}`;
+    const diffLbl = G.difficulty==='easy'?'Easy':G.difficulty==='hard'?'Hard':'Normal';
+    document.getElementById('turn-lbl').textContent=`[${diffLbl}]　ステージ ${G.eIdx+1}／10　ターン ${G.turn}`;
     document.getElementById('rp-deck').textContent=G.deck.length;
     document.getElementById('rp-disc').textContent=G.discard.length;
 
@@ -2743,6 +2755,30 @@ function updateHandChangeBtn(){
     cnt.textContent = `残り ${n} 回`;
     btn.disabled = (n <= 0);
     btn.style.opacity = (n <= 0) ? '0.45' : '1';
+}
+
+let _confirmYesCb=null, _confirmNoCb=null;
+function showConfirmPopup(html, onYes, onNo){
+    document.getElementById('confirm-popup-body').innerHTML=html;
+    _confirmYesCb=onYes||null; _confirmNoCb=onNo||null;
+    document.getElementById('confirm-popup-overlay').classList.remove('hidden');
+}
+function confirmPopupYes(){
+    document.getElementById('confirm-popup-overlay').classList.add('hidden');
+    if(_confirmYesCb) _confirmYesCb();
+}
+function confirmPopupNo(){
+    document.getElementById('confirm-popup-overlay').classList.add('hidden');
+    if(_confirmNoCb) _confirmNoCb();
+}
+function confirmHandChange(){
+    if(G.handChanges <= 0 || G.phase !== 'player') return;
+    const remaining = G.handChanges;
+    showConfirmPopup(
+        `🔀 手札を引き直しますか？<br><span style="font-size:0.85rem;color:var(--text-dim);">（残り ${remaining} 回）</span>`,
+        doHandChange,
+        null
+    );
 }
 
 function doHandChange(){
