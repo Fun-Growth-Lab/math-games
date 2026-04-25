@@ -222,6 +222,14 @@
         .sk-eff-val { font-size:1.2rem; font-weight:800; color:#7a2010; line-height:1.1; }
         .sk-eff-val.defense { color:#1a3a7a; }
         .sk-eff-val.heal    { color:#1a6a1a; }
+        .sk-eff-val.poison  { color:#7a22aa; }
+        .sk-eff-val.charge  { color:#9a6200; }
+        /* Skill card type colors */
+        .skill-card.sk-attack  { background:#fff2f2; border-color:#c05050; }
+        .skill-card.sk-defense { background:#f2f4ff; border-color:#4466cc; }
+        .skill-card.sk-heal    { background:#f2fff4; border-color:#44aa66; }
+        .skill-card.sk-charge  { background:#fffbe8; border-color:#c49a2a; }
+        .skill-card.sk-poison  { background:#f8f0ff; border-color:#9944cc; }
 
         /* Operator display (single, no buttons) */
         .op-display {
@@ -1077,7 +1085,8 @@
 const ENEMY_LIST = [
     { name:'スライム',   maxHp:  50,  atk: 8,  img:'images/enemy_1_1.png',  em:'🟢', skill:null,
       hardSkill:{ name:'攻撃強化',   desc:'基礎攻撃力を永続的に50%増加する' } },
-    { name:'コウモリ',   maxHp:  80,  atk:10,  img:'images/enemy_2_1.png',  em:'🦇', skill:null,
+    { name:'コウモリ',   maxHp:  80,  atk:10,  img:'images/enemy_2_1.png',  em:'🦇',
+      skill:{ name:'毒(1)', poisonAmt:1, desc:'プレーヤーに毒(1)を付与する' },
       hardSkill:{ name:'３倍攻撃',   desc:'次のターン、攻撃力3倍で攻撃する' } },
     { name:'スケルトン', maxHp: 110,  atk:12,  img:'images/enemy_3_1.png',  em:'💀',
       skill:{ name:'手札封印',   desc:'手札をランダムで1枚、3ターン使用不可にする' },
@@ -1102,7 +1111,8 @@ const ENEMY_LIST = [
       hardSkill:{ name:'３倍攻撃',   desc:'次のターン、攻撃力3倍で攻撃する' } },
     { name:'古代の神',   maxHp: 360,  atk:26,  img:'images/enemy_10_1.png', em:'👁️',
       skill:{ name:'４倍攻撃',   desc:'次のターン、攻撃力4倍で攻撃する' },
-      hardSkill:{ name:'シールド破壊', desc:'プレーヤーのシールドを0にする' } },
+      hardSkill:{ name:'シールド破壊', desc:'プレーヤーのシールドを0にする' },
+      hardSkill2:{ name:'毒(2)', poisonAmt:2, desc:'プレーヤーに毒(2)を付与する' } },
 ];
 const ALL_ENEMY_SKILLS = ENEMY_LIST.filter(e=>e.skill).map(e=>e.skill);
 const SUITS = ['♥','♦','♠','♣'];
@@ -1251,6 +1261,10 @@ function newG() {
         sealedSkills: [],  // [{skillIdx, turnsLeft}]
         healSealed: 0,     // turns remaining for heal seal
         chargeMultiplier: 1, // player attack multiplier for next turn (*10 skill)
+        ePoisonStacks: 0,    // poison on enemy (from player skills)
+        playerPoisonStacks: 0, // poison on player (from enemy skills)
+        // Hard extra skill 2
+        eExtraSkill2: null,
         // Character selection
         classIdx: 0,
         gender: 'male',
@@ -1314,21 +1328,13 @@ function restoreEnemySkillSec(){
     const e = ENEMY_LIST[G.eIdx];
     const skSec = document.getElementById('enemy-skill-sec');
     if(!skSec) return;
-    if(e.skill || G.eExtraSkill){
-        let html = '';
-        if(e.skill){
-            html += `<div class="enemy-skill-box" id="enemy-skill-box">
-                <div class="enemy-skill-name">⚡ ${e.skill.name}</div>
-                <div class="enemy-skill-desc">${e.skill.desc}</div>
-            </div>`;
-        }
-        if(G.eExtraSkill){
-            html += `<div class="enemy-skill-box" id="enemy-skill-box2" style="margin-top:4px;">
-                <div class="enemy-skill-name">⚡ ${G.eExtraSkill.name}</div>
-                <div class="enemy-skill-desc">${G.eExtraSkill.desc}</div>
-            </div>`;
-        }
-        skSec.innerHTML = html;
+    const eskills=[e.skill, G.eExtraSkill, G.eExtraSkill2].filter(Boolean);
+    if(eskills.length){
+        skSec.innerHTML = eskills.map((sk,i)=>`
+            <div class="enemy-skill-box" id="enemy-skill-box${i||''}" ${i>0?'style="margin-top:4px;"':''}>
+                <div class="enemy-skill-name">⚡ ${sk.name}</div>
+                <div class="enemy-skill-desc">${sk.desc}</div>
+            </div>`).join('');
     } else { skSec.innerHTML = ''; }
 }
 function restoreGameUI(){
@@ -1400,11 +1406,23 @@ function chargeMultForSkill(sk){
     const suits = sk.conds.filter(c=>c[0]!=='*'&&c[0]!=='≤').length;
     return suits===0 ? 2 : suits===1 ? 3 : 4;
 }
-// Unified display info for a skill (handles charge type)
+// Poison skill helper
+function isPoisonSkill(sk){ return sk.type==='poison'; }
+// CSS modifier class by skill type
+function skTypeClass(sk){
+    if(isChargeSkill(sk)) return 'sk-charge';
+    if(isPoisonSkill(sk)) return 'sk-poison';
+    return 'sk-'+sk.type; // sk-attack / sk-defense / sk-heal
+}
+// Unified display info for a skill (handles all types)
 function skillDispInfo(sk){
     if(isChargeSkill(sk)){
         const m = chargeMultForSkill(sk);
-        return { icon:'💫', effLbl:'攻撃倍化', effVal:`×${m}`, effCls:'' };
+        return { icon:'💥', effLbl:'攻撃倍化', effVal:`×${m}`, effCls:' charge' };
+    }
+    if(isPoisonSkill(sk)){
+        const amt = skillEffect(sk); // base=suitCount, level multiplier applies
+        return { icon:'☠️', effLbl:'毒付与', effVal:`(${amt})`, effCls:' poison' };
     }
     const icon = sk.type==='attack'?'⚔️':sk.type==='defense'?'🛡️':'🪄';
     const effLbl = sk.type==='attack'?'ダメージ':sk.type==='defense'?'シールド':'回復';
@@ -1459,8 +1477,21 @@ function fillHand(){while(G.hand.length<5){const c=drawOne();if(!c)break;G.hand.
 // SKILL SYSTEM  (prob: 1cond=60%, 2cond=30%, 3cond=10%)
 // Damage: suit=5~10, number=20~30, +10 bonus(2conds), +35 bonus(3conds)
 // ============================================================
-// Generate skill candidate. Type: attack/defense/heal. Max 2 suits, max 1 mult.
+// Generate poison skill (suit conditions only)
+function genPoisonSkill(){
+    const usedS=new Set(); const conds=[];
+    const suitCount = Math.random()<0.55 ? 1 : 2; // 55% single suit, 45% double
+    while(conds.length<suitCount){
+        const s=SUITS[rnd(0,3)];
+        if(!usedS.has(s)){usedS.add(s); conds.push(s);}
+    }
+    const level = Math.random()<0.05 ? 2 : 1;
+    return {type:'poison', conds, base:suitCount, level};
+}
+
+// Generate skill candidate. Type: attack/defense/heal/poison. Max 2 suits, max 1 mult.
 function genSkill(){
+    if(Math.random()<0.10) return genPoisonSkill(); // 10% chance of poison skill
     const r=Math.random();
     const n = r<0.6 ? 1 : r<0.9 ? 2 : 3;
     const suitPart=[]; const multPart=[]; const lePart=[];
@@ -1702,7 +1733,7 @@ function renderSkills(){
             const sealInfo=G.sealedSkills.find(s=>s.skillIdx===i);
             const isSealed=sealInfo&&sealInfo.turnsLeft>0;
             const {icon,effLbl,effVal,effCls}=skillDispInfo(sk);
-            d.className='skill-card'+(isSealed?' sealed-skill':''); d.id=`sk${i}`;
+            d.className='skill-card '+skTypeClass(sk)+(isSealed?' sealed-skill':''); d.id=`sk${i}`;
             d.innerHTML=
                 `<div class="sk-type-sec">
                    <div class="sk-type-icon">${icon}</div>
@@ -1753,6 +1784,8 @@ function updateStatus(){
             badges.push(`<span style="background:rgba(180,40,20,0.25);border:1px solid #cc4444;border-radius:4px;padding:0 5px;color:#ff7755;font-size:0.82rem;font-weight:800;white-space:nowrap;">回復×</span>`);
         if((G.chargeMultiplier||1) > 1)
             badges.push(`<span style="background:rgba(196,154,42,0.22);border:1px solid var(--gold);border-radius:4px;padding:0 5px;color:#f5e040;font-size:0.82rem;font-weight:800;white-space:nowrap;">攻撃×${G.chargeMultiplier}</span>`);
+        if((G.playerPoisonStacks||0) > 0)
+            badges.push(`<span style="background:rgba(120,20,160,0.22);border:1px solid #9944cc;border-radius:4px;padding:0 5px;color:#cc88ff;font-size:0.82rem;font-weight:800;white-space:nowrap;">☠️${G.playerPoisonStacks}</span>`);
         if(badges.length > 0){
             el.innerHTML = `<span style="display:inline-flex;gap:4px;align-items:center;flex-wrap:wrap;">${badges.join('')}</span>`;
             el.style.color = '';
@@ -1764,14 +1797,23 @@ function updateStatus(){
     // Enemy status
     const eel = document.getElementById('rp-estatus');
     if(eel){
-        if(G.atkMult >= 2){
-            eel.textContent = `攻撃×${G.atkMult}`;
-            eel.style.color = '#e05040';
+        const ebadges=[];
+        if(G.atkMult >= 2)
+            ebadges.push(`<span style="background:rgba(180,40,20,0.25);border:1px solid #cc4444;border-radius:4px;padding:0 5px;color:#ff7755;font-size:0.82rem;font-weight:800;white-space:nowrap;">攻撃×${G.atkMult}</span>`);
+        if((G.ePoisonStacks||0) > 0)
+            ebadges.push(`<span style="background:rgba(120,20,160,0.22);border:1px solid #9944cc;border-radius:4px;padding:0 5px;color:#cc88ff;font-size:0.82rem;font-weight:800;white-space:nowrap;">☠️${G.ePoisonStacks}</span>`);
+        if(ebadges.length > 0){
+            eel.innerHTML=`<span style="display:inline-flex;gap:4px;align-items:center;flex-wrap:wrap;">${ebadges.join('')}</span>`;
+            eel.style.color='';
         } else {
             eel.textContent = '正常';
             eel.style.color = '#b8a870';
         }
     }
+}
+
+function updateEnemyPoisonDisplay(){
+    updateStatus();
 }
 
 function calcRes(c1,c2,op){ return op==='+'?c1.value+c2.value:Math.abs(c1.value-c2.value); }
@@ -2047,7 +2089,19 @@ function doAttack(){
         const afterAll=()=>{
             if(G.eHP<=0){hideEnemyNow(); setTimeout(()=>showVictory(),900); return;}
             updateStatus();
-            setTimeout(()=>enemyTurn(),1200);
+            // Apply enemy poison tick at end of player turn
+            if((G.ePoisonStacks||0)>0){
+                setTimeout(()=>{
+                    const net=applyEnemyDamage(G.ePoisonStacks);
+                    showDmg(net,'enemy-wrap','dmg-skill');
+                    setMsg(`☠️ 毒ダメージ！ 敵に ${net} ダメージ！`);
+                    updateHP();
+                    if(G.eHP<=0){hideEnemyNow(); setTimeout(()=>showVictory(),900); return;}
+                    setTimeout(()=>enemyTurn(),1000);
+                },400);
+            } else {
+                setTimeout(()=>enemyTurn(),1200);
+            }
         };
         applyNextSkillEffect(trigList, 0, afterAll, chargeMult);
     });
@@ -2066,9 +2120,15 @@ function applyNextSkillEffect(list, idx, done, chargeMult=1){
             // *10 skill: set next-turn charge multiplier
             const m=chargeMultForSkill(sk);
             G.chargeMultiplier=m;
-            showFloatOnHero(`💫×${m}`,'dmg-skill');
-            setMsg(`💫 スキル発動！ 次のターン攻撃力 ×${m}！`);
+            showFloatOnHero(`💥×${m}`,'dmg-skill');
+            setMsg(`💥 スキル発動！ 次のターン攻撃力 ×${m}！`);
             updateStatus();
+        } else if(isPoisonSkill(sk)){
+            const amt=skillEffect(sk);
+            G.ePoisonStacks=(G.ePoisonStacks||0)+amt;
+            showDmg(`☠️+${amt}`,'enemy-wrap','dmg-skill');
+            setMsg(`☠️ スキル発動！ 敵に毒(${amt})付与！ 合計毒スタック: ${G.ePoisonStacks}`);
+            updateEnemyPoisonDisplay();
         } else if(sk.type==='attack'){
             const eff=skillEffect(sk);
             const boostedEff=Math.floor(eff*chargeMult);
@@ -2125,14 +2185,14 @@ function enemyTurn(){
     // Decrement heal seal
     if(G.healSealed>0) G.healSealed--;
 
-    if(isSkillTurn && (e.skill || G.eExtraSkill)){
+    if(isSkillTurn && (e.skill || G.eExtraSkill || G.eExtraSkill2)){
         if(e.skill) doEnemySkill(e.skill, e.name);
         if(G.eExtraSkill) doEnemySkill(G.eExtraSkill, e.name);
+        if(G.eExtraSkill2) doEnemySkill(G.eExtraSkill2, e.name);
         renderHand(); renderSkills();
         updateHP(); G.turn++; G.totalTurns++;
         if(G.pHP<=0){setTimeout(()=>showGameover(),800); return;}
-        G.phase='player'; updateFormula(); updateHandChangeBtn();
-        setTimeout(()=>{ setMsg(''); },1100);
+        endEnemyTurn();
         return;
     }
 
@@ -2154,8 +2214,26 @@ function enemyTurn(){
         setMsg(`👹 ${e.name}の攻撃！ ${atkPow}ダメージ${G.shield>0?`（シールド${atkPow-dmg}吸収）`:''}`);
     updateHP(); renderSkills(); G.turn++; G.totalTurns++;
     if(G.pHP<=0){setTimeout(()=>showGameover(),800); return;}
-    G.phase='player'; updateFormula(); updateHandChangeBtn();
-    setTimeout(()=>{ setMsg(''); },1100);
+    endEnemyTurn();
+}
+
+function endEnemyTurn(){
+    // Apply player poison tick at end of enemy turn
+    if((G.playerPoisonStacks||0)>0){
+        setTimeout(()=>{
+            const dmg=G.playerPoisonStacks;
+            G.pHP=Math.max(0,G.pHP-dmg);
+            showDmg(dmg,'hero-wrap','dmg-player');
+            setMsg(`☠️ 毒ダメージ！ ${dmg} ダメージを受けた！`);
+            updateHP(); updateStatus();
+            if(G.pHP<=0){setTimeout(()=>showGameover(),500); return;}
+            G.phase='player'; updateFormula(); updateHandChangeBtn();
+            setTimeout(()=>{ setMsg(''); },1100);
+        },500);
+    } else {
+        G.phase='player'; updateFormula(); updateHandChangeBtn();
+        setTimeout(()=>{ setMsg(''); },1100);
+    }
 }
 
 function doEnemySkill(sk, enemyName){
@@ -2194,6 +2272,12 @@ function doEnemySkill(sk, enemyName){
     } else if(name==='４倍攻撃'){
         G.atkMult=4;
         setMsg(`✨ ${enemyName}の「${name}」発動！次のターン4倍攻撃！`);
+    } else if(name.startsWith('毒')){
+        const amt=sk.poisonAmt||1;
+        G.playerPoisonStacks=(G.playerPoisonStacks||0)+amt;
+        showFloatOnHero(`☠️+${amt}`,'dmg-player');
+        setMsg(`☠️ ${enemyName}の「${name}」発動！毒(${amt})付与！ 合計: ${G.playerPoisonStacks}`);
+        updateStatus();
     }
 }
 
@@ -2374,7 +2458,7 @@ function openSkillReward(){
         const {icon,effLbl,effVal,effCls}=skillDispInfo(sk);
         // Render as skill-card (same layout as left panel)
         const d=document.createElement('div');
-        d.className='skill-card';
+        d.className='skill-card '+skTypeClass(sk);
         d.style.cssText='cursor:pointer;width:200px;height:54px;flex-shrink:0;transition:transform 0.18s,box-shadow 0.18s;';
         d.innerHTML=
             `<div class="sk-type-sec">
@@ -2561,12 +2645,11 @@ function confirmPowerUp(){
 // FORGET SKILL
 // ============================================================
 function skillBadgeHTML(sk){
-    const icon=sk.type==='attack'?'⚔️':sk.type==='defense'?'🛡️':'🪄';
-    const eff=skillEffect(sk);
+    const {icon,effVal}=skillDispInfo(sk);
     return `<div style="display:flex;align-items:center;gap:5px;justify-content:center;flex-wrap:wrap;">
                 <span style="font-size:1.2rem;">${icon}</span>
                 <span style="font-size:1.1rem;">${condHTML(sk.conds)}</span>
-                <span style="font-size:0.9rem;font-weight:800;color:#7a2010;">${eff}</span>
+                <span style="font-size:0.9rem;font-weight:800;color:#7a2010;">${effVal}</span>
             </div>
             <div style="font-size:0.72rem;color:var(--text-dim);margin-top:2px;text-align:center;">Lv.${sk.level}</div>`;
 }
@@ -2574,14 +2657,13 @@ function openForgetSkill(){
     document.getElementById('forget-new-sk').innerHTML=skillBadgeHTML(pendingNewSkill);
     const list=document.getElementById('forget-list'); list.innerHTML='';
     G.skills.forEach((sk,i)=>{
-        const icon=sk.type==='attack'?'⚔️':sk.type==='defense'?'🛡️':'🪄';
-        const eff=skillEffect(sk);
+        const {icon,effVal}=skillDispInfo(sk);
         const d=document.createElement('div'); d.className='forget-sk-item';
         d.innerHTML=`<span style="font-size:1.1rem;flex-shrink:0;">${icon}</span>
                      <div style="flex:1;min-width:0;">
                          <div class="forget-sk-conds">${condHTML(sk.conds)}</div>
                          <div style="display:flex;align-items:center;gap:8px;">
-                             <span class="forget-sk-ap">${eff}</span>
+                             <span class="forget-sk-ap">${effVal}</span>
                              <span class="sk-lv" style="font-size:0.75rem;">Lv.${sk.level}</span>
                          </div>
                      </div>
@@ -2620,6 +2702,7 @@ function nextEnemy(){
     G.atkMult=1;
     G.sealedCards=[]; G.sealedSkills=[]; G.healSealed=0;
     G.chargeMultiplier=1;
+    G.ePoisonStacks=0; G.playerPoisonStacks=0;
 
     G.eIdx=nextIdx;
     G.phase='player';
@@ -2732,7 +2815,7 @@ function openSkillsView(){
         G.skills.forEach(sk=>{
             const {icon,effLbl,effVal,effCls}=skillDispInfo(sk);
             const d=document.createElement('div');
-            d.className='skill-card';
+            d.className='skill-card '+skTypeClass(sk);
             d.style.cssText='height:54px;pointer-events:none;';
             d.innerHTML=
                 `<div class="sk-type-sec"><div class="sk-type-icon">${icon}</div><div class="sk-lv">Lv.${sk.level}</div></div>
@@ -2775,25 +2858,18 @@ function setupEnemyUI(idx){
         eem.style.display='block';
     }
 
-    // Hard mode: use the fixed hardSkill defined per enemy
-    G.eExtraSkill = (G.difficulty === 'hard' && e.hardSkill) ? e.hardSkill : null;
+    // Hard mode: use the fixed hardSkills defined per enemy
+    G.eExtraSkill  = (G.difficulty==='hard' && e.hardSkill)  ? e.hardSkill  : null;
+    G.eExtraSkill2 = (G.difficulty==='hard' && e.hardSkill2) ? e.hardSkill2 : null;
 
     const skSec=document.getElementById('enemy-skill-sec');
-    if(e.skill || G.eExtraSkill){
-        let html = '';
-        if(e.skill){
-            html += `<div class="enemy-skill-box" id="enemy-skill-box">
-                <div class="enemy-skill-name">⚡ ${e.skill.name}</div>
-                <div class="enemy-skill-desc">${e.skill.desc}</div>
-            </div>`;
-        }
-        if(G.eExtraSkill){
-            html += `<div class="enemy-skill-box" id="enemy-skill-box2" style="margin-top:4px;">
-                <div class="enemy-skill-name">⚡ ${G.eExtraSkill.name}</div>
-                <div class="enemy-skill-desc">${G.eExtraSkill.desc}</div>
-            </div>`;
-        }
-        skSec.innerHTML = html;
+    const eskills=[e.skill, G.eExtraSkill, G.eExtraSkill2].filter(Boolean);
+    if(eskills.length){
+        skSec.innerHTML = eskills.map((sk,i)=>`
+            <div class="enemy-skill-box" id="enemy-skill-box${i||''}" ${i>0?'style="margin-top:4px;"':''}>
+                <div class="enemy-skill-name">⚡ ${sk.name}</div>
+                <div class="enemy-skill-desc">${sk.desc}</div>
+            </div>`).join('');
     } else { skSec.innerHTML=''; }
 
     // stage+turn shown in turn-lbl (left panel)
