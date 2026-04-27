@@ -593,20 +593,23 @@
             cursor:pointer; font-family:inherit; transition:all 0.12s; line-height:1.3;
         }
         .cs-gender-btn-row.active { background:var(--gold); color:#1a0800; border-color:#f5d060; }
-        /* Class image column */
+        /* Class stats column (expanded) */
         .cs-class-info {
-            width:108px; flex-shrink:0;
-            display:flex; flex-direction:column; align-items:center; justify-content:center;
+            width:210px; flex-shrink:0;
+            display:flex; flex-direction:column; align-items:center;
             background:rgba(0,0,0,0.3); border:1px solid var(--bdr-dim); border-radius:10px;
-            padding:4px 2px; gap:3px;
+            padding:7px 8px; gap:3px;
         }
         .cs-hero-img {
-            height:68px; width:auto; max-width:96px;
+            height:80px; width:auto; max-width:100px;
             object-fit:contain; object-position:center;
             display:block;
         }
-        .cs-hero-em   { font-size:38px; line-height:1; }
-        .cs-class-name { font-size:0.8rem; font-weight:800; color:var(--text-hi); text-align:center; }
+        .cs-hero-em   { font-size:42px; line-height:1; }
+        .cs-class-name { font-size:0.88rem; font-weight:800; color:var(--text-hi); text-align:center; margin-bottom:2px; }
+        .cs-stat-row  { font-size:0.76rem; font-weight:700; color:var(--text-main); line-height:1.5; align-self:flex-start; }
+        .cs-stat-skill{ font-size:0.72rem; color:var(--text-dim); font-weight:700; align-self:flex-start; line-height:1.4; }
+        .cs-stat-bonus{ font-size:0.72rem; color:#c4a04a; font-weight:800; align-self:flex-start; line-height:1.4; }
         .cs-locked-img {
             height:68px; width:68px;
             display:flex; align-items:center; justify-content:center;
@@ -618,16 +621,14 @@
             flex:1;
             display:flex; flex-direction:column; align-items:center; justify-content:center;
             background:rgba(0,0,0,0.35); border:2px solid var(--bdr-dim);
-            border-radius:10px; cursor:pointer; transition:all 0.15s; gap:3px; padding:6px;
+            border-radius:10px; cursor:pointer; transition:all 0.15s; gap:6px; padding:8px 4px;
             text-align:center;
         }
         .cs-cell:hover:not(.cs-locked) { border-color:var(--gold); background:rgba(196,154,42,0.1); }
         .cs-cell.cs-selected { border-color:var(--gold); background:rgba(196,154,42,0.22); box-shadow:0 0 14px rgba(196,154,42,0.5); }
         .cs-cell.cs-locked { cursor:not-allowed; opacity:0.40; }
-        .cs-diff-label { font-size:0.7rem; font-weight:800; color:var(--text-dim); letter-spacing:1px; }
+        .cs-diff-label { font-size:0.72rem; font-weight:800; color:var(--text-dim); letter-spacing:1px; }
         .cs-class-lbl  { font-size:0.92rem; font-weight:800; color:var(--text-hi); }
-        .cs-stats      { font-size:0.78rem; font-weight:700; color:var(--text-main); line-height:1.4; }
-        .cs-skill-desc { font-size:0.72rem; color:var(--text-dim); font-weight:700; margin-top:1px; }
         .cs-locked-mark{ font-size:1.5rem; font-weight:800; color:rgba(196,154,42,0.28); letter-spacing:3px; }
 
         /* Slot machine */
@@ -1007,7 +1008,7 @@
             <!-- Header row: gender-col placeholder | img placeholder | Easy | Normal | Hard -->
             <div class="cs-header-row">
                 <div style="width:52px;flex-shrink:0;"></div>
-                <div style="width:108px;flex-shrink:0;"></div>
+                <div style="width:210px;flex-shrink:0;"></div>
                 <div class="cs-diff-header">Easy</div>
                 <div class="cs-diff-header">Normal</div>
                 <div class="cs-diff-header">Hard</div>
@@ -1154,13 +1155,13 @@ const CLASS_DEFS = [
       startSkills:[{type:'attack',suits:2},{type:'defense',suits:1}] },
 ];
 
-// Card counts per class [values 1..9]
+// Card counts per class [values 1..9] — all classes use same balanced deck
 const CLASS_DECK_SPECS = [
     [2,2,2,2,2,2,2,2,2],  // 戦士
-    [4,2,2,1,0,1,2,2,4],  // 魔法使い
-    [1,1,2,3,4,3,2,1,1],  // 僧侶
-    [4,0,0,0,0,3,3,4,4],  // 盗賊
-    [0,5,0,4,0,4,0,5,0],  // 弓使い
+    [2,2,2,2,2,2,2,2,2],  // 魔法使い
+    [2,2,2,2,2,2,2,2,2],  // 僧侶
+    [2,2,2,2,2,2,2,2,2],  // 盗賊
+    [2,2,2,2,2,2,2,2,2],  // 弓使い
 ];
 
 // ============================================================
@@ -1179,6 +1180,31 @@ function recordClear(ci, diff){
     for(let i=0;i<=dIdx;i++) unlocks[`${ci+1}_${DIFFICULTIES[i]}`]=true;
     localStorage.setItem(UNLOCK_KEY, JSON.stringify(unlocks));
 }
+// Clear medal system
+const CLEAR_KEY = 'arith_clears';
+function getClears(){ try{ return JSON.parse(localStorage.getItem(CLEAR_KEY)||'{}'); }catch{ return {}; } }
+function hasClear(ci, diff){ return !!getClears()[`${ci}_${diff}`]; }
+function recordClearMedal(ci, diff){
+    const clears=getClears();
+    const dIdx=DIFFICULTIES.indexOf(diff);
+    for(let i=0;i<=dIdx;i++) clears[`${ci}_${DIFFICULTIES[i]}`]=true;
+    localStorage.setItem(CLEAR_KEY, JSON.stringify(clears));
+}
+function medalHTML(ci, diff){
+    const medals={easy:'⭐',normal:'🌟',hard:'👑'};
+    if(hasClear(ci,diff))
+        return `<span style="font-size:2rem;line-height:1;filter:drop-shadow(0 0 6px rgba(255,220,50,0.7));">${medals[diff]}</span>`;
+    // Empty medal slot (hole in wall effect)
+    return `<div style="display:inline-block;width:32px;height:32px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#221208,#060200);border:2px solid rgba(80,50,20,0.4);box-shadow:inset 0 3px 10px rgba(0,0,0,0.95),inset 0 1px 3px rgba(0,0,0,0.8);"></div>`;
+}
+// Class bonus descriptions per class index
+const CLASS_BONUS_DESCS = [
+    '🛡️シールドスキル ×1.5',
+    '⚔️攻撃スキル ×1.5',
+    '🪄回復スキル ×1.5',
+    '☠️毒スキル 出現×2・Lv↑×2',
+    '💥攻撃倍化 出現×2・Lv↑×2',
+];
 
 // Multiple conditions: '*N' = result divisible by N, base = fixed damage
 const MULT_CONDS = [
@@ -3023,45 +3049,49 @@ function renderCharGrid(){
     const grid=document.getElementById('class-grid');
     grid.innerHTML='';
     CLASS_DEFS.forEach((def,ci)=>{
-        // A class counts as "image-unlocked" if even Easy is available
         const classVisible = ci===0 || isUnlocked(ci,'easy');
         const row=document.createElement('div');
         row.className='cs-row';
 
-        // ── Gender column (♂/♀ buttons, left of image) ──────────────
+        // ── Gender column ──────────────────────────────────────────
         const gCol=document.createElement('div');
         gCol.className='cs-gender-col';
         if(classVisible){
-            const g = charSel.genders[ci]||'male';
+            const g=charSel.genders[ci]||'male';
             gCol.innerHTML=
                 `<button class="cs-gender-btn-row${g==='male'?' active':''}"
                     onclick="csSelectGender(${ci},'male')">♂<br>男</button>
                  <button class="cs-gender-btn-row${g==='female'?' active':''}"
                     onclick="csSelectGender(${ci},'female')">♀<br>女</button>`;
         } else {
-            // locked class: show dimmed placeholder
             gCol.innerHTML=`<div style="opacity:0.18;font-size:0.8rem;text-align:center;line-height:1.5;color:var(--text-dim);">♂<br>♀</div>`;
         }
         row.appendChild(gCol);
 
-        // ── Class image + name column ────────────────────────────────
-        const imgCol=document.createElement('div');
-        imgCol.className='cs-class-info';
+        // ── Class stats column (image + stats + bonus) ─────────────
+        const statsCol=document.createElement('div');
+        statsCol.className='cs-class-info';
         if(classVisible){
             const imgBase=(charSel.genders[ci]||'male')==='female'?def.femaleBase:def.maleBase;
-            imgCol.innerHTML=
+            const skillDesc=classSkillDesc(ci);
+            const bonusDesc=CLASS_BONUS_DESCS[ci]||'';
+            statsCol.innerHTML=
                 `<img src="images/${imgBase}_1.png" class="cs-hero-img" id="cs-img-${ci}" alt="${def.name}"
                     onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
                  <div class="cs-hero-em" style="display:none;">👤</div>
-                 <div class="cs-class-name">${def.name}</div>`;
+                 <div class="cs-class-name">${def.name}</div>
+                 <div class="cs-stat-row">❤️ HP &nbsp;<b>${def.maxHP}</b></div>
+                 <div class="cs-stat-row">🛡️ シールド &nbsp;<b>${def.initShield}</b></div>
+                 <div class="cs-stat-skill">🗡️ ${skillDesc}</div>
+                 <div class="cs-stat-bonus">✨ ${bonusDesc}</div>`;
         } else {
-            imgCol.innerHTML=
+            statsCol.innerHTML=
                 `<div class="cs-locked-img">？</div>
                  <div class="cs-class-name" style="opacity:0.28;color:var(--text-dim);">？？？</div>`;
         }
-        row.appendChild(imgCol);
+        row.appendChild(statsCol);
 
-        // ── 3 difficulty cells ───────────────────────────────────────
+        // ── 3 difficulty cells (medal display) ──────────────────────
         DIFFICULTIES.forEach((diff,dIdx)=>{
             const unlocked=isUnlocked(ci,diff);
             const isSelected=charSel.ci===ci && charSel.diff===diff;
@@ -3069,12 +3099,9 @@ function renderCharGrid(){
             cell.className='cs-cell'+(unlocked?'':' cs-locked')+(isSelected?' cs-selected':'');
             cell.id=`cs-cell-${ci}-${dIdx}`;
             if(unlocked){
-                const hpAdj = diff==='easy' ? 10 : diff==='hard' ? -10 : 0;
-                const dispHP = def.maxHP + hpAdj;
-                const shieldTxt=def.initShield>0?`<div class="cs-stats">🛡️ ${def.initShield}</div>`:'';
-                cell.innerHTML=`<div class="cs-stats"><b>HP</b> ${dispHP}</div>
-                    ${shieldTxt}
-                    <div class="cs-stats cs-skill-desc">${classSkillDesc(ci)}</div>`;
+                cell.innerHTML=
+                    `<div class="cs-diff-label">${diff.toUpperCase()}</div>
+                     <div>${medalHTML(ci,diff)}</div>`;
                 cell.onclick=()=>csSelectCell(ci,dIdx);
             } else {
                 cell.innerHTML=`<div class="cs-locked-mark">？？？</div>`;
@@ -3107,8 +3134,7 @@ function startGameWithClass(ci, diff, gender){
     G.gender    = gender;
 
     const def = CLASS_DEFS[ci];
-    const hpAdj = diff==='easy' ? 10 : diff==='hard' ? -10 : 0;
-    G.pMaxHP  = def.maxHP + hpAdj;
+    G.pMaxHP  = def.maxHP;
     G.pHP     = G.pMaxHP;
     G.initShield = def.initShield;
     G.shield  = def.initShield;
@@ -3176,7 +3202,7 @@ function submitScore(score){
     const diff=G.difficulty||'easy';
     const className=CLASS_DEFS[G.classIdx||0]?.name||'戦士';
     // Record unlock only on full game clear (score===10 = all 10 enemies defeated)
-    if(score===10) recordClear(G.classIdx||0, diff);
+    if(score===10){ recordClear(G.classIdx||0, diff); recordClearMedal(G.classIdx||0, diff); }
     saveLocalScore(name, score, turns, diff, className);
     if(window.currentUser && window.saveOnlineScore){
         window.saveOnlineScore(window.currentUser.uid, name, score, turns, diff, className);
