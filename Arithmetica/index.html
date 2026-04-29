@@ -889,7 +889,8 @@
             <div class="ov-title" style="text-align:center;">❓ あそびかた</div>
             <div class="howto-row"><b>■ 基本</b>　カードを式の枠にドラッグして「攻撃！」で敵にダメージ。奇数ターンは足し算（赤）、偶数ターンは引き算（青）が自動切替。引き算は左が大きい数になるよう自動で入れ替わる。</div>
             <div class="howto-row"><b>■ スート</b>　♥赤 ♦黄 ♠黒 ♣緑。スキルの発動条件に使われる。</div>
-            <div class="howto-row"><b>■ スキル（最大4つ）</b>　スートや計算結果が条件に一致すると自動発動。⚔️ダメージ／🛡️シールド／🪄回復の3種。光っているスキルは発動予告。</div>
+            <div class="howto-row"><b>■ スキル（最大4つ）</b>　スートや計算結果が条件に一致すると自動発動。⚔️攻撃／🛡️シールド／🪄回復／☠️毒／💥倍加／🔮共鳴の6種。光っているスキルは発動予告。</div>
+            <div class="howto-row"><b>■ 倍加スキル💥</b>　発動すると次のターンのスキル効果を倍増（攻撃・シールド・回復・毒・共鳴すべて対象）。スート1条件→Lv1で×1.2（Lvごとに+0.10倍）、スート2条件→Lv1で×1.4（Lvごとに+0.20倍）。同ターンに複数発動すると掛け算で重複。</div>
             <div class="howto-row"><b>■ 特殊カード</b>　報酬カードの一部に⚔️+10・🛡️+5・💚+10の特殊能力。式で使うと攻撃後に自動発動。</div>
             <div class="howto-row"><b>■ 敵のスキル</b>　2・6・10…ターン目に特殊スキルを使う（そのターンは攻撃しない）。光っているときは次に使うサイン。</div>
             <div class="howto-row"><b>■ ステージクリア</b>　HP最大値の1/3回復。シールドはリセット。カード1枚を選んでデッキに追加し、代わりに1枚捨てる。スキルも1つ選べる。</div>
@@ -1178,9 +1179,11 @@ const CLASS_DEFS = [
     { name:'僧侶',    maleBase:'hero_3',  femaleBase:'hero_53', maxHP:120, initShield:30,
       startSkills:[{type:'heal',suits:1},{type:'attack',suits:1}] },
     { name:'盗賊',    maleBase:'hero_4',  femaleBase:'hero_54', maxHP:50, initShield:0,
-      startSkills:[{type:'attack',suits:1},{type:'attack',suits:1},{type:'attack',suits:1}] },
+      startSkills:[{type:'attack',suits:1},{type:'attack',suits:1},{type:'poison',suits:1}] },
     { name:'弓使い',  maleBase:'hero_5',  femaleBase:'hero_55', maxHP:90, initShield:0,
-      startSkills:[{type:'attack',suits:2},{type:'defense',suits:1}] },
+      startSkills:[{type:'attack',suits:1},{type:'attack',suits:1},{type:'charge',suits:1}] },
+    { name:'武道家',  maleBase:'hero_6',  femaleBase:'hero_56', maxHP:80, initShield:10,
+      startSkills:[{type:'boost',suits:1},{type:'attack',suits:1,shareWith:0},{type:'attack',suits:1}] },
 ];
 
 // Card counts per class [values 1..9] — all classes use same balanced deck
@@ -1190,6 +1193,7 @@ const CLASS_DECK_SPECS = [
     [2,2,2,2,2,2,2,2,2],  // 僧侶
     [2,2,2,2,2,2,2,2,2],  // 盗賊
     [2,2,2,2,2,2,2,2,2],  // 弓使い
+    [2,2,2,2,2,2,2,2,2],  // 武道家
 ];
 
 // ============================================================
@@ -1230,8 +1234,9 @@ const CLASS_BONUS_DESCS = [
     '🛡️シールドスキル ×1.5',
     '⚔️攻撃スキル ×1.5',
     '🪄回復スキル ×1.5',
-    '☠️毒スキル 出現×2・Lv↑×2',
-    '💥攻撃倍化 出現×2・Lv↑×2',
+    '☠️毒ダメージ ×1.5',
+    '💥倍加スキル 効果×1.5',
+    '🔮共鳴スキル 効果×1.5',
 ];
 
 // Multiple conditions: '*N' = result divisible by N, base = fixed damage
@@ -1471,34 +1476,43 @@ function skillEffect(sk){
     let val = Math.floor(sk.base * mult);
     // Global balance: attack and heal are 2x effective (shield kept as-is for relative weakness)
     if((sk.type==='attack' && !isChargeSkill(sk)) || sk.type==='heal') val *= 2;
-    // Class bonus: 戦士→shield×1.5, 魔法使い→attack×1.5, 僧侶→heal×1.5
+    // Class bonus
     if(typeof G !== 'undefined' && G && G.classIdx !== undefined && CLASS_DEFS[G.classIdx]){
         const clsName = CLASS_DEFS[G.classIdx].name;
         if(sk.type==='defense' && clsName==='戦士')                          val = Math.floor(val * 1.5);
         else if(sk.type==='attack' && !isChargeSkill(sk) && clsName==='魔法使い') val = Math.floor(val * 1.5);
         else if(sk.type==='heal'   && clsName==='僧侶')                      val = Math.floor(val * 1.5);
+        else if(sk.type==='poison' && clsName==='盗賊')                      val = Math.floor(val * 1.5);
     }
     return val;
 }
-// Charge skill helpers (*10 condition → next-attack multiplier)
-function isChargeSkill(sk){ return sk.conds.includes('*10'); }
+// Charge skill helpers (type:'charge' → next-turn skill multiplier)
+function isChargeSkill(sk){ return sk.type==='charge' || sk.conds.includes('*10'); }
 function chargeMultForSkill(sk){
-    const suits = sk.conds.filter(c=>c[0]!=='*'&&c[0]!=='≤').length;
-    const base = suits + 2; // 0suits→2, 1suit→3, 2suits→4
     const lv = sk.level || 1;
-    // Each level adds 50% of base: Lv1→base, Lv2→base*1.5, Lv3→base*2
-    const m = base * (1 + 0.5*(lv-1));
-    return m;
+    // Legacy *10 skill — keep old formula
+    if(sk.conds.includes('*10')){
+        const suits = sk.conds.filter(c=>c[0]!=='*'&&c[0]!=='≤').length;
+        return (suits + 2) * (1 + 0.5*(lv-1));
+    }
+    // New suit-only charge: 1suit→1.2+0.10/lv, 2suits→1.4+0.20/lv
+    const suits = sk.conds.length;
+    const base = suits >= 2 ? (1.4 + 0.20*(lv-1)) : (1.2 + 0.10*(lv-1));
+    // 弓使いボーナス
+    const _cls = (typeof G!=='undefined'&&G&&G.classIdx!==undefined) ? CLASS_DEFS[G.classIdx] : null;
+    return _cls && _cls.name==='弓使い' ? base * 1.5 : base;
 }
 // Poison skill helper
 function isPoisonSkill(sk){ return sk.type==='poison'; }
 // Boost skill helpers
 function isBoostSkill(sk){ return sk.type==='boost'; }
 function boostMultForSkill(sk){
-    const suits = sk.conds.length; // boost uses suit-only conds
+    const suits = sk.conds.length;
     const lv = sk.level || 1;
-    if(suits >= 2) return 2.0 + 0.5*(lv-1);
-    return 1.5 + 0.25*(lv-1);
+    const base = suits >= 2 ? (2.0 + 0.5*(lv-1)) : (1.5 + 0.25*(lv-1));
+    // 武道家ボーナス
+    const _cls = (typeof G!=='undefined'&&G&&G.classIdx!==undefined) ? CLASS_DEFS[G.classIdx] : null;
+    return _cls && _cls.name==='武道家' ? base * 1.5 : base;
 }
 // CSS modifier class by skill type
 function skTypeClass(sk){
@@ -1590,6 +1604,18 @@ function genPoisonSkill(){
     return {type:'poison', conds, base, level};
 }
 
+// Generate charge (倍加) skill — suit conditions only, 1 or 2 suits
+function genChargeSkill(){
+    const usedS=new Set(); const conds=[];
+    const suitCount = Math.random()<0.55 ? 1 : 2;
+    while(conds.length<suitCount){
+        const s=SUITS[rnd(0,3)];
+        if(!usedS.has(s)){usedS.add(s); conds.push(s);}
+    }
+    const level = Math.random()<0.05 ? 2 : 1;
+    return {type:'charge', conds, base:0, level};
+}
+
 // Generate boost (共鳴) skill — suit conditions only, 1 or 2 suits
 function genBoostSkill(){
     const usedS=new Set(); const conds=[];
@@ -1602,15 +1628,11 @@ function genBoostSkill(){
     return {type:'boost', conds, base:0, level};
 }
 
-// Generate skill candidate. Type: attack/defense/heal/poison/boost. Max 2 suits, max 1 mult.
+// Generate skill candidate. Type: attack/defense/heal/poison/charge/boost.
 function genSkill(){
-    // Class-based appearance adjustments
-    const _cls = (typeof G!=='undefined' && G && G.classIdx!==undefined) ? CLASS_DEFS[G.classIdx] : null;
-    const _isThief  = _cls && _cls.name==='盗賊';
-    const _isArcher = _cls && _cls.name==='弓使い';
-    const poisonChance = _isThief ? 0.20 : 0.10; // 盗賊は毒スキル2倍
-    if(Math.random()<poisonChance) return genPoisonSkill();
-    if(Math.random()<0.10) return genBoostSkill(); // 共鳴スキル（チャージと同程度の出現率）
+    if(Math.random()<0.10) return genPoisonSkill();
+    if(Math.random()<0.10) return genChargeSkill();
+    if(Math.random()<0.10) return genBoostSkill();
     const r=Math.random();
     const n = r<0.6 ? 1 : r<0.9 ? 2 : 3;
     const suitPart=[]; const multPart=[]; const lePart=[];
@@ -1636,20 +1658,12 @@ function genSkill(){
                 if(!usedS.has(s)){suitPart.push(s);usedS.add(s);break;}
             }
         }
-        function pickMultCondWeighted(){
-            // *10 has weight 1 normally (1/5 as often), but weight 2 for 弓使い (2/5 as often)
-            const chargeW = _isArcher ? 2 : 1;
-            const totalW = MULT_CONDS.reduce((s,c)=>s+(c.key==='*10'?chargeW:5), 0);
-            let r = Math.random() * totalW;
-            for(const c of MULT_CONDS){ r -= (c.key==='*10'?chargeW:5); if(r<=0) return c.key; }
-            return MULT_CONDS[MULT_CONDS.length-1].key;
-        }
         function pickNonSuit(){
             if(canMult && canLe){
-                if(Math.random()<0.5) multPart.push(pickMultCondWeighted());
+                if(Math.random()<0.5) multPart.push(MULT_CONDS[rnd(0,MULT_CONDS.length-1)].key);
                 else lePart.push(LE_CONDS[rnd(0,LE_CONDS.length-1)].key);
             } else if(canMult){
-                multPart.push(pickMultCondWeighted());
+                multPart.push(MULT_CONDS[rnd(0,MULT_CONDS.length-1)].key);
             } else {
                 lePart.push(LE_CONDS[rnd(0,LE_CONDS.length-1)].key);
             }
@@ -1676,22 +1690,42 @@ function genSuitSkill(){
     return finalizeSkill({type:'attack', conds:[SUITS[rnd(0,3)]], base:4});
 }
 
+function _pickNSuits(n){
+    const usedS=new Set(); const conds=[];
+    while(conds.length<n){
+        const s=SUITS[rnd(0,3)];
+        if(!usedS.has(s)){usedS.add(s); conds.push(s);}
+    }
+    return conds;
+}
+function _makeOneStartSkill(sk, conds){
+    if(sk.type==='charge') return finalizeSkill({type:'charge', conds, base:0, level:1});
+    if(sk.type==='boost')  return finalizeSkill({type:'boost',  conds, base:0, level:1});
+    if(sk.type==='poison') return finalizeSkill({type:'poison', conds, base:conds.length*2, level:1});
+    const base = 4 * sk.suits * sk.suits; // attack/defense/heal: 1suit→4, 2suits→16
+    return finalizeSkill({type:sk.type, conds, base, level:1});
+}
 // Generate all starting skills for a class (returns array)
 function makeClassStartSkills(ci){
-    return CLASS_DEFS[ci].startSkills.map(sk=>{
-        const suits=[]; const usedS=new Set();
-        while(suits.length<sk.suits){
-            const s=SUITS[rnd(0,3)];
-            if(!usedS.has(s)){suits.push(s);usedS.add(s);}
+    const defs = CLASS_DEFS[ci].startSkills;
+    const generatedConds = []; // cache conds by index for shareWith
+    return defs.map((sk, i)=>{
+        let conds;
+        if(sk.shareWith !== undefined){
+            // Reuse the first suit from a previously generated skill
+            const src = generatedConds[sk.shareWith];
+            conds = src ? [src[0]] : _pickNSuits(1);
+        } else {
+            conds = _pickNSuits(sk.suits);
         }
-        const base=4*sk.suits*sk.suits; // 1 suit→4, 2 suits→16
-        return finalizeSkill({type:sk.type, conds:suits, base});
+        generatedConds.push(conds);
+        return _makeOneStartSkill(sk, conds);
     });
 }
 
 // Build human-readable skill description for class-select cell
 function classSkillDesc(ci){
-    const typeName={attack:'攻撃スキル', defense:'防御スキル', heal:'回復スキル', boost:'共鳴スキル'};
+    const typeName={attack:'攻撃スキル', defense:'防御スキル', heal:'回復スキル', charge:'倍加スキル', boost:'共鳴スキル', poison:'毒スキル'};
     const labels=CLASS_DEFS[ci].startSkills.map(sk=>{
         const prefix=sk.suits>=2?'強い':'';
         return prefix+typeName[sk.type];
@@ -1916,7 +1950,7 @@ function updateStatus(){
         if(G.healSealed > 0)
             badges.push(`<span style="background:rgba(180,40,20,0.25);border:1px solid #cc4444;border-radius:4px;padding:0 5px;color:#ff7755;font-size:0.82rem;font-weight:800;white-space:nowrap;">回復×</span>`);
         if((G.chargeMultiplier||1) > 1)
-            badges.push(`<span style="background:rgba(196,154,42,0.22);border:1px solid var(--gold);border-radius:4px;padding:0 5px;color:#f5e040;font-size:0.82rem;font-weight:800;white-space:nowrap;">攻撃×${G.chargeMultiplier}</span>`);
+            badges.push(`<span style="background:rgba(196,154,42,0.22);border:1px solid var(--gold);border-radius:4px;padding:0 5px;color:#f5e040;font-size:0.82rem;font-weight:800;white-space:nowrap;">💥スキル×${G.chargeMultiplier.toFixed(2).replace(/\.?0+$/,'')}</span>`);
         if((G.playerPoisonStacks||0) > 0)
             badges.push(`<span style="background:rgba(120,20,160,0.22);border:1px solid #9944cc;border-radius:4px;padding:0 5px;color:#cc88ff;font-size:0.82rem;font-weight:800;white-space:nowrap;">☠️${G.playerPoisonStacks}</span>`);
         if(badges.length > 0){
@@ -2234,21 +2268,19 @@ function doAttack(){
     const res=calcRes(c1,c2,opNow);
     G.s1=null; G.s2=null;
 
-    // Consume charge multiplier (set by *10 skill on previous turn)
+    // Consume charge multiplier (set by charge skill on previous turn) — applies to skills only
     const chargeMult = G.chargeMultiplier || 1;
     G.chargeMultiplier = 1;
-    const chargedRes = Math.floor(res * chargeMult);
 
-    // Apply damage to enemy (with enemy shield)
-    const netRes=applyEnemyDamage(chargedRes);
+    // Apply damage to enemy (direct attack — no charge bonus)
+    const netRes=applyEnemyDamage(res);
     showDmg(netRes,'enemy-wrap','dmg-enemy');
     shakeEnemy();
     G.discard.push(c1,c2);
     updateHP(); updateFormula();
     const sym=opNow==='+'?'＋':'－';
-    const shieldMsg=(chargedRes-netRes)>0?`（シールド${chargedRes-netRes}吸収）`:'';
-    const chargeNote = chargeMult>1 ? `　⚡×${chargeMult}` : '';
-    setMsg(`⚔️ ${c1.value}${sym}${c2.value}＝${res}${chargeNote}　${netRes}ダメージ！${shieldMsg}`);
+    const shieldMsg=(res-netRes)>0?`（シールド${res-netRes}吸収）`:'';
+    setMsg(`⚔️ ${c1.value}${sym}${c2.value}＝${res}　${netRes}ダメージ！${shieldMsg}`);
 
     // Skill weight for this turn: add ALL triggered skills' weights at most once,
     // so skills that "would have fired" when enemy dies mid-chain still count.
@@ -2354,47 +2386,51 @@ function applyNextSkillEffect(list, idx, done, chargeMult=1, boostMult=1){
             const effectiveMult=boostMultForSkill(sk)*boostMult;
             const nextSkIdx=list[idx+1];
             if(nextSkIdx===i+1){
-                // 直下スキルも発動している → 共鳴成立
                 showFloatOnHero(`🔮${_mFmt(effectiveMult)}`,'dmg-skill');
                 setMsg(`🔮 共鳴！ 次のスキルを${_mFmt(effectiveMult)}強化！`);
                 nextBoostMult=effectiveMult;
             } else {
-                // 直下スキル未発動 → 不発
                 showFloatOnHero('🔮 不発','dmg-skill');
                 setMsg('🔮 共鳴スキル発動…対象スキルが未発動のため効果なし');
             }
         } else if(isChargeSkill(sk)){
+            // 乗算累積（同ターンに複数発動時）
             const m=chargeMultForSkill(sk)*boostMult;
-            G.chargeMultiplier=m;
-            showFloatOnHero(`💥${_mFmt(m)}`,'dmg-skill');
+            G.chargeMultiplier=(G.chargeMultiplier||1)*m;
+            showFloatOnHero(`💥${_mFmt(G.chargeMultiplier)}`,'dmg-skill');
             const note=boostMult>1?` （🔮共鳴${_mFmt(boostMult)}）`:'';
-            setMsg(`💥 スキル発動！ 次のターン攻撃力 ${_mFmt(m)}！${note}`);
+            setMsg(`💥 スキル発動！ 次のターンスキル効果 ${_mFmt(G.chargeMultiplier)}！${note}`);
             updateStatus();
         } else if(isPoisonSkill(sk)){
-            const amt=Math.floor(skillEffect(sk)*boostMult);
+            const amt=Math.floor(skillEffect(sk)*boostMult*chargeMult);
             G.ePoisonStacks=(G.ePoisonStacks||0)+amt;
             showDmg(`☠️+${amt}`,'enemy-wrap','dmg-skill');
-            const note=boostMult>1?` （🔮共鳴${_mFmt(boostMult)}）`:'';
+            const notes=[];
+            if(chargeMult>1) notes.push(`💥${_mFmt(chargeMult)}`);
+            if(boostMult>1)  notes.push(`🔮${_mFmt(boostMult)}`);
+            const note=notes.length?` （${notes.join('・')}）`:'';
             setMsg(`☠️ スキル発動！ 敵に毒(${amt})付与！ 合計毒スタック: ${G.ePoisonStacks}${note}`);
             updateEnemyPoisonDisplay();
         } else if(sk.type==='attack'){
-            const eff=Math.floor(skillEffect(sk)*boostMult);
-            const boostedEff=Math.floor(eff*chargeMult);
-            const netEff=applyEnemyDamage(boostedEff);
+            const eff=Math.floor(skillEffect(sk)*boostMult*chargeMult);
+            const netEff=applyEnemyDamage(eff);
             showDmg(netEff,'enemy-wrap','dmg-skill');
             const notes=[];
-            if(chargeMult>1) notes.push(`${_mFmt(chargeMult)}ブースト`);
-            if(boostMult>1)  notes.push(`🔮共鳴${_mFmt(boostMult)}`);
+            if(chargeMult>1) notes.push(`💥${_mFmt(chargeMult)}`);
+            if(boostMult>1)  notes.push(`🔮${_mFmt(boostMult)}`);
             const note=notes.length?`（${notes.join('・')}）`:'';
             setMsg(`⚔️ スキル発動！ ${netEff}ダメージ！${note}`);
         } else if(sk.type==='defense'){
-            const eff=Math.floor(skillEffect(sk)*boostMult);
+            const eff=Math.floor(skillEffect(sk)*boostMult*chargeMult);
             G.shield+=eff;
             showFloatOnHero(`🛡️+${eff}`,'dmg-shield');
-            const note=boostMult>1?` （🔮共鳴${_mFmt(boostMult)}）`:'';
+            const notes=[];
+            if(chargeMult>1) notes.push(`💥${_mFmt(chargeMult)}`);
+            if(boostMult>1)  notes.push(`🔮${_mFmt(boostMult)}`);
+            const note=notes.length?` （${notes.join('・')}）`:'';
             setMsg(`🛡️ スキル発動！ シールド +${eff}${note}`);
         } else {
-            const eff=Math.floor(skillEffect(sk)*boostMult);
+            const eff=Math.floor(skillEffect(sk)*boostMult*chargeMult);
             if(G.healSealed>0){
                 showFloatOnHero('🪄封印','dmg-heal');
                 setMsg('🪄 回復封じ中！回復できない！');
@@ -2402,7 +2438,10 @@ function applyNextSkillEffect(list, idx, done, chargeMult=1, boostMult=1){
                 const healed=Math.min(eff, G.pMaxHP-G.pHP);
                 G.pHP+=healed;
                 showFloatOnHero(`🪄+${healed}`,'dmg-heal');
-                const note=boostMult>1?` （🔮共鳴${_mFmt(boostMult)}）`:'';
+                const notes=[];
+                if(chargeMult>1) notes.push(`💥${_mFmt(chargeMult)}`);
+                if(boostMult>1)  notes.push(`🔮${_mFmt(boostMult)}`);
+                const note=notes.length?` （${notes.join('・')}）`:'';
                 setMsg(`🪄 スキル発動！ HP +${healed}${note}`);
             }
         }
@@ -2791,19 +2830,7 @@ function pickSkill(sk){
 function tryRandomSkillLevelup(callback){
     const upCandidates = G.skills.slice(); // no level cap
     if(upCandidates.length===0 || Math.random()>=0.5){ if(callback) callback(); return; }
-    // Class-based levelup weights: thief→poison×2, archer→charge×2
-    const cls = CLASS_DEFS[G.classIdx];
-    const isThief = cls && cls.name==='盗賊';
-    const isArcher = cls && cls.name==='弓使い';
-    const weights = upCandidates.map(sk=>{
-        if(isThief && isPoisonSkill(sk)) return 2;
-        if(isArcher && isChargeSkill(sk)) return 2;
-        return 1;
-    });
-    const totalW = weights.reduce((a,b)=>a+b,0);
-    let r2 = Math.random()*totalW;
-    let sk = upCandidates[upCandidates.length-1];
-    for(let i=0;i<upCandidates.length;i++){r2-=weights[i]; if(r2<=0){sk=upCandidates[i]; break;}}
+    const sk = upCandidates[rnd(0, upCandidates.length-1)];
     sk.level++;
     renderSkills();
     const {icon,effLbl,effVal,effCls}=skillDispInfo(sk);
