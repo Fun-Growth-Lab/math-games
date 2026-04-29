@@ -278,7 +278,9 @@
         .forget-sk-conds { font-size:1.4rem; font-weight:800; flex:1; display:flex; align-items:center; gap:3px; flex-wrap:wrap; }
         .forget-sk-ap    { font-size:0.9rem; font-weight:800; color:#8b2020; white-space:nowrap; }
 
-        #turn-lbl { color:var(--text-dim); font-size:0.9rem; font-weight:bold; text-align:center; padding-top:2px; }
+        #turn-lbl { color:var(--text-dim); font-size:0.78rem; font-weight:bold; text-align:center; padding-top:2px;
+                    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        #score-lbl { font-size:0.82rem; font-weight:800; color:var(--gold); text-align:center; letter-spacing:1px; }
 
         /* ==================== CENTER ==================== */
         #battle-center { flex:1; min-width:0; display:flex; flex-direction:column; justify-content:flex-start; gap:4px; }
@@ -736,7 +738,8 @@
                 <div class="srow" style="margin-bottom:0;"><span class="slabel">捨て札</span><span id="rp-disc" class="sval">0</span></div>
             </div>
 
-            <div id="turn-lbl">[Normal]　ステージ 1／10　ターン 1</div>
+            <div id="turn-lbl"></div>
+            <div id="score-lbl">スコア: —</div>
         </div>
 
         <!-- CENTER -->
@@ -1141,7 +1144,7 @@ const ENEMY_LIST = [
       hardSkill:{ name:'３倍攻撃',   desc:'次のターン、攻撃力3倍で攻撃する' } },
     { name:'古代の神',   maxHp: 600,  atk: 60, img:'images/enemy_10_1.png', em:'👁️',
       skill:{ name:'４倍攻撃',   desc:'次のターン、攻撃力4倍で攻撃する' },
-      hardSkill:{ name:'シールド破壊', desc:'プレーヤーのシールドを0にする' },
+      hardSkill:{ name:'HP回復', desc:'最大HPの10%を回復する' },
       hardSkill2:{ name:'毒(6)', poisonAmt:6, desc:'プレーヤーに毒(6)を付与する' } },
 ];
 const ALL_ENEMY_SKILLS = ENEMY_LIST.filter(e=>e.skill).map(e=>e.skill);
@@ -1328,6 +1331,8 @@ function newG() {
         handChanges: 3,
         // Hard extra skill
         eExtraSkill: null,
+        // Cumulative skill score (weighted trigger count across whole run)
+        totalSkillWeight: 0,
         // Save state
         saveState: 'battle',
         pendingSkillOptions: null,
@@ -2027,9 +2032,10 @@ function updateFormula(){
     }
 
     const diffLbl = G.difficulty==='easy'?'Easy':G.difficulty==='hard'?'Hard':'Normal';
-    document.getElementById('turn-lbl').textContent=`[${diffLbl}]　ステージ ${G.eIdx+1}／10　ターン ${G.turn}`;
+    document.getElementById('turn-lbl').textContent=`[${diffLbl}] ステージ${G.eIdx+1}/10 ターン${G.turn}`;
     document.getElementById('rp-deck').textContent=G.deck.length;
     document.getElementById('rp-disc').textContent=G.discard.length;
+    updateScoreLbl();
 
     updateSkillPreview();
 
@@ -2177,7 +2183,22 @@ function doAttack(){
     const chargeNote = chargeMult>1 ? `　⚡×${chargeMult}` : '';
     setMsg(`⚔️ ${c1.value}${sym}${c2.value}＝${res}${chargeNote}　${netRes}ダメージ！${shieldMsg}`);
 
-    if(G.eHP<=0){hideEnemyNow(); setTimeout(()=>showVictory(),900); return;}
+    // Skill weight for this turn: add ALL triggered skills' weights at most once,
+    // so skills that "would have fired" when enemy dies mid-chain still count.
+    let _skillWeightAdded=false;
+    const addSkillWeightOnce=()=>{
+        if(_skillWeightAdded) return;
+        _skillWeightAdded=true;
+        G.skills.forEach((sk,i)=>{
+            if(triggered(sk,c1,c2,res,i)){
+                const n=sk.conds.length;
+                G.totalSkillWeight=(G.totalSkillWeight||0)+(n===1?1:n===2?2:4);
+            }
+        });
+        updateScoreLbl();
+    };
+
+    if(G.eHP<=0){addSkillWeightOnce(); hideEnemyNow(); setTimeout(()=>showVictory(),900); return;}
 
     // Card special abilities (applied before skills)
     const specials=[];
@@ -2208,7 +2229,7 @@ function doAttack(){
                     }
                 }
                 updateHP();
-                if(G.eHP<=0){hideEnemyNow(); setTimeout(()=>showVictory(),900); return;}
+                if(G.eHP<=0){addSkillWeightOnce(); hideEnemyNow(); setTimeout(()=>showVictory(),900); return;}
                 next();
             },500);
         };
@@ -2216,7 +2237,7 @@ function doAttack(){
     };
 
     afterSpecials(()=>{
-        if(G.eHP<=0){hideEnemyNow(); setTimeout(()=>showVictory(),900); return;}
+        if(G.eHP<=0){addSkillWeightOnce(); hideEnemyNow(); setTimeout(()=>showVictory(),900); return;}
         // Collect triggered skills (clear preview class)
         const trigList=[];
         G.skills.forEach((sk,i)=>{
@@ -2226,6 +2247,9 @@ function doAttack(){
                 if(el) el.classList.remove('preview');
             }
         });
+        // Count ALL triggered skills now — includes those that won't fire
+        // because enemy dies on an earlier skill in the chain
+        addSkillWeightOnce();
         const afterAll=()=>{
             if(G.eHP<=0){hideEnemyNow(); setTimeout(()=>showVictory(),900); return;}
             updateStatus();
@@ -2424,6 +2448,21 @@ function doEnemySkill(sk, enemyName){
         showDmg('☠️→0','enemy-wrap','dmg-shield');
         setMsg(`✨ ${enemyName}の「毒消し」発動！毒${prev>0?`(${prev})`:''}が消えた！`);
         updateStatus();
+    } else if(name==='HP回復'){
+        const healAmt=Math.min(Math.floor(G.eMaxHp*0.1), G.eMaxHp-G.eHP);
+        G.eHP+=healAmt;
+        // Show positive float on enemy
+        const _tgt=document.getElementById('enemy-wrap');
+        const _cont=document.getElementById('container');
+        const _tr=_tgt.getBoundingClientRect(), _cr=_cont.getBoundingClientRect(), _sc=getScale();
+        const _f=document.createElement('div');
+        _f.className='dmg-float dmg-heal';
+        _f.textContent=`+${healAmt}`;
+        _f.style.left=(((_tr.left-_cr.left)+_tr.width/2-24)/_sc)+'px';
+        _f.style.top= ((_tr.top -_cr.top +_tr.height*0.2)/_sc)+'px';
+        _cont.appendChild(_f); setTimeout(()=>_f.remove(),1200);
+        setMsg(`✨ ${enemyName}の「HP回復」発動！${healAmt>0?healAmt+'HP回復！':'HPが満タン！'}`);
+        updateHP();
     }
 }
 
@@ -2453,6 +2492,18 @@ function shakeEnemy(){
 function hideEnemyNow(){
     document.getElementById('enemy-wrap').style.visibility='hidden';
     document.getElementById('vs-area').style.visibility='hidden';
+}
+
+// ============================================================
+// SCORE
+// ============================================================
+function calcBattleScore(){
+    const hpRatio = G.pMaxHP > 0 ? Math.max(0, G.pHP) / G.pMaxHP : 0;
+    return Math.round(hpRatio * 200 + (G.totalSkillWeight||0) * 100);
+}
+function updateScoreLbl(){
+    const el=document.getElementById('score-lbl');
+    if(el) el.textContent=`スコア: ${calcBattleScore()}`;
 }
 
 // ============================================================
@@ -3248,11 +3299,11 @@ function getLocalRanking(diff){
     const key=RANK_KEYS[diff]||RANK_KEYS.easy;
     try{ return JSON.parse(localStorage.getItem(key)||'[]'); }catch{ return []; }
 }
-function saveLocalScore(name, score, turns, diff, className){
+function saveLocalScore(name, score, turns, diff, className, pointScore){
     const key=RANK_KEYS[diff]||RANK_KEYS.easy;
     let r=getLocalRanking(diff);
     const dateStr=new Date().toLocaleDateString('ja-JP');
-    r.push({name, score, turns, date:dateStr, className:className||''});
+    r.push({name, score, turns, date:dateStr, className:className||'', pointScore:pointScore||0});
     r.sort((a,b)=>{
         if(b.score!==a.score) return b.score-a.score;
         if((a.turns||999)!==(b.turns||999)) return (a.turns||999)-(b.turns||999);
@@ -3266,11 +3317,12 @@ function submitScore(score){
     const turns=G.totalTurns;
     const diff=G.difficulty||'easy';
     const className=CLASS_DEFS[G.classIdx||0]?.name||'戦士';
+    const pointScore=calcBattleScore();
     // Record unlock only on full game clear (score===10 = all 10 enemies defeated)
     if(score===10){ recordClear(G.classIdx||0, diff); recordClearMedal(G.classIdx||0, diff); }
-    saveLocalScore(name, score, turns, diff, className);
+    saveLocalScore(name, score, turns, diff, className, pointScore);
     if(window.currentUser && window.saveOnlineScore){
-        window.saveOnlineScore(window.currentUser.uid, name, score, turns, diff, className);
+        window.saveOnlineScore(window.currentUser.uid, name, score, turns, diff, className, pointScore);
     }
 }
 
@@ -3291,10 +3343,12 @@ function renderRankList(rows, myUid){
         const numCls = i<3 ? 'rank-num top3' : 'rank-num';
         const nameCls = isMe ? 'rank-pname me' : 'rank-pname';
         const classLbl = r.className ? `<span class="rank-date">${r.className}</span>` : '';
+        const ptTxt = r.pointScore!=null ? `<span class="rank-score" style="color:#c4a04a;font-size:0.92rem;">${r.pointScore}pt</span>` : '';
         li.innerHTML = `<span class="${numCls}">${numTxt}</span>
                         <span class="${nameCls}">${r.name||'ななしさん'}</span>
                         ${classLbl}
                         <span class="rank-score">${scoreLabel(r.score)}</span>
+                        ${ptTxt}
                         <span class="rank-date">${r.turns!=null?r.turns+'ターン':''}</span>
                         ${r.date?`<span class="rank-date">${r.date}</span>`:''}`;
         ul.appendChild(li);
