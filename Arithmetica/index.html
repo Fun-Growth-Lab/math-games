@@ -1035,12 +1035,16 @@
         </div>
     </div>
 
-    <!-- Drag ghost -->
+    <!-- Drag ghost (hand cards) -->
     <div id="drag-ghost" class="card">
         <div class="c-suit s-none" id="gh-suit"></div>
         <div class="c-num" id="gh-num"></div>
         <div class="c-special" id="gh-special"></div>
     </div>
+    <!-- Skill drag ghost -->
+    <div id="sk-ghost" class="skill-card" style="position:absolute;pointer-events:none;z-index:9998;display:none;
+         transform:rotate(-3deg) scale(1.07);box-shadow:0 10px 30px rgba(0,0,0,0.75);
+         opacity:0.93;width:230px;"></div>
 
 </div><!-- #container -->
 
@@ -1112,7 +1116,7 @@ const ENEMY_LIST = [
       hardSkill:{ name:'攻撃強化',   desc:'基礎攻撃力を永続的に50%増加する' } },
     { name:'コウモリ',   maxHp: 100,  atk: 14, img:'images/enemy_2_1.png',  em:'🦇',
       skill:{ name:'毒(2)', poisonAmt:2, desc:'プレーヤーに毒(2)を付与する' },
-      hardSkill:{ name:'３倍攻撃',   desc:'次のターン、攻撃力3倍で攻撃する' } },
+      hardSkill:{ name:'2.5倍攻撃', desc:'次のターン、攻撃力2.5倍で攻撃する' } },
     { name:'スケルトン', maxHp: 150,  atk: 20, img:'images/enemy_3_1.png',  em:'💀',
       skill:{ name:'手札封印',   desc:'手札をランダムで1枚、3ターン使用不可にする' },
       hardSkill:{ name:'回復封じ',   desc:'3ターン、HP回復を封じる' } },
@@ -1124,7 +1128,7 @@ const ENEMY_LIST = [
       skill:{ name:'回復封じ',   desc:'3ターン、HP回復を封じる' },
       hardSkill:{ name:'手札封印',   desc:'手札をランダムで1枚、3ターン使用不可にする' } },
     { name:'オーク戦士', maxHp: 380,  atk: 34, img:'images/enemy_6_1.png',  em:'👹',
-      skill:{ name:'３倍攻撃',   desc:'次のターン、攻撃力3倍で攻撃する' },
+      skill:{ name:'2.5倍攻撃', desc:'次のターン、攻撃力2.5倍で攻撃する' },
       hardSkill:{ name:'守備強化',   desc:'自身の基礎攻撃力の2倍のシールドを張る' } },
     { name:'ゴーレム',   maxHp: 460,  atk: 38, img:'images/enemy_7_1.png',  em:'🗿',
       skill:{ name:'守備強化',   desc:'自身の基礎攻撃力の2倍のシールドを張る' },
@@ -1135,9 +1139,9 @@ const ENEMY_LIST = [
       hardSkill2:{ name:'毒消し', desc:'自身の毒状態を治す' } },
     { name:'闇の魔道士', maxHp: 500,  atk: 56, img:'images/enemy_9_1.png',  em:'🧙',
       skill:{ name:'スキル封印', desc:'スキルをランダムで1つ、3ターン使用不可にする' },
-      hardSkill:{ name:'３倍攻撃',   desc:'次のターン、攻撃力3倍で攻撃する' } },
+      hardSkill:{ name:'2.5倍攻撃', desc:'次のターン、攻撃力2.5倍で攻撃する' } },
     { name:'古代の神',   maxHp: 600,  atk: 60, img:'images/enemy_10_1.png', em:'👁️',
-      skill:{ name:'４倍攻撃',   desc:'次のターン、攻撃力4倍で攻撃する' },
+      skill:{ name:'３倍攻撃',   desc:'次のターン、攻撃力3倍で攻撃する' },
       hardSkill:{ name:'HP回復', desc:'最大HPの10%を回復する' },
       hardSkill2:{ name:'毒(6)', poisonAmt:6, desc:'プレーヤーに毒(6)を付与する' } },
 ];
@@ -1450,7 +1454,7 @@ function restoreGameUI(){
 
 // Compute actual effect for a skill (accounts for level, global balance, and class bonus)
 function skillEffect(sk){
-    const mult = sk.level===1 ? 1.0 : sk.level===2 ? 1.5 : 2.0;
+    const mult = 1.0 + 0.5 * ((sk.level||1) - 1);
     let val = Math.floor(sk.base * mult);
     // Global balance: attack and heal are 2x effective (shield kept as-is for relative weakness)
     if((sk.type==='attack' && !isChargeSkill(sk)) || sk.type==='heal') val *= 2;
@@ -1812,7 +1816,6 @@ function renderSkills(){
             d.className='skill-card '+skTypeClass(sk)+(isSealed?' sealed-skill':'');
             d.id=`sk${i}`;
             d.dataset.skidx=i;
-            d.draggable=true;
             d.title='ドラッグで順番変更';
             d.innerHTML=
                 `<div class="sk-type-sec">
@@ -1825,70 +1828,16 @@ function renderSkills(){
                    <div class="sk-eff-val${effCls}">${effVal}</div>
                  </div>`;
 
-            // ── 共通: スワップ実行 ──────────────────────────────
-            const doSwap=(from,to)=>{
-                if(from===to||from===null||to===null) return;
-                if(to>=G.skills.length) return;
-                [G.skills[from],G.skills[to]]=[G.skills[to],G.skills[from]];
-                G.sealedSkills.forEach(s=>{
-                    if(s.skillIdx===from) s.skillIdx=to;
-                    else if(s.skillIdx===to) s.skillIdx=from;
-                });
-                renderSkills();
-                updateSkillPreview();
-                autoSave('battle');
-            };
-            const clearOver=()=>list.querySelectorAll('.skill-card').forEach(el=>el.classList.remove('sk-drag-over'));
-
-            // ── マウス drag & drop ──────────────────────────────
-            d.addEventListener('dragstart',e=>{
-                skillDragSrc=i;
-                e.dataTransfer.effectAllowed='move';
-                setTimeout(()=>d.classList.add('sk-dragging'),0);
+            d.addEventListener('mousedown',e=>{
+                startSkillDrag(i,d,e.clientX,e.clientY);
             });
-            d.addEventListener('dragend',()=>{
-                d.classList.remove('sk-dragging'); clearOver(); skillDragSrc=null;
-            });
-            d.addEventListener('dragover',e=>{
-                e.preventDefault(); e.dataTransfer.dropEffect='move';
-                clearOver();
-                if(skillDragSrc!==null&&skillDragSrc!==i) d.classList.add('sk-drag-over');
-            });
-            d.addEventListener('dragleave',()=>d.classList.remove('sk-drag-over'));
-            d.addEventListener('drop',e=>{
-                e.preventDefault();
-                const from=skillDragSrc; skillDragSrc=null; clearOver();
-                doSwap(from,i);
-            });
-
-            // ── タッチ drag & drop ──────────────────────────────
             d.addEventListener('touchstart',e=>{
-                e.preventDefault();
-                skillDragSrc=i;
-                d.classList.add('sk-dragging');
-            },{passive:false});
-            d.addEventListener('touchmove',e=>{
-                e.preventDefault();
                 const t=e.touches[0];
-                const over=document.elementFromPoint(t.clientX,t.clientY);
-                const card=over?.closest('[data-skidx]');
-                clearOver();
-                if(card&&card!==d) card.classList.add('sk-drag-over');
-            },{passive:false});
-            d.addEventListener('touchend',e=>{
-                e.preventDefault();
-                d.classList.remove('sk-dragging'); clearOver();
-                const t=e.changedTouches[0];
-                const over=document.elementFromPoint(t.clientX,t.clientY);
-                const card=over?.closest('[data-skidx]');
-                const to=card ? parseInt(card.dataset.skidx) : null;
-                const from=skillDragSrc; skillDragSrc=null;
-                doSwap(from,to);
+                startSkillDrag(i,d,t.clientX,t.clientY);
             },{passive:false});
 
         }else{
             d.className='skill-card empty-slot';
-            d.addEventListener('dragover',e=>{ if(skillDragSrc!==null) e.preventDefault(); });
         }
         list.appendChild(d);
     }
@@ -2085,8 +2034,10 @@ function setMsg(t){
 // DRAG & DROP  (ghost coords use inverse-scale fix)
 // ============================================================
 let dragging=null;
-let skillDragSrc=null; // index of skill being drag-reordered
+let skillDragSrc=null;
+let _skDragActive=false;
 const ghost=document.getElementById('drag-ghost');
+const skGhost=document.getElementById('sk-ghost');
 
 function getScale(){
     const r=document.getElementById('container').getBoundingClientRect();
@@ -2144,13 +2095,71 @@ function endDrag(cx,cy){
     dragging=null;
 }
 
-document.addEventListener('mousemove',e=>{if(!dragging)return;moveGhost(e.clientX,e.clientY);hlSlots(e.clientX,e.clientY);});
+// ── Skill drag ghost helpers ─────────────────────────────────
+function moveSkGhost(cx,cy){
+    const cr=document.getElementById('container').getBoundingClientRect();
+    const sc=getScale();
+    skGhost.style.left=((cx-cr.left)/sc-115)+'px';
+    skGhost.style.top =((cy-cr.top) /sc-25) +'px';
+}
+function skCardAt(cx,cy){
+    const el=document.elementFromPoint(cx,cy);
+    const card=el?.closest('[data-skidx]');
+    return card || null;
+}
+function skHighlight(cx,cy){
+    const list=document.getElementById('skills-list');
+    if(!list) return;
+    list.querySelectorAll('.skill-card').forEach(el=>el.classList.remove('sk-drag-over'));
+    const card=skCardAt(cx,cy);
+    if(card && parseInt(card.dataset.skidx)!==skillDragSrc) card.classList.add('sk-drag-over');
+}
+function startSkillDrag(fromIdx, srcEl, cx, cy){
+    skillDragSrc=fromIdx; _skDragActive=true;
+    skGhost.className=srcEl.className;
+    skGhost.innerHTML=srcEl.innerHTML;
+    skGhost.style.display='flex';
+    moveSkGhost(cx,cy);
+    srcEl.classList.add('sk-dragging');
+}
+function endSkillDrag(cx,cy){
+    if(!_skDragActive) return;
+    _skDragActive=false;
+    skGhost.style.display='none';
+    const list=document.getElementById('skills-list');
+    if(list) list.querySelectorAll('.skill-card').forEach(el=>{
+        el.classList.remove('sk-dragging'); el.classList.remove('sk-drag-over');
+    });
+    const card=skCardAt(cx,cy);
+    const to=card ? parseInt(card.dataset.skidx) : null;
+    const from=skillDragSrc; skillDragSrc=null;
+    if(from!==null && to!==null && from!==to && to<G.skills.length){
+        [G.skills[from],G.skills[to]]=[G.skills[to],G.skills[from]];
+        G.sealedSkills.forEach(s=>{
+            if(s.skillIdx===from) s.skillIdx=to;
+            else if(s.skillIdx===to) s.skillIdx=from;
+        });
+        renderSkills(); updateSkillPreview(); autoSave('battle');
+    }
+}
+
+document.addEventListener('mousemove',e=>{
+    if(_skDragActive){ moveSkGhost(e.clientX,e.clientY); skHighlight(e.clientX,e.clientY); }
+    if(!dragging) return; moveGhost(e.clientX,e.clientY); hlSlots(e.clientX,e.clientY);
+});
 document.addEventListener('touchmove',e=>{
-    if(!dragging)return; e.preventDefault();
+    if(_skDragActive){
+        e.preventDefault();
+        const t=e.touches[0]; moveSkGhost(t.clientX,t.clientY); skHighlight(t.clientX,t.clientY);
+        return;
+    }
+    if(!dragging) return; e.preventDefault();
     const t=e.touches[0]; moveGhost(t.clientX,t.clientY); hlSlots(t.clientX,t.clientY);
 },{passive:false});
-document.addEventListener('mouseup', e=>endDrag(e.clientX,e.clientY));
-document.addEventListener('touchend',e=>{const t=e.changedTouches[0];endDrag(t.clientX,t.clientY);});
+document.addEventListener('mouseup',e=>{ endSkillDrag(e.clientX,e.clientY); endDrag(e.clientX,e.clientY); });
+document.addEventListener('touchend',e=>{
+    const t=e.changedTouches[0]; endSkillDrag(t.clientX,t.clientY); endDrag(t.clientX,t.clientY);
+});
 
 function placeCard(card,slotNum){
     if(slotNum===1&&G.s1) G.discard.push(G.s1);
@@ -2433,9 +2442,9 @@ function doEnemySkill(sk, enemyName){
         showFloatOnHero('🛡️→0','dmg-player');
     } else if(name==='回復封じ'){
         G.healSealed=3;
-    } else if(name==='３倍攻撃'){
-        G.atkMult=3;
-        setMsg(`✨ ${enemyName}の「${name}」発動！次のターン3倍攻撃！`);
+    } else if(name==='2.5倍攻撃'){
+        G.atkMult=2.5;
+        setMsg(`✨ ${enemyName}の「${name}」発動！次のターン2.5倍攻撃！`);
     } else if(name==='守備強化'){
         G.eShield+=G.eAtkBase*2;
         setMsg(`✨ ${enemyName}の「${name}」発動！敵にシールド+${G.eAtkBase*2}`);
@@ -2450,9 +2459,9 @@ function doEnemySkill(sk, enemyName){
             const idx=available[rnd(0,available.length-1)];
             G.sealedSkills.push({skillIdx:idx, turnsLeft:3});
         }
-    } else if(name==='４倍攻撃'){
-        G.atkMult=4;
-        setMsg(`✨ ${enemyName}の「${name}」発動！次のターン4倍攻撃！`);
+    } else if(name==='３倍攻撃'){
+        G.atkMult=3;
+        setMsg(`✨ ${enemyName}の「${name}」発動！次のターン3倍攻撃！`);
     } else if(name.startsWith('毒') && name!=='毒消し'){
         const amt=sk.poisonAmt||1;
         G.playerPoisonStacks=(G.playerPoisonStacks||0)+amt;
@@ -2709,7 +2718,7 @@ function pickSkill(sk){
     }
 }
 function tryRandomSkillLevelup(callback){
-    const upCandidates = G.skills.filter(sk=>sk.level<3);
+    const upCandidates = G.skills.slice(); // no level cap
     if(upCandidates.length===0 || Math.random()>=0.5){ if(callback) callback(); return; }
     // Class-based levelup weights: thief→poison×2, archer→charge×2
     const cls = CLASS_DEFS[G.classIdx];
@@ -2831,7 +2840,7 @@ function _applyPowerUp(){
     } else {
         const idx=rnd(0,G.skills.length-1);
         const sk=G.skills[idx];
-        if(sk&&sk.level<3){
+        if(sk){
             const oldLv=sk.level;
             sk.level++;
             renderSkills(); updateHP();
@@ -2847,8 +2856,7 @@ function _applyPowerUp(){
             const oldHP=G.pMaxHP;
             G.pMaxHP+=20; G.pHP=Math.min(G.pHP+20,G.pMaxHP);
             renderSkills(); updateHP();
-            popupHtml=`<div style="font-size:0.9rem;color:var(--text-dim);margin-bottom:6px;">スキルが最大レベル！代わりに...</div>
-                       <div style="font-size:1.1rem;font-weight:800;color:#e07070;margin-bottom:8px;">❤️ 最大HP</div>
+            popupHtml=`<div style="font-size:1.1rem;font-weight:800;color:#e07070;margin-bottom:8px;">❤️ 最大HP</div>
                        <div style="font-size:1.6rem;font-weight:800;color:var(--text-hi);">${oldHP} → <span style="color:#e07070;">${G.pMaxHP}</span></div>`;
         }
     }
