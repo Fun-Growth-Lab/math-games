@@ -239,12 +239,6 @@
             box-shadow:0 0 14px rgba(245,224,64,0.85) !important;
             transform:scale(1.03);
         }
-        /* drag handle hint */
-        .sk-drag-handle {
-            position:absolute; right:3px; top:50%; transform:translateY(-50%);
-            font-size:0.7rem; color:rgba(196,154,42,0.45); line-height:1;
-            pointer-events:none; letter-spacing:0; user-select:none;
-        }
 
         /* Operator display (single, no buttons) */
         .op-display {
@@ -1817,9 +1811,9 @@ function renderSkills(){
             const {icon,effLbl,effVal,effCls}=skillDispInfo(sk);
             d.className='skill-card '+skTypeClass(sk)+(isSealed?' sealed-skill':'');
             d.id=`sk${i}`;
+            d.dataset.skidx=i;
             d.draggable=true;
             d.title='ドラッグで順番変更';
-            d.style.position='relative';
             d.innerHTML=
                 `<div class="sk-type-sec">
                    <div class="sk-type-icon">${icon}</div>
@@ -1829,49 +1823,72 @@ function renderSkills(){
                  <div class="sk-eff-sec">
                    <div class="sk-eff-lbl">${effLbl}</div>
                    <div class="sk-eff-val${effCls}">${effVal}</div>
-                 </div>
-                 <span class="sk-drag-handle">⠿⠿</span>`;
-            // ── Drag & drop for skill reordering ──
-            d.addEventListener('dragstart',e=>{
-                skillDragSrc=i;
-                e.dataTransfer.effectAllowed='move';
-                // delay class add so ghost image shows normal card first
-                setTimeout(()=>d.classList.add('sk-dragging'),0);
-            });
-            d.addEventListener('dragend',()=>{
-                d.classList.remove('sk-dragging');
-                list.querySelectorAll('.skill-card').forEach(el=>el.classList.remove('sk-drag-over'));
-                skillDragSrc=null;
-            });
-            d.addEventListener('dragover',e=>{
-                e.preventDefault();
-                e.dataTransfer.dropEffect='move';
-                list.querySelectorAll('.skill-card').forEach(el=>el.classList.remove('sk-drag-over'));
-                if(skillDragSrc!==null && skillDragSrc!==i) d.classList.add('sk-drag-over');
-            });
-            d.addEventListener('dragleave',()=>d.classList.remove('sk-drag-over'));
-            d.addEventListener('drop',e=>{
-                e.preventDefault();
-                if(skillDragSrc===null || skillDragSrc===i){skillDragSrc=null;return;}
-                const from=skillDragSrc, to=i;
-                // Swap skills in array
+                 </div>`;
+
+            // ── 共通: スワップ実行 ──────────────────────────────
+            const doSwap=(from,to)=>{
+                if(from===to||from===null||to===null) return;
+                if(to>=G.skills.length) return;
                 [G.skills[from],G.skills[to]]=[G.skills[to],G.skills[from]];
-                // Update sealed-skill indices to match new positions
                 G.sealedSkills.forEach(s=>{
                     if(s.skillIdx===from) s.skillIdx=to;
                     else if(s.skillIdx===to) s.skillIdx=from;
                 });
-                skillDragSrc=null;
                 renderSkills();
                 updateSkillPreview();
                 autoSave('battle');
+            };
+            const clearOver=()=>list.querySelectorAll('.skill-card').forEach(el=>el.classList.remove('sk-drag-over'));
+
+            // ── マウス drag & drop ──────────────────────────────
+            d.addEventListener('dragstart',e=>{
+                skillDragSrc=i;
+                e.dataTransfer.effectAllowed='move';
+                setTimeout(()=>d.classList.add('sk-dragging'),0);
             });
+            d.addEventListener('dragend',()=>{
+                d.classList.remove('sk-dragging'); clearOver(); skillDragSrc=null;
+            });
+            d.addEventListener('dragover',e=>{
+                e.preventDefault(); e.dataTransfer.dropEffect='move';
+                clearOver();
+                if(skillDragSrc!==null&&skillDragSrc!==i) d.classList.add('sk-drag-over');
+            });
+            d.addEventListener('dragleave',()=>d.classList.remove('sk-drag-over'));
+            d.addEventListener('drop',e=>{
+                e.preventDefault();
+                const from=skillDragSrc; skillDragSrc=null; clearOver();
+                doSwap(from,i);
+            });
+
+            // ── タッチ drag & drop ──────────────────────────────
+            d.addEventListener('touchstart',e=>{
+                e.preventDefault();
+                skillDragSrc=i;
+                d.classList.add('sk-dragging');
+            },{passive:false});
+            d.addEventListener('touchmove',e=>{
+                e.preventDefault();
+                const t=e.touches[0];
+                const over=document.elementFromPoint(t.clientX,t.clientY);
+                const card=over?.closest('[data-skidx]');
+                clearOver();
+                if(card&&card!==d) card.classList.add('sk-drag-over');
+            },{passive:false});
+            d.addEventListener('touchend',e=>{
+                e.preventDefault();
+                d.classList.remove('sk-dragging'); clearOver();
+                const t=e.changedTouches[0];
+                const over=document.elementFromPoint(t.clientX,t.clientY);
+                const card=over?.closest('[data-skidx]');
+                const to=card ? parseInt(card.dataset.skidx) : null;
+                const from=skillDragSrc; skillDragSrc=null;
+                doSwap(from,to);
+            },{passive:false});
+
         }else{
             d.className='skill-card empty-slot';
-            // Allow dragging over empty slots (no-op drop)
-            d.addEventListener('dragover',e=>{
-                if(skillDragSrc!==null) e.preventDefault();
-            });
+            d.addEventListener('dragover',e=>{ if(skillDragSrc!==null) e.preventDefault(); });
         }
         list.appendChild(d);
     }
@@ -2497,13 +2514,15 @@ function hideEnemyNow(){
 // ============================================================
 // SCORE
 // ============================================================
+// Final score (submitted to ranking): skill score + HP survival bonus
 function calcBattleScore(){
     const hpRatio = G.pMaxHP > 0 ? Math.max(0, G.pHP) / G.pMaxHP : 0;
     return Math.round(hpRatio * 200 + (G.totalSkillWeight||0) * 100);
 }
+// In-game display: skill score only (0 at start, grows as skills fire)
 function updateScoreLbl(){
     const el=document.getElementById('score-lbl');
-    if(el) el.textContent=`スコア: ${calcBattleScore()}`;
+    if(el) el.textContent=`スコア: ${(G.totalSkillWeight||0)*100}`;
 }
 
 // ============================================================
@@ -3343,13 +3362,12 @@ function renderRankList(rows, myUid){
         const numCls = i<3 ? 'rank-num top3' : 'rank-num';
         const nameCls = isMe ? 'rank-pname me' : 'rank-pname';
         const classLbl = r.className ? `<span class="rank-date">${r.className}</span>` : '';
-        const ptTxt = r.pointScore!=null ? `<span class="rank-score" style="color:#c4a04a;font-size:0.92rem;">${r.pointScore}pt</span>` : '';
+        const ptScore = r.pointScore != null ? r.pointScore : 0;
         li.innerHTML = `<span class="${numCls}">${numTxt}</span>
                         <span class="${nameCls}">${r.name||'ななしさん'}</span>
                         ${classLbl}
                         <span class="rank-score">${scoreLabel(r.score)}</span>
-                        ${ptTxt}
-                        <span class="rank-date">${r.turns!=null?r.turns+'ターン':''}</span>
+                        <span class="rank-score" style="color:#c4a04a;">${ptScore}pt</span>
                         ${r.date?`<span class="rank-date">${r.date}</span>`:''}`;
         ul.appendChild(li);
     });
