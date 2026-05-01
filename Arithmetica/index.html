@@ -1068,7 +1068,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut }
         from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-    import { getFirestore, collection, addDoc, query, orderBy, limit, getDocs, serverTimestamp }
+    import { getFirestore, collection, doc, setDoc, getDocs, serverTimestamp }
         from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
     const cfg = {
@@ -1095,23 +1095,27 @@
     });
 
     // ---- Firestore ranking helpers (exposed to game script) ----
-    window.saveOnlineScore = async (uid, name, score, turns, difficulty, className) => {
+    window.saveOnlineScore = async (uid, name, score, turns, difficulty, className, pointScore) => {
         try {
             const col = `scores_arithmetica_${difficulty||'easy'}`;
-            await addDoc(collection(db, col), {
+            const dateStr = new Date().toLocaleDateString('ja-JP');
+            // setDoc with uid as key → 1 entry per player (overwrites previous)
+            await setDoc(doc(db, col, uid), {
                 uid, name, score, turns:turns||0,
-                className:className||'', createdAt:serverTimestamp()
+                className:className||'', pointScore:pointScore||0,
+                date:dateStr, createdAt:serverTimestamp()
             });
         } catch(e){ console.error('Firestore save error:', e); }
     };
     window.loadWorldRanking = async (difficulty) => {
         try {
             const col = `scores_arithmetica_${difficulty||'easy'}`;
-            const q=query(collection(db, col), orderBy('score','desc'), limit(50));
-            const snap=await getDocs(q);
+            // orderBy不使用（インデックス不要）→ クライアント側でソート
+            const snap=await getDocs(collection(db, col));
             const rows=[]; snap.forEach(d=>rows.push(d.data()));
             rows.sort((a,b)=>{
-                if(b.score!==a.score) return b.score-a.score;
+                const pa=(a.pointScore||0), pb=(b.pointScore||0);
+                if(pb!==pa) return pb-pa;
                 if((a.turns||999)!==(b.turns||999)) return (a.turns||999)-(b.turns||999);
                 return 0;
             });
@@ -1593,7 +1597,7 @@ function genPoisonSkill(){
         const s=SUITS[rnd(0,3)];
         if(!usedS.has(s)){usedS.add(s); conds.push(s);}
     }
-    const base = suitCount * 2; // suit1→2, suit2→4
+    const base = suitCount * 4; // suit1→4, suit2→8
     const level = Math.random()<0.05 ? 2 : 1;
     return {type:'poison', conds, base, level};
 }
@@ -1675,7 +1679,7 @@ function _pickNSuits(n){
 function _makeOneStartSkill(sk, conds){
     if(sk.type==='paralyze') return finalizeSkill({type:'paralyze', conds, base:0, level:1});
     if(sk.type==='boost')    return finalizeSkill({type:'boost',    conds, base:0, level:1});
-    if(sk.type==='poison')   return finalizeSkill({type:'poison',   conds, base:conds.length*2, level:1});
+    if(sk.type==='poison')   return finalizeSkill({type:'poison',   conds, base:conds.length*4, level:1});
     const base = 4 * sk.suits * sk.suits; // attack/defense/heal: 1suit→4, 2suits→16
     return finalizeSkill({type:sk.type, conds, base, level:1});
 }
