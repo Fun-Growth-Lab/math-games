@@ -1534,9 +1534,10 @@ function boostMultForSkill(sk){
     const lv = sk.level || 1;
     const _cls = (typeof G!=='undefined'&&G&&G.classIdx!==undefined) ? CLASS_DEFS[G.classIdx] : null;
     if(_cls && _cls.name==='サムライ'){
-        return suits >= 2 ? (1.6 + 0.3*(lv-1)) : (1.3 + 0.15*(lv-1));
+        // 共鳴効果×1.5ボーナス: base×1.5, increment×1.5
+        return suits >= 2 ? (2.4 + 0.3*(lv-1)) : (1.8 + 0.3*(lv-1));
     }
-    return suits >= 2 ? (1.4 + 0.2*(lv-1)) : (1.2 + 0.1*(lv-1));
+    return suits >= 2 ? (1.6 + 0.2*(lv-1)) : (1.2 + 0.2*(lv-1));
 }
 // CSS modifier class by skill type
 function skTypeClass(sk){
@@ -1687,7 +1688,16 @@ function genSkill(){
 }
 // Finalize skill: preserve level if provided (e.g. Lv.2 reward)
 function finalizeSkill(sk){
-    return{type:sk.type, conds:sk.conds, base:sk.base, level:sk.level||1};
+    // Sort suit conditions in fixed display order ♥♠♦♣; numeric conditions stay at end
+    const SUIT_ORDER = ['♥','♠','♦','♣'];
+    const sorted = [...sk.conds].sort((a,b)=>{
+        const ai=SUIT_ORDER.indexOf(a), bi=SUIT_ORDER.indexOf(b);
+        if(ai>=0 && bi>=0) return ai-bi; // both suits → fixed order
+        if(ai>=0) return -1;             // suit before numeric
+        if(bi>=0) return  1;             // numeric after suit
+        return 0;                        // both numeric → unchanged
+    });
+    return{type:sk.type, conds:sorted, base:sk.base, level:sk.level||1};
 }
 function genSuitSkill(){
     return finalizeSkill({type:'attack', conds:[SUITS[rnd(0,3)]], base:4});
