@@ -2623,20 +2623,24 @@ function triggered(sk,c1,c2,res,skIdx){
         const sealInfo=G.sealedSkills.find(s=>s.skillIdx===skIdx&&s.turnsLeft>0);
         if(sealInfo) return false;
     }
-    // Build suit bag (multiset) from both cards — allows same-suit duplicate matching
-    // e.g. ♡+♡ requires c1=♡ AND c2=♡, not just "any ♡"
-    const suitBag=[];
-    c1.suits.forEach(s=>suitBag.push(s));
-    c2.suits.forEach(s=>suitBag.push(s));
-    const remaining=[...suitBag];
-    return sk.conds.every(cd=>{
-        if(cd[0]==='*') return res>0 && res%parseInt(cd.slice(1))===0;
-        if(cd[0]==='≤') return res<=parseInt(cd.slice(1));
-        // Suit: consume one matching suit from remaining bag
-        const idx=remaining.indexOf(cd);
-        if(idx>=0){ remaining.splice(idx,1); return true; }
-        return false;
-    });
+    if(!sk||!Array.isArray(sk.conds)) return false;
+    // Build suit bag (multiset) from both cards — ♥+♥ requires BOTH cards to be ♥
+    const s1 = Array.isArray(c1.suits) ? c1.suits : (c1.suit ? [c1.suit] : []);
+    const s2 = Array.isArray(c2.suits) ? c2.suits : (c2.suit ? [c2.suit] : []);
+    const bag = [...s1, ...s2];
+    // Check each condition in order; suit conditions consume from bag
+    for(const cd of sk.conds){
+        if(cd[0]==='*'){
+            if(!(res>0 && res%parseInt(cd.slice(1))===0)) return false;
+        } else if(cd[0]==='≤'){
+            if(res>parseInt(cd.slice(1))) return false;
+        } else {
+            const idx=bag.indexOf(cd);
+            if(idx<0) return false;
+            bag.splice(idx,1);
+        }
+    }
+    return true;
 }
 
 // condHTML: inline with ＋ for reward overlays / forget overlay
@@ -2682,8 +2686,12 @@ function skillCondsHTML(conds){
         return `<div style="display:flex;align-items:center;justify-content:center;width:100%;">${condSymHTML(conds[0])}</div>`;
     }
     if(conds.length===2 && suits.length===2){
-        return `<div style="display:flex;align-items:center;justify-content:center;gap:4px;width:100%;">
-                    ${condSymHTML(suits[0])}${condSymHTML(suits[1])}
+        // Same-suit: add visible "+" so ♥♥ doesn't look like one symbol
+        const sep = suits[0]===suits[1]
+            ? `<span style="color:#8b7050;font-weight:700;font-size:0.75em;line-height:1;">＋</span>`
+            : '';
+        return `<div style="display:flex;align-items:center;justify-content:center;gap:2px;width:100%;">
+                    ${condSymHTML(suits[0])}${sep}${condSymHTML(suits[1])}
                 </div>`;
     }
     if(conds.length===2 && suits.length===1){
@@ -2693,8 +2701,14 @@ function skillCondsHTML(conds){
                 </div>`;
     }
     // 3 conditions: 2 suits horizontal on top, extra on bottom
+    const suitsSep = (suits.length===2 && suits[0]===suits[1])
+        ? `<span style="color:#8b7050;font-weight:700;font-size:0.75em;line-height:1;">＋</span>`
+        : '';
+    const suitsHTML = suits.length===2
+        ? `${condSymHTML(suits[0])}${suitsSep}${condSymHTML(suits[1])}`
+        : suits.map(condSymHTML).join('');
     return `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;gap:1px;">
-                <div style="display:flex;align-items:center;gap:3px;">${suits.map(condSymHTML).join('')}</div>
+                <div style="display:flex;align-items:center;gap:2px;">${suitsHTML}</div>
                 <div>${condSymHTML(extras[0])}</div>
             </div>`;
 }
