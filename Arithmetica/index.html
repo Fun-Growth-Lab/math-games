@@ -943,6 +943,12 @@
             <button class="lang-btn active" id="lang-btn-ja"   onclick="setLang('ja')">日本語</button>
             <button class="lang-btn"        id="lang-btn-kana" onclick="setLang('kana')">かんたんなにほんご</button>
             <button class="lang-btn"        id="lang-btn-en"   onclick="setLang('en')">English</button>
+            <div style="margin-top:16px;border-top:1px solid rgba(196,154,42,0.3);padding-top:14px;">
+                <div id="settings-input-label" style="color:var(--gold);font-size:0.9rem;font-weight:800;margin-bottom:10px;">カード入力方法</div>
+                <button class="lang-btn active" id="input-mode-drag"   onclick="setInputMode('drag')">ドラッグのみ</button>
+                <button class="lang-btn"        id="input-mode-dbl"    onclick="setInputMode('dbl')">ダブルタップ</button>
+                <button class="lang-btn"        id="input-mode-single" onclick="setInputMode('single')">シングルタップ</button>
+            </div>
             <div style="margin-top:20px;">
                 <button class="btn btn-gray btn-sm" onclick="closeSettings()" id="settings-close-btn">閉じる</button>
             </div>
@@ -1178,6 +1184,9 @@
 // i18n — STRINGS / t() / setLang() / applyLang()
 // ============================================================
 let currentLang = localStorage.getItem('arith_lang') || 'ja';
+// Input mode: 'drag'=drag only (default), 'dbl'=double-tap, 'single'=single-tap
+let OPT_INPUT_MODE = localStorage.getItem('arith_input_mode') ||
+    (localStorage.getItem('arith_dblclick')==='true' ? 'dbl' : 'drag'); // migrate old key
 
 const STRINGS = {
   ja: {
@@ -1195,6 +1204,10 @@ const STRINGS = {
     settingsTitle:'⚙ 設定',
     settingsLangLabel:'言語 / Language',
     settingsClose:'閉じる',
+    settingsInputLabel:'カード入力方法',
+    inputModeDrag:'ドラッグのみ',
+    inputModeDbl: 'ダブルタップ',
+    inputModeSingle:'シングルタップ',
     // Battle left panel
     panelPlayer:'プレーヤー',
     labelName:'名前',
@@ -1345,7 +1358,12 @@ const STRINGS = {
     msgShieldAbsorb:'（シールド{n}吸収）',
     msgCardAtk:'⚔️ カード特殊発動！ +10ダメージ！',
     msgCardShield:'🛡️ カード特殊発動！ シールド +5',
-    msgHealSealed:'🪄 回復封じ中！回復できない！',
+    msgHealSealed:'🪄 回復弱体中！回復効果½！',
+    msgHealWeak:'🪄 回復弱体（½）',
+    msgHealAndPoison:'🪄 +{healed}回復 / ☠️毒-{red}',
+    msgEnemyPoisonHalf:'✨ {ename}の「{sname}」発動！毒を半減！({prev}→{now})',
+    msgEnemyShieldHalf:'✨ {ename}の「{sname}」発動！シールドを半減！({prev}→{now})',
+    msgEnemyParalyzeResist:'✨ {ename}の「{sname}」発動！3ターン麻痺耐性！',
     msgCardHeal:'💚 カード特殊発動！ HP +{n}',
     msgPoisonDmgEnemy:'☠️ 毒ダメージ！ 敵に {n} ダメージ！',
     msgResonanceHit:'🔮 共鳴！ 次のスキルを{m}強化！',
@@ -1385,6 +1403,10 @@ const STRINGS = {
     settingsTitle:'⚙ せってい',
     settingsLangLabel:'げんご / Language',
     settingsClose:'とじる',
+    settingsInputLabel:'カードにゅうりょくほうほう',
+    inputModeDrag:'ドラッグのみ',
+    inputModeDbl: 'ダブルタップ',
+    inputModeSingle:'シングルタップ',
     panelPlayer:'プレーヤー',
     labelName:'なまえ',
     labelStatus:'じょうたい',
@@ -1502,7 +1524,12 @@ const STRINGS = {
     msgShieldAbsorb:'（シールド{n}きゅうしゅう）',
     msgCardAtk:'⚔️ カードとくしゅはつどう！ +10ダメージ！',
     msgCardShield:'🛡️ カードとくしゅはつどう！ シールド +5',
-    msgHealSealed:'🪄 かいふくふうじちゅう！かいふくできない！',
+    msgHealSealed:'🪄 かいふくじゃくたいちゅう！かいふくこうか½！',
+    msgHealWeak:'🪄 かいふくじゃくたい（½）',
+    msgHealAndPoison:'🪄 +{healed}かいふく / ☠️どく-{red}',
+    msgEnemyPoisonHalf:'✨ {ename}の「{sname}」はつどう！どくをはんげん！({prev}→{now})',
+    msgEnemyShieldHalf:'✨ {ename}の「{sname}」はつどう！シールドをはんげん！({prev}→{now})',
+    msgEnemyParalyzeResist:'✨ {ename}の「{sname}」はつどう！3ターンまひたいせい！',
     msgCardHeal:'💚 カードとくしゅはつどう！ HP +{n}',
     msgPoisonDmgEnemy:'☠️ どくダメージ！ てきに {n} ダメージ！',
     msgResonanceHit:'🔮 きょうめい！ つぎのスキルを{m}きょうか！',
@@ -1551,6 +1578,10 @@ const STRINGS = {
     settingsTitle:'⚙ Settings',
     settingsLangLabel:'Language',
     settingsClose:'Close',
+    settingsInputLabel:'Card Input',
+    inputModeDrag:'Drag only',
+    inputModeDbl: 'Double-tap',
+    inputModeSingle:'Single-tap',
     panelPlayer:'PLAYER',
     labelName:'Name',
     labelStatus:'Status',
@@ -1668,7 +1699,12 @@ const STRINGS = {
     msgShieldAbsorb:' (shld -{n})',
     msgCardAtk:'⚔️ Card ability! +10 damage!',
     msgCardShield:'🛡️ Card ability! Shield +5',
-    msgHealSealed:'🪄 Heal is sealed! Cannot heal!',
+    msgHealSealed:'🪄 Heal weakened! Effect ½!',
+    msgHealWeak:'🪄 Heal ½',
+    msgHealAndPoison:'🪄 +{healed} HP / ☠️Poison-{red}',
+    msgEnemyPoisonHalf:'✨ {ename}\'s [{sname}]! Poison halved! ({prev}→{now})',
+    msgEnemyShieldHalf:'✨ {ename}\'s [{sname}]! Shield halved! ({prev}→{now})',
+    msgEnemyParalyzeResist:'✨ {ename}\'s [{sname}]! Paralyze resist 3 turns!',
     msgCardHeal:'💚 Card ability! HP +{n}',
     msgPoisonDmgEnemy:'☠️ Poison! {n} damage to enemy!',
     msgResonanceHit:'🔮 Resonate! Next skill ×{m}!',
@@ -1746,6 +1782,11 @@ function applyLang(){
     // Settings overlay
     const st=s('settings-title'); if(st) st.textContent=t('settingsTitle');
     const sc=s('settings-close-btn'); if(sc) sc.textContent=t('settingsClose');
+    const sil=s('settings-input-label'); if(sil) sil.textContent=t('settingsInputLabel');
+    const imDrag=s('input-mode-drag');   if(imDrag)   imDrag.textContent=t('inputModeDrag');
+    const imDbl=s('input-mode-dbl');     if(imDbl)    imDbl.textContent=t('inputModeDbl');
+    const imSingle=s('input-mode-single');if(imSingle) imSingle.textContent=t('inputModeSingle');
+    updateInputModeUI();
 
     // Battle panel labels (ptitle)
     qa('#left-panel .ptitle').forEach((el,i)=>{
@@ -1876,9 +1917,22 @@ function openSettings(){
         const b=document.getElementById('lang-btn-'+l);
         if(b) b.classList.toggle('active', l===currentLang);
     });
+    updateInputModeUI();
     document.getElementById('settings-overlay').classList.remove('hidden');
 }
 function closeSettings(){ document.getElementById('settings-overlay').classList.add('hidden'); }
+
+function setInputMode(mode){
+    OPT_INPUT_MODE = mode;
+    localStorage.setItem('arith_input_mode', mode);
+    updateInputModeUI();
+}
+function updateInputModeUI(){
+    ['drag','dbl','single'].forEach(m=>{
+        const btn=document.getElementById('input-mode-'+m);
+        if(btn) btn.classList.toggle('active', m===OPT_INPUT_MODE);
+    });
+}
 
 // ============================================================
 // ENEMY SKILL TRANSLATIONS
@@ -1889,12 +1943,13 @@ const ENEMY_SKILL_TRANS = {
     '攻撃強化':   { name:'攻撃強化',   desc:'基礎攻撃力を永続的に50%増加する' },
     '毒(2)':      { name:'毒(2)',       desc:'プレーヤーに毒(2)を付与する' },
     '手札封印':   { name:'手札封印',   desc:'手札をランダムで1枚、3ターン使用不可にする' },
-    '回復封じ':   { name:'回復封じ',   desc:'3ターン、HP回復を封じる' },
-    'シールド破壊':{ name:'シールド破壊', desc:'プレーヤーのシールドを0にする' },
+    '回復弱体':   { name:'回復弱体',   desc:'3ターン、プレーヤーの回復効果を半減させる' },
+    'シールド破壊':{ name:'シールド破壊', desc:'プレーヤーのシールドを半減させる' },
     'スキル封印': { name:'スキル封印', desc:'スキルをランダムで1つ、3ターン使用不可にする' },
     '2.5倍攻撃':  { name:'2.5倍攻撃',  desc:'次のターン、攻撃力2.5倍で攻撃する' },
     '守備強化':   { name:'守備強化',   desc:'自身の基礎攻撃力の2倍のシールドを張る' },
-    '毒消し':     { name:'毒消し',     desc:'自身の毒状態を治す' },
+    '毒消し':     { name:'毒消し',     desc:'自身の毒スタックを半分（切り捨て）にする' },
+    '麻痺耐性':   { name:'麻痺耐性',   desc:'3ターン、プレーヤーの麻痺効果を半減させる' },
     '３倍攻撃':   { name:'３倍攻撃',   desc:'次のターン、攻撃力3倍で攻撃する' },
     'HP回復':     { name:'HP回復',     desc:'最大HPの10%を回復する' },
     '毒(6)':      { name:'毒(6)',       desc:'プレーヤーに毒(6)を付与する' },
@@ -1904,31 +1959,33 @@ const ENEMY_SKILL_TRANS = {
     '攻撃強化':   { name:'こうげききょうか',   desc:'きそこうげきりょくをえいきゅうに50%ふやす' },
     '毒(2)':      { name:'どく(2)',             desc:'プレーヤーにどく(2)をふよする' },
     '手札封印':   { name:'てふだふういん',       desc:'てふだをランダムで1まい、3ターンつかえなくする' },
-    '回復封じ':   { name:'かいふくふうじ',       desc:'3ターン、HPかいふくをふうじる' },
-    'シールド破壊':{ name:'シールドはかい',      desc:'プレーヤーのシールドを0にする' },
+    '回復弱体':   { name:'かいふくじゃくたい',   desc:'3ターン、プレーヤーのかいふくこうかをはんげんさせる' },
+    'シールド破壊':{ name:'シールドはかい',      desc:'プレーヤーのシールドをはんげんさせる' },
     'スキル封印': { name:'スキルふういん',       desc:'スキルをランダムで1つ、3ターンつかえなくする' },
     '2.5倍攻撃':  { name:'2.5ばいこうげき',     desc:'つぎのターン、こうげきりょく2.5ばいでこうげきする' },
     '守備強化':   { name:'しゅびきょうか',       desc:'じしんのきそこうげきりょくの2ばいのシールドをはる' },
-    '毒消し':     { name:'どくけし',             desc:'じしんのどくじょうたいをなおす' },
+    '毒消し':     { name:'どくけし',             desc:'じしんのどくスタックをはんぶん（きりすて）にする' },
+    '麻痺耐性':   { name:'まひたいせい',         desc:'3ターン、プレーヤーのまひこうかをはんげんさせる' },
     '３倍攻撃':   { name:'3ばいこうげき',        desc:'つぎのターン、こうげきりょく3ばいでこうげきする' },
     'HP回復':     { name:'HPかいふく',           desc:'さいだいHPの10%をかいふくする' },
     '毒(6)':      { name:'どく(6)',              desc:'プレーヤーにどく(6)をふよする' },
     '毒(10)':     { name:'どく(10)',             desc:'プレーヤーにどく(10)をふよする' },
   },
   en: {
-    '攻撃強化':   { name:'Attack Up',    desc:'Permanently increases base attack by 50%' },
-    '毒(2)':      { name:'Poison(2)',    desc:'Inflicts Poison(2) on the player' },
-    '手札封印':   { name:'Card Seal',    desc:'Seals a random card in hand for 3 turns' },
-    '回復封じ':   { name:'Heal Block',   desc:'Blocks HP recovery for 3 turns' },
-    'シールド破壊':{ name:'Shield Break', desc:'Sets player shield to 0' },
-    'スキル封印': { name:'Skill Seal',   desc:'Seals a random skill for 3 turns' },
-    '2.5倍攻撃':  { name:'2.5× Attack', desc:'Next turn: attack at ×2.5 power' },
-    '守備強化':   { name:'Defense Up',   desc:'Gains a shield equal to 2× base attack' },
-    '毒消し':     { name:'Cleanse',      desc:'Cures own poison status' },
-    '３倍攻撃':   { name:'3× Attack',   desc:'Next turn: attack at ×3 power' },
-    'HP回復':     { name:'HP Recovery', desc:'Recovers 10% of max HP' },
-    '毒(6)':      { name:'Poison(6)',   desc:'Inflicts Poison(6) on the player' },
-    '毒(10)':     { name:'Poison(10)', desc:'Inflicts Poison(10) on the player' },
+    '攻撃強化':   { name:'Attack Up',      desc:'Permanently increases base attack by 50%' },
+    '毒(2)':      { name:'Poison(2)',      desc:'Inflicts Poison(2) on the player' },
+    '手札封印':   { name:'Card Seal',      desc:'Seals a random card in hand for 3 turns' },
+    '回復弱体':   { name:'Heal Weaken',    desc:'Halves player\'s heal effect for 3 turns' },
+    'シールド破壊':{ name:'Shield Break',  desc:'Halves the player\'s shield' },
+    'スキル封印': { name:'Skill Seal',     desc:'Seals a random skill for 3 turns' },
+    '2.5倍攻撃':  { name:'2.5× Attack',   desc:'Next turn: attack at ×2.5 power' },
+    '守備強化':   { name:'Defense Up',     desc:'Gains a shield equal to 2× base attack' },
+    '毒消し':     { name:'Cleanse',        desc:'Halves own poison stacks (rounded down)' },
+    '麻痺耐性':   { name:'Para. Resist',   desc:'Halves player\'s paralyze effect for 3 turns' },
+    '３倍攻撃':   { name:'3× Attack',     desc:'Next turn: attack at ×3 power' },
+    'HP回復':     { name:'HP Recovery',   desc:'Recovers 10% of max HP' },
+    '毒(6)':      { name:'Poison(6)',     desc:'Inflicts Poison(6) on the player' },
+    '毒(10)':     { name:'Poison(10)',    desc:'Inflicts Poison(10) on the player' },
   }
 };
 
@@ -1953,7 +2010,7 @@ function tEnemySkillDesc(jaName){
 const ENEMY_LIST = [
     { name:'スライム',   maxHp:  50,  atk: 10, img:'images/enemy_1_1.png',  em:'🟢',
       easySkill:null,
-      normalSkill:{ name:'守備強化',   desc:'自身の基礎攻撃力の2倍のシールドを張る' },
+      normalSkill:null,
       hardSkill: { name:'攻撃強化',   desc:'基礎攻撃力を永続的に50%増加する' } },
     { name:'コウモリ',   maxHp: 100,  atk: 14, img:'images/enemy_2_1.png',  em:'🦇',
       easySkill:null,
@@ -1961,28 +2018,28 @@ const ENEMY_LIST = [
       hardSkill: { name:'スキル封印', desc:'スキルをランダムで1つ、3ターン使用不可にする' } },
     { name:'スケルトン', maxHp: 150,  atk: 20, img:'images/enemy_3_1.png',  em:'💀',
       easySkill:{ name:'手札封印',   desc:'手札をランダムで1枚、3ターン使用不可にする' },
-      normalSkill:{ name:'回復封じ',   desc:'3ターン、HP回復を封じる' },
-      hardSkill: { name:'毒消し',     desc:'自身の毒状態を治す' } },
+      normalSkill:{ name:'回復弱体',   desc:'3ターン、プレーヤーの回復効果を半減させる' },
+      hardSkill: { name:'毒消し',     desc:'自身の毒スタックを半分（切り捨て）にする' } },
     { name:'ゾンビ',     maxHp: 220,  atk: 26, img:'images/enemy_4_1.png',  em:'🧟',
-      easySkill:{ name:'シールド破壊', desc:'プレーヤーのシールドを0にする' },
+      easySkill:{ name:'シールド破壊', desc:'プレーヤーのシールドを半減させる' },
       normalSkill:{ name:'HP回復',     desc:'最大HPの10%を回復する' },
-      hardSkill: { name:'スキル封印', desc:'スキルをランダムで1つ、3ターン使用不可にする' } },
+      hardSkill: { name:'毒(6)', poisonAmt:6, desc:'プレーヤーに毒(6)を付与する' } },
     { name:'ミイラ',     maxHp: 300,  atk: 30, img:'images/enemy_5_1.png',  em:'🏺',
-      easySkill:{ name:'回復封じ',   desc:'3ターン、HP回復を封じる' },
+      easySkill:{ name:'回復弱体',   desc:'3ターン、プレーヤーの回復効果を半減させる' },
       normalSkill:{ name:'手札封印',   desc:'手札をランダムで1枚、3ターン使用不可にする' },
-      hardSkill: { name:'毒消し',     desc:'自身の毒状態を治す' } },
+      hardSkill: { name:'毒消し',     desc:'自身の毒スタックを半分（切り捨て）にする' } },
     { name:'オーク戦士', maxHp: 380,  atk: 34, img:'images/enemy_6_1.png',  em:'👹',
       easySkill:{ name:'2.5倍攻撃', desc:'次のターン、攻撃力2.5倍で攻撃する' },
       normalSkill:{ name:'守備強化',   desc:'自身の基礎攻撃力の2倍のシールドを張る' },
-      hardSkill: { name:'毒(6)', poisonAmt:6, desc:'プレーヤーに毒(6)を付与する' } },
+      hardSkill: { name:'麻痺耐性',   desc:'3ターン、プレーヤーの麻痺効果を半減させる' } },
     { name:'ゴーレム',   maxHp: 460,  atk: 38, img:'images/enemy_7_1.png',  em:'🗿',
       easySkill:{ name:'守備強化',   desc:'自身の基礎攻撃力の2倍のシールドを張る' },
       normalSkill:{ name:'手札封印',   desc:'手札をランダムで1枚、3ターン使用不可にする' },
-      hardSkill: { name:'シールド破壊', desc:'プレーヤーのシールドを0にする' } },
+      hardSkill: { name:'シールド破壊', desc:'プレーヤーのシールドを半減させる' } },
     { name:'ドラゴン',   maxHp: 460,  atk: 40, img:'images/enemy_8_1.png',  em:'🐉',
       easySkill:{ name:'攻撃強化',   desc:'基礎攻撃力を永続的に50%増加する' },
       normalSkill:{ name:'守備強化',   desc:'自身の基礎攻撃力の2倍のシールドを張る' },
-      hardSkill: { name:'HP回復',     desc:'最大HPの10%を回復する' } },
+      hardSkill: { name:'麻痺耐性',   desc:'3ターン、プレーヤーの麻痺効果を半減させる' } },
     { name:'闇の魔道士', maxHp: 500,  atk: 56, img:'images/enemy_9_1.png',  em:'🧙',
       easySkill:{ name:'スキル封印', desc:'スキルをランダムで1つ、3ターン使用不可にする' },
       normalSkill:{ name:'2.5倍攻撃',  desc:'次のターン、攻撃力2.5倍で攻撃する' },
@@ -2197,10 +2254,11 @@ function newG() {
         // Status effects on player
         sealedCards: [],   // [{cardId, turnsLeft}]
         sealedSkills: [],  // [{skillIdx, turnsLeft}]
-        healSealed: 0,     // turns remaining for heal seal
-        ePoisonStacks: 0,    // poison on enemy (from player skills)
-        eParalyzeStacks: 0,  // paralyze on enemy (from player skills)
-        playerPoisonStacks: 0, // poison on player (from enemy skills)
+        healSealed: 0,           // turns remaining for heal weaken (×0.5)
+        ePoisonStacks: 0,        // poison on enemy (from player skills)
+        eParalyzeStacks: 0,      // paralyze on enemy (from player skills)
+        eParalyzeResistTurns: 0, // turns remaining for enemy paralyze resistance (×0.5)
+        playerPoisonStacks: 0,   // poison on player (from enemy skills)
         // Hard extra skill 2
         eExtraSkill2: null,
         // Character selection
@@ -2338,8 +2396,8 @@ function restoreGameUI(){
 function skillEffect(sk){
     const mult = 1.0 + 0.5 * ((sk.level||1) - 1);
     let val = Math.floor(sk.base * mult);
-    // Global balance: attack and heal are 2x effective (shield kept as-is for relative weakness)
-    if(sk.type==='attack' || sk.type==='heal') val *= 2;
+    // Global balance: attack, heal, defense are all 2x effective
+    if(sk.type==='attack' || sk.type==='heal' || sk.type==='defense') val *= 2;
     // Class bonus (organized by skill type)
     if(typeof G !== 'undefined' && G && G.classIdx !== undefined && CLASS_DEFS[G.classIdx]){
         const clsName = CLASS_DEFS[G.classIdx].name;
@@ -2853,7 +2911,7 @@ function updateStatus(){
     if(el){
         const badges = [];
         if(G.healSealed > 0)
-            badges.push(`<span style="background:rgba(180,40,20,0.25);border:1px solid #cc4444;border-radius:4px;padding:0 5px;color:#ff7755;font-size:0.82rem;font-weight:800;white-space:nowrap;">回復×</span>`);
+            badges.push(`<span style="background:rgba(180,40,20,0.25);border:1px solid #cc4444;border-radius:4px;padding:0 5px;color:#ff7755;font-size:0.82rem;font-weight:800;white-space:nowrap;">回復½</span>`);
         if((G.playerPoisonStacks||0) > 0)
             badges.push(`<span style="background:rgba(120,20,160,0.22);border:1px solid #9944cc;border-radius:4px;padding:0 5px;color:#cc88ff;font-size:0.82rem;font-weight:800;white-space:nowrap;">☠️${G.playerPoisonStacks}</span>`);
         if(badges.length > 0){
@@ -2874,6 +2932,8 @@ function updateStatus(){
             ebadges.push(`<span style="background:rgba(120,20,160,0.22);border:1px solid #9944cc;border-radius:4px;padding:0 5px;color:#cc88ff;font-size:0.82rem;font-weight:800;white-space:nowrap;">☠️${G.ePoisonStacks}</span>`);
         if((G.eParalyzeStacks||0) > 0)
             ebadges.push(`<span style="background:rgba(30,80,180,0.22);border:1px solid #3388cc;border-radius:4px;padding:0 5px;color:#88ccff;font-size:0.82rem;font-weight:800;white-space:nowrap;">💫${G.eParalyzeStacks}%</span>`);
+        if((G.eParalyzeResistTurns||0) > 0)
+            ebadges.push(`<span style="background:rgba(30,80,180,0.15);border:1px solid #5599bb;border-radius:4px;padding:0 5px;color:#aaddff;font-size:0.82rem;font-weight:800;white-space:nowrap;">麻痺½</span>`);
         if(ebadges.length > 0){
             eel.innerHTML=`<span style="display:inline-flex;gap:4px;align-items:center;flex-wrap:wrap;">${ebadges.join('')}</span>`;
             eel.style.color='';
@@ -3031,8 +3091,10 @@ function moveGhost(cx,cy){
 }
 
 function setupDrag(el,card){
+    let _startX=0, _startY=0;
     const start=(cx,cy)=>{
         if(G.phase!=='player') return;
+        _startX=cx; _startY=cy;
         dragging={card,srcEl:el};
         el.classList.add('dragging');
         const s0=card.suits[0]||null;
@@ -3047,9 +3109,45 @@ function setupDrag(el,card){
         moveGhost(cx,cy);
     };
     el.addEventListener('mousedown',e=>{e.preventDefault();start(e.clientX,e.clientY);});
+
+    // Single-click to place (mouse) — click fires after mousedown+mouseup with no drag
+    el.addEventListener('click',e=>{
+        if(OPT_INPUT_MODE!=='single' || G.phase!=='player') return;
+        e.preventDefault();
+        autoPlaceCard(card);
+    });
+
+    // Double-click to place (mouse)
+    el.addEventListener('dblclick',e=>{
+        if(OPT_INPUT_MODE!=='dbl' || G.phase!=='player') return;
+        e.preventDefault(); e.stopPropagation();
+        if(dragging){ ghost.style.display='none'; dragging.srcEl.classList.remove('dragging'); dragging=null; }
+        autoPlaceCard(card);
+    });
+
+    // Touch handling (single-tap / double-tap / drag)
+    let _lastTapEnd=0;
     el.addEventListener('touchstart',e=>{
+        if(OPT_INPUT_MODE==='dbl' && Date.now()-_lastTapEnd<350){
+            e.preventDefault();
+            _lastTapEnd=0;
+            if(dragging){ ghost.style.display='none'; dragging.srcEl.classList.remove('dragging'); dragging=null; }
+            autoPlaceCard(card);
+            return;
+        }
+        _lastTapEnd=0;
         e.preventDefault(); const t=e.touches[0]; start(t.clientX,t.clientY);
     },{passive:false});
+    el.addEventListener('touchend',e=>{
+        if(OPT_INPUT_MODE==='single' && dragging && dragging.card===card){
+            const t=e.changedTouches[0];
+            if(Math.abs(t.clientX-_startX)<15 && Math.abs(t.clientY-_startY)<15){
+                ghost.style.display='none'; dragging.srcEl.classList.remove('dragging'); dragging=null;
+                autoPlaceCard(card); return;
+            }
+        }
+        if(OPT_INPUT_MODE==='dbl') _lastTapEnd=Date.now();
+    },{passive:true});
 }
 
 function slotAt(cx,cy){
@@ -3141,6 +3239,13 @@ document.addEventListener('touchend',e=>{
     const t=e.changedTouches[0]; endSkillDrag(t.clientX,t.clientY); endDrag(t.clientX,t.clientY);
 });
 
+// Auto-place card into first empty slot (slot1 → slot2 → slot1 overwrite)
+function autoPlaceCard(card){
+    if(G.phase!=='player') return;
+    const slot = !G.s1 ? 1 : !G.s2 ? 2 : 1;
+    placeCard(card, slot);
+}
+
 function placeCard(card,slotNum){
     if(slotNum===1&&G.s1) G.discard.push(G.s1);
     if(slotNum===2&&G.s2) G.discard.push(G.s2);
@@ -3221,7 +3326,9 @@ function doAttack(){
                     setMsg(t('msgCardShield'));
                 } else {
                     if(G.healSealed>0){
-                        setMsg(t('msgHealSealed'));
+                        const h=Math.min(5,G.pMaxHP-G.pHP); // halved (10→5)
+                        G.pHP+=h; showFloatOnHero(`💚+${h} (½)`,'dmg-heal');
+                        setMsg(t('msgCardHeal').replace('{n}',h)+` ${t('msgHealWeak')}`);
                     } else {
                         const h=Math.min(10,G.pMaxHP-G.pHP);
                         G.pHP+=h; showFloatOnHero(`💚+${h}`,'dmg-heal');
@@ -3302,7 +3409,8 @@ function applyNextSkillEffect(list, idx, done, boostMult=1){
             setMsg(t('msgPoisonApply').replace('{n}',amt).replace('{total}',G.ePoisonStacks).replace('{note}',note));
             updateEnemyPoisonDisplay();
         } else if(isParalyzeSkill(sk)){
-            const amt=Math.floor(paralyzeAmtForSkill(sk)*boostMult);
+            let amt=Math.floor(paralyzeAmtForSkill(sk)*boostMult);
+            if((G.eParalyzeResistTurns||0)>0) amt=Math.floor(amt/2);
             G.eParalyzeStacks=(G.eParalyzeStacks||0)+amt;
             showDmg(`💫+${amt}%`,'enemy-wrap','dmg-skill');
             const note=boostMult>1?` （🔮${_mFmt(boostMult)}）`:'';
@@ -3322,16 +3430,30 @@ function applyNextSkillEffect(list, idx, done, boostMult=1){
             setMsg(t('msgDefSkill').replace('{n}',eff).replace('{note}',note));
         } else {
             const eff=Math.floor(skillEffect(sk)*boostMult);
-            if(G.healSealed>0){
-                showFloatOnHero('🪄封印','dmg-heal');
-                setMsg(t('msgHealSealed'));
+            // Poison recovery: floor(currentPoison × eff/maxHP)
+            const poisonRed = (G.playerPoisonStacks||0)>0
+                ? Math.min(G.playerPoisonStacks, Math.floor(G.playerPoisonStacks * eff / G.pMaxHP))
+                : 0;
+            if(poisonRed>0) G.playerPoisonStacks=Math.max(0,G.playerPoisonStacks-poisonRed);
+            // Heal (halved if weakened)
+            const healEff = G.healSealed>0 ? Math.floor(eff/2) : eff;
+            const healed=Math.min(healEff, G.pMaxHP-G.pHP);
+            G.pHP+=healed;
+            const note=boostMult>1?` （🔮${_mFmt(boostMult)}）`:'';
+            if(poisonRed>0 && healed>0){
+                showFloatOnHero(`🪄+${healed} ☠️-${poisonRed}`,'dmg-heal');
+                setMsg(t('msgHealAndPoison').replace('{healed}',healed).replace('{red}',poisonRed)+(G.healSealed>0?` ${t('msgHealWeak')}`:'')+note);
+            } else if(healed>0){
+                showFloatOnHero(`🪄+${healed}`+(G.healSealed>0?' (½)':''),'dmg-heal');
+                setMsg(t('msgHealSkill').replace('{n}',healed).replace('{note}',note)+(G.healSealed>0?` ${t('msgHealWeak')}`:''));
+            } else if(poisonRed>0){
+                showFloatOnHero(`☠️-${poisonRed}`,'dmg-heal');
+                setMsg(`☠️ 毒-${poisonRed}${note}`);
             } else {
-                const healed=Math.min(eff, G.pMaxHP-G.pHP);
-                G.pHP+=healed;
-                showFloatOnHero(`🪄+${healed}`,'dmg-heal');
-                const note=boostMult>1?` （🔮${_mFmt(boostMult)}）`:'';
-                setMsg(t('msgHealSkill').replace('{n}',healed).replace('{note}',note));
+                showFloatOnHero('🪄0','dmg-heal');
+                setMsg(t('msgHealSkill').replace('{n}',0).replace('{note}',note));
             }
+            updateStatus();
         }
         updateHP();
         if(G.eHP<=0){hideEnemyNow(); setTimeout(()=>showVictory(),900); return;}
@@ -3362,8 +3484,10 @@ function enemyTurn(){
     // Decrement sealed skill turns
     G.sealedSkills.forEach(s=>{ if(s.turnsLeft>0) s.turnsLeft--; });
     G.sealedSkills=G.sealedSkills.filter(s=>s.turnsLeft>0);
-    // Decrement heal seal
+    // Decrement heal weaken
     if(G.healSealed>0) G.healSealed--;
+    // Decrement enemy paralyze resistance
+    if(G.eParalyzeResistTurns>0) G.eParalyzeResistTurns--;
 
     // Paralyze check — applies to all enemy actions (skill and normal attack)
     const paraStack = G.eParalyzeStacks || 0;
@@ -3445,9 +3569,11 @@ function doEnemySkill(sk, enemyName){
             G.sealedCards.push({cardId:target.id, turnsLeft:3});
         }
     } else if(name==='シールド破壊'){
-        G.shield=0;
-        showFloatOnHero('🛡️→0','dmg-player');
-    } else if(name==='回復封じ'){
+        const prevShield=G.shield;
+        G.shield=Math.floor(G.shield/2);
+        showFloatOnHero(`🛡️÷2→${G.shield}`,'dmg-player');
+        setMsg(t('msgEnemyShieldHalf').replace('{ename}',enemyName).replace('{sname}',tName).replace('{prev}',prevShield).replace('{now}',G.shield));
+    } else if(name==='回復弱体'){
         G.healSealed=3;
     } else if(name==='2.5倍攻撃'){
         G.atkMult=2.5;
@@ -3477,11 +3603,13 @@ function doEnemySkill(sk, enemyName){
         updateStatus();
     } else if(name==='毒消し'){
         const prev=G.ePoisonStacks||0;
-        G.ePoisonStacks=0;
-        showDmg('☠️→0','enemy-wrap','dmg-shield');
-        const prevStr=prev>0?`(${prev})`:'';
-        setMsg(t('msgEnemyPoisonClear').replace('{ename}',enemyName).replace('{sname}',tName).replace('{prev}',prevStr));
+        G.ePoisonStacks=Math.floor(prev/2);
+        showDmg(`☠️÷2→${G.ePoisonStacks}`,'enemy-wrap','dmg-shield');
+        setMsg(t('msgEnemyPoisonHalf').replace('{ename}',enemyName).replace('{sname}',tName).replace('{prev}',prev).replace('{now}',G.ePoisonStacks));
         updateStatus();
+    } else if(name==='麻痺耐性'){
+        G.eParalyzeResistTurns=3;
+        setMsg(t('msgEnemyParalyzeResist').replace('{ename}',enemyName).replace('{sname}',tName));
     } else if(name==='HP回復'){
         const healAmt=Math.min(Math.floor(G.eMaxHp*0.1), G.eMaxHp-G.eHP);
         G.eHP+=healAmt;
