@@ -949,6 +949,10 @@
                 <button class="lang-btn"        id="input-mode-dbl"    onclick="setInputMode('dbl')">ダブルタップ</button>
                 <button class="lang-btn"        id="input-mode-single" onclick="setInputMode('single')">シングルタップ</button>
             </div>
+            <div style="margin-top:12px;border-top:1px solid rgba(196,154,42,0.3);padding-top:14px;">
+                <div id="settings-auto-atk-label" style="color:var(--gold);font-size:0.9rem;font-weight:800;margin-bottom:10px;">自動攻撃</div>
+                <button class="lang-btn" id="auto-atk-btn" onclick="toggleAutoAtk()">自動攻撃: OFF</button>
+            </div>
             <div style="margin-top:20px;">
                 <button class="btn btn-gray btn-sm" onclick="closeSettings()" id="settings-close-btn">閉じる</button>
             </div>
@@ -1187,6 +1191,8 @@ let currentLang = localStorage.getItem('arith_lang') || 'ja';
 // Input mode: 'drag'=drag only (default), 'dbl'=double-tap, 'single'=single-tap
 let OPT_INPUT_MODE = localStorage.getItem('arith_input_mode') ||
     (localStorage.getItem('arith_dblclick')==='true' ? 'dbl' : 'drag'); // migrate old key
+// Auto-attack: automatically trigger doAttack() when both slots are filled
+let OPT_AUTO_ATTACK = localStorage.getItem('arith_auto_attack') === 'true'; // default OFF
 
 const STRINGS = {
   ja: {
@@ -1208,6 +1214,9 @@ const STRINGS = {
     inputModeDrag:'ドラッグのみ',
     inputModeDbl: 'ダブルタップ',
     inputModeSingle:'シングルタップ',
+    autoAtkLabel:'自動攻撃',
+    autoAtkOff:'自動攻撃: OFF',
+    autoAtkOn: '自動攻撃: ON',
     // Battle left panel
     panelPlayer:'プレーヤー',
     labelName:'名前',
@@ -1407,6 +1416,9 @@ const STRINGS = {
     inputModeDrag:'ドラッグのみ',
     inputModeDbl: 'ダブルタップ',
     inputModeSingle:'シングルタップ',
+    autoAtkLabel:'じどうこうげき',
+    autoAtkOff:'じどうこうげき: OFF',
+    autoAtkOn: 'じどうこうげき: ON',
     panelPlayer:'プレーヤー',
     labelName:'なまえ',
     labelStatus:'じょうたい',
@@ -1582,6 +1594,9 @@ const STRINGS = {
     inputModeDrag:'Drag only',
     inputModeDbl: 'Double-tap',
     inputModeSingle:'Single-tap',
+    autoAtkLabel:'Auto Attack',
+    autoAtkOff:'Auto Attack: OFF',
+    autoAtkOn: 'Auto Attack: ON',
     panelPlayer:'PLAYER',
     labelName:'Name',
     labelStatus:'Status',
@@ -1786,7 +1801,9 @@ function applyLang(){
     const imDrag=s('input-mode-drag');   if(imDrag)   imDrag.textContent=t('inputModeDrag');
     const imDbl=s('input-mode-dbl');     if(imDbl)    imDbl.textContent=t('inputModeDbl');
     const imSingle=s('input-mode-single');if(imSingle) imSingle.textContent=t('inputModeSingle');
+    const autoAtkLbl=s('settings-auto-atk-label'); if(autoAtkLbl) autoAtkLbl.textContent=t('autoAtkLabel');
     updateInputModeUI();
+    updateAutoAtkBtn();
 
     // Battle panel labels (ptitle)
     qa('#left-panel .ptitle').forEach((el,i)=>{
@@ -1918,9 +1935,22 @@ function openSettings(){
         if(b) b.classList.toggle('active', l===currentLang);
     });
     updateInputModeUI();
+    updateAutoAtkBtn();
     document.getElementById('settings-overlay').classList.remove('hidden');
 }
 function closeSettings(){ document.getElementById('settings-overlay').classList.add('hidden'); }
+
+function toggleAutoAtk(){
+    OPT_AUTO_ATTACK = !OPT_AUTO_ATTACK;
+    localStorage.setItem('arith_auto_attack', OPT_AUTO_ATTACK);
+    updateAutoAtkBtn();
+}
+function updateAutoAtkBtn(){
+    const btn = document.getElementById('auto-atk-btn');
+    if(!btn) return;
+    btn.textContent = OPT_AUTO_ATTACK ? t('autoAtkOn') : t('autoAtkOff');
+    btn.classList.toggle('active', OPT_AUTO_ATTACK);
+}
 
 function setInputMode(mode){
     OPT_INPUT_MODE = mode;
@@ -3254,6 +3284,10 @@ function placeCard(card,slotNum){
     const nc=drawOne(); if(nc)G.hand.push(nc);
     renderHand(); updateFormula();
     autoSave('battle');
+    // Auto-attack: trigger doAttack after a brief render delay when both slots filled
+    if(OPT_AUTO_ATTACK && G.s1 && G.s2 && G.phase==='player'){
+        setTimeout(()=>{ if(G.s1&&G.s2&&G.phase==='player') doAttack(); }, 80);
+    }
 }
 
 
@@ -3492,7 +3526,7 @@ function enemyTurn(){
     // Paralyze check — applies to all enemy actions (skill and normal attack)
     const paraStack = G.eParalyzeStacks || 0;
     const isParalyzed = paraStack > 0 && Math.random() < Math.min(1, paraStack / 100);
-    G.eParalyzeStacks = Math.max(0, paraStack - 50);
+    G.eParalyzeStacks = Math.floor(paraStack / 2);
     updateStatus();
     if(isParalyzed){
         setMsg(t('msgParalyzed').replace('{name}',tEnemyName(G.eIdx)));
