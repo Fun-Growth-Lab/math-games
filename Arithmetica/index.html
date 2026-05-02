@@ -914,7 +914,7 @@
             <p class="ov-desc">1つ選んで習得しよう（スキップも可 / 最大4つ）</p>
             <div class="rew-skills" id="rew-skills-row"></div>
             <button class="btn btn-gray btn-sm" onclick="skipSkill()">スキップ</button>
-            <p style="font-size:0.78rem;color:var(--text-dim);margin-top:10px;">スキルを獲得しない場合、50%の確率でスキルが1つLvアップします</p>
+            <p id="skill-rew-note" style="font-size:0.78rem;color:var(--text-dim);margin-top:10px;">スキルを獲得しない場合、50%の確率でスキルが1つLvアップします</p>
         </div>
     </div>
 
@@ -1805,7 +1805,7 @@ function applyLang(){
     qa('#skill-rew-overlay .btn').forEach(btn=>{
         if(btn.textContent.includes('スキップ')||btn.textContent.includes('Skip')) btn.textContent=t('skipBtn');
     });
-    const srNote=q('#skill-rew-overlay p'); if(srNote) srNote.textContent=t('skillRewSkipNote');
+    const srNote=s('skill-rew-note'); if(srNote) srNote.textContent=t('skillRewSkipNote');
 
     // How-to overlay
     const htT=q('#howto-overlay .ov-title'); if(htT) htT.textContent=t('howtoTitle');
@@ -2070,24 +2070,24 @@ const CLASS_BONUS_DESCS = [
 // Multiple conditions: '*N' = result divisible by N, base = fixed damage
 const MULT_CONDS = [
     { key:'*2',  label:'2の倍数',  base: 4 },
-    { key:'*3',  label:'3の倍数',  base: 6 },
-    { key:'*4',  label:'4の倍数',  base: 8 },
-    { key:'*5',  label:'5の倍数',  base:10 },
-    { key:'*6',  label:'6の倍数',  base:12 },
-    { key:'*7',  label:'7の倍数',  base:14 },
-    { key:'*8',  label:'8の倍数',  base:16 },
-    { key:'*9',  label:'9の倍数',  base:18 },
-    { key:'*10', label:'10の倍数', base:20 },
+    { key:'*3',  label:'3の倍数',  base: 5 },
+    { key:'*4',  label:'4の倍数',  base: 6 },
+    { key:'*5',  label:'5の倍数',  base: 7 },
+    { key:'*6',  label:'6の倍数',  base: 8 },
+    { key:'*7',  label:'7の倍数',  base: 9 },
+    { key:'*8',  label:'8の倍数',  base:10 },
+    { key:'*9',  label:'9の倍数',  base:11 },
+    { key:'*10', label:'10の倍数', base:12 },
 ];
 
 // Less-than-or-equal conditions: '≤N' = result ≤ N, base = fixed damage
 const LE_CONDS = [
-    { key:'≤5', label:'5以下', base:10 },
-    { key:'≤4', label:'4以下', base:12 },
-    { key:'≤3', label:'3以下', base:14 },
-    { key:'≤2', label:'2以下', base:16 },
-    { key:'≤1', label:'1以下', base:18 },
-    { key:'≤0', label:'０',    base:20 },
+    { key:'≤5', label:'5以下', base: 7 },
+    { key:'≤4', label:'4以下', base: 8 },
+    { key:'≤3', label:'3以下', base: 9 },
+    { key:'≤2', label:'2以下', base:10 },
+    { key:'≤1', label:'1以下', base:11 },
+    { key:'≤0', label:'０',    base:12 },
 ];
 
 // Poison-specific numeric condition base values
@@ -2508,12 +2508,7 @@ function genParalyzeSkill(){
 
 // Generate boost (共鳴) skill — suit conditions only, 1 or 2 suits
 function genBoostSkill(){
-    const usedS=new Set(); const conds=[];
-    const suitCount = Math.random()<0.40 ? 1 : 2; // 40% single suit, 60% double
-    while(conds.length<suitCount){
-        const s=SUITS[rnd(0,3)];
-        if(!usedS.has(s)){usedS.add(s); conds.push(s);}
-    }
+    const conds=_pickNSuits(Math.random()<0.40 ? 1 : 2);
     const level = Math.random()<0.05 ? 2 : 1;
     return {type:'boost', conds, base:0, level};
 }
@@ -2570,11 +2565,8 @@ function genSuitSkill(){
 }
 
 function _pickNSuits(n){
-    const usedS=new Set(); const conds=[];
-    while(conds.length<n){
-        const s=SUITS[rnd(0,3)];
-        if(!usedS.has(s)){usedS.add(s); conds.push(s);}
-    }
+    const conds=[];
+    while(conds.length<n) conds.push(SUITS[rnd(0,3)]);
     return conds;
 }
 function _makeOneStartSkill(sk, conds){
@@ -2631,13 +2623,19 @@ function triggered(sk,c1,c2,res,skIdx){
         const sealInfo=G.sealedSkills.find(s=>s.skillIdx===skIdx&&s.turnsLeft>0);
         if(sealInfo) return false;
     }
-    const usedSuits=new Set();
-    c1.suits.forEach(s=>usedSuits.add(s));
-    c2.suits.forEach(s=>usedSuits.add(s));
+    // Build suit bag (multiset) from both cards — allows same-suit duplicate matching
+    // e.g. ♡+♡ requires c1=♡ AND c2=♡, not just "any ♡"
+    const suitBag=[];
+    c1.suits.forEach(s=>suitBag.push(s));
+    c2.suits.forEach(s=>suitBag.push(s));
+    const remaining=[...suitBag];
     return sk.conds.every(cd=>{
-        if(cd[0]==='*') return res > 0 && res % parseInt(cd.slice(1)) === 0;
-        if(cd[0]==='≤') return res <= parseInt(cd.slice(1));
-        return usedSuits.has(cd);
+        if(cd[0]==='*') return res>0 && res%parseInt(cd.slice(1))===0;
+        if(cd[0]==='≤') return res<=parseInt(cd.slice(1));
+        // Suit: consume one matching suit from remaining bag
+        const idx=remaining.indexOf(cd);
+        if(idx>=0){ remaining.splice(idx,1); return true; }
+        return false;
     });
 }
 
