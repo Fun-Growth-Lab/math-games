@@ -1437,6 +1437,7 @@ const STRINGS = {
     msgEnemyHpRecover:'✨ {ename}の「{sname}」発動！{result}',
     msgHpRecovered:'{n}HP回復！',
     msgHpFull:'HPが満タン！',
+    msgEnemyRecovery:'✨ {ename}の「{sname}」発動！毒・麻痺を半減、HP+{heal}回復！',
     msgHandChanged:'🔀 手札をチェンジした！',
   },
   kana: {
@@ -1606,6 +1607,7 @@ const STRINGS = {
     msgEnemyHpRecover:'✨ {ename}の「{sname}」はつどう！{result}',
     msgHpRecovered:'{n}HPかいふく！',
     msgHpFull:'HPがまんタン！',
+    msgEnemyRecovery:'✨ {ename}の「{sname}」はつどう！どく・まひをはんげん、HP+{heal}かいふく！',
     msgHandChanged:'🔀 てふだをチェンジした！',
     className_0:'せんし',
     className_1:'まほうつかい',
@@ -1784,6 +1786,7 @@ const STRINGS = {
     msgEnemyHpRecover:'✨ {ename}\'s [{sname}]! {result}',
     msgHpRecovered:'{n} HP recovered!',
     msgHpFull:'HP full!',
+    msgEnemyRecovery:'✨ {ename}\'s [{sname}]! Poison & Paralysis halved, +{heal} HP restored!',
     msgHandChanged:'🔀 Hand redrawn!',
     className_0:'Warrior',
     className_1:'Mage',
@@ -2024,6 +2027,7 @@ const ENEMY_SKILL_TRANS = {
     '麻痺治療':   { name:'麻痺治療',   desc:'自身の麻痺を０にする' },
     '３倍攻撃':   { name:'３倍攻撃',   desc:'次のターン、攻撃力3倍で攻撃する' },
     'HP回復':     { name:'HP回復',     desc:'最大HPの10%を回復する' },
+    '回復行動':   { name:'回復行動',   desc:'毒・麻痺を半減し、最大HPの10%を回復する' },
     '毒(6)':      { name:'毒(6)',       desc:'プレーヤーに毒(6)を付与する' },
     '毒(10)':     { name:'毒(10)',      desc:'プレーヤーに毒(10)を付与する' },
   },
@@ -2040,6 +2044,7 @@ const ENEMY_SKILL_TRANS = {
     '麻痺治療':   { name:'まひちりょう',         desc:'じしんのまひを０にする' },
     '３倍攻撃':   { name:'3ばいこうげき',        desc:'つぎのターン、こうげきりょく3ばいでこうげきする' },
     'HP回復':     { name:'HPかいふく',           desc:'さいだいHPの10%をかいふくする' },
+    '回復行動':   { name:'かいふくこうどう',     desc:'どく・まひをはんげんし、さいだいHPの10%をかいふくする' },
     '毒(6)':      { name:'どく(6)',              desc:'プレーヤーにどく(6)をふよする' },
     '毒(10)':     { name:'どく(10)',             desc:'プレーヤーにどく(10)をふよする' },
   },
@@ -2056,6 +2061,7 @@ const ENEMY_SKILL_TRANS = {
     '麻痺治療':   { name:'Para. Cure',     desc:'Clears own paralysis to 0' },
     '３倍攻撃':   { name:'3× Attack',     desc:'Next turn: attack at ×3 power' },
     'HP回復':     { name:'HP Recovery',   desc:'Recovers 10% of max HP' },
+    '回復行動':   { name:'Recovery Act',  desc:'Halves own Poison & Paralysis, recovers 10% of max HP' },
     '毒(6)':      { name:'Poison(6)',     desc:'Inflicts Poison(6) on the player' },
     '毒(10)':     { name:'Poison(10)',    desc:'Inflicts Poison(10) on the player' },
   }
@@ -2118,8 +2124,8 @@ const ENEMY_LIST = [
       hardSkill: { name:'HP回復',     desc:'最大HPの10%を回復する' } },
     { name:'古代の神',   maxHp: 500,  atk: 50, img:'images/enemy_10_1.png', em:'👁️',
       easySkill:{ name:'３倍攻撃',   desc:'次のターン、攻撃力3倍で攻撃する' },
-      normalSkill:{ name:'HP回復',     desc:'最大HPの10%を回復する' },
-      hardSkill: { name:'毒(10)', poisonAmt:10, desc:'プレーヤーに毒(10)を付与する' } },
+      normalSkill:{ name:'守備強化',   desc:'自身の基礎攻撃力の2倍のシールドを張る' },
+      hardSkill: { name:'回復行動',   desc:'毒・麻痺を半減し、最大HPの10%を回復する' } },
 ];
 const ALL_ENEMY_SKILLS = ENEMY_LIST.filter(e=>e.easySkill).map(e=>e.easySkill);
 const SUITS = ['♥','♦','♠','♣'];
@@ -3725,6 +3731,26 @@ function doEnemySkill(sk, enemyName){
         showDmg(`💫→0%`,'enemy-wrap','dmg-shield');
         setMsg(t('msgEnemyParalyzeResist').replace('{ename}',enemyName).replace('{sname}',tName).replace('{prev}',prevPara));
         updateStatus();
+    } else if(name==='回復行動'){
+        // 毒を半減
+        G.ePoisonStacks = Math.floor((G.ePoisonStacks||0) / 2);
+        // 麻痺を半減
+        G.eParalyzeStacks = Math.floor((G.eParalyzeStacks||0) / 2);
+        // HP 10%回復
+        const _healAmt=Math.min(Math.floor(G.eMaxHp*0.1), G.eMaxHp-G.eHP);
+        G.eHP+=_healAmt;
+        const _tgt2=document.getElementById('enemy-wrap');
+        const _cont2=document.getElementById('container');
+        const _tr2=_tgt2.getBoundingClientRect(), _cr2=_cont2.getBoundingClientRect(), _sc2=getScale();
+        const _f2=document.createElement('div');
+        _f2.className='dmg-float dmg-heal';
+        _f2.textContent=`+${_healAmt}`;
+        _f2.style.left=(((_tr2.left-_cr2.left)+_tr2.width/2-24)/_sc2)+'px';
+        _f2.style.top= ((_tr2.top -_cr2.top +_tr2.height*0.2)/_sc2)+'px';
+        _cont2.appendChild(_f2); setTimeout(()=>_f2.remove(),1200);
+        updateStatus();
+        updateHP();
+        setMsg(t('msgEnemyRecovery').replace('{ename}',enemyName).replace('{sname}',tName).replace('{heal}',_healAmt));
     } else if(name==='HP回復'){
         const healAmt=Math.min(Math.floor(G.eMaxHp*0.1), G.eMaxHp-G.eHP);
         G.eHP+=healAmt;
