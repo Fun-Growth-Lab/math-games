@@ -1229,6 +1229,8 @@ let OPT_INPUT_MODE = localStorage.getItem('arith_input_mode') ||
     (localStorage.getItem('arith_dblclick')==='true' ? 'dbl' : 'drag'); // migrate old key
 // Auto-attack: automatically trigger doAttack() when both slots are filled
 let OPT_AUTO_ATTACK = localStorage.getItem('arith_auto_attack') === 'true'; // default OFF
+// Display-only card references: keep formula visible during animations (cleared in endEnemyTurn)
+let _dispCalcS1 = null, _dispCalcS2 = null;
 
 const STRINGS = {
   ja: {
@@ -3055,19 +3057,29 @@ function updateFormula(){
     // Operator state — strictly alternating by turn
     G.op = (G.turn % 2 === 1) ? '+' : '-';
 
+    // Display cards: use actual slots if filled, otherwise fall back to display-only vars
+    const dS1 = G.s1 ?? _dispCalcS1;
+    const dS2 = G.s2 ?? _dispCalcS2;
+
     // Auto-swap for subtraction: left must be ≥ right (skip swap if equal values → result 0)
+    // Only swap live slots (not display-only)
     if(G.op==='-' && G.s1 && G.s2 && G.s1.value < G.s2.value){
         const tmp=G.s1; G.s1=G.s2; G.s2=tmp;
+    }
+    // Also apply swap for display vars when showing post-attack formula
+    let dS1final=dS1, dS2final=dS2;
+    if(G.op==='-' && dS1 && dS2 && dS1.value < dS2.value){
+        dS1final=dS2; dS2final=dS1;
     }
 
     // Render slots (after possible swap)
     const s1el=document.getElementById('slot1');
-    if(G.s1){s1el.classList.add('filled'); s1el.innerHTML=slotHTML(G.s1);}
-    else    {s1el.classList.remove('filled'); s1el.innerHTML='□';}
+    if(dS1final){s1el.classList.add('filled'); s1el.innerHTML=slotHTML(dS1final);}
+    else        {s1el.classList.remove('filled'); s1el.innerHTML='□';}
 
     const s2el=document.getElementById('slot2');
-    if(G.s2){s2el.classList.add('filled'); s2el.innerHTML=slotHTML(G.s2);}
-    else    {s2el.classList.remove('filled'); s2el.innerHTML='□';}
+    if(dS2final){s2el.classList.add('filled'); s2el.innerHTML=slotHTML(dS2final);}
+    else        {s2el.classList.remove('filled'); s2el.innerHTML='□';}
 
     const opDisp=document.getElementById('op-display');
     const fArea =document.getElementById('formula-area');
@@ -3086,19 +3098,20 @@ function updateFormula(){
     const rn=document.getElementById('res-n');
     const rs=document.getElementById('res-s');
     const rsp = document.getElementById('res-sp');
-    if(G.s1&&G.s2){
-        const res=calcRes(G.s1,G.s2,G.op);
+    if(dS1final&&dS2final){
+        const res=calcRes(dS1final,dS2final,G.op);
         rn.textContent=res;
         rc.classList.remove('empty');
-        const allS=[...G.s1.suits,...G.s2.suits];
+        const allS=[...dS1final.suits,...dS2final.suits];
         rs.innerHTML=allS.map(s=>`<span class="res-suit-sym ${sc(s)}">${s}</span>`).join('');
         // Show special icons from slot cards (side by side if both have one)
         const spIcons={'atk':'⚔️+10','shld':'🛡️+5','heal':'💚+10'};
         const spParts=[];
-        if(G.s1.special) spParts.push(spIcons[G.s1.special]||'');
-        if(G.s2.special) spParts.push(spIcons[G.s2.special]||'');
+        if(dS1final.special) spParts.push(spIcons[dS1final.special]||'');
+        if(dS2final.special) spParts.push(spIcons[dS2final.special]||'');
         if(rsp){ rsp.textContent=spParts.join(' '); rsp.className='res-special'+(spParts.length?` has-special`:''); }
-        document.getElementById('atk-btn').disabled=false;
+        // Attack button: only enabled when live slots are filled (not just display vars)
+        document.getElementById('atk-btn').disabled=!(G.s1&&G.s2);
     }else{
         rn.textContent='？'; rc.classList.add('empty'); rs.innerHTML='';
         if(rsp){ rsp.textContent=''; rsp.className='res-special'; }
@@ -3348,6 +3361,8 @@ function doAttack(){
     const c1=G.s1, c2=G.s2;
     const opNow=G.op;
     const res=calcRes(c1,c2,opNow);
+    // Save display references BEFORE nulling (formula stays visible during animations)
+    _dispCalcS1=c1; _dispCalcS2=c2;
     G.s1=null; G.s2=null;
 
     // Apply damage to enemy (direct attack)
@@ -3355,7 +3370,7 @@ function doAttack(){
     showDmg(netRes,'enemy-wrap','dmg-enemy');
     shakeEnemy();
     G.discard.push(c1,c2);
-    updateHP(); updateFormula();
+    updateHP(); updateFormula(); // formula still shows via _dispCalcS1/S2
     const sym=opNow==='+'?'＋':'－';
     const shieldMsg=(res-netRes)>0?t('msgShieldAbsorb').replace('{n}',res-netRes):'';
     setMsg(t('msgAtk').replace('{a}',c1.value).replace('{op}',sym).replace('{b}',c2.value).replace('{res}',res).replace('{dmg}',netRes).replace('{shield}',shieldMsg));
@@ -3618,11 +3633,15 @@ function endEnemyTurn(){
             setMsg(t('msgPoisonDmgPlayer').replace('{n}',dmg));
             updateHP(); updateStatus();
             if(G.pHP<=0){setTimeout(()=>showGameover(),500); return;}
-            G.phase='player'; updateFormula(); updateHandChangeBtn();
+            G.phase='player';
+            _dispCalcS1=null; _dispCalcS2=null; // clear display formula now that turn is over
+            updateFormula(); updateHandChangeBtn();
             setTimeout(()=>{ setMsg(''); },1100);
         },500);
     } else {
-        G.phase='player'; updateFormula(); updateHandChangeBtn();
+        G.phase='player';
+        _dispCalcS1=null; _dispCalcS2=null; // clear display formula now that turn is over
+        updateFormula(); updateHandChangeBtn();
         setTimeout(()=>{ setMsg(''); },1100);
     }
 }
