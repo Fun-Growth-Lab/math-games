@@ -1163,7 +1163,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut }
         from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-    import { getFirestore, collection, doc, setDoc, getDoc, getDocs, serverTimestamp }
+    import { getFirestore, collection, doc, addDoc, getDocs, serverTimestamp }
         from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
     const cfg = {
@@ -1191,31 +1191,16 @@
 
     // ---- Firestore ranking helpers (exposed to game script) ----
     window.saveOnlineScore = async (uid, name, score, turns, difficulty, className, pointScore) => {
+        // pointScore=0 は保存しない（旧形式レコードの汚染を防ぐ）
+        if ((pointScore||0) <= 0) {
+            console.log('Ranking: pointScore=0のため送信しません');
+            return;
+        }
         try {
             const col = `scores_arithmetica_${difficulty||'easy'}`;
-            const ref = doc(db, col, uid);
-            // 既存スコアを読み込み、新スコアが良い場合のみ上書き
-            const existing = await getDoc(ref);
-            if (existing.exists()) {
-                const d = existing.data();
-                const oldPt    = d.pointScore || 0;
-                const oldScore = d.score      || 0;
-                const oldTurns = d.turns      || 9999;
-                // 旧形式レコード（pointScore=0）は常に上書き許可
-                // 新形式同士は pointScore→score→turns の優先順で比較
-                if (oldPt > 0) {
-                    const isBetter =
-                        pointScore >  oldPt ||
-                        (pointScore === oldPt && score >  oldScore) ||
-                        (pointScore === oldPt && score === oldScore && (turns||9999) < oldTurns);
-                    if (!isBetter) {
-                        console.log('Ranking: 既存スコアの方が良いため更新しません', {old:{pt:oldPt,score:oldScore}, new_:{pt:pointScore,score}});
-                        return;
-                    }
-                }
-            }
             const dateStr = new Date().toLocaleDateString('ja-JP');
-            await setDoc(ref, {
+            // addDoc: ゲーム毎に新エントリ作成（読み込み時にUID別で集約）
+            await addDoc(collection(db, col), {
                 uid, name, score, turns:turns||0,
                 className:className||'', pointScore:pointScore||0,
                 date:dateStr, createdAt:serverTimestamp()
@@ -1223,27 +1208,25 @@
             console.log('Ranking: オンラインスコア登録成功', {score, pointScore, difficulty});
         } catch(e){
             console.error('Firestore save error:', e);
-            // ユーザーへ通知（コンソール以外でも分かるように）
             if (window._showRankSaveError) window._showRankSaveError(e);
         }
     };
     window.loadWorldRanking = async (difficulty) => {
         try {
             const col = `scores_arithmetica_${difficulty||'easy'}`;
-            // orderBy不使用（インデックス不要）→ クライアント側でソート
             const snap=await getDocs(collection(db, col));
-            const rows=[];
+            // pointScore>0 のエントリのみ対象
+            const allRows=[];
             snap.forEach(d=>{
                 const data=d.data();
-                // pointScore未設定または0の旧形式レコードを除外
-                if((data.pointScore||0) > 0) rows.push(data);
+                if((data.pointScore||0) > 0) allRows.push(data);
             });
+            const rows=allRows;
             rows.sort((a,b)=>{
                 const pa=(a.pointScore||0), pb=(b.pointScore||0);
                 if(pb!==pa) return pb-pa;
                 if((b.score||0)!==(a.score||0)) return (b.score||0)-(a.score||0);
-                if((a.turns||999)!==(b.turns||999)) return (a.turns||999)-(b.turns||999);
-                return 0;
+                return (a.turns||999)-(b.turns||999);
             });
             return rows.slice(0,10);
         } catch(e){ console.error('Firestore load error:', e); return null; }
@@ -3844,15 +3827,19 @@ function hideEnemyNow(){
 // ============================================================
 // SCORE
 // ============================================================
-// Final score (submitted to ranking): skill score + HP survival bonus
+// Final score (submitted to ranking): (skill fires / turns)*100 + (HP ratio)*200
 function calcBattleScore(){
-    const hpRatio = G.pMaxHP > 0 ? Math.max(0, G.pHP) / G.pMaxHP : 0;
-    return Math.round(hpRatio * 200 + (G.totalSkillWeight||0) * 100);
+    const hpRatio   = G.pMaxHP > 0 ? Math.max(0, G.pHP) / G.pMaxHP : 0;
+    const skillRatio = G.totalTurns > 0 ? (G.totalSkillWeight||0) / G.totalTurns : 0;
+    return Math.round(skillRatio * 100 + hpRatio * 200);
 }
-// In-game display: skill score only (0 at start, grows as skills fire)
+// In-game display: skill rate * 100
 function updateScoreLbl(){
     const el=document.getElementById('score-lbl');
-    if(el) el.textContent=`${t('labelScore')}: ${(G.totalSkillWeight||0)*100}`;
+    if(el){
+        const skillRatio = G.totalTurns > 0 ? (G.totalSkillWeight||0) / G.totalTurns : 0;
+        el.textContent=`${t('labelScore')}: ${Math.round(skillRatio * 100)}`;
+    }
 }
 
 // ============================================================
@@ -3876,7 +3863,7 @@ function showVictory(){
         document.getElementById('clear-overlay').classList.remove('hidden');
     } else {
         document.getElementById('vic-desc').textContent=t('stageClear').replace('{n}', G.eIdx+1);
-        const _skillBonus=(G.totalSkillWeight||0)*100;
+        const _skillBonus=Math.round((G.totalTurns>0?(G.totalSkillWeight||0)/G.totalTurns:0)*100);
         const _hpRatio=G.pMaxHP>0?Math.max(0,G.pHP)/G.pMaxHP:0;
         const _hpBonus=Math.round(_hpRatio*200);
         const _vicScore=document.getElementById('vic-score');
