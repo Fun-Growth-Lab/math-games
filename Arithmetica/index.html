@@ -1163,7 +1163,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut }
         from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-    import { getFirestore, collection, doc, setDoc, getDocs, serverTimestamp }
+    import { getFirestore, collection, doc, setDoc, getDoc, getDocs, serverTimestamp }
         from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
     const cfg = {
@@ -1193,14 +1193,36 @@
     window.saveOnlineScore = async (uid, name, score, turns, difficulty, className, pointScore) => {
         try {
             const col = `scores_arithmetica_${difficulty||'easy'}`;
+            const ref = doc(db, col, uid);
+            // 既存スコアを読み込み、新スコアが良い場合のみ上書き
+            const existing = await getDoc(ref);
+            if (existing.exists()) {
+                const d = existing.data();
+                const oldPt    = d.pointScore || 0;
+                const oldScore = d.score      || 0;
+                const oldTurns = d.turns      || 9999;
+                // 判定: pointScore→score→turns の優先順でどちらが良いか
+                const isBetter =
+                    pointScore >  oldPt ||
+                    (pointScore === oldPt && score >  oldScore) ||
+                    (pointScore === oldPt && score === oldScore && (turns||9999) < oldTurns);
+                if (!isBetter) {
+                    console.log('Ranking: 既存スコアの方が良いため更新しません', {old:{pt:oldPt,score:oldScore}, new_:{pt:pointScore,score}});
+                    return;
+                }
+            }
             const dateStr = new Date().toLocaleDateString('ja-JP');
-            // setDoc with uid as key → 1 entry per player (overwrites previous)
-            await setDoc(doc(db, col, uid), {
+            await setDoc(ref, {
                 uid, name, score, turns:turns||0,
                 className:className||'', pointScore:pointScore||0,
                 date:dateStr, createdAt:serverTimestamp()
             });
-        } catch(e){ console.error('Firestore save error:', e); }
+            console.log('Ranking: オンラインスコア登録成功', {score, pointScore, difficulty});
+        } catch(e){
+            console.error('Firestore save error:', e);
+            // ユーザーへ通知（コンソール以外でも分かるように）
+            if (window._showRankSaveError) window._showRankSaveError(e);
+        }
     };
     window.loadWorldRanking = async (difficulty) => {
         try {
@@ -4681,7 +4703,12 @@ function submitScore(score){
     if(score===10){ recordClear(G.classIdx||0, diff); recordClearMedal(G.classIdx||0, diff); }
     saveLocalScore(name, score, turns, diff, className, pointScore);
     if(window.currentUser && window.saveOnlineScore){
-        window.saveOnlineScore(window.currentUser.uid, name, score, turns, diff, className, pointScore);
+        console.log('Ranking: オンライン送信開始', {uid:window.currentUser.uid, name, score, turns, diff, pointScore});
+        window.saveOnlineScore(window.currentUser.uid, name, score, turns, diff, className, pointScore)
+            .catch(e => console.error('Ranking: saveOnlineScore 未捕捉エラー', e));
+    } else {
+        console.log('Ranking: オンライン送信スキップ',
+            {currentUser:!!window.currentUser, saveOnlineScore:!!window.saveOnlineScore});
     }
 }
 
