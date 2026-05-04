@@ -1201,14 +1201,17 @@
                 const oldPt    = d.pointScore || 0;
                 const oldScore = d.score      || 0;
                 const oldTurns = d.turns      || 9999;
-                // 判定: pointScore→score→turns の優先順でどちらが良いか
-                const isBetter =
-                    pointScore >  oldPt ||
-                    (pointScore === oldPt && score >  oldScore) ||
-                    (pointScore === oldPt && score === oldScore && (turns||9999) < oldTurns);
-                if (!isBetter) {
-                    console.log('Ranking: 既存スコアの方が良いため更新しません', {old:{pt:oldPt,score:oldScore}, new_:{pt:pointScore,score}});
-                    return;
+                // 旧形式レコード（pointScore=0）は常に上書き許可
+                // 新形式同士は pointScore→score→turns の優先順で比較
+                if (oldPt > 0) {
+                    const isBetter =
+                        pointScore >  oldPt ||
+                        (pointScore === oldPt && score >  oldScore) ||
+                        (pointScore === oldPt && score === oldScore && (turns||9999) < oldTurns);
+                    if (!isBetter) {
+                        console.log('Ranking: 既存スコアの方が良いため更新しません', {old:{pt:oldPt,score:oldScore}, new_:{pt:pointScore,score}});
+                        return;
+                    }
                 }
             }
             const dateStr = new Date().toLocaleDateString('ja-JP');
@@ -1229,10 +1232,16 @@
             const col = `scores_arithmetica_${difficulty||'easy'}`;
             // orderBy不使用（インデックス不要）→ クライアント側でソート
             const snap=await getDocs(collection(db, col));
-            const rows=[]; snap.forEach(d=>rows.push(d.data()));
+            const rows=[];
+            snap.forEach(d=>{
+                const data=d.data();
+                // pointScore未設定または0の旧形式レコードを除外
+                if((data.pointScore||0) > 0) rows.push(data);
+            });
             rows.sort((a,b)=>{
                 const pa=(a.pointScore||0), pb=(b.pointScore||0);
                 if(pb!==pa) return pb-pa;
+                if((b.score||0)!==(a.score||0)) return (b.score||0)-(a.score||0);
                 if((a.turns||999)!==(b.turns||999)) return (a.turns||999)-(b.turns||999);
                 return 0;
             });
