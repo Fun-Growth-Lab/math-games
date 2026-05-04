@@ -2369,6 +2369,9 @@ function newG() {
         // Per-stage counters (reset each enemy)
         stageTurnStart: 0,
         stageSkillStart: 0,
+        // Skill bonus tracking (new formula)
+        totalSkillBonus: 0,
+        stageSkillBonusStart: 0,
         // Accumulated ranking score (sum of stage scores)
         totalScore: 0,
         // Save state
@@ -3442,6 +3445,7 @@ function doAttack(){
             if(triggered(sk,c1,c2,res,i)){
                 const n=sk.conds.length;
                 G.totalSkillWeight=(G.totalSkillWeight||0)+(n===1?1:n===2?2:4);
+                G.totalSkillBonus=(G.totalSkillBonus||0)+calcSingleSkillBonus(sk);
             }
         });
         // スコア表示は敵撃破時のみ更新（ここでは呼ばない）
@@ -3835,6 +3839,24 @@ function hideEnemyNow(){
 // ============================================================
 // SCORE
 // ============================================================
+// Skill bonus score helpers
+function _numCondPt(cond){
+    if(cond[0]==='*') return parseInt(cond.slice(1)) * 2; // *2→4 .. *10→20
+    if(cond[0]==='≤') return 10 + (5 - parseInt(cond.slice(1))) * 2; // ≤5→10 .. ≤0→20
+    return 0;
+}
+function calcSingleSkillBonus(sk){
+    const sc = sk.conds.filter(c=>c[0]!=='*'&&c[0]!=='≤').length; // スート数
+    const numC = sk.conds.filter(c=>c[0]==='*'||c[0]==='≤');       // 数値条件
+    const numPt = numC.length > 0 ? _numCondPt(numC[0]) : 0;
+    if(sc===1 && numC.length===0) return 4;                         // スートのみ×1
+    if(sc===2 && numC.length===0) return (4+4)*2;                  // スート2×2
+    if(sc===1 && numC.length===1) return (4+numPt)*3;              // スート+数値×3
+    if(sc===2 && numC.length===1) return (4+4+numPt)*4;            // スート2+数値×4
+    return 0;
+}
+
+// ============================================================
 // Final score: sum of per-stage scores (set in showVictory each stage)
 function calcBattleScore(){
     return G.totalScore || 0;
@@ -3860,12 +3882,11 @@ function showVictory(){
     document.getElementById('rp-disc').textContent = 0;
     autoSave('victory');
     // --- ステージスコア計算 ---
-    const _stageNum   = G.eIdx + 1;
-    const _stageTurns = G.totalTurns - (G.stageTurnStart||0);
-    const _stageSW    = (G.totalSkillWeight||0) - (G.stageSkillStart||0);
-    const _skillRatio = _stageTurns > 0 ? _stageSW / _stageTurns : 0;
-    const _hpRatio    = G.pMaxHP > 0 ? Math.max(0, G.pHP) / G.pMaxHP : 0;
-    const _skillBonus = Math.round(_skillRatio * 2000);
+    const _stageNum        = G.eIdx + 1;
+    const _stageTurns      = G.totalTurns - (G.stageTurnStart||0);
+    const _stageSkillBonus = (G.totalSkillBonus||0) - (G.stageSkillBonusStart||0);
+    const _hpRatio         = G.pMaxHP > 0 ? Math.max(0, G.pHP) / G.pMaxHP : 0;
+    const _skillBonus      = _stageTurns > 0 ? Math.round(_stageSkillBonus / _stageTurns * 100) : 0;
     const _hpBonus    = Math.round(_hpRatio    * 2000);
     const _stageBonus = _stageNum * 1000;
     G.totalScore = (G.totalScore||0) + _skillBonus + _hpBonus + _stageBonus;
@@ -4249,8 +4270,9 @@ function nextEnemy(){
     G.pHP=Math.min(G.pMaxHP, G.pHP+heal);
     G.shield=G.initShield; // restore permanent shield (0 if no power-up taken)
     G.turn=1;
-    G.stageTurnStart  = G.totalTurns;
-    G.stageSkillStart = G.totalSkillWeight;
+    G.stageTurnStart       = G.totalTurns;
+    G.stageSkillStart      = G.totalSkillWeight;
+    G.stageSkillBonusStart = G.totalSkillBonus;
 
     // Reset enemy state
     G.eShield=0;
