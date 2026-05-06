@@ -323,6 +323,25 @@
         }
         .hidden { display: none !important; opacity: 0; pointer-events: none; }
 
+        /* 設定モーダル */
+        .setting-mode-btn {
+            width: 300px; height: 58px; margin: 6px auto;
+            font-size: 22px;
+            background: linear-gradient(to bottom, #cfd9df, #e2ebf0);
+            color: #555; text-shadow: none;
+        }
+        .setting-mode-btn.active-mode {
+            background: linear-gradient(to bottom, var(--btn-blue-top), var(--btn-blue-bot));
+            color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+            box-shadow: 0 5px 0 rgba(0,0,100,0.3);
+        }
+        .mode-desc-box {
+            background: rgba(0,0,0,0.07); border-radius: 10px;
+            padding: 10px 16px; font-size: 14px; color: #555;
+            min-height: 44px; line-height: 1.6; text-align: center;
+            margin-top: 8px; width: 300px;
+        }
+
     </style>
 </head>
 <body>
@@ -401,6 +420,7 @@
                     <button class="puz-btn btn-score" onclick="game.toggleRankingPopup(true)">ランキング</button>
                     
                     <button class="puz-btn btn-sub" onclick="window.location.href='../index.html'">INDEXへ</button>
+                    <button class="puz-btn btn-sub" onclick="game.openSettings()">⚙ 設定</button>
                 </div>
             </div>
         </div>
@@ -468,6 +488,20 @@
                     </div>
                 </div>
                 <button class="puz-btn btn-sub" style="margin-top:20px;" onclick="game.toggleRankingPopup(false)">とじる</button>
+            </div>
+        </div>
+
+        <div id="settings-modal" class="full-screen-overlay hidden">
+            <div class="content-box-translucent" style="width:420px;">
+                <h2 style="color:#333; margin:0 0 6px 0; font-size:28px;">⚙ 設定</h2>
+                <div style="color:#666; font-size:15px; margin-bottom:16px; font-weight:bold;">カードの操作方法をえらぼう</div>
+                <div style="display:flex; flex-direction:column; align-items:center; width:100%;">
+                    <button id="setting-drag" class="puz-btn setting-mode-btn" onclick="game.setControlMode('drag')">🖱 ドラッグ</button>
+                    <button id="setting-doubletap" class="puz-btn setting-mode-btn" onclick="game.setControlMode('doubletap')">👆👆 ダブルタップ</button>
+                    <button id="setting-singletap" class="puz-btn setting-mode-btn" onclick="game.setControlMode('singletap')">👆 シングルタップ</button>
+                </div>
+                <div class="mode-desc-box" id="mode-desc-text"></div>
+                <button class="puz-btn btn-sub" style="margin-top:18px; width:200px;" onclick="game.closeSettings()">とじる</button>
             </div>
         </div>
 
@@ -607,6 +641,7 @@ class Game {
         this.lastItemJSON = "";
 
         this.lastTime = 0;
+        this.controlMode = localStorage.getItem('math_braves_control_mode') || 'drag';
         this.updateClearCounts();
     }
 
@@ -781,42 +816,53 @@ class Game {
     attachInputHandlers() {
         const getPos = (e) => {
             const rect = this.canvas.getBoundingClientRect();
-            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-            
-            return { 
-                x: (clientX - rect.left) / this.scaleRatio, 
-                y: (clientY - rect.top) / this.scaleRatio 
-            };
+            let clientX, clientY;
+            if (e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX; clientY = e.touches[0].clientY;
+            } else if (e.changedTouches && e.changedTouches.length > 0) {
+                clientX = e.changedTouches[0].clientX; clientY = e.changedTouches[0].clientY;
+            } else {
+                clientX = e.clientX; clientY = e.clientY;
+            }
+            return { x: (clientX - rect.left) / this.scaleRatio, y: (clientY - rect.top) / this.scaleRatio };
         };
 
-        const onStart = (e) => {
+        const findCardAt = (pos) => {
+            for (let i = this.handCards.length - 1; i >= 0; i--) {
+                const c = this.handCards[i];
+                if (pos.x >= c.x - c.width/2 && pos.x <= c.x + c.width/2 &&
+                    pos.y >= c.y - c.height/2 && pos.y <= c.y + c.height/2) return c;
+            }
+            return null;
+        };
+
+        // --- ドラッグ ---
+        const onDragStart = (e) => {
+            if (this.controlMode !== 'drag') return;
             if (this.state === 'ROUND_TRANSITION_WAIT') { this.nextRound(); return; }
             if (this.state === 'GAME_OVER_WAIT') { this.gameOver(); return; }
             if (this.state !== 'PLAYING') return;
-            
+            e.preventDefault();
             const pos = getPos(e);
-            for (let i = this.handCards.length - 1; i >= 0; i--) {
-                let card = this.handCards[i];
-                if (pos.x >= card.x - card.width/2 && pos.x <= card.x + card.width/2 &&
-                    pos.y >= card.y - card.height/2 && pos.y <= card.y + card.height/2) {
-                    this.draggedCard = card;
-                    card.isDragging = true;
-                    this.dragOffset.x = pos.x - card.x;
-                    this.dragOffset.y = pos.y - card.y;
-                    this.handCards.splice(i, 1); this.handCards.push(card); 
-                    break;
-                }
+            const card = findCardAt(pos);
+            if (card) {
+                this.draggedCard = card;
+                card.isDragging = true;
+                this.dragOffset.x = pos.x - card.x;
+                this.dragOffset.y = pos.y - card.y;
+                this.handCards.splice(this.handCards.indexOf(card), 1);
+                this.handCards.push(card);
             }
         };
-        const onMove = (e) => {
-            if (!this.draggedCard) return;
+        const onDragMove = (e) => {
+            if (this.controlMode !== 'drag' || !this.draggedCard) return;
+            e.preventDefault();
             const pos = getPos(e);
             this.draggedCard.x = pos.x - this.dragOffset.x;
             this.draggedCard.y = pos.y - this.dragOffset.y;
         };
-        const onEnd = (e) => {
-            if (!this.draggedCard) return;
+        const onDragEnd = (e) => {
+            if (this.controlMode !== 'drag' || !this.draggedCard) return;
             const card = this.draggedCard;
             const field = this.fieldCard;
             const dist = Math.sqrt(Math.pow(card.x - field.x, 2) + Math.pow(card.y - field.y, 2));
@@ -825,17 +871,86 @@ class Game {
             this.draggedCard = null;
         };
 
-        this.canvas.addEventListener('mousedown', onStart);
-        this.canvas.addEventListener('mousemove', onMove);
-        this.canvas.addEventListener('mouseup', onEnd);
-        this.canvas.addEventListener('touchstart', onStart, {passive: false});
-        this.canvas.addEventListener('touchmove', onMove, {passive: false});
-        this.canvas.addEventListener('touchend', onEnd, {passive: false});
-        
+        // --- タップ共通 ---
+        let lastTapCard = null;
+        let lastTapTime = 0;
+
+        const onTap = (e) => {
+            if (this.controlMode === 'drag') return;
+            if (this.state === 'ROUND_TRANSITION_WAIT') { this.nextRound(); return; }
+            if (this.state === 'GAME_OVER_WAIT') { this.gameOver(); return; }
+            if (this.state !== 'PLAYING') return;
+            const pos = getPos(e);
+            const card = findCardAt(pos);
+            if (!card) return;
+            if (this.controlMode === 'singletap') {
+                this.clearCardSelection();
+                this.mergeCard(card);
+            } else if (this.controlMode === 'doubletap') {
+                const now = Date.now();
+                if (lastTapCard === card && now - lastTapTime < 400) {
+                    this.clearCardSelection();
+                    this.mergeCard(card);
+                    lastTapCard = null; lastTapTime = 0;
+                } else {
+                    if (lastTapCard) lastTapCard.isSelected = false;
+                    card.isSelected = true;
+                    lastTapCard = card; lastTapTime = now;
+                }
+            }
+        };
+
+        // --- イベント登録 ---
+        this.canvas.addEventListener('mousedown', (e) => { if (this.controlMode === 'drag') onDragStart(e); });
+        this.canvas.addEventListener('mousemove', (e) => { if (this.controlMode === 'drag') onDragMove(e); });
+        this.canvas.addEventListener('mouseup',   (e) => { if (this.controlMode === 'drag') onDragEnd(e); else onTap(e); });
+
+        this.canvas.addEventListener('touchstart', (e) => { e.preventDefault(); if (this.controlMode === 'drag') onDragStart(e); }, {passive: false});
+        this.canvas.addEventListener('touchmove',  (e) => { e.preventDefault(); if (this.controlMode === 'drag') onDragMove(e); }, {passive: false});
+        this.canvas.addEventListener('touchend',   (e) => { e.preventDefault(); if (this.controlMode === 'drag') onDragEnd(e); else onTap(e); }, {passive: false});
+
         document.getElementById('transition-overlay').addEventListener('click', () => {
             if (this.state === 'ROUND_TRANSITION_WAIT') this.nextRound();
             else if (this.state === 'GAME_OVER_WAIT') this.gameOver();
         });
+    }
+
+    clearCardSelection() {
+        this.handCards.forEach(c => c.isSelected = false);
+    }
+
+    openSettings() {
+        const modal = document.getElementById('settings-modal');
+        modal.classList.remove('hidden');
+        modal.classList.add('active');
+        this._refreshSettingUI();
+    }
+
+    closeSettings() {
+        const modal = document.getElementById('settings-modal');
+        modal.classList.remove('active');
+        setTimeout(() => modal.classList.add('hidden'), 300);
+    }
+
+    setControlMode(mode) {
+        this.controlMode = mode;
+        localStorage.setItem('math_braves_control_mode', mode);
+        this.clearCardSelection();
+        this._refreshSettingUI();
+    }
+
+    _refreshSettingUI() {
+        const descs = {
+            drag:       'カードを ばのカードまで\nドラッグして はなす',
+            doubletap:  'カードを 2かい すばやく\nタップ（クリック）する',
+            singletap:  'カードを 1かい\nタップ（クリック）する'
+        };
+        ['drag', 'doubletap', 'singletap'].forEach(m => {
+            const btn = document.getElementById(`setting-${m}`);
+            if (btn) btn.classList.toggle('active-mode', this.controlMode === m);
+        });
+        const desc = document.getElementById('mode-desc-text');
+        if (desc) desc.innerText = descs[this.controlMode] || '';
     }
 
     showDifficultySelect() {
@@ -973,6 +1088,7 @@ class Game {
     }
 
     mergeCard(handCard) {
+        handCard.isSelected = false;
         this.fieldCard.value *= handCard.value;
         this.fieldCard.scale = 1.5;
         this.createParticles(this.fieldCard.x, this.fieldCard.y, 10, '#f1c40f');
@@ -1196,8 +1312,12 @@ class Game {
         this.ctx.fillStyle = isField ? '#2a1a3a' : '#ffffff';
         this.ctx.beginPath(); this.ctx.roundRect(-card.width/2, -card.height/2, card.width, card.height, 12); this.ctx.fill();
         
-        this.ctx.lineWidth = isField ? 4 : 2; 
-        this.ctx.strokeStyle = isField ? '#ffd700' : '#888'; 
+        this.ctx.lineWidth = isField ? 4 : (card.isSelected ? 4 : 2);
+        this.ctx.strokeStyle = isField ? '#ffd700' : (card.isSelected ? '#ffff00' : '#888');
+        if (!isField && card.isSelected) {
+            this.ctx.shadowColor = 'rgba(255,255,0,0.9)';
+            this.ctx.shadowBlur = 18;
+        }
         this.ctx.stroke();
 
         this.ctx.fillStyle = isField ? '#ffd700' : '#2c3e50'; 
