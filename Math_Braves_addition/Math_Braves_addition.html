@@ -71,15 +71,18 @@
         #game-area {
             flex: 1;
             position: relative;
-            /* 修正：SNS映えする明るいイエローストライプに変更 */
-            background-color: #fffde7; 
-            background-image: repeating-linear-gradient(
+            background-color: #fffde7;
+            background-image: url('images/haikei_1.png'), repeating-linear-gradient(
                 45deg,
                 #fffde7,
                 #fffde7 30px,
                 #fff9c4 30px,
                 #fff9c4 60px
             );
+            background-size: cover, auto;
+            background-position: center, 0 0;
+            background-repeat: no-repeat, repeat;
+            transition: background-image 0.4s;
             overflow: hidden;
         }
 
@@ -404,7 +407,7 @@
                 <div class="calc-box">
                     ★スコアのけいさん<br>
                     <span style="font-size: 1.1rem; display:block; margin-top:5px;">
-                    <span class="emoji-red">🔴</span> × <span class="emoji-star">⭐</span> × 10てん
+                    <span class="emoji-red">⚔️</span> × <span class="emoji-star">⭐</span> × 10てん
                     </span>
                 </div>
             </div>
@@ -1160,6 +1163,171 @@ async function showRankingScreen() {
     }
 }
 
+// ===== 敵キャラ 30種 + ボス定義 =====
+const ENEMY_TYPES = [
+    { color:'#ff6b6b', dark:'#c62828', shape:'blob',     face:'angry'  },
+    { color:'#ffa95b', dark:'#e65100', shape:'fat',      face:'normal' },
+    { color:'#ffd060', dark:'#f57f17', shape:'blob',     face:'happy'  },
+    { color:'#7bed9f', dark:'#2e7d32', shape:'fat',      face:'happy'  },
+    { color:'#74b9ff', dark:'#1565c0', shape:'blob',     face:'normal' },
+    { color:'#a29bfe', dark:'#512da8', shape:'fat',      face:'scary'  },
+    { color:'#fd79a8', dark:'#ad1457', shape:'blob',     face:'happy'  },
+    { color:'#55efc4', dark:'#00695c', shape:'fat',      face:'normal' },
+    { color:'#fdcb6e', dark:'#e65100', shape:'blob',     face:'angry'  },
+    { color:'#81ecec', dark:'#006064', shape:'fat',      face:'happy'  },
+    { color:'#ff7675', dark:'#c62828', shape:'star',     face:'angry'  },
+    { color:'#6c5ce7', dark:'#311b92', shape:'diamond',  face:'scary'  },
+    { color:'#00b894', dark:'#004d40', shape:'hex',      face:'normal' },
+    { color:'#0984e3', dark:'#0d47a1', shape:'rect',     face:'normal' },
+    { color:'#e17055', dark:'#bf360c', shape:'star',     face:'angry'  },
+    { color:'#fdcb6e', dark:'#f9a825', shape:'hex',      face:'happy'  },
+    { color:'#b2bec3', dark:'#546e7a', shape:'rect',     face:'scary'  },
+    { color:'#d63031', dark:'#7f0000', shape:'diamond',  face:'angry'  },
+    { color:'#6ab04c', dark:'#2e7d32', shape:'star',     face:'normal' },
+    { color:'#e84393', dark:'#880e4f', shape:'hex',      face:'happy'  },
+    { color:'#dfe6e9', dark:'#90a4ae', shape:'cloud',    face:'happy'  },
+    { color:'#ff4757', dark:'#b71c1c', shape:'mushroom', face:'angry'  },
+    { color:'#2ed573', dark:'#1b5e20', shape:'mushroom', face:'normal' },
+    { color:'#7c4dff', dark:'#311b92', shape:'ghost',    face:'scary'  },
+    { color:'#74b9ff', dark:'#1565c0', shape:'ghost',    face:'normal' },
+    { color:'#eccc68', dark:'#f9a825', shape:'cloud',    face:'happy'  },
+    { color:'#ff6b81', dark:'#880e4f', shape:'heart',    face:'happy'  },
+    { color:'#636e72', dark:'#263238', shape:'ghost',    face:'scary'  },
+    { color:'#a29bfe', dark:'#311b92', shape:'cloud',    face:'normal' },
+    { color:'#ff9f43', dark:'#bf360c', shape:'mushroom', face:'angry'  },
+];
+
+function _drawEnemyShape(ctx, cx, cy, r, shape) {
+    ctx.beginPath();
+    switch (shape) {
+        case 'blob':  ctx.arc(cx, cy, r, 0, Math.PI*2); break;
+        case 'fat':   ctx.ellipse(cx, cy, r*1.25, r*0.82, 0, 0, Math.PI*2); break;
+        case 'star': {
+            for (let i=0; i<10; i++) {
+                const a = (Math.PI/5)*i - Math.PI/2;
+                const rad = i%2===0 ? r : r*0.42;
+                if (i===0) ctx.moveTo(cx+Math.cos(a)*rad, cy+Math.sin(a)*rad);
+                else       ctx.lineTo(cx+Math.cos(a)*rad, cy+Math.sin(a)*rad);
+            }
+            ctx.closePath(); break;
+        }
+        case 'diamond':
+            ctx.moveTo(cx, cy-r); ctx.lineTo(cx+r*0.78, cy);
+            ctx.lineTo(cx, cy+r); ctx.lineTo(cx-r*0.78, cy); ctx.closePath(); break;
+        case 'hex': {
+            for (let i=0; i<6; i++) {
+                const a = (Math.PI/3)*i - Math.PI/6;
+                if (i===0) ctx.moveTo(cx+r*Math.cos(a), cy+r*Math.sin(a));
+                else       ctx.lineTo(cx+r*Math.cos(a), cy+r*Math.sin(a));
+            }
+            ctx.closePath(); break;
+        }
+        case 'rect':
+            ctx.roundRect(cx-r*0.88, cy-r*0.95, r*1.76, r*1.9, r*0.22); break;
+        case 'ghost':
+            ctx.arc(cx, cy-r*0.08, r, Math.PI, 0);
+            ctx.lineTo(cx+r, cy+r*0.52);
+            ctx.quadraticCurveTo(cx+r*0.66, cy+r*0.18, cx+r*0.33, cy+r*0.52);
+            ctx.quadraticCurveTo(cx,         cy+r*0.18, cx-r*0.33, cy+r*0.52);
+            ctx.quadraticCurveTo(cx-r*0.66, cy+r*0.18, cx-r,       cy+r*0.52);
+            ctx.closePath(); break;
+        case 'mushroom':
+            ctx.arc(cx, cy-r*0.18, r, Math.PI, 0);
+            ctx.lineTo(cx+r*0.55, cy+r*0.42);
+            ctx.lineTo(cx+r*0.28, cy+r*0.42); ctx.lineTo(cx+r*0.28, cy+r*0.95);
+            ctx.lineTo(cx-r*0.28, cy+r*0.95); ctx.lineTo(cx-r*0.28, cy+r*0.42);
+            ctx.lineTo(cx-r*0.55, cy+r*0.42); ctx.closePath(); break;
+        case 'heart':
+            ctx.moveTo(cx, cy+r*0.68);
+            ctx.bezierCurveTo(cx-r, cy+r*0.08, cx-r*1.1, cy-r*0.72, cx-r*0.38, cy-r*0.58);
+            ctx.bezierCurveTo(cx-r*0.12, cy-r*0.78, cx, cy-r*0.48, cx, cy-r*0.12);
+            ctx.bezierCurveTo(cx, cy-r*0.48, cx+r*0.12, cy-r*0.78, cx+r*0.38, cy-r*0.58);
+            ctx.bezierCurveTo(cx+r*1.1, cy-r*0.72, cx+r, cy+r*0.08, cx, cy+r*0.68);
+            break;
+        default: ctx.arc(cx, cy, r, 0, Math.PI*2);
+    }
+}
+
+function _drawEnemyFace(ctx, cx, cy, r, face) {
+    const ey = cy - r*0.32;
+    const ex = r*0.28;
+    const er = r*0.13;
+    ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
+
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.ellipse(cx-ex, ey, er*1.4, er*1.6, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx+ex, ey, er*1.4, er*1.6, 0, 0, Math.PI*2); ctx.fill();
+
+    const pd = face==='angry' ? er*0.4 : er*0.2;
+    ctx.fillStyle = '#222';
+    ctx.beginPath(); ctx.arc(cx-ex+pd, ey+pd, er*0.82, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx+ex-pd, ey+pd, er*0.82, 0, Math.PI*2); ctx.fill();
+
+    if (face==='scary') {
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(cx-ex, ey, er*0.5, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(cx+ex, ey, er*0.5, 0, Math.PI*2); ctx.fill();
+    }
+    if (face==='angry') {
+        ctx.strokeStyle='#444'; ctx.lineWidth=2.5;
+        ctx.beginPath(); ctx.moveTo(cx-ex-er*1.5, ey-er*2); ctx.lineTo(cx-ex+er*1.5, ey-er*1); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(cx+ex+er*1.5, ey-er*2); ctx.lineTo(cx+ex-er*1.5, ey-er*1); ctx.stroke();
+    }
+
+    const my = cy + r*0.18;
+    ctx.strokeStyle='#555'; ctx.lineWidth=2.5;
+    ctx.beginPath();
+    if (face==='happy')  { ctx.arc(cx, my-r*0.04, r*0.22, 0.15, Math.PI-0.15); }
+    else if (face==='angry') { ctx.arc(cx, my+r*0.14, r*0.22, Math.PI+0.2, -0.2); }
+    else if (face==='scary') { ctx.moveTo(cx-r*0.28,my); ctx.lineTo(cx-r*0.1,my-r*0.1); ctx.lineTo(cx,my); ctx.lineTo(cx+r*0.1,my-r*0.1); ctx.lineTo(cx+r*0.28,my); }
+    else { ctx.moveTo(cx-r*0.2, my); ctx.lineTo(cx+r*0.2, my); }
+    ctx.stroke();
+}
+
+function _drawBossCharacter(ctx, cx, cy, r) {
+    ctx.fillStyle = '#4a148c'; ctx.strokeStyle = '#9c27b0'; ctx.lineWidth = 3;
+    const drawWing = (dir) => {
+        ctx.beginPath();
+        ctx.moveTo(cx+dir*r*0.45, cy-r*0.18);
+        ctx.bezierCurveTo(cx+dir*r*2.0, cy-r*1.0, cx+dir*r*2.2, cy-r*1.5, cx+dir*r*0.9, cy-r*1.1);
+        ctx.bezierCurveTo(cx+dir*r*1.8, cy-r*0.2, cx+dir*r*1.2, cy+r*0.4, cx+dir*r*0.45, cy+r*0.2);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+    };
+    drawWing(-1); drawWing(1);
+
+    ctx.fillStyle = '#e91e63'; ctx.strokeStyle = '#880e4f'; ctx.lineWidth = 2;
+    const drawHorn = (dir) => {
+        ctx.beginPath();
+        ctx.moveTo(cx+dir*r*0.32, cy-r*0.82);
+        ctx.lineTo(cx+dir*r*0.62, cy-r*1.78);
+        ctx.lineTo(cx+dir*r*0.04, cy-r*0.92);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+    };
+    drawHorn(-1); drawHorn(1);
+
+    const grad = ctx.createRadialGradient(cx, cy-r*0.28, r*0.1, cx, cy, r);
+    grad.addColorStop(0, '#9c27b0'); grad.addColorStop(1, '#1a0030');
+    ctx.fillStyle = grad; ctx.strokeStyle = '#e040fb'; ctx.lineWidth = 5;
+    ctx.shadowColor = 'rgba(156,0,255,0.5)'; ctx.shadowBlur = 22;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    ctx.fillStyle = '#ffeb3b'; ctx.shadowColor='#ffeb3b'; ctx.shadowBlur=14;
+    ctx.beginPath(); ctx.ellipse(cx-r*0.3, cy-r*0.15, r*0.2, r*0.13, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx+r*0.3, cy-r*0.15, r*0.2, r*0.13, 0, 0, Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle='#000';
+    ctx.beginPath(); ctx.arc(cx-r*0.3, cy-r*0.15, r*0.08, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx+r*0.3, cy-r*0.15, r*0.08, 0, Math.PI*2); ctx.fill();
+
+    ctx.strokeStyle='#fff'; ctx.lineWidth=2.5;
+    ctx.beginPath(); ctx.arc(cx, cy+r*0.3, r*0.28, Math.PI+0.3, -0.3); ctx.stroke();
+    ctx.fillStyle='#fff';
+    ctx.beginPath(); ctx.moveTo(cx-r*0.2,cy+r*0.3); ctx.lineTo(cx-r*0.12,cy+r*0.5); ctx.lineTo(cx-r*0.04,cy+r*0.3); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(cx+r*0.04,cy+r*0.3); ctx.lineTo(cx+r*0.12,cy+r*0.5); ctx.lineTo(cx+r*0.2,cy+r*0.3);  ctx.closePath(); ctx.fill();
+}
+// ===== ここまで敵キャラ定義 =====
+
 class Card {
     constructor(slotIndex) {
         this.slotIndex = slotIndex;
@@ -1199,14 +1367,13 @@ class Card {
         // 数字を少し下へ（0.65）
         ctx.fillText(this.value, this.x + this.width/2, this.y + this.height * 0.65);
 
-        // 赤い丸とスタック数の描画（上部中央）
-        ctx.fillStyle = '#ef5350';
+        // ⚔️とスタック数の描画（上部中央）
         ctx.font = `800 ${this.width * 0.25}px "M PLUS Rounded 1c"`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
-        let stackText = "🔴";
+        let stackText = "⚔️";
         if (this.stackCount > 1) {
-            stackText = `🔴×${this.stackCount}`;
+            stackText = `⚔️×${this.stackCount}`;
         }
         ctx.fillText(stackText, this.x + this.width/2, this.y + 10);
     }
@@ -1224,9 +1391,11 @@ class Enemy {
             this.gemCount = getWeightedRandom(CONFIG.gemProb);
             this.maxHp = CONFIG.bossHP;
             this.hp = CONFIG.bossHP;
+            this.type = -1;
         } else {
             this.value = randomInt(CONFIG.enemyMin, CONFIG.enemyMax);
             this.gemCount = getWeightedRandom(CONFIG.gemProb);
+            this.type = randomInt(0, 29);
         }
 
         this.x = 0;
@@ -1246,84 +1415,86 @@ class Enemy {
         const spacing = state.width / (total + 1);
         this.x = spacing * (index + 1) - this.width / 2;
 
-        const bodyColor = this.isBoss ? '#ab47bc' : '#795548'; 
-        const borderColor = this.isBoss ? '#8e24aa' : '#5d4037'; 
-        const textColor = '#fff'; 
+        const cx = this.x + this.width / 2;
+        const r  = this.width * 0.42;
+        const charCY = this.y + this.height * 0.50;
 
-        ctx.beginPath();
-        const r = 25; 
-        ctx.moveTo(this.x, this.y + this.height - r);
-        ctx.lineTo(this.x, this.y + this.height * 0.4);
-        ctx.bezierCurveTo(
-            this.x, this.y - this.height * 0.15,        
-            this.x + this.width, this.y - this.height * 0.15, 
-            this.x + this.width, this.y + this.height * 0.4  
-        );
-        ctx.lineTo(this.x + this.width, this.y + this.height - r);
-        ctx.quadraticCurveTo(this.x + this.width, this.y + this.height, this.x + this.width - r, this.y + this.height);
-        ctx.lineTo(this.x + r, this.y + this.height);
-        ctx.quadraticCurveTo(this.x, this.y + this.height, this.x, this.y + this.height - r);
-        ctx.closePath();
+        ctx.save();
 
         // 影
-        ctx.shadowColor = 'rgba(0,0,0,0.15)';
-        ctx.shadowBlur = 10;
-        ctx.shadowOffsetY = 5;
-
-        ctx.fillStyle = bodyColor;
-        ctx.fill();
-        
-        ctx.shadowColor = 'transparent'; 
-        
-        ctx.strokeStyle = borderColor;
-        ctx.lineWidth = this.isBoss ? 8 : 5;
-        ctx.stroke();
-
-        ctx.fillStyle = textColor;
-        ctx.font = `800 ${this.width * 0.5}px "M PLUS Rounded 1c"`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(this.value, this.x + this.width/2, this.y + this.height/2 + 10);
-
-        // ⭐(星)の描画
-        const gemSize = this.width * 0.15;
-        const gemY = this.y + 20;
-        const totalW = (this.gemCount * gemSize) + ((this.gemCount-1) * 2);
-        let startX = this.x + (this.width - totalW) / 2 + gemSize/2;
-        
-        ctx.font = `800 ${gemSize}px "M PLUS Rounded 1c"`;
-        for(let i=0; i<this.gemCount; i++) {
-             ctx.fillStyle = '#fff'; 
-             ctx.textBaseline = 'middle';
-             ctx.fillText("⭐", startX + i * (gemSize+2), gemY);
-        }
+        ctx.shadowColor = 'rgba(0,0,0,0.28)';
+        ctx.shadowBlur   = 14;
+        ctx.shadowOffsetY = 7;
 
         if (this.isBoss) {
-            ctx.fillStyle = '#ffca28';
-            ctx.font = '800 30px "M PLUS Rounded 1c"';
-            ctx.strokeStyle = '#333';
-            ctx.lineWidth = 4;
-            ctx.strokeText("BOSS", this.x + this.width/2, this.y - 50);
-            ctx.fillText("BOSS", this.x + this.width/2, this.y - 50);
+            _drawBossCharacter(ctx, cx, charCY, r * 1.2);
+        } else {
+            const cfg = ENEMY_TYPES[this.type % 30];
+            if (cfg.shape === 'cloud') {
+                ctx.fillStyle = cfg.color; ctx.strokeStyle = cfg.dark; ctx.lineWidth = 4;
+                [[cx-r*0.38, charCY+r*0.1, r*0.62],[cx+r*0.38, charCY+r*0.1, r*0.62],[cx, charCY-r*0.15, r*0.72]].forEach(([bx,by,br]) => {
+                    ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+                });
+            } else {
+                ctx.fillStyle = cfg.color; ctx.strokeStyle = cfg.dark; ctx.lineWidth = 4;
+                _drawEnemyShape(ctx, cx, charCY, r, cfg.shape);
+                ctx.fill(); ctx.stroke();
+            }
+            ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+            // ハイライト
+            ctx.fillStyle = 'rgba(255,255,255,0.32)';
+            ctx.beginPath(); ctx.ellipse(cx-r*0.22, charCY-r*0.42, r*0.22, r*0.14, -0.3, 0, Math.PI*2); ctx.fill();
+            // 顔
+            _drawEnemyFace(ctx, cx, charCY, r, cfg.face);
+        }
 
-            const barW = this.width * 1.5;
+        ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+
+        // 体の中に数字
+        const numFontSize = Math.floor(r * (String(this.value).length > 1 ? 0.72 : 0.85));
+        ctx.font = `800 ${numFontSize}px "M PLUS Rounded 1c"`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 5;
+        ctx.strokeText(this.value, cx, charCY + r * 0.14);
+        ctx.fillStyle = '#fff';
+        ctx.fillText(this.value, cx, charCY + r * 0.14);
+
+        // 頭上に⭐
+        const starSize  = Math.floor(this.width * 0.17);
+        const starGap   = 2;
+        const totalStarW = this.gemCount * (starSize + starGap) - starGap;
+        const starStartX = cx - totalStarW / 2 + starSize / 2;
+        const starY = this.y + 14;
+        ctx.font = `${starSize}px "M PLUS Rounded 1c"`;
+        ctx.textBaseline = 'middle';
+        for (let i = 0; i < this.gemCount; i++) {
+            ctx.fillText('⭐', starStartX + i * (starSize + starGap), starY);
+        }
+
+        // BOSS専用：ラベル＋HPバー
+        if (this.isBoss) {
+            ctx.fillStyle = '#ffca28'; ctx.strokeStyle = '#333'; ctx.lineWidth = 4;
+            ctx.font = '800 28px "M PLUS Rounded 1c"';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+            ctx.strokeText('BOSS', cx, this.y - 48);
+            ctx.fillText('BOSS', cx, this.y - 48);
+
+            const barW = this.width * 1.6;
             const barH = 20;
-            const barX = this.x + this.width/2 - barW/2;
-            const barY = this.y - 35;
-
+            const barX = cx - barW / 2;
+            const barY = this.y - 32;
             ctx.fillStyle = '#555';
             roundRect(ctx, barX, barY, barW, barH, 10, true, false);
-            
             const pct = Math.max(0, this.hp / this.maxHp);
             if (pct > 0) {
                 ctx.fillStyle = '#ef5350';
                 roundRect(ctx, barX, barY, barW * pct, barH, 10, true, false);
             }
-            
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 3;
+            ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;
             roundRect(ctx, barX, barY, barW, barH, 10, false, true);
         }
+
+        ctx.restore();
     }
 }
 
@@ -1415,6 +1586,7 @@ function initGame() {
     
     ui.difficultyLabel.textContent = CONFIG.label;
 
+    setBattleBackground(false);
     resize();
     refillCards();
     refillEnemies();
@@ -1442,6 +1614,12 @@ function refillCards() {
     state.forbiddenValue = null;
 }
 
+function setBattleBackground(isBoss) {
+    const gameArea = document.getElementById('game-area');
+    const img = isBoss ? 'haikei_2.png' : 'haikei_1.png';
+    gameArea.style.backgroundImage = `url('images/${img}'), repeating-linear-gradient(45deg,#fffde7,#fffde7 30px,#fff9c4 30px,#fff9c4 60px)`;
+}
+
 function refillEnemies() {
     if (state.bossSpawned || state.isGameClearProcessing) return;
 
@@ -1450,7 +1628,8 @@ function refillEnemies() {
         state.boss = boss;
         state.enemies.push(boss);
         state.bossSpawned = true;
-        updateUI(); 
+        setBattleBackground(true);
+        updateUI();
         return;
     }
 
