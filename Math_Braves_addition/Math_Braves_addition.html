@@ -459,12 +459,12 @@
                 <div class="panel-title">🏆 スコア</div>
                 <div style="display:flex; flex-direction:column; gap:10px; flex:1;">
                     <div class="info-item">
-                        <div class="info-label">🥇 さいだい スコア</div>
-                        <div id="disp-max-score" class="info-value" style="color:#ef5350;">0</div>
+                        <div class="info-label">⚡ ぜんかい スコア</div>
+                        <div id="disp-last-score" class="info-value" style="color:#ffa726;">0</div>
                     </div>
                     <div class="info-item">
-                        <div class="info-label">⚡ さっきの スコア</div>
-                        <div id="disp-last-score" class="info-value" style="color:#ffa726;">0</div>
+                        <div class="info-label">🥇 さいだい スコア</div>
+                        <div id="disp-max-score" class="info-value" style="color:#ef5350;">0</div>
                     </div>
                     <div class="info-item" style="border:2px solid #4fc3f7; background:linear-gradient(to bottom,#e1f5fe,#b3e5fc);">
                         <div class="info-label" style="color:#0277bd;">✨ ごうけい スコア</div>
@@ -487,11 +487,11 @@
             <button id="btn-close-howto">✕</button>
             <h2 style="color:#fb8c00; border-bottom:3px dotted #ffcc80; padding-bottom:10px; margin-top:0; font-size:1.3rem;">あそびかた</h2>
             <div style="font-size:0.92rem; line-height:1.75;">
-                <p>1. <strong>しろいカード</strong>を かさねると<br>かずが たされるよ。</p>
-                <p>2. <strong>くろいカード</strong>（てき）と<br>おなじかずを つくって ぶつけよう！</p>
-                <p>3. <strong>⭐(ほし)</strong>が おおいほど とくてんが たかいよ。</p>
-                <p>4. いらないカードは したの <strong>ゴミすてば</strong> へ。</p>
-                <p>5. てきを こうげきすると <strong>じかん</strong>が ふえるよ。</p>
+                <p>1. カードを <strong>てきに ぶつけて</strong> たおそう！<br>てきカードと <strong>おなじかず</strong>を つくってね。</p>
+                <p>2. カードを <strong>かさねる</strong>と かずが たされるよ。<br>かさねると <strong>のこり じかん</strong>が へるよ。</p>
+                <p>3. てきカードの <strong>⭐</strong> が おおいほど<br>とくてんが たかくなるよ。</p>
+                <p>4. いらないカードは したの <strong>すてば</strong> へ。<br>すてても じかんが へるよ。</p>
+                <p>5. てきを たおすと <strong>のこり じかん</strong>が ふえるよ。</p>
                 <p style="margin-bottom:0;">6. <strong>ボス</strong>を たおすと ゲームクリアだ！</p>
             </div>
         </div>
@@ -1356,14 +1356,24 @@ class Card {
         ctx.fillText(this.value, this.x + this.width/2, this.y + this.height * 0.65);
 
         // ⚔️とスタック数の描画（上部中央）
-        ctx.font = `800 ${this.width * 0.25}px "M PLUS Rounded 1c"`;
-        ctx.textAlign = 'center';
+        const swordSize = this.width * 0.25;
+        ctx.font = `800 ${swordSize}px "M PLUS Rounded 1c"`;
         ctx.textBaseline = 'top';
-        let stackText = "⚔️";
         if (this.stackCount > 1) {
-            stackText = `⚔️×${this.stackCount}`;
+            const multiplier = `×${this.stackCount}`;
+            const emojiW = ctx.measureText("⚔️").width;
+            const totalW = emojiW + ctx.measureText(multiplier).width;
+            const startX = this.x + this.width / 2 - totalW / 2;
+            ctx.textAlign = 'left';
+            ctx.fillStyle = '#555';
+            ctx.fillText("⚔️", startX, this.y + 10);
+            ctx.fillStyle = '#e53935'; // 倍率は赤系
+            ctx.fillText(multiplier, startX + emojiW, this.y + 10);
+        } else {
+            ctx.fillStyle = '#555';
+            ctx.textAlign = 'center';
+            ctx.fillText("⚔️", this.x + this.width / 2, this.y + 10);
         }
-        ctx.fillText(stackText, this.x + this.width/2, this.y + 10);
     }
 }
 
@@ -1372,7 +1382,7 @@ class Enemy {
         this.isBoss = isBoss;
         const baseSize = Math.min(state.width, state.height * 1.5);
         this.width = baseSize * 0.19;
-        this.height = this.width * 1.85;
+        this.height = this.width * 2.0;
         
         if (isBoss) {
             this.value = randomInt(CONFIG.bossMin, CONFIG.bossMax);
@@ -1383,7 +1393,7 @@ class Enemy {
         } else {
             this.value = randomInt(CONFIG.enemyMin, CONFIG.enemyMax);
             this.gemCount = getWeightedRandom(CONFIG.gemProb);
-            this.type = randomInt(0, 29);
+            this.colorIndex = randomInt(0, 5); // 色はランダム、形状はgemCountで決まる
         }
 
         this.slotIndex = 0; // refillEnemies() で上書きされる
@@ -1409,8 +1419,10 @@ class Enemy {
         }
 
         const cx     = this.x + this.width / 2;
+        const cntWpre = this.width - 6;
         const charR  = this.width * 0.40;
-        const charCY = this.y + this.height * 0.32;
+        // キャラクター下端をカードコンテナ上端に揃える
+        const charCY = this.y + this.height - cntWpre - charR * 1.1;
 
         // キャラクター描画（影付き）
         ctx.save();
@@ -1418,17 +1430,18 @@ class Enemy {
         if (this.isBoss) {
             _drawMul2Boss(ctx, cx, charCY, charR);
         } else {
-            const cfg = getEnemyConfig(this.type);
-            _drawMul2Enemy(ctx, cx, charCY, charR, cfg.shape, cfg.body, cfg.dark);
+            const { body, dark } = ENEMY_COLORS[this.colorIndex];
+            const shape = (this.gemCount - 1) % 5; // ⭐1→ゴースト, 2→四角, 3→葉, 4→星, 5→まる
+            _drawMul2Enemy(ctx, cx, charCY, charR, shape, body, dark);
         }
         ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
         ctx.restore();
 
-        // カード型コンテナ（キャラクター下）
-        const cntH = this.height * 0.45;
+        // カード型コンテナ（キャラクター下・正方形）
+        const cntW = this.width - 6;
+        const cntH = cntW; // 1:1
         const cntY = this.y + this.height - cntH;
         const cntX = this.x + 3;
-        const cntW = this.width - 6;
         ctx.save();
         ctx.fillStyle = 'rgba(255, 243, 210, 0.97)';
         ctx.strokeStyle = 'rgba(190, 130, 30, 0.35)';
@@ -1796,7 +1809,7 @@ function drawHUD(ctx) {
 
     ctx.fillStyle = '#888';
     ctx.font = '800 16px "M PLUS Rounded 1c"';
-    ctx.fillText("のこり じかん", state.width / 2, 95);
+    ctx.fillText("のこり", state.width / 2, 95);
 
     ctx.fillStyle = state.time <= 3 ? '#ef5350' : '#555'; 
     ctx.font = '800 60px "M PLUS Rounded 1c"';
@@ -1942,7 +1955,7 @@ function onUp(e) {
     }
 
     if (!actionDone) {
-        if (cy > state.height * 0.85) {
+        if (cy > state.height * 0.87) {
             state.forbiddenValue = state.cards[idx].value;
             state.cards[idx] = null;
             consumeTime();
@@ -1973,34 +1986,12 @@ function gameLoop() {
     if (state.screen !== 'PLAYING') return;
 
     ctx.clearRect(0, 0, state.width, state.height);
-    
-    drawHUD(ctx);
 
-    // ゴミ箱エリアのデザイン変更
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-    ctx.fillRect(0, state.height * 0.85, state.width, state.height * 0.15);
-    
-    // 点線
-    ctx.beginPath();
-    ctx.setLineDash([10, 10]);
-    ctx.moveTo(0, state.height * 0.85);
-    ctx.lineTo(state.width, state.height * 0.85);
-    ctx.strokeStyle = '#b0bec5';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    ctx.fillStyle = '#90a4ae';
-    ctx.font = '800 20px "M PLUS Rounded 1c"';
-    ctx.textAlign = 'center';
-    ctx.fillText("いらないカードは ここへ", state.width/2, state.height * 0.92);
-
-    // 敵＋手札を包む単一の半透明コンテナ
-    const firstEnemy = state.enemies[0];
+    // 敵＋手札＋HUDを包む単一の半透明コンテナ（先に描いてHUD/カードが上に乗る）
     const firstCard = state.cards.find(c => c);
     if (firstCard) {
         const padX = 12;
-        const topY  = firstEnemy ? firstEnemy.y - padX : firstCard.baseY - padX;
+        const topY  = 8;
         const botY  = firstCard.baseY + firstCard.height + padX;
         ctx.save();
         ctx.fillStyle   = 'rgba(255,255,255,0.58)';
@@ -2009,6 +2000,27 @@ function gameLoop() {
         roundRect(ctx, padX, topY, state.width - padX * 2, botY - topY, 24, true, true);
         ctx.restore();
     }
+
+    drawHUD(ctx);
+
+    // カード捨て場（灰色）
+    ctx.fillStyle = 'rgba(160, 170, 185, 0.50)';
+    ctx.fillRect(0, state.height * 0.87, state.width, state.height * 0.13);
+
+    // 点線
+    ctx.beginPath();
+    ctx.setLineDash([10, 10]);
+    ctx.moveTo(0, state.height * 0.87);
+    ctx.lineTo(state.width, state.height * 0.87);
+    ctx.strokeStyle = '#90a4ae';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = '#78909c';
+    ctx.font = '800 20px "M PLUS Rounded 1c"';
+    ctx.textAlign = 'center';
+    ctx.fillText("いらないカードは ここへ", state.width/2, state.height * 0.93);
 
     state.enemies.forEach((enemy, i) => {
         enemy.draw(ctx, i, state.enemies.length);
