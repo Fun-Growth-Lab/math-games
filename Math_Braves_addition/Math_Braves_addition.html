@@ -710,32 +710,35 @@
 
 const PRESET_EASY = {
     label: "しょきゅう",
-    handMin: 1, handMax: 9,       
-    enemyMin: 10, enemyMax: 15,    
-    bossMin: 15, bossMax: 25,     
-    enemyCount: 20, bossHP: 1200, 
-    initialTime: 10, timeRecovery: 2, 
-    gemProb: [30, 25, 20, 15, 10]
+    handMin: 1, handMax: 9,
+    enemyMin: 10, enemyMax: 15,
+    bossMin: 15, bossMax: 25,
+    enemyCount: 20, bossHP: 1200,
+    initialTime: 10, timeRecovery: 4,
+    gemProb: [30, 25, 20, 15, 10],
+    fireProb: 0, fireCountWeights: [100, 0, 0]
 };
 
 const PRESET_NORMAL = {
     label: "ちゅうきゅう",
-    handMin: 1, handMax: 14,       
-    enemyMin: 15, enemyMax: 20,   
-    bossMin: 20, bossMax: 30,     
-    enemyCount: 20, bossHP: 1500, 
-    initialTime: 10, timeRecovery: 2, 
-    gemProb: [30, 25, 20, 15, 10]
+    handMin: 1, handMax: 14,
+    enemyMin: 15, enemyMax: 20,
+    bossMin: 20, bossMax: 30,
+    enemyCount: 20, bossHP: 1500,
+    initialTime: 10, timeRecovery: 4,
+    gemProb: [30, 25, 20, 15, 10],
+    fireProb: 0.20, fireCountWeights: [95, 5, 0]
 };
 
 const PRESET_HARD = {
     label: "じょうきゅう",
-    handMin: 1, handMax: 19,       
-    enemyMin: 20, enemyMax: 30,   
-    bossMin: 30, bossMax: 40,     
-    enemyCount: 20, bossHP: 2000, 
-    initialTime: 20, timeRecovery: 2, 
-    gemProb: [30, 25, 20, 15, 10]
+    handMin: 1, handMax: 19,
+    enemyMin: 20, enemyMax: 30,
+    bossMin: 30, bossMax: 40,
+    enemyCount: 20, bossHP: 2000,
+    initialTime: 20, timeRecovery: 4,
+    gemProb: [30, 25, 20, 15, 10],
+    fireProb: 0.30, fireCountWeights: [85, 10, 5]
 };
 
 // NGワードリスト（ひらがな）
@@ -1395,6 +1398,15 @@ class Enemy {
             this.value = randomInt(CONFIG.enemyMin, CONFIG.enemyMax);
             this.gemCount = getWeightedRandom(CONFIG.gemProb);
             this.colorIndex = randomInt(0, 5); // 色はランダム、形状はgemCountで決まる
+            // 🔥攻撃フラグ抽選
+            this.fireCount = 0;
+            if (CONFIG.fireProb > 0 && Math.random() < CONFIG.fireProb) {
+                const r = Math.random() * 100;
+                const w = CONFIG.fireCountWeights;
+                if (r < w[0]) this.fireCount = 1;
+                else if (r < w[0] + w[1]) this.fireCount = 2;
+                else this.fireCount = 3;
+            }
         }
 
         this.slotIndex = 0; // refillEnemies() で上書きされる
@@ -1466,6 +1478,26 @@ class Enemy {
         ctx.fillText(this.value, cx, cntY + cntH * 0.68);
         ctx.restore();
 
+        // 🔥マーク（カードコンテナ左上角）
+        if (!this.isBoss && this.fireCount > 0) {
+            ctx.save();
+            const fireSize = Math.floor(this.width * 0.21);
+            ctx.font = `${fireSize}px sans-serif`;
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+            // 背景pill
+            const pillW = fireSize * this.fireCount + 6;
+            const pillH = fireSize + 4;
+            const pillX = cntX;
+            const pillY = cntY - pillH + 2;
+            ctx.fillStyle = 'rgba(40,40,40,0.55)';
+            roundRect(ctx, pillX, pillY, pillW, pillH, 6, true, false);
+            for (let f = 0; f < this.fireCount; f++) {
+                ctx.fillText('🔥', pillX + 3 + f * fireSize, pillY + 2);
+            }
+            ctx.restore();
+        }
+
         // BOSS専用：ラベル＋HPバー（イラスト下部に重ねて配置）
         if (this.isBoss) {
             ctx.save();
@@ -1503,15 +1535,16 @@ class Enemy {
 }
 
 class Particle {
-    constructor(x, y, text, color, type = 'text') {
+    constructor(x, y, text, color, type = 'text', fontSize = 34) {
         this.x = x;
         this.y = y;
         this.text = text;
         this.color = color;
-        this.type = type; 
+        this.type = type;
+        this.fontSize = fontSize;
         this.life = 1.0;
         this.size = 0;
-        this.vy = -3; 
+        this.vy = -3;
     }
     update() {
         if (this.type === 'text') {
@@ -1527,8 +1560,10 @@ class Particle {
         if (this.type === 'text') {
             ctx.fillStyle = this.color;
             ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 4;
-            ctx.font = "800 35px 'M PLUS Rounded 1c'";
+            ctx.lineWidth = Math.max(3, this.fontSize * 0.1);
+            ctx.font = `800 ${this.fontSize}px 'M PLUS Rounded 1c'`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'alphabetic';
             ctx.strokeText(this.text, this.x, this.y);
             ctx.fillText(this.text, this.x, this.y);
         } else if (this.type === 'circle') {
@@ -1697,16 +1732,8 @@ function addTime(amount) {
     updateUI();
 }
 
-function checkPraise(damage, x, y) {
-    let msg = "";
-    if (damage >= 400) msg = "かみレベル！";
-    else if (damage >= 300) msg = "てんさい！";
-    else if (damage >= 200) msg = "グレート！";
-    else if (damage >= 100) msg = "すごい！";
-
-    if (msg) {
-        state.particles.push(new Particle(x, y - 80, msg, '#ffa726', 'text'));
-    }
+function scoreParticleFontSize(damage) {
+    return Math.min(66, Math.floor(26 + Math.sqrt(damage) * 1.5));
 }
 
 function gameOver() {
@@ -1871,46 +1898,42 @@ function onUp(e) {
                     state.maxScore = damage;
                 }
                 
-                state.particles.push(new Particle(enemy.x + enemy.width/2, enemy.y, `+${damage}`, '#ffca28', 'text'));
+                const scoreFs = scoreParticleFontSize(damage);
+                state.particles.push(new Particle(enemy.x + enemy.width/2, enemy.y, `+${damage}`, '#ffca28', 'text', scoreFs));
                 state.particles.push(new Particle(enemy.x + enemy.width/2, enemy.y + enemy.height/2, "", "#ef5350", "circle"));
-                
-                checkPraise(damage, enemy.x + enemy.width/2, enemy.y);
 
                 state.cards[idx] = null;
-                
-                let bonusRecovery = Math.floor(damage / 100);
-                if (bonusRecovery > 10) bonusRecovery = 10;
-                const totalRecovery = CONFIG.timeRecovery + bonusRecovery;
+
+                // アタックコスト -1、カード破壊回復 +4（NET +3）
+                if (state.time > 0) state.time -= 1;
 
                 if (enemy.isBoss) {
                     enemy.hp -= damage;
-                    addTime(totalRecovery);
-                    
+                    addTime(CONFIG.timeRecovery);
+
                     if (enemy.hp <= 0) {
-                        enemy.hp = 0; 
-                        state.inputLocked = true; 
+                        enemy.hp = 0;
+                        state.inputLocked = true;
                         state.isGameClearProcessing = true;
-                        state.defeatedCount++; 
-                        
+                        state.defeatedCount++;
+
                         setTimeout(() => {
-                            state.enemies.splice(i, 1); 
+                            state.enemies.splice(i, 1);
                             state.boss = null;
-                            setTimeout(() => {
-                                gameClear();
-                            }, 1000); 
-                        }, 500); 
-                        
+                            setTimeout(() => { gameClear(); }, 1000);
+                        }, 500);
+
                         actionDone = true;
                         state.dragInfo = null;
-                        updateUI(); 
-                        return; 
+                        updateUI();
+                        return;
                     } else {
                         enemy.reroll();
                     }
                 } else {
                     state.enemies.splice(i, 1);
-                    addTime(totalRecovery);
-                    state.defeatedCount++; 
+                    addTime(CONFIG.timeRecovery);
+                    state.defeatedCount++;
                 }
                 actionDone = true;
             }
@@ -1956,11 +1979,38 @@ function onUp(e) {
         refillCards();
         refillEnemies();
         updateUI();
+        enemyAttackCheck();
     } else {
         card.isDragging = false;
     }
-    
+
     state.dragInfo = null;
+}
+
+function enemyAttackCheck() {
+    if (state.isGameClearProcessing || state.isGameOverProcessing || state.inputLocked) return;
+    let attacked = false;
+    state.enemies.forEach(enemy => {
+        if (!enemy.isBoss && enemy.fireCount > 0 && Math.random() < 1 / 3) {
+            const dmg = enemy.fireCount;
+            state.time = Math.max(0, state.time - dmg);
+            state.particles.push(new Particle(
+                enemy.x + enemy.width / 2,
+                enemy.y - 10,
+                `🔥 -${dmg}`,
+                '#ff5722', 'text', 30
+            ));
+            attacked = true;
+        }
+    });
+    if (attacked) {
+        updateUI();
+        if (state.time === 0 && !state.isGameOverProcessing) {
+            state.isGameOverProcessing = true;
+            state.inputLocked = true;
+            setTimeout(() => { if (state.screen === 'PLAYING') gameOver(); }, 500);
+        }
+    }
 }
 
 canvas.addEventListener('mousedown', onDown);
