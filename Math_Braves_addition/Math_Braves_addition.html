@@ -712,33 +712,36 @@ const PRESET_EASY = {
     label: "やさしい",
     handMin: 1, handMax: 9,
     enemyMin: 10, enemyMax: 15,
-    bossMin: 15, bossMax: 25,
-    enemyCount: 20, bossHP: 1200,
+    bossMin: 10, bossMax: 15,
+    enemyCount: 10, bossHP: 400,
     initialTime: 10, timeRecovery: 4,
     gemProb: [30, 25, 20, 15, 10],
-    fireProb: 0, fireCountWeights: [100, 0, 0]
+    fireProb: 0, fireCountWeights: [100, 0, 0],
+    hpBase: 30, hpStep: 5
 };
 
 const PRESET_NORMAL = {
     label: "ふつう",
-    handMin: 1, handMax: 14,
+    handMin: 1, handMax: 9,
     enemyMin: 15, enemyMax: 20,
-    bossMin: 20, bossMax: 30,
-    enemyCount: 20, bossHP: 1500,
-    initialTime: 10, timeRecovery: 4,
+    bossMin: 10, bossMax: 20,
+    enemyCount: 10, bossHP: 900,
+    initialTime: 10, timeRecovery: 5,
     gemProb: [30, 25, 20, 15, 10],
-    fireProb: 0.20, fireCountWeights: [95, 5, 0]
+    fireProb: 0.20, fireCountWeights: [95, 5, 0],
+    hpBase: 60, hpStep: 10
 };
 
 const PRESET_HARD = {
     label: "むずかしい",
-    handMin: 1, handMax: 19,
-    enemyMin: 20, enemyMax: 30,
-    bossMin: 30, bossMax: 40,
-    enemyCount: 20, bossHP: 2000,
-    initialTime: 20, timeRecovery: 4,
+    handMin: 1, handMax: 9,
+    enemyMin: 20, enemyMax: 25,
+    bossMin: 10, bossMax: 25,
+    enemyCount: 10, bossHP: 1800,
+    initialTime: 20, timeRecovery: 6,
     gemProb: [30, 25, 20, 15, 10],
-    fireProb: 0.30, fireCountWeights: [85, 10, 5]
+    fireProb: 0.30, fireCountWeights: [85, 10, 5],
+    hpBase: 120, hpStep: 20
 };
 
 // NGワードリスト（ひらがな）
@@ -1398,7 +1401,10 @@ class Enemy {
         } else {
             this.value = randomInt(CONFIG.enemyMin, CONFIG.enemyMax);
             this.gemCount = getWeightedRandom(CONFIG.gemProb);
-            this.colorIndex = randomInt(0, 5); // 色はランダム、形状はgemCountで決まる
+            this.colorIndex = randomInt(0, 5);
+            const n = state.defeatedCount + 1; // 1〜enemyCount
+            this.maxHp = CONFIG.hpBase + CONFIG.hpStep * n;
+            this.hp = this.maxHp;
             // 🔥攻撃フラグ抽選
             this.fireCount = 0;
             if (CONFIG.fireProb > 0 && Math.random() < CONFIG.fireProb) {
@@ -1410,9 +1416,9 @@ class Enemy {
             }
         }
 
-        this.slotIndex = 0; // refillEnemies() で上書きされる
+        this.slotIndex = 0;
         this.x = 0;
-        this.y = state.height * 0.24;
+        this.y = state.height * 0.22;
     }
 
     reroll() {
@@ -1424,105 +1430,98 @@ class Enemy {
         this.gemCount = getWeightedRandom(CONFIG.gemProb);
     }
 
-    draw(ctx, index, total) {
-        if (this.isBoss) {
-            this.x = state.width / 2 - this.width / 2;
-        } else {
-            const spacing = state.width / 4; // 常に3スロット固定
-            this.x = spacing * (this.slotIndex + 1) - this.width / 2;
-        }
+    draw(ctx) {
+        // 常に1体・中央配置
+        this.x = state.width / 2 - this.width / 2;
 
-        const cx     = this.x + this.width / 2;
-        const cntWpre = this.width - 6;
-        const charR  = this.width * 0.40;
-        // キャラクター下端をカードコンテナ上端に揃える
-        const charCY = this.y + this.height - cntWpre - charR * 1.1;
+        const cx      = this.x + this.width / 2;
+        const cntW    = this.width - 6;
+        const cntH    = cntW; // 1:1
+        const cntY    = this.y + this.height - cntH;
+        const cntX    = this.x + 3;
+        const charR   = this.width * 0.40;
+        const charCY  = cntY - charR * 1.1;
 
-        // キャラクター描画（影付き）
+        // キャラクター描画
         ctx.save();
         ctx.shadowColor = 'rgba(0,0,0,0.2)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 5;
         if (this.isBoss) {
             _drawMul2Boss(ctx, cx, charCY, charR);
         } else {
             const { body, dark } = ENEMY_COLORS[this.colorIndex];
-            const shape = (this.gemCount - 1) % 5; // ⭐1→ゴースト, 2→四角, 3→葉, 4→星, 5→まる
+            const shape = (this.gemCount - 1) % 5;
             _drawMul2Enemy(ctx, cx, charCY, charR, shape, body, dark);
         }
         ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
         ctx.restore();
 
-        // カード型コンテナ（キャラクター下・正方形）
-        const cntW = this.width - 6;
-        const cntH = cntW; // 1:1
-        const cntY = this.y + this.height - cntH;
-        const cntX = this.x + 3;
+        // 黄色カード（正方形）
         ctx.save();
         ctx.fillStyle = 'rgba(255, 243, 210, 0.97)';
-        ctx.strokeStyle = 'rgba(190, 130, 30, 0.35)';
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgba(190, 130, 30, 0.55)';
+        ctx.lineWidth = 2.5;
         roundRect(ctx, cntX, cntY, cntW, cntH, 10, true, true);
 
-        // ⭐（上段・手札の⚔️と同サイズ）
+        // ⭐（上部）
         const starSize = Math.floor(Math.min(this.width * 0.171, cntW / (this.gemCount + 0.5)));
         const totalStarW = this.gemCount * (starSize + 2) - 2;
         const starStartX = cx - totalStarW / 2 + starSize / 2;
         ctx.font = `${starSize}px "M PLUS Rounded 1c"`;
         ctx.textBaseline = 'middle';
         for (let i = 0; i < this.gemCount; i++) {
-            ctx.fillText('⭐', starStartX + i * (starSize + 2), cntY + cntH * 0.24);
+            ctx.fillText('⭐', starStartX + i * (starSize + 2), cntY + cntH * 0.19);
         }
 
-        // 数値（下段、大きめ）
-        const numSize = Math.floor(cntH * 0.56);
+        // 数値（中央）
+        const numSize = Math.floor(cntH * 0.48);
         ctx.font = `800 ${numSize}px "M PLUS Rounded 1c"`;
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#444';
-        ctx.fillText(this.value, cx, cntY + cntH * 0.68);
+        ctx.fillText(this.value, cx, cntY + cntH * 0.52);
+
+        // HPバー（下部・全敵共通）
+        const barW = cntW * 0.88;
+        const barH = Math.floor(cntH * 0.12);
+        const barX = cx - barW / 2;
+        const barY = cntY + cntH * 0.74;
+        ctx.fillStyle = 'rgba(80,80,80,0.25)';
+        roundRect(ctx, barX, barY, barW, barH, barH / 2, true, false);
+        const pct = Math.max(0, this.hp / this.maxHp);
+        if (pct > 0) {
+            ctx.fillStyle = this.isBoss
+                ? (pct > 0.5 ? '#ef5350' : '#ff7043')
+                : (pct > 0.5 ? '#42a5f5' : '#ff7043');
+            roundRect(ctx, barX, barY, barW * pct, barH, barH / 2, true, false);
+        }
+        ctx.strokeStyle = 'rgba(150,150,150,0.5)'; ctx.lineWidth = 1;
+        roundRect(ctx, barX, barY, barW, barH, barH / 2, false, true);
+        // HP数値
+        ctx.fillStyle = '#666';
+        ctx.font = `bold ${Math.max(9, barH - 1)}px "M PLUS Rounded 1c"`;
+        ctx.textBaseline = 'middle';
+        ctx.fillText(`${this.hp} / ${this.maxHp}`, cx, barY + barH / 2);
         ctx.restore();
 
-        // 🔥マーク（敵イラスト左上）
+        // 🔥マーク（通常敵のみ・イラスト左上）
         if (!this.isBoss && this.fireCount > 0) {
             ctx.save();
             const fireSize = Math.floor(this.width * 0.22);
             ctx.font = `${fireSize}px sans-serif`;
-            ctx.textAlign = 'left';
-            ctx.textBaseline = 'top';
+            ctx.textAlign = 'left'; ctx.textBaseline = 'top';
             for (let f = 0; f < this.fireCount; f++) {
                 ctx.fillText('🔥', this.x + 2 + f * (fireSize * 0.85), this.y + 2);
             }
             ctx.restore();
         }
 
-        // BOSS専用：ラベル＋HPバー（イラスト下部に重ねて配置）
+        // BOSSラベル（イラスト下部に重なる）
         if (this.isBoss) {
             ctx.save();
-            // BOSS文字：カードコンテナ上端から少し上（イラスト下部に重なる）
             const labelY = cntY - this.width * 0.08;
             ctx.fillStyle = '#ffca28'; ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 5;
             ctx.font = `800 ${Math.floor(this.width * 0.22)}px "M PLUS Rounded 1c"`;
             ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
             ctx.strokeText('BOSS', cx, labelY);
             ctx.fillText('BOSS', cx, labelY);
-
-            // HPバー：BOSS文字の直下、カードコンテナに少しかかる位置
-            const barW = cntW * 0.92;
-            const barH = 14;
-            const barX = cx - barW / 2;
-            const barY = cntY + 4;
-            ctx.fillStyle = 'rgba(60,60,60,0.7)';
-            roundRect(ctx, barX, barY, barW, barH, 7, true, false);
-            const pct = Math.max(0, this.hp / this.maxHp);
-            if (pct > 0) {
-                ctx.fillStyle = pct > 0.5 ? '#ef5350' : '#ff7043';
-                roundRect(ctx, barX, barY, barW * pct, barH, 7, true, false);
-            }
-            ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 2;
-            roundRect(ctx, barX, barY, barW, barH, 7, false, true);
-
-            // HP数値
-            ctx.fillStyle = '#fff';
-            ctx.font = `800 ${barH - 2}px "M PLUS Rounded 1c"`;
-            ctx.textBaseline = 'middle';
-            ctx.fillText(`${this.hp} / ${this.maxHp}`, cx, barY + barH / 2);
             ctx.restore();
         }
     }
@@ -1667,13 +1666,9 @@ function refillEnemies() {
         return;
     }
 
-    const usedSlots = new Set(state.enemies.map(e => e.slotIndex));
-    while (state.enemies.length < 3 && state.enemiesRemaining > 0) {
-        let slot = 0;
-        while (usedSlots.has(slot)) slot++;
+    if (state.enemies.length === 0 && state.enemiesRemaining > 0) {
         const enemy = new Enemy(false);
-        enemy.slotIndex = slot;
-        usedSlots.add(slot);
+        enemy.slotIndex = 0;
         state.enemies.push(enemy);
         state.enemiesRemaining--;
     }
@@ -1885,50 +1880,47 @@ function onUp(e) {
         const enemy = state.enemies[i];
         if (cx > enemy.x && cx < enemy.x + enemy.width && cy > enemy.y && cy < enemy.y + enemy.height) {
             if (card.value === enemy.value) {
-                const damage = card.stackCount * enemy.gemCount * 10;
+                // 攻撃力 = ⚔(stackCount) × ⭐(gemCount) × 黄色カード数値(enemy.value)
+                const damage = card.stackCount * enemy.gemCount * enemy.value;
                 state.score += damage;
                 state.lastScore = damage;
-                
-                if (damage > state.maxScore) {
-                    state.maxScore = damage;
-                }
-                
+                if (damage > state.maxScore) state.maxScore = damage;
+
                 const scoreFs = scoreParticleFontSize(damage);
                 state.particles.push(new Particle(enemy.x + enemy.width/2, enemy.y, `+${damage}`, '#ffca28', 'text', scoreFs));
                 state.particles.push(new Particle(enemy.x + enemy.width/2, enemy.y + enemy.height/2, "", "#ef5350", "circle"));
 
                 state.cards[idx] = null;
 
-                // アタックコスト -1、カード破壊回復 +4（NET +3）
+                // アタックコスト -1
                 if (state.time > 0) state.time -= 1;
 
-                if (enemy.isBoss) {
-                    enemy.hp -= damage;
-                    addTime(CONFIG.timeRecovery);
+                enemy.hp -= damage;
 
-                    if (enemy.hp <= 0) {
-                        enemy.hp = 0;
+                if (enemy.hp <= 0) {
+                    enemy.hp = 0;
+                    if (enemy.isBoss) {
                         state.inputLocked = true;
                         state.isGameClearProcessing = true;
                         state.defeatedCount++;
-
                         setTimeout(() => {
                             state.enemies.splice(i, 1);
                             state.boss = null;
                             setTimeout(() => { gameClear(); }, 1000);
                         }, 500);
-
                         actionDone = true;
                         state.dragInfo = null;
                         updateUI();
                         return;
                     } else {
-                        enemy.reroll();
+                        state.enemies.splice(i, 1);
+                        addTime(CONFIG.timeRecovery);
+                        state.defeatedCount++;
                     }
                 } else {
-                    state.enemies.splice(i, 1);
-                    addTime(CONFIG.timeRecovery);
-                    state.defeatedCount++;
+                    // HP残あり：数値を再抽選
+                    enemy.reroll();
+                    if (enemy.isBoss) addTime(CONFIG.timeRecovery);
                 }
                 actionDone = true;
             }
@@ -2074,9 +2066,7 @@ function gameLoop() {
     ctx.fillText("いらないカードは ここへ", state.width/2, state.height * 0.93);
     ctx.restore();
 
-    state.enemies.forEach((enemy, i) => {
-        enemy.draw(ctx, i, state.enemies.length);
-    });
+    state.enemies.forEach(enemy => enemy.draw(ctx));
 
     state.cards.forEach(c => {
         if (c && !c.isDragging) c.draw(ctx);
