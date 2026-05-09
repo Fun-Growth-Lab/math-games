@@ -473,9 +473,9 @@
                     </div>
                 </div>
                 <div class="calc-box" style="margin-top:14px;">
-                    ★スコアのけいさん<br>
+                    ★ダメージのけいさん<br>
                     <span style="font-size:1.1rem; display:block; margin-top:5px;">
-                    <span class="emoji-red">⚔️</span> × <span class="emoji-star">⭐</span> × てきのすうじ
+                    <span class="emoji-red">⚔️</span> × <span class="emoji-star">⭐</span> × かず
                     </span>
                 </div>
             </div>
@@ -1390,19 +1390,26 @@ class Enemy {
         const singleCardW = Math.floor(baseSize * 0.19 - 6);
         this.cardSize = singleCardW;
 
+        const gap = 8;
         if (isBoss) {
-            this.width = Math.floor(baseSize * 0.19);
-            this.height = this.width * 2.0;
-            this.value = randomInt(CONFIG.bossMin, CONFIG.bossMax);
-            this.gemCount = getWeightedRandom(CONFIG.gemProb);
+            this.width = 2 * singleCardW + gap;         // ボス：2枚並列
+            this.height = Math.ceil(singleCardW * 2.5);
+            const v1 = randomInt(CONFIG.bossMin, CONFIG.bossMax);
+            let v2 = randomInt(CONFIG.bossMin, CONFIG.bossMax);
+            const bossRange = CONFIG.bossMax - CONFIG.bossMin;
+            while (v2 === v1 && bossRange > 0) v2 = randomInt(CONFIG.bossMin, CONFIG.bossMax);
+            this.values = [v1, v2];
+            this.gemCounts = [
+                getWeightedRandom(CONFIG.gemProb),
+                getWeightedRandom(CONFIG.gemProb)
+            ];
             this.maxHp = CONFIG.bossHP;
             this.hp = CONFIG.bossHP;
             this.displayHp = CONFIG.bossHP;
             this.type = -1;
         } else {
-            const gap = 8;
-            this.width = 3 * singleCardW + 2 * gap;
-            this.height = Math.ceil(singleCardW * 2.3);
+            this.width = 3 * singleCardW + 2 * gap;    // 通常敵：3枚並列
+            this.height = Math.ceil(singleCardW * 2.5);
             this.gemCounts = [
                 getWeightedRandom(CONFIG.gemProb),
                 getWeightedRandom(CONFIG.gemProb),
@@ -1422,15 +1429,24 @@ class Enemy {
             this.values = [...vSet];
         }
 
+        this.isDefeated = false;
+        this.defeatProcessed = false;
         this.slotIndex = 0;
         this.x = 0;
-        this.y = state.height * 0.22;
+        this.y = state.height * 0.14;  // HUD直下
     }
 
     reroll() {
         if (this.isBoss) {
-            this.value = randomInt(CONFIG.bossMin, CONFIG.bossMax);
-            this.gemCount = getWeightedRandom(CONFIG.gemProb);
+            const v1 = randomInt(CONFIG.bossMin, CONFIG.bossMax);
+            let v2 = randomInt(CONFIG.bossMin, CONFIG.bossMax);
+            const bossRange = CONFIG.bossMax - CONFIG.bossMin;
+            while (v2 === v1 && bossRange > 0) v2 = randomInt(CONFIG.bossMin, CONFIG.bossMax);
+            this.values = [v1, v2];
+            this.gemCounts = [
+                getWeightedRandom(CONFIG.gemProb),
+                getWeightedRandom(CONFIG.gemProb)
+            ];
         } else {
             const vRange = CONFIG.enemyMax - CONFIG.enemyMin + 1;
             const vCount = Math.min(3, vRange);
@@ -1447,15 +1463,11 @@ class Enemy {
         }
     }
 
-    // 黄色カード j の当たり判定矩形を返す
+    // 黄色カード j の当たり判定矩形を返す（ボス・通常敵共通）
     getCardRect(j) {
-        const cardY = this.y + this.height - this.cardSize;
-        if (this.isBoss) {
-            const cardX = this.x + Math.floor((this.width - this.cardSize) / 2);
-            return { x: cardX, y: cardY, w: this.cardSize, h: this.cardSize };
-        }
         const gap = 8;
         const cardX = this.x + j * (this.cardSize + gap);
+        const cardY = this.y + this.height - this.cardSize;
         return { x: cardX, y: cardY, w: this.cardSize, h: this.cardSize };
     }
 
@@ -1467,10 +1479,10 @@ class Enemy {
         const hpBarH = 14;
         const cardsTopY = this.y + this.height - this.cardSize;
         const hpBarY  = cardsTopY - hpBarH - 6;
-        const hpBarW  = this.width - 10;
-        const hpBarX  = this.x + 5;
         const charR   = Math.floor(this.cardSize * 0.42);
         const charCY  = hpBarY - 8 - charR;
+        const hpBarW  = Math.ceil(charR * 2.4);
+        const hpBarX  = cx - hpBarW / 2;
 
         // キャラクター描画
         ctx.save();
@@ -1516,11 +1528,9 @@ class Enemy {
         ctx.fillText(`${Math.ceil(this.displayHp)} / ${this.maxHp}`, cx, hpBarY + hpBarH / 2);
         ctx.restore();
 
-        // 黄色カード（ボス1枚・通常敵3枚、各カードに⭐と数値）
+        // 黄色カード（ボス2枚・通常敵3枚、各カードに⭐と数値）
         ctx.save();
-        const vals  = this.isBoss ? [this.value]    : this.values;
-        const gcArr = this.isBoss ? [this.gemCount] : this.gemCounts;
-        const cardCount = vals.length;
+        const cardCount = this.values.length;
 
         for (let j = 0; j < cardCount; j++) {
             const rect = this.getCardRect(j);
@@ -1532,7 +1542,7 @@ class Enemy {
             roundRect(ctx, rect.x, rect.y, rect.w, rect.h, 12, true, true);
 
             // ⭐（カード上部）
-            const gc = gcArr[j];
+            const gc = this.gemCounts[j];
             const starSize = Math.floor(Math.min(rect.w * 0.20, rect.w / (gc + 0.5)));
             const totalStarW = gc * (starSize + 2) - 2;
             const starCX = rect.x + rect.w / 2;
@@ -1548,7 +1558,7 @@ class Enemy {
             const numSize = Math.floor(rect.w * 0.48);
             ctx.font = `800 ${numSize}px "M PLUS Rounded 1c"`;
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#444';
-            ctx.fillText(vals[j], rect.x + rect.w / 2, rect.y + rect.h * 0.63);
+            ctx.fillText(this.values[j], rect.x + rect.w / 2, rect.y + rect.h * 0.63);
         }
         ctx.restore();
     }
@@ -1758,7 +1768,7 @@ function updateUI() {
     if (state.boss) {
         ui.enemies.textContent = "BOSS";
     } else {
-        ui.enemies.textContent = Math.max(0, state.enemiesRemaining + state.enemies.filter(e => !e.isBoss).length);
+        ui.enemies.textContent = Math.max(0, state.enemiesRemaining + state.enemies.filter(e => !e.isBoss && !e.isDefeated).length);
     }
     ui.maxScore.textContent = state.maxScore; 
     ui.lastScore.textContent = state.lastScore;
@@ -1950,10 +1960,11 @@ function onUp(e) {
 
     for (let i = 0; i < state.enemies.length; i++) {
         const enemy = state.enemies[i];
+        if (enemy.isDefeated) continue;
 
-        // どの黄色カードを狙ったか判定（ボス1枚・通常敵3枚）
+        // どの黄色カードを狙ったか判定（ボス2枚・通常敵3枚）
         let hitJ = -1;
-        const cardCount = enemy.isBoss ? 1 : enemy.values.length;
+        const cardCount = enemy.values.length;
         for (let j = 0; j < cardCount; j++) {
             const rect = enemy.getCardRect(j);
             if (cx >= rect.x && cx <= rect.x + rect.w &&
@@ -1964,9 +1975,9 @@ function onUp(e) {
         }
 
         if (hitJ >= 0) {
-            const checkVal = enemy.isBoss ? enemy.value : enemy.values[hitJ];
+            const checkVal = enemy.values[hitJ];
             if (card.value === checkVal) {
-                const gemCount = enemy.isBoss ? enemy.gemCount : enemy.gemCounts[hitJ];
+                const gemCount = enemy.gemCounts[hitJ];
                 const damage   = card.stackCount * gemCount * checkVal;
 
                 // 手札カードが黄色カードへ突っ込むエフェクト
@@ -1992,25 +2003,7 @@ function onUp(e) {
 
                 if (enemy.hp <= 0) {
                     enemy.hp = 0;
-                    enemy.displayHp = 0;
-                    if (enemy.isBoss) {
-                        state.inputLocked = true;
-                        state.isGameClearProcessing = true;
-                        state.defeatedCount++;
-                        setTimeout(() => {
-                            state.enemies.splice(i, 1);
-                            state.boss = null;
-                            setTimeout(() => { gameClear(); }, 1000);
-                        }, 500);
-                        actionDone = true;
-                        state.dragInfo = null;
-                        updateUI();
-                        return;
-                    } else {
-                        state.enemies.splice(i, 1);
-                        addTime(CONFIG.timeRecovery);
-                        state.defeatedCount++;
-                    }
+                    enemy.isDefeated = true;
                 } else {
                     enemy.reroll();
                     if (enemy.isBoss) addTime(CONFIG.timeRecovery);
@@ -2087,6 +2080,34 @@ function gameLoop() {
             if (enemy.displayHp < enemy.hp) enemy.displayHp = enemy.hp;
         }
     });
+
+    // 倒れた敵の処理（displayHp が 0 に達したら除去）
+    for (let i = state.enemies.length - 1; i >= 0; i--) {
+        const enemy = state.enemies[i];
+        if (enemy.isDefeated && !enemy.defeatProcessed && enemy.displayHp <= 0.5) {
+            enemy.defeatProcessed = true;
+            enemy.displayHp = 0;
+            state.particles.push(new Particle(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, "", "#ef5350", "circle"));
+            if (enemy.isBoss) {
+                state.inputLocked = true;
+                state.isGameClearProcessing = true;
+                state.defeatedCount++;
+                const deadEnemy = enemy;
+                setTimeout(() => {
+                    const idx = state.enemies.indexOf(deadEnemy);
+                    if (idx >= 0) state.enemies.splice(idx, 1);
+                    state.boss = null;
+                    setTimeout(() => { gameClear(); }, 1000);
+                }, 500);
+            } else {
+                state.enemies.splice(i, 1);
+                addTime(CONFIG.timeRecovery);
+                state.defeatedCount++;
+                refillEnemies();
+                updateUI();
+            }
+        }
+    }
 
     // 敵＋手札＋HUDを包む単一の半透明コンテナ（先に描いてHUD/カードが上に乗る）
     const firstCard = state.cards.find(c => c);
