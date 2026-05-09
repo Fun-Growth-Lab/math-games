@@ -527,17 +527,17 @@
                 <div class="difficulty-container">
                     <div class="diff-wrapper">
                         <div id="crown-easy" class="crown-icon">👑</div>
-                        <button id="btn-easy" class="btn btn-success">しょきゅう</button>
+                        <button id="btn-easy" class="btn btn-success">やさしい</button>
                         <div id="clear-easy" class="clear-count-text">0回クリア</div>
                     </div>
                     <div class="diff-wrapper">
                         <div id="crown-normal" class="crown-icon">👑</div>
-                        <button id="btn-normal" class="btn">ちゅうきゅう</button>
+                        <button id="btn-normal" class="btn">ふつう</button>
                         <div id="clear-normal" class="clear-count-text">0回クリア</div>
                     </div>
                     <div class="diff-wrapper">
                         <div id="crown-hard" class="crown-icon">👑</div>
-                        <button id="btn-hard" class="btn btn-danger">じょうきゅう</button>
+                        <button id="btn-hard" class="btn btn-danger">むずかしい</button>
                         <div id="clear-hard" class="clear-count-text">0回クリア</div>
                     </div>
                 </div>
@@ -560,15 +560,15 @@
 
                 <div class="ranking-container">
                     <div class="ranking-box">
-                        <div class="ranking-title" style="color: #8bc34a;">しょきゅう</div>
+                        <div class="ranking-title" style="color: #8bc34a;">やさしい</div>
                         <ul id="rank-list-easy" class="ranking-list"></ul>
                     </div>
                     <div class="ranking-box">
-                        <div class="ranking-title" style="color: #29b6f6;">ちゅうきゅう</div>
+                        <div class="ranking-title" style="color: #29b6f6;">ふつう</div>
                         <ul id="rank-list-normal" class="ranking-list"></ul>
                     </div>
                     <div class="ranking-box">
-                        <div class="ranking-title" style="color: #ef5350;">じょうきゅう</div>
+                        <div class="ranking-title" style="color: #ef5350;">むずかしい</div>
                         <ul id="rank-list-hard" class="ranking-list"></ul>
                     </div>
                 </div>
@@ -709,7 +709,7 @@
  */
 
 const PRESET_EASY = {
-    label: "しょきゅう",
+    label: "やさしい",
     handMin: 1, handMax: 9,
     enemyMin: 10, enemyMax: 15,
     bossMin: 15, bossMax: 25,
@@ -720,7 +720,7 @@ const PRESET_EASY = {
 };
 
 const PRESET_NORMAL = {
-    label: "ちゅうきゅう",
+    label: "ふつう",
     handMin: 1, handMax: 14,
     enemyMin: 15, enemyMax: 20,
     bossMin: 20, bossMax: 30,
@@ -731,7 +731,7 @@ const PRESET_NORMAL = {
 };
 
 const PRESET_HARD = {
-    label: "じょうきゅう",
+    label: "むずかしい",
     handMin: 1, handMax: 19,
     enemyMin: 20, enemyMax: 30,
     bossMin: 30, bossMax: 40,
@@ -816,6 +816,7 @@ let state = {
     defeatedCount: 0,
     totalConsumedTime: 0,
     forbiddenValue: null,
+    shakeFrames: 0,
     rankingMode: 'LOCAL',
     playerName: "ななしさん" 
 };
@@ -1478,22 +1479,15 @@ class Enemy {
         ctx.fillText(this.value, cx, cntY + cntH * 0.68);
         ctx.restore();
 
-        // 🔥マーク（カードコンテナ左上角）
+        // 🔥マーク（敵イラスト左上）
         if (!this.isBoss && this.fireCount > 0) {
             ctx.save();
-            const fireSize = Math.floor(this.width * 0.21);
+            const fireSize = Math.floor(this.width * 0.22);
             ctx.font = `${fireSize}px sans-serif`;
             ctx.textAlign = 'left';
             ctx.textBaseline = 'top';
-            // 背景pill
-            const pillW = fireSize * this.fireCount + 6;
-            const pillH = fireSize + 4;
-            const pillX = cntX;
-            const pillY = cntY - pillH + 2;
-            ctx.fillStyle = 'rgba(40,40,40,0.55)';
-            roundRect(ctx, pillX, pillY, pillW, pillH, 6, true, false);
             for (let f = 0; f < this.fireCount; f++) {
-                ctx.fillText('🔥', pillX + 3 + f * fireSize, pillY + 2);
+                ctx.fillText('🔥', this.x + 2 + f * (fireSize * 0.85), this.y + 2);
             }
             ctx.restore();
         }
@@ -1622,7 +1616,8 @@ function initGame() {
     state.defeatedCount = 0;
     state.totalConsumedTime = 0;
     state.forbiddenValue = null;
-    
+    state.shakeFrames = 0;
+
     ui.difficultyLabel.textContent = CONFIG.label;
 
     setBattleBackground(false);
@@ -2004,6 +1999,7 @@ function enemyAttackCheck() {
         }
     });
     if (attacked) {
+        state.shakeFrames = 10;
         updateUI();
         if (state.time === 0 && !state.isGameOverProcessing) {
             state.isGameOverProcessing = true;
@@ -2025,6 +2021,17 @@ function gameLoop() {
     if (state.screen !== 'PLAYING') return;
 
     ctx.clearRect(0, 0, state.width, state.height);
+
+    // 画面シェイク
+    const isShaking = state.shakeFrames > 0;
+    if (isShaking) {
+        const intensity = Math.ceil(state.shakeFrames / 3);
+        const sx = (Math.random() - 0.5) * intensity * 2;
+        const sy = (Math.random() - 0.5) * intensity * 2;
+        ctx.save();
+        ctx.translate(sx, sy);
+        state.shakeFrames--;
+    }
 
     // 敵＋手札＋HUDを包む単一の半透明コンテナ（先に描いてHUD/カードが上に乗る）
     const firstCard = state.cards.find(c => c);
@@ -2085,6 +2092,8 @@ function gameLoop() {
         if (p.life <= 0) state.particles.splice(i, 1);
     }
     
+    if (isShaking) ctx.restore();
+
     updateUI();
 
     requestAnimationFrame(gameLoop);
