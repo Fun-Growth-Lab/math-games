@@ -1436,31 +1436,21 @@ class Enemy {
         this.y = state.height * 0.14;  // HUD直下
     }
 
-    reroll() {
-        if (this.isBoss) {
-            const v1 = randomInt(CONFIG.bossMin, CONFIG.bossMax);
-            let v2 = randomInt(CONFIG.bossMin, CONFIG.bossMax);
-            const bossRange = CONFIG.bossMax - CONFIG.bossMin;
-            while (v2 === v1 && bossRange > 0) v2 = randomInt(CONFIG.bossMin, CONFIG.bossMax);
-            this.values = [v1, v2];
-            this.gemCounts = [
-                getWeightedRandom(CONFIG.gemProb),
-                getWeightedRandom(CONFIG.gemProb)
-            ];
-        } else {
-            const vRange = CONFIG.enemyMax - CONFIG.enemyMin + 1;
-            const vCount = Math.min(3, vRange);
-            const vSet = new Set();
-            while (vSet.size < vCount) {
-                vSet.add(randomInt(CONFIG.enemyMin, CONFIG.enemyMax));
-            }
-            this.values = [...vSet];
-            this.gemCounts = [
-                getWeightedRandom(CONFIG.gemProb),
-                getWeightedRandom(CONFIG.gemProb),
-                getWeightedRandom(CONFIG.gemProb)
-            ];
+    // j 番目の黄色カードだけを再生成（他のカードはそのまま）
+    reroll(j) {
+        const range = this.isBoss ? CONFIG.bossMax - CONFIG.bossMin : CONFIG.enemyMax - CONFIG.enemyMin;
+        // 他のカードの値と重複しないよう新しい値を引き直す
+        const otherVals = this.values.filter((_, idx) => idx !== j);
+        let newVal = randomInt(this.isBoss ? CONFIG.bossMin : CONFIG.enemyMin,
+                               this.isBoss ? CONFIG.bossMax : CONFIG.enemyMax);
+        let tries = 0;
+        while (otherVals.includes(newVal) && range > 0 && tries < 50) {
+            newVal = randomInt(this.isBoss ? CONFIG.bossMin : CONFIG.enemyMin,
+                               this.isBoss ? CONFIG.bossMax : CONFIG.enemyMax);
+            tries++;
         }
+        this.values[j]    = newVal;
+        this.gemCounts[j] = getWeightedRandom(CONFIG.gemProb);
     }
 
     // 黄色カード j の当たり判定矩形を返す（ボス・通常敵共通）
@@ -2007,7 +1997,7 @@ function onUp(e) {
                     enemy.hp = 0;
                     enemy.isDefeated = true;
                 } else {
-                    enemy.reroll();
+                    enemy.reroll(hitJ);
                     if (enemy.isBoss) addTime(CONFIG.timeRecovery);
                 }
                 actionDone = true;
