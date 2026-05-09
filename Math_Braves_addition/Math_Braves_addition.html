@@ -716,7 +716,6 @@ const PRESET_EASY = {
     enemyCount: 10, bossHP: 400,
     initialTime: 10, timeRecovery: 5,
     gemProb: [30, 25, 20, 15, 10],
-    fireProb: 0, fireCountWeights: [100, 0, 0],
     hpBase: 30, hpStep: 5
 };
 
@@ -728,7 +727,6 @@ const PRESET_NORMAL = {
     enemyCount: 10, bossHP: 900,
     initialTime: 10, timeRecovery: 7,
     gemProb: [30, 25, 20, 15, 10],
-    fireProb: 0.20, fireCountWeights: [95, 5, 0],
     hpBase: 60, hpStep: 10
 };
 
@@ -740,7 +738,6 @@ const PRESET_HARD = {
     enemyCount: 10, bossHP: 1800,
     initialTime: 20, timeRecovery: 9,
     gemProb: [30, 25, 20, 15, 10],
-    fireProb: 0.30, fireCountWeights: [85, 10, 5],
     hpBase: 120, hpStep: 20
 };
 
@@ -820,6 +817,7 @@ let state = {
     totalConsumedTime: 0,
     forbiddenValue: null,
     shakeFrames: 0,
+    flyingCards: [],
     rankingMode: 'LOCAL',
     playerName: "ななしさん" 
 };
@@ -1389,21 +1387,32 @@ class Enemy {
     constructor(isBoss = false) {
         this.isBoss = isBoss;
         const baseSize = Math.min(state.width, state.height * 1.5);
-        this.width = baseSize * 0.19;
-        this.height = this.width * 2.0;
-        
+        const singleCardW = Math.floor(baseSize * 0.19 - 6);
+        this.cardSize = singleCardW;
+
         if (isBoss) {
+            this.width = Math.floor(baseSize * 0.19);
+            this.height = this.width * 2.0;
             this.value = randomInt(CONFIG.bossMin, CONFIG.bossMax);
             this.gemCount = getWeightedRandom(CONFIG.gemProb);
             this.maxHp = CONFIG.bossHP;
             this.hp = CONFIG.bossHP;
+            this.displayHp = CONFIG.bossHP;
             this.type = -1;
         } else {
-            this.gemCount = getWeightedRandom(CONFIG.gemProb);
+            const gap = 8;
+            this.width = 3 * singleCardW + 2 * gap;
+            this.height = Math.ceil(singleCardW * 2.3);
+            this.gemCounts = [
+                getWeightedRandom(CONFIG.gemProb),
+                getWeightedRandom(CONFIG.gemProb),
+                getWeightedRandom(CONFIG.gemProb)
+            ];
             this.colorIndex = randomInt(0, 5);
             const n = state.defeatedCount + 1;
             this.maxHp = CONFIG.hpBase + CONFIG.hpStep * (n - 1);
             this.hp = this.maxHp;
+            this.displayHp = this.maxHp;
             const vRange = CONFIG.enemyMax - CONFIG.enemyMin + 1;
             const vCount = Math.min(3, vRange);
             const vSet = new Set();
@@ -1411,15 +1420,6 @@ class Enemy {
                 vSet.add(randomInt(CONFIG.enemyMin, CONFIG.enemyMax));
             }
             this.values = [...vSet];
-            // 🔥攻撃フラグ抽選
-            this.fireCount = 0;
-            if (CONFIG.fireProb > 0 && Math.random() < CONFIG.fireProb) {
-                const r = Math.random() * 100;
-                const w = CONFIG.fireCountWeights;
-                if (r < w[0]) this.fireCount = 1;
-                else if (r < w[0] + w[1]) this.fireCount = 2;
-                else this.fireCount = 3;
-            }
         }
 
         this.slotIndex = 0;
@@ -1430,6 +1430,7 @@ class Enemy {
     reroll() {
         if (this.isBoss) {
             this.value = randomInt(CONFIG.bossMin, CONFIG.bossMax);
+            this.gemCount = getWeightedRandom(CONFIG.gemProb);
         } else {
             const vRange = CONFIG.enemyMax - CONFIG.enemyMin + 1;
             const vCount = Math.min(3, vRange);
@@ -1438,33 +1439,38 @@ class Enemy {
                 vSet.add(randomInt(CONFIG.enemyMin, CONFIG.enemyMax));
             }
             this.values = [...vSet];
+            this.gemCounts = [
+                getWeightedRandom(CONFIG.gemProb),
+                getWeightedRandom(CONFIG.gemProb),
+                getWeightedRandom(CONFIG.gemProb)
+            ];
         }
-        this.gemCount = getWeightedRandom(CONFIG.gemProb);
+    }
+
+    // 黄色カード j の当たり判定矩形を返す
+    getCardRect(j) {
+        const cardY = this.y + this.height - this.cardSize;
+        if (this.isBoss) {
+            const cardX = this.x + Math.floor((this.width - this.cardSize) / 2);
+            return { x: cardX, y: cardY, w: this.cardSize, h: this.cardSize };
+        }
+        const gap = 8;
+        const cardX = this.x + j * (this.cardSize + gap);
+        return { x: cardX, y: cardY, w: this.cardSize, h: this.cardSize };
     }
 
     draw(ctx) {
         // 常に1体・中央配置
         this.x = state.width / 2 - this.width / 2;
-
         const cx = this.x + this.width / 2;
 
-        // レイアウト（下から積み上げ）
-        const gap = 3;
-        const singleCardW = Math.floor((this.width - gap * 2) / 3);
-        const cardsBottomY = this.y + this.height;
-        const cardsTopY = cardsBottomY - singleCardW;
-
-        const starSize = Math.max(10, Math.floor(singleCardW * 0.30));
-        const starsAreaH = starSize + 2;
-        const starsAreaTopY = cardsTopY - 4 - starsAreaH;
-
-        const hpBarH = 12;
-        const hpBarY = starsAreaTopY - hpBarH - 4;
-        const hpBarW = this.width - 10;
-        const hpBarX = this.x + 5;
-
-        const charR = this.width * 0.40;
-        const charCY = hpBarY - 6 - charR;
+        const hpBarH = 14;
+        const cardsTopY = this.y + this.height - this.cardSize;
+        const hpBarY  = cardsTopY - hpBarH - 6;
+        const hpBarW  = this.width - 10;
+        const hpBarX  = this.x + 5;
+        const charR   = Math.floor(this.cardSize * 0.42);
+        const charCY  = hpBarY - 8 - charR;
 
         // キャラクター描画
         ctx.save();
@@ -1473,13 +1479,14 @@ class Enemy {
             _drawMul2Boss(ctx, cx, charCY, charR);
         } else {
             const { body, dark } = ENEMY_COLORS[this.colorIndex];
-            const shape = (this.gemCount - 1) % 5;
+            const avgGem = Math.round(this.gemCounts.reduce((a, b) => a + b, 0) / 3);
+            const shape = (avgGem - 1) % 5;
             _drawMul2Enemy(ctx, cx, charCY, charR, shape, body, dark);
         }
         ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
         ctx.restore();
 
-        // BOSSラベル（HPバーの上）
+        // BOSSラベル
         if (this.isBoss) {
             ctx.save();
             ctx.fillStyle = '#ffca28'; ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 5;
@@ -1490,11 +1497,11 @@ class Enemy {
             ctx.restore();
         }
 
-        // HPバー（イラスト直下）
+        // HPバー（displayHp でなめらかアニメーション）
         ctx.save();
         ctx.fillStyle = 'rgba(80,80,80,0.25)';
         roundRect(ctx, hpBarX, hpBarY, hpBarW, hpBarH, hpBarH / 2, true, false);
-        const pct = Math.max(0, this.hp / this.maxHp);
+        const pct = Math.max(0, this.displayHp / this.maxHp);
         if (pct > 0) {
             ctx.fillStyle = this.isBoss
                 ? (pct > 0.5 ? '#ef5350' : '#ff7043')
@@ -1506,52 +1513,44 @@ class Enemy {
         ctx.fillStyle = '#666';
         ctx.font = `bold ${Math.max(9, hpBarH - 1)}px "M PLUS Rounded 1c"`;
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText(`${this.hp} / ${this.maxHp}`, cx, hpBarY + hpBarH / 2);
+        ctx.fillText(`${Math.ceil(this.displayHp)} / ${this.maxHp}`, cx, hpBarY + hpBarH / 2);
         ctx.restore();
 
-        // ⭐ 行（カードの上）
+        // 黄色カード（ボス1枚・通常敵3枚、各カードに⭐と数値）
         ctx.save();
-        const totalStarW = this.gemCount * (starSize + 2) - 2;
-        const starStartX = cx - totalStarW / 2 + starSize / 2;
-        ctx.font = `${starSize}px "M PLUS Rounded 1c"`;
-        ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
-        for (let i = 0; i < this.gemCount; i++) {
-            ctx.fillText('⭐', starStartX + i * (starSize + 2) - starSize / 2,
-                starsAreaTopY + starsAreaH / 2);
-        }
-        ctx.restore();
-
-        // 黄色カード（ボスは1枚・通常敵は3枚）
-        ctx.save();
-        const vals = this.isBoss ? [this.value] : this.values;
+        const vals  = this.isBoss ? [this.value]    : this.values;
+        const gcArr = this.isBoss ? [this.gemCount] : this.gemCounts;
         const cardCount = vals.length;
-        const totalCardsW = cardCount * singleCardW + (cardCount - 1) * gap;
-        const cardsStartX = cx - totalCardsW / 2;
 
         for (let j = 0; j < cardCount; j++) {
-            const cardX = cardsStartX + j * (singleCardW + gap);
+            const rect = this.getCardRect(j);
+
+            // カード背景
             ctx.fillStyle = 'rgba(255, 243, 210, 0.97)';
             ctx.strokeStyle = 'rgba(190, 130, 30, 0.55)';
-            ctx.lineWidth = 2;
-            roundRect(ctx, cardX, cardsTopY, singleCardW, singleCardW, 8, true, true);
-            const numSize = Math.floor(singleCardW * 0.52);
+            ctx.lineWidth = 2.5;
+            roundRect(ctx, rect.x, rect.y, rect.w, rect.h, 12, true, true);
+
+            // ⭐（カード上部）
+            const gc = gcArr[j];
+            const starSize = Math.floor(Math.min(rect.w * 0.20, rect.w / (gc + 0.5)));
+            const totalStarW = gc * (starSize + 2) - 2;
+            const starCX = rect.x + rect.w / 2;
+            const starStartX = starCX - totalStarW / 2 + starSize / 2;
+            ctx.font = `${starSize}px sans-serif`;
+            ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+            for (let s = 0; s < gc; s++) {
+                ctx.fillText('⭐', starStartX + s * (starSize + 2) - starSize / 2,
+                    rect.y + rect.h * 0.24);
+            }
+
+            // 数値（カード中央やや下）
+            const numSize = Math.floor(rect.w * 0.48);
             ctx.font = `800 ${numSize}px "M PLUS Rounded 1c"`;
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#444';
-            ctx.fillText(vals[j], cardX + singleCardW / 2, cardsTopY + singleCardW / 2);
+            ctx.fillText(vals[j], rect.x + rect.w / 2, rect.y + rect.h * 0.63);
         }
         ctx.restore();
-
-        // 🔥マーク（通常敵のみ・イラスト左上）
-        if (!this.isBoss && this.fireCount > 0) {
-            ctx.save();
-            const fireSize = Math.floor(this.width * 0.22);
-            ctx.font = `${fireSize}px sans-serif`;
-            ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-            for (let f = 0; f < this.fireCount; f++) {
-                ctx.fillText('🔥', this.x + 2 + f * (fireSize * 0.85), this.y + 2);
-            }
-            ctx.restore();
-        }
     }
 }
 
@@ -1595,6 +1594,50 @@ class Particle {
             ctx.stroke();
         }
         ctx.globalAlpha = 1.0;
+    }
+}
+
+// 手札カードが黄色カードへ突っ込んでいくエフェクト
+class FlyingCard {
+    constructor(fromX, fromY, toX, toY, value, stackCount, cardW, cardH) {
+        this.fromX = fromX; this.fromY = fromY;
+        this.toX   = toX;   this.toY   = toY;
+        this.value = value; this.stackCount = stackCount;
+        this.cardW = cardW; this.cardH = cardH;
+        this.totalFrames = 18;
+        this.frame = 0;
+        this.done  = false;
+    }
+    get progress() { return Math.min(1, this.frame / this.totalFrames); }
+    update() {
+        this.frame++;
+        if (this.frame >= this.totalFrames) this.done = true;
+    }
+    draw(ctx) {
+        if (this.done) return;
+        const t    = this.progress;
+        const ease = t * t;           // quadratic ease-in（加速）
+        const x    = this.fromX + (this.toX - this.fromX) * ease;
+        const y    = this.fromY + (this.toY - this.fromY) * ease;
+        const sc   = 1 - t * 0.65;   // 縮小
+        const alpha = Math.max(0, 1 - t * t);
+        const w = this.cardW, h = this.cardH;
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.translate(x, y);
+        ctx.scale(sc, sc);
+        ctx.fillStyle = '#fff';
+        ctx.strokeStyle = '#bdbdbd';
+        ctx.lineWidth = 2;
+        roundRect(ctx, -w / 2, -h / 2, w, h, 12, true, true);
+        ctx.fillStyle = '#555';
+        ctx.font = `${w * 0.22}px "M PLUS Rounded 1c"`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+        ctx.fillText(this.stackCount > 1 ? `⚔️×${this.stackCount}` : '⚔️', 0, -h / 2 + 5);
+        ctx.font = `800 ${w * 0.55}px "M PLUS Rounded 1c"`;
+        ctx.textBaseline = 'middle';
+        ctx.fillText(this.value, 0, h * 0.10);
+        ctx.restore();
     }
 }
 
@@ -1644,6 +1687,7 @@ function initGame() {
     state.totalConsumedTime = 0;
     state.forbiddenValue = null;
     state.shakeFrames = 0;
+    state.flyingCards = [];
 
     ui.difficultyLabel.textContent = CONFIG.label;
 
@@ -1906,29 +1950,49 @@ function onUp(e) {
 
     for (let i = 0; i < state.enemies.length; i++) {
         const enemy = state.enemies[i];
-        if (cx > enemy.x && cx < enemy.x + enemy.width && cy > enemy.y && cy < enemy.y + enemy.height) {
-            const hitValue = enemy.isBoss
-                ? (card.value === enemy.value ? card.value : null)
-                : (enemy.values.includes(card.value) ? card.value : null);
-            if (hitValue !== null) {
-                const damage = card.stackCount * enemy.gemCount * hitValue;
+
+        // どの黄色カードを狙ったか判定（ボス1枚・通常敵3枚）
+        let hitJ = -1;
+        const cardCount = enemy.isBoss ? 1 : enemy.values.length;
+        for (let j = 0; j < cardCount; j++) {
+            const rect = enemy.getCardRect(j);
+            if (cx >= rect.x && cx <= rect.x + rect.w &&
+                cy >= rect.y && cy <= rect.y + rect.h) {
+                hitJ = j;
+                break;
+            }
+        }
+
+        if (hitJ >= 0) {
+            const checkVal = enemy.isBoss ? enemy.value : enemy.values[hitJ];
+            if (card.value === checkVal) {
+                const gemCount = enemy.isBoss ? enemy.gemCount : enemy.gemCounts[hitJ];
+                const damage   = card.stackCount * gemCount * checkVal;
+
+                // 手札カードが黄色カードへ突っ込むエフェクト
+                const tRect = enemy.getCardRect(hitJ);
+                state.flyingCards.push(new FlyingCard(
+                    card.x + card.width / 2, card.y + card.height / 2,
+                    tRect.x + tRect.w / 2,   tRect.y + tRect.h / 2,
+                    card.value, card.stackCount, card.width, card.height
+                ));
+
                 state.score += damage;
                 state.lastScore = damage;
                 if (damage > state.maxScore) state.maxScore = damage;
 
                 const scoreFs = scoreParticleFontSize(damage);
-                state.particles.push(new Particle(enemy.x + enemy.width/2, enemy.y, `+${damage}`, '#ffca28', 'text', scoreFs));
-                state.particles.push(new Particle(enemy.x + enemy.width/2, enemy.y + enemy.height/2, "", "#ef5350", "circle"));
+                state.particles.push(new Particle(enemy.x + enemy.width / 2, enemy.y, `+${damage}`, '#ffca28', 'text', scoreFs));
+                state.particles.push(new Particle(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, "", "#ef5350", "circle"));
 
                 state.cards[idx] = null;
-
-                // アタックコスト -1
                 if (state.time > 0) state.time -= 1;
 
                 enemy.hp -= damage;
 
                 if (enemy.hp <= 0) {
                     enemy.hp = 0;
+                    enemy.displayHp = 0;
                     if (enemy.isBoss) {
                         state.inputLocked = true;
                         state.isGameClearProcessing = true;
@@ -1948,7 +2012,6 @@ function onUp(e) {
                         state.defeatedCount++;
                     }
                 } else {
-                    // HP残あり：数値を再抽選
                     enemy.reroll();
                     if (enemy.isBoss) addTime(CONFIG.timeRecovery);
                 }
@@ -1996,39 +2059,11 @@ function onUp(e) {
         refillCards();
         refillEnemies();
         updateUI();
-        enemyAttackCheck();
     } else {
         card.isDragging = false;
     }
 
     state.dragInfo = null;
-}
-
-function enemyAttackCheck() {
-    if (state.isGameClearProcessing || state.isGameOverProcessing || state.inputLocked) return;
-    let attacked = false;
-    state.enemies.forEach(enemy => {
-        if (!enemy.isBoss && enemy.fireCount > 0 && Math.random() < 1 / 3) {
-            const dmg = enemy.fireCount;
-            state.time = Math.max(0, state.time - dmg);
-            state.particles.push(new Particle(
-                enemy.x + enemy.width / 2,
-                enemy.y - 10,
-                `🔥 -${dmg}`,
-                '#ff5722', 'text', 30
-            ));
-            attacked = true;
-        }
-    });
-    if (attacked) {
-        state.shakeFrames = 10;
-        updateUI();
-        if (state.time === 0 && !state.isGameOverProcessing) {
-            state.isGameOverProcessing = true;
-            state.inputLocked = true;
-            setTimeout(() => { if (state.screen === 'PLAYING') gameOver(); }, 500);
-        }
-    }
 }
 
 canvas.addEventListener('mousedown', onDown);
@@ -2044,16 +2079,14 @@ function gameLoop() {
 
     ctx.clearRect(0, 0, state.width, state.height);
 
-    // 画面シェイク
-    const isShaking = state.shakeFrames > 0;
-    if (isShaking) {
-        const intensity = Math.ceil(state.shakeFrames / 3);
-        const sx = (Math.random() - 0.5) * intensity * 2;
-        const sy = (Math.random() - 0.5) * intensity * 2;
-        ctx.save();
-        ctx.translate(sx, sy);
-        state.shakeFrames--;
-    }
+    // HP スムーズアニメーション（displayHp → hp へ徐々に近づける）
+    state.enemies.forEach(enemy => {
+        if (enemy.displayHp > enemy.hp) {
+            const speed = Math.max(1, (enemy.displayHp - enemy.hp) * 0.07);
+            enemy.displayHp -= speed;
+            if (enemy.displayHp < enemy.hp) enemy.displayHp = enemy.hp;
+        }
+    });
 
     // 敵＋手札＋HUDを包む単一の半透明コンテナ（先に描いてHUD/カードが上に乗る）
     const firstCard = state.cards.find(c => c);
@@ -2111,8 +2144,14 @@ function gameLoop() {
         p.draw(ctx);
         if (p.life <= 0) state.particles.splice(i, 1);
     }
-    
-    if (isShaking) ctx.restore();
+
+    // 飛んでいくカードエフェクト
+    for (let i = state.flyingCards.length - 1; i >= 0; i--) {
+        const fc = state.flyingCards[i];
+        fc.update();
+        fc.draw(ctx);
+        if (fc.done) state.flyingCards.splice(i, 1);
+    }
 
     updateUI();
 
