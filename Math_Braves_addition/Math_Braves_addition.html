@@ -460,10 +460,6 @@
                 <div class="panel-title">🏆 スコア</div>
                 <div style="display:flex; flex-direction:column; gap:10px; flex:1;">
                     <div class="info-item">
-                        <div class="info-label">⚡ ぜんかい スコア</div>
-                        <div id="disp-last-score" class="info-value" style="color:#ffa726;">0</div>
-                    </div>
-                    <div class="info-item">
                         <div class="info-label">🥇 さいだい スコア</div>
                         <div id="disp-max-score" class="info-value" style="color:#ef5350;">0</div>
                     </div>
@@ -1823,11 +1819,20 @@ function scoreParticleFontSize(damage) {
 function addBattleLog(html) {
     const el = document.getElementById('battle-log-entries');
     if (!el) return;
+    // 既存エントリの強調を外す
+    Array.from(el.children).forEach(c => {
+        c.style.background = '';
+        c.style.borderRadius = '';
+        c.style.fontWeight = '';
+    });
     const div = document.createElement('div');
     div.innerHTML = html;
-    div.style.cssText = 'border-bottom:1px dotted #ddd; padding-bottom:2px; margin-bottom:2px;';
-    el.insertBefore(div, el.firstChild);
-    while (el.children.length > 15) el.removeChild(el.lastChild);
+    // 最新メッセージを目立たせる
+    div.style.cssText = 'border-top:1px dotted #ddd; padding:3px 4px; margin-top:2px; background:rgba(255,236,180,0.8); border-radius:6px; font-weight:bold;';
+    el.appendChild(div);
+    while (el.children.length > 15) el.removeChild(el.firstChild);
+    // 最下部にスクロール
+    el.scrollTop = el.scrollHeight;
 }
 function clearBattleLog() {
     const el = document.getElementById('battle-log-entries');
@@ -1847,7 +1852,7 @@ function bossDamageTime() {
 }
 function triggerBossAttack() {
     if (!state.boss || state.boss.isDefeated || state.isGameClearProcessing || state.inputLocked) return;
-    state.bossAttackEffect = 40;
+    state.bossAttackEffect = 16;
     bossDamageTime();
     addBattleLog('💥 <b style="color:#c62828">ボスのこうげき！</b> のこりじかん <b style="color:#ef5350">-1</b>');
     // ダメージ受けエフェクト（パーティクル）
@@ -2232,13 +2237,13 @@ function gameLoop() {
     // ボス攻撃フラッシュエフェクト（最前面に赤オーバーレイ）
     if (state.bossAttackEffect > 0) {
         state.bossAttackEffect--;
-        const alpha = (state.bossAttackEffect / 40) * 0.48;
+        const alpha = (state.bossAttackEffect / 16) * 0.52;
         ctx.save();
         ctx.fillStyle = `rgba(200, 0, 0, ${alpha})`;
         ctx.fillRect(0, 0, state.width, state.height);
-        // 「ボスのこうげき！」文字
-        if (state.bossAttackEffect > 20) {
-            const textAlpha = Math.min(1, (state.bossAttackEffect - 20) / 10);
+        // 「ボスのこうげき！」文字（前半8フレームのみ表示）
+        if (state.bossAttackEffect > 8) {
+            const textAlpha = (state.bossAttackEffect - 8) / 8;
             ctx.globalAlpha = textAlpha;
             ctx.font = '800 40px "M PLUS Rounded 1c"';
             ctx.fillStyle = '#fff';
