@@ -472,11 +472,16 @@
                         <div id="disp-total-score" class="info-value" style="font-size:2.2rem; color:#01579b;">0</div>
                     </div>
                 </div>
-                <div class="calc-box" style="margin-top:14px;">
+                <div class="calc-box" style="margin-top:10px;">
                     ★ダメージのけいさん<br>
                     <span style="font-size:1.1rem; display:block; margin-top:5px;">
                     <span class="emoji-red">⚔️</span> × <span class="emoji-star">⭐</span> × かず
                     </span>
+                </div>
+                <!-- バトルログ -->
+                <div style="margin-top:10px; flex:1; display:flex; flex-direction:column; min-height:0;">
+                    <div style="font-size:0.78rem; font-weight:800; color:#e65100; margin-bottom:4px;">📋 バトルログ</div>
+                    <div id="battle-log-entries" style="flex:1; overflow-y:auto; background:rgba(255,255,255,0.72); border-radius:10px; border:2px solid rgba(200,140,60,0.25); padding:6px 8px; font-size:0.75rem; line-height:1.6; color:#444;"></div>
                 </div>
             </div>
         </div>
@@ -732,7 +737,7 @@ const PRESET_NORMAL = {
     enemyCount: 10, bossHP: 900,
     initialTime: 10, timeRecovery: 4,
     gemProb: [30, 25, 20, 15, 10],
-    hpBase: 50, hpStep: 5
+    hpBase: 60, hpStep: 5
 };
 
 const PRESET_HARD = {
@@ -743,7 +748,7 @@ const PRESET_HARD = {
     enemyCount: 10, bossHP: 1800,
     initialTime: 10, timeRecovery: 4,
     gemProb: [30, 25, 20, 15, 10],
-    hpBase: 70, hpStep: 5
+    hpBase: 90, hpStep: 5
 };
 
 // NGワードリスト（ひらがな）
@@ -824,7 +829,10 @@ let state = {
     shakeFrames: 0,
     flyingCards: [],
     rankingMode: 'LOCAL',
-    playerName: "ななしさん" 
+    playerName: "ななしさん",
+    bossTurnCount: 0,
+    bossAttackEffect: 0,
+    battleLog: []
 };
 
 const canvas = document.getElementById('gameCanvas');
@@ -1695,6 +1703,10 @@ function initGame() {
     state.forbiddenValue = null;
     state.shakeFrames = 0;
     state.flyingCards = [];
+    state.bossTurnCount = 0;
+    state.bossAttackEffect = 0;
+    state.battleLog = [];
+    clearBattleLog();
 
     ui.difficultyLabel.textContent = CONFIG.label;
 
@@ -1740,7 +1752,9 @@ function refillEnemies() {
         state.boss = boss;
         state.enemies.push(boss);
         state.bossSpawned = true;
+        state.bossTurnCount = 0;
         setBattleBackground(true);
+        addBattleLog('👹 <b>ボスが あらわれた！</b>');
         updateUI();
         return;
     }
@@ -1803,6 +1817,41 @@ function addTime(amount) {
 
 function scoreParticleFontSize(damage) {
     return Math.min(66, Math.floor(26 + Math.sqrt(damage) * 1.5));
+}
+
+// ── バトルログ ──────────────────────────────
+function addBattleLog(html) {
+    const el = document.getElementById('battle-log-entries');
+    if (!el) return;
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    div.style.cssText = 'border-bottom:1px dotted #ddd; padding-bottom:2px; margin-bottom:2px;';
+    el.insertBefore(div, el.firstChild);
+    while (el.children.length > 15) el.removeChild(el.lastChild);
+}
+function clearBattleLog() {
+    const el = document.getElementById('battle-log-entries');
+    if (el) el.innerHTML = '';
+}
+
+// ── ボス攻撃 ────────────────────────────────
+function bossDamageTime() {
+    if (state.isGameClearProcessing || state.inputLocked) return;
+    state.time = Math.max(0, state.time - 1);
+    updateUI();
+    if (state.time === 0 && !state.isGameOverProcessing) {
+        state.isGameOverProcessing = true;
+        state.inputLocked = true;
+        setTimeout(() => { if (state.screen === 'PLAYING') gameOver(); }, 500);
+    }
+}
+function triggerBossAttack() {
+    if (!state.boss || state.boss.isDefeated || state.isGameClearProcessing || state.inputLocked) return;
+    state.bossAttackEffect = 40;
+    bossDamageTime();
+    addBattleLog('💥 <b style="color:#c62828">ボスのこうげき！</b> のこりじかん <b style="color:#ef5350">-1</b>');
+    // ダメージ受けエフェクト（パーティクル）
+    state.particles.push(new Particle(state.width / 2, state.height / 2, '💥', '#ef5350', 'text', 48));
 }
 
 function gameOver() {
@@ -1988,6 +2037,7 @@ function onUp(e) {
                 state.score += damage;
                 state.lastScore = damage;
                 if (damage > state.maxScore) state.maxScore = damage;
+                addBattleLog(`⚔️×${card.stackCount} × ⭐×${gemCount} × <b>${checkVal}</b> = <b style="color:#e65100">${damage} ダメージ</b>`);
 
                 const scoreFs = scoreParticleFontSize(damage);
                 state.particles.push(new Particle(enemy.x + enemy.width / 2, enemy.y, `+${damage}`, '#ffca28', 'text', scoreFs));
@@ -2049,6 +2099,14 @@ function onUp(e) {
         refillCards();
         refillEnemies();
         updateUI();
+        // ボスが生きていればターンカウント（２ターンに１回攻撃）
+        if (state.boss && !state.boss.isDefeated && !state.isGameClearProcessing) {
+            state.bossTurnCount++;
+            if (state.bossTurnCount >= 2) {
+                state.bossTurnCount = 0;
+                setTimeout(() => triggerBossAttack(), 350);
+            }
+        }
     } else {
         card.isDragging = false;
     }
@@ -2169,6 +2227,29 @@ function gameLoop() {
         fc.update();
         fc.draw(ctx);
         if (fc.done) state.flyingCards.splice(i, 1);
+    }
+
+    // ボス攻撃フラッシュエフェクト（最前面に赤オーバーレイ）
+    if (state.bossAttackEffect > 0) {
+        state.bossAttackEffect--;
+        const alpha = (state.bossAttackEffect / 40) * 0.48;
+        ctx.save();
+        ctx.fillStyle = `rgba(200, 0, 0, ${alpha})`;
+        ctx.fillRect(0, 0, state.width, state.height);
+        // 「ボスのこうげき！」文字
+        if (state.bossAttackEffect > 20) {
+            const textAlpha = Math.min(1, (state.bossAttackEffect - 20) / 10);
+            ctx.globalAlpha = textAlpha;
+            ctx.font = '800 40px "M PLUS Rounded 1c"';
+            ctx.fillStyle = '#fff';
+            ctx.strokeStyle = '#b71c1c';
+            ctx.lineWidth = 6;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.strokeText('💥 ボスのこうげき！', state.width / 2, state.height / 2);
+            ctx.fillText('💥 ボスのこうげき！', state.width / 2, state.height / 2);
+        }
+        ctx.restore();
     }
 
     updateUI();
