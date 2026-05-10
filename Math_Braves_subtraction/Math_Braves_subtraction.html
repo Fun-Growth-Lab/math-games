@@ -1333,11 +1333,24 @@ class Card {
             this.y = this.baseY;
         }
 
-        ctx.fillStyle = '#fff';
-        ctx.strokeStyle = '#bdbdbd';
-        ctx.lineWidth = 2;
-        roundRect(ctx, this.x, this.y, this.width, this.height, 15, true, true);
+        const canAttack = this.stackCount >= 2;
 
+        // カード背景（攻撃可能なら光る枠）
+        ctx.save();
+        if (canAttack) {
+            ctx.shadowColor = '#ff9800';
+            ctx.shadowBlur = 14;
+            ctx.strokeStyle = '#ff9800';
+            ctx.lineWidth = 3;
+        } else {
+            ctx.strokeStyle = '#bdbdbd';
+            ctx.lineWidth = 2;
+        }
+        ctx.fillStyle = '#fff';
+        roundRect(ctx, this.x, this.y, this.width, this.height, 15, true, true);
+        ctx.restore();
+
+        // 数値
         ctx.fillStyle = '#555';
         ctx.font = `800 ${this.width * 0.6}px "M PLUS Rounded 1c"`;
         ctx.textAlign = 'center';
@@ -1362,6 +1375,25 @@ class Card {
             ctx.fillStyle = '#555';
             ctx.textAlign = 'center';
             ctx.fillText("⚔️", this.x + this.width / 2, this.y + 10);
+        }
+
+        // 攻撃可能な赤△をカードの上に表示
+        if (canAttack) {
+            ctx.save();
+            const triX = this.x + this.width / 2;
+            const triY = this.y - 6;
+            const triS = this.width * 0.22;
+            ctx.fillStyle = '#e53935';
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(triX, triY - triS);
+            ctx.lineTo(triX + triS * 0.87, triY + triS * 0.5);
+            ctx.lineTo(triX - triS * 0.87, triY + triS * 0.5);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
         }
     }
 }
@@ -1897,24 +1929,15 @@ function gameClear() {
 
 function drawHUD(ctx) {
     ctx.textAlign = 'center';
-    const boxW = 140, boxH = 28;
-    const boxX = state.width / 2 - boxW / 2;
-    const boxY = 4;
-    ctx.fillStyle = '#fff'; ctx.strokeStyle = '#4fc3f7'; ctx.lineWidth = 3;
-    roundRect(ctx, boxX, boxY, boxW, boxH, 14, true, true);
-    ctx.fillStyle = '#039be5';
-    ctx.font = '800 18px "M PLUS Rounded 1c"';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('ひきざん', state.width / 2, boxY + boxH / 2);
 
     ctx.fillStyle = '#666';
-    ctx.font = '800 14px "M PLUS Rounded 1c"';
+    ctx.font = '800 15px "M PLUS Rounded 1c"';
     ctx.textBaseline = 'alphabetic';
-    ctx.fillText('のこり', state.width / 2, 46);
+    ctx.fillText('のこり', state.width / 2, 26);
 
     ctx.fillStyle = state.time <= 3 ? '#ef5350' : '#555';
-    ctx.font = '800 50px "M PLUS Rounded 1c"';
-    ctx.fillText(state.time, state.width / 2, 90);
+    ctx.font = '800 58px "M PLUS Rounded 1c"';
+    ctx.fillText(state.time, state.width / 2, 82);
 }
 
 function getEventPos(e) {
@@ -1987,6 +2010,11 @@ function onUp(e) {
         }
 
         if (hitJ >= 0) {
+            // 引き算ゲーム：1回以上合成しないと攻撃できない
+            if (card.stackCount < 2) {
+                state.particles.push(new Particle(cx, cy - 20, 'かさねて！', '#e53935', 'text', 26));
+                break;
+            }
             const checkVal = enemy.values[hitJ];
             if (card.value === checkVal) {
                 const gemCount = enemy.gemCounts[hitJ];
