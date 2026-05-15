@@ -1670,8 +1670,15 @@ function showResultScreen(title, titleColor, isClear, finalScore, timeBonus, max
 }
 
 function addItemToInventory(id) {
-    const existing = state.items.find(i => i.id === id);
-    if (existing) { existing.count++; } else { state.items.push({ id, count: 1 }); }
+    if (id === 10) {
+        // 数字カード: 入手時に数値を確定。同じ数値はスタック、異なる数値は別エントリ
+        const numVal = getSmartCardValue();
+        const existing = state.items.find(i => i.id === 10 && i.value === numVal);
+        if (existing) { existing.count++; } else { state.items.push({ id: 10, value: numVal, count: 1 }); }
+    } else {
+        const existing = state.items.find(i => i.id === id);
+        if (existing) { existing.count++; } else { state.items.push({ id, count: 1 }); }
+    }
     renderItemList();
 }
 
@@ -1683,7 +1690,7 @@ function renderItemList() {
         if (state.itemSelectMode === null) {
             notice.style.display = 'none';
         } else if (state.itemSelectMode === 10) {
-            notice.textContent = `👆 てふだをタップ（数字カード ${state.itemSelectValue}）`;
+            notice.textContent = `👆 てふだをタップ（${state.itemSelectValue}のカード）`;
             notice.style.display = 'block';
         } else {
             notice.textContent = '👆 つかうマスをタップしてね';
@@ -1698,8 +1705,11 @@ function renderItemList() {
     state.items.forEach(inv => {
         const item = ITEMS[inv.id];
         if (!item) return;
+        // 数字カードは value も照合して選択中判定
+        const isSelecting = state.itemSelectMode === inv.id &&
+            (inv.id !== 10 || state.itemSelectValue === inv.value);
         const row = document.createElement('div');
-        row.className = 'item-row' + (state.itemSelectMode === inv.id ? ' selecting' : '');
+        row.className = 'item-row' + (isSelecting ? ' selecting' : '');
         // icon
         const iconEl = document.createElement('div');
         iconEl.className = 'item-icon';
@@ -1712,20 +1722,21 @@ function renderItemList() {
             iconEl.textContent = '';
             iconEl.appendChild(imgEl);
         }
-        // name
+        // name: 数字カードは「Nのカード」と表示
         const nameEl = document.createElement('div');
         nameEl.className = 'item-name';
-        nameEl.textContent = item.name;
+        nameEl.textContent = inv.id === 10 ? `${inv.value}のカード` : item.name;
         // count
         const countEl = document.createElement('div');
         countEl.className = 'item-count';
         countEl.textContent = `×${inv.count}`;
-        // use button
+        // use button: 数字カードは inv.value も渡す
         const useBtn = document.createElement('button');
         useBtn.className = 'btn-item-use';
         useBtn.textContent = 'つかう';
-        useBtn.addEventListener('click', (e) => { e.stopPropagation(); onUseItemButton(inv.id); });
-        useBtn.addEventListener('touchstart', (e) => { e.stopPropagation(); e.preventDefault(); onUseItemButton(inv.id); }, { passive: false });
+        const _invVal = inv.value ?? null;
+        useBtn.addEventListener('click', (e) => { e.stopPropagation(); onUseItemButton(inv.id, _invVal); });
+        useBtn.addEventListener('touchstart', (e) => { e.stopPropagation(); e.preventDefault(); onUseItemButton(inv.id, _invVal); }, { passive: false });
         row.appendChild(iconEl);
         row.appendChild(nameEl);
         row.appendChild(countEl);
@@ -1734,19 +1745,21 @@ function renderItemList() {
     });
 }
 
-function onUseItemButton(id) {
+function onUseItemButton(id, cardValue = null) {
     if (state.screen !== 'PLAYING') return;
     const item = ITEMS[id];
     if (!item) return;
-    const inv = state.items.find(i => i.id === id);
+    // 数字カードは value を照合して該当エントリを特定
+    const inv = id === 10
+        ? state.items.find(i => i.id === 10 && i.value === cardValue)
+        : state.items.find(i => i.id === id);
     if (!inv || inv.count <= 0) return;
     if (id === 10) {
-        // 数字カード: 手札カードを選ばせて掛け算
-        const numVal = getSmartCardValue();
+        // 数字カード: 入手時確定済みの値を使って手札選択モードへ
         state.itemSelectMode = 10;
-        state.itemSelectValue = numVal;
+        state.itemSelectValue = cardValue;
         renderItemList();
-        addDungeonLog(`👆 🃏 <b style="color:#4fc3f7">数字カード(${numVal})</b> → てふだをタップ`);
+        addDungeonLog(`👆 🃏 <b style="color:#4fc3f7">${cardValue}のカード</b> → てふだをタップ`);
     } else if (item.needsTarget) {
         state.itemSelectMode = id;
         renderItemList();
@@ -2085,11 +2098,11 @@ function onDown(e) {
                     const numVal = state.itemSelectValue;
                     c.value *= numVal;
                     c.stackCount += 1;
-                    // アイテム消費
-                    const inv10 = state.items.find(it => it.id === 10);
-                    if (inv10) { inv10.count--; if (inv10.count <= 0) state.items = state.items.filter(it => it.id !== 10); }
+                    // アイテム消費（同じ value のエントリを照合）
+                    const inv10 = state.items.find(it => it.id === 10 && it.value === numVal);
+                    if (inv10) { inv10.count--; if (inv10.count <= 0) state.items = state.items.filter(it => !(it.id === 10 && it.value === numVal)); }
                     state.itemSelectMode = null; state.itemSelectValue = null;
-                    addDungeonLog(`🃏 <b style="color:#4fc3f7">数字カード(${numVal})</b>で ×${numVal} に！`);
+                    addDungeonLog(`🃏 <b style="color:#4fc3f7">${numVal}のカード</b>で ×${numVal} に！`);
                     state.particles.push(new Particle(c.x + c.width/2, c.y + c.height/2, `×${numVal}`, '#4fc3f7', 'circle'));
                     state.particles.push(new Particle(c.x + c.width/2, c.y + c.height/2 - 20, `×${numVal}`, '#4fc3f7', 'text'));
                     renderItemList(); updateUI();
