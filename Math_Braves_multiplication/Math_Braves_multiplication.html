@@ -794,6 +794,7 @@ let state = {
     keysNeeded: 1,
     items: [],
     itemSelectMode: null,
+    itemSelectValue: null,
     doorRevealed: false,
 
     grid: [],
@@ -1563,7 +1564,7 @@ function backToTitle() {
 
 function initGame() {
     state.score = 0; state.time = CONFIG.initTime; state.maxSingleScore = 0;
-    state.floor = 1; state.items = []; state.itemSelectMode = null; state.cards = [null,null,null,null,null];
+    state.floor = 1; state.items = []; state.itemSelectMode = null; state.itemSelectValue = null; state.cards = [null,null,null,null,null];
     state.particles = []; state.isGameOverProcessing = false; state.inputLocked = false;
     state.damageEffectTimer = 0; state.panelsDestroyed = 0;
     state.dungeonLog = []; state.combo = 0; state.maxCombo = 0;
@@ -1678,7 +1679,17 @@ function renderItemList() {
     const container = document.getElementById('item-list');
     const notice = document.getElementById('item-select-notice');
     if (!container) return;
-    if (notice) notice.style.display = state.itemSelectMode !== null ? 'block' : 'none';
+    if (notice) {
+        if (state.itemSelectMode === null) {
+            notice.style.display = 'none';
+        } else if (state.itemSelectMode === 10) {
+            notice.textContent = `👆 てふだをタップ（数字カード ${state.itemSelectValue}）`;
+            notice.style.display = 'block';
+        } else {
+            notice.textContent = '👆 つかうマスをタップしてね';
+            notice.style.display = 'block';
+        }
+    }
     if (state.items.length === 0) {
         container.innerHTML = '<div style="color:var(--text-muted); font-size:0.8rem; text-align:center; padding:10px;">アイテムなし</div>';
         return;
@@ -1729,7 +1740,14 @@ function onUseItemButton(id) {
     if (!item) return;
     const inv = state.items.find(i => i.id === id);
     if (!inv || inv.count <= 0) return;
-    if (item.needsTarget) {
+    if (id === 10) {
+        // 数字カード: 手札カードを選ばせて掛け算
+        const numVal = getSmartCardValue();
+        state.itemSelectMode = 10;
+        state.itemSelectValue = numVal;
+        renderItemList();
+        addDungeonLog(`👆 🃏 <b style="color:#4fc3f7">数字カード(${numVal})</b> → てふだをタップ`);
+    } else if (item.needsTarget) {
         state.itemSelectMode = id;
         renderItemList();
         addDungeonLog(`👆 ${item.emoji} <b style="color:#ffd54f">${item.name}</b> → つかうマスをタップ`);
@@ -2057,6 +2075,37 @@ function onDown(e) {
     // アイテム対象選択モード
     if (state.itemSelectMode !== null) {
         const pos = getEventPos(e);
+
+        // 数字カード(10): 手札カードをタップして掛け算
+        if (state.itemSelectMode === 10) {
+            let hit = false;
+            for (let i = 0; i < 5; i++) {
+                const c = state.cards[i];
+                if (c && pos.x >= c.x && pos.x <= c.x + c.width && pos.y >= c.y && pos.y <= c.y + c.height) {
+                    const numVal = state.itemSelectValue;
+                    c.value *= numVal;
+                    c.stackCount += 1;
+                    // アイテム消費
+                    const inv10 = state.items.find(it => it.id === 10);
+                    if (inv10) { inv10.count--; if (inv10.count <= 0) state.items = state.items.filter(it => it.id !== 10); }
+                    state.itemSelectMode = null; state.itemSelectValue = null;
+                    addDungeonLog(`🃏 <b style="color:#4fc3f7">数字カード(${numVal})</b>で ×${numVal} に！`);
+                    state.particles.push(new Particle(c.x + c.width/2, c.y + c.height/2, `×${numVal}`, '#4fc3f7', 'circle'));
+                    state.particles.push(new Particle(c.x + c.width/2, c.y + c.height/2 - 20, `×${numVal}`, '#4fc3f7', 'text'));
+                    renderItemList(); updateUI();
+                    hit = true; break;
+                }
+            }
+            if (!hit) {
+                // 手札以外をタップ → キャンセル
+                state.itemSelectMode = null; state.itemSelectValue = null;
+                addDungeonLog(`❌ アイテム使用をキャンセル`);
+                renderItemList();
+            }
+            return;
+        }
+
+        // その他対象指定アイテム: パネルをタップ
         const cellW2 = state.boardW / GRID_COLS;
         const cellH2 = cellW2 * 0.95;
         const startX2 = state.boardX;
