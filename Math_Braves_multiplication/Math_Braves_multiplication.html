@@ -1605,7 +1605,7 @@ function checkPraise(gain, x, y) {
     if (msg) state.particles.push(new Particle(x, y - 50, msg, '#ffd54f', 'text'));
 }
 
-function showResultScreen(title, titleColor, isClear, finalScore, timeBonus, maxScoreBonus, isNewRecord, comboBonus = 0) {
+function showResultScreen(title, titleColor, isClear, finalScore, timeBonus, maxScoreBonus, isNewRecord) {
     ui.result.innerHTML = `
         <div style="background:#1a1830; padding:28px; border-radius:20px; color:var(--text-light); text-align:center; border:3px solid ${titleColor}; box-shadow: 0 10px 40px rgba(0,0,0,0.7);">
             <h2 style="font-size:2.3rem; color:${titleColor}; margin:0 0 18px 0; border:none; text-shadow: 0 0 15px ${titleColor};">${title}</h2>
@@ -1613,7 +1613,6 @@ function showResultScreen(title, titleColor, isClear, finalScore, timeBonus, max
                 <div>バトルスコア：<span style="float:right; color:var(--text-light); font-weight:bold;">${state.score}点</span></div>
                 <div>タイムボーナス：<span style="float:right; color:#66bb6a; font-weight:bold;">${timeBonus}点</span></div>
                 <div>MAXスコアボーナス：<span style="float:right; color:#ffd54f; font-weight:bold;">${maxScoreBonus}点</span></div>
-                ${isClear ? `<div>コンボボーナス：<span style="float:right; color:#4fc3f7; font-weight:bold;">${comboBonus}点</span></div>` : ''}
                 <hr style="border:1px solid rgba(255,255,255,0.1); margin:12px 0;">
                 <div style="font-size:1.5rem;">最終スコア：<span style="float:right; color:#ffd54f; font-weight:bold;">${finalScore}点</span></div>
                 <div style="text-align:center; margin-top:10px; color:${isNewRecord?'#ffd54f':'var(--text-muted)'}; font-weight:bold;">${isNewRecord ? '🏆 自己ベストこうしん！' : ''}</div>
@@ -1645,11 +1644,10 @@ function gameClear() {
     state.screen = 'CLEAR'; ui.btnToTitle.classList.add('hidden');
     const timeBonus = state.time * 100;
     const maxScoreBonus = state.maxSingleScore * 10;
-    const comboBonus = state.maxCombo * 50;
-    const finalScore = state.score + timeBonus + maxScoreBonus + comboBonus;
+    const finalScore = state.score + timeBonus + maxScoreBonus;
     const isNewRecord = saveScore(state.difficulty, finalScore);
     incrementClearCount(state.difficulty);
-    showResultScreen("ゲームクリア！", "#ffd54f", true, finalScore, timeBonus, maxScoreBonus, isNewRecord, comboBonus);
+    showResultScreen("ゲームクリア！", "#ffd54f", true, finalScore, timeBonus, maxScoreBonus, isNewRecord);
 }
 
 function getGridPos(row, col) {
@@ -1866,15 +1864,6 @@ function onUp(e) {
                         let rec = 1 + scoreBonus;
                         state.time += rec;
 
-                        // コンボ処理
-                        state.combo++;
-                        if (state.combo > state.maxCombo) state.maxCombo = state.combo;
-                        if (state.combo >= 3) {
-                            const extra = Math.min(state.combo - 2, 3);
-                            state.time += extra;
-                            addDungeonLog(`🔥 <b style="color:#ffd54f">${state.combo}コンボ！</b> <span style="color:#66bb6a">Time+${extra}</span>`);
-                        }
-
                         addDungeonLog(`⚔️ <b style="color:#ffd54f">${cell.value}</b> のパネルをかいほう！ <span style="color:#ffd54f">+${gain}</span>`);
 
                         setTimeout(() => state.particles.push(new Particle(cx, cy, `+${gain}`, '#ffd54f', 'text')), 0);
@@ -1883,10 +1872,8 @@ function onUp(e) {
                         cell.isEnemy = false; revealUnknown(row, col);
                         if (cell.item && cell.item !== 'DOOR') setTimeout(() => collectItem(cell), 900);
                         state.cards[idx] = null; actionDone = true;
-                    } else {
-                        state.combo = 0;
-                        state.particles.push(new Particle(cx, cy, "ミス！", '#90a4ae', 'text'));
                     }
+                    // ※不正解の場合はカードが戻るだけ（メッセージなし）
                 }
                 else if (cell.item === 'CREATURE' || cell.item === 'BOSS') {
                     if (card.value === cell.creatureValue) {
@@ -1908,10 +1895,8 @@ function onUp(e) {
                         }
 
                         state.cards[idx] = null; actionDone = true;
-                    } else {
-                        state.combo = 0;
-                        state.particles.push(new Particle(cx, cy, "ミス！", '#95a5a6', 'text'));
                     }
+                    // ※不正解の場合はカードが戻るだけ（メッセージなし）
                 }
             }
         }
