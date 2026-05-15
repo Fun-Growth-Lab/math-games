@@ -183,6 +183,31 @@
         }
         .btn-skill:disabled { background: #1a1a2e; cursor: not-allowed; box-shadow: none; transform: none; filter: none; border-color: #333; color: #555; }
 
+        /* アイテムリスト */
+        .item-row {
+            display: flex; align-items: center; gap: 5px;
+            padding: 5px 3px; border-bottom: 1px solid rgba(255,255,255,0.07);
+            cursor: pointer; border-radius: 6px; transition: background 0.1s;
+        }
+        .item-row:hover { background: rgba(255,255,255,0.06); }
+        .item-row.selecting { background: rgba(255,213,79,0.18); outline: 1px solid var(--accent-gold); }
+        .item-icon { font-size: 1.15rem; flex-shrink: 0; width: 24px; text-align: center; }
+        .item-name { flex: 1; font-size: 0.76rem; color: var(--text-light); line-height: 1.2; }
+        .item-count { font-size: 0.9rem; color: var(--accent-gold); font-weight: bold; min-width: 26px; text-align: right; }
+        .btn-item-use {
+            width: 44px; height: 26px; font-size: 0.72rem; margin: 0;
+            border-radius: 6px; padding: 0; cursor: pointer; font-family: "M PLUS Rounded 1c", sans-serif;
+            font-weight: bold; background: linear-gradient(to bottom, #5a3a10, #3a2008);
+            border: 1px solid var(--accent-orange); color: #ffe0b2;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .btn-item-use:active { filter: brightness(130%); }
+        #item-select-notice {
+            font-size: 0.78rem; color: var(--accent-gold); text-align: center;
+            padding: 6px 4px; background: rgba(255,213,79,0.1); border-radius: 6px;
+            border: 1px solid rgba(255,213,79,0.3); margin-bottom: 6px; display: none;
+        }
+
         .btn-auth { background: linear-gradient(to bottom, #7a2020, #4a1010); border-color: var(--accent-red); color: #ffcdd2; font-size: 0.95rem; width: 240px; height: 52px; margin: 5px auto; }
 
         .btn-toggle {
@@ -383,17 +408,12 @@
                     <div class="info-label">カギ 🗝️</div>
                     <div id="disp-key" class="info-value" style="color:var(--accent-orange);">0/1</div>
                 </div>
-                <div class="info-item">
-                    <div class="info-label">ジェム 💎</div>
-                    <div id="disp-gems" class="info-value" style="font-size:1.5rem; color:var(--accent-purple);">0</div>
-                </div>
             </div>
 
-            <div class="info-box">
-                <h2>✨ スキル (💎1消費)</h2>
-                <button id="btn-skill-door" class="btn btn-skill">① ドアのいち</button>
-                <button id="btn-skill-key" class="btn btn-skill">② カギのいち</button>
-                <button id="btn-skill-change" class="btn btn-skill">③ ばんめんチェンジ</button>
+            <div class="info-box" style="flex:1; display:flex; flex-direction:column; min-height:0; margin-bottom:0;">
+                <h2>🎒 アイテム</h2>
+                <div id="item-select-notice">👆 つかうマスをタップしてね</div>
+                <div id="item-list" style="overflow-y:auto; flex:1; -webkit-overflow-scrolling:touch;"></div>
             </div>
         </div>
 
@@ -557,20 +577,16 @@
                 <p>・重ねるとのこりAPが1減るよ。大きな数を作ろう！</p>
             </div>
             <div class="howto-section">
-                <div class="howto-title">🔥 コンボ</div>
-                <p>・パネルを連続で撃破すると<b>コンボ</b>がたまる！</p>
-                <p>・コンボ3以上でTime+ボーナス！ミスするとリセット。</p>
-            </div>
-            <div class="howto-section">
                 <div class="howto-title">🗝️ カギとドア</div>
                 <p>・カギを集めてドアを開けると次のフロアへ！</p>
                 <p>・最終フロアにはボス👾がいる。倒すとゲームクリア！</p>
             </div>
             <div class="howto-section">
-                <div class="howto-title">✨ スキル (💎1消費)</div>
-                <p>・① ドアのいち：ドアの位置をこっそり教えてくれる</p>
-                <p>・② カギのいち：カギの位置をこっそり教えてくれる</p>
-                <p>・③ ばんめんチェンジ：パネルの数字をシャッフル！</p>
+                <div class="howto-title">🎒 アイテム</div>
+                <p>・パネルを開けると低確率で<b>アイテム🎒</b>が手に入る！</p>
+                <p>・アイテムは左パネルの一覧から「つかう」ボタンで使用</p>
+                <p>・爆弾・剣など対象マスが必要なアイテムはタップで指定</p>
+                <p>・アイテムを使うときは時間（AP）は消費しない</p>
             </div>
             <div class="howto-section" style="border-bottom:none; margin-bottom:0; padding-bottom:0;">
                 <div class="howto-title">🗑️ カードすてば</div>
@@ -706,6 +722,26 @@ const NG_WORDS_HIRAGANA = [
 const CROWN_THRESHOLDS = { BRONZE: 5000, SILVER: 7500, GOLD: 10000 };
 const CREATURE_ICONS = ["👾", "🦇", "🕷", "🐍", "🦂"];
 
+const ITEMS = {
+    1:  { name: 'カギ探知の巻物',  emoji: '🔑', img: 'item_1.png',  needsTarget: false },
+    2:  { name: 'ドア探知の巻物',  emoji: '🚪', img: 'item_2.png',  needsTarget: false },
+    3:  { name: '透視の巻物',      emoji: '🔍', img: 'item_3.png',  needsTarget: false },
+    4:  { name: '地形変換の杖',    emoji: '🔄', img: 'item_4.png',  needsTarget: false },
+    5:  { name: '大地形変換の杖',  emoji: '💫', img: 'item_5.png',  needsTarget: false },
+    6:  { name: '手札召喚の杖',    emoji: '✨', img: 'item_6.png',  needsTarget: false },
+    7:  { name: '小爆弾',          emoji: '💣', img: 'item_7.png',  needsTarget: true  },
+    8:  { name: '十字爆弾',        emoji: '💥', img: 'item_8.png',  needsTarget: true  },
+    9:  { name: '２分の１の剣',    emoji: '⚔️', img: 'item_9.png',  needsTarget: true  },
+    10: { name: '数字カード',       emoji: '🃏', img: 'item_10.png', needsTarget: false },
+};
+// アイテム画像プリロード
+const ITEM_IMAGES = {};
+for (let _ii = 1; _ii <= 10; _ii++) {
+    const _img = new Image();
+    _img.src = `items/item_${_ii}.png`;
+    ITEM_IMAGES[_ii] = _img;
+}
+
 // カード重みは √値 の逆数基準（小さい数ほど引きやすい）
 // パネル重みも同様（大きい数ほど出にくい）
 const PRESET_EASY = {
@@ -714,7 +750,7 @@ const PRESET_EASY = {
     enemyTable: { 2:50, 3:41, 4:35, 6:28, 8:25, 9:23, 12:20, 16:17 }, // パネル: 2,3,4,6,8,9,12,16
     initTime: 20,
     thresholds: CROWN_THRESHOLDS,
-    dropRates: { time: 30, score: 40, gem: 15, creature: 15 },
+    dropRates: { time: 30, score: 45, item: 10, creature: 15 },
     bossHpList: [80, 100, 120, 150, 160, 180]
 };
 const PRESET_NORMAL = {
@@ -724,7 +760,7 @@ const PRESET_NORMAL = {
                   12:20, 15:18, 16:17, 18:16, 20:15, 24:14, 25:14 }, // パネル: 2,3,4,5,6,8,9,10,12,15,16,18,20,24,25
     initTime: 20,
     thresholds: CROWN_THRESHOLDS,
-    dropRates: { time: 28, score: 32, gem: 15, creature: 25 },
+    dropRates: { time: 28, score: 37, item: 10, creature: 25 },
     bossHpList: [200, 220, 250, 280, 320, 360, 400]
 };
 const PRESET_HARD = {
@@ -738,7 +774,7 @@ const PRESET_HARD = {
     },
     initTime: 20,
     thresholds: CROWN_THRESHOLDS,
-    dropRates: { time: 25, score: 28, gem: 15, creature: 32 },
+    dropRates: { time: 25, score: 33, item: 10, creature: 32 },
     bossHpList: [300, 340, 380, 420, 460, 500, 550, 600]
 };
 
@@ -756,7 +792,8 @@ let state = {
     floor: 1,
     keysFound: 0,
     keysNeeded: 1,
-    gems: 0,
+    items: [],
+    itemSelectMode: null,
     doorRevealed: false,
 
     grid: [],
@@ -804,7 +841,6 @@ const ui = {
     time: document.getElementById('disp-time'),
     floor: document.getElementById('disp-floor'),
     key: document.getElementById('disp-key'),
-    gems: document.getElementById('disp-gems'),
     totalScore: document.getElementById('disp-total-score'),
     maxScore: document.getElementById('disp-max-score'),
     titleWrapper: document.getElementById('title-wrapper'),
@@ -834,9 +870,6 @@ const ui = {
     btnNo: document.getElementById('btn-no'),
     btnRankLocal: document.getElementById('btn-rank-local'),
     btnRankWorld: document.getElementById('btn-rank-world'),
-    btnSkillDoor: document.getElementById('btn-skill-door'),
-    btnSkillKey: document.getElementById('btn-skill-key'),
-    btnSkillChange: document.getElementById('btn-skill-change'),
     crowns: { EASY: document.getElementById('crown-easy'), NORMAL: document.getElementById('crown-normal'), HARD: document.getElementById('crown-hard') },
     clears: { EASY: document.getElementById('clear-easy'), NORMAL: document.getElementById('clear-normal'), HARD: document.getElementById('clear-hard') },
     playerScreen: document.getElementById('player-manager-overlay'),
@@ -1356,7 +1389,7 @@ function initFloor() {
         cells.push({
             id: i, row: Math.floor(i / GRID_COLS), col: i % GRID_COLS,
             value: generateEnemyValue(), gemCount: gems,
-            isEnemy: true, isUnknown: true, item: null, isVisible: false, isKeyRevealed: false, isKeyCollected: false
+            isEnemy: true, isUnknown: true, item: null, isVisible: false, isKeyRevealed: false, isKeyCollected: false, peekRevealed: false
         });
     }
 
@@ -1412,8 +1445,8 @@ function initFloor() {
         cumulative += rates.score;
         if (rnd < cumulative) { cells[idx].item = 'ITEM_SCORE'; continue; }
 
-        cumulative += rates.gem;
-        if (rnd < cumulative) { cells[idx].item = 'ITEM_GEM'; continue; }
+        cumulative += rates.item;
+        if (rnd < cumulative) { cells[idx].item = 'ITEM_BAG'; continue; }
 
         cumulative += rates.creature;
         if (rnd < cumulative) {
@@ -1467,7 +1500,7 @@ function collectItem(cell) {
         cell.isKeyCollected = true;
     }
 
-    let scoreGain = 0; let timeGain = 0; let gemGain = 0;
+    let scoreGain = 0; let timeGain = 0;
     let symbol = ""; let color = "";
 
     if (cell.item === 'KEY') {
@@ -1490,13 +1523,15 @@ function collectItem(cell) {
         symbol = "🎁"; color = '#ffca28';
         addDungeonLog(`🎁 スコアボーナス！ <span style="color:#ffd54f">+${scoreGain}</span>`);
     }
-    else if (cell.item === 'ITEM_GEM') {
-        gemGain = 1;
-        symbol = "💎"; color = '#ba68c8';
-        addDungeonLog(`💎 ジェムゲット！ <span style="color:#ba68c8">+1</span>`);
+    else if (cell.item === 'ITEM_BAG') {
+        const itemId = Math.floor(Math.random() * 10) + 1;
+        const item = ITEMS[itemId];
+        symbol = item.emoji; color = '#ba68c8';
+        addItemToInventory(itemId);
+        addDungeonLog(`🎒 アイテムをゲット！ <b style="color:#ba68c8">${item.emoji} ${item.name}</b>`);
     }
 
-    state.score += scoreGain; state.time += timeGain; state.gems += gemGain;
+    state.score += scoreGain; state.time += timeGain;
 
     const pos = getGridPos(cell.row, cell.col);
     const cx = pos.x + pos.w/2; const cy = pos.y + pos.h/2;
@@ -1504,7 +1539,7 @@ function collectItem(cell) {
     setTimeout(() => state.particles.push(new Particle(cx, cy, symbol, color, 'text')), delay); delay += 300;
     if (timeGain > 0) { setTimeout(() => state.particles.push(new Particle(cx, cy, `+${timeGain}`, color, 'text')), delay); delay += 300; }
     if (scoreGain > 0) { setTimeout(() => state.particles.push(new Particle(cx, cy, `+${scoreGain}`, color, 'text')), delay); delay += 300; }
-    if (cell.item === 'KEY' || cell.item === 'ITEM_GEM') { setTimeout(() => state.particles.push(new Particle(cx, cy, "GET!", color, 'text')), delay); }
+    if (cell.item === 'KEY') { setTimeout(() => state.particles.push(new Particle(cx, cy, "GET!", color, 'text')), delay); }
 
     if (cell.item !== 'KEY') {
         cell.item = null;
@@ -1528,11 +1563,12 @@ function backToTitle() {
 
 function initGame() {
     state.score = 0; state.time = CONFIG.initTime; state.maxSingleScore = 0;
-    state.floor = 1; state.gems = 0; state.cards = [null,null,null,null,null];
+    state.floor = 1; state.items = []; state.itemSelectMode = null; state.cards = [null,null,null,null,null];
     state.particles = []; state.isGameOverProcessing = false; state.inputLocked = false;
     state.damageEffectTimer = 0; state.panelsDestroyed = 0;
     state.dungeonLog = []; state.combo = 0; state.maxCombo = 0;
     renderDungeonLog();
+    renderItemList();
     ui.difficultyLabel.textContent = CONFIG.label;
     resize();
     refillCards(true);
@@ -1558,9 +1594,6 @@ function updateUI() {
     ui.key.textContent = `${state.keysFound}/${state.keysNeeded}`;
     ui.totalScore.textContent = state.score;
     ui.maxScore.textContent = state.maxSingleScore;
-    ui.gems.textContent = state.gems;
-    const hasGem = state.gems > 0;
-    ui.btnSkillDoor.disabled = !hasGem; ui.btnSkillKey.disabled = !hasGem; ui.btnSkillChange.disabled = !hasGem;
 }
 
 function consumeTime() {
@@ -1633,6 +1666,221 @@ function showResultScreen(title, titleColor, isClear, finalScore, timeBonus, max
         const handleRetry = (e) => { if(e) e.preventDefault(); location.reload(); };
         okBtn.addEventListener('click', handleRetry); okBtn.addEventListener('touchstart', handleRetry, {passive:false});
     }
+}
+
+function addItemToInventory(id) {
+    const existing = state.items.find(i => i.id === id);
+    if (existing) { existing.count++; } else { state.items.push({ id, count: 1 }); }
+    renderItemList();
+}
+
+function renderItemList() {
+    const container = document.getElementById('item-list');
+    const notice = document.getElementById('item-select-notice');
+    if (!container) return;
+    if (notice) notice.style.display = state.itemSelectMode !== null ? 'block' : 'none';
+    if (state.items.length === 0) {
+        container.innerHTML = '<div style="color:var(--text-muted); font-size:0.8rem; text-align:center; padding:10px;">アイテムなし</div>';
+        return;
+    }
+    container.innerHTML = '';
+    state.items.forEach(inv => {
+        const item = ITEMS[inv.id];
+        if (!item) return;
+        const row = document.createElement('div');
+        row.className = 'item-row' + (state.itemSelectMode === inv.id ? ' selecting' : '');
+        // icon
+        const iconEl = document.createElement('div');
+        iconEl.className = 'item-icon';
+        iconEl.textContent = item.emoji;
+        const preloaded = ITEM_IMAGES[inv.id];
+        if (preloaded && preloaded.complete && preloaded.naturalWidth > 0) {
+            const imgEl = document.createElement('img');
+            imgEl.src = preloaded.src;
+            imgEl.style.cssText = 'width:22px;height:22px;object-fit:contain;vertical-align:middle;';
+            iconEl.textContent = '';
+            iconEl.appendChild(imgEl);
+        }
+        // name
+        const nameEl = document.createElement('div');
+        nameEl.className = 'item-name';
+        nameEl.textContent = item.name;
+        // count
+        const countEl = document.createElement('div');
+        countEl.className = 'item-count';
+        countEl.textContent = `×${inv.count}`;
+        // use button
+        const useBtn = document.createElement('button');
+        useBtn.className = 'btn-item-use';
+        useBtn.textContent = 'つかう';
+        useBtn.addEventListener('click', (e) => { e.stopPropagation(); onUseItemButton(inv.id); });
+        useBtn.addEventListener('touchstart', (e) => { e.stopPropagation(); e.preventDefault(); onUseItemButton(inv.id); }, { passive: false });
+        row.appendChild(iconEl);
+        row.appendChild(nameEl);
+        row.appendChild(countEl);
+        row.appendChild(useBtn);
+        container.appendChild(row);
+    });
+}
+
+function onUseItemButton(id) {
+    if (state.screen !== 'PLAYING') return;
+    const item = ITEMS[id];
+    if (!item) return;
+    const inv = state.items.find(i => i.id === id);
+    if (!inv || inv.count <= 0) return;
+    if (item.needsTarget) {
+        state.itemSelectMode = id;
+        renderItemList();
+        addDungeonLog(`👆 ${item.emoji} <b style="color:#ffd54f">${item.name}</b> → つかうマスをタップ`);
+    } else {
+        executeItem(id, null);
+    }
+}
+
+function executeItem(id, targetCell) {
+    const inv = state.items.find(i => i.id === id);
+    if (!inv || inv.count <= 0) return false;
+    let consumed = true;
+    switch(id) {
+        case 1: {
+            let cands = state.grid.filter(c => c.item === 'KEY' && !c.isKeyRevealed);
+            if (cands.length > 0) {
+                cands[Math.floor(Math.random() * cands.length)].isKeyRevealed = true;
+                addDungeonLog(`🔑 カギのいちをかんち！`);
+                state.particles.push(new Particle(state.width/2, state.height/2, "カギかんち！", '#ffa726', 'text'));
+            } else {
+                addDungeonLog(`🔑 カギはもうないようだ`);
+                state.particles.push(new Particle(state.width/2, state.height/2, "カギはない", '#9990b0', 'text'));
+            }
+        } break;
+        case 2: {
+            state.doorRevealed = true;
+            addDungeonLog(`🚪 ドアのいちをかんち！`);
+            state.particles.push(new Particle(state.width/2, state.height/2, "ドアかんち！", '#ba68c8', 'text'));
+        } break;
+        case 3: {
+            let hidden = state.grid.filter(c => !c.isVisible && c.isEnemy);
+            for (let i = hidden.length - 1; i > 0; i--) { const j = Math.floor(Math.random()*(i+1)); [hidden[i],hidden[j]]=[hidden[j],hidden[i]]; }
+            hidden.slice(0, 3).forEach(c => { c.peekRevealed = true; });
+            addDungeonLog(`🔍 ３マスの数値をとうし！`);
+            state.particles.push(new Particle(state.width/2, state.height/2, "透視！", '#4fc3f7', 'text'));
+        } break;
+        case 4: {
+            let ens = state.grid.filter(c => c.isEnemy);
+            for (let i = ens.length - 1; i > 0; i--) { const j = Math.floor(Math.random()*(i+1)); [ens[i],ens[j]]=[ens[j],ens[i]]; }
+            ens.slice(0, Math.ceil(ens.length/2)).forEach(c => {
+                c.value = generateEnemyValue();
+                const r2 = Math.random();
+                c.gemCount = r2>0.95?5:r2>0.85?4:r2>0.70?3:r2>0.40?2:1;
+                c.peekRevealed = false;
+            });
+            addDungeonLog(`🔄 地形が変わった！（半分）`);
+            state.particles.push(new Particle(state.width/2, state.height/2, "地形変換！", '#ba68c8', 'text'));
+        } break;
+        case 5: {
+            state.grid.filter(c => c.isEnemy).forEach(c => {
+                c.value = generateEnemyValue();
+                const r2 = Math.random();
+                c.gemCount = r2>0.95?5:r2>0.85?4:r2>0.70?3:r2>0.40?2:1;
+                c.peekRevealed = false;
+            });
+            addDungeonLog(`💫 すべての地形が変わった！`);
+            state.particles.push(new Particle(state.width/2, state.height/2, "大地形変換！", '#ba68c8', 'text'));
+        } break;
+        case 6: {
+            for (let i = 0; i < 5; i++) state.cards[i] = null;
+            refillCards(true);
+            addDungeonLog(`✨ 手札を引き直した！`);
+            state.particles.push(new Particle(state.width/2, state.height/2, "手札召喚！", '#ba68c8', 'text'));
+        } break;
+        case 7: {
+            if (!targetCell) { consumed = false; break; }
+            const pos7 = getGridPos(targetCell.row, targetCell.col);
+            const cx7 = pos7.x + pos7.w/2, cy7 = pos7.y + pos7.h/2;
+            if (!targetCell.isVisible) {
+                targetCell.isVisible = true; targetCell.isUnknown = false;
+                state.particles.push(new Particle(cx7, cy7, "💥", '#ffa726', 'text'));
+                revealUnknown(targetCell.row, targetCell.col);
+                if (!targetCell.isEnemy && targetCell.item && targetCell.item !== 'DOOR') setTimeout(() => collectItem(targetCell), 300);
+            } else if (targetCell.isEnemy) {
+                targetCell.isEnemy = false;
+                state.particles.push(new Particle(cx7, cy7, "💥", '#ffa726', 'text'));
+                revealUnknown(targetCell.row, targetCell.col);
+                if (targetCell.item && targetCell.item !== 'DOOR') setTimeout(() => collectItem(targetCell), 300);
+            } else { consumed = false; }
+            if (consumed) addDungeonLog(`💣 小爆弾をつかった！`);
+        } break;
+        case 8: {
+            if (!targetCell) { consumed = false; break; }
+            const dirs8 = [[0,0],[-1,0],[1,0],[0,-1],[0,1]];
+            dirs8.forEach(([dr,dc]) => {
+                const nr = targetCell.row+dr, nc = targetCell.col+dc;
+                if (nr<0||nr>=GRID_ROWS||nc<0||nc>=GRID_COLS) return;
+                const c8 = state.grid[nr*GRID_COLS+nc];
+                if (!c8) return;
+                const p8 = getGridPos(c8.row, c8.col);
+                state.particles.push(new Particle(p8.x+p8.w/2, p8.y+p8.h/2, "💥", '#ffa726', 'text'));
+                if (!c8.isVisible) {
+                    c8.isVisible = true; c8.isUnknown = false;
+                    if (!c8.isEnemy && c8.item && c8.item !== 'DOOR') setTimeout(() => collectItem(c8), 300);
+                } else if (c8.isEnemy) {
+                    c8.isEnemy = false;
+                    if (c8.item && c8.item !== 'DOOR') setTimeout(() => collectItem(c8), 300);
+                }
+            });
+            dirs8.forEach(([dr,dc]) => {
+                const nr = targetCell.row+dr, nc = targetCell.col+dc;
+                if (nr>=0&&nr<GRID_ROWS&&nc>=0&&nc<GRID_COLS) revealUnknown(nr, nc);
+            });
+            addDungeonLog(`💥 十字爆弾をつかった！`);
+        } break;
+        case 9: {
+            if (!targetCell) { consumed = false; break; }
+            if (targetCell.item === 'BOSS') {
+                addDungeonLog(`⚔️ ボスにはきかない`);
+                state.particles.push(new Particle(state.width/2, state.height/2, "ボスにはきかない", '#9990b0', 'text'));
+                consumed = false; break;
+            }
+            const pos9 = getGridPos(targetCell.row, targetCell.col);
+            const cx9 = pos9.x+pos9.w/2, cy9 = pos9.y+pos9.h/2;
+            const isEnemy9 = targetCell.isEnemy || targetCell.item === 'CREATURE';
+            if (!isEnemy9) { consumed = false; addDungeonLog(`⚔️ そのパネルにはつかえない`); break; }
+            if (Math.random() < 0.5) {
+                if (targetCell.isEnemy) {
+                    targetCell.isEnemy = false;
+                    revealUnknown(targetCell.row, targetCell.col);
+                    if (targetCell.item && targetCell.item !== 'DOOR') setTimeout(() => collectItem(targetCell), 300);
+                } else { targetCell.item = null; }
+                state.score += 100;
+                state.particles.push(new Particle(cx9, cy9, "撃破！", '#ef5350', 'text'));
+                addDungeonLog(`⚔️ ２分の１の剣がきまった！ <span style="color:#ffd54f">+100</span>`);
+            } else {
+                state.particles.push(new Particle(cx9, cy9, "はずれ...", '#9990b0', 'text'));
+                addDungeonLog(`⚔️ ２分の１の剣がはずれた...`);
+            }
+        } break;
+        case 10: {
+            const emptySlot = state.cards.findIndex(c => c === null);
+            if (emptySlot >= 0) {
+                state.cards[emptySlot] = new Card(emptySlot);
+                addDungeonLog(`🃏 数字カードを手札にくわえた！`);
+                state.particles.push(new Particle(state.width/2, state.height/2, "カード召喚！", '#4fc3f7', 'text'));
+            } else {
+                addDungeonLog(`🃏 手札がいっぱいです`);
+                state.particles.push(new Particle(state.width/2, state.height/2, "手札がいっぱい", '#9990b0', 'text'));
+                consumed = false;
+            }
+        } break;
+        default: consumed = false;
+    }
+    if (consumed) {
+        inv.count--;
+        if (inv.count <= 0) state.items = state.items.filter(i => i.id !== id);
+        renderItemList();
+        updateUI();
+    }
+    return consumed;
 }
 
 function gameOver() {
@@ -1732,6 +1980,14 @@ function drawGrid(ctx) {
             if (cell.isKeyRevealed && cell.item === 'KEY') {
                 ctx.globalAlpha = 0.7; ctx.font = `${w*0.5}px "M PLUS Rounded 1c"`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText("🗝️", cx, cy); ctx.globalAlpha = 1.0;
             }
+            if (cell.peekRevealed && cell.isEnemy) {
+                ctx.globalAlpha = 0.65;
+                ctx.fillStyle = '#4fc3f7';
+                ctx.font = `bold ${w*0.38}px "M PLUS Rounded 1c"`;
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(cell.value, cx, cy);
+                ctx.globalAlpha = 1.0;
+            }
             return;
         }
         if (cell.isEnemy) {
@@ -1768,7 +2024,7 @@ function drawGrid(ctx) {
             else if (cell.item === 'DOOR') ctx.fillText("🚪", cx, cy);
             else if (cell.item === 'ITEM_TIME') ctx.fillText("⏰", cx, cy);
             else if (cell.item === 'ITEM_SCORE') ctx.fillText("🎁", cx, cy);
-            else if (cell.item === 'ITEM_GEM') ctx.fillText("💎", cx, cy);
+            else if (cell.item === 'ITEM_BAG') ctx.fillText("🎒", cx, cy);
             else if (cell.item === 'CREATURE' || cell.item === 'BOSS') {
                ctx.font = `${w*0.6}px "M PLUS Rounded 1c"`; ctx.fillText(cell.creatureIcon, x + w/2, y + h/2 - 10);
                const valFontSize = (cell.item === 'BOSS') ? w*0.25 : w*0.3;
@@ -1797,6 +2053,31 @@ function onDown(e) {
         if (state.screen === 'GAMEOVER') backToTitle();
         return;
     }
+
+    // アイテム対象選択モード
+    if (state.itemSelectMode !== null) {
+        const pos = getEventPos(e);
+        const cellW2 = state.boardW / GRID_COLS;
+        const cellH2 = cellW2 * 0.95;
+        const startX2 = state.boardX;
+        const startY2 = state.gridAreaY;
+        if (pos.y >= startY2 && pos.y < startY2 + GRID_ROWS * cellH2 && pos.x >= startX2 && pos.x < startX2 + GRID_COLS * cellW2) {
+            const col2 = Math.floor((pos.x - startX2) / cellW2);
+            const row2 = Math.floor((pos.y - startY2) / cellH2);
+            const cell2 = state.grid[row2 * GRID_COLS + col2];
+            if (cell2) {
+                const itemId2 = state.itemSelectMode;
+                state.itemSelectMode = null;
+                executeItem(itemId2, cell2);
+            }
+        } else {
+            state.itemSelectMode = null;
+            addDungeonLog(`❌ アイテム使用をキャンセル`);
+            renderItemList();
+        }
+        return;
+    }
+
     const pos = getEventPos(e);
     const cellW = state.boardW / GRID_COLS;
     const cellH = cellW * 0.95;
@@ -1953,42 +2234,6 @@ function bindBtn(btn, callback) {
         btn.addEventListener('touchstart', (e) => { e.preventDefault(); callback(); }, { passive: false });
     }
 }
-
-bindBtn(ui.btnSkillDoor, () => {
-    if (state.gems > 0 && !state.doorRevealed) { state.gems--; updateUI(); state.doorRevealed = true; const msg = (state.floor === MAX_FLOOR) ? "ボスのいちをかんち！" : "ドアをかんち！"; state.particles.push(new Particle(state.width/2, state.height/2, msg, '#ba68c8', 'text')); addDungeonLog(`🚪 ドアのいちをかんち！`); }
-    else if (state.gems > 0) { state.gems--; updateUI(); state.particles.push(new Particle(state.width/2, state.height/2, "ドアはもうみえている", '#9990b0', 'text')); }
-});
-bindBtn(ui.btnSkillKey, () => {
-    if (state.gems > 0) {
-        state.gems--; updateUI();
-        let candidateCells = []; state.grid.forEach(c => { if (c.item === 'KEY' && c.isEnemy && !c.isKeyRevealed) candidateCells.push(c); });
-        if (candidateCells.length > 0) {
-            let target = candidateCells[Math.floor(Math.random() * candidateCells.length)]; target.isKeyRevealed = true;
-            state.particles.push(new Particle(state.width/2, state.height/2, "カギをかんち！", '#ba68c8', 'text'));
-            addDungeonLog(`🗝️ カギのいちをかんち！`);
-        } else state.particles.push(new Particle(state.width/2, state.height/2, "カギはもうないようだ", '#9990b0', 'text'));
-    }
-});
-bindBtn(ui.btnSkillChange, () => {
-    if (state.gems > 0) {
-        state.gems--;
-        state.grid.forEach(cell => {
-            if (cell.isEnemy) {
-                cell.value = generateEnemyValue();
-                let r = Math.random();
-                let gems = 1;
-                if (r > 0.95) gems = 5;
-                else if (r > 0.85) gems = 4;
-                else if (r > 0.70) gems = 3;
-                else if (r > 0.40) gems = 2;
-                cell.gemCount = gems;
-            }
-        });
-        state.particles.push(new Particle(state.width/2, state.height/2, "ばんめんチェンジ！", '#ba68c8', 'text'));
-        addDungeonLog(`🔄 ばんめんチェンジ！`);
-        updateUI();
-    }
-});
 
 ui.btnYes.addEventListener('click', (e) => { e.preventDefault(); confirmAction(); });
 ui.btnYes.addEventListener('touchstart', (e) => { e.preventDefault(); confirmAction(); }, {passive: false});
