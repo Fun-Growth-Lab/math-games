@@ -738,12 +738,26 @@ const ITEMS = {
     9:  { name: '２分の１の剣',    emoji: '⚔️', img: 'item_9.png',  needsTarget: true  },
     10: { name: '数字カード',       emoji: '🃏', img: 'item_10.png', needsTarget: false },
 };
-// アイテム画像プリロード
+// アイテム画像プリロード (1-10: アイテム, 11: カギ, 12: ドア, 13: スコアボーナス)
 const ITEM_IMAGES = {};
-for (let _ii = 1; _ii <= 10; _ii++) {
+for (let _ii = 1; _ii <= 13; _ii++) {
     const _img = new Image();
     _img.src = `items/item_${_ii}.png`;
     ITEM_IMAGES[_ii] = _img;
+}
+// 敵画像プリロード enemy_1.png ~ enemy_10.png
+const ENEMY_IMAGES = {};
+for (let _ei = 1; _ei <= 10; _ei++) {
+    const _img = new Image();
+    _img.src = `images/enemy_${_ei}.png`;
+    ENEMY_IMAGES[_ei] = _img;
+}
+// ボス画像プリロード boss_1.png ~ boss_3.png
+const BOSS_IMAGES = {};
+for (let _bi = 1; _bi <= 3; _bi++) {
+    const _img = new Image();
+    _img.src = `images/boss_${_bi}.png`;
+    BOSS_IMAGES[_bi] = _img;
 }
 
 // カード重みは √値 の逆数基準（小さい数ほど引きやすい）
@@ -1354,6 +1368,17 @@ function roundRect(ctx, x, y, w, h, r, fill, stroke) {
     if (stroke) ctx.stroke();
 }
 
+// 画像があれば描画、なければ絵文字フォールバック
+function drawImageOrEmoji(ctx, img, emoji, cx, cy, size) {
+    if (img && img.complete && img.naturalWidth > 0) {
+        ctx.drawImage(img, cx - size / 2, cy - size / 2, size, size);
+    } else {
+        ctx.font = `${size}px "M PLUS Rounded 1c"`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(emoji, cx, cy);
+    }
+}
+
 // 重み付きパネル値抽選（大きい数ほど出にくい）
 function generateEnemyValue() {
     const table = CONFIG.enemyTable;
@@ -1455,6 +1480,7 @@ function initFloor() {
         cells[bossIdx].item = 'BOSS';
         cells[bossIdx].creatureValue = generateBossValue();
         cells[bossIdx].creatureIcon = "🐲";
+        cells[bossIdx].bossImgIdx = Math.floor(Math.random() * 3) + 1;
         usedCount++;
     }
 
@@ -1488,6 +1514,7 @@ function initFloor() {
                 cells[idx].creatureValue = generateEnemyValue();
             }
 
+            cells[idx].creatureImgIdx = Math.floor(Math.random() * 10) + 1;
             cells[idx].creatureIcon = CREATURE_ICONS[Math.floor(Math.random() * CREATURE_ICONS.length)];
             continue;
         }
@@ -2044,11 +2071,15 @@ function drawGrid(ctx) {
 
         if (!cell.isVisible) {
             if (state.doorRevealed && (cell.item === 'DOOR' || cell.item === 'BOSS')) {
-                const mark = (cell.item === 'BOSS') ? "👹" : "🚪";
-                ctx.globalAlpha = 0.7; ctx.font = `${w*0.5}px "M PLUS Rounded 1c"`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(mark, cx, cy); ctx.globalAlpha = 1.0;
+                ctx.globalAlpha = 0.7;
+                if (cell.item === 'BOSS') drawImageOrEmoji(ctx, BOSS_IMAGES[cell.bossImgIdx], "🐲", cx, cy, w * 0.5);
+                else drawImageOrEmoji(ctx, ITEM_IMAGES[12], "🚪", cx, cy, w * 0.5);
+                ctx.globalAlpha = 1.0;
             }
             if (cell.isKeyRevealed && cell.item === 'KEY') {
-                ctx.globalAlpha = 0.7; ctx.font = `${w*0.5}px "M PLUS Rounded 1c"`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText("🗝️", cx, cy); ctx.globalAlpha = 1.0;
+                ctx.globalAlpha = 0.7;
+                drawImageOrEmoji(ctx, ITEM_IMAGES[11], "🗝️", cx, cy, w * 0.5);
+                ctx.globalAlpha = 1.0;
             }
             if (cell.peekRevealed && cell.isEnemy) {
                 ctx.globalAlpha = 0.65;
@@ -2078,27 +2109,46 @@ function drawGrid(ctx) {
                 }
             }
             if (state.doorRevealed && (cell.item === 'DOOR' || cell.item === 'BOSS')) {
-                const mark = (cell.item === 'BOSS') ? "👹" : "🚪";
-                ctx.globalAlpha = 0.7; ctx.font = `${w*0.5}px "M PLUS Rounded 1c"`; ctx.fillText(mark, cx, cy); ctx.globalAlpha = 1.0;
-            }
-            if (cell.isKeyRevealed && cell.item === 'KEY') {
-                ctx.globalAlpha = 0.7; ctx.font = `${w*0.5}px "M PLUS Rounded 1c"`; ctx.fillText("🗝️", cx, cy); ctx.globalAlpha = 1.0;
-            }
-        } else {
-            ctx.font = `${w*0.5}px "M PLUS Rounded 1c"`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#e8e0d0';
-            if (cell.item === 'KEY') {
-                if (cell.isKeyCollected) ctx.globalAlpha = 0.5;
-                ctx.fillText("🗝️", cx, cy);
+                ctx.globalAlpha = 0.7;
+                if (cell.item === 'BOSS') drawImageOrEmoji(ctx, BOSS_IMAGES[cell.bossImgIdx], "🐲", cx, cy, w * 0.5);
+                else drawImageOrEmoji(ctx, ITEM_IMAGES[12], "🚪", cx, cy, w * 0.5);
                 ctx.globalAlpha = 1.0;
             }
-            else if (cell.item === 'DOOR') ctx.fillText("🚪", cx, cy);
-            else if (cell.item === 'ITEM_TIME') ctx.fillText("⏰", cx, cy);
-            else if (cell.item === 'ITEM_SCORE') ctx.fillText("🎁", cx, cy);
-            else if (cell.item === 'ITEM_BAG') ctx.fillText("🎒", cx, cy);
+            if (cell.isKeyRevealed && cell.item === 'KEY') {
+                ctx.globalAlpha = 0.7;
+                drawImageOrEmoji(ctx, ITEM_IMAGES[11], "🗝️", cx, cy, w * 0.5);
+                ctx.globalAlpha = 1.0;
+            }
+        } else {
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            if (cell.item === 'KEY') {
+                if (cell.isKeyCollected) ctx.globalAlpha = 0.5;
+                drawImageOrEmoji(ctx, ITEM_IMAGES[11], "🗝️", cx, cy, w * 0.52);
+                ctx.globalAlpha = 1.0;
+            }
+            else if (cell.item === 'DOOR') {
+                drawImageOrEmoji(ctx, ITEM_IMAGES[12], "🚪", cx, cy, w * 0.56);
+            }
+            else if (cell.item === 'ITEM_TIME') {
+                ctx.font = `${w*0.5}px "M PLUS Rounded 1c"`; ctx.fillStyle = '#e8e0d0';
+                ctx.fillText("⏰", cx, cy);
+            }
+            else if (cell.item === 'ITEM_SCORE') {
+                drawImageOrEmoji(ctx, ITEM_IMAGES[13], "🎁", cx, cy, w * 0.52);
+            }
+            else if (cell.item === 'ITEM_BAG') {
+                ctx.font = `${w*0.5}px "M PLUS Rounded 1c"`; ctx.fillStyle = '#e8e0d0';
+                ctx.fillText("🎒", cx, cy);
+            }
             else if (cell.item === 'CREATURE' || cell.item === 'BOSS') {
-               ctx.font = `${w*0.6}px "M PLUS Rounded 1c"`; ctx.fillText(cell.creatureIcon, x + w/2, y + h/2 - 10);
-               const valFontSize = (cell.item === 'BOSS') ? w*0.25 : w*0.3;
-               ctx.font = `bold ${valFontSize}px "M PLUS Rounded 1c"`; ctx.fillStyle = '#ef5350'; ctx.fillText(cell.creatureValue, x + w/2, y + h/2 + 25);
+                const isBoss2 = cell.item === 'BOSS';
+                const cImg = isBoss2 ? BOSS_IMAGES[cell.bossImgIdx] : ENEMY_IMAGES[cell.creatureImgIdx];
+                const cEmoji = cell.creatureIcon || (isBoss2 ? "🐲" : "👾");
+                drawImageOrEmoji(ctx, cImg, cEmoji, x + w/2, y + h/2 - 10, w * 0.6);
+                const valFontSize = isBoss2 ? w*0.25 : w*0.3;
+                ctx.font = `bold ${valFontSize}px "M PLUS Rounded 1c"`;
+                ctx.fillStyle = getNumberColor(cell.creatureValue);
+                ctx.fillText(cell.creatureValue, x + w/2, y + h/2 + 25);
             }
         }
     });
