@@ -703,10 +703,12 @@ const NG_WORDS_HIRAGANA = [
 const CROWN_THRESHOLDS = { BRONZE: 5000, SILVER: 7500, GOLD: 10000 };
 const CREATURE_ICONS = ["👾", "🦇", "🕷", "🐍", "🦂"];
 
+// カード重みは √値 の逆数基準（小さい数ほど引きやすい）
+// パネル重みも同様（大きい数ほど出にくい）
 const PRESET_EASY = {
     label: "やさしい",
-    weights: { 2: 40, 3: 30, 4: 15, 5: 25 },
-    enemyList: [4, 6, 8, 9, 10, 12, 15, 16, 18, 20, 24, 25],
+    weights: { 2: 50, 3: 41, 4: 35 },                         // カード: 2,3,4
+    enemyTable: { 2:50, 3:41, 4:35, 6:28, 8:25, 9:23, 12:20, 16:17 }, // パネル: 2,3,4,6,8,9,12,16
     initTime: 20,
     thresholds: CROWN_THRESHOLDS,
     dropRates: { time: 30, score: 40, gem: 15, creature: 15 },
@@ -714,8 +716,9 @@ const PRESET_EASY = {
 };
 const PRESET_NORMAL = {
     label: "ふつう",
-    weights: { 2: 28, 3: 22, 4: 8, 5: 20, 6: 10, 7: 15 },
-    enemyList: [4,6,8,9,10,12,14,15,16,18,20,21,24,25,27,28,30,32,35,36,42,49],
+    weights: { 2: 50, 3: 41, 4: 35, 5: 31 },                  // カード: 2,3,4,5
+    enemyTable: { 2:50, 3:41, 4:35, 5:31, 6:28, 8:25, 9:23, 10:22,
+                  12:20, 15:18, 16:17, 18:16, 20:15, 24:14, 25:14 }, // パネル: 2,3,4,5,6,8,9,10,12,15,16,18,20,24,25
     initTime: 20,
     thresholds: CROWN_THRESHOLDS,
     dropRates: { time: 28, score: 32, gem: 15, creature: 25 },
@@ -723,8 +726,13 @@ const PRESET_NORMAL = {
 };
 const PRESET_HARD = {
     label: "むずかしい",
-    weights: { 2: 22, 3: 18, 4: 7, 5: 18, 6: 8, 7: 16, 8: 6, 9: 12 },
-    enemyList: [4,6,8,9,10,12,14,15,16,18,20,21,24,25,27,28,30,32,35,36,40,42,45,48,49,54,56,63,64,72,81],
+    weights: { 2: 50, 3: 41, 4: 35, 5: 31, 6: 28, 7: 26, 8: 25, 9: 23 }, // カード: 2〜9
+    enemyTable: {                                               // パネル: 2〜81 (掛け算で作れる数のみ)
+        2:70, 3:58, 4:50, 5:44, 6:40, 7:37, 8:35, 9:33,
+        10:31, 12:28, 14:26, 15:25, 16:25, 18:23, 20:22, 21:21,
+        24:20, 25:20, 27:19, 28:18, 30:18, 32:17, 35:16, 36:16,
+        40:15, 42:15, 45:14, 48:14, 49:14, 54:13, 56:13, 63:12, 64:12, 72:11, 81:11
+    },
     initTime: 20,
     thresholds: CROWN_THRESHOLDS,
     dropRates: { time: 25, score: 28, gem: 15, creature: 32 },
@@ -1193,24 +1201,8 @@ async function showRankingScreen() {
 class Card {
     constructor(slotIndex, excludeValue = -1) {
         this.slotIndex = slotIndex;
-        const weights = CONFIG.weights;
-        let weightedPool = [];
-
-        for (const [valStr, weight] of Object.entries(weights)) {
-            const val = parseInt(valStr);
-            if (val !== excludeValue) {
-                for (let k = 0; k < weight; k++) weightedPool.push(val);
-            }
-        }
-
-        if (weightedPool.length === 0) {
-            for (const [valStr, weight] of Object.entries(weights)) {
-                const val = parseInt(valStr);
-                for (let k = 0; k < weight; k++) weightedPool.push(val);
-            }
-        }
-
-        this.value = weightedPool[Math.floor(Math.random() * weightedPool.length)];
+        // スマートドロー: 見えているパネルの因数を40%優先、残り60%は重み付き通常抽選
+        this.value = getSmartCardValue(excludeValue);
         this.stackCount = 1;
 
         this.width = 80;
@@ -1295,9 +1287,50 @@ function roundRect(ctx, x, y, w, h, r, fill, stroke) {
     if (stroke) ctx.stroke();
 }
 
+// 重み付きパネル値抽選（大きい数ほど出にくい）
 function generateEnemyValue() {
-    const list = CONFIG.enemyList;
-    return list[Math.floor(Math.random() * list.length)];
+    const table = CONFIG.enemyTable;
+    const entries = Object.entries(table);
+    const total = entries.reduce((s, [, w]) => s + w, 0);
+    let r = Math.random() * total;
+    for (const [v, w] of entries) {
+        r -= w;
+        if (r <= 0) return parseInt(v);
+    }
+    return parseInt(entries[entries.length - 1][0]);
+}
+
+// スマートドロー: 40%の確率で見えているパネルの因数になれるカード値を優先
+function getSmartCardValue(excludeValue = -1) {
+    if (Math.random() < 0.4 && state.grid && state.grid.length > 0) {
+        const visible = state.grid.filter(c => c.isVisible && c.isEnemy);
+        if (visible.length > 0) {
+            const panel = visible[Math.floor(Math.random() * visible.length)];
+            const cardVals = Object.keys(CONFIG.weights).map(Number);
+            const useful = cardVals.filter(v => v !== excludeValue && panel.value % v === 0);
+            if (useful.length > 0) {
+                // 役立つカード候補の中でも重み付き抽選
+                let pool = [];
+                useful.forEach(v => {
+                    const w = CONFIG.weights[v] || 1;
+                    for (let i = 0; i < w; i++) pool.push(v);
+                });
+                return pool[Math.floor(Math.random() * pool.length)];
+            }
+        }
+    }
+    // 通常の重み付き抽選
+    let pool = [];
+    for (const [valStr, weight] of Object.entries(CONFIG.weights)) {
+        const val = parseInt(valStr);
+        if (val !== excludeValue) {
+            for (let k = 0; k < weight; k++) pool.push(val);
+        }
+    }
+    if (pool.length === 0) {
+        pool = Object.keys(CONFIG.weights).map(Number).filter(v => v !== excludeValue);
+    }
+    return pool[Math.floor(Math.random() * pool.length)];
 }
 
 function generateBossValue() {
