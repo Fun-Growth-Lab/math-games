@@ -773,7 +773,7 @@ const ITEMS = {
     2:  { name: 'ドア探知の巻物',  emoji: '🚪', img: 'item_2.png',  needsTarget: false, desc: 'ドアがどこにあるかを地図に表示します。' },
     3:  { name: '透視の巻物',      emoji: '🔍', img: 'item_3.png',  needsTarget: false, desc: 'まだ開いていないパネル3マスの数値をこっそりのぞき見ます。' },
     4:  { name: '地形変換の杖',    emoji: '🔄', img: 'item_4.png',  needsTarget: false, desc: 'パネルの約半分の数値をランダムにシャッフルします。' },
-    5:  { name: '大地形変換の杖',  emoji: '💫', img: 'item_5.png',  needsTarget: false, desc: 'すべての敵パネルの数値を一斉にシャッフルします。' },
+    5:  { name: '大地形変換の杖',  emoji: '💫', img: 'item_5.png',  needsTarget: false, desc: 'すべてのパネルの数値を一斉にシャッフルします。' },
     6:  { name: '手札交換の杖',    emoji: '✨', img: 'item_6.png',  needsTarget: false, desc: '手札5枚をすべて新しいカードに引き直します。APは消費しません。' },
     7:  { name: '小爆弾',          emoji: '💣', img: 'item_7.png',  needsTarget: true,  desc: '1マスを爆発させてパネルを破壊します。周囲のマスの数値もオープンされます。（ドラッグで対象指定）' },
     8:  { name: '十字爆弾',        emoji: '💥', img: 'item_8.png',  needsTarget: true,  desc: '十字型5マスを一気に爆発・破壊します。周囲の数値もオープンされます。（ドラッグで対象指定）' },
@@ -1481,15 +1481,36 @@ function generateCardValue(excludeValue = -1) {
 }
 
 // ====== EXP / レベルシステム ======
-const SLOT_REWARDS = [
-    { type: 'ap',    value: 5,    emoji: '⚡',  label: 'AP+5',    weight: 24 },
-    { type: 'ap',    value: 10,   emoji: '⚡⚡', label: 'AP+10',   weight: 10 },
-    { type: 'score', value: 500,  emoji: '⭐',  label: '+500点',  weight: 22 },
-    { type: 'score', value: 1000, emoji: '🌟',  label: '+1000点', weight: 18 },
-    { type: 'score', value: 1500, emoji: '💫',  label: '+1500点', weight: 12 },
-    { type: 'score', value: 2000, emoji: '✨',  label: '+2000点', weight: 6  },
-    { type: 'item',  value: null, emoji: '🎁',  label: 'アイテム！', weight: 8 },
+// スロット基本報酬（アイテムは毎回4種ランダム追加）
+const SLOT_REWARDS_BASE = [
+    { type: 'ap',    value: 5,    label: 'AP+5',        weight: 24 },
+    { type: 'ap',    value: 10,   label: 'AP+10',       weight: 10 },
+    { type: 'score', value: 500,  label: 'スコア+500',  weight: 22 },
+    { type: 'score', value: 1000, label: 'スコア+1000', weight: 18 },
+    { type: 'score', value: 1500, label: 'スコア+1500', weight: 12 },
+    { type: 'score', value: 2000, label: 'スコア+2000', weight: 6  },
 ];
+
+function buildLevelUpRewards() {
+    const rewards = SLOT_REWARDS_BASE.map(r => ({ ...r }));
+    // 全アイテムからランダムに4種選ぶ（重複なし）
+    const allIds = Object.keys(ITEMS).map(Number);
+    const pool = [...allIds];
+    const chosen = [];
+    while (chosen.length < 4 && pool.length > 0) {
+        const i = Math.floor(Math.random() * pool.length);
+        chosen.push(pool.splice(i, 1)[0]);
+    }
+    chosen.forEach(id => rewards.push({ type: 'item', value: id, label: ITEMS[id].name, weight: 2 }));
+    return rewards;
+}
+
+function pickFromRewards(rewards) {
+    const total = rewards.reduce((s, r) => s + r.weight, 0);
+    let r = Math.random() * total;
+    for (const rw of rewards) { r -= rw.weight; if (r <= 0) return rw; }
+    return rewards[0];
+}
 
 function calcExpToNext(level) {
     // Lv1→2: 200, Lv2→3: 280, Lv3→4: 392 ...
@@ -1523,13 +1544,6 @@ function gainExp(amount) {
     }
 }
 
-function pickSlotReward() {
-    const total = SLOT_REWARDS.reduce((s, r) => s + r.weight, 0);
-    let r = Math.random() * total;
-    for (const rw of SLOT_REWARDS) { r -= rw.weight; if (r <= 0) return rw; }
-    return SLOT_REWARDS[0];
-}
-
 function triggerLevelUp() {
     if (state.screen !== 'PLAYING') return;
     const overlay = document.getElementById('slot-overlay');
@@ -1545,10 +1559,11 @@ function triggerLevelUp() {
     overlay.classList.remove('hidden');
     state.inputLocked = true;
 
-    const reward   = pickSlotReward();
+    const rewards  = buildLevelUpRewards();
+    const reward   = pickFromRewards(rewards);
     const itemH    = 54; // 1行の高さ（ドラムのhに合わせる）
     const spinN    = 28; // 回転数（スクロールするアイテム数）
-    const allLabels = SLOT_REWARDS.map(r => r.label);
+    const allLabels = rewards.map(r => r.label);
 
     // スクロール用ラベルリスト: spinN個＋当選ラベル
     const strip = [];
@@ -1575,9 +1590,9 @@ function triggerLevelUp() {
         reelEl.style.transform = `translateY(-${spinN * itemH}px)`;
     }, 80);
 
-    // アニメーション終了後に結果表示
+    // アニメーション終了後に結果表示（ゲット！のみ）
     setTimeout(() => {
-        resEl.innerHTML = `<span style="color:var(--accent-gold)">${reward.label}</span> をゲット！`;
+        resEl.innerHTML = `<span style="color:var(--accent-gold)">ゲット！</span>`;
         okBtn.classList.remove('hidden');
     }, 2850);
 
@@ -1866,20 +1881,14 @@ function checkCreatureAttack() {
     let attacked = false;
     state.grid.forEach(cell => {
         if (cell.isVisible && !cell.isEnemy) {
-            let prob = 0;
-            if (cell.item === 'CREATURE') prob = 0.5;
-            else if (cell.item === 'BOSS') prob = 0.66;
-
-            if (prob > 0 && Math.random() < prob) {
-                const dmg = (cell.item === 'BOSS') ? 2 : 1;
-                state.time -= dmg;
-                if (state.time < 0) state.time = 0;
-                attacked = true;
-                const pos = getGridPos(cell.row, cell.col);
-                const dmgMsg = (dmg > 1) ? `Attack! -${dmg}` : "Attack!";
-                state.particles.push(new Particle(pos.x + pos.w/2, pos.y + 20, dmgMsg, "#ef5350", 'text'));
-                addDungeonLog(`💢 <b style="color:#ef5350">こうげき！</b> AP-${dmg}`);
-            }
+            const dmg = cell.item === 'BOSS' ? 2 : cell.item === 'CREATURE' ? 1 : 0;
+            if (dmg === 0) return;
+            state.time -= dmg;
+            if (state.time < 0) state.time = 0;
+            attacked = true;
+            const pos = getGridPos(cell.row, cell.col);
+            state.particles.push(new Particle(pos.x + pos.w/2, pos.y + 20, `Attack! -${dmg}`, "#ef5350", 'text'));
+            addDungeonLog(`💢 <b style="color:#ef5350">こうげき！</b> AP-${dmg}`);
         }
     });
     if (attacked) {
@@ -2378,7 +2387,7 @@ function drawGrid(ctx) {
             roundRect(ctx, plateX, plateY, plateW, plateH, 10, false, true);
         }
         else if (cell.isEnemy) {
-            // 敵パネル(石ブロック)
+            // パネル(石ブロック)
             ctx.fillStyle = '#2d3d48'; // 側面
             roundRect(ctx, plateX, plateY + depth, plateW, plateH, 10, true, false);
 
@@ -2637,7 +2646,7 @@ function onUp(e) {
                         state.score += gain;
                         state.panelsDestroyed++;
                         if (gain > state.maxSingleScore) state.maxSingleScore = gain;
-                        const rec = 2;
+                        const rec = 1;
                         state.time += rec;
 
                         addDungeonLog(`⚔️ <b style="color:${getNumberColor(cell.value)}">${cell.value}</b> のパネル！ <span style="color:#ffd54f">+${gain}</span>`);
@@ -2788,6 +2797,20 @@ function gameLoop() {
     state.cards.forEach(c => { if (c) c.draw(ctx); });
     if (state.dragInfo) { const c = state.cards[state.dragInfo.slotIndex]; if (c) c.draw(ctx); }
     for (let i = state.particles.length - 1; i >= 0; i--) { let p = state.particles[i]; p.update(); p.draw(ctx); if (p.life <= 0) state.particles.splice(i, 1); }
+
+    // 敵キャラ・ボスが見えているとき赤枠をパルス表示
+    const hasVisibleEnemy = state.grid && state.grid.some(c =>
+        c.isVisible && (c.item === 'CREATURE' || c.item === 'BOSS')
+    );
+    if (hasVisibleEnemy) {
+        const pulse = 0.25 + 0.22 * Math.sin(Date.now() / 380);
+        ctx.save();
+        ctx.strokeStyle = `rgba(239,83,80,${pulse})`;
+        ctx.lineWidth = 8;
+        ctx.strokeRect(4, 4, state.width - 8, state.height - 8);
+        ctx.restore();
+    }
+
     requestAnimationFrame(gameLoop);
 }
 
