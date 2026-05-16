@@ -1366,9 +1366,7 @@ class Card {
         ctx.fillStyle = numColor;
         ctx.font = `900 ${this.width * 0.6}px "M PLUS Rounded 1c"`;
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        // ×2ボックスがあれば少し下（0.62）、なければ中央（0.5）
-        const numY = this.y + this.height * (this.multiplier > 1 ? 0.62 : 0.5);
-        ctx.fillText(this.value, this.x + this.width / 2, numY);
+        ctx.fillText(this.value, this.x + this.width / 2, this.y + this.height * 0.5);
 
         // ×N ボーナス表示（5%で付与、重ね合わせで累積）
         if (this.multiplier > 1) {
@@ -1466,20 +1464,32 @@ function generateEnemyValue() {
     return parseInt(entries[entries.length - 1][0]);
 }
 
-// カード値を重み付きランダムで生成（スマートドロー廃止）
+// カード値を重み付きランダムで生成（スマートドロー付き）
 function generateCardValue(excludeValue = -1) {
-    // 手札に2,3,5,7が欠けているとき50%で補充（5はふつう以上、7はむずかしいのみ）
     const handVals = state.cards.filter(c => c !== null).map(c => c.value);
     const primeTargets = [2, 3];
     if (state.difficulty === 'NORMAL' || state.difficulty === 'HARD') primeTargets.push(5);
     if (state.difficulty === 'HARD') primeTargets.push(7);
+
+    // 対象素数のうち手札に1枚もないもの
     const missing = primeTargets.filter(p =>
         p !== excludeValue &&
         CONFIG.weights[p] !== undefined &&
         !handVals.includes(p)
     );
+    // 対象素数のうち手札に1枚だけあるもの
+    const onlyOne = primeTargets.filter(p =>
+        p !== excludeValue &&
+        CONFIG.weights[p] !== undefined &&
+        handVals.filter(v => v === p).length === 1
+    );
+
     if (missing.length > 0 && Math.random() < 0.5) {
+        // IF: 手札に存在しない素数がある → 50%でその中からランダムに引く
         return missing[Math.floor(Math.random() * missing.length)];
+    } else if (missing.length === 0 && onlyOne.length > 0 && Math.random() < 0.5) {
+        // ELSE IF: 全素数が手札にあるが1枚しかないものがある → 50%で補充
+        return onlyOne[Math.floor(Math.random() * onlyOne.length)];
     }
 
     // 通常の重み付き抽選
