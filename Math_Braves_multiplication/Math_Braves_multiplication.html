@@ -454,10 +454,8 @@
                 </div>
             </div>
 
-            <div id="combo-display" class="info-box hidden" style="text-align:center; padding:6px 10px; flex-shrink:0;">
-                <div style="font-size:0.72rem; color:var(--text-muted); margin-bottom:1px;">さいごのカード</div>
-                <div id="disp-last-value" style="font-size:2.6rem; font-weight:900; line-height:1.1; color:#ef5350;"></div>
-                <div id="disp-combo-count" style="font-size:1rem; font-weight:900; color:var(--accent-gold); margin-top:1px;"></div>
+            <div id="combo-display" class="info-box hidden" style="text-align:center; padding:8px 10px; flex-shrink:0;">
+                <div id="disp-combo-count" style="font-size:1.6rem; font-weight:900; color:var(--accent-gold);"></div>
             </div>
 
             <div class="info-box" style="flex:1; display:flex; flex-direction:column; min-height:0;">
@@ -587,14 +585,23 @@
                 <p>・重ねるとのこりAPが1減るよ。大きな数を作ろう！</p>
             </div>
             <div class="howto-section">
+                <div class="howto-title">🔥 コンボ</div>
+                <p>・カードでパネルを破壊 or 敵を倒すとコンボ数が増える！</p>
+                <p>・コンボ数をnとすると、スコアが <b>×(1+0.25n)</b> になるよ！</p>
+                <p>・カードを重ねたり捨てたりするとコンボはリセット！</p>
+                <p>・さくさく攻撃してコンボをつなごう！</p>
+            </div>
+            <div class="howto-section">
                 <div class="howto-title">🗝️ カギとドア</div>
-                <p>・カギを集めてドアを開けると次のフロアへ！</p>
+                <p>・カギはパネルを開けると現れる。<b>タップ</b>して収集！</p>
+                <p>・カギを集めてドアをタップすると次のフロアへ！</p>
                 <p>・最終フロアにはボス👾がいる。倒すとゲームクリア！</p>
             </div>
             <div class="howto-section">
                 <div class="howto-title">🎒 アイテム</div>
-                <p>・パネルを開けると低確率で<b>アイテム🎒</b>が手に入る！</p>
-                <p>・アイテムは左パネルの一覧から「つかう」ボタンで使用</p>
+                <p>・パネルを破壊するとアイテムが現れることがある！</p>
+                <p>・アイテムパネルを<b>タップ</b>してGETしよう！</p>
+                <p>・アイテムは左の一覧から「つかう」ボタンで使用</p>
                 <p>・爆弾・剣など対象マスが必要なアイテムはタップで指定</p>
                 <p>・アイテムを使うときは時間（AP）は消費しない</p>
             </div>
@@ -748,7 +755,7 @@ const ITEMS = {
 const ITEM_IMAGES = {};
 for (let _ii = 1; _ii <= 14; _ii++) {
     const _img = new Image();
-    _img.src = `items/item_${_ii}.png`;
+    _img.src = `images/item_${_ii}.png`;
     ITEM_IMAGES[_ii] = _img;
 }
 // 敵画像プリロード enemy_1.png ~ enemy_8.png
@@ -774,7 +781,7 @@ const PRESET_EASY = {
     enemyTable: { 2:50, 3:41, 4:35, 6:28, 8:25, 9:23, 12:20, 16:17 }, // パネル: 2,3,4,6,8,9,12,16
     initTime: 20,
     thresholds: CROWN_THRESHOLDS,
-    dropRates: { time: 30, score: 45, item: 10, creature: 15 },
+    dropRates: { time: 25, score: 42, item: 18, creature: 15 },
     bossHpList: [80, 100, 120, 150, 160, 180]
 };
 const PRESET_NORMAL = {
@@ -784,7 +791,7 @@ const PRESET_NORMAL = {
                   12:20, 15:18, 16:17, 18:16, 20:15, 24:14, 25:14 }, // パネル: 2,3,4,5,6,8,9,10,12,15,16,18,20,24,25
     initTime: 20,
     thresholds: CROWN_THRESHOLDS,
-    dropRates: { time: 28, score: 37, item: 10, creature: 25 },
+    dropRates: { time: 23, score: 34, item: 18, creature: 25 },
     bossHpList: [200, 220, 250, 280, 320, 360, 400]
 };
 const PRESET_HARD = {
@@ -798,7 +805,7 @@ const PRESET_HARD = {
     },
     initTime: 20,
     thresholds: CROWN_THRESHOLDS,
-    dropRates: { time: 25, score: 33, item: 10, creature: 32 },
+    dropRates: { time: 20, score: 30, item: 18, creature: 32 },
     bossHpList: [300, 340, 380, 420, 460, 500, 550, 600]
 };
 
@@ -869,7 +876,6 @@ const ui = {
     key: document.getElementById('disp-key'),
     combo: document.getElementById('disp-combo'),
     comboDisplay: document.getElementById('combo-display'),
-    dispLastValue: document.getElementById('disp-last-value'),
     dispComboCount: document.getElementById('disp-combo-count'),
     totalScore: document.getElementById('disp-total-score'),
     maxScore: document.getElementById('disp-max-score'),
@@ -1165,19 +1171,13 @@ function getNumberColor(n) {
     return '#ef9a9a';                     // 薄赤: それ以外（素数など）
 }
 
-// 倍数・約数コンボ処理: card.value と lastCardValue の関係をチェック
-// コンボが続いていれば倍率 (1 + 0.1 × combo) を返す
-function applyComboHit(cardValue) {
-    if (state.lastCardValue > 0 && cardValue > 0) {
-        const a = cardValue, b = state.lastCardValue;
-        if (a % b === 0 || b % a === 0) {
-            state.combo++;
-        } else {
-            state.combo = 0;
-        }
-    }
-    state.lastCardValue = cardValue;
-    return 1 + 0.1 * state.combo;
+// 連続ヒットコンボ処理: パネル破壊・敵撃破のたびに呼び出す
+// 倍率 = 1 + 0.25 × (現コンボ数)。呼び出し後にコンボをインクリメントする。
+function applyComboHit() {
+    const mult = 1 + 0.25 * state.combo; // 現コンボ数を使って倍率計算
+    state.combo++;
+    if (state.combo > state.maxCombo) state.maxCombo = state.combo;
+    return mult;
 }
 
 function getRankingKey(diff) { return `math_braves_multi_ranking_${diff}`; }
@@ -1496,7 +1496,7 @@ function initFloor() {
     for (let i = usedCount; i < 25; i++) {
         let idx = indices[i];
 
-        if (Math.random() >= 2.0 / 3.0) {
+        if (Math.random() >= 0.55) { // 45%のセルでアイテムロール（旧:33%）
             cells[idx].item = null;
             continue;
         }
@@ -1512,7 +1512,11 @@ function initFloor() {
         if (rnd < cumulative) { cells[idx].item = 'ITEM_SCORE'; continue; }
 
         cumulative += rates.item;
-        if (rnd < cumulative) { cells[idx].item = 'ITEM_BAG'; continue; }
+        if (rnd < cumulative) {
+            cells[idx].item = 'ITEM_BAG';
+            cells[idx].itemBagId = Math.floor(Math.random() * 10) + 1; // フロア生成時にアイテムIDを確定
+            continue;
+        }
 
         cumulative += rates.creature;
         if (rnd < cumulative) {
@@ -1551,9 +1555,7 @@ function revealUnknown(row, col) {
             if (state.grid[idx].isEnemy) state.grid[idx].isUnknown = false;
             if (!state.grid[idx].isVisible) {
                 state.grid[idx].isVisible = true;
-                if (!state.grid[idx].isEnemy && state.grid[idx].item && state.grid[idx].item !== 'DOOR') {
-                    collectItem(state.grid[idx]);
-                }
+                // アイテムはタップで取得するため自動回収しない
             }
         }
     });
@@ -1586,13 +1588,13 @@ function collectItem(cell) {
         let base = 200;
         if (state.difficulty === 'NORMAL') base = Math.floor(200 * 1.5);
         if (state.difficulty === 'HARD') base = Math.floor(200 * 2.0);
-        const comboMult = 1 + 0.1 * state.combo;
+        const comboMult = 1 + 0.25 * state.combo;
         scoreGain = Math.floor(base * comboMult);
         symbol = "🎁"; color = '#ffca28';
         addDungeonLog(`🎁 スコアボーナス！ <span style="color:#ffd54f">+${scoreGain}</span>`);
     }
     else if (cell.item === 'ITEM_BAG') {
-        const itemId = Math.floor(Math.random() * 10) + 1;
+        const itemId = cell.itemBagId || (Math.floor(Math.random() * 10) + 1);
         const item = ITEMS[itemId];
         symbol = item.emoji; color = '#ba68c8';
         addItemToInventory(itemId);
@@ -1666,12 +1668,10 @@ function updateUI() {
         ui.combo.textContent = state.combo > 0 ? `${state.combo}` : '0';
         ui.combo.style.color = state.combo >= 3 ? '#ffd54f' : state.combo > 0 ? '#ef5350' : 'var(--text-muted)';
     }
-    if (ui.comboDisplay && ui.dispLastValue && ui.dispComboCount) {
-        if (state.combo > 0 && state.lastCardValue > 0) {
+    if (ui.comboDisplay && ui.dispComboCount) {
+        if (state.combo > 0) {
             ui.comboDisplay.classList.remove('hidden');
-            ui.dispLastValue.textContent = state.lastCardValue;
-            ui.dispLastValue.style.color = getNumberColor(state.lastCardValue);
-            ui.dispComboCount.textContent = `${state.combo}コンボ！`;
+            ui.dispComboCount.textContent = `🔥 ${state.combo}コンボ！`;
             ui.dispComboCount.style.color = state.combo >= 3 ? '#ffd54f' : '#ef5350';
         } else {
             ui.comboDisplay.classList.add('hidden');
@@ -2139,21 +2139,40 @@ function drawGrid(ctx) {
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             if (cell.item === 'KEY') {
                 if (cell.isKeyCollected) ctx.globalAlpha = 0.5;
-                drawImageOrEmoji(ctx, ITEM_IMAGES[11], "🗝️", cx, cy, w * 0.52);
+                drawImageOrEmoji(ctx, ITEM_IMAGES[11], "🗝️", cx, cy - h*0.08, w * 0.52);
                 ctx.globalAlpha = 1.0;
+                if (!cell.isKeyCollected) {
+                    ctx.fillStyle = '#ffd54f'; ctx.font = `bold ${w*0.17}px "M PLUS Rounded 1c"`;
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText('タップ！', cx, cy + h * 0.36);
+                }
             }
             else if (cell.item === 'DOOR') {
                 drawImageOrEmoji(ctx, ITEM_IMAGES[12], "🚪", cx, cy, w * 0.56);
             }
             else if (cell.item === 'ITEM_TIME') {
-                drawImageOrEmoji(ctx, ITEM_IMAGES[14], "⏰", cx, cy, w * 0.52);
+                drawImageOrEmoji(ctx, ITEM_IMAGES[14], "⏰", cx, cy - h*0.08, w * 0.52);
+                ctx.fillStyle = '#ffd54f'; ctx.font = `bold ${w*0.17}px "M PLUS Rounded 1c"`;
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText('タップ！', cx, cy + h * 0.36);
             }
             else if (cell.item === 'ITEM_SCORE') {
-                drawImageOrEmoji(ctx, ITEM_IMAGES[13], "🎁", cx, cy, w * 0.52);
+                drawImageOrEmoji(ctx, ITEM_IMAGES[13], "🎁", cx, cy - h*0.08, w * 0.52);
+                ctx.fillStyle = '#ffd54f'; ctx.font = `bold ${w*0.17}px "M PLUS Rounded 1c"`;
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText('タップ！', cx, cy + h * 0.36);
             }
             else if (cell.item === 'ITEM_BAG') {
-                ctx.font = `${w*0.5}px "M PLUS Rounded 1c"`; ctx.fillStyle = '#e8e0d0';
-                ctx.fillText("🎒", cx, cy);
+                // フロア生成時に確定したアイテム画像を表示
+                const bagId = cell.itemBagId;
+                const bagImg = bagId ? ITEM_IMAGES[bagId] : null;
+                const bagEmoji = bagId && ITEMS[bagId] ? ITEMS[bagId].emoji : '🎒';
+                drawImageOrEmoji(ctx, bagImg, bagEmoji, cx, cy - h*0.08, w * 0.50);
+                // 「タップ！」ヒント
+                ctx.fillStyle = '#ffd54f';
+                ctx.font = `bold ${w*0.17}px "M PLUS Rounded 1c"`;
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText('タップ！', cx, cy + h * 0.36);
             }
             else if (cell.item === 'CREATURE' || cell.item === 'BOSS') {
                 const isBoss2 = cell.item === 'BOSS';
@@ -2263,6 +2282,11 @@ function onDown(e) {
                     else state.particles.push(new Particle(pos.x, pos.y, "カギがたりない", '#ffa726', 'text'));
                     return;
                 }
+                // アイテムタップ収集
+                if (cell.item === 'KEY' || cell.item === 'ITEM_TIME' || cell.item === 'ITEM_SCORE' || cell.item === 'ITEM_BAG') {
+                    collectItem(cell);
+                    return;
+                }
             }
         }
     }
@@ -2306,7 +2330,7 @@ function onUp(e) {
             if (cell.isVisible) {
                 if (cell.isEnemy) {
                     if (card.value === cell.value) {
-                        const comboMult = applyComboHit(card.value);
+                        const comboMult = applyComboHit();
                         const baseGain = card.stackCount * cell.gemCount * 10;
                         const gain = Math.floor(baseGain * comboMult);
                         state.score += gain;
@@ -2323,7 +2347,7 @@ function onUp(e) {
                         setTimeout(() => state.particles.push(new Particle(cx, cy, `Time+${rec}`, '#66bb6a', 'text')), 600);
                         if (state.combo >= 2) setTimeout(() => state.particles.push(new Particle(cx, cy - 50, `🔥${state.combo}コンボ！`, '#ef5350', 'text')), 900);
                         cell.isEnemy = false; revealUnknown(row, col);
-                        if (cell.item && cell.item !== 'DOOR') setTimeout(() => collectItem(cell), 900);
+                        // アイテムはパネルに残してタップGETに変更（DOORは除く）
                         state.cards[idx] = null; actionDone = true;
                     }
                     // ※不正解の場合はカードが戻るだけ（メッセージなし）
@@ -2331,7 +2355,7 @@ function onUp(e) {
                 else if (cell.item === 'CREATURE' || cell.item === 'BOSS') {
                     if (card.value === cell.creatureValue) {
                         const isBoss = (cell.item === 'BOSS');
-                        const comboMult = applyComboHit(card.value);
+                        const comboMult = applyComboHit();
                         const baseGain = isBoss ? 2000 : 500;
                         const gain = Math.floor(baseGain * comboMult);
                         state.score += gain;
@@ -2367,7 +2391,7 @@ function onUp(e) {
             if (dist < card.width * 0.8) {
                 const newValue = target.value * card.value;
                 target.value = newValue; target.stackCount += card.stackCount;
-                state.cards[idx] = null; consumeTime(); checkCreatureAttack(); actionDone = true;
+                state.cards[idx] = null; state.combo = 0; consumeTime(); checkCreatureAttack(); actionDone = true;
                 state.particles.push(new Particle(target.x + target.width / 2, target.y + target.height / 2, "x", '#4fc3f7', 'circle'));
                 break;
             }
@@ -2378,7 +2402,7 @@ function onUp(e) {
         if (cx >= tr.x && cx <= tr.x + tr.w && cy >= tr.y && cy <= tr.y + tr.h) {
             const oldVal = state.cards[idx].value;
             state.cards[idx] = new Card(idx, oldVal);
-            consumeTime(); checkCreatureAttack(); actionDone = true;
+            state.combo = 0; consumeTime(); checkCreatureAttack(); actionDone = true;
         }
     }
     if (actionDone) { refillCards(); updateUI(); } else { card.isDragging = false; }
