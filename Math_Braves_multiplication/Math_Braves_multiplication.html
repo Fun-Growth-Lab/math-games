@@ -1316,6 +1316,7 @@ class Card {
         this.slotIndex = slotIndex;
         this.value = generateCardValue(excludeValue);
         this.stackCount = 1;
+        this.multiplier = (Math.random() < 0.05) ? 2 : 1; // 5%で×2ボーナス
 
         this.width = 80;
         this.height = 112;
@@ -1354,26 +1355,22 @@ class Card {
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillText(this.value, this.x + this.width / 2, this.y + this.height * 0.64);
 
-        // スタック表示: ⚔️×N スタイル（左右に分けて十分に離す）
-        if (this.stackCount >= 1) {
-            const iconX = this.x + this.width / 2;
-            const iconY = this.y + this.height * 0.21;
-            const fs = Math.round(this.width * 0.17);
+        // ×N ボーナス表示（5%で付与、重ね合わせで累積）
+        if (this.multiplier > 1) {
+            const bw = this.width * 0.72;
+            const bh = this.height * 0.20;
+            const bx = this.x + (this.width - bw) / 2;
+            const by = this.y + this.height * 0.04;
+            // 赤い矩形背景
+            ctx.fillStyle = '#c62828';
+            roundRect(ctx, bx, by, bw, bh, 5, true, false);
+            ctx.strokeStyle = '#ffcdd2'; ctx.lineWidth = 1.5;
+            roundRect(ctx, bx, by, bw, bh, 5, false, true);
+            // ×N テキスト
+            ctx.font = `900 ${Math.round(bh * 0.68)}px "M PLUS Rounded 1c"`;
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            if (this.stackCount > 1) {
-                // ⚔️と×Nを左右に十分離す
-                const half = fs * 1.0;
-                ctx.font = `${fs}px serif`;
-                ctx.fillText('⚔️', iconX - half, iconY);
-                ctx.font = `900 ${fs}px "M PLUS Rounded 1c"`;
-                ctx.strokeStyle = 'rgba(0,0,0,0.8)'; ctx.lineWidth = 3;
-                ctx.fillStyle = '#ffd54f';
-                ctx.strokeText(`×${this.stackCount}`, iconX + half * 0.7, iconY);
-                ctx.fillText(`×${this.stackCount}`, iconX + half * 0.7, iconY);
-            } else {
-                ctx.font = `${fs}px serif`;
-                ctx.fillText('⚔️', iconX, iconY);
-            }
+            ctx.fillStyle = '#fff';
+            ctx.fillText(`×${this.multiplier}`, this.x + this.width / 2, by + bh / 2);
         }
     }
 }
@@ -1557,7 +1554,7 @@ function triggerLevelUp() {
     updateUI();
     addDungeonLog(`⚡ Lv UP！ <span style="color:#66bb6a">AP+5（確定）</span>`);
 
-    lvText.textContent = `⬆️ Lv${state.level - 1} → Lv${state.level}！  AP+5確定！`;
+    lvText.textContent = `⬆️ Lv${state.level - 1} → Lv${state.level}！`;
     resEl.textContent = '';
     okBtn.classList.add('hidden');
     overlay.classList.remove('hidden');
@@ -2499,11 +2496,19 @@ function drawGrid(ctx) {
                 const isBoss2 = cell.item === 'BOSS';
                 const cImg = isBoss2 ? BOSS_IMAGES[cell.bossImgIdx] : ENEMY_IMAGES[cell.creatureImgIdx];
                 const cEmoji = cell.creatureIcon || (isBoss2 ? "🐲" : "👾");
-                drawImageOrEmoji(ctx, cImg, cEmoji, x + w/2, y + h/2 - 10, w * 0.6);
-                const valFontSize = isBoss2 ? w*0.25 : w*0.3;
+                drawImageOrEmoji(ctx, cImg, cEmoji, x + w/2, y + h/2 - 8, w * 0.55);
+                const valFontSize = isBoss2 ? w*0.22 : w*0.27;
                 ctx.font = `bold ${valFontSize}px "M PLUS Rounded 1c"`;
                 ctx.fillStyle = getNumberColor(cell.creatureValue);
-                ctx.fillText(cell.creatureValue, x + w/2, y + h/2 + 25);
+                ctx.fillText(cell.creatureValue, x + w/2, y + h/2 + 22);
+                // ⭐ 表示
+                const gc = cell.gemCount || 1;
+                const gSz = w * 0.14;
+                const gTotalW = gc * gSz;
+                let gX = x + (w - gTotalW) / 2 + gSz / 2;
+                ctx.font = `${gSz}px sans-serif`;
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                for (let i = 0; i < gc; i++) ctx.fillText('⭐', gX + i * gSz, y + h * 0.13);
             }
         }
     });
@@ -2646,7 +2651,7 @@ function onUp(e) {
             if (cell.isVisible) {
                 if (cell.isEnemy) {
                     if (card.value === cell.value) {
-                        const gain = card.stackCount * cell.gemCount * 10;
+                        const gain = cell.value * cell.gemCount * (card.multiplier || 1);
                         state.score += gain;
                         state.panelsDestroyed++;
                         if (gain > state.maxSingleScore) state.maxSingleScore = gain;
@@ -2664,7 +2669,8 @@ function onUp(e) {
                 else if (cell.item === 'CREATURE' || cell.item === 'BOSS') {
                     if (card.value === cell.creatureValue) {
                         const isBoss = (cell.item === 'BOSS');
-                        const gain = isBoss ? 2000 : 500;
+                        const bonus = isBoss ? 5 : 2;
+                        const gain = cell.creatureValue * (cell.gemCount || 1) * (card.multiplier || 1) * bonus;
                         state.score += gain;
                         let rec = isBoss ? 20 : 5;
                         state.time += rec;
@@ -2697,8 +2703,9 @@ function onUp(e) {
             const dy = cy - (target.y + target.height / 2);
             const dist = Math.sqrt(dx * dx + dy * dy);
             if (dist < card.width * 0.8) {
-                const newValue = target.value * card.value;
-                target.value = newValue; target.stackCount += card.stackCount;
+                target.value = target.value * card.value;
+                target.multiplier = (target.multiplier || 1) * (card.multiplier || 1);
+                target.stackCount += card.stackCount;
                 state.cards[idx] = null; consumeTime(); checkCreatureAttack(); actionDone = true;
                 state.particles.push(new Particle(target.x + target.width / 2, target.y + target.height / 2, "x", '#4fc3f7', 'circle'));
                 break;
