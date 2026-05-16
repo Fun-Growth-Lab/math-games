@@ -408,10 +408,6 @@
                     <div class="info-label">カギ 🗝️</div>
                     <div id="disp-key" class="info-value" style="color:var(--accent-orange);">0/1</div>
                 </div>
-                <div class="info-item" style="margin-bottom:0;">
-                    <div class="info-label">コンボ 🔥</div>
-                    <div id="disp-combo" class="info-value" style="font-size:1.1rem; color:var(--accent-red);">0</div>
-                </div>
             </div>
 
             <div class="info-box" style="flex:1; display:flex; flex-direction:column; min-height:0; margin-bottom:0;">
@@ -454,9 +450,6 @@
                 </div>
             </div>
 
-            <div id="combo-display" class="info-box hidden" style="text-align:center; padding:8px 10px; flex-shrink:0;">
-                <div id="disp-combo-count" style="font-size:1.6rem; font-weight:900; color:var(--accent-gold);"></div>
-            </div>
 
             <div class="info-box" style="flex:1; display:flex; flex-direction:column; min-height:0;">
                 <h2>📜 ダンジョンログ</h2>
@@ -789,8 +782,10 @@ for (let _bi = 1; _bi <= 3; _bi++) {
 // パネル重みも同様（大きい数ほど出にくい）
 const PRESET_EASY = {
     label: "やさしい",
-    weights: { 2: 50, 3: 41, 4: 35 },                         // カード: 2,3,4
-    enemyTable: { 2:50, 3:41, 4:35, 6:28, 8:25, 9:23, 12:20, 16:17 }, // パネル: 2,3,4,6,8,9,12,16
+    weights: { 2: 55, 3: 48, 4: 40 },                         // カード: 2,3,4
+    enemyTable: {                                               // パネル: 6,8,9,12,16,18,24,27,32
+        6:55, 8:48, 9:44, 12:36, 16:28, 18:24, 24:18, 27:14, 32:10
+    },
     initTime: 20,
     thresholds: CROWN_THRESHOLDS,
     dropRates: { time: 25, score: 42, item: 18, creature: 15 },
@@ -798,9 +793,11 @@ const PRESET_EASY = {
 };
 const PRESET_NORMAL = {
     label: "ふつう",
-    weights: { 2: 50, 3: 41, 4: 35, 5: 31 },                  // カード: 2,3,4,5
-    enemyTable: { 2:50, 3:41, 4:35, 5:31, 6:28, 8:25, 9:23, 10:22,
-                  12:20, 15:18, 16:17, 18:16, 20:15, 24:14, 25:14 }, // パネル: 2,3,4,5,6,8,9,10,12,15,16,18,20,24,25
+    weights: { 2: 52, 3: 46, 4: 40, 5: 34 },                  // カード: 2,3,4,5
+    enemyTable: {                                               // パネル: 6,8,9,10,12,15,16,18,20,24,25,27,30,32,36,40,45,48,50
+        6:52, 8:46, 9:43, 10:40, 12:36, 15:30, 16:28, 18:26,
+        20:24, 24:20, 25:19, 27:17, 30:15, 32:14, 36:11, 40:9, 45:7, 48:6, 50:5
+    },
     initTime: 20,
     thresholds: CROWN_THRESHOLDS,
     dropRates: { time: 23, score: 34, item: 18, creature: 25 },
@@ -808,12 +805,11 @@ const PRESET_NORMAL = {
 };
 const PRESET_HARD = {
     label: "むずかしい",
-    weights: { 2: 50, 3: 41, 4: 35, 5: 31, 6: 28, 7: 26, 8: 25, 9: 23 }, // カード: 2〜9
-    enemyTable: {                                               // パネル: 2〜81 (掛け算で作れる数のみ)
-        2:70, 3:58, 4:50, 5:44, 6:40, 7:37, 8:35, 9:33,
-        10:31, 12:28, 14:26, 15:25, 16:25, 18:23, 20:22, 21:21,
-        24:20, 25:20, 27:19, 28:18, 30:18, 32:17, 35:16, 36:16,
-        40:15, 42:15, 45:14, 48:14, 49:14, 54:13, 56:13, 63:12, 64:12, 72:11, 81:11
+    weights: { 2: 50, 3: 44, 4: 38, 5: 33, 6: 29, 7: 26, 8: 24, 9: 22 }, // カード: 2〜9
+    enemyTable: {                                               // パネル: 10〜81 (掛け算で作れる数のみ)
+        10:42, 12:38, 14:35, 15:33, 16:32, 18:29, 20:27, 21:26,
+        24:23, 25:22, 27:20, 28:19, 30:18, 32:16, 35:14, 36:14,
+        40:12, 42:11, 45:10, 48:9, 49:9, 54:7, 56:6, 63:5, 64:5, 72:4, 81:3
     },
     initTime: 20,
     thresholds: CROWN_THRESHOLDS,
@@ -861,8 +857,6 @@ let state = {
 
     panelsDestroyed: 0,
     dungeonLog: [],
-    combo: 0,
-    maxCombo: 0,
     rankingMode: 'LOCAL'
 };
 
@@ -886,9 +880,7 @@ const ui = {
     time: document.getElementById('disp-time'),
     floor: document.getElementById('disp-floor'),
     key: document.getElementById('disp-key'),
-    combo: document.getElementById('disp-combo'),
-    comboDisplay: document.getElementById('combo-display'),
-    dispComboCount: document.getElementById('disp-combo-count'),
+
     totalScore: document.getElementById('disp-total-score'),
     maxScore: document.getElementById('disp-max-score'),
     titleWrapper: document.getElementById('title-wrapper'),
@@ -1183,14 +1175,6 @@ function getNumberColor(n) {
     return '#ef9a9a';                     // 薄赤: それ以外（素数など）
 }
 
-// 連続ヒットコンボ処理: パネル破壊・敵撃破のたびに呼び出す
-// 倍率 = 1 + 0.25 × (現コンボ数)。呼び出し後にコンボをインクリメントする。
-function applyComboHit() {
-    const mult = 1 + 0.25 * state.combo; // 現コンボ数を使って倍率計算
-    state.combo++;
-    if (state.combo > state.maxCombo) state.maxCombo = state.combo;
-    return mult;
-}
 
 function getRankingKey(diff) { return `math_braves_multi_ranking_${diff}`; }
 function getClearCountKey(diff) { return `math_braves_multi_clears_${diff}`; }
@@ -1336,18 +1320,25 @@ class Card {
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillText(this.value, this.x + this.width / 2, this.y + this.height * 0.64);
 
-        // スタック表示: purple（数字と離す）
+        // スタック表示: ⚔️×N スタイル
         if (this.stackCount >= 1) {
-            const r = this.width * 0.13;
-            const circleX = this.x + this.width / 2;
-            const circleY = this.y + this.height * 0.20;
-            ctx.beginPath();
-            ctx.arc(circleX, circleY, r, 0, Math.PI * 2);
-            ctx.fillStyle = '#7e57c2'; ctx.fill();
-            ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 2; ctx.stroke();
+            const iconX = this.x + this.width / 2;
+            const iconY = this.y + this.height * 0.21;
+            const fs = Math.round(this.width * 0.18);
+            // ⚔️絵文字（システムフォント）
+            ctx.font = `${fs}px serif`;
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             if (this.stackCount > 1) {
-                ctx.fillStyle = '#fff'; ctx.font = `bold ${this.width * 0.2}px "M PLUS Rounded 1c"`;
-                ctx.fillText(`x${this.stackCount}`, circleX, circleY);
+                // ⚔️を左、×Nを右に分けて描画
+                const swordX = iconX - fs * 0.5;
+                ctx.fillText('⚔️', swordX, iconY);
+                ctx.font = `900 ${fs}px "M PLUS Rounded 1c"`;
+                ctx.strokeStyle = 'rgba(0,0,0,0.8)'; ctx.lineWidth = 3;
+                ctx.fillStyle = '#ffd54f';
+                ctx.strokeText(`×${this.stackCount}`, iconX + fs * 0.4, iconY);
+                ctx.fillText(`×${this.stackCount}`, iconX + fs * 0.4, iconY);
+            } else {
+                ctx.fillText('⚔️', iconX, iconY);
             }
         }
     }
@@ -1610,8 +1601,7 @@ function collectItem(cell) {
         let base = 200;
         if (state.difficulty === 'NORMAL') base = Math.floor(200 * 1.5);
         if (state.difficulty === 'HARD') base = Math.floor(200 * 2.0);
-        const comboMult = 1 + 0.25 * state.combo;
-        scoreGain = Math.floor(base * comboMult);
+        scoreGain = base;
         symbol = "🎁"; color = '#ffca28';
         addDungeonLog(`🎁 スコアボーナス！ <span style="color:#ffd54f">+${scoreGain}</span>`);
     }
@@ -1666,7 +1656,7 @@ function initGame() {
     state.floor = 1; state.items = []; state.itemSelectMode = null; state.itemSelectValue = null; state.lastCardValue = 0; state.cards = [null,null,null,null,null];
     state.particles = []; state.isGameOverProcessing = false; state.inputLocked = false;
     state.damageEffectTimer = 0; state.panelsDestroyed = 0;
-    state.dungeonLog = []; state.combo = 0; state.maxCombo = 0;
+    state.dungeonLog = [];
     renderDungeonLog();
     renderItemList();
     ui.difficultyLabel.textContent = CONFIG.label;
@@ -1694,19 +1684,7 @@ function updateUI() {
     ui.key.textContent = `${state.keysFound}/${state.keysNeeded}`;
     ui.totalScore.textContent = state.score;
     ui.maxScore.textContent = state.maxSingleScore;
-    if (ui.combo) {
-        ui.combo.textContent = state.combo > 0 ? `${state.combo}` : '0';
-        ui.combo.style.color = state.combo >= 3 ? '#ffd54f' : state.combo > 0 ? '#ef5350' : 'var(--text-muted)';
-    }
-    if (ui.comboDisplay && ui.dispComboCount) {
-        if (state.combo > 0) {
-            ui.comboDisplay.classList.remove('hidden');
-            ui.dispComboCount.textContent = `🔥 ${state.combo}コンボ！`;
-            ui.dispComboCount.style.color = state.combo >= 3 ? '#ffd54f' : '#ef5350';
-        } else {
-            ui.comboDisplay.classList.add('hidden');
-        }
-    }
+
 }
 
 function consumeTime() {
@@ -2489,9 +2467,7 @@ function onUp(e) {
             if (cell.isVisible) {
                 if (cell.isEnemy) {
                     if (card.value === cell.value) {
-                        const comboMult = applyComboHit();
-                        const baseGain = card.stackCount * cell.gemCount * 10;
-                        const gain = Math.floor(baseGain * comboMult);
+                        const gain = card.stackCount * cell.gemCount * 10;
                         state.score += gain;
                         state.panelsDestroyed++;
                         if (gain > state.maxSingleScore) state.maxSingleScore = gain;
@@ -2503,7 +2479,6 @@ function onUp(e) {
                         setTimeout(() => state.particles.push(new Particle(cx, cy, `+${gain}`, '#ffd54f', 'text')), 0);
                         setTimeout(() => checkPraise(gain, cx, cy), 300);
                         setTimeout(() => state.particles.push(new Particle(cx, cy, `Time+${rec}`, '#66bb6a', 'text')), 600);
-                        if (state.combo >= 2) setTimeout(() => state.particles.push(new Particle(cx, cy - 50, `🔥${state.combo}コンボ！`, '#ef5350', 'text')), 900);
                         cell.isEnemy = false; revealUnknown(row, col);
                         if (cell.item && cell.item !== 'DOOR') setTimeout(() => collectItem(cell), 400);
                         state.cards[idx] = null; actionDone = true;
@@ -2513,9 +2488,7 @@ function onUp(e) {
                 else if (cell.item === 'CREATURE' || cell.item === 'BOSS') {
                     if (card.value === cell.creatureValue) {
                         const isBoss = (cell.item === 'BOSS');
-                        const comboMult = applyComboHit();
-                        const baseGain = isBoss ? 2000 : 500;
-                        const gain = Math.floor(baseGain * comboMult);
+                        const gain = isBoss ? 2000 : 500;
                         state.score += gain;
                         let rec = isBoss ? 20 : 5;
                         state.time += rec;
@@ -2549,7 +2522,7 @@ function onUp(e) {
             if (dist < card.width * 0.8) {
                 const newValue = target.value * card.value;
                 target.value = newValue; target.stackCount += card.stackCount;
-                state.cards[idx] = null; state.combo = 0; consumeTime(); checkCreatureAttack(); actionDone = true;
+                state.cards[idx] = null; consumeTime(); checkCreatureAttack(); actionDone = true;
                 state.particles.push(new Particle(target.x + target.width / 2, target.y + target.height / 2, "x", '#4fc3f7', 'circle'));
                 break;
             }
@@ -2560,7 +2533,7 @@ function onUp(e) {
         if (cx >= tr.x && cx <= tr.x + tr.w && cy >= tr.y && cy <= tr.y + tr.h) {
             const oldVal = state.cards[idx].value;
             state.cards[idx] = new Card(idx, oldVal);
-            state.combo = 0; consumeTime(); checkCreatureAttack(); actionDone = true;
+            consumeTime(); checkCreatureAttack(); actionDone = true;
         }
     }
     if (actionDone) { refillCards(); updateUI(); } else { card.isDragging = false; }
