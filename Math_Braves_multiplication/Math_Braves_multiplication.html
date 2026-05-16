@@ -569,6 +569,19 @@
         </div>
     </div>
 
+    <!-- アイテム確認ポップアップ -->
+    <div id="item-popup" class="hidden" style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:150;display:flex;justify-content:center;align-items:center;background:rgba(0,0,0,0.65);">
+        <div style="background:#181410;padding:22px 24px;border-radius:16px;border:2px solid var(--accent-gold);min-width:230px;max-width:340px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.7);">
+            <div id="item-popup-icon" style="margin-bottom:8px;height:56px;display:flex;align-items:center;justify-content:center;font-size:2.4rem;"></div>
+            <div id="item-popup-name" style="font-size:1.05rem;font-weight:900;color:var(--accent-gold);margin-bottom:10px;"></div>
+            <div id="item-popup-desc" style="font-size:0.82rem;color:var(--text-light);line-height:1.65;margin-bottom:18px;text-align:left;"></div>
+            <div style="display:flex;gap:12px;justify-content:center;">
+                <button id="item-popup-use" class="btn btn-success" style="width:110px;height:42px;font-size:0.95rem;">つかう</button>
+                <button id="item-popup-cancel" class="btn btn-danger" style="width:110px;height:42px;font-size:0.95rem;">やめる</button>
+            </div>
+        </div>
+    </div>
+
     <!-- あそびかたオーバーレイ -->
     <div id="howto-overlay" class="hidden">
         <div class="overlay-content">
@@ -739,16 +752,16 @@ const CROWN_THRESHOLDS = { BRONZE: 5000, SILVER: 7500, GOLD: 10000 };
 const CREATURE_ICONS = ["👾", "🦇", "🕷", "🐍", "🦂"];
 
 const ITEMS = {
-    1:  { name: 'カギ探知の巻物',  emoji: '🔑', img: 'item_1.png',  needsTarget: false },
-    2:  { name: 'ドア探知の巻物',  emoji: '🚪', img: 'item_2.png',  needsTarget: false },
-    3:  { name: '透視の巻物',      emoji: '🔍', img: 'item_3.png',  needsTarget: false },
-    4:  { name: '地形変換の杖',    emoji: '🔄', img: 'item_4.png',  needsTarget: false },
-    5:  { name: '大地形変換の杖',  emoji: '💫', img: 'item_5.png',  needsTarget: false },
-    6:  { name: '手札交換の杖',    emoji: '✨', img: 'item_6.png',  needsTarget: false },
-    7:  { name: '小爆弾',          emoji: '💣', img: 'item_7.png',  needsTarget: true  },
-    8:  { name: '十字爆弾',        emoji: '💥', img: 'item_8.png',  needsTarget: true  },
-    9:  { name: '２分の１の剣',    emoji: '⚔️', img: 'item_9.png',  needsTarget: true  },
-    10: { name: '数字カード',       emoji: '🃏', img: 'item_10.png', needsTarget: false },
+    1:  { name: 'カギ探知の巻物',  emoji: '🔑', img: 'item_1.png',  needsTarget: false, desc: 'まだ見つかっていないカギの場所を1か所だけ明らかにします。' },
+    2:  { name: 'ドア探知の巻物',  emoji: '🚪', img: 'item_2.png',  needsTarget: false, desc: 'ドアがどこにあるかを地図に表示します。' },
+    3:  { name: '透視の巻物',      emoji: '🔍', img: 'item_3.png',  needsTarget: false, desc: 'まだ開いていないパネル3マスの数値をこっそりのぞき見ます。' },
+    4:  { name: '地形変換の杖',    emoji: '🔄', img: 'item_4.png',  needsTarget: false, desc: 'パネルの約半分の数値をランダムにシャッフルします。' },
+    5:  { name: '大地形変換の杖',  emoji: '💫', img: 'item_5.png',  needsTarget: false, desc: 'すべての敵パネルの数値を一斉にシャッフルします。' },
+    6:  { name: '手札交換の杖',    emoji: '✨', img: 'item_6.png',  needsTarget: false, desc: '手札5枚をすべて新しいカードに引き直します。APは消費しません。' },
+    7:  { name: '小爆弾',          emoji: '💣', img: 'item_7.png',  needsTarget: true,  desc: '1マスを爆発させてパネルを破壊します。周囲のマスの数値もオープンされます。（ドラッグで対象指定）' },
+    8:  { name: '十字爆弾',        emoji: '💥', img: 'item_8.png',  needsTarget: true,  desc: '十字型5マスを一気に爆発・破壊します。周囲の数値もオープンされます。（ドラッグで対象指定）' },
+    9:  { name: '２分の１の剣',    emoji: '⚔️', img: 'item_9.png',  needsTarget: true,  desc: '50%の確率で敵を一撃で倒します。ボスには効きません。（ドラッグで対象指定）' },
+    10: { name: '数字カード',       emoji: '🃏', img: 'item_10.png', needsTarget: false, desc: '手札カードにドロップすることで、そのカードの数値を掛け算できます。（ドラッグで手札に使用）' },
 };
 // アイテム画像プリロード (1-10: アイテム, 11: カギ, 12: ドア, 13: スコアボーナス, 14: 時計)
 const ITEM_IMAGES = {};
@@ -1589,9 +1602,7 @@ function collectItem(cell) {
         addDungeonLog(`🗝️ カギをゲット！ <span style="color:#ffa726">${state.keysFound}/${state.keysNeeded}</span>`);
     }
     else if (cell.item === 'ITEM_TIME') {
-        if (state.difficulty === 'HARD') timeGain = 4;
-        else if (state.difficulty === 'NORMAL') timeGain = 3;
-        else timeGain = 2;
+        timeGain = 5;
         symbol = "⏰"; color = '#66bb6a';
         addDungeonLog(`⏰ タイム回復！ <span style="color:#66bb6a">AP+${timeGain}</span>`);
     }
@@ -1783,6 +1794,40 @@ function addItemToInventory(id) {
     renderItemList();
 }
 
+// アイテム確認ポップアップを表示（即時使用アイテム用）
+function showItemPopup(id, value) {
+    if (state.screen !== 'PLAYING') return;
+    const item = ITEMS[id];
+    if (!item) return;
+    const popup  = document.getElementById('item-popup');
+    const iconEl = document.getElementById('item-popup-icon');
+    const nameEl = document.getElementById('item-popup-name');
+    const descEl = document.getElementById('item-popup-desc');
+    const useBtn = document.getElementById('item-popup-use');
+    const cancelBtn = document.getElementById('item-popup-cancel');
+
+    // アイコン
+    iconEl.innerHTML = '';
+    iconEl.style.fontSize = '2.4rem';
+    const preloaded = ITEM_IMAGES[id];
+    if (preloaded && preloaded.complete && preloaded.naturalWidth > 0) {
+        const imgEl = document.createElement('img');
+        imgEl.src = preloaded.src;
+        imgEl.style.cssText = 'width:50px;height:50px;object-fit:contain;';
+        iconEl.appendChild(imgEl);
+    } else {
+        iconEl.textContent = item.emoji;
+    }
+    nameEl.textContent = id === 10 ? `${value}のカード` : item.name;
+    descEl.textContent = item.desc || '';
+
+    popup.classList.remove('hidden');
+
+    const cleanup = () => { popup.classList.add('hidden'); useBtn.onclick = null; cancelBtn.onclick = null; };
+    useBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); cleanup(); onUseItemButton(id, value); };
+    cancelBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); cleanup(); };
+}
+
 // ============================================================
 // アイテムドラッグシステム（対象指定アイテム・数字カードを直接ドロップ）
 // ============================================================
@@ -1960,9 +2005,9 @@ function renderItemList() {
             row.addEventListener('mousedown', (e) => { e.preventDefault(); startItemDrag({ id: _invId, value: _invVal }, e); });
             row.addEventListener('touchstart', (e) => { e.stopPropagation(); e.preventDefault(); startItemDrag({ id: _invId, value: _invVal }, e); }, { passive: false });
         } else {
-            // 即時使用: クリック/タップで使用
-            row.addEventListener('click', () => onUseItemButton(_invId, _invVal));
-            row.addEventListener('touchstart', (e) => { e.stopPropagation(); e.preventDefault(); onUseItemButton(_invId, _invVal); }, { passive: false });
+            // 即時使用: クリック/タップで確認ポップアップを表示
+            row.addEventListener('click', () => showItemPopup(_invId, _invVal));
+            row.addEventListener('touchstart', (e) => { e.stopPropagation(); e.preventDefault(); showItemPopup(_invId, _invVal); }, { passive: false });
         }
         container.appendChild(row);
     });
@@ -2052,42 +2097,37 @@ function executeItem(id, targetCell) {
             if (!targetCell) { consumed = false; break; }
             const pos7 = getGridPos(targetCell.row, targetCell.col);
             const cx7 = pos7.x + pos7.w/2, cy7 = pos7.y + pos7.h/2;
-            if (!targetCell.isVisible) {
-                targetCell.isVisible = true; targetCell.isUnknown = false;
-                state.particles.push(new Particle(cx7, cy7, "💥", '#ffa726', 'text'));
-                revealUnknown(targetCell.row, targetCell.col);
-                if (!targetCell.isEnemy && targetCell.item && targetCell.item !== 'DOOR') setTimeout(() => collectItem(targetCell), 300);
-            } else if (targetCell.isEnemy) {
+            // 可視・非可視に関わらずオープン＆破壊
+            targetCell.isVisible = true; targetCell.isUnknown = false;
+            state.particles.push(new Particle(cx7, cy7, "💥", '#ffa726', 'text'));
+            state.particles.push(new Particle(cx7, cy7, "💥", '#ef5350', 'circle'));
+            if (targetCell.isEnemy) {
                 targetCell.isEnemy = false;
-                state.particles.push(new Particle(cx7, cy7, "💥", '#ffa726', 'text'));
-                revealUnknown(targetCell.row, targetCell.col);
-                if (targetCell.item && targetCell.item !== 'DOOR') setTimeout(() => collectItem(targetCell), 300);
-            } else { consumed = false; }
-            if (consumed) addDungeonLog(`💣 小爆弾をつかった！`);
+                if (targetCell.item && targetCell.item !== 'DOOR') setTimeout(() => collectItem(targetCell), 400);
+            }
+            revealUnknown(targetCell.row, targetCell.col);
+            addDungeonLog(`💣 小爆弾！ 1マスを爆破！`);
         } break;
         case 8: {
             if (!targetCell) { consumed = false; break; }
             const dirs8 = [[0,0],[-1,0],[1,0],[0,-1],[0,1]];
+            // 十字5マスを全てオープン＆破壊
             dirs8.forEach(([dr,dc]) => {
                 const nr = targetCell.row+dr, nc = targetCell.col+dc;
                 if (nr<0||nr>=GRID_ROWS||nc<0||nc>=GRID_COLS) return;
                 const c8 = state.grid[nr*GRID_COLS+nc];
                 if (!c8) return;
                 const p8 = getGridPos(c8.row, c8.col);
+                c8.isVisible = true; c8.isUnknown = false;
                 state.particles.push(new Particle(p8.x+p8.w/2, p8.y+p8.h/2, "💥", '#ffa726', 'text'));
-                if (!c8.isVisible) {
-                    c8.isVisible = true; c8.isUnknown = false;
-                    if (!c8.isEnemy && c8.item && c8.item !== 'DOOR') setTimeout(() => collectItem(c8), 300);
-                } else if (c8.isEnemy) {
+                state.particles.push(new Particle(p8.x+p8.w/2, p8.y+p8.h/2, "💥", '#ef5350', 'circle'));
+                if (c8.isEnemy) {
                     c8.isEnemy = false;
-                    if (c8.item && c8.item !== 'DOOR') setTimeout(() => collectItem(c8), 300);
+                    if (c8.item && c8.item !== 'DOOR') setTimeout(() => collectItem(c8), 400);
                 }
+                revealUnknown(c8.row, c8.col);
             });
-            dirs8.forEach(([dr,dc]) => {
-                const nr = targetCell.row+dr, nc = targetCell.col+dc;
-                if (nr>=0&&nr<GRID_ROWS&&nc>=0&&nc<GRID_COLS) revealUnknown(nr, nc);
-            });
-            addDungeonLog(`💥 十字爆弾をつかった！`);
+            addDungeonLog(`💥 十字爆弾！ 十字5マスを爆破！`);
         } break;
         case 9: {
             if (!targetCell) { consumed = false; break; }
@@ -2455,8 +2495,7 @@ function onUp(e) {
                         state.score += gain;
                         state.panelsDestroyed++;
                         if (gain > state.maxSingleScore) state.maxSingleScore = gain;
-                        let scoreBonus = Math.floor(gain / 50); if (scoreBonus > 20) scoreBonus = 20;
-                        let rec = 1 + scoreBonus;
+                        const rec = 2;
                         state.time += rec;
 
                         addDungeonLog(`⚔️ <b style="color:${getNumberColor(cell.value)}">${cell.value}</b> のパネル！ <span style="color:#ffd54f">+${gain}</span>`);
@@ -2478,7 +2517,7 @@ function onUp(e) {
                         const baseGain = isBoss ? 2000 : 500;
                         const gain = Math.floor(baseGain * comboMult);
                         state.score += gain;
-                        let rec = isBoss ? 20 : 3;
+                        let rec = isBoss ? 20 : 5;
                         state.time += rec;
 
                         state.particles.push(new Particle(cx, cy, `+${gain}`, '#ffd54f', 'text'));
