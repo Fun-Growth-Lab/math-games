@@ -781,7 +781,7 @@ const CREATURE_ICONS = ["👾", "🦇", "🕷", "🐍", "🦂"];
 const ITEMS = {
     1:  { name: 'カギ探知の巻物',  emoji: '🔑', img: 'item_1.png',  needsTarget: false, desc: 'まだ見つかっていないカギの場所を1か所だけ明らかにします。' },
     2:  { name: 'ドア探知の巻物',  emoji: '🚪', img: 'item_2.png',  needsTarget: false, desc: 'ドアがどこにあるかを地図に表示します。' },
-    3:  { name: '透視の巻物',      emoji: '🔍', img: 'item_3.png',  needsTarget: false, desc: 'まだ開いていないパネル3マスの数値をこっそりのぞき見ます。' },
+    3:  { name: '透視の巻物',      emoji: '🔍', img: 'item_3.png',  needsTarget: false, desc: 'まだ開いていないパネル5マスの数値をこっそりのぞき見ます。' },
     4:  { name: '地形変換の杖',    emoji: '🔄', img: 'item_4.png',  needsTarget: false, desc: 'パネルの約半分の数値をランダムにシャッフルします。' },
     5:  { name: '大地形変換の杖',  emoji: '💫', img: 'item_5.png',  needsTarget: false, desc: 'すべてのパネルの数値を一斉にシャッフルします。' },
     6:  { name: '手札交換の杖',    emoji: '✨', img: 'item_6.png',  needsTarget: false, desc: '手札5枚をすべて新しいカードに引き直します。APは消費しません。' },
@@ -828,7 +828,7 @@ const PRESET_EASY = {
     ],
     initTime: 20,
     thresholds: CROWN_THRESHOLDS,
-    dropRates: { time: 22, score: 25, item: 28, creature: 30 },
+    dropRates: { time: 30, score: 20, item: 15, numCard: 15, creature: 20 },
     bossHpList: [80, 100, 120, 150, 160]
 };
 const PRESET_NORMAL = {
@@ -844,12 +844,12 @@ const PRESET_NORMAL = {
     ],
     initTime: 20,
     thresholds: CROWN_THRESHOLDS,
-    dropRates: { time: 20, score: 17, item: 28, creature: 40 },
+    dropRates: { time: 30, score: 10, item: 15, numCard: 15, creature: 30 },
     bossHpList: [200, 220, 250, 280, 320, 360]
 };
 const PRESET_HARD = {
     label: "むずかしい",
-    weights: { 2: 30, 3: 30, 4: 5, 5: 15, 6: 5, 7: 10, 8: 3, 9: 2 }, // カード: 2〜9
+    weights: { 2: 35, 3: 25, 4: 5, 5: 15, 6: 5, 7: 10, 8: 3, 9: 2 }, // カード: 2〜9
     floorEnemyTables: [
         null, // [0] unused
         { 10:42, 12:38, 14:35, 15:33, 16:32, 18:29, 20:27, 21:26, 24:23, 25:22, 27:20, 28:19, 30:18, 32:16, 35:14, 36:14, 40:12, 42:11, 45:10, 48:9, 49:9 }, // F1 〜49
@@ -860,7 +860,7 @@ const PRESET_HARD = {
     ],
     initTime: 20,
     thresholds: CROWN_THRESHOLDS,
-    dropRates: { time: 16, score: 13, item: 25, creature: 50 },
+    dropRates: { time: 30, score: 0, item: 15, numCard: 15, creature: 40 },
     bossHpList: [300, 340, 380, 420, 460, 500, 550]
 };
 
@@ -1697,15 +1697,15 @@ function triggerLevelUp() {
     // リフロー強制 → アニメーション開始
     reelEl.offsetHeight;
     setTimeout(() => {
-        reelEl.style.transition = `transform 2.6s cubic-bezier(0.08, 0.82, 0.17, 1.0)`;
+        reelEl.style.transition = `transform 1.8s cubic-bezier(0.08, 0.82, 0.17, 1.0)`;
         reelEl.style.transform = `translateY(-${spinN * itemH}px)`;
     }, 80);
 
-    // アニメーション終了後に結果表示（ゲット！のみ）
+    // アニメーション終了後にうけとるボタン表示（ゲット！テキストなし）
     setTimeout(() => {
-        resEl.innerHTML = `<span style="color:var(--accent-gold)">ゲット！</span>`;
+        resEl.textContent = '';
         okBtn.classList.remove('hidden');
-    }, 2850);
+    }, 1980);
 
     // うけとるボタン: click + touchend 両対応
     const onOk = (e) => {
@@ -1823,6 +1823,14 @@ function initFloor() {
             continue;
         }
 
+        cumulative += (rates.numCard || 0);
+        if (rnd < cumulative) {
+            cells[idx].item = 'ITEM_NUM_CARD';
+            // 数値カードの数値は難易度のカード重みから抽選
+            cells[idx].itemNumCardValue = generateCardValue();
+            continue;
+        }
+
         cumulative += rates.creature;
         if (rnd < cumulative) {
             cells[idx].item = 'CREATURE';
@@ -1902,6 +1910,12 @@ function collectItem(cell) {
         addItemToInventory(itemId);
         addDungeonLog(`🎒 <b style="color:#ba68c8">${item.emoji} ${item.name}</b> をゲット！`);
     }
+    else if (cell.item === 'ITEM_NUM_CARD') {
+        const numVal = cell.itemNumCardValue || generateCardValue();
+        symbol = '🃏'; color = '#4fc3f7';
+        addItemToInventory(10, numVal); // item id=10 は数字カード
+        addDungeonLog(`🃏 <b style="color:#4fc3f7">${numVal}のカード</b> をゲット！`);
+    }
 
     state.score += scoreGain; state.time += timeGain;
 
@@ -1914,6 +1928,7 @@ function collectItem(cell) {
     else if (cell.item === 'ITEM_TIME') pickupImg = ITEM_IMAGES[14];
     else if (cell.item === 'ITEM_SCORE') pickupImg = ITEM_IMAGES[13];
     else if (cell.item === 'ITEM_BAG') pickupImg = cell.itemBagId ? ITEM_IMAGES[cell.itemBagId] : null;
+    else if (cell.item === 'ITEM_NUM_CARD') pickupImg = ITEM_IMAGES[10];
     state.particles.push(new Particle(cx, cy, symbol, color, 'image', pickupImg));
 
     let delay = 200;
@@ -2045,10 +2060,10 @@ function showResultScreen(title, titleColor, isClear, finalScore, timeBonus, max
     }
 }
 
-function addItemToInventory(id) {
+function addItemToInventory(id, presetValue = null) {
     if (id === 10) {
-        // 数字カード: 入手時に数値を確定。同じ数値はスタック、異なる数値は別エントリ
-        const numVal = generateCardValue();
+        // 数字カード: 数値を確定（外部指定があればそれを使う）
+        const numVal = presetValue !== null ? presetValue : generateCardValue();
         const existing = state.items.find(i => i.id === 10 && i.value === numVal);
         if (existing) { existing.count++; } else { state.items.push({ id: 10, value: numVal, count: 1 }); }
     } else {
@@ -2381,8 +2396,8 @@ function executeItem(id, targetCell) {
         case 3: {
             let hidden = state.grid.filter(c => !c.isVisible && c.isEnemy);
             for (let i = hidden.length - 1; i > 0; i--) { const j = Math.floor(Math.random()*(i+1)); [hidden[i],hidden[j]]=[hidden[j],hidden[i]]; }
-            hidden.slice(0, 3).forEach(c => { c.peekRevealed = true; });
-            addDungeonLog(`🔍 ３マスの数値をとうし！`);
+            hidden.slice(0, 5).forEach(c => { c.peekRevealed = true; });
+            addDungeonLog(`🔍 ５マスの数値をとうし！`);
             state.particles.push(new Particle(state.width/2, state.height/2, "透視！", '#4fc3f7', 'text'));
         } break;
         case 4: {
@@ -2657,6 +2672,9 @@ function drawGrid(ctx) {
                 const bagImg = bagId ? ITEM_IMAGES[bagId] : null;
                 const bagEmoji = bagId && ITEMS[bagId] ? ITEMS[bagId].emoji : '🎒';
                 drawImageOrEmoji(ctx, bagImg, bagEmoji, cx, cy, w * 0.52);
+            }
+            else if (cell.item === 'ITEM_NUM_CARD') {
+                drawImageOrEmoji(ctx, ITEM_IMAGES[10], '🃏', cx, cy, w * 0.52);
             }
             else if (cell.item === 'CREATURE' || cell.item === 'BOSS') {
                 const isBoss2 = cell.item === 'BOSS';
