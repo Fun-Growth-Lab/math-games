@@ -830,7 +830,8 @@ const PRESET_EASY = {
     thresholds: CROWN_THRESHOLDS,
     dropRates: { time: 10, score: 10, item: 10, numCard: 10, creature: 20 }, // 残り40%=空
     expInitial: 100,
-    bossHpList: [80, 100, 120, 150, 160]
+    // やさしいはカード2,3,4 → 2^a×3^b の形のみ有効
+    bossHpList: [48, 54, 64, 72, 81, 96]
 };
 const PRESET_NORMAL = {
     label: "ふつう",
@@ -847,7 +848,8 @@ const PRESET_NORMAL = {
     thresholds: CROWN_THRESHOLDS,
     dropRates: { time: 10, score: 10, item: 10, numCard: 10, creature: 30 }, // 残り30%=空
     expInitial: 150,
-    bossHpList: [200, 220, 250, 280, 320, 360]
+    // ふつうはカード2,3,4,5 → 2^a×3^b×5^c の形のみ有効
+    bossHpList: [150, 200, 250, 270, 300, 360]
 };
 const PRESET_HARD = {
     label: "むずかしい",
@@ -864,7 +866,8 @@ const PRESET_HARD = {
     thresholds: CROWN_THRESHOLDS,
     dropRates: { time: 10, score: 10, item: 10, numCard: 10, creature: 40 }, // 残り20%=空
     expInitial: 200,
-    bossHpList: [300, 340, 380, 420, 460, 500, 550]
+    // むずかしいはカード2〜9 → 2^a×3^b×5^c×7^d の形のみ有効
+    bossHpList: [300, 360, 420, 450, 480, 504, 560]
 };
 
 let CONFIG = Object.assign({}, PRESET_NORMAL);
@@ -2366,11 +2369,24 @@ function renderItemList() {
             hint.style.cssText = 'color:var(--accent-gold);font-size:1rem;flex-shrink:0;padding-left:2px;';
             row.appendChild(hint);
             row.addEventListener('mousedown', (e) => { e.preventDefault(); startItemDrag({ id: _invId, value: _invVal }, e); });
+            // ドラッグ開始はタッチ判定が必要なため touchstart で取るが preventDefault はドラッグ行のみ
             row.addEventListener('touchstart', (e) => { e.stopPropagation(); e.preventDefault(); startItemDrag({ id: _invId, value: _invVal }, e); }, { passive: false });
         } else {
-            // 即時使用: クリック/タップで確認ポップアップを表示
+            // 即時使用: スクロールと共存させるため touchend でタップ判定
+            let _touchStartY = 0;
             row.addEventListener('click', () => showItemPopup(_invId, _invVal));
-            row.addEventListener('touchstart', (e) => { e.stopPropagation(); e.preventDefault(); showItemPopup(_invId, _invVal); }, { passive: false });
+            row.addEventListener('touchstart', (e) => {
+                _touchStartY = e.touches[0].clientY;
+                // preventDefault しない → スクロール開始を妨げない
+            }, { passive: true });
+            row.addEventListener('touchend', (e) => {
+                // 縦方向の移動が少なければタップとみなす
+                const dy = Math.abs(e.changedTouches[0].clientY - _touchStartY);
+                if (dy < 12) {
+                    e.preventDefault(); e.stopPropagation();
+                    showItemPopup(_invId, _invVal);
+                }
+            }, { passive: false });
         }
         container.appendChild(row);
     });
