@@ -593,15 +593,13 @@
             </div>
             <div class="howto-section">
                 <div class="howto-title">🗝️ カギとドア</div>
-                <p>・カギはパネルを開けると現れる。<b>タップ</b>して収集！</p>
-                <p>・カギを集めてドアをタップすると次のフロアへ！</p>
+                <p>・カギを集めてドアを開けると次のフロアへ！</p>
                 <p>・最終フロアにはボス👾がいる。倒すとゲームクリア！</p>
             </div>
             <div class="howto-section">
                 <div class="howto-title">🎒 アイテム</div>
-                <p>・パネルを破壊するとアイテムが現れることがある！</p>
-                <p>・アイテムパネルを<b>タップ</b>してGETしよう！</p>
-                <p>・アイテムは左の一覧から「つかう」ボタンで使用</p>
+                <p>・パネルを破壊するとアイテムが出てきて自動でゲット！</p>
+                <p>・アイテムは左パネルの一覧から「つかう」ボタンで使用</p>
                 <p>・爆弾・剣など対象マスが必要なアイテムはタップで指定</p>
                 <p>・アイテムを使うときは時間（AP）は消費しない</p>
             </div>
@@ -1342,13 +1340,15 @@ class Card {
 }
 
 class Particle {
-    constructor(x, y, text, color, type = 'text') {
+    constructor(x, y, text, color, type = 'text', img = null) {
         this.x = x; this.y = y; this.text = text; this.color = color;
         this.type = type; this.life = 1.0; this.size = 0; this.vy = -2;
+        this.img = img; // 'image' タイプ用
     }
     update() {
         if (this.type === 'text') { this.y += this.vy; this.life -= 0.01; }
         else if (this.type === 'circle') { this.size += 5; this.life -= 0.03; }
+        else if (this.type === 'image') { this.y += -1.5; this.life -= 0.015; } // スライドアップフェード
     }
     draw(ctx) {
         ctx.globalAlpha = Math.max(0, this.life);
@@ -1360,6 +1360,16 @@ class Particle {
         } else if (this.type === 'circle') {
             ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
             ctx.strokeStyle = this.color; ctx.lineWidth = 5; ctx.stroke();
+        } else if (this.type === 'image') {
+            const sz = 52;
+            if (this.img && this.img.complete && this.img.naturalWidth > 0) {
+                ctx.drawImage(this.img, this.x - sz/2, this.y - sz/2, sz, sz);
+            } else {
+                ctx.font = `${sz}px "M PLUS Rounded 1c"`;
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillStyle = '#fff';
+                ctx.fillText(this.text, this.x, this.y);
+            }
         }
         ctx.globalAlpha = 1.0;
     }
@@ -1605,11 +1615,19 @@ function collectItem(cell) {
 
     const pos = getGridPos(cell.row, cell.col);
     const cx = pos.x + pos.w/2; const cy = pos.y + pos.h/2;
-    let delay = 0;
-    setTimeout(() => state.particles.push(new Particle(cx, cy, symbol, color, 'text')), delay); delay += 300;
-    if (timeGain > 0) { setTimeout(() => state.particles.push(new Particle(cx, cy, `+${timeGain}`, color, 'text')), delay); delay += 300; }
+
+    // スライドアップ画像エフェクト（アイテム画像がふわっと上へ消える）
+    let pickupImg = null;
+    if (cell.item === 'KEY') pickupImg = ITEM_IMAGES[11];
+    else if (cell.item === 'ITEM_TIME') pickupImg = ITEM_IMAGES[14];
+    else if (cell.item === 'ITEM_SCORE') pickupImg = ITEM_IMAGES[13];
+    else if (cell.item === 'ITEM_BAG') pickupImg = cell.itemBagId ? ITEM_IMAGES[cell.itemBagId] : null;
+    state.particles.push(new Particle(cx, cy, symbol, color, 'image', pickupImg));
+
+    let delay = 200;
+    if (timeGain > 0) { setTimeout(() => state.particles.push(new Particle(cx, cy, `AP+${timeGain}`, color, 'text')), delay); delay += 300; }
     if (scoreGain > 0) { setTimeout(() => state.particles.push(new Particle(cx, cy, `+${scoreGain}`, color, 'text')), delay); delay += 300; }
-    if (cell.item === 'KEY') { setTimeout(() => state.particles.push(new Particle(cx, cy, "GET!", color, 'text')), delay); }
+    if (cell.item === 'KEY') { setTimeout(() => state.particles.push(new Particle(cx, cy - 30, "GET!", color, 'text')), delay); }
 
     if (cell.item !== 'KEY') {
         cell.item = null;
@@ -2139,40 +2157,23 @@ function drawGrid(ctx) {
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             if (cell.item === 'KEY') {
                 if (cell.isKeyCollected) ctx.globalAlpha = 0.5;
-                drawImageOrEmoji(ctx, ITEM_IMAGES[11], "🗝️", cx, cy - h*0.08, w * 0.52);
+                drawImageOrEmoji(ctx, ITEM_IMAGES[11], "🗝️", cx, cy, w * 0.52);
                 ctx.globalAlpha = 1.0;
-                if (!cell.isKeyCollected) {
-                    ctx.fillStyle = '#ffd54f'; ctx.font = `bold ${w*0.17}px "M PLUS Rounded 1c"`;
-                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                    ctx.fillText('タップ！', cx, cy + h * 0.36);
-                }
             }
             else if (cell.item === 'DOOR') {
                 drawImageOrEmoji(ctx, ITEM_IMAGES[12], "🚪", cx, cy, w * 0.56);
             }
             else if (cell.item === 'ITEM_TIME') {
-                drawImageOrEmoji(ctx, ITEM_IMAGES[14], "⏰", cx, cy - h*0.08, w * 0.52);
-                ctx.fillStyle = '#ffd54f'; ctx.font = `bold ${w*0.17}px "M PLUS Rounded 1c"`;
-                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                ctx.fillText('タップ！', cx, cy + h * 0.36);
+                drawImageOrEmoji(ctx, ITEM_IMAGES[14], "⏰", cx, cy, w * 0.52);
             }
             else if (cell.item === 'ITEM_SCORE') {
-                drawImageOrEmoji(ctx, ITEM_IMAGES[13], "🎁", cx, cy - h*0.08, w * 0.52);
-                ctx.fillStyle = '#ffd54f'; ctx.font = `bold ${w*0.17}px "M PLUS Rounded 1c"`;
-                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                ctx.fillText('タップ！', cx, cy + h * 0.36);
+                drawImageOrEmoji(ctx, ITEM_IMAGES[13], "🎁", cx, cy, w * 0.52);
             }
             else if (cell.item === 'ITEM_BAG') {
-                // フロア生成時に確定したアイテム画像を表示
                 const bagId = cell.itemBagId;
                 const bagImg = bagId ? ITEM_IMAGES[bagId] : null;
                 const bagEmoji = bagId && ITEMS[bagId] ? ITEMS[bagId].emoji : '🎒';
-                drawImageOrEmoji(ctx, bagImg, bagEmoji, cx, cy - h*0.08, w * 0.50);
-                // 「タップ！」ヒント
-                ctx.fillStyle = '#ffd54f';
-                ctx.font = `bold ${w*0.17}px "M PLUS Rounded 1c"`;
-                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                ctx.fillText('タップ！', cx, cy + h * 0.36);
+                drawImageOrEmoji(ctx, bagImg, bagEmoji, cx, cy, w * 0.52);
             }
             else if (cell.item === 'CREATURE' || cell.item === 'BOSS') {
                 const isBoss2 = cell.item === 'BOSS';
@@ -2282,11 +2283,6 @@ function onDown(e) {
                     else state.particles.push(new Particle(pos.x, pos.y, "カギがたりない", '#ffa726', 'text'));
                     return;
                 }
-                // アイテムタップ収集
-                if (cell.item === 'KEY' || cell.item === 'ITEM_TIME' || cell.item === 'ITEM_SCORE' || cell.item === 'ITEM_BAG') {
-                    collectItem(cell);
-                    return;
-                }
             }
         }
     }
@@ -2347,7 +2343,7 @@ function onUp(e) {
                         setTimeout(() => state.particles.push(new Particle(cx, cy, `Time+${rec}`, '#66bb6a', 'text')), 600);
                         if (state.combo >= 2) setTimeout(() => state.particles.push(new Particle(cx, cy - 50, `🔥${state.combo}コンボ！`, '#ef5350', 'text')), 900);
                         cell.isEnemy = false; revealUnknown(row, col);
-                        // アイテムはパネルに残してタップGETに変更（DOORは除く）
+                        if (cell.item && cell.item !== 'DOOR') setTimeout(() => collectItem(cell), 400);
                         state.cards[idx] = null; actionDone = true;
                     }
                     // ※不正解の場合はカードが戻るだけ（メッセージなし）
