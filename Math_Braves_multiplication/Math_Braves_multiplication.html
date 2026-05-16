@@ -828,7 +828,8 @@ const PRESET_EASY = {
     ],
     initTime: 20,
     thresholds: CROWN_THRESHOLDS,
-    dropRates: { time: 30, score: 20, item: 15, numCard: 15, creature: 20 },
+    dropRates: { time: 10, score: 10, item: 10, numCard: 10, creature: 20 }, // 残り40%=空
+    expInitial: 100,
     bossHpList: [80, 100, 120, 150, 160]
 };
 const PRESET_NORMAL = {
@@ -844,7 +845,8 @@ const PRESET_NORMAL = {
     ],
     initTime: 20,
     thresholds: CROWN_THRESHOLDS,
-    dropRates: { time: 30, score: 10, item: 15, numCard: 15, creature: 30 },
+    dropRates: { time: 10, score: 10, item: 10, numCard: 10, creature: 30 }, // 残り30%=空
+    expInitial: 150,
     bossHpList: [200, 220, 250, 280, 320, 360]
 };
 const PRESET_HARD = {
@@ -860,7 +862,8 @@ const PRESET_HARD = {
     ],
     initTime: 20,
     thresholds: CROWN_THRESHOLDS,
-    dropRates: { time: 30, score: 0, item: 15, numCard: 15, creature: 40 },
+    dropRates: { time: 10, score: 10, item: 10, numCard: 10, creature: 40 }, // 残り20%=空
+    expInitial: 200,
     bossHpList: [300, 340, 380, 420, 460, 500, 550]
 };
 
@@ -906,7 +909,7 @@ let state = {
     dungeonLog: [],
     level: 1,
     exp: 0,
-    expToNext: 100,
+    expToNext: 150, // initGame で calcExpToNext(1) に上書き
     rankingMode: 'LOCAL'
 };
 
@@ -1347,8 +1350,8 @@ class Card {
     constructor(slotIndex, excludeValue = -1) {
         this.slotIndex = slotIndex;
 
-        // 3% でジョーカー（数値未確定）
-        if (Math.random() < 0.03) {
+        // 2% でジョーカー（数値未確定）
+        if (Math.random() < 0.02) {
             this.isJoker = true;
             this.jokerChosen = false;
             this.value = 0; // 選択前は 0
@@ -1579,8 +1582,11 @@ function pickFromRewards(rewards) {
 }
 
 function calcExpToNext(level) {
-    // Lv1→2: 100, Lv2→3: 125, Lv3→4: 156 ...
-    return Math.floor(100 * Math.pow(1.25, level - 1));
+    // 初期値（難易度別）× 1.2^(level-1) の正確な値を 10の位で四捨五入
+    // 計算チェーンは浮動小数点そのまま（四捨五入前の値を引き継ぐ）
+    const initial = CONFIG.expInitial || 100;
+    const exact = initial * Math.pow(1.2, level - 1);
+    return Math.round(exact / 10) * 10;
 }
 
 function updateExpBar() {
@@ -1957,7 +1963,7 @@ function initGame() {
     state.particles = []; state.isGameOverProcessing = false; state.inputLocked = false;
     state.damageEffectTimer = 0; state.panelsDestroyed = 0;
     state.dungeonLog = [];
-    state.level = 1; state.exp = 0; state.expToNext = 100;
+    state.level = 1; state.exp = 0; state.expToNext = calcExpToNext(1);
     updateExpBar();
     renderDungeonLog();
     renderItemList();
