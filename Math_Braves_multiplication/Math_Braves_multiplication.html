@@ -588,6 +588,16 @@
         </div>
     </div>
 
+    <!-- ジョーカー数値選択オーバーレイ -->
+    <div id="joker-overlay" class="hidden" style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:160;display:flex;justify-content:center;align-items:center;background:rgba(0,0,0,0.72);">
+        <div style="background:#181410;padding:22px 24px;border-radius:16px;border:2px solid var(--accent-gold);min-width:240px;max-width:320px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.7);">
+            <div style="font-size:2.2rem;margin-bottom:4px;">🃏</div>
+            <div style="color:var(--accent-gold);font-size:1.1rem;font-weight:900;margin-bottom:14px;">数値を選んでね</div>
+            <div id="joker-btn-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;"></div>
+            <button id="joker-cancel-btn" class="btn btn-danger" style="width:120px;height:42px;font-size:0.95rem;">もどる</button>
+        </div>
+    </div>
+
     <!-- レベルアップ スロットオーバーレイ -->
     <div id="slot-overlay" class="hidden" style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:200;display:flex;justify-content:center;align-items:center;background:rgba(0,0,0,0.82);">
         <div style="background:#181410;padding:26px 32px;border-radius:20px;border:3px solid var(--accent-gold);text-align:center;min-width:250px;box-shadow:0 0 48px rgba(255,202,40,0.25);">
@@ -1212,11 +1222,16 @@ function randomInt(min, max) { return Math.floor(Math.random() * (max - min + 1)
 
 // 数値の色: 最小素因数で判定（色がプレイヤーへのヒントになる）
 function getNumberColor(n) {
-    if (n % 2 === 0) return '#4fc3f7';   // 青: 偶数（2の倍数）
-    if (n % 3 === 0) return '#66bb6a';   // 緑: 3の倍数
-    if (n % 5 === 0) return '#ffa726';   // オレンジ: 5の倍数
-    if (n % 7 === 0) return '#ce93d8';   // 薄紫: 7の倍数
-    return '#ef9a9a';                     // 薄赤: それ以外（素数など）
+    // 9→8→7→…→2 の順で最大の約数を調べ色を決定（パネル・ログ用: 暗背景向け明色）
+    if (n % 9 === 0) return '#a5d6a7'; // 薄緑:  9の倍数 (3²)
+    if (n % 8 === 0) return '#81d4fa'; // 薄空色: 8の倍数 (2³)
+    if (n % 7 === 0) return '#ce93d8'; // 薄紫:  7の倍数
+    if (n % 6 === 0) return '#4db6ac'; // ティール: 6の倍数 (2×3)
+    if (n % 5 === 0) return '#ffb74d'; // オレンジ: 5の倍数
+    if (n % 4 === 0) return '#90caf9'; // 薄青:  4の倍数 (2²)
+    if (n % 3 === 0) return '#66bb6a'; // 緑:    3の倍数
+    if (n % 2 === 0) return '#4fc3f7'; // 青:    2の倍数
+    return '#ef9a9a';                  // 薄赤:  その他（素数 11以上など）
 }
 
 
@@ -1331,7 +1346,18 @@ async function showRankingScreen() {
 class Card {
     constructor(slotIndex, excludeValue = -1) {
         this.slotIndex = slotIndex;
-        this.value = generateCardValue(excludeValue);
+
+        // 3% でジョーカー（数値未確定）
+        if (Math.random() < 0.03) {
+            this.isJoker = true;
+            this.jokerChosen = false;
+            this.value = 0; // 選択前は 0
+        } else {
+            this.isJoker = false;
+            this.jokerChosen = false;
+            this.value = generateCardValue(excludeValue);
+        }
+
         this.stackCount = 1;
         this.multiplier = (Math.random() < 0.05) ? 2 : 1; // 5%で×2ボーナス
 
@@ -1358,19 +1384,30 @@ class Card {
         ctx.strokeStyle = 'rgba(120,90,50,0.35)'; ctx.lineWidth = 2;
         roundRect(ctx, this.x, this.y, this.width, this.height, 12, true, true);
 
-        // 数字: 白背景用の濃い色
-        const numColor = (() => {
-            const v = this.value;
-            if (v % 6 === 0) return '#1565c0';   // 6の倍数: 濃い青
-            if (v % 5 === 0) return '#1b5e20';   // 5の倍数: 濃い緑
-            if (v % 3 === 0) return '#7b1030';   // 3の倍数: 濃い赤
-            if (v % 2 === 0) return '#0d47a1';   // 2の倍数: 青
-            return '#3e2a18';                     // その他: 濃い茶
-        })();
-        ctx.fillStyle = numColor;
-        ctx.font = `900 ${this.width * 0.6}px "M PLUS Rounded 1c"`;
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText(this.value, this.x + this.width / 2, this.y + this.height * 0.5);
+        if (this.isJoker && !this.jokerChosen) {
+            // 未確定ジョーカー: 🃏 絵文字を中央に表示
+            ctx.font = `${this.width * 0.52}px serif`;
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText('🃏', this.x + this.width / 2, this.y + this.height * 0.5);
+        } else {
+            // 数字: クリーム背景用の濃い色（9→8→7→…→2 の順で最大の約数）
+            const numColor = (() => {
+                const v = this.value;
+                if (v % 9 === 0) return '#1b5e20'; // 深緑:   9の倍数 (3²)
+                if (v % 8 === 0) return '#0d47a1'; // 深紺青: 8の倍数 (2³)
+                if (v % 7 === 0) return '#6a1b9a'; // 深紫:   7の倍数
+                if (v % 6 === 0) return '#00695c'; // 深ティール: 6の倍数 (2×3)
+                if (v % 5 === 0) return '#bf360c'; // 深橙赤: 5の倍数
+                if (v % 4 === 0) return '#0277bd'; // 青:     4の倍数 (2²)
+                if (v % 3 === 0) return '#33691e'; // 緑:     3の倍数
+                if (v % 2 === 0) return '#1565c0'; // 紺青:   2の倍数
+                return '#3e2a18';                   // 茶:     その他
+            })();
+            ctx.fillStyle = numColor;
+            ctx.font = `900 ${this.width * 0.6}px "M PLUS Rounded 1c"`;
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(this.value, this.x + this.width / 2, this.y + this.height * 0.5);
+        }
 
         // ×N ボーナス表示（5%で付与、重ね合わせで累積）
         if (this.multiplier > 1) {
@@ -2019,6 +2056,52 @@ function addItemToInventory(id) {
         if (existing) { existing.count++; } else { state.items.push({ id, count: 1 }); }
     }
     renderItemList();
+}
+
+// ジョーカー数値選択ピッカー
+function showJokerPicker(slotIndex) {
+    const overlay   = document.getElementById('joker-overlay');
+    const grid      = document.getElementById('joker-btn-grid');
+    const cancelBtn = document.getElementById('joker-cancel-btn');
+    if (!overlay) return;
+
+    state.inputLocked = true;
+    overlay.classList.remove('hidden');
+
+    // 1〜9 のボタンを生成
+    grid.innerHTML = '';
+    for (let v = 1; v <= 9; v++) {
+        const btn = document.createElement('button');
+        btn.className = 'btn';
+        btn.textContent = v;
+        btn.style.cssText = 'font-size:1.5rem;font-weight:900;height:52px;';
+        const _v = v;
+        const onSelect = (e) => {
+            e.preventDefault(); e.stopPropagation();
+            overlay.classList.add('hidden');
+            state.inputLocked = false;
+            cancelBtn.removeEventListener('touchstart', onCancel);
+            const card = state.cards[slotIndex];
+            if (card && card.isJoker) {
+                card.value = _v;
+                card.jokerChosen = true;
+                addDungeonLog(`🃏 ジョーカー → <b style="color:#ffd54f">${_v}</b> に決定！`);
+            }
+        };
+        btn.addEventListener('click', onSelect);
+        btn.addEventListener('touchstart', onSelect, { passive: false });
+        grid.appendChild(btn);
+    }
+
+    // もどるボタン
+    const onCancel = (e) => {
+        e.preventDefault(); e.stopPropagation();
+        overlay.classList.add('hidden');
+        state.inputLocked = false;
+        cancelBtn.removeEventListener('touchstart', onCancel);
+    };
+    cancelBtn.onclick = onCancel;
+    cancelBtn.addEventListener('touchstart', onCancel, { passive: false });
 }
 
 // アイテム確認ポップアップを表示（即時使用アイテム用）
@@ -2697,6 +2780,11 @@ function onDown(e) {
     for (let i = 4; i >= 0; i--) {
         const c = state.cards[i];
         if (c && pos.x >= c.x && pos.x <= c.x + c.width && pos.y >= c.y && pos.y <= c.y + c.height) {
+            // 未確定ジョーカーはドラッグせず数値選択ピッカーを開く
+            if (c.isJoker && !c.jokerChosen) {
+                showJokerPicker(i);
+                return;
+            }
             state.dragInfo = { slotIndex: i, offsetX: pos.x - c.x, offsetY: pos.y - c.y };
             c.isDragging = true;
             break;
