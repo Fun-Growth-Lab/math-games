@@ -423,10 +423,17 @@
                 </div>
             </div>
 
-            <div class="info-box" style="flex:1; display:flex; flex-direction:column; min-height:0; margin-bottom:0;">
-                <h2>🎒 アイテム</h2>
+            <div class="info-box" style="display:flex; flex-direction:column; margin-bottom:0;">
+                <div style="display:flex; align-items:center; justify-content:space-between; border-bottom:2px solid var(--accent-gold); padding-bottom:5px; margin-bottom:10px;">
+                    <h2 style="margin:0; border:none; padding:0;">🎒 アイテム</h2>
+                    <div id="item-page-ctrl" style="display:none; align-items:center; gap:4px;">
+                        <button id="item-page-prev" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:var(--text-light);border-radius:5px;width:24px;height:24px;cursor:pointer;font-size:0.8rem;padding:0;">◀</button>
+                        <span id="item-page-label" style="font-size:0.75rem;color:var(--text-muted);min-width:32px;text-align:center;">1/1</span>
+                        <button id="item-page-next" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:var(--text-light);border-radius:5px;width:24px;height:24px;cursor:pointer;font-size:0.8rem;padding:0;">▶</button>
+                    </div>
+                </div>
                 <div id="item-select-notice">👆 つかうマスをタップしてね</div>
-                <div id="item-list" style="overflow-y:auto; flex:1; -webkit-overflow-scrolling:touch; touch-action:pan-y; overscroll-behavior:contain;"></div>
+                <div id="item-list"></div>
             </div>
         </div>
 
@@ -913,7 +920,8 @@ let state = {
     level: 1,
     exp: 0,
     expToNext: 150, // initGame で calcExpToNext(1) に上書き
-    rankingMode: 'LOCAL'
+    rankingMode: 'LOCAL',
+    itemPage: 0
 };
 
 // Player Management
@@ -1961,7 +1969,7 @@ function backToTitle() {
 
 function initGame() {
     state.score = 0; state.time = CONFIG.initTime; state.maxSingleScore = 0;
-    state.floor = 1; state.items = []; state.itemSelectMode = null; state.itemSelectValue = null; state.lastCardValue = 0; state.cards = [null,null,null,null,null];
+    state.floor = 1; state.items = []; state.itemPage = 0; state.itemSelectMode = null; state.itemSelectValue = null; state.lastCardValue = 0; state.cards = [null,null,null,null,null];
     state.particles = []; state.isGameOverProcessing = false; state.inputLocked = false;
     state.damageEffectTimer = 0; state.panelsDestroyed = 0;
     state.dungeonLog = [];
@@ -2303,10 +2311,18 @@ function finalizeItemDrop(e) {
 }
 // ============================================================
 
+const ITEM_PAGE_SIZE = 5; // 1ページに表示するアイテム数
+
 function renderItemList() {
     const container = document.getElementById('item-list');
-    const notice = document.getElementById('item-select-notice');
+    const notice    = document.getElementById('item-select-notice');
+    const pageCtrl  = document.getElementById('item-page-ctrl');
+    const pageLabel = document.getElementById('item-page-label');
+    const prevBtn   = document.getElementById('item-page-prev');
+    const nextBtn   = document.getElementById('item-page-next');
     if (!container) return;
+
+    // 選択モード通知
     if (notice) {
         if (state.itemSelectMode === null) {
             notice.style.display = 'none';
@@ -2318,12 +2334,49 @@ function renderItemList() {
             notice.style.display = 'block';
         }
     }
+
     if (state.items.length === 0) {
         container.innerHTML = '<div style="color:var(--text-muted); font-size:0.8rem; text-align:center; padding:10px;">アイテムなし</div>';
+        if (pageCtrl) pageCtrl.style.display = 'none';
         return;
     }
+
+    // ページ数・現在ページ補正
+    const totalPages = Math.ceil(state.items.length / ITEM_PAGE_SIZE);
+    if (!state.itemPage) state.itemPage = 0;
+    state.itemPage = Math.max(0, Math.min(state.itemPage, totalPages - 1));
+
+    // ページコントロール表示
+    if (pageCtrl) {
+        if (totalPages > 1) {
+            pageCtrl.style.display = 'flex';
+            if (pageLabel) pageLabel.textContent = `${state.itemPage + 1}/${totalPages}`;
+            if (prevBtn) prevBtn.disabled = (state.itemPage === 0);
+            if (nextBtn) nextBtn.disabled = (state.itemPage >= totalPages - 1);
+        } else {
+            pageCtrl.style.display = 'none';
+        }
+    }
+
+    // ページ送りボタンのイベント（毎回付け直し）
+    if (prevBtn) {
+        const onPrev = (e) => { e.preventDefault(); e.stopPropagation(); if (state.itemPage > 0) { state.itemPage--; renderItemList(); } };
+        prevBtn.onclick = onPrev;
+        prevBtn.ontouchstart = null;
+        prevBtn.addEventListener('touchstart', onPrev, { passive: false });
+    }
+    if (nextBtn) {
+        const onNext = (e) => { e.preventDefault(); e.stopPropagation(); if (state.itemPage < totalPages - 1) { state.itemPage++; renderItemList(); } };
+        nextBtn.onclick = onNext;
+        nextBtn.ontouchstart = null;
+        nextBtn.addEventListener('touchstart', onNext, { passive: false });
+    }
+
+    // 現在ページのアイテムを描画
+    const pageItems = state.items.slice(state.itemPage * ITEM_PAGE_SIZE, (state.itemPage + 1) * ITEM_PAGE_SIZE);
     container.innerHTML = '';
-    state.items.forEach(inv => {
+
+    pageItems.forEach(inv => {
         const item = ITEMS[inv.id];
         if (!item) return;
         const isDraggable = item.needsTarget || inv.id === 10;
@@ -2345,11 +2398,9 @@ function renderItemList() {
             iconEl.textContent = '';
             iconEl.appendChild(imgEl);
         }
-        // name
         const nameEl = document.createElement('div');
         nameEl.className = 'item-name';
         nameEl.textContent = inv.id === 10 ? `${inv.value}のカード` : item.name;
-        // count
         const countEl = document.createElement('div');
         countEl.className = 'item-count';
         countEl.textContent = `×${inv.count}`;
@@ -2362,31 +2413,15 @@ function renderItemList() {
         const _invVal = inv.value ?? null;
 
         if (isDraggable) {
-            // ドラッグで対象にアタッチ（↗ アイコンで示す）
             const hint = document.createElement('span');
             hint.textContent = '↗';
-            hint.title = 'ドラッグして対象にアタッチ';
             hint.style.cssText = 'color:var(--accent-gold);font-size:1rem;flex-shrink:0;padding-left:2px;';
             row.appendChild(hint);
             row.addEventListener('mousedown', (e) => { e.preventDefault(); startItemDrag({ id: _invId, value: _invVal }, e); });
-            // ドラッグ開始はタッチ判定が必要なため touchstart で取るが preventDefault はドラッグ行のみ
             row.addEventListener('touchstart', (e) => { e.stopPropagation(); e.preventDefault(); startItemDrag({ id: _invId, value: _invVal }, e); }, { passive: false });
         } else {
-            // 即時使用: スクロールと共存させるため touchend でタップ判定
-            let _touchStartY = 0;
             row.addEventListener('click', () => showItemPopup(_invId, _invVal));
-            row.addEventListener('touchstart', (e) => {
-                _touchStartY = e.touches[0].clientY;
-                // preventDefault しない → スクロール開始を妨げない
-            }, { passive: true });
-            row.addEventListener('touchend', (e) => {
-                // 縦方向の移動が少なければタップとみなす
-                const dy = Math.abs(e.changedTouches[0].clientY - _touchStartY);
-                if (dy < 12) {
-                    e.preventDefault(); e.stopPropagation();
-                    showItemPopup(_invId, _invVal);
-                }
-            }, { passive: false });
+            row.addEventListener('touchstart', (e) => { e.stopPropagation(); e.preventDefault(); showItemPopup(_invId, _invVal); }, { passive: false });
         }
         container.appendChild(row);
     });
