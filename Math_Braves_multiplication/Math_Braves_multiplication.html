@@ -454,6 +454,12 @@
                 </div>
             </div>
 
+            <div id="combo-display" class="info-box hidden" style="text-align:center; padding:6px 10px; flex-shrink:0;">
+                <div style="font-size:0.72rem; color:var(--text-muted); margin-bottom:1px;">さいごのカード</div>
+                <div id="disp-last-value" style="font-size:2.6rem; font-weight:900; line-height:1.1; color:#ef5350;"></div>
+                <div id="disp-combo-count" style="font-size:1rem; font-weight:900; color:var(--accent-gold); margin-top:1px;"></div>
+            </div>
+
             <div class="info-box" style="flex:1; display:flex; flex-direction:column; min-height:0;">
                 <h2>📜 ダンジョンログ</h2>
                 <div id="dungeon-log-entries" style="flex:1; overflow-y:auto;"></div>
@@ -862,6 +868,9 @@ const ui = {
     floor: document.getElementById('disp-floor'),
     key: document.getElementById('disp-key'),
     combo: document.getElementById('disp-combo'),
+    comboDisplay: document.getElementById('combo-display'),
+    dispLastValue: document.getElementById('disp-last-value'),
+    dispComboCount: document.getElementById('disp-combo-count'),
     totalScore: document.getElementById('disp-total-score'),
     maxScore: document.getElementById('disp-max-score'),
     titleWrapper: document.getElementById('title-wrapper'),
@@ -1580,9 +1589,7 @@ function collectItem(cell) {
         const comboMult = 1 + 0.1 * state.combo;
         scoreGain = Math.floor(base * comboMult);
         symbol = "🎁"; color = '#ffca28';
-        const bonusComboStr = state.combo > 0
-            ? ` <span style="color:#ef5350">🔥×${comboMult.toFixed(1)}</span>` : '';
-        addDungeonLog(`🎁 スコアボーナス！ <span style="color:#ffd54f">+${scoreGain}</span>${bonusComboStr}`);
+        addDungeonLog(`🎁 スコアボーナス！ <span style="color:#ffd54f">+${scoreGain}</span>`);
     }
     else if (cell.item === 'ITEM_BAG') {
         const itemId = Math.floor(Math.random() * 10) + 1;
@@ -1656,10 +1663,19 @@ function updateUI() {
     ui.totalScore.textContent = state.score;
     ui.maxScore.textContent = state.maxSingleScore;
     if (ui.combo) {
-        ui.combo.textContent = state.combo > 0
-            ? `${state.combo} (×${(1 + 0.1 * state.combo).toFixed(1)})`
-            : '0';
+        ui.combo.textContent = state.combo > 0 ? `${state.combo}` : '0';
         ui.combo.style.color = state.combo >= 3 ? '#ffd54f' : state.combo > 0 ? '#ef5350' : 'var(--text-muted)';
+    }
+    if (ui.comboDisplay && ui.dispLastValue && ui.dispComboCount) {
+        if (state.combo > 0 && state.lastCardValue > 0) {
+            ui.comboDisplay.classList.remove('hidden');
+            ui.dispLastValue.textContent = state.lastCardValue;
+            ui.dispLastValue.style.color = getNumberColor(state.lastCardValue);
+            ui.dispComboCount.textContent = `${state.combo}コンボ！`;
+            ui.dispComboCount.style.color = state.combo >= 3 ? '#ffd54f' : '#ef5350';
+        } else {
+            ui.comboDisplay.classList.add('hidden');
+        }
     }
 }
 
@@ -2300,9 +2316,7 @@ function onUp(e) {
                         let rec = 1 + scoreBonus;
                         state.time += rec;
 
-                        const comboStr = state.combo > 0
-                            ? ` <span style="color:#ef5350">🔥${state.combo}コンボ ×${comboMult.toFixed(1)}</span>` : '';
-                        addDungeonLog(`⚔️ <b style="color:${getNumberColor(cell.value)}">${cell.value}</b> のパネルをかいほう！ <span style="color:#ffd54f">+${gain}</span>${comboStr}`);
+                        addDungeonLog(`⚔️ <b style="color:${getNumberColor(cell.value)}">${cell.value}</b> のパネル！ <span style="color:#ffd54f">+${gain}</span>`);
 
                         setTimeout(() => state.particles.push(new Particle(cx, cy, `+${gain}`, '#ffd54f', 'text')), 0);
                         setTimeout(() => checkPraise(gain, cx, cy), 300);
@@ -2327,9 +2341,7 @@ function onUp(e) {
                         state.particles.push(new Particle(cx, cy, `+${gain}`, '#ffd54f', 'text'));
                         state.particles.push(new Particle(cx, cy+40, `Time+${rec}`, '#66bb6a', 'text'));
                         state.particles.push(new Particle(cx, cy-40, "撃破！", '#ef5350', 'text'));
-                        const comboStr2 = state.combo > 0
-                            ? ` <span style="color:#ef5350">🔥${state.combo}コンボ ×${comboMult.toFixed(1)}</span>` : '';
-                        addDungeonLog(`💥 てきをたおした！ <span style="color:#ffd54f">+${gain}</span>${comboStr2}`);
+                        addDungeonLog(`💥 てきをたおした！ <span style="color:#ffd54f">+${gain}</span>`);
 
                         if (isBoss) {
                             cell.item = 'DOOR';
@@ -2403,8 +2415,15 @@ canvas.addEventListener('mousedown', onDown);
 window.addEventListener('mousemove', onMove);
 window.addEventListener('mouseup', onUp);
 canvas.addEventListener('touchstart', (e) => { e.preventDefault(); onDown(e); }, { passive: false });
-window.addEventListener('touchmove', (e) => { e.preventDefault(); onMove(e); }, { passive: false });
-window.addEventListener('touchend', (e) => { e.preventDefault(); onUp(e); }, { passive: false });
+window.addEventListener('touchmove', (e) => {
+    // howtoオーバーレイが開いているときはスクロールを妨げない
+    if (ui.howtoOverlay && !ui.howtoOverlay.classList.contains('hidden')) return;
+    e.preventDefault(); onMove(e);
+}, { passive: false });
+window.addEventListener('touchend', (e) => {
+    if (ui.howtoOverlay && !ui.howtoOverlay.classList.contains('hidden')) return;
+    e.preventDefault(); onUp(e);
+}, { passive: false });
 
 function gameLoop() {
     if (state.screen !== 'PLAYING') return;
