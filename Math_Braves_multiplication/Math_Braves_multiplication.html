@@ -3057,20 +3057,32 @@ window.addEventListener('mouseup', (e) => {
 canvas.addEventListener('touchstart', (e) => { e.preventDefault(); onDown(e); }, { passive: false });
 window.addEventListener('touchmove', (e) => {
     if (ui.howtoOverlay && !ui.howtoOverlay.classList.contains('hidden')) return;
+    // アイテムドラッグ中はリスト内からでも追従させる（targetはtouchstart要素に固定のため）
+    if (itemDrag.active) {
+        e.preventDefault();
+        if (itemDrag.floatEl) {
+            itemDrag.floatEl.style.left = e.touches[0].clientX + 'px';
+            itemDrag.floatEl.style.top = e.touches[0].clientY + 'px';
+        }
+        return;
+    }
     // #item-list 内のタッチ縦スクロールは妨害しない
     if (e.target.closest && e.target.closest('#item-list')) return;
     e.preventDefault();
-    if (itemDrag.active && itemDrag.floatEl) {
-        itemDrag.floatEl.style.left = e.touches[0].clientX + 'px';
-        itemDrag.floatEl.style.top = e.touches[0].clientY + 'px';
-    } else { onMove(e); }
+    onMove(e);
 }, { passive: false });
 window.addEventListener('touchend', (e) => {
     if (ui.howtoOverlay && !ui.howtoOverlay.classList.contains('hidden')) return;
+    // アイテムドラッグ中はリスト内からでもドロップを確定させる
+    if (itemDrag.active) {
+        e.preventDefault();
+        finalizeItemDrop(e);
+        return;
+    }
     // #item-list 内は click/touchstart で処理済みなので通す
     if (e.target.closest && e.target.closest('#item-list')) return;
     e.preventDefault();
-    if (itemDrag.active) { finalizeItemDrop(e); } else { onUp(e); }
+    onUp(e);
 }, { passive: false });
 
 function gameLoop() {
