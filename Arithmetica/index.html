@@ -753,8 +753,6 @@
                     <span id="cur-player-disp">ななしさん</span>
                     <span id="btn-player-change-lbl" style="font-size:0.72rem;opacity:0.45;">(へんこう)</span>
                 </button>
-                <button id="btn-login"  class="btn btn-auth">Googleでログイン</button>
-                <button id="btn-logout" class="btn btn-red hidden">ログアウト</button>
                 <button id="btn-ranking" class="btn btn-purple" onclick="openRanking()">🏆 ランキング</button>
                 <button id="btn-index"   class="btn btn-gray"   onclick="location.href='../index.html'">🏠 INDEXへ</button>
             </div>
@@ -900,7 +898,17 @@
     <div id="gameover-overlay" class="overlay hidden">
         <div class="ov-box">
             <div class="ov-title">💀 ゲームオーバー</div>
-            <button class="btn btn-red btn-sm" onclick="doReturnTitle()">タイトルへ戻る</button>
+            <div id="go-score-disp" style="color:var(--gold);font-size:1.05rem;font-weight:800;margin:4px 0 10px;"></div>
+            <div id="go-rank-wrap">
+                <div style="font-size:0.8rem;color:var(--text-dim);margin-bottom:6px;">🏆 ワールドランキングに登録</div>
+                <div style="display:flex;gap:6px;justify-content:center;align-items:center;">
+                    <input id="go-rank-name" type="text" maxlength="16"
+                        style="padding:5px 10px;border-radius:8px;border:1px solid var(--bdr-gold);background:#2a1505;color:var(--text-hi);font-size:0.9rem;width:130px;text-align:center;font-family:inherit;">
+                    <button id="go-rank-btn" class="btn btn-purple btn-sm" onclick="submitToWorld('go')" style="white-space:nowrap;">送信</button>
+                </div>
+                <div id="go-rank-msg" style="font-size:0.8rem;color:var(--gold);margin-top:5px;min-height:1.2em;text-align:center;"></div>
+            </div>
+            <button class="btn btn-red btn-sm" style="margin-top:10px;" onclick="doReturnTitle()">タイトルへ戻る</button>
         </div>
     </div>
 
@@ -908,7 +916,17 @@
         <div class="ov-box">
             <div class="ov-title">👑 GAME CLEAR！</div>
             <p class="ov-desc">おめでとう！</p>
-            <button class="btn btn-green btn-sm" onclick="doReturnTitle()">タイトルへ戻る</button>
+            <div id="cl-score-disp" style="color:var(--gold);font-size:1.05rem;font-weight:800;margin:4px 0 10px;"></div>
+            <div id="cl-rank-wrap">
+                <div style="font-size:0.8rem;color:var(--text-dim);margin-bottom:6px;">🏆 ワールドランキングに登録</div>
+                <div style="display:flex;gap:6px;justify-content:center;align-items:center;">
+                    <input id="cl-rank-name" type="text" maxlength="16"
+                        style="padding:5px 10px;border-radius:8px;border:1px solid var(--bdr-gold);background:#2a1505;color:var(--text-hi);font-size:0.9rem;width:130px;text-align:center;font-family:inherit;">
+                    <button id="cl-rank-btn" class="btn btn-purple btn-sm" onclick="submitToWorld('cl')" style="white-space:nowrap;">送信</button>
+                </div>
+                <div id="cl-rank-msg" style="font-size:0.8rem;color:var(--gold);margin-top:5px;min-height:1.2em;text-align:center;"></div>
+            </div>
+            <button class="btn btn-green btn-sm" style="margin-top:10px;" onclick="doReturnTitle()">タイトルへ戻る</button>
         </div>
     </div>
 
@@ -1167,79 +1185,58 @@
 
 </div><!-- #container -->
 
-<!-- Firebase -->
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut }
-        from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-    import { getFirestore, collection, doc, addDoc, getDocs, serverTimestamp }
-        from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+<!-- Supabase -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+(function(){
+    const _url = '__SUPABASE_URL__';
+    const _key = '__SUPABASE_ANON_KEY__';
+    const _sb  = supabase.createClient(_url, _key);
 
-    const cfg = {
-        apiKey:"AIzaSyBCg5dCEM89UmYYhfGqVeRf_VrUlg8_o-4",
-        authDomain:"math-braves.firebaseapp.com", projectId:"math-braves",
-        storageBucket:"math-braves.firebasestorage.app",
-        messagingSenderId:"217117619290",
-        appId:"1:217117619290:web:d227feb603970d3948d463"
+    window.saveOnlineScore = async (name, pointScore, stageScore, turns, difficulty, className) => {
+        if ((pointScore||0) <= 0) return;
+        const { error } = await _sb.from('rankings').insert({
+            game:         'arithmetica',
+            difficulty:   difficulty  || 'easy',
+            player_name:  name        || 'ななしさん',
+            point_score:  pointScore  || 0,
+            stage_score:  stageScore  || 0,
+            turns:        turns       || 0,
+            class_name:   className   || ''
+        });
+        if (error) throw error;
+        console.log('Ranking: 登録成功', { name, pointScore });
     };
-    const app  = initializeApp(cfg);
-    const auth = getAuth(app);
-    const db   = getFirestore(app);
-    const prov = new GoogleAuthProvider();
 
-    window.currentUser = null;
-    const bL = document.getElementById('btn-login');
-    const bO = document.getElementById('btn-logout');
-    bL.onclick = () => signInWithPopup(auth, prov).catch(() => alert('ログインに失敗しました'));
-    bO.onclick = () => signOut(auth).catch(console.error);
-    onAuthStateChanged(auth, u => {
-        window.currentUser = u ? {uid:u.uid, displayName:u.displayName||'ななしさん'} : null;
-        bL.classList.toggle('hidden', !!u);
-        bO.classList.toggle('hidden', !u);
-    });
-
-    // ---- Firestore ranking helpers (exposed to game script) ----
-    window.saveOnlineScore = async (uid, name, score, turns, difficulty, className, pointScore) => {
-        // pointScore=0 は保存しない（旧形式レコードの汚染を防ぐ）
-        if ((pointScore||0) <= 0) {
-            console.log('Ranking: pointScore=0のため送信しません');
-            return;
-        }
-        try {
-            const col = `scores_arithmetica_${difficulty||'easy'}`;
-            const dateStr = new Date().toLocaleDateString('ja-JP');
-            // addDoc: ゲーム毎に新エントリ作成（読み込み時にUID別で集約）
-            await addDoc(collection(db, col), {
-                uid, name, score, turns:turns||0,
-                className:className||'', pointScore:pointScore||0,
-                date:dateStr, createdAt:serverTimestamp()
-            });
-            console.log('Ranking: オンラインスコア登録成功', {score, pointScore, difficulty});
-        } catch(e){
-            console.error('Firestore save error:', e);
-            if (window._showRankSaveError) window._showRankSaveError(e);
-        }
-    };
     window.loadWorldRanking = async (difficulty) => {
         try {
-            const col = `scores_arithmetica_${difficulty||'easy'}`;
-            const snap=await getDocs(collection(db, col));
-            // pointScore>0 のエントリのみ対象
-            const allRows=[];
-            snap.forEach(d=>{
-                const data=d.data();
-                if((data.pointScore||0) > 0) allRows.push(data);
-            });
-            const rows=allRows;
-            rows.sort((a,b)=>{
-                const pa=(a.pointScore||0), pb=(b.pointScore||0);
-                if(pb!==pa) return pb-pa;
-                if((b.score||0)!==(a.score||0)) return (b.score||0)-(a.score||0);
-                return (a.turns||999)-(b.turns||999);
-            });
-            return rows.slice(0,10);
-        } catch(e){ console.error('Firestore load error:', e); return null; }
+            const { data, error } = await _sb
+                .from('rankings')
+                .select('player_name,class_name,point_score,stage_score,turns,created_at')
+                .eq('game', 'arithmetica')
+                .eq('difficulty', difficulty || 'easy')
+                .gt('point_score', 0)
+                .order('point_score',  { ascending: false })
+                .order('stage_score',  { ascending: false })
+                .order('turns',        { ascending: true  })
+                .limit(10);
+            if (error) throw error;
+            return data.map(r => ({
+                name:       r.player_name,
+                className:  r.class_name,
+                score:      r.stage_score,
+                pointScore: r.point_score,
+                turns:      r.turns,
+                date:       r.created_at
+                            ? new Date(r.created_at).toLocaleDateString('ja-JP')
+                            : ''
+            }));
+        } catch(e) {
+            console.error('Ranking: 読み込みエラー', e);
+            return null;
+        }
     };
+})();
 </script>
 
 <!-- Game -->
@@ -1846,8 +1843,6 @@ function applyLang(){
 
     // Title buttons
     const bStart=s('btn-start'); if(bStart) bStart.textContent=t('gameStart');
-    const bLogin=s('btn-login'); if(bLogin) bLogin.textContent=t('loginGoogle');
-    const bLogout=s('btn-logout'); if(bLogout) bLogout.textContent=t('logout');
     // Save-row buttons (続きから / 初めから)
     const saveRow=s('btn-save-row');
     if(saveRow){
@@ -3904,6 +3899,15 @@ function showVictory(){
     if(isLast){
         submitScore(10);  // game clear = 10 enemies defeated
         clearSave();  // remove save on game clear
+        // ランキング送信UIを初期化
+        const _clName=document.getElementById('cl-rank-name');
+        if(_clName) _clName.value=getCurP();
+        const _clBtn=document.getElementById('cl-rank-btn');
+        if(_clBtn) _clBtn.disabled=false;
+        const _clMsg=document.getElementById('cl-rank-msg');
+        if(_clMsg) _clMsg.textContent='';
+        const _clDisp=document.getElementById('cl-score-disp');
+        if(_clDisp) _clDisp.textContent=`スコア: ${G.totalScore||0} pt`;
         document.getElementById('clear-overlay').classList.remove('hidden');
     } else {
         document.getElementById('vic-desc').textContent=t('stageClear').replace('{n}', _stageNum);
@@ -3921,6 +3925,15 @@ function showGameover(){
     _clearTriggeredSkills();
     submitScore(G.eIdx);  // enemies defeated before dying
     clearSave();  // remove save on game over
+    // ランキング送信UIを初期化
+    const _goName=document.getElementById('go-rank-name');
+    if(_goName) _goName.value=getCurP();
+    const _goBtn=document.getElementById('go-rank-btn');
+    if(_goBtn) _goBtn.disabled=false;
+    const _goMsg=document.getElementById('go-rank-msg');
+    if(_goMsg) _goMsg.textContent='';
+    const _goDisp=document.getElementById('go-score-disp');
+    if(_goDisp) _goDisp.textContent=`スコア: ${G.totalScore||0} pt`;
     document.getElementById('gameover-overlay').classList.remove('hidden');
 }
 
@@ -4743,19 +4756,41 @@ function submitScore(score){
     // Record unlock only on full game clear (score===10 = all 10 enemies defeated)
     if(score===10){ recordClear(G.classIdx||0, diff); recordClearMedal(G.classIdx||0, diff); }
     saveLocalScore(name, score, turns, diff, className, pointScore);
-    if(window.currentUser && window.saveOnlineScore){
-        console.log('Ranking: オンライン送信開始', {uid:window.currentUser.uid, name, score, turns, diff, pointScore});
-        window.saveOnlineScore(window.currentUser.uid, name, score, turns, diff, className, pointScore)
-            .catch(e => console.error('Ranking: saveOnlineScore 未捕捉エラー', e));
-    } else {
-        console.log('Ranking: オンライン送信スキップ',
-            {currentUser:!!window.currentUser, saveOnlineScore:!!window.saveOnlineScore});
+    // ワールド送信はゲームオーバー/クリア画面のボタンから手動で行う
+}
+
+// ワールドランキング送信（ゲームオーバー/クリア画面の送信ボタン）
+async function submitToWorld(which){
+    const nameInput = document.getElementById(`${which}-rank-name`);
+    const btn       = document.getElementById(`${which}-rank-btn`);
+    const msg       = document.getElementById(`${which}-rank-msg`);
+    const name      = (nameInput ? nameInput.value.trim() : '') || getCurP();
+    const pointScore = G.totalScore || 0;
+    const stageScore = (which === 'cl') ? 10 : (G.eIdx || 0);
+    const turns      = G.totalTurns || 0;
+    const diff       = G.difficulty || 'easy';
+    const className  = CLASS_DEFS[G.classIdx||0]?.name || '戦士';
+
+    if(pointScore <= 0){
+        if(msg){ msg.style.color='#cc6644'; msg.textContent='スコアが0のため登録できません'; }
+        return;
+    }
+    if(btn) btn.disabled = true;
+    if(msg){ msg.style.color='var(--text-dim)'; msg.textContent='送信中…'; }
+    try {
+        await window.saveOnlineScore(name, pointScore, stageScore, turns, diff, className);
+        setCurP(name);  // 入力名をプレイヤー名として保存
+        if(msg){ msg.style.color='var(--gold)'; msg.textContent='✅ 登録しました！'; }
+    } catch(e) {
+        if(btn) btn.disabled = false;
+        if(msg){ msg.style.color='#cc4444'; msg.textContent='❌ 登録に失敗しました'; }
+        console.error('submitToWorld error:', e);
     }
 }
 
 function scoreLabel(s){ return s===10 ? t('rankClear') : `${t('rankStage')} ${s}`; }
 
-function renderRankList(rows, myUid){
+function renderRankList(rows, myName){
     const ul = document.getElementById('rank-list');
     ul.innerHTML = '';
     if(!rows || rows.length===0){
@@ -4764,7 +4799,7 @@ function renderRankList(rows, myUid){
     }
     rows.forEach((r,i)=>{
         const li = document.createElement('li');
-        const isMe = myUid && r.uid === myUid;
+        const isMe = myName && r.name === myName;
         const medals = ['🥇','🥈','🥉'];
         const numTxt = i<3 ? medals[i] : `${i+1}.`;
         const numCls = i<3 ? 'rank-num top3' : 'rank-num';
@@ -4802,14 +4837,8 @@ async function loadAndRender(){
 
     if(rankTab==='local'){
         loading.style.display='none';
-        renderRankList(getLocalRanking(rankDiff), null);
+        renderRankList(getLocalRanking(rankDiff), getCurP());
     } else {
-        if(!window.currentUser){
-            loading.style.display='none';
-            document.getElementById('rank-list').innerHTML=
-                `<li><span class="rank-empty" style="width:100%;">${t('rankLoginRequired')}</span></li>`;
-            return;
-        }
         const rows=await (window.loadWorldRanking?window.loadWorldRanking(rankDiff):Promise.resolve(null));
         loading.style.display='none';
         if(!rows){
@@ -4817,12 +4846,12 @@ async function loadAndRender(){
                 `<li><span class="rank-empty" style="width:100%;">取得に失敗しました</span></li>`;
             return;
         }
-        renderRankList(rows, window.currentUser?.uid);
+        renderRankList(rows, getCurP());
     }
 }
 
 function openRanking(){
-    rankTab=window.currentUser?'world':'local';
+    rankTab='world';
     rankDiff=G.difficulty||'easy';
     document.getElementById('btn-rank-local').classList.toggle('active', rankTab==='local');
     document.getElementById('btn-rank-world').classList.toggle('active', rankTab==='world');
