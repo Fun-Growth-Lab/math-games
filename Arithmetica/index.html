@@ -1185,42 +1185,48 @@
 
 </div><!-- #container -->
 
-<!-- Supabase -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<!-- Supabase (direct REST fetch — no library dependency) -->
 <script>
 (function(){
-    const _url = 'https://rpxassndgiunoqkxqcco.supabase.co';
-    const _key = 'sb_publishable_Wnge6OPvSf5l2YEgaPg4rw_nj4CyYAH';
-    const _sb  = supabase.createClient(_url, _key);
+    const _base = 'https://rpxassndgiunoqkxqcco.supabase.co/rest/v1';
+    const _key  = 'sb_publishable_Wnge6OPvSf5l2YEgaPg4rw_nj4CyYAH';
+    const _hdr  = { 'apikey': _key, 'Authorization': 'Bearer ' + _key,
+                    'Content-Type': 'application/json', 'Prefer': 'return=minimal' };
 
     window.saveOnlineScore = async (name, pointScore, stageScore, turns, difficulty, className) => {
         if ((pointScore||0) <= 0) return;
-        const { error } = await _sb.from('rankings').insert({
-            game:         'arithmetica',
-            difficulty:   difficulty  || 'easy',
-            player_name:  name        || 'ななしさん',
-            point_score:  pointScore  || 0,
-            stage_score:  stageScore  || 0,
-            turns:        turns       || 0,
-            class_name:   className   || ''
+        const res = await fetch(`${_base}/rankings`, {
+            method: 'POST',
+            headers: _hdr,
+            body: JSON.stringify({
+                game:        'arithmetica',
+                difficulty:  difficulty  || 'easy',
+                player_name: name        || 'ななしさん',
+                point_score: pointScore  || 0,
+                stage_score: stageScore  || 0,
+                turns:       turns       || 0,
+                class_name:  className   || ''
+            })
         });
-        if (error) throw error;
+        if (!res.ok) { const t=await res.text(); throw new Error(`HTTP ${res.status}: ${t}`); }
         console.log('Ranking: 登録成功', { name, pointScore });
     };
 
     window.loadWorldRanking = async (difficulty) => {
         try {
-            const { data, error } = await _sb
-                .from('rankings')
-                .select('player_name,class_name,point_score,stage_score,turns,created_at')
-                .eq('game', 'arithmetica')
-                .eq('difficulty', difficulty || 'easy')
-                .gt('point_score', 0)
-                .order('point_score',  { ascending: false })
-                .order('stage_score',  { ascending: false })
-                .order('turns',        { ascending: true  })
-                .limit(10);
-            if (error) throw error;
+            const q = new URLSearchParams({
+                select:      'player_name,class_name,point_score,stage_score,turns,created_at',
+                game:        'eq.arithmetica',
+                difficulty:  `eq.${difficulty || 'easy'}`,
+                point_score: 'gt.0',
+                order:       'point_score.desc,stage_score.desc,turns.asc',
+                limit:       '10'
+            });
+            const res = await fetch(`${_base}/rankings?${q}`, {
+                headers: { 'apikey': _key, 'Authorization': 'Bearer ' + _key }
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
             return data.map(r => ({
                 name:       r.player_name,
                 className:  r.class_name,
@@ -1228,8 +1234,7 @@
                 pointScore: r.point_score,
                 turns:      r.turns,
                 date:       r.created_at
-                            ? new Date(r.created_at).toLocaleDateString('ja-JP')
-                            : ''
+                            ? new Date(r.created_at).toLocaleDateString('ja-JP') : ''
             }));
         } catch(e) {
             console.error('Ranking: 読み込みエラー', e);
