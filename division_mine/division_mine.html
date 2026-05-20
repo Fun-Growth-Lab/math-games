@@ -14,9 +14,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ザクザク発掘！わりざん鉱山 | Fun & Growth Lab</title>
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap" rel="stylesheet">
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <!-- Supabase -->
+    <script>
+    (function(){
+        const _b = 'https://rpxassndgiunoqkxqcco.supabase.co/rest/v1';
+        const _k = 'sb_publishable_Wnge6OPvSf5l2YEgaPg4rw_nj4CyYAH';
+        window._sb = { b:_b, k:_k,
+            h:{'apikey':_k,'Authorization':'Bearer '+_k,'Content-Type':'application/json','Prefer':'return=minimal'},
+            rh:{'apikey':_k,'Authorization':'Bearer '+_k} };
+        window.currentUser = null;
+    })();
+    </script>
 
     <style>
         :root {
@@ -705,15 +713,6 @@ const NG_WORDS_HIRAGANA = [
     'ぱすわーど', 'ぱす', 'あかうんと', 'こじんじょうほう'
 ];
 
-// Firebase Config
-const firebaseConfig = {
-  apiKey: "AIzaSyBCg5dCEM89UmYYhfGqVeRf_VrUlg8_o-4",
-  authDomain: "math-braves.firebaseapp.com",
-  projectId: "math-braves",
-  storageBucket: "math-braves.firebasestorage.app",
-  messagingSenderId: "217117619290",
-  appId: "1:217117619290:web:d227feb603970d3948d463"
-};
 
 // 宝石データ
 const GEMS = { NONE: 0, DIAMOND: 1, RUBY: 2, SAPPHIRE: 3, EMERALD: 4, TOPAZ: 5, MONSTER: 6, DWARF: 7, TREASURE: 8 };
@@ -736,26 +735,11 @@ const CANVAS_H = 720;
 const DESIGN_W = 1280;
 const DESIGN_H = 720;
 
-let db = null;
-let auth = null;
-let googleProvider = null;
-
 /**
- * 初期化 & Firebase
+ * 初期化
  */
 window.onload = () => {
-    try {
-        if (firebase.apps.length === 0) firebase.initializeApp(firebaseConfig);
-        db = firebase.firestore();
-        auth = firebase.auth();
-        googleProvider = new firebase.auth.GoogleAuthProvider();
-        
-        // 認証初期化
-        Auth.init();
-    } catch (e) {
-        console.warn("Firebase Init Error (Local mode):", e);
-    }
-    
+    Auth.init();
     loadImages();
     PlayerManager.init();
     Game.init();
@@ -796,43 +780,33 @@ function loadImages() {
  */
 class Auth {
     static init() {
-        if (!auth) return;
-        auth.onAuthStateChanged(user => {
-            const btn = document.getElementById('btn-google');
-            if (user) {
-                // ログイン済み：名前を表示し、ログアウトボタン化
-                const name = user.displayName || user.email;
-                btn.textContent = name;
-                btn.className = "btn-logout"; // クラス変更で色を変える
-            } else {
-                // 未ログイン
-                btn.textContent = "Googleでログイン";
-                btn.className = "btn-google";
-            }
-        });
+        // Supabase移行後：ログインボタンの初期表示設定
+        const btn = document.getElementById('btn-google');
+        if (btn) {
+            btn.textContent = "Googleでログイン";
+            btn.className = "btn-google";
+        }
     }
 
     static handleClick() {
-        if (!auth) return alert("Firebase設定が必要です");
         const btn = document.getElementById('btn-google');
-        
-        if (auth.currentUser) {
-            // ログアウト処理
+        if (window.currentUser) {
             if(confirm("ログアウトしますか？")) {
-                auth.signOut().then(() => alert("ログアウトしました"));
+                window.currentUser = null;
+                if (btn) { btn.textContent = "Googleでログイン"; btn.className = "btn-google"; }
+                alert("ログアウトしました");
             }
         } else {
-            // ログイン処理
-            auth.signInWithPopup(googleProvider)
-                .then(res => {
-                    alert("ログインしました: " + res.user.displayName);
-                    Ranking.switchMode('WORLD');
-                })
-                .catch(e => alert("ログインエラー: " + e.message));
+            const name = prompt("プレイヤー名を入力してください（ランキング表示名）");
+            if (name && name.trim()) {
+                window.currentUser = {uid: 'player_' + Date.now(), displayName: name.trim()};
+                if (btn) { btn.textContent = name.trim(); btn.className = "btn-logout"; }
+                alert("ログインしました: " + name.trim());
+                Ranking.switchMode('WORLD');
+            }
         }
     }
-    
-    // loginGoogleメソッドは handleClick に統合したため削除（後方互換で残してもよいが使わない）
+
     static loginGoogle() { this.handleClick(); }
 }
 
@@ -845,8 +819,8 @@ class Ranking {
     }
 
     static switchMode(mode) {
-        if (mode === 'WORLD' && (!auth || !auth.currentUser)) {
-            alert("ワールドランキングを見るにはGoogleログインが必要です");
+        if (mode === 'WORLD' && !window.currentUser) {
+            alert("ワールドランキングを見るにはログインが必要です");
             return;
         }
         this.mode = mode;
@@ -874,29 +848,31 @@ class Ranking {
                 .sort((a, b) => b.score - a.score)
                 .slice(0, 10);
         } else {
-            // WORLD (Firestore)
-            if (!db) {
+            // WORLD (Supabase)
+            if (!window._sb) {
                 table.innerHTML = "<tr><td>設定エラー</td></tr>";
                 return;
             }
             try {
-                const snapshot = await db.collection("scores_division_mine")
-                    .where("difficulty", "==", difficulty)
-                    .orderBy("score", "desc")
-                    .limit(10)
-                    .get();
-                snapshot.forEach(doc => {
-                    data.push(doc.data());
+                const params = new URLSearchParams({
+                    'game': 'eq.division_mine',
+                    'difficulty': 'eq.' + difficulty,
+                    'order': 'point_score.desc',
+                    'limit': '10'
+                });
+                const res = await fetch(window._sb.b + '/rankings?' + params.toString(), { headers: window._sb.rh });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const rows = await res.json();
+                rows.forEach(row => {
+                    data.push({ name: row.player_name, score: row.point_score, difficulty: row.difficulty });
                 });
             } catch (e) {
                 console.error(e);
-                if (e.message && e.message.includes("indexes?create_composite_index=")) {
-                    const urlMatch = e.message.match(/https:\/\/console\.firebase\.google\.com[^\s]*/);
-                    if (urlMatch) {
-                        const link = urlMatch[0];
-                        const msg = "ランキング表示にはインデックスの作成が必要です。\nOKを押すと作成ページが開きます。\n(作成には数分かかります)";
-                        if(confirm(msg)) {
-                            window.open(link, "_blank");
+                if (false) {
+                    const link = '#';
+                    const msg = "取得エラー";
+                    if(confirm(msg)) {
+                        window.open(link, "_blank");
                         }
                     }
                 }
@@ -1725,10 +1701,16 @@ class Game {
         localScores.push(scoreData);
         localStorage.setItem('fgl_division_scores', JSON.stringify(localScores));
 
-        if (auth && auth.currentUser && db) {
-            db.collection("scores_division_mine").add({
-                ...scoreData,
-                date: firebase.firestore.FieldValue.serverTimestamp()
+        if (window._sb && window.currentUser) {
+            fetch(window._sb.b + '/rankings', {
+                method: 'POST',
+                headers: window._sb.h,
+                body: JSON.stringify({
+                    game: 'division_mine',
+                    player_name: scoreData.name,
+                    point_score: scoreData.score,
+                    difficulty: scoreData.difficulty
+                })
             }).then(() => document.getElementById('ranking-msg').textContent = "ランキング送信完了")
               .catch(() => document.getElementById('ranking-msg').textContent = "送信エラー");
         } else {
