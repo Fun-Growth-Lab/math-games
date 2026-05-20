@@ -17,9 +17,32 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap" rel="stylesheet">
     
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script>
+(function(){
+    const _b = 'https://rpxassndgiunoqkxqcco.supabase.co/rest/v1';
+    const _k = 'sb_publishable_Wnge6OPvSf5l2YEgaPg4rw_nj4CyYAH';
+    const _h = {'apikey':_k,'Authorization':'Bearer '+_k,'Content-Type':'application/json','Prefer':'return=minimal'};
+    const _rh = {'apikey':_k,'Authorization':'Bearer '+_k};
+    window.currentUser = {uid:'guest', displayName:''};
+    window.saveOnlineScore = async (uid, name, score, difficulty) => {
+        if((score||0)<=0) return;
+        try {
+            const res = await fetch(`${_b}/rankings`,{method:'POST',headers:_h,
+                body:JSON.stringify({game:'math_braves_decimal',difficulty:difficulty||'normal',player_name:name||'ゲスト',point_score:Math.round(score)||0})});
+            if(!res.ok){const t=await res.text();throw new Error(`HTTP ${res.status}: ${t}`);}
+        } catch(e){console.error('Ranking save error:',e);}
+    };
+    window.fetchOnlineRanking = async (difficulty) => {
+        try {
+            const q = new URLSearchParams({select:'player_name,point_score,created_at',game:'eq.math_braves_decimal',difficulty:`eq.${difficulty||'normal'}`,point_score:'gt.0',order:'point_score.desc',limit:'10'});
+            const res = await fetch(`${_b}/rankings?${q}`,{headers:_rh});
+            if(!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            return data.map(r=>({uid:'',name:r.player_name,score:r.point_score,date:r.created_at?new Date(r.created_at).toLocaleDateString('ja-JP'):''}));
+        } catch(e){console.error('Ranking load error:',e);return [];}
+    };
+})();
+</script>
 
     <style>
         :root {
@@ -231,11 +254,11 @@
             <div id="current-player-display">現在のプレーヤー: ゲスト</div>
             <button class="menu-btn green" onclick="goToDifficulty()">はじめる</button>
             <button class="menu-btn blue" onclick="showScreen('screen-player')">プレーヤー選択</button>
-            <button id="btn-google-login" class="menu-btn red" onclick="loginGoogle()">Googleでログイン</button>
+            <button id="btn-google-login" class="menu-btn red" onclick="loginGoogle()" style="display:none">Googleでログイン</button>
             <button class="menu-btn yellow" onclick="showRanking()">ランキング</button>
             <button class="menu-btn gray" onclick="location.href='../index.html'">INDEXへ戻る</button>
         </div>
-        <div id="login-info" style="position: absolute; bottom: 20px; right: 30px; color: var(--text-dark); font-size: 20px; font-weight: bold; background: rgba(255,255,255,0.9); padding: 8px 20px; border-radius: 15px; border: 3px solid #FFECB3; display: none;"></div>
+        <div id="login-info" style="position: absolute; bottom: 20px; right: 30px; color: var(--text-dark); font-size: 20px; font-weight: bold; background: rgba(255,255,255,0.9); padding: 8px 20px; border-radius: 15px; border: 3px solid #FFECB3; display: none !important;"></div>
     </div>
 
     <div id="screen-difficulty" class="ui-layer hidden">
@@ -329,20 +352,6 @@
 </div>
 
 <script>
-    /* =========================================
-       Firebase Initialization
-    ========================================= */
-    const firebaseConfig = {
-        apiKey: "AIzaSyBCg5dCEM89UmYYhfGqVeRf_VrUlg8_o-4",
-        authDomain: "math-braves.firebaseapp.com",
-        projectId: "math-braves",
-        storageBucket: "math-braves.firebasestorage.app",
-        messagingSenderId: "217117619290",
-        appId: "1:217117619290:web:d227feb603970d3948d463"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
-    const auth = firebase.auth();
     const COLLECTION_NAME = 'scores_math_braves_decimal';
 
     /* =========================================
@@ -538,45 +547,11 @@
     }
 
     /* =========================================
-       Auth Logic
+       Auth Logic (Supabase移行済 - ログイン不要)
     ========================================= */
-    let currentUserEmail = "";
+    function loginGoogle() {}
 
-    auth.onAuthStateChanged((user) => {
-        const btn = document.getElementById('btn-google-login');
-        const loginInfo = document.getElementById('login-info');
-        if (user) {
-            currentUserEmail = user.email || user.displayName || "ゲスト";
-            btn.innerText = "ログアウト";
-            btn.onclick = logoutGoogle;
-            btn.classList.remove('red');
-            btn.classList.add('gray');
-            loginInfo.innerText = `${currentUserEmail} がログイン中`;
-            loginInfo.style.display = 'block';
-        } else {
-            currentUserEmail = "";
-            btn.innerText = "Googleでログイン";
-            btn.onclick = loginGoogle;
-            btn.classList.remove('gray');
-            btn.classList.add('red');
-            loginInfo.style.display = 'none';
-        }
-    });
-
-    function loginGoogle() {
-        const provider = new firebase.auth.GoogleAuthProvider();
-        auth.signInWithPopup(provider).then((result) => {
-            systemAlert(`Googleアカウント連携完了！\n※ランキング送信時は選択中のプレーヤー名(${currentPlayer || 'ゲスト'})が使用されます。`);
-        }).catch((error) => {
-            systemAlert("ログインに失敗しました。");
-        });
-    }
-
-    function logoutGoogle() {
-        auth.signOut().then(() => {
-            systemAlert("ログアウトしました。");
-        });
-    }
+    function logoutGoogle() {}
 
     /* =========================================
        Ranking
@@ -628,27 +603,21 @@
             localScores.sort((a,b) => b.clearedStages - a.clearedStages || b.score - a.score || b.remainingHP - a.remainingHP);
             renderRankingTable(localScores.slice(0, 10));
         } else {
-            db.collection(COLLECTION_NAME).where("difficulty", "==", currentRankDiff).get().then(snap => {
-                let data = [];
-                snap.forEach(doc => data.push(doc.data()));
-                data.sort((a,b) => b.clearedStages - a.clearedStages || b.score - a.score || b.remainingHP - a.remainingHP);
+            const diffMap = {'やさしい':'easy', 'ふつう':'normal', 'むずかしい':'hard'};
+            const diffKey = diffMap[currentRankDiff] || 'normal';
+            window.fetchOnlineRanking(diffKey).then(data => {
                 document.getElementById('ranking-loading').style.display = 'none';
-                renderRankingTable(data.slice(0, 10));
+                const mapped = data.map(r => ({
+                    playerName: r.name,
+                    clearedStages: '-',
+                    score: r.score,
+                    remainingHP: 0
+                }));
+                renderRankingTable(mapped);
             }).catch(err => {
                 document.getElementById('ranking-loading').style.display = 'none';
-                if (err.message && err.message.includes('FAILED_PRECONDITION')) {
-                    const match = err.message.match(/(https:\/\/console\.firebase\.google\.com[^\s]+)/);
-                    if (match) {
-                        console.error("Firebaseインデックスを作成してください: \n" + match[0]);
-                        systemAlert("ランキングを表示するためのデータベース設定(インデックス)が完了していません。\n開発者はブラウザのコンソールを開き、リンクから作成してください。");
-                    } else {
-                        console.error(err);
-                        systemAlert("ランキングの取得に失敗しました。");
-                    }
-                } else {
-                    console.error(err);
-                    systemAlert("ランキングの取得に失敗しました。");
-                }
+                console.error(err);
+                systemAlert("ランキングの取得に失敗しました。");
             });
         }
     }
@@ -675,10 +644,8 @@
         local.push(scoreData);
         localStorage.setItem('math_braves_scores', JSON.stringify(local));
 
-        if(auth.currentUser) {
-            scoreData.timestamp = firebase.firestore.FieldValue.serverTimestamp();
-            db.collection(COLLECTION_NAME).add(scoreData);
-        }
+        const diffMap = {'やさしい':'easy', 'ふつう':'normal', 'むずかしい':'hard'};
+        window.saveOnlineScore(window.currentUser.uid, scoreData.playerName, scoreData.score, diffMap[scoreData.difficulty] || 'normal');
     }
 
     /* =========================================

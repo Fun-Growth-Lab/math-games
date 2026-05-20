@@ -13,9 +13,32 @@
     </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Math Braves - かけざん２</title>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script>
+(function(){
+    const _b = 'https://rpxassndgiunoqkxqcco.supabase.co/rest/v1';
+    const _k = 'sb_publishable_Wnge6OPvSf5l2YEgaPg4rw_nj4CyYAH';
+    const _h = {'apikey':_k,'Authorization':'Bearer '+_k,'Content-Type':'application/json','Prefer':'return=minimal'};
+    const _rh = {'apikey':_k,'Authorization':'Bearer '+_k};
+    window.currentUser = {uid:'guest', displayName:''};
+    window.saveOnlineScore = async (uid, name, score, difficulty) => {
+        if((score||0)<=0) return;
+        try {
+            const res = await fetch(`${_b}/rankings`,{method:'POST',headers:_h,
+                body:JSON.stringify({game:'math_braves_multiplication2',difficulty:difficulty||'normal',player_name:name||'ゲスト',point_score:Math.round(score)||0})});
+            if(!res.ok){const t=await res.text();throw new Error(`HTTP ${res.status}: ${t}`);}
+        } catch(e){console.error('Ranking save error:',e);}
+    };
+    window.fetchOnlineRanking = async (difficulty) => {
+        try {
+            const q = new URLSearchParams({select:'player_name,point_score,created_at',game:'eq.math_braves_multiplication2',difficulty:`eq.${difficulty||'normal'}`,point_score:'gt.0',order:'point_score.desc',limit:'10'});
+            const res = await fetch(`${_b}/rankings?${q}`,{headers:_rh});
+            if(!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            return data.map(r=>({uid:'',name:r.player_name,score:r.point_score,date:r.created_at?new Date(r.created_at).toLocaleDateString('ja-JP'):''}));
+        } catch(e){console.error('Ranking load error:',e);return [];}
+    };
+})();
+</script>
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -437,8 +460,8 @@
                         <span id="current-player-name-title">ななしさん</span>
                     </button>
 
-                    <button id="btn-title-login" class="puz-btn btn-login" onclick="game.login()">Googleでログイン</button>
-                    <button id="btn-title-logout" class="puz-btn btn-login hidden" onclick="game.logout()">ログアウト</button>
+                    <button id="btn-title-login" class="puz-btn btn-login" onclick="game.login()" style="display:none">Googleでログイン</button>
+                    <button id="btn-title-logout" class="puz-btn btn-login hidden" onclick="game.logout()" style="display:none">ログアウト</button>
 
                     <button class="puz-btn btn-score" onclick="game.toggleRankingPopup(true)">ランキング</button>
 
@@ -595,23 +618,6 @@ const NG_WORDS_HIRAGANA = [
     'ぱすわーど', 'ぱす', 'あかうんと', 'こじんじょうほう'
 ];
 
-const firebaseConfig = {
-    apiKey: "AIzaSyBCg5dCEM89UmYYhfGqVeRf_VrUlg8_o-4",
-    authDomain: "math-braves.firebaseapp.com",
-    projectId: "math-braves",
-    storageBucket: "math-braves.firebasestorage.app",
-    messagingSenderId: "217117619290",
-    appId: "1:217117619290:web:d227feb603970d3948d463"
-};
-
-let db, auth;
-try {
-    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-    db = firebase.firestore();
-    auth = firebase.auth();
-} catch (e) {
-    console.error("Firebase init failed:", e);
-}
 
 class Game {
     constructor() {
@@ -668,37 +674,11 @@ class Game {
         this.updateClearCounts();
     }
 
-    setupAuth() {
-        if (!auth) return;
-        auth.onAuthStateChanged((user) => {
-            this.user = user;
-            const btnLogin = document.getElementById('btn-title-login');
-            const btnLogout = document.getElementById('btn-title-logout');
+    setupAuth() {}
 
-            if (user) {
-                btnLogin.classList.add('hidden');
-                btnLogout.classList.remove('hidden');
-                btnLogout.innerHTML = `ログアウト<br><span style="font-size:14px;">(${user.displayName || "名無し"})</span>`;
-            } else {
-                btnLogin.classList.remove('hidden');
-                btnLogout.classList.add('hidden');
-            }
-        });
-    }
+    login() {}
 
-    login() {
-        if (!auth) return;
-        const provider = new firebase.auth.GoogleAuthProvider();
-        auth.signInWithPopup(provider).catch((error) => {
-            console.error("Login failed:", error);
-            alert("ログインに失敗しました");
-        });
-    }
-
-    logout() {
-        if (!auth) return;
-        auth.signOut().catch((error) => console.error("Logout failed:", error));
-    }
+    logout() {}
 
     resize() {
         this.canvas.width = this.baseWidth;
@@ -1419,17 +1399,8 @@ class Game {
         ranks[this.difficulty].sort((a,b)=>b.score-a.score);
         ranks[this.difficulty] = ranks[this.difficulty].slice(0,10);
         localStorage.setItem(`ranking_local_${this.collectionName}`, JSON.stringify(ranks));
-        
-        if(db && this.user) {
-             try {
-                 await db.collection(this.collectionName).add({
-                     uid: this.user.uid,
-                     displayName: nameToSave, 
-                     score: score, difficulty: this.difficulty,
-                     timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                 });
-             } catch(e) { console.error("Score save error:", e); }
-        }
+
+        await window.saveOnlineScore(window.currentUser.uid, nameToSave, score, this.difficulty);
     }
 
     toggleRankingPopup(show) {
@@ -1460,18 +1431,8 @@ class Game {
             const ranks = JSON.parse(localStorage.getItem(`ranking_local_${this.collectionName}`) || "{}");
             return ranks[diff] || [];
         } else {
-            if(!db) return [{name:"オフライン", score:0}];
-            try {
-                const q = await db.collection(this.collectionName)
-                    .where('difficulty','==',diff)
-                    .orderBy('score','desc')
-                    .limit(10)
-                    .get();
-                return q.docs.map(d => ({name: d.data().displayName, score: d.data().score}));
-            } catch(e) {
-                console.error(e);
-                return [{name:"取得エラー", score:0}];
-            }
+            const data = await window.fetchOnlineRanking(diff);
+            return data;
         }
     }
 

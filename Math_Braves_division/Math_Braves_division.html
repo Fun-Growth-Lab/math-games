@@ -11,6 +11,32 @@
       gtag('js', new Date());
       gtag('config', 'G-5C4G61Y29Q');
     </script>
+    <script>
+(function(){
+    const _b = 'https://rpxassndgiunoqkxqcco.supabase.co/rest/v1';
+    const _k = 'sb_publishable_Wnge6OPvSf5l2YEgaPg4rw_nj4CyYAH';
+    const _h = {'apikey':_k,'Authorization':'Bearer '+_k,'Content-Type':'application/json','Prefer':'return=minimal'};
+    const _rh = {'apikey':_k,'Authorization':'Bearer '+_k};
+    window.currentUser = {uid:'guest', displayName:''};
+    window.saveOnlineScore = async (uid, name, score, difficulty) => {
+        if((score||0)<=0) return;
+        try {
+            const res = await fetch(`${_b}/rankings`,{method:'POST',headers:_h,
+                body:JSON.stringify({game:'math_braves_division',difficulty:difficulty||'normal',player_name:name||'ゲスト',point_score:Math.round(score)||0})});
+            if(!res.ok){const t=await res.text();throw new Error(`HTTP ${res.status}: ${t}`);}
+        } catch(e){console.error('Ranking save error:',e);}
+    };
+    window.fetchOnlineRanking = async (difficulty) => {
+        try {
+            const q = new URLSearchParams({select:'player_name,point_score,created_at',game:'eq.math_braves_division',difficulty:`eq.${difficulty||'normal'}`,point_score:'gt.0',order:'point_score.desc',limit:'10'});
+            const res = await fetch(`${_b}/rankings?${q}`,{headers:_rh});
+            if(!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            return data.map(r=>({uid:'',name:r.player_name,score:r.point_score,date:r.created_at?new Date(r.created_at).toLocaleDateString('ja-JP'):''}));
+        } catch(e){console.error('Ranking load error:',e);return [];}
+    };
+})();
+</script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>わりざんバトル - Math Braves Division</title>
     <style>
@@ -278,10 +304,10 @@
                     <span>👤 <span id="current-player-name-display">ゲスト</span> <span style="font-size: 0.8rem;">(へんこう)</span></span>
                 </button>
 
-                <div style="width: 100%; display: flex; flex-direction: column; align-items: center; background: rgba(0,0,0,0.05); border-radius: 15px; margin-bottom: 15px; padding-top: 10px;">
-                    <p id="auth-status" style="margin: 0 0 10px 0; font-size: 0.85rem; color: #8d6e63; font-weight: bold;">ログインしていません</p>
-                    <button id="btn-login" class="btn btn-auth title-menu-btn" style="margin-top:0;">Googleでログイン</button>
-                    <button id="btn-logout" class="btn btn-danger hidden title-menu-btn" style="margin-top:0;">ログアウト</button>
+                <div style="width: 100%; display: flex; flex-direction: column; align-items: center; background: rgba(0,0,0,0.05); border-radius: 15px; margin-bottom: 15px; padding-top: 10px; display:none">
+                    <p id="auth-status" style="margin: 0 0 10px 0; font-size: 0.85rem; color: #8d6e63; font-weight: bold; display:none">ログインしていません</p>
+                    <button id="btn-login" class="btn btn-auth title-menu-btn" style="margin-top:0; display:none">Googleでログイン</button>
+                    <button id="btn-logout" class="btn btn-danger hidden title-menu-btn" style="margin-top:0; display:none">ログアウト</button>
                 </div>
 
                 <button id="btn-view-ranking" class="btn btn-spla-yellow title-menu-btn">🏆 ランキング</button>
@@ -390,79 +416,9 @@
     </div>
 </div>
 
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-    import { getFirestore, collection, doc, setDoc, serverTimestamp, query, where, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyBCg5dCEM89UmYYhfGqVeRf_VrUlg8_o-4",
-      authDomain: "math-braves.firebaseapp.com",
-      projectId: "math-braves",
-      storageBucket: "math-braves.firebasestorage.app",
-      messagingSenderId: "217117619290",
-      appId: "1:217117619290:web:d227feb603970d3948d463"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
-    const provider = new GoogleAuthProvider();
-
-    window.currentUser = null; 
-
-    const btnLogin = document.getElementById('btn-login');
-    const btnLogout = document.getElementById('btn-logout');
-    const authStatus = document.getElementById('auth-status');
-
-    window.handleLogin = function() {
-        signInWithPopup(auth, provider)
-            .then((result) => { console.log("ログイン成功:", result.user.displayName); })
-            .catch((error) => { console.error("ログインエラー:", error); window.showCustomAlert("ログインに失敗しました。"); });
-    };
-
-    window.handleLogout = function() {
-        signOut(auth).then(() => { console.log("ログアウト成功"); }).catch((error) => { console.error("ログアウトエラー:", error); });
-    };
-
-    onAuthStateChanged(auth, (user) => {
-        if (user) {
-            window.currentUser = { uid: user.uid, displayName: user.displayName || 'ゲスト' };
-            if(authStatus) authStatus.textContent = `ログイン中: ${window.currentUser.displayName}`;
-            if(btnLogin) btnLogin.classList.add('hidden');
-            if(btnLogout) btnLogout.classList.remove('hidden');
-        } else {
-            window.currentUser = null;
-            if(authStatus) authStatus.textContent = 'ログインしていません';
-            if(btnLogin) btnLogin.classList.remove('hidden');
-            if(btnLogout) btnLogout.classList.add('hidden');
-        }
-    });
-
-    window.saveOnlineScore = async (userId, customName, difficulty, score) => {
-        try {
-            const docId = `${userId}_${difficulty}_${Date.now()}`;
-            await setDoc(doc(db, "scores_math_braves_division", docId), {
-                uid: userId, name: customName, difficulty: difficulty, score: score, createdAt: serverTimestamp()
-            });
-        } catch (error) { console.error("Firestoreへの保存エラー:", error); }
-    };
-
-    window.fetchOnlineRanking = async (difficulty) => {
-        if (!window.currentUser) { return []; }
-        try {
-            const scoresRef = collection(db, "scores_math_braves_division");
-            const q = query(scoresRef, where("difficulty", "==", difficulty));
-            const querySnapshot = await getDocs(q);
-            let ranking = [];
-            querySnapshot.forEach((doc) => { ranking.push(doc.data()); });
-            ranking.sort((a, b) => b.score - a.score);
-            return ranking.slice(0, 10);
-        } catch (error) { console.error("ランキング取得エラー:", error); return []; }
-    };
-    
-    btnLogin.addEventListener('click', window.handleLogin);
-    btnLogout.addEventListener('click', window.handleLogout);
+<script>
+    window.handleLogin = function() {};
+    window.handleLogout = function() {};
 </script>
 <script>
 // Game Config
@@ -1483,9 +1439,7 @@ function updateUI() {
 
 function saveScoreData() {
     saveLocalScore(state.difficulty, state.playerName, state.score);
-    if (window.currentUser) {
-        window.saveOnlineScore(window.currentUser.uid, state.playerName, state.difficulty, state.score);
-    }
+    window.saveOnlineScore('guest', state.playerName, state.score, state.difficulty);
 }
 
 const savedPlayers = getPlayers();

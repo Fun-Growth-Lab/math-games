@@ -14,9 +14,32 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>トレジャー＆クラフト ～7つの秘境と幻の竜～</title>
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;900&display=swap" rel="stylesheet">
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script>
+(function(){
+    const _b = 'https://rpxassndgiunoqkxqcco.supabase.co/rest/v1';
+    const _k = 'sb_publishable_Wnge6OPvSf5l2YEgaPg4rw_nj4CyYAH';
+    const _h = {'apikey':_k,'Authorization':'Bearer '+_k,'Content-Type':'application/json','Prefer':'return=minimal'};
+    const _rh = {'apikey':_k,'Authorization':'Bearer '+_k};
+    window.currentUser = {uid:'guest', displayName:''};
+    window.saveOnlineScore = async (name, score, difficulty) => {
+        if((score||0)<=0) return;
+        try {
+            const res = await fetch(`${_b}/rankings`,{method:'POST',headers:_h,
+                body:JSON.stringify({game:'treasure_craft',difficulty:difficulty||'normal',player_name:name||'ゲスト',point_score:Math.round(score)||0})});
+            if(!res.ok){const t=await res.text();throw new Error(`HTTP ${res.status}: ${t}`);}
+        } catch(e){console.error('Ranking save error:',e);}
+    };
+    window.fetchOnlineRanking = async (difficulty) => {
+        try {
+            const q = new URLSearchParams({select:'player_name,point_score,created_at',game:'eq.treasure_craft',difficulty:`eq.${difficulty||'normal'}`,point_score:'gt.0',order:'point_score.desc',limit:'10'});
+            const res = await fetch(`${_b}/rankings?${q}`,{headers:_rh});
+            if(!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            return data.map(r=>({name:r.player_name,score:r.point_score,date:r.created_at?new Date(r.created_at).toLocaleDateString('ja-JP'):''}));
+        } catch(e){console.error('Ranking load error:',e);return [];}
+    };
+})();
+</script>
     <script src="data.js"></script>
 
     <style>
@@ -68,19 +91,6 @@ setTimeout(() => {
 // ==========================================
 // 1. 定数・初期設定
 // ==========================================
-const firebaseConfig = {
-    apiKey: "AIzaSyBCg5dCEM89UmYYhfGqVeRf_VrUlg8_o-4",
-    authDomain: "math-braves.firebaseapp.com",
-    projectId: "math-braves",
-    storageBucket: "math-braves.firebasestorage.app",
-    messagingSenderId: "217117619290",
-    appId: "1:217117619290:web:d227feb603970d3948d463"
-};
-if (!firebase.apps.length) {
-    firebase.initializeApp(firebaseConfig);
-}
-const db = firebase.firestore();
-const FIRESTORE_COLLECTION = "scores_treasure_craft";
 
 const cvs = document.getElementById("gameCanvas");
 const ctx = cvs.getContext("2d");
@@ -467,41 +477,17 @@ function renderTitle() {
     let row2Y = startY + bH + gapY;
 
     drawBtn("はじめる", leftX, row1Y, bW, bH, '#ffb3ba', () => { GAME_STATE = "PLAYER_SELECT"; });
-    
-    let loginTxt = googleUser ? "ログアウト" : "Googleでログイン";
-    let loginCol = googleUser ? '#d3d3d3' : '#bae1ff';
-    drawBtn(loginTxt, rightX, row1Y, bW, bH, loginCol, () => { 
-        if(googleUser) logout(); else loginWithGoogle(); 
-    });
 
-    drawBtn("ランキング", leftX, row2Y, bW, bH, '#ffd8b1', () => { 
-        rankingTab = "LOCAL"; rankingDataWorld = null; GAME_STATE = "RANKING"; 
+    drawBtn("ランキング", leftX, row2Y, bW, bH, '#ffd8b1', () => {
+        rankingTab = "LOCAL"; rankingDataWorld = null; GAME_STATE = "RANKING";
     });
 
     drawBtn("INDEXへ", rightX, row2Y, bW, bH, '#e2f0cb', () => { window.location.href = "../index.html"; });
-
-    if(googleUser) {
-        let dispName = googleUser.displayName || googleUser.email || "ユーザー";
-        drawText(`(${dispName}でログイン中)`, 1260, 690, 20, '#ecf0f1', 'right');
-    }
 }
 
-function loginWithGoogle() {
-    const provider = new firebase.auth.GoogleAuthProvider();
-    firebase.auth().signInWithPopup(provider).then((result) => {
-        googleUser = result.user;
-        activePopup = { text: `${googleUser.displayName}さん、ようこそ！`, isAlert: true };
-    }).catch((error) => {
-        activePopup = { text: "ログインに失敗しました。", isAlert: true };
-    });
-}
+function loginWithGoogle() {}
 
-function logout() {
-    firebase.auth().signOut().then(() => {
-        googleUser = null;
-        activePopup = { text: "ログアウトしました。", isAlert: true };
-    });
-}
+function logout() {}
 
 function showPrompt(title, defaultVal, callback) {
     const inp = document.getElementById("nameInput");
@@ -1010,15 +996,9 @@ function finishExploration(isClear) {
             days: gameData.day,
             saving: true
         };
-        
-        if(firebase.apps.length > 0 && firebaseConfig.apiKey !== "YOUR_API_KEY") {
-            db.collection(FIRESTORE_COLLECTION).add({
-                ...scoreData, timestamp: firebase.firestore.FieldValue.serverTimestamp()
-            }).then(() => { if(activePopup && activePopup.isClearPopup) activePopup.saving = false; })
-              .catch(() => { if(activePopup && activePopup.isClearPopup) activePopup.saving = false; });
-        } else {
-            setTimeout(() => { if(activePopup && activePopup.isClearPopup) activePopup.saving = false; }, 1000);
-        }
+
+        window.saveOnlineScore(currentPlayerName, assets, 'normal')
+            .finally(() => { if(activePopup && activePopup.isClearPopup) activePopup.saving = false; });
         GAME_STATE = "MAIN";
     } else {
         GAME_STATE = "MAIN";
@@ -1228,14 +1208,8 @@ function finishGame(isClear) {
     });
     localStorage.setItem('fgl_local_ranking', JSON.stringify(localRank));
 
-    if(firebase.apps.length > 0 && firebaseConfig.apiKey !== "YOUR_API_KEY") {
-        db.collection(FIRESTORE_COLLECTION).add({
-            ...scoreData, timestamp: firebase.firestore.FieldValue.serverTimestamp()
-        }).then(() => setTimeout(() => { rankingTab="LOCAL"; GAME_STATE="RANKING"; }, 2000))
-          .catch(() => setTimeout(() => { rankingTab="LOCAL"; GAME_STATE="RANKING"; }, 2000));
-    } else {
-        setTimeout(() => { rankingTab="LOCAL"; GAME_STATE="RANKING"; }, 2000);
-    }
+    window.saveOnlineScore(currentPlayerName, assets, 'normal')
+        .finally(() => setTimeout(() => { rankingTab="LOCAL"; GAME_STATE="RANKING"; }, 2000));
 }
 
 function renderResult() {
@@ -1254,25 +1228,15 @@ function renderRanking() {
     drawBtn("ローカル", 440, 120, 150, 40, rankingTab==="LOCAL" ? '#e74c3c' : '#bdc3c7', () => rankingTab="LOCAL");
     drawBtn("ワールド", 690, 120, 150, 40, rankingTab==="WORLD" ? '#3498db' : '#bdc3c7', () => {
         rankingTab="WORLD";
-        if(!rankingDataWorld && firebaseConfig.apiKey !== "YOUR_API_KEY") {
-            db.collection(FIRESTORE_COLLECTION).get()
-              .then(snap => { 
-                  let data = []; 
-                  snap.forEach(doc => data.push(doc.data())); 
-                  data.sort((a, b) => {
-                      if (a.isClear !== b.isClear) return b.isClear ? 1 : -1;
-                      if (a.isClear) return a.days - b.days || b.assets - a.assets;
-                      return b.assets - a.assets;
-                  });
-                  rankingDataWorld = data.slice(0, 10); 
-              })
-              .catch(error => { 
-                  console.error("ランキング取得エラー:", error);
-                  if(error.message && error.message.includes("index")) {
-                      console.error("以下のリンクから複合インデックスを作成してください:\n" + error.message);
-                  }
-                  rankingDataWorld = []; 
-              });
+        if(!rankingDataWorld) {
+            window.fetchOnlineRanking('normal').then(data => {
+                rankingDataWorld = data.map(r => ({
+                    name: r.name,
+                    assets: r.score,
+                    days: '-',
+                    isClear: true
+                }));
+            }).catch(() => { rankingDataWorld = []; });
         }
     });
 
@@ -1490,18 +1454,7 @@ cvs.addEventListener("click", (e) => {
     }
 });
 
-requestAnimationFrame(loop); 
-
-if (firebase.apps.length > 0 && firebaseConfig.apiKey !== "YOUR_API_KEY") {
-    firebase.auth().onAuthStateChanged((user) => {
-        if (user && !user.isAnonymous) {
-            googleUser = user;
-        } else {
-            googleUser = null;
-        }
-    });
-    firebase.auth().signInAnonymously().catch(e => console.warn("Auth Info: ", e.message));
-}
+requestAnimationFrame(loop);
 
 </script>
 </body>
