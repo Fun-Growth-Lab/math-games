@@ -234,8 +234,8 @@
         <div>
             <button id="btn-title-start" class="btn btn-success btn-title-menu">はじめる</button>
             <button id="btn-title-player" class="btn btn-warning btn-title-menu">プレーヤー選択</button>
-            <button id="btn-title-login" class="btn btn-auth btn-title-menu">Googleでログイン</button>
-            <button id="btn-title-logout" class="btn btn-danger btn-title-menu hidden">ログアウト</button>
+            <button id="btn-title-login" class="btn btn-auth btn-title-menu" style="display:none">Googleでログイン</button>
+            <button id="btn-title-logout" class="btn btn-danger btn-title-menu hidden" style="display:none">ログアウト</button>
             <button id="btn-title-ranking" class="btn btn-title-menu" style="background:#9b59b6;">ランキング</button>
             <button id="btn-title-index" class="btn btn-title-menu" style="background:#7f8c8d;">INDEXへ</button>
         </div>
@@ -330,79 +330,37 @@
     </div>
 </div>
 
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-
+<!-- Supabase -->
 <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyBCg5dCEM89UmYYhfGqVeRf_VrUlg8_o-4",
-      authDomain: "math-braves.firebaseapp.com",
-      projectId: "math-braves",
-      storageBucket: "math-braves.firebasestorage.app",
-      messagingSenderId: "217117619290",
-      appId: "1:217117619290:web:d227feb603970d3948d463"
-    };
+(function(){
+    const _b = 'https://rpxassndgiunoqkxqcco.supabase.co/rest/v1';
+    const _k = 'sb_publishable_Wnge6OPvSf5l2YEgaPg4rw_nj4CyYAH';
+    const _h = {'apikey':_k,'Authorization':'Bearer '+_k,'Content-Type':'application/json','Prefer':'return=minimal'};
+    const _rh = {'apikey':_k,'Authorization':'Bearer '+_k};
 
-    if (!firebase.apps.length) {
-        firebase.initializeApp(firebaseConfig);
-    }
-    const db = firebase.firestore();
-    const auth = firebase.auth();
-    const FIREBASE_COLLECTION_NAME = "scores_modulo"; 
+    window.currentUser = {uid:'guest', displayName:''};
 
-    window.currentUser = null; 
-
-    window.handleLogin = function() { 
-        const provider = new firebase.auth.GoogleAuthProvider();
-        auth.signInWithPopup(provider).catch(()=>customAlert("ログインに失敗しました")); 
-    };
-    
-    window.handleLogout = function() { 
-        auth.signOut(); 
-    };
-
-    auth.onAuthStateChanged((user) => {
-        const authStatus = document.getElementById('auth-status');
-        const btnLogin = document.getElementById('btn-title-login');
-        const btnLogout = document.getElementById('btn-title-logout');
-        if (user) {
-            window.currentUser = { uid: user.uid, displayName: user.displayName || 'No Name' };
-            if(authStatus) authStatus.textContent = `Googleアカウント: ${window.currentUser.displayName}`;
-            if(btnLogin) btnLogin.classList.add('hidden');
-            if(btnLogout) btnLogout.classList.remove('hidden');
-        } else {
-            window.currentUser = null;
-            if(authStatus) authStatus.textContent = 'Google未ログイン (ローカル保存のみ)';
-            if(btnLogin) btnLogin.classList.remove('hidden');
-            if(btnLogout) btnLogout.classList.add('hidden');
-        }
-    });
-
-    window.saveOnlineScore = async (userId, userName, difficulty, score) => {
+    window.saveOnlineScore = async (uid, name, difficulty, score) => {
+        if ((score||0) <= 0) return;
         try {
-            await db.collection(FIREBASE_COLLECTION_NAME).add({
-                uid: userId, 
-                name: userName, 
-                difficulty: difficulty, 
-                score: score, 
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            const res = await fetch(`${_b}/rankings`, {
+                method:'POST', headers:_h,
+                body: JSON.stringify({game:'modulo_blitz_addition', difficulty:difficulty||'normal', player_name:name||'ゲスト', point_score:Math.round(score)||0})
             });
-        } catch (error) { console.error(error); }
+            if (!res.ok) { const t=await res.text(); throw new Error(`HTTP ${res.status}: ${t}`); }
+        } catch(e) { console.error('Ranking save error:', e); }
     };
 
     window.fetchOnlineRankingGlobal = async (difficulty) => {
-        if (!window.currentUser) return [];
         try {
-            const snap = await db.collection(FIREBASE_COLLECTION_NAME)
-                .where("difficulty", "==", difficulty)
-                .get();
-            const ranking = [];
-            snap.forEach((doc) => ranking.push(doc.data()));
-            ranking.sort((a,b) => b.score - a.score);
-            return ranking.slice(0, 10);
-        } catch (error) { console.error(error); return []; }
+            const q = new URLSearchParams({select:'player_name,point_score,created_at', game:'eq.modulo_blitz_addition', difficulty:`eq.${difficulty||'normal'}`, point_score:'gt.0', order:'point_score.desc', limit:'10'});
+            const res = await fetch(`${_b}/rankings?${q}`, {headers:_rh});
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            return data.map(r=>({uid:'', name:r.player_name, score:r.point_score, date:r.created_at?new Date(r.created_at).toLocaleDateString('ja-JP'):''}));
+        } catch(e) { console.error('Ranking load error:', e); return null; }
     };
+})();
 </script>
 
 <script>

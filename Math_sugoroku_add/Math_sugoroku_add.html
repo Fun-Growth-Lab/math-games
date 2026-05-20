@@ -367,7 +367,7 @@
                     <div style="display:flex; flex-direction:column; gap:12px; width: 250px;">
                         <button class="btn btn-easy" onclick="showLevelSelect()">はじめる</button>
                         <button class="btn btn-normal" onclick="showPlayerSelect()">プレーヤー選択</button>
-                        <button id="btn-login-google-title" class="btn btn-google" onclick="handleGoogleLogin()">Googleでログイン</button>
+                        <button id="btn-login-google-title" class="btn btn-google" onclick="handleGoogleLogin()" style="display:none">Googleでログイン</button>
                         <button class="btn btn-yellow" onclick="showFullRanking()">ランキング</button>
                         <button class="btn btn-gray" onclick="window.location.href='../index.html'">INDEXへ</button>
                     </div>
@@ -562,11 +562,40 @@
         </div>
     </div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-        import { getFirestore, collection, query, where, getDocs, setDoc, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    <!-- Supabase -->
+    <script>
+    (function(){
+        const _b = 'https://rpxassndgiunoqkxqcco.supabase.co/rest/v1';
+        const _k = 'sb_publishable_Wnge6OPvSf5l2YEgaPg4rw_nj4CyYAH';
+        const _h = {'apikey':_k,'Authorization':'Bearer '+_k,'Content-Type':'application/json','Prefer':'return=minimal'};
+        const _rh = {'apikey':_k,'Authorization':'Bearer '+_k};
 
+        window.currentUser = {uid:'guest', displayName:''};
+
+        window.saveOnlineScore = async (uid, name, difficulty, score) => {
+            if ((score||0) <= 0) return;
+            try {
+                const res = await fetch(`${_b}/rankings`, {
+                    method:'POST', headers:_h,
+                    body: JSON.stringify({game:'math_sugoroku_add', difficulty:difficulty||'normal', player_name:name||'ゲスト', point_score:Math.round(score)||0})
+                });
+                if (!res.ok) { const t=await res.text(); throw new Error(`HTTP ${res.status}: ${t}`); }
+            } catch(e) { console.error('Ranking save error:', e); }
+        };
+
+        window.fetchOnlineRanking = async (difficulty) => {
+            try {
+                const q = new URLSearchParams({select:'player_name,point_score,created_at', game:'eq.math_sugoroku_add', difficulty:`eq.${difficulty||'normal'}`, point_score:'gt.0', order:'point_score.desc', limit:'10'});
+                const res = await fetch(`${_b}/rankings?${q}`, {headers:_rh});
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                return data.map(r=>({uid:'', name:r.player_name, score:r.point_score, date:r.created_at?new Date(r.created_at).toLocaleDateString('ja-JP'):''}));
+            } catch(e) { console.error('Ranking load error:', e); return null; }
+        };
+    })();
+    </script>
+
+    <script type="module">
         // 半角数字を全角数字に変換する関数
         function toZenkaku(str) {
             return str.toString().replace(/[0-9]/g, function(s) {
@@ -625,20 +654,7 @@
             'ぱすわーど', 'ぱす', 'あかうんと', 'こじんじょうほう'
         ];
 
-        // --- Firebase設定 ---
-        const firebaseConfig = {
-            apiKey: "AIzaSyBCg5dCEM89UmYYhfGqVeRf_VrUlg8_o-4",
-            authDomain: "math-braves.firebaseapp.com",
-            projectId: "math-braves",
-            storageBucket: "math-braves.firebasestorage.app",
-            messagingSenderId: "217117619290",
-            appId: "1:217117619290:web:d227feb603970d3948d463"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        let currentUser = null;
+        let currentUser = window.currentUser;
 
         // カスタムアラート機能
         function showCustomAlert(msg, callback = null) {
@@ -661,46 +677,6 @@
                 document.getElementById('custom-confirm-screen').classList.add('hidden');
             };
         }
-
-        // --- Firebase関連関数 ---
-        function handleGoogleLogin() {
-            if (currentUser) {
-                signOut(auth).then(() => {
-                    showCustomAlert("ログアウトしました");
-                }).catch((error) => {
-                    console.error(error);
-                });
-            } else {
-                const provider = new GoogleAuthProvider();
-                signInWithPopup(auth, provider)
-                    .then((result) => {
-                        console.log("Logged in:", result.user);
-                    }).catch((error) => {
-                        console.error("Login failed:", error);
-                        showCustomAlert("ログインに失敗しました: " + error.message);
-                    });
-            }
-        }
-
-        onAuthStateChanged(auth, (user) => {
-            currentUser = user;
-            const statusText = document.getElementById("login-status-text");
-            const loginBtnTitle = document.getElementById("btn-login-google-title");
-
-            if (user) {
-                statusText.innerText = `ログイン中: ${user.displayName}`;
-                statusText.style.color = "#43A047";
-                loginBtnTitle.innerText = "ログアウト";
-                loginBtnTitle.classList.remove("btn-google");
-                loginBtnTitle.classList.add("btn-gray");
-            } else {
-                statusText.innerText = "ログインしていません";
-                statusText.style.color = "#795548";
-                loginBtnTitle.innerText = "Googleでログイン";
-                loginBtnTitle.classList.remove("btn-gray");
-                loginBtnTitle.classList.add("btn-google");
-            }
-        });
 
         // --- 定数・変数 ---
         const ITEMS = ["🛼","🏍️","🚲","🚀","🚁","🚩","🗼","🌈","🤖","👓","💍","🧸","🎻","🍜","🍹","☃️"];
@@ -1703,27 +1679,8 @@
         
         function recordScore(score, level) {
             saveLocalScore(score, level);
-            if (currentUser) {
-                const diffUpper = level.toUpperCase();
-                saveOnlineScore(currentUser.uid, currentPlayerName, diffUpper, score);
-            }
-        }
-
-        async function saveOnlineScore(userId, userName, difficulty, score) {
-            console.log(`[Debug] saveOnlineScore: ${difficulty}, ${score}pt, Name:${userName}`);
-            try {
-                const docId = `${userId}_${difficulty}_${Date.now()}`;
-                await setDoc(doc(db, "scores_sugoroku", docId), {
-                    uid: userId,
-                    name: userName, 
-                    difficulty: difficulty, 
-                    score: score,
-                    createdAt: serverTimestamp() 
-                });
-                console.log("[Debug] Saved to scores_sugoroku!");
-            } catch (error) {
-                console.error("[Error] Save failed:", error);
-            }
+            const diffUpper = level.toUpperCase();
+            window.saveOnlineScore('guest', currentPlayerName, diffUpper, score);
         }
 
         function gameOver() {
@@ -1804,32 +1761,9 @@
             renderRankingList(data, list);
         }
 
-        // --- オンラインランキング (Firestore) ---
+        // --- オンラインランキング (Supabase) ---
         async function fetchOnlineRanking(difficulty) {
-             console.log(`[Debug] fetchOnlineRanking: ${difficulty}`);
-             try {
-                const q = query(
-                    collection(db, "scores_sugoroku"), 
-                    where("difficulty", "==", difficulty)
-                );
-                
-                const querySnapshot = await getDocs(q);
-                let ranking = [];
-                
-                querySnapshot.forEach((doc) => {
-                    const d = doc.data();
-                    if (d.score !== undefined) {
-                        ranking.push(d);
-                    }
-                });
-
-                ranking.sort((a, b) => b.score - a.score);
-                return ranking.slice(0, 10);
-
-            } catch (error) {
-                console.error("[Error] Fetch ranking failed:", error);
-                return [];
-            }
+            return window.fetchOnlineRanking(difficulty) || [];
         }
 
         function renderRankingList(data, listElement) {
@@ -1885,13 +1819,6 @@
                 loadLocalRankingColumn('normal', 'rank-list-normal');
                 loadLocalRankingColumn('hard', 'rank-list-hard');
             } else {
-                if(!currentUser) {
-                    ['rank-list-easy', 'rank-list-normal', 'rank-list-hard'].forEach(id => {
-                        document.getElementById(id).innerHTML = "<li style='text-align:center; color:#aaa; padding:10px;'>ログインが必要です</li>";
-                    });
-                    return;
-                }
-                
                 const [easyData, normalData, hardData] = await Promise.all([
                     fetchOnlineRanking('EASY'),
                     fetchOnlineRanking('NORMAL'),
