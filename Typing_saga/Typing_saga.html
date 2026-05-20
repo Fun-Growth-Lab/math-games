@@ -84,9 +84,19 @@
             background-color: #888;
         }
     </style>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    <!-- Supabase -->
+    <script>
+    (function(){
+        const _b = 'https://rpxassndgiunoqkxqcco.supabase.co/rest/v1';
+        const _k = 'sb_publishable_Wnge6OPvSf5l2YEgaPg4rw_nj4CyYAH';
+        window._sb = {
+            b:_b, k:_k,
+            h:{'apikey':_k,'Authorization':'Bearer '+_k,'Content-Type':'application/json','Prefer':'return=minimal'},
+            rh:{'apikey':_k,'Authorization':'Bearer '+_k}
+        };
+        window.currentUser = {uid:'guest', displayName:'ゲスト'};
+    })();
+    </script>
     <script src="data.js"></script>
 </head>
 <body>
@@ -96,7 +106,7 @@
     
     <div id="login-overlay">
         <h2 style="text-shadow: 2px 2px #000; color: #eee;">ログインが必要です</h2>
-        <button class="mc-btn" id="google-login-btn">Googleでログイン</button>
+        <button class="mc-btn" id="google-login-btn" style="display:none">Googleでログイン</button>
         <button class="mc-btn" style="font-size:16px; width:200px;" onclick="document.getElementById('login-overlay').style.display='none'">ログインせず遊ぶ</button>
     </div>
 </div>
@@ -106,112 +116,9 @@
  * Math Craft: Typing Saga
  */
 
-// Firebase設定
-const firebaseConfig = {
-  apiKey: "AIzaSyBCg5dCEM89UmYYhfGqVeRf_VrUlg8_o-4",
-  authDomain: "math-braves.firebaseapp.com",
-  projectId: "math-braves",
-  storageBucket: "math-braves.firebasestorage.app",
-  messagingSenderId: "217117619290",
-  appId: "1:217117619290:web:d227feb603970d3948d463"
-};
+let currentUser = window.currentUser || {uid:'guest', displayName:'ゲスト'};
+let auth = null;
 
-let db, auth;
-let currentUser = null;
-
-if (!firebase.apps.length) {
-    firebase.initializeApp(firebaseConfig);
-    db = firebase.firestore();
-    auth = firebase.auth();
-} else {
-    firebase.app();
-    db = firebase.firestore();
-    auth = firebase.auth();
-}
-
-// ログイン状態の監視とコレクションの読み込み
-// ログイン監視とコレクション同期
-auth.onAuthStateChanged(user => {
-    currentUser = user;
-    
-    // HTML側のログインUI制御 (もしあれば)
-    const loginBtn = document.getElementById('google-login-btn');
-    const welcome = document.getElementById('welcome-msg');
-    
-    if (user) {
-        if(loginBtn) loginBtn.style.display = 'none';
-        
-        // ★修正: メールアドレスのID部分(@より前)を取得
-        const mailId = user.email ? user.email.split('@')[0] : 'Guest';
-        // ★修正: currentUserにIDを紐付けておく
-        currentUser.mailId = mailId;
-
-        if(welcome) {
-            welcome.style.display = 'block';
-            // ★修正: 表示名をメールIDに変更
-            welcome.textContent = `Welcome, ${mailId}!`;
-        }
-
-        // ★重要: クラウドからコレクションを取得してローカルと統合
-        db.collection("users").doc(user.uid).get().then((doc) => {
-            if (doc.exists) {
-                const cloudData = doc.data();
-                if (cloudData.collection) {
-                    // 1. 現在のローカルデータを取得
-                    let currentLocal = { weapons: [], armors: [] };
-                    
-                    // gameStateがあればそこから、なければlocalStorageから
-                    if (typeof gameState !== 'undefined' && gameState.collection) {
-                        currentLocal = gameState.collection;
-                    } else {
-                        // ★修正: キー名を ts_collection に統一
-                        const saved = localStorage.getItem('ts_collection');
-                        if (saved) currentLocal = JSON.parse(saved);
-                    }
-
-                    // 2. マージ (重複排除)
-                    // ★修正: 配列が存在しない場合のエラー防止
-                    const localWeapons = currentLocal.weapons || [];
-                    const cloudWeapons = cloudData.collection.weapons || [];
-                    const localArmors = currentLocal.armors || [];
-                    const cloudArmors = cloudData.collection.armors || [];
-
-                    const mergedWeapons = Array.from(new Set([...localWeapons, ...cloudWeapons]));
-                    const mergedArmors = Array.from(new Set([...localArmors, ...cloudArmors]));
-                    
-                    const newCollection = { weapons: mergedWeapons, armors: mergedArmors };
-
-                    // 3. gameState と localStorage の両方を更新
-                    if (typeof gameState !== 'undefined') {
-                        gameState.collection = newCollection;
-                    }
-                    // ★修正: キー名を ts_collection に統一
-                    localStorage.setItem('ts_collection', JSON.stringify(newCollection));
-                    
-                    console.log("Collection synced and saved to local.");
-
-                    // 4. ★追加: マージした完全版データをクラウドにも書き戻す (双方向同期)
-                    db.collection("users").doc(user.uid).set({
-                        collection: newCollection,
-                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    }, { merge: true })
-                    .then(() => console.log("Merged collection synced back to cloud."))
-                    .catch(err => console.error("Error syncing back to cloud:", err));
-                }
-            } else {
-                // クラウドにデータがない場合は、現在のローカルデータを初回保存
-                if (typeof gameState !== 'undefined' && gameState.collection) {
-                    saveCollection();
-                }
-            }
-        });
-
-    } else {
-        if(loginBtn) loginBtn.style.display = 'block';
-        if(welcome) welcome.style.display = 'none';
-        currentUser = null;
-    }
-});
 
 // --- Game State ---
 
@@ -413,22 +320,8 @@ function getPlusMultiplier(plus) {
 
 // コレクション保存用
 function saveCollection() {
-    // ローカル保存
+    // ローカル保存のみ
     localStorage.setItem('ts_collection', JSON.stringify(gameState.collection));
-
-    // クラウド保存 (ログイン時のみ)
-    if (currentUser) {
-        db.collection("users").doc(currentUser.uid).set({
-            collection: gameState.collection,
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        }, { merge: true })
-        .then(() => {
-            console.log("Collection saved to cloud.");
-        })
-        .catch((error) => {
-            console.error("Error saving collection to cloud: ", error);
-        });
-    }
 }
 
 class TypingEngine {
@@ -1066,27 +959,27 @@ function saveScore() {
     localStorage.setItem('myGame_lastScore', JSON.stringify(localScoreData));
 
 
-    // --- Firebase保存 (World / Google ID) ---
-    if (currentUser) {
-        // メールアドレスの@より前をIDとして取得
-        const mailId = currentUser.email ? currentUser.email.split('@')[0] : "名無し";
-
-        db.collection("scores_typing_saga").add({
-            uid: currentUser.uid,
-            name: mailId, // WorldはGoogle ID
-            floor: recordFloor, // ★修正: 計算した制圧階層を使用
-            gold: gameState.player.gold,
-            difficulty: gameState.difficulty,
-            mode: 'world',
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            dateString: new Date().toLocaleString()
+    // --- Supabase保存 (World) ---
+    {
+        const playerName = gameState.player.name || "名無し";
+        const diffLabels = ['やさしい', 'ふつう', 'むずかしい'];
+        const diffLabel = diffLabels[gameState.difficulty] || String(gameState.difficulty);
+        fetch(window._sb.b + '/rankings', {
+            method: 'POST',
+            headers: window._sb.h,
+            body: JSON.stringify({
+                game: 'typing_saga',
+                difficulty: diffLabel,
+                player_name: playerName,
+                point_score: recordFloor,
+                stage_score: gameState.player.gold,
+                turns: 0,
+                class_name: 'world',
+                created_at: new Date().toISOString()
+            })
         })
-        .then(() => {
-            console.log("Score saved to Firestore!");
-        })
-        .catch((error) => {
-            console.error("Error adding document: ", error);
-        });
+        .then(() => { console.log("Score saved to Supabase!"); })
+        .catch(error => { console.error("Error saving score:", error); });
     }
 }
 
@@ -1123,32 +1016,28 @@ async function loadRanking(diff, mode) {
         }));
         
     } else {
-        // Firebase (World)
+        // Supabase (World)
         try {
-            const snapshot = await db.collection('scores_typing_saga')
-                .where('difficulty', '==', diff)
-                .orderBy('floor', 'desc')
-                .orderBy('gold', 'desc')
-                .limit(10)
-                .get();
-            
-            const list = [];
-            snapshot.forEach(doc => {
-                const d = doc.data();
-                list.push({
-                    name: d.name,
-                    floor: d.floor,
-                    gold: d.gold 
-                });
+            const diffLabels = ['やさしい', 'ふつう', 'むずかしい'];
+            const diffLabel = diffLabels[diff] || String(diff);
+            const params = new URLSearchParams({
+                game: 'eq.typing_saga',
+                difficulty: 'eq.' + diffLabel,
+                order: 'point_score.desc,stage_score.desc',
+                limit: '10',
+                select: 'player_name,point_score,stage_score'
             });
-            rankingState.data = list;
-            
+            const res = await fetch(window._sb.b + '/rankings?' + params.toString(), {
+                headers: window._sb.rh
+            });
+            const rows = await res.json();
+            rankingState.data = rows.map(d => ({
+                name: d.player_name,
+                floor: d.point_score,
+                gold: d.stage_score
+            }));
         } catch (e) {
             console.error("Ranking Error:", e);
-            if (e.code === 'failed-precondition') {
-                console.log("%c▼▼▼ このURLをクリックしてインデックスを作成してください ▼▼▼", "color:red; font-size:16px; font-weight:bold;");
-                console.log(e.message); 
-            }
         }
     }
 }
@@ -1515,7 +1404,7 @@ function drawTyping() {
     
     // ★修正: 特定のGoogleアカウントログイン時のみデバッグボタンを表示
     // "あなたのメールアドレス@gmail.com" をご自身のものに書き換えてください
-    if (auth.currentUser && auth.currentUser.email === "tetsuya581231@gmail.com") {
+    if (false) {
         drawMcButton(630, 340, 160, 40, "デバッグ(Skip)", "#c62828");
     }
 
@@ -2368,7 +2257,7 @@ canvas.addEventListener('mousedown', e => {
         
         if (x > 630 && x < 790 && y > 340 && y < 380) {
             // ★重要: ユーザー自身のメールアドレスに書き換えてください
-            if (auth.currentUser && auth.currentUser.email === "tetsuya581231@gmail.com") {
+            if (false) {
                 const base = 800;
                 const floorBonus = Math.pow(1.1, gameState.currentFloor - 1);
                 gameState.player.gold += Math.floor(base * floorBonus);
@@ -2684,23 +2573,6 @@ function loop() {
 }
 loop();
 
-if (auth) {
-    document.getElementById('google-login-btn').addEventListener('click', () => {
-        const provider = new firebase.auth.GoogleAuthProvider();
-        
-        // ★修正: 毎回アカウント選択画面を強制的に表示（ID変更用）
-        provider.setCustomParameters({
-            prompt: 'select_account'
-        });
-
-        auth.signInWithPopup(provider).then(() => {
-            document.getElementById('login-overlay').style.display = 'none';
-        }).catch((error) => {
-            // ★修正: エラーハンドリングを追加（再ログイン時のコンソールエラー防止）
-            console.error("Login error:", error);
-        });
-    });
-}
 
 function resizeGame() {
     const container = document.getElementById('game-container');

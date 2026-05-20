@@ -14,9 +14,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>日本地図クイズ - 16:9 Edition</title>
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&display=swap" rel="stylesheet">
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <!-- Supabase -->
+    <script>
+    (function(){
+        const _b = 'https://rpxassndgiunoqkxqcco.supabase.co/rest/v1';
+        const _k = 'sb_publishable_Wnge6OPvSf5l2YEgaPg4rw_nj4CyYAH';
+        window._sb = {
+            b:_b, k:_k,
+            h:{'apikey':_k,'Authorization':'Bearer '+_k,'Content-Type':'application/json','Prefer':'return=minimal'},
+            rh:{'apikey':_k,'Authorization':'Bearer '+_k}
+        };
+        window.currentUser = {uid:'guest', displayName:'ゲスト'};
+    })();
+    </script>
     <script src="map_data.js"></script>
     <style>
         :root {
@@ -47,18 +57,6 @@
 <canvas id="gameCanvas"></canvas>
 
 <script>
-const firebaseConfig = {
-    apiKey: "AIzaSyBCg5dCEM89UmYYhfGqVeRf_VrUlg8_o-4",
-    authDomain: "math-braves.firebaseapp.com",
-    projectId: "math-braves",
-    storageBucket: "math-braves.firebasestorage.app",
-    messagingSenderId: "217117619290",
-    appId: "1:217117619290:web:d227feb603970d3948d463"
-};
-if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
-const auth = firebase.auth();
-
 const BASE_W = 1600;
 const BASE_H = 900;
 let TOTAL_QUESTIONS = 10;
@@ -189,7 +187,6 @@ function init() {
     resize();
     canvas.addEventListener('mousedown', handleInput);
     window.addEventListener('keydown', handleInput);
-    auth.onAuthStateChanged(u => user = u);
     gameLoop();
 }
 
@@ -562,7 +559,7 @@ function drawTitle() {
         { t: "はじめる", c: "#78c850" },
         { t: "プレーヤー選択", c: "#ffaa00" },
         { t: "ランキング", c: "#5bc0de" },
-        { t: user ? "ログアウト" : "Googleでログイン", c: "#ea4335" },
+        { t: "Googleでログイン", c: "#ea4335" },
         { t: "INDEXへ", c: "#8d7d6a" }
     ];
     menu.forEach((m, i) => {
@@ -570,10 +567,6 @@ function drawTitle() {
         drawButton(550, py, 500, 75, m.t, m.c, 30);
     });
 
-    if (user) {
-        let displayId = user.displayName || user.email.split('@')[0];
-        drawText(`${displayId}でログイン中`, BASE_W/2, 850, 30, "bold", "#8d7d6a");
-    }
 }
 
 function drawPlayerSelect() {
@@ -661,18 +654,14 @@ function drawRanking() {
     const cols = [100, 350, 650, 850];
     const headers = ["順位", "なまえ", "正解", "タイム"];
     headers.forEach((h, i) => drawText(h, startX + cols[i], startY, 28, "bold", "#78c850"));
-    if (rankingTab === 'world' && !user) {
-        drawText("ログインすると表示されます", BASE_W/2, 540, 36, "bold", "#ff4500");
-    } else {
-        rankingData.filter(d => d.level == rankingLv && d.mode == rankingMode).slice(0, 10).forEach((d, i) => {
-            const py = startY + 50 + i * rowH;
-            const name = d.name || 'ゲスト';
-            drawText(i + 1, startX + cols[0], py, 26, "", "#000000");
-            drawText(name, startX + cols[1], py, 26, "", "#000000");
-            drawText(`${d.correct || 0}問`, startX + cols[2], py, 26, "", "#000000");
-            drawText(`${parseFloat(d.time).toFixed(2)}秒`, startX + cols[3], py, 26, "", "#000000");
-        });
-    }
+    rankingData.filter(d => d.level == rankingLv && d.mode == rankingMode).slice(0, 10).forEach((d, i) => {
+        const py = startY + 50 + i * rowH;
+        const name = d.name || 'ゲスト';
+        drawText(i + 1, startX + cols[0], py, 26, "", "#000000");
+        drawText(name, startX + cols[1], py, 26, "", "#000000");
+        drawText(`${d.correct || 0}問`, startX + cols[2], py, 26, "", "#000000");
+        drawText(`${parseFloat(d.time).toFixed(2)}秒`, startX + cols[3], py, 26, "", "#000000");
+    });
     drawButton(700, 810, 200, 60, "タイトルへ", "#c1e1c1", 26, "#000");
 }
 
@@ -720,64 +709,84 @@ function drawQuizButton(x, y, w, h, txt, ruby, color) {
     drawText(txt, x + w/2, startY + rubySize + gap + mainSize / 1.1, mainSize, "bold", "#000000");
 }
 
-async function login() {
-    const provider = new firebase.auth.GoogleAuthProvider();
-    try {
-        await auth.signInWithPopup(provider);
-    } catch(e) {
-        console.error("ログインエラー:", e);
-        alert("ログインに失敗しました。");
-    }
-}
-
-async function logout() {
-    try {
-        await auth.signOut();
-    } catch(e) {
-        console.error("ログアウトエラー:", e);
-    }
-}
+function login() { /* ログイン機能は無効（Supabase移行済み） */ }
+function logout() { /* ログアウト機能は無効（Supabase移行済み） */ }
 
 async function saveScore(time) {
     let localName = 'ゲスト';
     if (currentPlayerIdx !== -1 && localPlayers[currentPlayerIdx] !== "あたらしく名前を登録") {
         localName = localPlayers[currentPlayerIdx];
     }
-    let worldName = localName;
-    
-    const scoreObj = { 
-        uid: user?.uid || 'guest', 
-        name: localName, 
-        time: parseFloat(time), 
-        mode: currentMode, 
-        level: currentLevel, 
-        correct: correctCount, 
-        date: Date.now() 
+
+    const scoreObj = {
+        uid: 'guest',
+        name: localName,
+        time: parseFloat(time),
+        mode: currentMode,
+        level: currentLevel,
+        correct: correctCount,
+        date: Date.now()
     };
-    
+
     let localScores = JSON.parse(localStorage.getItem('japan_map_scores') || '[]');
     localScores.push(scoreObj);
     localScores.sort((a,b) => (b.correct !== a.correct) ? b.correct - a.correct : a.time - b.time);
     localStorage.setItem('japan_map_scores', JSON.stringify(localScores.slice(0, 100)));
-    
-    if (user) {
-        await db.collection("scores_japan_map").add({ 
-            ...scoreObj, 
-            name: worldName,
-            date: firebase.firestore.FieldValue.serverTimestamp() 
+
+    // --- Supabase保存 (World) ---
+    try {
+        await fetch(window._sb.b + '/rankings', {
+            method: 'POST',
+            headers: window._sb.h,
+            body: JSON.stringify({
+                game: 'japan_map',
+                difficulty: String(currentLevel),
+                player_name: localName,
+                point_score: correctCount,
+                stage_score: 0,
+                turns: Math.round(parseFloat(time)),
+                class_name: currentMode,
+                created_at: new Date().toISOString()
+            })
         });
+        console.log("Score saved to Supabase!");
+    } catch(e) {
+        console.error("Error saving score:", e);
     }
 }
 
 async function fetchRanking() {
     if (rankingTab === 'local') {
         let localScores = JSON.parse(localStorage.getItem('japan_map_scores') || '[]');
-        rankingData = localScores.sort((a,b) => (b.correct !== a.correct) ? b.correct - a.correct : a.time - b.time);
+        rankingData = localScores
+            .filter(d => d.level === rankingLv && d.mode === rankingMode)
+            .sort((a,b) => (b.correct !== a.correct) ? b.correct - a.correct : a.time - b.time);
     } else {
-        if (!user) { rankingData = []; return; }
-        let q = db.collection("scores_japan_map").where("level", "==", rankingLv).where("mode", "==", rankingMode).orderBy("correct", "desc").orderBy("time", "asc").limit(20);
-        const snap = await q.get();
-        rankingData = snap.docs.map(doc => doc.data());
+        // Supabase (World)
+        try {
+            const params = new URLSearchParams({
+                game: 'eq.japan_map',
+                difficulty: 'eq.' + String(rankingLv),
+                class_name: 'eq.' + rankingMode,
+                order: 'point_score.desc,turns.asc',
+                limit: '20',
+                select: 'player_name,point_score,turns'
+            });
+            const res = await fetch(window._sb.b + '/rankings?' + params.toString(), {
+                headers: window._sb.rh
+            });
+            const rows = await res.json();
+            rankingData = rows.map(d => ({
+                name: d.player_name,
+                correct: d.point_score,
+                time: d.turns,
+                level: rankingLv,
+                mode: rankingMode
+            }));
+        } catch(e) {
+            console.error("Ranking Error:", e);
+            rankingData = [];
+        }
     }
 }
 

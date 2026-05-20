@@ -502,8 +502,8 @@
 
                     <div class="auth-container">
                         <p id="auth-status" style="margin:0; font-size:0.75rem; color:var(--text-muted); margin-bottom:5px;">ログインしていません</p>
-                        <button id="btn-login" class="btn btn-auth"><span style="font-size:0.95rem;">Googleでログイン</span></button>
-                        <button id="btn-logout" class="btn btn-danger hidden" style="height:52px; width:240px; font-size:0.95rem; margin:0 auto;">ログアウト</button>
+                        <button id="btn-login" class="btn btn-auth" style="display:none;"><span style="font-size:0.95rem;">Googleでログイン</span></button>
+                        <button id="btn-logout" class="btn btn-danger hidden" style="height:52px; width:240px; font-size:0.95rem; margin:0 auto; display:none;">ログアウト</button>
                     </div>
 
                     <button id="btn-index-title" class="btn" style="background:linear-gradient(to bottom,#2a2840,#1a1830); border-color:var(--border-stone);">INDEXへ</button>
@@ -660,73 +660,55 @@
     </div>
 </div>
 
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-    import { getFirestore, collection, doc, setDoc, serverTimestamp, query, where, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+<!-- Supabase -->
+<script>
+(function(){
+    const _b = 'https://rpxassndgiunoqkxqcco.supabase.co/rest/v1';
+    const _k = 'sb_publishable_Wnge6OPvSf5l2YEgaPg4rw_nj4CyYAH';
+    const _h = {'apikey':_k,'Authorization':'Bearer '+_k,'Content-Type':'application/json','Prefer':'return=minimal'};
+    const _rh = {'apikey':_k,'Authorization':'Bearer '+_k};
 
-    const firebaseConfig = {
-        apiKey: "AIzaSyBCg5dCEM89UmYYhfGqVeRf_VrUlg8_o-4",
-        authDomain: "math-braves.firebaseapp.com",
-        projectId: "math-braves",
-        storageBucket: "math-braves.firebasestorage.app",
-        messagingSenderId: "217117619290",
-        appId: "1:217117619290:web:d227feb603970d3948d463"
-    };
+    window.currentUser = {uid:'guest', displayName:''};
 
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
-    const provider = new GoogleAuthProvider();
-
-    window.currentUser = null;
-    const btnLogin = document.getElementById('btn-login');
-    const btnLogout = document.getElementById('btn-logout');
-    const authStatus = document.getElementById('auth-status');
-
-    window.handleLogin = function() {
-        signInWithPopup(auth, provider).then((result) => {}).catch((error) => { alert("ログインにしっぱいしました。"); });
-    };
-
-    window.handleLogout = function() {
-        signOut(auth).then(() => {}).catch((error) => {});
-    };
-
-    onAuthStateChanged(auth, (user) => {
-        if (user) {
-            window.currentUser = { uid: user.uid, displayName: user.displayName || '名無しさん' };
-            if (authStatus) authStatus.textContent = `ログイン中: ${window.currentUser.displayName}`;
-            if (btnLogin) btnLogin.classList.add('hidden');
-            if (btnLogout) btnLogout.classList.remove('hidden');
-        } else {
-            window.currentUser = null;
-            if (authStatus) authStatus.textContent = 'ログインしていません';
-            if (btnLogin) btnLogin.classList.remove('hidden');
-            if (btnLogout) btnLogout.classList.add('hidden');
-        }
-    });
-
-    window.saveOnlineScore = async (userId, userName, difficulty, score) => {
+    window.saveOnlineScore = async (uid, name, difficulty, score) => {
+        if ((score||0) <= 0) return;
         try {
-            const docId = `${userId}_${difficulty}_${Date.now()}`;
-            await setDoc(doc(db, "scores_math_braves_multiplication", docId), {
-                uid: userId, name: userName, difficulty: difficulty, score: score, createdAt: serverTimestamp()
+            const res = await fetch(`${_b}/rankings`, {
+                method:'POST', headers:_h,
+                body: JSON.stringify({
+                    game: 'math_braves_multiplication',
+                    difficulty: difficulty||'normal',
+                    player_name: name||'ゲスト',
+                    point_score: Math.round(score)||0
+                })
             });
-        } catch (error) { console.error(error); }
+            if (!res.ok) { const t=await res.text(); throw new Error(`HTTP ${res.status}: ${t}`); }
+            console.log('Ranking: 登録成功', {name, score});
+        } catch(e) { console.error('Ranking save error:', e); throw e; }
     };
 
     window.fetchOnlineRanking = async (difficulty) => {
-        if (!window.currentUser) return [];
         try {
-            const scoresRef = collection(db, "scores_math_braves_multiplication");
-            const q = query(scoresRef, where("difficulty", "==", difficulty));
-            const querySnapshot = await getDocs(q);
-            let ranking = [];
-            querySnapshot.forEach((doc) => { ranking.push(doc.data()); });
-            ranking.sort((a, b) => b.score - a.score);
-            return ranking.slice(0, 10);
-        } catch (error) { console.error(error); return []; }
+            const q = new URLSearchParams({
+                select: 'player_name,point_score,created_at',
+                game: 'eq.math_braves_multiplication',
+                difficulty: `eq.${difficulty||'normal'}`,
+                point_score: 'gt.0',
+                order: 'point_score.desc,created_at.asc',
+                limit: '10'
+            });
+            const res = await fetch(`${_b}/rankings?${q}`, {headers:_rh});
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            return data.map(r=>({
+                uid: '',
+                name: r.player_name,
+                score: r.point_score,
+                date: r.created_at ? new Date(r.created_at).toLocaleDateString('ja-JP') : ''
+            }));
+        } catch(e) { console.error('Ranking load error:', e); return null; }
     };
+})();
 </script>
 
 <script>
