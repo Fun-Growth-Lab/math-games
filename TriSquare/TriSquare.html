@@ -1,0 +1,1188 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<script>if(screen.orientation&&screen.orientation.lock){screen.orientation.lock('landscape').catch(function(){});}</script>
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-5C4G61Y29Q"></script>
+<script>
+  window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}
+  gtag('js',new Date());gtag('config','G-5C4G61Y29Q');
+</script>
+<script>
+(function(){
+  const _b='https://rpxassndgiunoqkxqcco.supabase.co/rest/v1';
+  const _k='sb_publishable_Wnge6OPvSf5l2YEgaPg4rw_nj4CyYAH';
+  const _h={'apikey':_k,'Authorization':'Bearer '+_k,'Content-Type':'application/json','Prefer':'return=minimal'};
+  const _rh={'apikey':_k,'Authorization':'Bearer '+_k};
+  window.saveOnlineScore=async(name,score,difficulty)=>{
+    if((score||0)<=0)return;
+    try{
+      const res=await fetch(`${_b}/rankings`,{method:'POST',headers:_h,
+        body:JSON.stringify({game:'trisquare',difficulty:difficulty||'normal',player_name:name||'ゲスト',point_score:Math.round(score)||0})});
+      if(!res.ok){const t=await res.text();throw new Error(`HTTP ${res.status}: ${t}`);}
+    }catch(e){console.error('Rank save error:',e);}
+  };
+  window.fetchOnlineRanking=async(difficulty)=>{
+    try{
+      const q=new URLSearchParams({select:'player_name,point_score,created_at',game:'eq.trisquare',difficulty:`eq.${difficulty||'normal'}`,point_score:'gt.0',order:'point_score.desc',limit:'10'});
+      const res=await fetch(`${_b}/rankings?${q}`,{headers:_rh});
+      if(!res.ok)throw new Error(`HTTP ${res.status}`);
+      const data=await res.json();
+      return data.map(r=>({name:r.player_name,score:r.point_score,date:r.created_at?new Date(r.created_at).toLocaleDateString('ja-JP'):''}));
+    }catch(e){console.error('Rank load error:',e);return[];}
+  };
+})();
+</script>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>TriSquare - Fun &amp; Growth Lab</title>
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{
+  overflow:hidden;background:#1a2a1a;
+  display:flex;justify-content:center;align-items:center;
+  width:100vw;height:100vh;
+  font-family:'M PLUS Rounded 1c',sans-serif;
+  user-select:none;-webkit-user-select:none;
+}
+#wrapper{
+  position:relative;width:1280px;height:720px;flex-shrink:0;
+  transform-origin:center center;
+}
+canvas{position:absolute;top:0;left:0;width:1280px;height:720px;cursor:default;}
+#name-input-el{
+  position:absolute;top:0;left:0;width:260px;height:44px;
+  font-size:22px;font-family:'M PLUS Rounded 1c',sans-serif;
+  border:3px solid #4caf50;border-radius:10px;padding:4px 12px;
+  outline:none;display:none;background:#fff;color:#333;
+}
+</style>
+</head>
+<body>
+<div id="wrapper">
+  <canvas id="cvs" width="1280" height="720"></canvas>
+</div>
+<script>
+// ============================================================
+//  CONSTANTS & CONFIG
+// ============================================================
+const W=1280,H=720;
+const CELL=80;        // px per grid cell
+const GX=28,GY=18;   // grid top-left
+const GN=5;           // 5×5 grid
+
+// Triangle directions: 0=N,1=E,2=S,3=W
+const N=0,E=1,S=2,Wd=3;
+
+// Item types: emoji + points
+const ITEMS=[
+  {emoji:'🎂',pt:30,color:'#f5c518'},
+  {emoji:'🍩',pt:20,color:'#ff9800'},
+  {emoji:'🍦',pt:15,color:'#81d4fa'},
+  {emoji:'🍪',pt:10,color:'#a1887f'},
+  {emoji:'⭐',pt:50,color:'#ffe082'},
+];
+
+// Difficulty settings
+const DIFF={
+  easy:  {enemyRate:[0,0.3,0.02],stageTargets:[200,400,700,1100,1600],hp:7,label:'やさしい'},
+  normal:{enemyRate:[0,0.45,0.05],stageTargets:[300,600,1000,1500,2200],hp:5,label:'ふつう'},
+  hard:  {enemyRate:[0,0.6,0.10],stageTargets:[500,900,1400,2000,2800],hp:3,label:'むずかしい'},
+};
+
+// ============================================================
+//  PIECE DEFINITIONS
+//  Each piece = array of {r,c,d} triangle coords (local space)
+//  d: 0=N,1=E,2=S,3=W
+// ============================================================
+function sq(r,c){return [{r,c,d:0},{r,c,d:1},{r,c,d:2},{r,c,d:3}];}
+function t(r,c,d){return [{r,c,d}];}
+
+const PIECE_DEFS=[
+  // ⭐1 (2 pieces)
+  {id:0,stars:1,tris:[...sq(0,0)]},                                              // 正方形
+  {id:1,stars:1,tris:[...t(0,0,N)]},                                             // 三角形1個
+
+  // ⭐2 (4 pieces)
+  {id:2,stars:2,tris:[...sq(0,0),...sq(0,1)]},                                   // ドミノ横
+  {id:3,stars:2,tris:[...sq(0,0),...t(-1,0,S)]},                                 // 正方形+三角(上)
+  {id:4,stars:2,tris:[...t(0,0,N),...t(0,0,E)]},                                 // 同セル隣接2三角
+  {id:5,stars:2,tris:[...t(0,0,S),...t(1,0,N)]},                                 // 隣接セル2三角(菱形)
+
+  // ⭐3 (13 pieces)
+  // --- SSS ---
+  {id:6,stars:3,tris:[...sq(0,0),...sq(0,1),...sq(0,2)]},                        // I3
+  {id:7,stars:3,tris:[...sq(0,0),...sq(0,1),...sq(1,0)]},                        // L3
+  // --- SST ---
+  {id:8,stars:3,tris:[...sq(0,0),...sq(0,1),...t(-1,0,S)]},                      // ドミノ+上三角
+  {id:9,stars:3,tris:[...sq(0,0),...sq(0,1),...t(0,2,Wd)]},                      // ドミノ+右端三角
+  {id:10,stars:3,tris:[...sq(0,0),...sq(1,0),...t(0,1,Wd)]},                     // 縦ドミノ+右三角
+  // --- STT ---
+  {id:11,stars:3,tris:[...sq(0,0),...t(-1,0,S),...t(-1,0,E)]},                   // 正方形+同セル2三角(SE)
+  {id:12,stars:3,tris:[...sq(0,0),...t(-1,0,S),...t(-1,0,Wd)]},                  // 正方形+同セル2三角(SW) ※鏡像
+  {id:13,stars:3,tris:[...sq(0,0),...t(0,1,Wd),...t(0,1,N)]},                    // 正方形+右セル2三角
+  {id:14,stars:3,tris:[...sq(0,0),...t(-1,0,S),...t(-2,0,S)]},                   // 正方形+縦2三角(NOTE: (-2,0,S)→adj to (-1,0,N)? need verify)
+  // --- TTT ---
+  {id:15,stars:3,tris:[...t(0,0,N),...t(0,0,E),...t(0,0,S)]},                    // 同セル3三角
+  {id:16,stars:3,tris:[...t(0,0,N),...t(0,0,E),...t(0,1,Wd)]},                   // 2内+1外
+  {id:17,stars:3,tris:[...t(0,0,S),...t(1,0,N),...t(1,0,E)]},                    // 菱形+隣接
+  {id:18,stars:3,tris:[...t(0,0,S),...t(1,0,N),...t(0,0,E)]},                    // 3方向
+];
+
+// Piece 14: sq + tri on top face + tri on right face (different faces of same square)
+PIECE_DEFS[14].tris = [...sq(0,0),...t(-1,0,S),...t(0,1,Wd)];
+// Piece 18: N+E+W fan within one cell (3 triangles, all adjacent to N)
+PIECE_DEFS[18].tris = [...t(0,0,N),...t(0,0,E),...t(0,0,Wd)];
+
+// ============================================================
+//  TRANSFORM HELPERS
+// ============================================================
+function rotateTri({r,c,d}){return {r:c, c:-r, d:(d+1)%4};}
+function flipTri({r,c,d}){
+  const dm=[N,Wd,S,E]; // N→N, E→W, S→S, W→E
+  return {r, c:-c, d:dm[d]};
+}
+function normalizeTris(tris){
+  const minR=Math.min(...tris.map(t=>t.r));
+  const minC=Math.min(...tris.map(t=>t.c));
+  return tris.map(({r,c,d})=>({r:r-minR,c:c-minC,d}));
+}
+function transformPiece(baseTris,rot,flipped){
+  let ts=baseTris.map(t=>({...t}));
+  for(let i=0;i<rot;i++) ts=ts.map(rotateTri);
+  if(flipped) ts=ts.map(flipTri);
+  return normalizeTris(ts);
+}
+function pieceSize(tris){
+  const maxR=Math.max(...tris.map(t=>t.r));
+  const maxC=Math.max(...tris.map(t=>t.c));
+  return {rows:maxR+1,cols:maxC+1};
+}
+
+// ============================================================
+//  GAME STATE
+// ============================================================
+let G={
+  grid:new Uint8Array(GN*GN*4), // 0=empty,1=filled,2=item,3=enemy
+  items:[],    // [{r,c,type}] on the square cell
+  enemies:[], // [{r,c,alive}]
+  hand:[null,null,null],
+  stock:null,
+  nextBatch:[],
+  selHand:-1,
+  rot:0,
+  flipped:false,
+  hoverCell:null,
+  score:0,
+  hp:5,
+  stage:1,
+  turn:1,
+  turnUsed:0,    // 0,1,2 pieces used this turn
+  stageStars:0,
+  stageScore:0,
+  difficulty:'normal',
+  phase:'title', // title|name_entry|game|stage_clear|game_over|ranking
+  playerName:'ゲスト',
+  rankingTab:'LOCAL',
+  rankingDataWorld:null,
+  log:[],
+  animFlash:[],  // [{r,c,color,ttl}]
+};
+
+// ============================================================
+//  PIECE RANDOM GENERATION
+// ============================================================
+function randomPiece(){
+  // Weight by stars: ⭐1=20%, ⭐2=40%, ⭐3=40%
+  const r=Math.random();
+  let pool;
+  if(r<0.20) pool=PIECE_DEFS.filter(p=>p.stars===1);
+  else if(r<0.60) pool=PIECE_DEFS.filter(p=>p.stars===2);
+  else pool=PIECE_DEFS.filter(p=>p.stars===3);
+  const def=pool[Math.floor(Math.random()*pool.length)];
+  return {defId:def.id, rot:Math.floor(Math.random()*4), flipped:Math.random()<0.5};
+}
+function getPieceTris(piece){
+  return transformPiece(PIECE_DEFS[piece.defId].tris, piece.rot, piece.flipped);
+}
+function getPieceStars(piece){return PIECE_DEFS[piece.defId].stars;}
+
+// ============================================================
+//  GRID HELPERS
+// ============================================================
+function triIdx(r,c,d){return (r*GN+c)*4+d;}
+function isInBounds(r,c){return r>=0&&r<GN&&c>=0&&c<GN;}
+// grid: 0=empty, 1=filled by placed piece (items/enemies tracked in arrays only)
+function isTriFilled(r,c,d){
+  if(!isInBounds(r,c))return true;
+  return G.grid[triIdx(r,c,d)]===1;
+}
+function isCellEmpty(r,c){
+  if(!isInBounds(r,c))return false;
+  const base=(r*GN+c)*4;
+  if(G.grid[base]||G.grid[base+1]||G.grid[base+2]||G.grid[base+3]) return false;
+  if(G.items.some(it=>it.r===r&&it.c===c)) return false;
+  if(G.enemies.some(en=>en.alive&&en.r===r&&en.c===c)) return false;
+  return true;
+}
+function getEmptySquareCells(){
+  const res=[];
+  for(let r=0;r<GN;r++)for(let c=0;c<GN;c++)if(isCellEmpty(r,c))res.push({r,c});
+  return res;
+}
+function placedTrisAbsolute(piece,anchorR,anchorC){
+  return getPieceTris(piece).map(({r,c,d})=>({r:r+anchorR,c:c+anchorC,d}));
+}
+function canPlace(piece,anchorR,anchorC){
+  const ts=placedTrisAbsolute(piece,anchorR,anchorC);
+  for(const {r,c,d} of ts){
+    if(!isInBounds(r,c)||isTriFilled(r,c,d))return false;
+  }
+  return true;
+}
+function hasAnyValidPlacement(piece){
+  for(let r=0;r<GN;r++)for(let c=0;c<GN;c++)if(canPlace(piece,r,c))return true;
+  return false;
+}
+
+// ============================================================
+//  CANVAS
+// ============================================================
+const cvs=document.getElementById('cvs');
+const ctx=cvs.getContext('2d');
+
+// Responsive scaling
+function rescale(){
+  const sx=window.innerWidth/W, sy=window.innerHeight/H;
+  const sc=Math.min(sx,sy);
+  const wrap=document.getElementById('wrapper');
+  wrap.style.transform=`scale(${sc})`;
+  // Position name input
+  const gx=cvs.getBoundingClientRect().left;
+  const gy=cvs.getBoundingClientRect().top;
+}
+window.addEventListener('resize',rescale);
+rescale();
+
+// ============================================================
+//  DRAWING HELPERS
+// ============================================================
+function cls(bg='#2d4a2d'){ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);}
+
+function roundRect(x,y,w,h,r,fill,stroke,sw=2){
+  ctx.beginPath();ctx.roundRect(x,y,w,h,r);
+  if(fill){ctx.fillStyle=fill;ctx.fill();}
+  if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=sw;ctx.stroke();}
+}
+
+function txt(s,x,y,sz,color='#fff',align='left',bold=false){
+  ctx.font=`${bold?'800':'700'} ${sz}px 'M PLUS Rounded 1c'`;
+  ctx.fillStyle=color;ctx.textAlign=align;ctx.textBaseline='middle';
+  ctx.fillText(s,x,y);
+}
+
+// Triangle vertices in canvas coords for grid cell (r,c) direction d
+function triPts(r,c,d,ox=GX,oy=GY,cell=CELL){
+  const x0=ox+c*cell, y0=oy+r*cell;
+  const cx=x0+cell/2, cy=y0+cell/2;
+  switch(d){
+    case N: return [[x0,y0],[x0+cell,y0],[cx,cy]];
+    case E: return [[x0+cell,y0],[x0+cell,y0+cell],[cx,cy]];
+    case S: return [[x0+cell,y0+cell],[x0,y0+cell],[cx,cy]];
+    case Wd:return [[x0,y0+cell],[x0,y0],[cx,cy]];
+  }
+}
+
+function drawTri(r,c,d,fill,stroke,sw=1,ox=GX,oy=GY,cell=CELL){
+  const pts=triPts(r,c,d,ox,oy,cell);
+  ctx.beginPath();
+  ctx.moveTo(pts[0][0],pts[0][1]);
+  ctx.lineTo(pts[1][0],pts[1][1]);
+  ctx.lineTo(pts[2][0],pts[2][1]);
+  ctx.closePath();
+  if(fill){ctx.fillStyle=fill;ctx.fill();}
+  if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=sw;ctx.stroke();}
+}
+
+// ============================================================
+//  GRID DRAWING
+// ============================================================
+const COLOR_EMPTY='#f5f5f0';
+const COLOR_FILLED='#2196f3';
+const COLOR_GHOST_OK='rgba(33,150,243,0.45)';
+const COLOR_GHOST_BAD='rgba(244,67,54,0.45)';
+const COLOR_GRID_LINE='#888';
+const COLOR_DIAG='#ccc';
+
+function drawGrid(){
+  // Background
+  roundRect(GX-4,GY-4,GN*CELL+8,GN*CELL+8,6,'#e0e0d8','#555',2);
+
+  for(let r=0;r<GN;r++){
+    for(let c=0;c<GN;c++){
+      const base=(r*GN+c)*4;
+      const hasItem=G.items.some(it=>it.r===r&&it.c===c);
+      const hasEnemy=G.enemies.some(en=>en.alive&&en.r===r&&en.c===c);
+      for(let d=0;d<4;d++){
+        let fill=COLOR_EMPTY;
+        if(G.grid[base+d]===1) fill=COLOR_FILLED;
+        else if(hasItem) fill='#fff9c4';
+        else if(hasEnemy) fill='#ffcdd2';
+        drawTri(r,c,d,fill,null,0);
+      }
+      // Grid lines (outer cell borders)
+      const x0=GX+c*CELL, y0=GY+r*CELL;
+      ctx.strokeStyle=COLOR_GRID_LINE; ctx.lineWidth=1.5;
+      ctx.strokeRect(x0,y0,CELL,CELL);
+      // Diagonal lines
+      ctx.strokeStyle=COLOR_DIAG; ctx.lineWidth=0.7;
+      ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x0+CELL,y0+CELL);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(x0+CELL,y0);ctx.lineTo(x0,y0+CELL);ctx.stroke();
+    }
+  }
+
+  // Draw item emojis
+  for(const it of G.items){
+    const x=GX+it.c*CELL+CELL/2, y=GY+it.r*CELL+CELL/2;
+    ctx.font='28px serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(ITEMS[it.type].emoji,x,y);
+    // Turn indicator
+    ctx.font='bold 11px sans-serif'; ctx.fillStyle='#e53935'; ctx.textAlign='right';
+    ctx.fillText('1T',GX+(it.c+1)*CELL-2,GY+it.r*CELL+12);
+  }
+
+  // Draw enemy icons
+  for(const en of G.enemies){
+    if(!en.alive)continue;
+    const x=GX+en.c*CELL+CELL/2, y=GY+en.r*CELL+CELL/2;
+    ctx.font='28px serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('👾',x,y);
+  }
+
+  // Ghost piece preview
+  if(G.selHand>=0&&G.hoverCell){
+    const piece=G.selHand==='stock'?G.stock:G.hand[G.selHand];
+    if(piece){
+      const {r:ar,c:ac}=G.hoverCell;
+      const ok=canPlace(piece,ar,ac);
+      const ts=placedTrisAbsolute(piece,ar,ac);
+      const ghostFill=ok?COLOR_GHOST_OK:COLOR_GHOST_BAD;
+      for(const {r,c,d} of ts){
+        if(isInBounds(r,c)) drawTri(r,c,d,ghostFill,'#1565c0',1);
+      }
+    }
+  }
+
+  // Flash animations
+  for(const fl of G.animFlash){
+    const x=GX+fl.c*CELL+CELL/2, y=GY+fl.r*CELL+CELL/2;
+    const alpha=fl.ttl/20;
+    ctx.globalAlpha=alpha;
+    ctx.font=`bold ${20+fl.sz}px 'M PLUS Rounded 1c'`;
+    ctx.fillStyle=fl.color; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(fl.text,x,y);
+    ctx.globalAlpha=1;
+  }
+}
+
+// ============================================================
+//  PIECE PREVIEW (in hand/stock/next cards)
+// ============================================================
+function drawPieceInBox(piece,bx,by,bw,bh,selected,label){
+  const border=selected?'#2196f3':'#9e9e9e';
+  const bg=selected?'#e3f2fd':'#fafafa';
+  roundRect(bx,by,bw,bh,10,bg,border,selected?3:2);
+  if(label){txt(label,bx+bw/2,by+14,12,'#777','center');}
+  if(!piece){
+    txt('なし',bx+bw/2,by+bh/2,14,'#bbb','center');
+    return;
+  }
+  // Stars
+  const stars=getPieceStars(piece);
+  const starStr='⭐'.repeat(stars);
+  ctx.font='13px serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(starStr,bx+bw/2,by+22);
+
+  // Draw piece centered in box
+  const tris=getPieceTris(piece);
+  const {rows,cols}=pieceSize(tris);
+  const previewCell=Math.min((bw-20)/Math.max(cols,1),(bh-70)/Math.max(rows,1),36);
+  const pw=cols*previewCell, ph=rows*previewCell;
+  const ox=bx+(bw-pw)/2, oy=by+34+(bh-70-ph)/2;
+
+  for(const {r,c,d} of tris){
+    drawTri(r,c,d,'#2196f3','#1565c0',1,ox,oy,previewCell);
+  }
+}
+
+function drawRotFlipBtns(bx,by,bw,bh,idx){
+  // Rotate button
+  const rx=bx+bw/2-42, ry=by+bh-36, btnW=38, btnH=26;
+  roundRect(rx,ry,btnW,btnH,6,'#4caf50','#388e3c',1.5);
+  txt('↺',rx+btnW/2,ry+btnH/2,16,'#fff','center');
+  // Flip button
+  const fx=bx+bw/2+4;
+  roundRect(fx,ry,btnW,btnH,6,'#ff9800','#e65100',1.5);
+  txt('↔',fx+btnW/2,ry+btnH/2,16,'#fff','center');
+  return {rot:{x:rx,y:ry,w:btnW,h:btnH}, flip:{x:fx,y:ry,w:btnW,h:btnH}};
+}
+
+// ============================================================
+//  INFO PANEL
+// ============================================================
+const PX=GX+GN*CELL+20; // panel left x
+const PW=W-PX-10;
+
+function drawInfoPanel(){
+  roundRect(PX,GY,PW,400,10,'#1b2f1b','#3a5a3a',2);
+
+  // Score
+  txt('SCORE',PX+10,GY+22,13,'#8bc34a','left');
+  txt(G.score.toLocaleString(),PX+PW-10,GY+22,22,'#fff','right',true);
+
+  // Stage / Turn
+  txt(`STAGE ${G.stage}  TURN ${G.turn}`,PX+10,GY+50,14,'#aed581');
+
+  // Target
+  const diff=DIFF[G.difficulty];
+  const target=diff.stageTargets[G.stage-1];
+  txt(`目標: ${target}`,PX+10,GY+72,13,'#ce93d8');
+
+  // HP
+  txt('HP',PX+10,GY+98,13,'#ef9a9a');
+  const maxHp=diff.hp;
+  for(let i=0;i<maxHp;i++){
+    const hx=PX+10+i*22, hy=GY+112;
+    ctx.font='18px serif'; ctx.textAlign='left'; ctx.textBaseline='middle';
+    ctx.fillText(i<G.hp?'❤️':'🖤',hx,hy);
+  }
+
+  // Stars accumulated
+  txt(`⭐合計: ${G.stageStars}`,PX+10,GY+136,13,'#ffe082');
+
+  // Divider
+  ctx.strokeStyle='#3a5a3a'; ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(PX+10,GY+152);ctx.lineTo(PX+PW-10,GY+152);ctx.stroke();
+
+  // Log
+  txt('ログ',PX+10,GY+166,13,'#90a4ae');
+  const logY0=GY+182;
+  const logLines=G.log.slice(-9);
+  for(let i=0;i<logLines.length;i++){
+    txt(logLines[i],PX+10,logY0+i*22,12,'#cfd8dc');
+  }
+
+  // Difficulty label
+  txt(diff.label,PX+PW-10,GY+398,13,'#78909c','right');
+}
+
+// ============================================================
+//  BOTTOM AREA (Hand cards, Stock, Next)
+// ============================================================
+const BY=GY+GN*CELL+12;  // bottom area y
+const CARD_W=168, CARD_H=H-BY-8;
+const BTN_H=36; // button area height
+
+// Stock: x=GX
+// Hand 0: x=GX+CARD_W+8
+// Hand 1: x=GX+2*(CARD_W+8)
+// Hand 2: x=GX+3*(CARD_W+8)
+// Next:   x=GX+4*(CARD_W+8)
+// Sidebar:x=GX+5*(CARD_W+8)
+const CARD_X=[GX, GX+CARD_W+8, GX+2*(CARD_W+8), GX+3*(CARD_W+8)];
+const NEXT_X=GX+4*(CARD_W+8);
+const SIDE_X=GX+5*(CARD_W+8);
+
+let btnRects={}; // Store button rects for hit testing
+
+function drawBottomArea(){
+  // Background bar (full width)
+  roundRect(GX-4,BY-4,W-GX-6,CARD_H+8,6,'#1b2f1b','#3a5a3a',2);
+
+  btnRects={};
+
+  // Stock card
+  const stockSel=G.selHand==='stock';
+  drawPieceInBox(G.stock,CARD_X[0],BY,CARD_W,CARD_H,stockSel,'ストック');
+  if(G.stock){
+    const r=drawRotFlipBtns(CARD_X[0],BY,CARD_W,CARD_H,'stock');
+    btnRects.stock_rot=r.rot; btnRects.stock_flip=r.flip;
+  }
+  btnRects.stock={x:CARD_X[0],y:BY,w:CARD_W,h:CARD_H-BTN_H};
+
+  // Hand cards 0,1,2
+  for(let i=0;i<3;i++){
+    const bx=CARD_X[i+1];
+    const sel=G.selHand===i;
+    const used=G.hand[i]===null;
+    drawPieceInBox(G.hand[i],bx,BY,CARD_W,CARD_H,sel,`手札${i+1}`);
+    if(!used){
+      const r=drawRotFlipBtns(bx,BY,CARD_W,CARD_H,i);
+      btnRects[`h${i}_rot`]=r.rot; btnRects[`h${i}_flip`]=r.flip;
+    }
+    btnRects[`h${i}`]={x:bx,y:BY,w:CARD_W,h:CARD_H-BTN_H};
+  }
+
+  // Next preview
+  roundRect(NEXT_X,BY,CARD_W,CARD_H,10,'#1b2f1b','#7b1fa2',2);
+  txt('NEXT',NEXT_X+CARD_W/2,BY+16,13,'#ce93d8','center');
+  if(G.nextBatch.length>0){
+    drawPieceInBox(G.nextBatch[0],NEXT_X+4,BY+28,CARD_W-8,CARD_H-32,false,null);
+  }
+
+  // Side buttons
+  const sx=SIDE_X, sw=W-SIDE_X-10;
+  roundRect(sx,BY,sw,CARD_H,10,'#1b2f1b','#3a5a3a',2);
+  // How to play button
+  btnRects.howto={x:sx+8,y:BY+12,w:sw-16,h:42};
+  roundRect(sx+8,BY+12,sw-16,42,8,'#37474f','#546e7a',1.5);
+  txt('あそびかた',sx+8+(sw-16)/2,BY+33,14,'#eceff1','center');
+  // Title button
+  btnRects.title_btn={x:sx+8,y:BY+62,w:sw-16,h:42};
+  roundRect(sx+8,BY+62,sw-16,42,8,'#37474f','#546e7a',1.5);
+  txt('タイトルへ',sx+8+(sw-16)/2,BY+83,14,'#eceff1','center');
+
+  // Turn status
+  const usedStr=G.turnUsed===0?'①②を選んで置こう':G.turnUsed===1?'②を選んで置こう':'ターン終了中...';
+  txt(usedStr,sx+8+(sw-16)/2,BY+130,12,'#aed581','center');
+}
+
+// ============================================================
+//  TITLE SCREEN
+// ============================================================
+let titleDiff='normal';
+let titlePhase='main'; // main | name_entry
+
+function drawTitle(){
+  cls('#0d1a0d');
+  // Background grid decoration
+  ctx.strokeStyle='rgba(76,175,80,0.08)'; ctx.lineWidth=1;
+  for(let x=0;x<W;x+=60){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  for(let y=0;y<H;y+=60){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+  // Diagonal decorations
+  ctx.strokeStyle='rgba(76,175,80,0.05)'; ctx.lineWidth=0.5;
+  for(let x=0;x<W;x+=60){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x+60,H);ctx.stroke();}
+
+  // Title box
+  roundRect(W/2-300,H/2-200,600,400,20,'rgba(0,0,0,0.6)','#4caf50',2);
+
+  // Title text
+  txt('TriSquare',W/2,H/2-130,64,'#4caf50','center',true);
+  txt('トライスクエア',W/2,H/2-80,20,'#81c784','center');
+
+  if(titlePhase==='main'){
+    // Difficulty buttons
+    txt('難易度を選んでください',W/2,H/2-44,15,'#a5d6a7','center');
+    const diffs=['easy','normal','hard'];
+    const dlabels=['やさしい','ふつう','むずかしい'];
+    const dcolors=[['#66bb6a','#388e3c'],['#42a5f5','#1565c0'],['#ef5350','#b71c1c']];
+    for(let i=0;i<3;i++){
+      const bx=W/2-220+i*150, by=H/2-20, bw=130, bh=50;
+      const sel=titleDiff===diffs[i];
+      const [fill,border]=dcolors[i];
+      roundRect(bx,by,bw,bh,10,sel?fill:'#1a2a1a',border,sel?3:1.5);
+      txt(dlabels[i],bx+bw/2,by+bh/2,16,sel?'#fff':'#aaa','center',sel);
+      btnRects[`diff_${diffs[i]}`]={x:bx,y:by,w:bw,h:bh};
+    }
+
+    // Start button
+    btnRects.start={x:W/2-110,y:H/2+52,w:220,h:56};
+    roundRect(W/2-110,H/2+52,220,56,14,'#4caf50','#2e7d32',2.5);
+    txt('はじめる',W/2,H/2+80,22,'#fff','center',true);
+
+    // Ranking button
+    btnRects.ranking_btn={x:W/2-80,y:H/2+122,w:160,h:40};
+    roundRect(W/2-80,H/2+122,160,40,10,'#37474f','#546e7a',1.5);
+    txt('ランキング',W/2,H/2+142,15,'#b0bec5','center');
+
+  } else if(titlePhase==='name_entry'){
+    txt('ニックネームを入力',W/2,H/2-20,18,'#a5d6a7','center');
+    txt('(最大12文字)',W/2,H/2+4,13,'#78909c','center');
+    roundRect(W/2-130,H/2+22,260,44,8,'#263238','#4caf50',2);
+    txt(G.playerName||'',W/2,H/2+44,20,'#fff','center');
+    // Cursor blink
+    if(Math.floor(Date.now()/500)%2===0){
+      const tw=ctx.measureText(G.playerName||'').width;
+      ctx.fillStyle='#4caf50';
+      ctx.fillRect(W/2+(tw/2)+2,H/2+34,2,20);
+    }
+    btnRects.name_ok={x:W/2-60,y:H/2+82,w:120,h:44};
+    roundRect(W/2-60,H/2+82,120,44,10,'#4caf50','#2e7d32',2);
+    txt('OK',W/2,H/2+104,20,'#fff','center',true);
+  }
+}
+
+// ============================================================
+//  RANKING SCREEN
+// ============================================================
+let rankingDiff='normal';
+
+function drawRanking(){
+  cls('#0d1a0d');
+  roundRect(W/2-400,30,800,660,16,'rgba(0,0,0,0.7)','#4caf50',2);
+  txt('ランキング',W/2,80,32,'#4caf50','center',true);
+
+  // Tab buttons
+  const tabs=['LOCAL','WORLD'];
+  const tlabels=['ローカル','ワールド'];
+  for(let i=0;i<2;i++){
+    const bx=W/2-130+i*140, by=108, bw=120, bh=36;
+    const sel=G.rankingTab===tabs[i];
+    roundRect(bx,by,bw,bh,8,sel?'#4caf50':'#263238',sel?'#2e7d32':'#546e7a',1.5);
+    txt(tlabels[i],bx+bw/2,by+bh/2,15,sel?'#fff':'#90a4ae','center',sel);
+    btnRects[`rtab_${tabs[i]}`]={x:bx,y:by,w:bw,h:bh};
+  }
+
+  // Difficulty tabs
+  const diffs=['easy','normal','hard'];
+  const dlabels=['やさしい','ふつう','むずかしい'];
+  for(let i=0;i<3;i++){
+    const bx=W/2-195+i*130, by=154, bw=110, bh=30;
+    const sel=rankingDiff===diffs[i];
+    roundRect(bx,by,bw,bh,6,sel?'#37474f':'#1a2a1a',sel?'#78909c':'#37474f',1.5);
+    txt(dlabels[i],bx+bw/2,by+bh/2,13,sel?'#fff':'#607d8b','center');
+    btnRects[`rdiff_${diffs[i]}`]={x:bx,y:by,w:bw,h:bh};
+  }
+
+  // Rankings list
+  let data=[];
+  if(G.rankingTab==='LOCAL'){
+    const all=JSON.parse(localStorage.getItem('ts_local_ranking')||'[]');
+    data=all.filter(d=>d.difficulty===rankingDiff).sort((a,b)=>b.score-a.score).slice(0,10);
+  } else {
+    data=G.rankingDataWorld||[];
+    if(!G.rankingDataWorld){
+      fetchOnlineRanking(rankingDiff).then(d=>{G.rankingDataWorld=d;});
+      txt('読み込み中...',W/2,380,18,'#78909c','center');
+    }
+  }
+  const medals=['🥇','🥈','🥉'];
+  for(let i=0;i<data.length;i++){
+    const ry=205+i*44;
+    roundRect(W/2-360,ry,720,38,6,i%2===0?'rgba(255,255,255,0.04)':'transparent',null);
+    const medal=i<3?medals[i]:`${i+1}.`;
+    txt(medal,W/2-340,ry+19,i<3?22:16,'#fff','left');
+    txt(data[i].name,W/2-290,ry+19,16,'#e0e0e0','left');
+    txt(data[i].score?.toLocaleString()||'',W/2+320,ry+19,18,'#ffcc02','right',true);
+    if(data[i].date)txt(data[i].date,W/2+360,ry+19,12,'#607d8b','right');
+  }
+  if(data.length===0&&G.rankingTab==='LOCAL'){
+    txt('まだデータがありません',W/2,380,18,'#546e7a','center');
+  }
+
+  // Back button
+  btnRects.ranking_back={x:W/2-70,y:650,w:140,h:44};
+  roundRect(W/2-70,650,140,44,10,'#37474f','#546e7a',1.5);
+  txt('もどる',W/2,672,16,'#b0bec5','center');
+}
+
+// ============================================================
+//  STAGE CLEAR / GAME OVER
+// ============================================================
+function drawOverlay(title,color,lines,btns){
+  ctx.fillStyle='rgba(0,0,0,0.6)';ctx.fillRect(0,0,W,H);
+  roundRect(W/2-280,H/2-180,560,360,16,'#1b2f1b',color,3);
+  txt(title,W/2,H/2-120,38,color,'center',true);
+  for(let i=0;i<lines.length;i++){
+    txt(lines[i].text,W/2,H/2-60+i*36,lines[i].sz||16,lines[i].color||'#cfd8dc','center');
+  }
+  for(const b of btns){
+    roundRect(b.x,b.y,b.w,b.h,10,b.bg||'#37474f',b.border||'#546e7a',1.5);
+    txt(b.label,b.x+b.w/2,b.y+b.h/2,16,b.tc||'#fff','center',true);
+    btnRects[b.id]={x:b.x,y:b.y,w:b.w,h:b.h};
+  }
+}
+
+// ============================================================
+//  LOGGING
+// ============================================================
+function addLog(msg){G.log.push(msg);if(G.log.length>30)G.log.shift();}
+
+// ============================================================
+//  TURN LOGIC
+// ============================================================
+function startGame(){
+  const diff=DIFF[G.difficulty];
+  G.grid=new Uint8Array(GN*GN*4);
+  G.items=[];G.enemies=[];
+  G.hand=[null,null,null];G.stock=null;G.nextBatch=[];
+  G.selHand=-1;G.rot=0;G.flipped=false;G.hoverCell=null;
+  G.score=0;G.hp=diff.hp;G.stage=1;G.turn=1;G.turnUsed=0;
+  G.stageStars=0;G.stageScore=0;
+  G.log=[];G.animFlash=[];
+  G.rankingDataWorld=null;
+  G.phase='game';
+  // Pre-generate next batch
+  for(let i=0;i<6;i++) G.nextBatch.push(randomPiece());
+  startTurn();
+}
+
+function dealHand(){
+  for(let i=0;i<3;i++){
+    G.hand[i]=G.nextBatch.shift();
+    // Ensure nextBatch has at least 3 ahead
+    G.nextBatch.push(randomPiece());
+  }
+}
+
+function spawnItems(){
+  const empty=getEmptySquareCells();
+  if(empty.length===0)return;
+  const count=Math.min(1+Math.floor(Math.random()*3),empty.length);
+  for(let i=0;i<count;i++){
+    const idx=Math.floor(Math.random()*empty.length);
+    const {r,c}=empty.splice(idx,1)[0];
+    G.items.push({r,c,type:Math.floor(Math.random()*ITEMS.length)});
+  }
+}
+
+function spawnEnemies(){
+  const diff=DIFF[G.difficulty];
+  const [,rate1,rate2]=diff.enemyRate;
+  const rnd=Math.random();
+  let count=rnd<rate2?2:rnd<rate1+rate2?1:0;
+  if(count===0)return;
+  const empty=getEmptySquareCells().filter(({r,c})=>!G.enemies.some(e=>e.r===r&&e.c===c));
+  count=Math.min(count,empty.length);
+  for(let i=0;i<count;i++){
+    const idx=Math.floor(Math.random()*empty.length);
+    const {r,c}=empty.splice(idx,1)[0];
+    G.enemies.push({r,c,alive:true});
+    addLog(`👾 敵が(${r+1},${c+1})に出現！`);
+  }
+}
+
+function startTurn(){
+  dealHand();
+  spawnItems();
+  spawnEnemies();
+  G.turnUsed=0;
+  G.selHand=-1;
+  addLog(`--- ターン${G.turn} ---`);
+}
+
+function placePiece(piece,anchorR,anchorC){
+  const tris=placedTrisAbsolute(piece,anchorR,anchorC);
+  const stars=getPieceStars(piece);
+  let area=0;
+  let itemBonus=0;
+  const defeatedEnemies=new Set();
+  const coveredItems=new Set();
+
+  // Find which items/enemies are touched
+  for(const {r,c,d} of tris){
+    const v=G.grid[triIdx(r,c,d)];
+    // Check items
+    const itIdx=G.items.findIndex(it=>it.r===r&&it.c===c);
+    if(itIdx>=0) coveredItems.add(itIdx);
+    // Check enemies
+    const enIdx=G.enemies.findIndex(en=>en.alive&&en.r===r&&en.c===c);
+    if(enIdx>=0) defeatedEnemies.add(enIdx);
+    // Fill
+    G.grid[triIdx(r,c,d)]=1;
+    area++;
+  }
+
+  // Remove covered items
+  const collectedItems=[...coveredItems].sort((a,b)=>b-a);
+  for(const idx of collectedItems){
+    const it=G.items[idx];
+    itemBonus+=ITEMS[it.type].pt;
+    addLog(`${ITEMS[it.type].emoji} GET! +${ITEMS[it.type].pt}pt`);
+    G.animFlash.push({r:it.r,c:it.c,text:`+${ITEMS[it.type].pt}`,color:ITEMS[it.type].color,ttl:25,sz:0});
+    G.items.splice(idx,1);
+  }
+
+  // Defeat enemies
+  for(const idx of defeatedEnemies){
+    G.enemies[idx].alive=false;
+    const en=G.enemies[idx];
+    // Clear enemy markers on grid (they're now filled by piece)
+    // Already filled above
+    addLog(`👾 敵を倒した！`);
+    G.animFlash.push({r:en.r,c:en.c,text:'撃破!',color:'#ef5350',ttl:25,sz:0});
+  }
+  G.enemies=G.enemies.filter(e=>e.alive);
+
+  // Score calculation: area * stars (of this piece) + itemBonus * stars
+  const turnStars=stars;
+  const turnScore=(area+itemBonus)*Math.max(1,turnStars);
+  G.score+=turnScore;
+  G.stageScore+=turnScore;
+  G.stageStars+=stars;
+  addLog(`置いた: ${area}△ ×⭐${stars} = +${turnScore}`);
+  G.animFlash.push({r:anchorR,c:anchorC,text:`+${turnScore}`,color:'#ffeb3b',ttl:30,sz:4});
+}
+
+function endTurn(){
+  // Expire items (they survive only 1 turn)
+  for(const it of G.items) addLog(`${ITEMS[it.type].emoji} 消えた...`);
+  G.items=[];
+
+  // Enemy damage
+  let dmg=0;
+  for(const en of G.enemies){
+    if(en.alive) dmg++;
+  }
+  if(dmg>0){
+    G.hp-=dmg;
+    addLog(`👾 ${dmg}ダメージ！ HP:${G.hp}`);
+    if(G.hp<=0){
+      G.phase='game_over';
+      saveScore();
+      return;
+    }
+  }
+
+  // Discard remaining hand
+  for(let i=0;i<3;i++) G.hand[i]=null;
+
+  G.turn++;
+
+  // Check stage clear
+  const target=DIFF[G.difficulty].stageTargets[G.stage-1];
+  if(G.stageScore>=target){
+    if(G.stage>=5){G.phase='game_over';saveScore();addLog('全ステージクリア！');return;}
+    G.phase='stage_clear';
+    return;
+  }
+
+  // Check if any piece can be placed
+  startTurn();
+  const canAny=G.hand.some(p=>p&&hasAnyValidPlacement(p));
+  if(!canAny){
+    addLog('置けるブロックがなくなった...');
+    G.phase='game_over';
+    saveScore();
+    return;
+  }
+}
+
+function useHandPiece(handIdx,anchorR,anchorC){
+  const piece=G.hand[handIdx];
+  if(!piece||!canPlace(piece,anchorR,anchorC))return;
+  placePiece(piece,anchorR,anchorC);
+  G.hand[handIdx]=null;
+  G.turnUsed++;
+  G.selHand=-1;
+  if(G.turnUsed>=2) setTimeout(endTurn,100);
+}
+
+function useStockPiece(anchorR,anchorC){
+  if(!G.stock||!canPlace(G.stock,anchorR,anchorC))return;
+  placePiece(G.stock,anchorR,anchorC);
+  G.stock=null;
+  G.turnUsed++;
+  G.selHand=-1;
+  if(G.turnUsed>=2) setTimeout(endTurn,100);
+}
+
+function putInStock(handIdx){
+  if(G.stock!==null)return; // stock already occupied
+  G.stock=G.hand[handIdx];
+  G.hand[handIdx]=null;
+  // Discard remaining
+  for(let i=0;i<3;i++) G.hand[i]=null;
+  G.turnUsed=2; // counts as 2 actions used
+  G.selHand=-1;
+  addLog('ストックに保管');
+  setTimeout(endTurn,100);
+}
+
+function saveScore(){
+  const entry={name:G.playerName,score:G.score,stage:G.stage,difficulty:G.difficulty,date:new Date().toLocaleDateString('ja-JP')};
+  const local=JSON.parse(localStorage.getItem('ts_local_ranking')||'[]');
+  local.push(entry);
+  localStorage.setItem('ts_local_ranking',JSON.stringify(local));
+  window.saveOnlineScore(G.playerName,G.score,G.difficulty);
+}
+
+// ============================================================
+//  MOUSE / INPUT
+// ============================================================
+function hitTest(rect,x,y){return x>=rect.x&&x<=rect.x+rect.w&&y>=rect.y&&y<=rect.y+rect.h;}
+
+function mouseToCell(mx,my){
+  const c=Math.floor((mx-GX)/CELL);
+  const r=Math.floor((my-GY)/CELL);
+  if(r<0||r>=GN||c<0||c>=GN)return null;
+  return {r,c};
+}
+
+cvs.addEventListener('mousemove',e=>{
+  const rect=cvs.getBoundingClientRect();
+  const scaleX=W/rect.width, scaleY=H/rect.height;
+  const mx=(e.clientX-rect.left)*scaleX;
+  const my=(e.clientY-rect.top)*scaleY;
+  G.hoverCell=mouseToCell(mx,my);
+});
+
+cvs.addEventListener('click',e=>{
+  const rect=cvs.getBoundingClientRect();
+  const scaleX=W/rect.width, scaleY=H/rect.height;
+  const mx=(e.clientX-rect.left)*scaleX;
+  const my=(e.clientY-rect.top)*scaleY;
+  handleClick(mx,my);
+});
+
+// Touch support
+cvs.addEventListener('touchend',e=>{
+  e.preventDefault();
+  const rect=cvs.getBoundingClientRect();
+  const scaleX=W/rect.width, scaleY=H/rect.height;
+  const touch=e.changedTouches[0];
+  const mx=(touch.clientX-rect.left)*scaleX;
+  const my=(touch.clientY-rect.top)*scaleY;
+  G.hoverCell=mouseToCell(mx,my);
+  handleClick(mx,my);
+},{passive:false});
+
+function handleClick(mx,my){
+  if(howToVisible){if(btnRects.howto_close&&hitTest(btnRects.howto_close,mx,my))howToVisible=false;return;}
+  if(G.phase==='title') return handleTitleClick(mx,my);
+  if(G.phase==='ranking') return handleRankingClick(mx,my);
+  if(G.phase==='stage_clear') return handleStageClearClick(mx,my);
+  if(G.phase==='game_over') return handleGameOverClick(mx,my);
+  if(G.phase==='game') return handleGameClick(mx,my);
+}
+
+function handleTitleClick(mx,my){
+  if(titlePhase==='name_entry'){
+    if(btnRects.name_ok&&hitTest(btnRects.name_ok,mx,my)){
+      if(!G.playerName) G.playerName='ゲスト';
+      startGame();
+    }
+    return;
+  }
+  for(const d of ['easy','normal','hard']){
+    if(btnRects[`diff_${d}`]&&hitTest(btnRects[`diff_${d}`],mx,my)) titleDiff=d;
+  }
+  if(btnRects.start&&hitTest(btnRects.start,mx,my)){
+    G.difficulty=titleDiff;
+    titlePhase='name_entry';
+    G.playerName='';
+    return;
+  }
+  if(btnRects.ranking_btn&&hitTest(btnRects.ranking_btn,mx,my)){
+    G.phase='ranking'; G.rankingTab='LOCAL'; G.rankingDataWorld=null;
+  }
+}
+
+
+function handleRankingClick(mx,my){
+  for(const tab of['LOCAL','WORLD']){
+    if(btnRects[`rtab_${tab}`]&&hitTest(btnRects[`rtab_${tab}`],mx,my)){
+      G.rankingTab=tab;
+      if(tab==='WORLD') G.rankingDataWorld=null;
+    }
+  }
+  for(const d of['easy','normal','hard']){
+    if(btnRects[`rdiff_${d}`]&&hitTest(btnRects[`rdiff_${d}`],mx,my)) rankingDiff=d;
+  }
+  if(btnRects.ranking_back&&hitTest(btnRects.ranking_back,mx,my)) G.phase='title';
+}
+
+function handleStageClearClick(mx,my){
+  if(btnRects.next_stage&&hitTest(btnRects.next_stage,mx,my)){
+    G.stage++;
+    G.stageScore=0;G.stageStars=0;
+    G.grid=new Uint8Array(GN*GN*4);
+    G.items=[];G.enemies=[];
+    G.hand=[null,null,null];G.stock=null;
+    G.turnUsed=0;G.selHand=-1;
+    G.turn=1;
+    const diff=DIFF[G.difficulty];
+    G.nextBatch=[];
+    for(let i=0;i<6;i++) G.nextBatch.push(randomPiece());
+    startTurn();
+    G.phase='game';
+  }
+  if(btnRects.sc_title&&hitTest(btnRects.sc_title,mx,my)){G.phase='title';titlePhase='main';}
+}
+
+function handleGameOverClick(mx,my){
+  if(btnRects.go_retry&&hitTest(btnRects.go_retry,mx,my)) startGame();
+  if(btnRects.go_title&&hitTest(btnRects.go_title,mx,my)){G.phase='title';titlePhase='main';}
+  if(btnRects.go_ranking&&hitTest(btnRects.go_ranking,mx,my)){G.phase='ranking';G.rankingTab='LOCAL';G.rankingDataWorld=null;}
+}
+
+function handleGameClick(mx,my){
+  // Check sidebar buttons
+  if(btnRects.howto&&hitTest(btnRects.howto,mx,my)){showHowTo();return;}
+  if(btnRects.title_btn&&hitTest(btnRects.title_btn,mx,my)){G.phase='title';titlePhase='main';return;}
+
+  // Rotate/flip for selected piece
+  const selKey=G.selHand==='stock'?'stock':G.selHand>=0?`h${G.selHand}`:null;
+  if(selKey){
+    const rotKey=selKey+'_rot', flipKey=selKey+'_flip';
+    if(btnRects[rotKey]&&hitTest(btnRects[rotKey],mx,my)){
+      const p=G.selHand==='stock'?G.stock:G.hand[G.selHand];
+      if(p) p.rot=(p.rot+1)%4;
+      return;
+    }
+    if(btnRects[flipKey]&&hitTest(btnRects[flipKey],mx,my)){
+      const p=G.selHand==='stock'?G.stock:G.hand[G.selHand];
+      if(p) p.flipped=!p.flipped;
+      return;
+    }
+  }
+
+  // Check rotate/flip for all cards (even unselected)
+  for(let i=0;i<3;i++){
+    if(btnRects[`h${i}_rot`]&&hitTest(btnRects[`h${i}_rot`],mx,my)&&G.hand[i]){
+      G.hand[i].rot=(G.hand[i].rot+1)%4; return;
+    }
+    if(btnRects[`h${i}_flip`]&&hitTest(btnRects[`h${i}_flip`],mx,my)&&G.hand[i]){
+      G.hand[i].flipped=!G.hand[i].flipped; return;
+    }
+  }
+  if(btnRects.stock_rot&&hitTest(btnRects.stock_rot,mx,my)&&G.stock){G.stock.rot=(G.stock.rot+1)%4;return;}
+  if(btnRects.stock_flip&&hitTest(btnRects.stock_flip,mx,my)&&G.stock){G.stock.flipped=!G.stock.flipped;return;}
+
+  // Click on grid → place piece
+  const cell=mouseToCell(mx,my);
+  if(cell&&G.selHand>=0){
+    const {r,c}=cell;
+    if(G.selHand==='stock'){
+      useStockPiece(r,c);
+    } else if(typeof G.selHand==='number'&&G.hand[G.selHand]){
+      useHandPiece(G.selHand,r,c);
+    }
+    return;
+  }
+
+  // Click on stock card → select or put-in-stock
+  if(btnRects.stock&&hitTest(btnRects.stock,mx,my)){
+    if(G.stock&&G.turnUsed<2){
+      G.selHand=G.selHand==='stock'?-1:'stock';
+    } else if(!G.stock&&G.selHand>=0&&typeof G.selHand==='number'&&G.hand[G.selHand]&&G.turnUsed<2){
+      // Put selected hand card into stock
+      putInStock(G.selHand);
+    }
+    return;
+  }
+
+  // Click on hand cards
+  for(let i=0;i<3;i++){
+    if(btnRects[`h${i}`]&&hitTest(btnRects[`h${i}`],mx,my)){
+      if(G.hand[i]&&G.turnUsed<2){
+        G.selHand=G.selHand===i?-1:i;
+      }
+      return;
+    }
+  }
+
+  // Deselect if click outside
+  if(mx>GX+GN*CELL||my>GY+GN*CELL||mx<GX||my<GY) G.selHand=-1;
+}
+
+// ============================================================
+//  KEYBOARD
+// ============================================================
+let howToVisible=false;
+function showHowTo(){howToVisible=!howToVisible;}
+
+document.addEventListener('keydown',e=>{
+  if(G.phase==='title'&&titlePhase==='name_entry'){
+    if(e.key==='Enter'){if(!G.playerName)G.playerName='ゲスト';startGame();}
+    else if(e.key==='Backspace') G.playerName=G.playerName.slice(0,-1);
+    else if(e.key.length===1&&G.playerName.length<12) G.playerName+=e.key;
+    return;
+  }
+  if(G.phase!=='game')return;
+  if(e.key==='r'||e.key==='R'){
+    const p=G.selHand==='stock'?G.stock:G.selHand>=0?G.hand[G.selHand]:null;
+    if(p) p.rot=(p.rot+1)%4;
+  }
+  if(e.key==='f'||e.key==='F'){
+    const p=G.selHand==='stock'?G.stock:G.selHand>=0?G.hand[G.selHand]:null;
+    if(p) p.flipped=!p.flipped;
+  }
+  if(e.key==='Escape') G.selHand=-1;
+});
+
+// ============================================================
+//  HOW TO PLAY OVERLAY
+// ============================================================
+function drawHowTo(){
+  ctx.fillStyle='rgba(0,0,0,0.75)';ctx.fillRect(0,0,W,H);
+  roundRect(W/2-350,H/2-270,700,540,16,'#1b2f1b','#4caf50',2);
+  txt('あそびかた',W/2,H/2-240,26,'#4caf50','center',true);
+  const lines=[
+    '5×5マスのグリッドにブロックを置いて面積を埋めよう！',
+    '手札3枚のうち2枚を使い、1枚は捨てられます。',
+    'ストックに1枚保管できます（そのターンの1アクションになります）。',
+    '⭐マークはブロックの倍率。高いほどスコアアップ！',
+    'アイテム(🎂🍩🍦🍪⭐)は1ターンで消える。その間に置くとボーナス！',
+    '敵(👾)を放置すると毎ターンダメージ。三角形1つでも当てれば倒せる！',
+    'HPが0になるか置けなくなるとゲーム終了。',
+    'キーボード: R=回転 F=反転 ESC=選択解除',
+  ];
+  for(let i=0;i<lines.length;i++){
+    txt(lines[i],W/2,H/2-192+i*54,14,'#cfd8dc','center');
+  }
+  btnRects.howto_close={x:W/2-60,y:H/2+246,w:120,h:40};
+  roundRect(W/2-60,H/2+246,120,40,10,'#37474f','#4caf50',2);
+  txt('とじる',W/2,H/2+266,15,'#fff','center',true);
+}
+
+// ============================================================
+//  MAIN RENDER LOOP
+// ============================================================
+function drawStageClear(){
+  drawGame();
+  const target=DIFF[G.difficulty].stageTargets[G.stage-1];
+  drawOverlay('STAGE CLEAR!','#4caf50',[
+    {text:`ステージ ${G.stage} クリア！`,sz:20,color:'#a5d6a7'},
+    {text:`スコア: ${G.stageScore.toLocaleString()} / 目標 ${target.toLocaleString()}`,sz:16},
+    {text:`累計: ${G.score.toLocaleString()}`,sz:16,color:'#ffe082'},
+  ],[
+    {id:'next_stage',x:W/2-130,y:H/2+100,w:120,h:44,bg:'#4caf50',border:'#2e7d32',label:'次のステージ'},
+    {id:'sc_title',x:W/2+10,y:H/2+100,w:120,h:44,label:'タイトル'},
+  ]);
+}
+
+function drawGameOver(){
+  drawGame();
+  const cleared=G.stage>5;
+  drawOverlay(cleared?'ALL CLEAR!':'GAME OVER',cleared?'#4caf50':'#ef5350',[
+    {text:`ステージ ${Math.min(G.stage,5)} / スコア ${G.score.toLocaleString()}`,sz:18,color:'#ffe082'},
+    {text:`ターン ${G.turn}まで生き残った！`,sz:14},
+  ],[
+    {id:'go_retry',x:W/2-180,y:H/2+92,w:100,h:40,bg:'#4caf50',border:'#2e7d32',label:'リトライ'},
+    {id:'go_title',x:W/2-60,y:H/2+92,w:100,h:40,label:'タイトル'},
+    {id:'go_ranking',x:W/2+60,y:H/2+92,w:100,h:40,bg:'#37474f',border:'#ffd600',label:'ランキング',tc:'#ffd600'},
+  ]);
+}
+
+function drawGame(){
+  cls('#1a2a1a');
+  drawGrid();
+  drawInfoPanel();
+  drawBottomArea();
+}
+
+function frame(){
+  // Update animations
+  G.animFlash=G.animFlash.filter(f=>{f.ttl--;f.sz+=0.5;return f.ttl>0;});
+
+  if(G.phase==='title') drawTitle();
+  else if(G.phase==='game'){
+    drawGame();
+    if(howToVisible) drawHowTo();
+  }
+  else if(G.phase==='stage_clear') drawStageClear();
+  else if(G.phase==='game_over') drawGameOver();
+  else if(G.phase==='ranking') drawRanking();
+
+  requestAnimationFrame(frame);
+}
+
+
+// ============================================================
+//  INIT
+// ============================================================
+frame();
+</script>
+</body>
+</html>
