@@ -196,10 +196,19 @@ const C_BG  ='#020d1e';
 const C_CELL='#061d3a';
 const C_LINE='rgba(56,178,248,0.12)';
 const C_DIAG='rgba(56,178,248,0.06)';
-const C_FILL='#3fd68a';
 const C_OK  ='rgba(63,214,138,0.36)';
 const C_BAD ='rgba(220,60,60,0.30)';
-const PC=['#3fd68a','#38b2f8','#f8a238','#f83880','#c838f8','#38f8f0','#f8f038','#e07060'];
+// 分類ごとの色 (cat1〜9)
+const CAT_COL=['#f87838','#38b2f8','#f8d830','#c038f8','#38d880','#f83870','#30d8f0','#90d840','#e06030'];
+
+// ── ボーナス1/4三角の幾何学対応テーブル ──────────────────────────────
+// ハーフ三角スロット t=0〜3 が覆う 1/4 三角:
+//   t=0(UL\左上) → dir=0(Top), dir=3(Left) を覆う
+//   t=1(LR\右下) → dir=1(Right), dir=2(Bottom) を覆う
+//   t=2(UR/右上) → dir=0(Top), dir=1(Right) を覆う
+//   t=3(LL/左下) → dir=2(Bottom), dir=3(Left) を覆う
+// DIR_COVERED[dir] = そのdirを覆うtスロットの配列
+const DIR_COVERED=[[0,2],[1,2],[1,3],[0,3]]; // dir0=Top,dir1=Right,dir2=Bottom,dir3=Left
 
 // ============================================================
 //  PIECE DEFINITIONS  (cat=分類, pts=点数)
@@ -232,23 +241,21 @@ const PIECE_DEFS=[
   {id:12, cat:7, pts:60, els:[...sq(0,0),...sq(0,1),...tr(1,1,0)]},            // □□横+△右下
   {id:13, cat:7, pts:60, els:[...tr(0,0,1),...sq(0,1),...tr(1,1,0)]},          // Z字5△
   {id:14, cat:7, pts:60, els:[...sq(0,0),...sq(1,0),...tr(1,1,0)]},            // □□縦+△右下
-  // 分類8 (75pt): 6△複合 辺接続確認済
+  // 分類8 (75pt): □□+△ 辺接続確認済
   {id:15, cat:8, pts:75, els:[...sq(0,0),...sq(0,1),...tr(0,2,0)]},            // □□+△端
   {id:16, cat:8, pts:75, els:[...sq(0,0),...sq(0,1),...tr(1,0,0)]},            // □□+△左下
-  {id:17, cat:8, pts:75, els:[...sq(0,0),...sq(0,1),...tr(1,0,0),...tr(1,1,0)]},// □□+2△下
-  {id:18, cat:8, pts:75, els:[...sq(0,0),...sq(1,0),...tr(0,1,0),...tr(1,1,0)]},// □□縦+2△右
   // 分類9 (90pt): □□□/L字
-  {id:19, cat:9, pts:90, els:[...sq(0,0),...sq(0,1),...sq(0,2)]},              // □□□横
-  {id:20, cat:9, pts:90, els:[...sq(0,0),...sq(0,1),...sq(1,0)]},              // L字
-  {id:21, cat:9, pts:90, els:[...sq(0,0),...sq(0,1),...sq(1,1)]},              // J字
-  {id:22, cat:9, pts:90, els:[...sq(0,0),...sq(1,0),...sq(1,1)]},              // L字縦
+  {id:17, cat:9, pts:90, els:[...sq(0,0),...sq(0,1),...sq(0,2)]},              // □□□横
+  {id:18, cat:9, pts:90, els:[...sq(0,0),...sq(0,1),...sq(1,0)]},              // L字
+  {id:19, cat:9, pts:90, els:[...sq(0,0),...sq(0,1),...sq(1,1)]},              // J字
+  {id:20, cat:9, pts:90, els:[...sq(0,0),...sq(1,0),...sq(1,1)]},              // L字縦
 ];
 
 // 分類別確率テーブル (cat1〜9, 合計=100%)
 const DIFF_PROB={
-  easy:  [25,25,15,15,20, 0, 0, 0, 0],
-  normal:[20,20,10,10,10, 0,10,10,10],
-  hard:  [15,15,10,10,10,10,10,10,10],
+  easy:  [20,15,15,15,15, 5, 5, 5, 5],
+  normal:[20,12,12,12,12, 8, 8, 8, 8],
+  hard:  [20,10,10,10,10,10,10,10,10],
 };
 
 // ============================================================
@@ -280,7 +287,6 @@ function xform(base,rot,flip){
   });
 }
 const getPEls=p=>xform(PIECE_DEFS[p.defId].els, p.rot, p.flipped);
-const pci=id=>id%PC.length;
 
 
 // ============================================================
@@ -301,13 +307,16 @@ function setLayout(){
 // ============================================================
 let G={
   grid:null,
+  gridCat:null,     // 各スロットを埋めた分類番号(1-9), 0=空
   hand:[null,null,null],
   selHand:-1, hoverCell:null,
-  score:0, placed:0,
-  areaScore:0,   // 面積ポイント累計 (△1個=5pt)
-  catScore:0,    // 分類ポイント累計
-  bonusPoint:0,  // ボーナス倍率 (0.1ずつ増加)
-  bonusCell:null,// 今光っている △スロット {r,c,t}
+  score:0,          // このステージのスコア = blockScoreSum × areaRate
+  displayScore:0,   // アニメーション表示用
+  scoreDelay:0,
+  blockScoreSum:0,  // このステージのブロック得点合計
+  prevStagesTotal:0,// 前ステージまでの合計スコア
+  placed:0,
+  bonusCells:[],    // ボーナス三角 [{r,c,t,mp}, {r,c,t,mp}] 最大2つ
   placedSinceDiscard:0,
   stage:1,
   difficulty:'normal',
@@ -321,9 +330,36 @@ let G={
 // ============================================================
 const gIdx=(r,c,t)=>(r*GN+c)*4+t;
 const inB=(r,c)=>r>=0&&r<GN&&c>=0&&c<GN;
-const isFilled=(r,c,t)=>!inB(r,c)||G.grid[gIdx(r,c,t)]===1;
+// セルに三角が1つでもあるか (ボーナス配置・G.placed・ステージクリア判定用)
+function cellHasAny(r,c){
+  if(!inB(r,c)) return true;
+  const b=(r*GN+c)*4;
+  return !!(G.grid[b]||G.grid[b+1]||G.grid[b+2]||G.grid[b+3]);
+}
+// セルが完全に埋まっているか: t=0+t=1 または t=2+t=3 が両方揃う
+function cellFull(r,c){
+  if(!inB(r,c)) return false;
+  const b=(r*GN+c)*4;
+  return (G.grid[b+0]&&G.grid[b+1])||(G.grid[b+2]&&G.grid[b+3]);
+}
+// スロット単位の空き判定: 対角線ペアのみ共存可
+//   t=0(UL)↔t=1(LR) は干渉しない (\ 対角線で分割)
+//   t=2(UR)↔t=3(LL) は干渉しない (/ 対角線で分割)
+//   クロス (t=0/1 ↔ t=2/3) は幾何的に重なるため不可
+function slotFree(r,c,t){
+  if(!inB(r,c)) return false;
+  const b=(r*GN+c)*4;
+  if(G.grid[b+t]) return false;           // 同スロット占有
+  if(t<=1) return !(G.grid[b+2]||G.grid[b+3]); // t=0/1 ↔ t=2/3 干渉
+  return     !(G.grid[b+0]||G.grid[b+1]);       // t=2/3 ↔ t=0/1 干渉
+}
+// isFilled: スロット単位
+const isFilled=(r,c,t)=>!slotFree(r,c,t);
 const absEls=(p,ar,ac)=>getPEls(p).map(({r,c,t})=>({r:r+ar,c:c+ac,t}));
-function canPlace(p,ar,ac){return absEls(p,ar,ac).every(({r,c,t})=>inB(r,c)&&!isFilled(r,c,t));}
+function canPlace(p,ar,ac){
+  // スロット単位: t=0とt=1は同一セルに共存OK (正方形の片側→残り半分を置ける)
+  return absEls(p,ar,ac).every(({r,c,t})=>slotFree(r,c,t));
+}
 
 // Check ALL 8 orientations (4 rot × 2 flip) so rotation is accounted for
 function anyValid(p){
@@ -333,7 +369,15 @@ function anyValid(p){
   }
   return false;
 }
-const maxTri=()=>GN*GN*2;   // t=0,t=1のみ使用
+const maxTri=()=>GN*GN;   // セル数 = 全セル占有でステージクリア
+
+// ゲームオーバー判定: 捨てられない かつ どのブロックも置けない
+function checkGameOver(){
+  if(G.phase!=='game') return;
+  if(G.placedSinceDiscard>=5) return;  // 捨てられる → まだゲームオーバーでない
+  if(G.hand.some(p=>p&&anyValid(p))) return;
+  G.phase='game_over';
+}
 
 // ============================================================
 //  CANVAS SETUP
@@ -366,9 +410,25 @@ function tx(s,x,y,sz,col,align='left',bold=false){
   ctx.fillText(s,x,y);
 }
 
+
 // ============================================================
 //  DRAW TRIANGLE (generic position)
 // ============================================================
+// ボーナス用センター三角: 両対角線で4分割した1/4正方形
+// dir: 0=上辺が底辺, 1=右辺が底辺, 2=下辺が底辺, 3=左辺が底辺  (中心が頂点)
+function drawCenterTri(x,y,S,dir,fill,stroke,lw){
+  const cx=x+S/2, cy=y+S/2;
+  ctx.beginPath();
+  switch(dir){
+    case 0:ctx.moveTo(x,y);    ctx.lineTo(x+S,y);    ctx.lineTo(cx,cy);break; // 上辺底辺
+    case 1:ctx.moveTo(x+S,y);  ctx.lineTo(x+S,y+S);  ctx.lineTo(cx,cy);break; // 右辺底辺
+    case 2:ctx.moveTo(x+S,y+S);ctx.lineTo(x,y+S);    ctx.lineTo(cx,cy);break; // 下辺底辺
+    case 3:ctx.moveTo(x,y+S);  ctx.lineTo(x,y);      ctx.lineTo(cx,cy);break; // 左辺底辺
+  }
+  ctx.closePath();
+  if(fill){ctx.fillStyle=fill;ctx.fill();}
+  if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=lw;ctx.stroke();}
+}
 function drawTri(x,y,S,t,fill,stroke,lw=0.5){
   ctx.beginPath();
   switch(t){
@@ -393,30 +453,51 @@ function drawGrid(){
     rr(x+1,y+1,CELL-2,CELL-2,2,C_CELL,null);
     ctx.strokeStyle=C_DIAG;ctx.lineWidth=0.6;
     ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+CELL,y+CELL);ctx.stroke();
-    // /対角線はt=2,t=3スロット用だが未使用のため描画しない
+    ctx.beginPath();ctx.moveTo(x+CELL,y);ctx.lineTo(x,y+CELL);ctx.stroke();
     const base=(r*GN+c)*4;
-    for(let t=0;t<4;t++) if(G.grid[base+t]) gridTri(r,c,t,C_FILL,'rgba(0,0,0,0.1)',0.3);
+    for(let t=0;t<4;t++){
+      if(G.grid[base+t]){
+        // 分類色で塗る
+        const catIdx=G.gridCat[base+t]-1;
+        const col=catIdx>=0?CAT_COL[catIdx]:'#3fd68a';
+        gridTri(r,c,t,col,'rgba(0,0,0,0.18)',0.5);
+      }
+    }
     ctx.strokeStyle=C_LINE;ctx.lineWidth=1;
     ctx.strokeRect(x+0.5,y+0.5,CELL-1,CELL-1);
   }
-  // ボーナスセル光るエフェクト
-  if(G.bonusCell){
-    const{r:br,c:bc,t:bt}=G.bonusCell;
-    const pulse=0.45+0.35*Math.sin(Date.now()/180);
-    ctx.save();
-    ctx.globalAlpha=pulse;
-    gridTri(br,bc,bt,'#ffe040',null,0);
+  // ── ボーナスセル (2つ、空きのみ・中心三角=両対角線4分割) ──
+  const pulse=0.45+0.35*Math.sin(Date.now()/180);
+  for(const bc of G.bonusCells){
+    // このdirを覆うtスロットのどちらかが既に埋まっていたら非表示
+    const [ta,tb]=DIR_COVERED[bc.dir];
+    const bb=(bc.r*GN+bc.c)*4;
+    if(G.grid[bb+ta]||G.grid[bb+tb]) continue;
+    const bcol=MP_COL[bc.mp]||'#ffe040';
+    const bx=GX+bc.c*CELL, by=GY+bc.r*CELL;
+    const dir=bc.dir||0;
+    // 塗りつぶし
+    ctx.save(); ctx.globalAlpha=pulse*0.72;
+    drawCenterTri(bx,by,CELL,dir,bcol,null,0);
     ctx.restore();
-    ctx.save();
-    ctx.globalAlpha=pulse*0.7;
-    gridTri(br,bc,bt,null,'#ffd700',2.5);
+    // 枠線
+    ctx.save(); ctx.globalAlpha=pulse;
+    drawCenterTri(bx,by,CELL,dir,null,bcol,2);
+    ctx.restore();
+    // ×n テキスト: 各三角の重心 = ((3頂点)の平均)
+    // 重心: dir0=(C/2,C/6) dir1=(5C/6,C/2) dir2=(C/2,5C/6) dir3=(C/6,C/2)
+    const cent=[[bx+CELL/2,by+CELL/6],[bx+CELL*5/6,by+CELL/2],
+                [bx+CELL/2,by+CELL*5/6],[bx+CELL/6,by+CELL/2]];
+    ctx.save(); ctx.globalAlpha=Math.min(1,pulse*1.4);
+    tx('×'+bc.mp, cent[dir][0], cent[dir][1], Math.round(CELL*0.20), bcol,'center',true);
     ctx.restore();
   }
-  // Score pop-up animations
+  // ── フロートスコア (delay対応) ──
   ctx.save();
   G.flash.forEach(f=>{
-    ctx.globalAlpha=f.ttl/28;
-    tx(f.text,GX+f.c*CELL+CELL/2,GY+f.r*CELL+CELL/2-f.sz*5,18+f.sz,f.col||'#ffe066','center',true);
+    if((f.delay||0)>0) return;
+    ctx.globalAlpha=Math.min(1,f.ttl/30);
+    tx(f.text,GX+f.c*CELL+CELL/2,GY+f.r*CELL+CELL/2-f.sz*5,20+f.sz,f.col||'#ffe066','center',true);
   });
   ctx.restore();
   // Ghost piece
@@ -435,26 +516,23 @@ function drawGrid(){
 //  INFO PANEL  (right side, y=8 to ~168)
 // ============================================================
 function drawInfo(){
-  rr(PX,8,PW,162,10,'#020c1e','#1a4870',1.5);
+  rr(PX,8,PW,148,10,'#020c1e','#1a4870',1.5);
 
-  // ステージ (左上)
-  tx('STAGE '+G.stage, PX+16, 30, 14,'#38b2f8','left',true);
+  // ── 第1行: STAGE ──
+  tx('STAGE  '+G.stage, PX+18, 30, 20,'#38b2f8','left',true);
 
-  // ボーナス倍率 (右上)
-  const bonusStr='×'+(1+G.bonusPoint).toFixed(1);
-  const bonusCol=G.bonusPoint>0?'#ffe040':'#2a5070';
-  tx(bonusStr, PX+PW-16, 30, 14, bonusCol,'right',true);
-
-  // スコア大きく中央
-  tx('SCORE',PX+PW/2,30,13,'#2a5070','center',true);
-  tx(G.score.toLocaleString(), PX+PW/2,88,62,'#cce8ff','center',true);
-
-  // プログレスバー
-  const pct=Math.min(G.placed/maxTri(),1);
-  const barX=PX+20, barY=122, barW=PW-40, barH=22;
-  rr(barX,barY,barW,barH,7,'#020d1e','#1a4870',1);
-  if(pct>0) rr(barX,barY,barW*pct,barH,7,C_FILL,null);
-  tx(Math.round(pct*100)+'%',PX+PW/2,barY+barH/2,14,'#fff','center',true);
+  if(G.stage===1){
+    // ── ステージ1: スコアのみ ──
+    tx('S C O R E', PX+PW/2, 56, 13,'#1e5070','center',true);
+    tx(G.displayScore.toLocaleString(), PX+PW/2, 108, 66,'#cce8ff','center',true);
+  } else {
+    // ── ステージ2以降: 左=今ステージ 右=全合計 ──
+    tx('THIS STAGE', PX+PW/4, 54, 11,'#2a7040','center',true);
+    tx('ALL TOTAL', PX+PW*3/4, 54, 11,'#1e4870','center',true);
+    const totalDisp=G.prevStagesTotal+G.displayScore;
+    tx(G.displayScore.toLocaleString(), PX+PW/4, 108, 44,'#3fd68a','center',true);
+    tx(totalDisp.toLocaleString(), PX+PW*3/4, 108, 44,'#cce8ff','center',true);
+  }
 }
 
 // ============================================================
@@ -469,18 +547,29 @@ let BR={};  // clickable button rects
 
 function drawPieceCard(p,bx,by,bw,bh,sel,dim){
   if(dim) ctx.globalAlpha=0.30;
-  rr(bx,by,bw,bh,10,sel?'#0a2a1a':'#030e22',sel?'#3fd68a':'#1a4870',sel?2.5:1.5);
+  const borderCol=sel?'#3fd68a':'#1a4870';
+  const borderW=sel?2.5:1.5;
+  rr(bx,by,bw,bh,10,sel?'#0a2a1a':'#030e22',borderCol,borderW);
+
   if(p){
+    // 基礎点 表示 (カード上部・大きく)
+    const def=PIECE_DEFS[p.defId];
+    const basePts=def?.pts||0;
+    const catIdx=(def?.cat||1)-1;
+    const catCol=CAT_COL[catIdx]||'#3a8aaa';
+    tx(basePts+' pt', bx+bw/2, by+24, 28, catCol,'center',true);
+
     const els=getPEls(p);
     const rows=Math.max(...els.map(e=>e.r))+1, cols=Math.max(...els.map(e=>e.c))+1;
-    // No stars — use full card height for piece
-    const sz=Math.min(Math.min((bw-20)/cols,(bh-20)/rows),80);
-    const ox=bx+(bw-cols*sz)/2, oy=by+(bh-rows*sz)/2;
-    const col=PC[pci(p.defId)];
+    // 上部46px(pt表示)と下部10px を除いた領域にピース描画
+    const topOff=46, botOff=10;
+    const drawH=bh-topOff-botOff;
+    const sz=Math.min(Math.min((bw-24)/cols,drawH/rows),80);
+    const ox=bx+(bw-cols*sz)/2, oy=by+topOff+(drawH-rows*sz)/2;
+    const col=catCol;  // 分類色を使用
     for(const {r,c,t} of els){
       const x=ox+c*sz, y=oy+r*sz;
       drawTri(x,y,sz,t,col,'rgba(0,0,0,0.22)',1.2);
-      // subtle diagonal guides inside piece
       ctx.strokeStyle='rgba(255,255,255,0.09)';ctx.lineWidth=0.5;
       ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+sz,y+sz);ctx.stroke();
       ctx.beginPath();ctx.moveTo(x+sz,y);ctx.lineTo(x,y+sz);ctx.stroke();
@@ -491,7 +580,7 @@ function drawPieceCard(p,bx,by,bw,bh,sel,dim){
 
 function drawHand(){
   BR={};
-  const canDiscard=G.placedSinceDiscard>=2;
+  const canDiscard=G.placedSinceDiscard>=5;
 
   for(let i=0;i<3;i++){
     const bx=cardX(i), sel=G.selHand===i, dim=drag.active&&drag.handIdx===i;
@@ -503,37 +592,40 @@ function drawHand(){
       const rby=CY+CH+6, rbh=46, rw=(CARD_W-8)/2;
       const rx=bx, fx=bx+rw+8;
       rr(rx,rby,rw,rbh,8,'#0e3a18','#1a6a30',2);
-      tx('↺',rx+rw/2,rby+rbh/2,26,'#3fd68a','center',true);
+      tx('↻',rx+rw/2,rby+rbh/2,26,'#3fd68a','center',true);
       rr(fx,rby,rw,rbh,8,'#3a1a0a','#7a3a0a',2);
       tx('↔',fx+rw/2,rby+rbh/2,26,'#f8a238','center',true);
       BR[`r${i}`]={x:rx,y:rby,w:rw,h:rbh};
       BR[`f${i}`]={x:fx,y:rby,w:rw,h:rbh};
 
-      // ── Discard (trash) button: 色だけで3段階表示、テキストなし ──
+      // ── Discard (trash) button: プログレスバー ──
       const dby=rby+rbh+6, dbh=44;
       const active=canDiscard&&!dim;
-      const lvl=G.placedSinceDiscard;  // 0,1,2+
-
-      if(active){
-        // 使える: 赤背景+赤枠
-        rr(bx,dby,CARD_W,dbh,8,'#3a0808','#cc3333',2);
-      } else {
-        // ベース: 暗い灰色
-        rr(bx,dby,CARD_W,dbh,8,'#0d0d1a','#232338',1.5);
-        if(lvl===1){
-          // 1回置いた: 左半分だけ薄い赤で塗る
-          ctx.save();
-          ctx.beginPath();ctx.rect(bx,dby,CARD_W/2,dbh);ctx.clip();
-          ctx.fillStyle='rgba(180,40,40,0.30)';
-          ctx.fillRect(bx,dby,CARD_W/2,dbh);
-          ctx.restore();
+      const completedT=G.placedSinceDiscard; // 0~5 (ターン直カウント)
+      // バー背景 (灰色)
+      rr(bx,dby,CARD_W,dbh,8,'#111122',active?'#cc4444':'#2a2a40',active?2:1);
+      // バー塗り (5分の1ずつ)
+      if(completedT>0){
+        const fillW=Math.floor(CARD_W*completedT/5);
+        ctx.save();
+        ctx.beginPath();ctx.roundRect(bx,dby,CARD_W,dbh,8);ctx.clip();
+        // グラデーション
+        const bg=ctx.createLinearGradient(bx,dby,bx+fillW,dby);
+        if(active){ bg.addColorStop(0,'#993333'); bg.addColorStop(1,'#dd4444'); }
+        else       { bg.addColorStop(0,'#552222'); bg.addColorStop(1,'#884444'); }
+        ctx.fillStyle=bg; ctx.fillRect(bx,dby,fillW,dbh);
+        // セグメント区切り線
+        for(let s=1;s<5;s++){
+          const sx=bx+Math.floor(CARD_W*s/5);
+          ctx.strokeStyle='rgba(0,0,0,0.3)';ctx.lineWidth=1;
+          ctx.beginPath();ctx.moveTo(sx,dby);ctx.lineTo(sx,dby+dbh);ctx.stroke();
         }
+        ctx.restore();
       }
-
-      // 🗑️ emoji センタリング (テキストなし)
+      // 🗑️ emoji + カウント
       ctx.save();
-      ctx.globalAlpha=active?1:lvl===1?0.55:0.22;
-      ctx.font='26px serif';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.globalAlpha=active?1:0.25+completedT*0.13;
+      ctx.font='18px serif';ctx.textAlign='center';ctx.textBaseline='middle';
       ctx.fillText('🗑️',bx+CARD_W/2,dby+dbh/2);
       ctx.restore();
 
@@ -555,7 +647,7 @@ function drawHand(){
   if(drag.active){
     const p=G.hand[drag.handIdx];
     if(p){
-      const els=getPEls(p),sz=52,col=PC[pci(p.defId)];
+      const els=getPEls(p),sz=52,col=CAT_COL[(PIECE_DEFS[p.defId]?.cat||1)-1];
       ctx.save();ctx.globalAlpha=0.85;
       for(const {r,c,t} of els)
         drawTri(drag.curX-sz+c*sz, drag.curY-sz+r*sz, sz, t, col,'rgba(255,255,255,0.5)',1.5);
@@ -570,8 +662,8 @@ function drawHand(){
 let howTo=false;
 
 function drawOv(title,col,lines,btns){
-  ctx.fillStyle='rgba(0,0,0,0.72)';ctx.fillRect(0,0,W,H);
-  rr(W/2-300,H/2-200,600,400,16,'#030e22',col,3);
+  ctx.fillStyle='rgba(0,0,0,0.48)';ctx.fillRect(0,0,W,H);
+  rr(W/2-300,H/2-200,600,400,16,'rgba(2,10,28,0.82)',col,3);
   tx(title,W/2,H/2-145,40,col,'center',true);
   lines.forEach((l,i)=>tx(l,W/2,H/2-72+i*52,17,'#cce8ff','center'));
   btns.forEach(({label,bg,key,x,y,w,h})=>{
@@ -610,13 +702,14 @@ function drawHowToScreen(){
     '① てふだの ブロックを グリッドに ドラッグして おこう',
     '   タップで えらんで → グリッドを タップ でもOK',
     '② ブロックを おくと すぐ 新しい ブロックが くる',
-    '③  ↺ボタン: 左回りに かいてん  ↔ボタン: 左右はんてん',
-    '④ ２個 おくと 🗑️ が ひかる → てふだを すてられる',
-    '   すてたら また ２個 おかないと すてられない',
-    '⑤ ３枚の てふだが どこにも おけなくなったら ゲームおわり',
-    '⑥ スコア = 埋めた △の数  (△=1点、正方形=2点)',
+    '③  ↻ボタン: 右回りに かいてん  ↔ボタン: 左右はんてん',
+    '④ 5ターン おくと 🗑️ が ひかる → てふだを すてられる',
+    '   すてたら また 5ターン おかないと すてられない',
+    '⑤ ３枚が どこにも おけず すてられないと ゲームおわり',
+    '⑥ スコア＝ブロック得点合計 × 面積占有率',
+    '   ブロック得点 ＝ 基礎点 × MP（ボーナス倍率）',
   ];
-  lines.forEach((l,i)=>tx(l,W/2-320,H/2-198+i*60,15,i%2===0?'#cce8ff':'#7aaec8','left'));
+  lines.forEach((l,i)=>tx(l,W/2-320,H/2-210+i*52,14,i%2===0?'#cce8ff':'#7aaec8','left'));
   BR.htclose={x:W/2-70,y:H/2+260,w:140,h:44};
   rr(W/2-70,H/2+260,140,44,10,'#1e2c3c','#38b2f8',2);
   tx('とじる',W/2,H/2+282,17,'#fff','center',true);
@@ -633,7 +726,10 @@ function drawGame(){
   if(G.phase==='game_over')    drawGameOver();
   else if(G.phase==='stage_clear') drawStageClear();
   if(howTo) drawHowToScreen();
-  G.flash=G.flash.filter(f=>{f.ttl--;f.sz+=0.5;return f.ttl>0;});
+  G.flash=G.flash.filter(f=>{
+    if((f.delay||0)>0){f.delay--;return true;}
+    f.ttl--;f.sz+=0.4;return f.ttl>0;
+  });
 }
 
 // ============================================================
@@ -653,31 +749,48 @@ function mkPiece(){
 // ============================================================
 //  GAME START / NEXT STAGE
 // ============================================================
-// ランダムな空きt=0/t=1スロットを選んで光らせる
+// 空き1/4三角スロットから2つ抽選
+// 「どの方向(dir)のボーナスを置けるか」をDIR_COVEREDで正確に判定
 function pickBonusCell(){
-  const empty=[];
-  for(let r=0;r<GN;r++) for(let c=0;c<GN;c++)
-    for(let t=0;t<2;t++) if(!G.grid[gIdx(r,c,t)]) empty.push({r,c,t});
-  G.bonusCell=empty.length?empty[Math.floor(Math.random()*empty.length)]:null;
+  // 全セルの全方向について「そのdirがまだ空いているか」をリストアップ
+  const available=[];
+  for(let r=0;r<GN;r++) for(let c=0;c<GN;c++){
+    const b=(r*GN+c)*4;
+    for(let dir=0;dir<4;dir++){
+      const [ta,tb]=DIR_COVERED[dir];
+      // このdirを覆う2つのtスロットが両方とも未占有なら空き
+      if(!G.grid[b+ta]&&!G.grid[b+tb]) available.push({r,c,dir});
+    }
+  }
+  G.bonusCells=[];
+  for(let k=0;k<2&&available.length;k++){
+    const idx=Math.floor(Math.random()*available.length);
+    const {r,c,dir}=available.splice(idx,1)[0];
+    const rv=Math.random();
+    const mp=rv<0.60?2:rv<0.85?3:rv<0.95?4:5;
+    G.bonusCells.push({r,c,mp,dir});
+  }
 }
 function _initGrid(){
   GN={easy:3,normal:4,hard:5}[G.difficulty]||5;
   setLayout();
   G.grid=new Uint8Array(GN*GN*4);
+  G.gridCat=new Uint8Array(GN*GN*4);
   G.hand=[mkPiece(),mkPiece(),mkPiece()];
   G.selHand=-1; G.hoverCell=null;
   G.placed=0; G.placedSinceDiscard=0;
-  G.flash=[]; G.phase='game';
+  G.blockScoreSum=0; G.score=0; G.displayScore=0; G.scoreDelay=0;
+  G.bonusCells=[]; G.flash=[]; G.phase='game';
   howTo=false; drag.active=false;
-  pickBonusCell();  // 最初のボーナスセル設定
+  pickBonusCell();
 }
 function startGame(){
-  G.score=0; G.stage=1;
-  G.areaScore=0; G.catScore=0; G.bonusPoint=0; G.bonusCell=null;
+  G.stage=1; G.prevStagesTotal=0;
   _initGrid();
   document.getElementById('title-screen').classList.add('hidden');
 }
 function nextStage(){
+  G.prevStagesTotal+=G.score;  // このステージのスコアを累積
   G.stage++;
   _initGrid();
 }
@@ -685,48 +798,76 @@ function nextStage(){
 // ============================================================
 //  PLACE PIECE  (score=分類の点数)
 // ============================================================
+// MPカラーテーブル (グローバル参照)
+const MP_COL={2:'#ffe040',3:'#ff8020',4:'#ff4060',5:'#c840ff'};
+
 function place(hi,ar,ac){
   const p=G.hand[hi];
   if(!p||!canPlace(p,ar,ac)) return;
   const els=absEls(p,ar,ac);
-  let n=0;
-  let bonusHit=false;
+  const cat=PIECE_DEFS[p.defId]?.cat||1;
+  // 初めて三角が入るセル (G.placed カウント用)
+  const newCells=new Set();
+  for(const {r,c} of els){
+    const k=r*GN+c;
+    if(!cellHasAny(r,c)&&!newCells.has(k)) newCells.add(k);
+  }
+  // ボーナス判定: 置いた三角(t)がボーナスdir の1/4を覆う場合にのみ取得
+  let mpHit=1, mpMaxSingle=1;
+  for(const bc of G.bonusCells){
+    const [ta,tb]=DIR_COVERED[bc.dir];
+    // elsの中に (r=bc.r, c=bc.c, t=ta or tb) の要素があれば取得
+    if(els.some(({r,c,t})=>r===bc.r&&c===bc.c&&(t===ta||t===tb))){
+      mpHit*=bc.mp;
+      mpMaxSingle=Math.max(mpMaxSingle,bc.mp);
+    }
+  }
+  const mpCol=MP_COL[Math.min(5,mpMaxSingle)]||'#ffe040';
+  // グリッドに格納
   for(const {r,c,t} of els){
-    G.grid[gIdx(r,c,t)]=1; n++; G.placed++;
-    if(G.bonusCell&&G.bonusCell.r===r&&G.bonusCell.c===c&&G.bonusCell.t===t) bonusHit=true;
+    const idx=gIdx(r,c,t);
+    G.grid[idx]=1; G.gridCat[idx]=cat;
   }
-  // スコア計算: (面積+分類) × (1+ボーナス)
-  const areaPts=n*5;
-  const catPts=PIECE_DEFS[p.defId]?.pts||0;
-  G.areaScore+=areaPts;
-  G.catScore+=catPts;
-  if(bonusHit){
-    G.bonusPoint+=0.1;
-    G.flash.push({r:ar,c:ac,text:'BONUS +0.1',ttl:40,sz:0,col:'#ffe566'});
+  G.placed+=newCells.size;  // セル単位でカウント
+  // ── スコア計算: basePts × MP ──
+  const basePts=PIECE_DEFS[p.defId]?.pts||0;
+  const mp=mpHit;
+  const blockScore=basePts*mp;
+  G.blockScoreSum+=blockScore;
+  const areaRate=G.placed/maxTri();
+  G.score=Math.floor(G.blockScoreSum*areaRate);
+  G.scoreDelay=72;
+
+  // ── フロートテキスト (時間差表示) ──
+  // ① 基礎点 → すぐ
+  G.flash.push({r:ar,c:ac,text:basePts+'pt',ttl:90,sz:0,col:'#aaddff',delay:0});
+  if(mp>1){
+    // ② ×MP → 20フレーム後
+    G.flash.push({r:ar,c:ac,text:'×'+mp,ttl:70,sz:0,col:mpCol,delay:20});
+    // ③ 合計pt → 42フレーム後 (色変え)
+    G.flash.push({r:ar,c:ac,text:'= '+blockScore+'pt',ttl:55,sz:0,col:'#ffe066',delay:42});
   }
-  G.score=Math.floor((G.areaScore+G.catScore)*(1+G.bonusPoint));
-  const showPts=areaPts+catPts;
-  G.flash.push({r:ar,c:ac,text:'+'+showPts,ttl:32,sz:0,col:'#3fd68a'});
-  if(G.placedSinceDiscard<2) G.placedSinceDiscard++;
+
+  if(G.placedSinceDiscard<5) G.placedSinceDiscard++;
   G.hand[hi]=mkPiece();
   G.selHand=-1;
-  // 全マス埋まった → ステージクリア
-  if(G.placed>=maxTri()){G.phase='stage_clear'; return;}
-  // 次のボーナスセルを設定
+  // ステージクリア: 全セルが完全に埋まっている (t=0+t=1 または t=2+t=3)
+  let allFull=true;
+  for(let r=0;r<GN&&allFull;r++) for(let c=0;c<GN&&allFull;c++) if(!cellFull(r,c)) allFull=false;
+  if(allFull){G.phase='stage_clear'; return;}
   pickBonusCell();
-  // 置けない かつ 捨てられない → ゲームオーバー
-  const canDiscard=G.placedSinceDiscard>=2;
-  if(!canDiscard&&!G.hand.some(p2=>p2&&anyValid(p2))) G.phase='game_over';
+  checkGameOver();
 }
 
 // ============================================================
 //  DISCARD PIECE
 // ============================================================
 function discard(hi){
-  if(!G.hand[hi]||G.placedSinceDiscard<2) return;
+  if(!G.hand[hi]||G.placedSinceDiscard<5) return;
   G.hand[hi]=mkPiece();
-  G.placedSinceDiscard=0;  // reset — need 2 more placements
+  G.placedSinceDiscard=0;  // リセット: また5ターン待つ
   G.selHand=-1;
+  checkGameOver(); // 新しいピースでも置けない場合ゲームオーバー
 }
 
 // ============================================================
@@ -790,7 +931,8 @@ cvs.addEventListener('pointerdown',e=>{
   // Rotate / flip ボタン
   for(let i=0;i<3;i++){
     if(G.hand[i]&&hit(BR[`r${i}`],mx,my)){
-      G.hand[i].rot=(G.hand[i].rot+1)%4; return;
+      const p=G.hand[i];
+      p.rot=(p.rot+(p.flipped?3:1))%4; return;
     }
     if(G.hand[i]&&hit(BR[`f${i}`],mx,my)){
       G.hand[i].flipped=!G.hand[i].flipped; return;
@@ -894,6 +1036,11 @@ function renderPL(){
 // ============================================================
 (function loop(){
   requestAnimationFrame(loop);
+  // displayScore アニメーション: 1秒ディレイ後にスコアに追いつく
+  if(G.scoreDelay>0) G.scoreDelay--;
+  else if(G.displayScore<G.score){
+    G.displayScore=Math.min(G.score, G.displayScore+Math.max(1,Math.floor((G.score-G.displayScore)*0.10)));
+  }
   if(G.phase==='game'||G.phase==='game_over'||G.phase==='stage_clear') drawGame();
 })();
 
