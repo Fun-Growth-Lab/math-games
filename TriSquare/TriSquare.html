@@ -202,6 +202,9 @@ const C_OK  ='rgba(63,214,138,0.36)';
 const C_BAD ='rgba(220,60,60,0.30)';
 // 分類ごとの色 (cat1〜9)
 const CAT_COL=['#f87838','#38b2f8','#f8d830','#c038f8','#38d880','#f83870','#30d8f0','#90d840','#e06030'];
+// Lvカラー (Lv1=灰青, Lv2〜10=各色, Lv11+はLv10と同色)
+const LV_COL=['#8899cc','#3fd68a','#38b2f8','#ffe040','#ff8020','#ff4060','#ff40c0','#c840ff','#40ffe0','#ffa030'];
+const lvColor=lv=>LV_COL[Math.min(lv-1,LV_COL.length-1)];
 
 // ── ボーナス1/4三角の幾何学対応テーブル ──────────────────────────────
 // ハーフ三角スロット t=0〜3 が覆う 1/4 三角:
@@ -259,6 +262,20 @@ function getPts(defId){
   const lv=G.pieceLevels[defId];
   return base + (base>>1)*(lv-1);  // base/2 は常に整数(全ptsが偶数のため)
 }
+// 形状正規化: 全8方向(4回転×2反転)の中で辞書順最小のキーを正規形とする
+// これにより「同じ形の回転・反転版」を同一扱いできる
+function pieceShape(defId){
+  const base=PIECE_DEFS[defId].els;
+  let best=null;
+  for(let rot=0;rot<4;rot++){
+    for(const flip of [false,true]){
+      const key=xform(base,rot,flip).map(e=>`${e.r},${e.c},${e.t}`).sort().join('|');
+      if(!best||key<best) best=key;
+    }
+  }
+  return best;
+}
+const PIECE_SHAPE=PIECE_DEFS.map(d=>pieceShape(d.id));
 
 // 分類別確率テーブル (cat1〜9, 合計=100%)
 const DIFF_PROB={
@@ -567,18 +584,18 @@ function drawPieceCard(p,bx,by,bw,bh,sel,dim){
   rr(bx,by,bw,bh,10,sel?'#0a2a1a':'#030e22',borderCol,borderW);
 
   if(p){
-    // 基礎点 + Lv 表示 (カード上部)
+    // Lv（上）+ 基礎点（下）表示
     const def=PIECE_DEFS[p.defId];
     const basePts=getPts(p.defId);
     const lv=G.pieceLevels[p.defId];
     const catIdx=(def?.cat||1)-1;
     const catCol=CAT_COL[catIdx]||'#3a8aaa';
-    tx(basePts+' pt', bx+bw/2, by+22, 24, catCol,'center',true);
-    tx('Lv.'+lv, bx+bw/2, by+42, 13, '#8899cc','center');
+    tx('Lv.'+lv, bx+bw/2, by+17, 14, lvColor(lv),'center',lv>1);
+    tx(basePts+' pt', bx+bw/2, by+38, 22, catCol,'center',true);
 
     const els=getPEls(p);
     const rows=Math.max(...els.map(e=>e.r))+1, cols=Math.max(...els.map(e=>e.c))+1;
-    // 上部54px(pt+Lv表示)と下部10px を除いた領域にピース描画
+    // 上部54px(Lv+pt表示)と下部10px を除いた領域にピース描画
     const topOff=54, botOff=10;
     const drawH=bh-topOff-botOff;
     const sz=Math.min(Math.min((bw-24)/cols,drawH/rows),80);
@@ -701,33 +718,38 @@ function drawGameOver(){
   ]);
 }
 function startReward(){
-  // 21種全てからランダムに3種選ぶ (重複なし)
+  // シャッフル後、同じ形(回転・反転を含む)は除外して3種選ぶ
   const pool=Array.from({length:PIECE_DEFS.length},(_,i)=>i);
-  const choices=[];
-  while(choices.length<3&&pool.length>0){
-    choices.push(pool.splice(Math.floor(Math.random()*pool.length),1)[0]);
+  for(let i=pool.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [pool[i],pool[j]]=[pool[j],pool[i]];
+  }
+  const choices=[], usedShapes=new Set();
+  for(const defId of pool){
+    if(choices.length>=3) break;
+    const shape=PIECE_SHAPE[defId];
+    if(!usedShapes.has(shape)){ usedShapes.add(shape); choices.push(defId); }
   }
   G.rewardChoices=choices;
 }
 function drawStageClear(){
-  // パネル
-  const pw=1000, ph=490;
+  // パネル (余白を十分に確保)
+  const pw=1000, ph=560;
   const px=W/2-pw/2, py=H/2-ph/2;
   ctx.fillStyle='rgba(0,0,0,0.60)'; ctx.fillRect(0,0,W,H);
   rr(px,py,pw,ph,18,'rgba(2,10,28,0.93)','#3fd68a',3);
 
   // タイトル
-  tx('STAGE '+G.stage+' CLEAR!', W/2, py+46, 36, '#3fd68a','center',true);
+  tx('STAGE '+G.stage+' CLEAR!', W/2, py+50, 36, '#3fd68a','center',true);
 
   // スコア大きく・カラフルに
-  tx('S C O R E', W/2, py+86, 13, '#4a8a5a','center',true);
-  tx(G.score.toLocaleString()+' 点', W/2, py+134, 52, '#ffe040','center',true);
+  tx('S C O R E', W/2, py+92, 13, '#4a8a5a','center',true);
+  tx(G.score.toLocaleString()+' 点', W/2, py+144, 52, '#ffe040','center',true);
 
-  // 3択カード (タップで選択)
-  tx('ブロックをレベルアップ！  選んだブロックは次のステージで必ずゲット', W/2, py+166, 13, '#7aaec8','center');
-  const cw=248, ch=265, gap=28;
+  // 3択カード (タップで選択、余白たっぷり)
+  const cw=252, ch=310, gap=26;
   const totalW=cw*3+gap*2;
-  const csx=W/2-totalW/2, csy=py+180;
+  const csx=W/2-totalW/2, csy=py+178;
 
   for(let i=0;i<3;i++){
     const defId=G.rewardChoices[i];
@@ -739,15 +761,16 @@ function drawStageClear(){
     const cx=csx+i*(cw+gap), cy=csy;
 
     rr(cx,cy,cw,ch,14,'#040f24',catCol,2.5);
-    tx('Lv.'+lv+'  ➡  Lv.'+(lv+1), cx+cw/2, cy+22, 16,'#ffffff','center',true);
+    // Lv遷移 (大きく)
+    tx('Lv.'+lv+'  ➡  Lv.'+(lv+1), cx+cw/2, cy+30, 21,'#ffffff','center',true);
 
     // ピース描画
     const p0={defId,rot:0,flipped:false};
     const els=getPEls(p0);
     const rows=Math.max(...els.map(e=>e.r))+1, cols=Math.max(...els.map(e=>e.c))+1;
-    const drawH=ch-82;
-    const sz=Math.min((cw-24)/cols,drawH/rows,68);
-    const ox=cx+(cw-cols*sz)/2, oy=cy+40+(drawH-rows*sz)/2;
+    const drawH=ch-98;
+    const sz=Math.min((cw-28)/cols,drawH/rows,72);
+    const ox=cx+(cw-cols*sz)/2, oy=cy+56+(drawH-rows*sz)/2;
     for(const {r,c,t} of els){
       const x=ox+c*sz, y=oy+r*sz;
       drawTri(x,y,sz,t,catCol,'rgba(0,0,0,0.22)',1.2);
@@ -755,7 +778,8 @@ function drawStageClear(){
       ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+sz,y+sz);ctx.stroke();
       ctx.beginPath();ctx.moveTo(x+sz,y);ctx.lineTo(x,y+sz);ctx.stroke();
     }
-    tx(curPts+'pt  ➡  '+nextPts+'pt', cx+cw/2, cy+ch-18, 15, catCol,'center',true);
+    // pt遷移 (大きく)
+    tx(curPts+'pt  ➡  '+nextPts+'pt', cx+cw/2, cy+ch-22, 20, catCol,'center',true);
     BR['rw'+i]={x:cx,y:cy,w:cw,h:ch};
   }
 }
