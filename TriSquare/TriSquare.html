@@ -345,7 +345,7 @@ let G={
   prevStagesTotal:0,// 前ステージまでの合計スコア
   placed:0,
   bonusCells:[],    // ボーナス三角 [{r,c,t,mp}, {r,c,t,mp}] 最大2つ
-  placedSinceDiscard:0,
+  placedSinceDiscard:[0,0,0],
   stage:1,
   difficulty:'normal',
   phase:'title',
@@ -405,7 +405,7 @@ const maxTri=()=>GN*GN;   // セル数 = 全セル占有でステージクリア
 // ゲームオーバー判定: 捨てられない かつ どのブロックも置けない
 function checkGameOver(){
   if(G.phase!=='game') return;
-  if(G.placedSinceDiscard>=5) return;  // 捨てられる → まだゲームオーバーでない
+  if(G.hand.some((p,i)=>p&&G.placedSinceDiscard[i]>=5)) return;  // いずれかが捨てられる → まだゲームオーバーでない
   if(G.hand.some(p=>p&&anyValid(p))) return;
   G.phase='game_over';
 }
@@ -442,6 +442,17 @@ function tx(s,x,y,sz,col,align='left',bold=false){
   ctx.font=`${bold?'800':'400'} ${sz}px 'Nunito','M PLUS Rounded 1c',sans-serif`;
   ctx.fillStyle=col;ctx.textAlign=align;ctx.textBaseline='middle';
   ctx.fillText(s,x,y);
+}
+// "Lv.N ➡ Lv.N+1" を各レベル色で描画
+function txLvArr(lv,cx,cy,sz){
+  const s1='Lv.'+lv, sa='  ➡  ', s2='Lv.'+(lv+1);
+  ctx.font=`800 ${sz}px 'Nunito','M PLUS Rounded 1c',sans-serif`;
+  const w1=ctx.measureText(s1).width, wa=ctx.measureText(sa).width, w2=ctx.measureText(s2).width;
+  const sx=cx-(w1+wa+w2)/2;
+  ctx.textBaseline='middle'; ctx.textAlign='left';
+  ctx.fillStyle=lvColor(lv);   ctx.fillText(s1,sx,cy);
+  ctx.fillStyle='#aabbcc';     ctx.fillText(sa,sx+w1,cy);
+  ctx.fillStyle=lvColor(lv+1); ctx.fillText(s2,sx+w1+wa,cy);
 }
 
 
@@ -616,8 +627,6 @@ function drawPieceCard(p,bx,by,bw,bh,sel,dim){
 
 function drawHand(){
   BR={};
-  const canDiscard=G.placedSinceDiscard>=5;
-
   for(let i=0;i<3;i++){
     const bx=cardX(i), sel=G.selHand===i, dim=drag.active&&drag.handIdx===i;
     drawPieceCard(G.hand[i],bx,CY,CARD_W,CH,sel,dim);
@@ -636,8 +645,8 @@ function drawHand(){
 
       // ── Discard (trash) button: プログレスバー ──
       const dby=rby+rbh+6, dbh=44;
-      const active=canDiscard&&!dim;
-      const completedT=G.placedSinceDiscard; // 0~5 (ターン直カウント)
+      const active=G.placedSinceDiscard[i]>=5&&!dim;
+      const completedT=G.placedSinceDiscard[i]; // 0~5 (スロット別カウント)
       // バー背景 (灰色)
       rr(bx,dby,CARD_W,dbh,8,'#111122',active?'#cc4444':'#2a2a40',active?2:1);
       // バー塗り (5分の1ずつ)
@@ -709,15 +718,25 @@ function drawOv(title,col,lines,btns){
   });
 }
 function drawGameOver(){
-  drawOv('GAME OVER','#38b2f8',[
-    'スコア:  '+G.score.toLocaleString()+' 点',
-    'ステージ '+G.stage+' で力つきました',
-    'もっと置ける場所がありません',
-  ],[
-    {label:'もういちど',bg:'#0e3a70',key:'retry', x:W/2-230,y:H/2+108,w:160,h:52},
-    {label:'タイトル', bg:'#1e2c3c',key:'title2',x:W/2-55, y:H/2+108,w:110,h:52},
-    {label:'ランキング',bg:'#3a1860',key:'rank2', x:W/2+65, y:H/2+108,w:160,h:52},
-  ]);
+  const pw=620, ph=370;
+  const px=W/2-pw/2, py=H/2-ph/2;
+  ctx.fillStyle='rgba(0,0,0,0.58)'; ctx.fillRect(0,0,W,H);
+  rr(px,py,pw,ph,18,'rgba(2,10,28,0.93)','#38b2f8',3);
+  tx('GAME OVER', W/2, py+52, 38, '#38b2f8','center',true);
+  tx('T O T A L  S C O R E', W/2, py+96, 13, '#1e4a6a','center',true);
+  const total=G.prevStagesTotal+G.score;
+  tx(total.toLocaleString()+' 点', W/2, py+148, 52, '#ffe040','center',true);
+  tx('STAGE  '+G.stage, W/2, py+192, 16, '#7aaec8','center');
+  const btns=[
+    {label:'もういちど',bg:'#0e3a70',key:'retry', x:W/2-200,y:py+228,w:150,h:52},
+    {label:'タイトル', bg:'#1e2c3c',key:'title2',x:W/2-35, y:py+228,w:110,h:52},
+    {label:'ランキング',bg:'#3a1860',key:'rank2', x:W/2+90, y:py+228,w:150,h:52},
+  ];
+  btns.forEach(({label,bg,key,x,y,w,h})=>{
+    rr(x,y,w,h,12,bg,'rgba(255,255,255,0.12)',1);
+    tx(label,x+w/2,y+h/2,18,'#fff','center',true);
+    BR[key]={x,y,w,h};
+  });
 }
 function startReward(){
   // シャッフル後、同じ形(回転・反転を含む)は除外して3種選ぶ
@@ -763,8 +782,8 @@ function drawStageClear(){
     const cx=csx+i*(cw+gap), cy=csy;
 
     rr(cx,cy,cw,ch,14,'#040f24',catCol,2.5);
-    // Lv遷移 (大きく)
-    tx('Lv.'+lv+'  ➡  Lv.'+(lv+1), cx+cw/2, cy+30, 21,'#ffffff','center',true);
+    // Lv遷移 (大きく・各Lv色付き)
+    txLvArr(lv, cx+cw/2, cy+30, 21);
 
     // ピース描画
     const p0={defId,rot:0,flipped:false};
@@ -874,7 +893,7 @@ function _initGrid(){
   G.pendingRewardId=-1;
   G.hand=[rewardPiece, mkPiece(), mkPiece()];
   G.selHand=-1; G.hoverCell=null;
-  G.placed=0; G.placedSinceDiscard=0;
+  G.placed=0; G.placedSinceDiscard=[0,0,0];
   G.blockScoreSum=0; G.score=0; G.displayScore=0; G.scoreDelay=0;
   G.bonusCells=[]; G.flash=[]; G.phase='game';
   howTo=false; drag.active=false;
@@ -946,7 +965,7 @@ function place(hi,ar,ac){
     G.flash.push({r:ar,c:ac,text:'= '+blockScore+'pt',ttl:55,sz:0,col:'#ffe066',delay:42});
   }
 
-  if(G.placedSinceDiscard<5) G.placedSinceDiscard++;
+  G.placedSinceDiscard=G.placedSinceDiscard.map(c=>Math.min(c+1,5));
   G.hand[hi]=mkPiece();
   G.selHand=-1;
   // ステージクリア: 全セルが完全に埋まっている (t=0+t=1 または t=2+t=3)
@@ -961,9 +980,9 @@ function place(hi,ar,ac){
 //  DISCARD PIECE
 // ============================================================
 function discard(hi){
-  if(!G.hand[hi]||G.placedSinceDiscard<5) return;
+  if(!G.hand[hi]||G.placedSinceDiscard[hi]<5) return;
   G.hand[hi]=mkPiece();
-  G.placedSinceDiscard=0;  // リセット: また5ターン待つ
+  G.placedSinceDiscard[hi]=0;  // そのスロットだけリセット: また5ターン待つ
   G.selHand=-1;
   checkGameOver(); // 新しいピースでも置けない場合ゲームオーバー
 }
