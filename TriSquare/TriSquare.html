@@ -338,12 +338,10 @@ let G={
   gridCat:null,     // 各スロットを埋めた分類番号(1-9), 0=空
   hand:[null,null,null],
   selHand:-1, hoverCell:null,
-  score:0,          // このステージのスコア = blockScoreSum × areaRate
+  score:0,          // このステージのスコア = Σ(basePts×Lv補正×MP)
   displayScore:0,   // アニメーション表示用
   scoreDelay:0,
-  blockScoreSum:0,  // このステージのブロック得点合計
   prevStagesTotal:0,// 前ステージまでの合計スコア
-  placed:0,
   bonusCells:[],    // ボーナス三角 [{r,c,t,mp}, {r,c,t,mp}] 最大2つ
   placedSinceDiscard:[0,0,0],
   stage:1,
@@ -361,7 +359,7 @@ let G={
 // ============================================================
 const gIdx=(r,c,t)=>(r*GN+c)*4+t;
 const inB=(r,c)=>r>=0&&r<GN&&c>=0&&c<GN;
-// セルに三角が1つでもあるか (ボーナス配置・G.placed・ステージクリア判定用)
+// セルに三角が1つでもあるか (ボーナス配置・ステージクリア判定用)
 function cellHasAny(r,c){
   if(!inB(r,c)) return true;
   const b=(r*GN+c)*4;
@@ -400,7 +398,6 @@ function anyValid(p){
   }
   return false;
 }
-const maxTri=()=>GN*GN;   // セル数 = 全セル占有でステージクリア
 
 // ゲームオーバー判定: 捨てられない かつ どのブロックも置けない
 function checkGameOver(){
@@ -893,8 +890,8 @@ function _initGrid(){
   G.pendingRewardId=-1;
   G.hand=[rewardPiece, mkPiece(), mkPiece()];
   G.selHand=-1; G.hoverCell=null;
-  G.placed=0; G.placedSinceDiscard=[0,0,0];
-  G.blockScoreSum=0; G.score=0; G.displayScore=0; G.scoreDelay=0;
+  G.placedSinceDiscard=[0,0,0];
+  G.score=0; G.displayScore=0; G.scoreDelay=0;
   G.bonusCells=[]; G.flash=[]; G.phase='game';
   howTo=false; drag.active=false;
   pickBonusCell();
@@ -923,12 +920,6 @@ function place(hi,ar,ac){
   if(!p||!canPlace(p,ar,ac)) return;
   const els=absEls(p,ar,ac);
   const cat=PIECE_DEFS[p.defId]?.cat||1;
-  // 初めて三角が入るセル (G.placed カウント用)
-  const newCells=new Set();
-  for(const {r,c} of els){
-    const k=r*GN+c;
-    if(!cellHasAny(r,c)&&!newCells.has(k)) newCells.add(k);
-  }
   // ボーナス判定: 置いた三角(t)がボーナスdir の1/4を覆う場合にのみ取得
   let mpHit=1, mpMaxSingle=1;
   for(const bc of G.bonusCells){
@@ -945,14 +936,11 @@ function place(hi,ar,ac){
     const idx=gIdx(r,c,t);
     G.grid[idx]=1; G.gridCat[idx]=cat;
   }
-  G.placed+=newCells.size;  // セル単位でカウント
   // ── スコア計算: basePts(Lv反映済) × MP ──
   const basePts=getPts(p.defId);
   const mp=mpHit;
   const blockScore=basePts*mp;
-  G.blockScoreSum+=blockScore;
-  const areaRate=G.placed/maxTri();
-  G.score=Math.floor(G.blockScoreSum*areaRate);
+  G.score+=blockScore;
   G.scoreDelay=72;
 
   // ── フロートテキスト (時間差表示) ──
