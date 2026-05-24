@@ -700,17 +700,6 @@ function drawGameOver(){
     {label:'ランキング',bg:'#3a1860',key:'rank2', x:W/2+65, y:H/2+108,w:160,h:52},
   ]);
 }
-function drawStageClear(){
-  drawOv('STAGE '+G.stage+' CLEAR!','#3fd68a',[
-    'スコア:  '+G.score.toLocaleString()+' 点',
-    'すべてのマスを埋めた！',
-    'ブロックをレベルアップして次へ！',
-  ],[
-    {label:'報酬を選ぶ ▶',bg:'#0e3a18',key:'next',  x:W/2-215,y:H/2+108,w:170,h:52},
-    {label:'タイトル',   bg:'#1e2c3c',key:'title2',x:W/2-30, y:H/2+108,w:110,h:52},
-    {label:'ランキング', bg:'#3a1860',key:'rank2', x:W/2+90, y:H/2+108,w:160,h:52},
-  ]);
-}
 function startReward(){
   // 21種全てからランダムに3種選ぶ (重複なし)
   const pool=Array.from({length:PIECE_DEFS.length},(_,i)=>i);
@@ -719,42 +708,46 @@ function startReward(){
     choices.push(pool.splice(Math.floor(Math.random()*pool.length),1)[0]);
   }
   G.rewardChoices=choices;
-  G.phase='reward';
 }
-function drawReward(){
-  const pw=900, ph=460;
+function drawStageClear(){
+  // パネル
+  const pw=1000, ph=490;
   const px=W/2-pw/2, py=H/2-ph/2;
   ctx.fillStyle='rgba(0,0,0,0.60)'; ctx.fillRect(0,0,W,H);
   rr(px,py,pw,ph,18,'rgba(2,10,28,0.93)','#3fd68a',3);
-  tx('ブロックをレベルアップ！',W/2,py+42,30,'#3fd68a','center',true);
-  tx('選んだブロックは次のステージで必ずゲット！',W/2,py+80,15,'#7aaec8','center');
 
-  const cw=240, ch=290;
-  const totalW=cw*3+30*2;
-  const csx=W/2-totalW/2, csy=py+105;
+  // タイトル
+  tx('STAGE '+G.stage+' CLEAR!', W/2, py+46, 36, '#3fd68a','center',true);
+
+  // スコア大きく・カラフルに
+  tx('S C O R E', W/2, py+86, 13, '#4a8a5a','center',true);
+  tx(G.score.toLocaleString()+' 点', W/2, py+134, 52, '#ffe040','center',true);
+
+  // 3択カード (タップで選択)
+  tx('ブロックをレベルアップ！  選んだブロックは次のステージで必ずゲット', W/2, py+166, 13, '#7aaec8','center');
+  const cw=248, ch=265, gap=28;
+  const totalW=cw*3+gap*2;
+  const csx=W/2-totalW/2, csy=py+180;
 
   for(let i=0;i<3;i++){
     const defId=G.rewardChoices[i];
     const def=PIECE_DEFS[defId];
     const lv=G.pieceLevels[defId];
     const curPts=getPts(defId);
-    const nextPts=def.pts+(def.pts>>1)*lv;  // lv+1時のpts
+    const nextPts=def.pts+(def.pts>>1)*lv;
     const catCol=CAT_COL[(def.cat-1)]||'#3a8aaa';
-    const cx=csx+i*(cw+30), cy=csy;
+    const cx=csx+i*(cw+gap), cy=csy;
 
-    // カード背景 (ホバー感はなし、タップで選択)
     rr(cx,cy,cw,ch,14,'#040f24',catCol,2.5);
+    tx('Lv.'+lv+'  ➡  Lv.'+(lv+1), cx+cw/2, cy+22, 16,'#ffffff','center',true);
 
-    // Lv遷移 (上部)
-    tx('Lv.'+lv+'  ➡  Lv.'+(lv+1), cx+cw/2, cy+26, 17, '#ffffff','center',true);
-
-    // ピース描画 (中央)
+    // ピース描画
     const p0={defId,rot:0,flipped:false};
     const els=getPEls(p0);
     const rows=Math.max(...els.map(e=>e.r))+1, cols=Math.max(...els.map(e=>e.c))+1;
-    const drawH=ch-90;
-    const sz=Math.min((cw-24)/cols, drawH/rows, 72);
-    const ox=cx+(cw-cols*sz)/2, oy=cy+50+(drawH-rows*sz)/2;
+    const drawH=ch-82;
+    const sz=Math.min((cw-24)/cols,drawH/rows,68);
+    const ox=cx+(cw-cols*sz)/2, oy=cy+40+(drawH-rows*sz)/2;
     for(const {r,c,t} of els){
       const x=ox+c*sz, y=oy+r*sz;
       drawTri(x,y,sz,t,catCol,'rgba(0,0,0,0.22)',1.2);
@@ -762,10 +755,7 @@ function drawReward(){
       ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+sz,y+sz);ctx.stroke();
       ctx.beginPath();ctx.moveTo(x+sz,y);ctx.lineTo(x,y+sz);ctx.stroke();
     }
-
-    // pt遷移 (下部)
-    tx(curPts+'pt  ➡  '+nextPts+'pt', cx+cw/2, cy+ch-22, 16, catCol,'center',true);
-
+    tx(curPts+'pt  ➡  '+nextPts+'pt', cx+cw/2, cy+ch-18, 15, catCol,'center',true);
     BR['rw'+i]={x:cx,y:cy,w:cw,h:ch};
   }
 }
@@ -800,7 +790,6 @@ function drawGame(){
   drawHand();
   if(G.phase==='game_over')      drawGameOver();
   else if(G.phase==='stage_clear') drawStageClear();
-  else if(G.phase==='reward')    drawReward();
   if(howTo) drawHowToScreen();
   G.flash=G.flash.filter(f=>{
     if((f.delay||0)>0){f.delay--;return true;}
@@ -937,7 +926,7 @@ function place(hi,ar,ac){
   // ステージクリア: 全セルが完全に埋まっている (t=0+t=1 または t=2+t=3)
   let allFull=true;
   for(let r=0;r<GN&&allFull;r++) for(let c=0;c<GN&&allFull;c++) if(!cellFull(r,c)) allFull=false;
-  if(allFull){G.phase='stage_clear'; return;}
+  if(allFull){ startReward(); G.phase='stage_clear'; return; }
   pickBonusCell();
   checkGameOver();
 }
@@ -983,15 +972,8 @@ cvs.addEventListener('pointerdown',e=>{
   const{mx,my}=toXY(e);
   // How-to overlay
   if(howTo){if(hit(BR.htclose,mx,my)) howTo=false; return;}
-  // Stage clear overlay
+  // Stage clear overlay — 3択カードを直接タップで選択
   if(G.phase==='stage_clear'){
-    if(hit(BR.next,  mx,my)) startReward();
-    else if(hit(BR.title2,mx,my)) showTitle();
-    else if(hit(BR.rank2, mx,my)) showRanking();
-    return;
-  }
-  // Reward overlay
-  if(G.phase==='reward'){
     for(let i=0;i<3;i++){
       if(hit(BR['rw'+i],mx,my)){
         G.pieceLevels[G.rewardChoices[i]]++;
