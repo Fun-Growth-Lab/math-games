@@ -462,9 +462,8 @@ let G={
   flash:[],
   pieceLevels:[...new Array(21).fill(1),...new Array(10).fill(0)], // Lv(通常=1〜, 特殊=0=ロック)
   pendingRewardId:-1,                  // 報酬で選んだブロックのdefId (-1=なし)
-  rewardChoices:[],                    // 報酬選択肢3つのdefId
+  rewardChoices:[],                    // 報酬選択肢3つ [{defId,bonusLvs,bonusText,bonusCol}]
   unlockedSpecial:new Set(),           // 解放済み特殊ブロックのidセット
-  rewardBonus:null,                    // {idx,text,col,defId} ボーナスLvUp表示用
 };
 
 // ============================================================
@@ -868,11 +867,17 @@ function startReward(){
   const weights=Object.assign({},REWARD_WEIGHTS[G.difficulty]||REWARD_WEIGHTS.normal);
 
   for(let slot=0;slot<3;slot++){
+    // ボーナスLvUp抽選 (カード生成時に確定)
+    const bv=Math.random();
+    let bonusLvs=1, bonusText=null, bonusCol=null;
+    if(bv<0.01){bonusLvs=3;bonusText='GREAT!!';bonusCol='#c840ff';}
+    else if(bv<0.06){bonusLvs=2;bonusText='GOOD!!';bonusCol='#ffe040';}
+
     // 5%の確率でロック中特殊ブロックを解放候補に
     const availLocked=lockedPool.filter(d=>!usedIds.has(d.id));
     if(availLocked.length>0&&Math.random()<0.05){
       const chosen=availLocked[Math.floor(Math.random()*availLocked.length)];
-      choices.push(chosen.id);
+      choices.push({defId:chosen.id,bonusLvs,bonusText,bonusCol});
       usedIds.add(chosen.id);
       usedShapes.add(PIECE_SHAPE[chosen.id]);
       continue;
@@ -893,7 +898,7 @@ function startReward(){
     if(!pool.length) pool=PIECE_DEFS.filter(d=>!d.locked&&!usedIds.has(d.id)&&!usedShapes.has(PIECE_SHAPE[d.id]));
     if(!pool.length) break;
     const chosen=pool[Math.floor(Math.random()*pool.length)];
-    choices.push(chosen.id);
+    choices.push({defId:chosen.id,bonusLvs,bonusText,bonusCol});
     usedIds.add(chosen.id);
     usedShapes.add(PIECE_SHAPE[chosen.id]);
   }
@@ -919,28 +924,44 @@ function drawStageClear(){
   const csx=W/2-totalW/2, csy=py+178;
 
   for(let i=0;i<3;i++){
-    const defId=G.rewardChoices[i];
+    const {defId,bonusLvs,bonusText,bonusCol}=G.rewardChoices[i];
     const def=PIECE_DEFS[defId];
     const lv=G.pieceLevels[defId];
     const isLocked=def.locked&&!G.unlockedSpecial.has(defId);
     const catCol=isLocked?'#ffe040':(CAT_COL[(def.cat-1)]||'#3a8aaa');
+    const borderCol=bonusText?bonusCol:catCol;
     const cx=csx+i*(cw+gap), cy=csy;
 
-    rr(cx,cy,cw,ch,14,'#040f24',catCol,2.5);
+    // カード本体 (ボーナスはグロー付きボーダー)
+    ctx.save();
+    if(bonusText){ctx.shadowColor=bonusCol;ctx.shadowBlur=bonusLvs===3?24:16;}
+    rr(cx,cy,cw,ch,14,'#040f24',borderCol,bonusText?3.5:2.5);
+    ctx.shadowBlur=0;ctx.restore();
+
+    // Lv表示
     if(isLocked){
-      // 初回解放カード: 「NEW!」バッジ + Lv.1表示
       tx('NEW!', cx+cw/2, cy+16, 18, '#ffe040','center',true);
-      tx('Lv.1', cx+cw/2, cy+40, 24, lvColor(1),'center',true);
+      tx('Lv.'+(bonusLvs), cx+cw/2, cy+40, 24, lvColor(bonusLvs),'center',true);
+    } else if(bonusLvs>1){
+      // ボーナスカード: Lv.N → Lv.N+bonusLvs を正確に表示
+      const sz2=21, tcy=cy+30;
+      const s1='Lv.'+lv, sa='  ➡  ', s2='Lv.'+(lv+bonusLvs);
+      ctx.font=`800 ${sz2}px 'Nunito','M PLUS Rounded 1c',sans-serif`;
+      const w1=ctx.measureText(s1).width,wa=ctx.measureText(sa).width,w2=ctx.measureText(s2).width;
+      const sx=(cx+cw/2)-(w1+wa+w2)/2;
+      ctx.textBaseline='middle';ctx.textAlign='left';
+      ctx.fillStyle=lvColor(lv);ctx.fillText(s1,sx,tcy);
+      ctx.fillStyle='#aabbcc';ctx.fillText(sa,sx+w1,tcy);
+      ctx.fillStyle=lvColor(lv+bonusLvs);ctx.fillText(s2,sx+w1+wa,tcy);
     } else {
-      // 通常LvUp: Lv遷移表示
       txLvArr(lv, cx+cw/2, cy+30, 21);
     }
 
-    // ピース描画
+    // ピース描画 (ボーナスカードは下部にバッジを入れるため描画高を削減)
     const p0={defId,rot:0,flipped:false};
     const els=getPEls(p0);
     const rows=Math.max(...els.map(e=>e.r))+1, cols=Math.max(...els.map(e=>e.c))+1;
-    const drawH=ch-98;
+    const drawH=bonusText?ch-118:ch-98;
     const sz=Math.min((cw-28)/cols,drawH/rows,72);
     const ox=cx+(cw-cols*sz)/2, oy=cy+56+(drawH-rows*sz)/2;
     for(const {r,c,t} of els){
@@ -950,34 +971,33 @@ function drawStageClear(){
       ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+sz,y+sz);ctx.stroke();
       ctx.beginPath();ctx.moveTo(x+sz,y);ctx.lineTo(x,y+sz);ctx.stroke();
     }
+
+    // ボーナスバッジ (ボーナスカードのみ)
+    if(bonusText){
+      const bby=cy+ch-64, bbh=22;
+      ctx.save();
+      ctx.beginPath();ctx.roundRect(cx+8,bby,cw-16,bbh,8);ctx.clip();
+      ctx.fillStyle=bonusLvs===3?'rgba(200,64,255,0.25)':'rgba(255,224,64,0.22)';
+      ctx.fillRect(cx+8,bby,cw-16,bbh);
+      ctx.restore();
+      rr(cx+8,bby,cw-16,bbh,8,null,bonusCol,1.5);
+      ctx.save();
+      ctx.shadowColor=bonusCol;ctx.shadowBlur=10;
+      const stars=bonusLvs===3?'✦✦ ':'✦ ';
+      tx(stars+bonusText+'  +'+bonusLvs+'Lv', cx+cw/2, bby+bbh/2, 15, bonusCol,'center',true);
+      ctx.shadowBlur=0;ctx.restore();
+    }
+
     // pt表示
+    const ptY=cy+ch-22;
     if(isLocked){
-      tx(def.pts+'pt', cx+cw/2, cy+ch-22, 20, '#ffe040','center',true);
+      tx(def.pts+'pt', cx+cw/2, ptY, 18, '#ffe040','center',true);
     } else {
       const curPts=getPts(defId);
-      const nextPts=def.pts+(def.pts>>1)*lv;
-      tx(curPts+'pt  ➡  '+nextPts+'pt', cx+cw/2, cy+ch-22, 20, catCol,'center',true);
+      const nextPts=def.pts+(def.pts>>1)*(lv+bonusLvs-1);
+      tx(curPts+'pt  ➡  '+nextPts+'pt', cx+cw/2, ptY, bonusText?16:20, catCol,'center',true);
     }
     BR['rw'+i]={x:cx,y:cy,w:cw,h:ch};
-  }
-
-  // ── ボーナスLvUp演出 (カード選択後の2タップ目を待つ) ──
-  if(G.rewardBonus){
-    const {idx,text,col}=G.rewardBonus;
-    const bcx=csx+idx*(cw+gap);
-    // 選択カードにオーバーレイ
-    ctx.save();
-    ctx.beginPath();ctx.roundRect(bcx,csy,cw,ch,14);ctx.clip();
-    ctx.fillStyle='rgba(0,0,0,0.60)';ctx.fillRect(bcx,csy,cw,ch);
-    ctx.restore();
-    rr(bcx,csy,cw,ch,14,null,col,3);
-    // ボーナステキスト (グロー付き)
-    ctx.save();
-    ctx.shadowColor=col; ctx.shadowBlur=24;
-    tx(text, bcx+cw/2, csy+ch/2-14, 48, col,'center',true);
-    ctx.shadowBlur=0; ctx.restore();
-    // タップ促進
-    tx('タップして　つぎへ', W/2, py+ph-30, 15, '#aaccee','center',false);
   }
 }
 function drawHowToScreen(){
@@ -1187,36 +1207,19 @@ cvs.addEventListener('pointerdown',e=>{
   if(howTo){if(hit(BR.htclose,mx,my)) howTo=false; return;}
   // Stage clear overlay — 3択カードを直接タップで選択
   if(G.phase==='stage_clear'){
-    // ボーナス演出中: どこかタップで次ステージへ
-    if(G.rewardBonus){
-      G.pendingRewardId=G.rewardBonus.defId;
-      G.rewardBonus=null;
-      nextStage();
-      return;
-    }
     for(let i=0;i<3;i++){
       if(hit(BR['rw'+i],mx,my)){
-        const defId=G.rewardChoices[i];
+        const {defId,bonusLvs}=G.rewardChoices[i];
         const def=PIECE_DEFS[defId];
-        // ボーナス抽選 (1%=GREAT!! +3Lv, 5%=GOOD!! +2Lv, 94%=+1Lv)
-        const r=Math.random();
-        let bonusLvs=1, bonusText=null, bonusCol=null;
-        if(r<0.01){bonusLvs=3;bonusText='GREAT!!';bonusCol='#c840ff';}
-        else if(r<0.06){bonusLvs=2;bonusText='GOOD!!';bonusCol='#ffe040';}
-        // レベル適用
+        // ボーナスLvはカード生成時に確定済み — そのまま適用
         if(def.locked&&!G.unlockedSpecial.has(defId)){
           G.unlockedSpecial.add(defId);
-          G.pieceLevels[defId]=bonusLvs;        // 初回解放時はボーナスLvから開始
+          G.pieceLevels[defId]=bonusLvs;
         } else {
           G.pieceLevels[defId]+=bonusLvs;
         }
-        if(bonusText){
-          // ボーナス演出: 2タップ目を待つ
-          G.rewardBonus={idx:i,text:bonusText,col:bonusCol,defId};
-        } else {
-          G.pendingRewardId=defId;
-          nextStage();
-        }
+        G.pendingRewardId=defId;
+        nextStage();
         return;
       }
     }
