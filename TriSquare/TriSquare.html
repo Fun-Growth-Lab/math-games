@@ -201,7 +201,7 @@ const C_DIAG='rgba(56,178,248,0.06)';
 const C_OK  ='rgba(63,214,138,0.36)';
 const C_BAD ='rgba(220,60,60,0.30)';
 // 分類ごとの色 (cat1〜9)
-const CAT_COL=['#f87838','#38b2f8','#f8d830','#c038f8','#38d880','#f83870','#30d8f0','#90d840','#e06030'];
+const CAT_COL=['#f87838','#38b2f8','#f8d830','#c038f8','#38d880','#f83870','#30d8f0','#90d840','#e06030','#ff69ff'];
 // Lvカラー (Lv1=灰青, Lv2〜10=各色, Lv11+はLv10と同色)
 const LV_COL=['#8899cc','#3fd68a','#38b2f8','#ffe040','#ff8020','#ff4060','#ff40c0','#c840ff','#40ffe0','#ffa030'];
 const lvColor=lv=>LV_COL[Math.min(lv-1,LV_COL.length-1)];
@@ -254,13 +254,24 @@ const PIECE_DEFS=[
   {id:18, cat:9, pts:180, els:[...sq(0,0),...sq(0,1),...sq(1,0)]},              // L字
   {id:19, cat:9, pts:180, els:[...sq(0,0),...sq(0,1),...sq(1,1)]},              // J字
   {id:20, cat:9, pts:180, els:[...sq(0,0),...sq(1,0),...sq(1,1)]},              // L字縦
+  // ── 特殊ブロック (cat10, locked:true) ── 最初はロック、報酬で解放
+  {id:21, cat:10, pts:300, locked:true, els:[...sq(0,0),...sq(0,1),...sq(1,0),...sq(1,1)]},  // 2×2正方形
+  {id:22, cat:10, pts:320, locked:true, els:[...sq(0,0),...sq(1,0),...sq(2,0),...sq(2,1)]},  // L字テトロミノ
+  {id:23, cat:10, pts:340, locked:true, els:[...sq(0,0),...sq(0,1),...sq(0,2),...sq(1,1)]},  // T字テトロミノ
+  {id:24, cat:10, pts:360, locked:true, els:[...sq(0,1),...sq(0,2),...sq(1,0),...sq(1,1)]},  // S字テトロミノ
+  {id:25, cat:10, pts:400, locked:true, els:[...sq(0,0),...sq(0,1),...sq(0,2),...sq(0,3)]},  // I字テトロミノ
+  {id:26, cat:10, pts:310, locked:true, els:[...tr(0,0,1),...tr(0,1,3),...tr(1,0,2),...tr(1,1,0)]}, // ひし形◇
+  {id:27, cat:10, pts:330, locked:true, els:[...tr(0,0,1),...sq(0,1),...sq(1,0),...tr(1,1,0)]},     // Z矢印
+  {id:28, cat:10, pts:350, locked:true, els:[...tr(0,0,1),...tr(0,1,0),...sq(1,0),...sq(1,1)]},     // 家形
+  {id:29, cat:10, pts:370, locked:true, els:[...sq(0,1),...tr(1,0,1),...sq(1,1),...tr(1,2,3)]},     // ロケット
+  {id:30, cat:10, pts:380, locked:true, els:[...tr(0,0,1),...tr(0,1,0),...tr(1,0,2),...tr(1,1,3)]}, // 翼形
 ];
 
 // Lvを考慮した実効得点 (線形加算: Lv1=base, Lv2=base×1.5, Lv3=base×2.0 ...)
 function getPts(defId){
   const base=PIECE_DEFS[defId].pts;
   const lv=G.pieceLevels[defId];
-  return base + (base>>1)*(lv-1);  // base/2 は常に整数(全ptsが偶数のため)
+  return base + (base>>1)*(Math.max(1,lv)-1);  // lv=0(ロック)はLv.1相当で表示
 }
 // 形状正規化: 全8方向(4回転×2反転)の中で辞書順最小のキーを正規形とする
 // これにより「同じ形の回転・反転版」を同一扱いできる
@@ -277,11 +288,17 @@ function pieceShape(defId){
 }
 // ※ PIECE_SHAPE の計算は TRANSFORMS セクション後(getPEls 直後)で行う
 
-// 分類別確率テーブル (cat1〜9, 合計=100%)
+// 分類別確率テーブル (cat1〜9, 合計=100%) — mkPiece(手札)用
 const DIFF_PROB={
   easy:  [20,15,15,15,15, 5, 5, 5, 5],
   normal:[20,12,12,12,12, 8, 8, 8, 8],
   hard:  [20,10,10,10,10,10,10,10,10],
+};
+// 報酬選択用の分類重みテーブル (cat1〜9, cat10は解放済み特殊ブロックがいれば+5)
+const REWARD_WEIGHTS={
+  easy:  {1:20,2:15,3:15,4:15,5:15,6:5,7:5,8:5,9:5},
+  normal:{1:20,2:12,3:12,4:12,5:12,6:8,7:8,8:8,9:8},
+  hard:  {1:20,2:10,3:10,4:10,5:10,6:10,7:10,8:10,9:10},
 };
 
 // ============================================================
@@ -349,9 +366,10 @@ let G={
   phase:'title',
   playerName:'ゲスト',
   flash:[],
-  pieceLevels:new Array(21).fill(1),  // 各ブロックのLv (ラン持続)
+  pieceLevels:[...new Array(21).fill(1),...new Array(10).fill(0)], // Lv(通常=1〜, 特殊=0=ロック)
   pendingRewardId:-1,                  // 報酬で選んだブロックのdefId (-1=なし)
   rewardChoices:[],                    // 報酬選択肢3つのdefId
+  unlockedSpecial:new Set(),           // 解放済み特殊ブロックのidセット
 };
 
 // ============================================================
@@ -735,18 +753,50 @@ function drawGameOver(){
     BR[key]={x,y,w,h};
   });
 }
+// 分類重みによるルーレット抽選
+function rollWeightedCat(weights){
+  const total=Object.values(weights).reduce((a,b)=>a+b,0);
+  let r=Math.random()*total;
+  for(const [cat,w] of Object.entries(weights)){r-=w;if(r<=0)return +cat;}
+  return +Object.keys(weights).at(-1);
+}
 function startReward(){
-  // シャッフル後、同じ形(回転・反転を含む)は除外して3種選ぶ
-  const pool=Array.from({length:PIECE_DEFS.length},(_,i)=>i);
-  for(let i=pool.length-1;i>0;i--){
-    const j=Math.floor(Math.random()*(i+1));
-    [pool[i],pool[j]]=[pool[j],pool[i]];
-  }
-  const choices=[], usedShapes=new Set();
-  for(const defId of pool){
-    if(choices.length>=3) break;
-    const shape=PIECE_SHAPE[defId];
-    if(!usedShapes.has(shape)){ usedShapes.add(shape); choices.push(defId); }
+  const choices=[], usedIds=new Set(), usedShapes=new Set();
+
+  // ロック中の特殊ブロック一覧
+  const lockedPool=PIECE_DEFS.filter(d=>d.locked&&!G.unlockedSpecial.has(d.id));
+  // 解放済み特殊ブロック一覧
+  const unlockedSpecials=PIECE_DEFS.filter(d=>d.locked&&G.unlockedSpecial.has(d.id));
+
+  // 報酬用重みテーブル (cat10があれば追加)
+  const weights=Object.assign({},REWARD_WEIGHTS[G.difficulty]||REWARD_WEIGHTS.normal);
+  if(unlockedSpecials.length>0) weights[10]=5;
+
+  for(let slot=0;slot<3;slot++){
+    // 5%の確率でロック中特殊ブロックを解放候補に
+    const availLocked=lockedPool.filter(d=>!usedIds.has(d.id));
+    if(availLocked.length>0&&Math.random()<0.05){
+      const chosen=availLocked[Math.floor(Math.random()*availLocked.length)];
+      choices.push(chosen.id);
+      usedIds.add(chosen.id);
+      usedShapes.add(PIECE_SHAPE[chosen.id]);
+      continue;
+    }
+    // 分類重みで抽選 → その分類からランダム選択
+    const cat=rollWeightedCat(weights);
+    let pool;
+    if(cat===10){
+      pool=unlockedSpecials.filter(d=>!usedIds.has(d.id)&&!usedShapes.has(PIECE_SHAPE[d.id]));
+    } else {
+      pool=PIECE_DEFS.filter(d=>!d.locked&&d.cat===cat&&!usedIds.has(d.id)&&!usedShapes.has(PIECE_SHAPE[d.id]));
+    }
+    // 同形なしで選べなければ全通常ピースからfallback
+    if(!pool.length) pool=PIECE_DEFS.filter(d=>!d.locked&&!usedIds.has(d.id)&&!usedShapes.has(PIECE_SHAPE[d.id]));
+    if(!pool.length) break;
+    const chosen=pool[Math.floor(Math.random()*pool.length)];
+    choices.push(chosen.id);
+    usedIds.add(chosen.id);
+    usedShapes.add(PIECE_SHAPE[chosen.id]);
   }
   G.rewardChoices=choices;
 }
@@ -773,14 +823,19 @@ function drawStageClear(){
     const defId=G.rewardChoices[i];
     const def=PIECE_DEFS[defId];
     const lv=G.pieceLevels[defId];
-    const curPts=getPts(defId);
-    const nextPts=def.pts+(def.pts>>1)*lv;
-    const catCol=CAT_COL[(def.cat-1)]||'#3a8aaa';
+    const isLocked=def.locked&&!G.unlockedSpecial.has(defId);
+    const catCol=isLocked?'#ffe040':(CAT_COL[(def.cat-1)]||'#3a8aaa');
     const cx=csx+i*(cw+gap), cy=csy;
 
     rr(cx,cy,cw,ch,14,'#040f24',catCol,2.5);
-    // Lv遷移 (大きく・各Lv色付き)
-    txLvArr(lv, cx+cw/2, cy+30, 21);
+    if(isLocked){
+      // 初回解放カード: 「NEW!」バッジ + 解放テキスト
+      tx('NEW!', cx+cw/2, cy+22, 20, '#ffe040','center',true);
+      tx('はじめて かいほう！', cx+cw/2, cy+44, 13, '#ffd080','center',false);
+    } else {
+      // 通常LvUp: Lv遷移表示
+      txLvArr(lv, cx+cw/2, cy+30, 21);
+    }
 
     // ピース描画
     const p0={defId,rot:0,flipped:false};
@@ -796,8 +851,14 @@ function drawStageClear(){
       ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+sz,y+sz);ctx.stroke();
       ctx.beginPath();ctx.moveTo(x+sz,y);ctx.lineTo(x,y+sz);ctx.stroke();
     }
-    // pt遷移 (大きく)
-    tx(curPts+'pt  ➡  '+nextPts+'pt', cx+cw/2, cy+ch-22, 20, catCol,'center',true);
+    // pt表示
+    if(isLocked){
+      tx(def.pts+'pt', cx+cw/2, cy+ch-22, 20, '#ffe040','center',true);
+    } else {
+      const curPts=getPts(defId);
+      const nextPts=def.pts+(def.pts>>1)*lv;
+      tx(curPts+'pt  ➡  '+nextPts+'pt', cx+cw/2, cy+ch-22, 20, catCol,'center',true);
+    }
     BR['rw'+i]={x:cx,y:cy,w:cw,h:ch};
   }
 }
@@ -813,7 +874,7 @@ function drawHowToScreen(){
     '④ 5ターン おくと 🗑️ が ひかる → てふだを すてられる',
     '   すてたら また 5ターン おかないと すてられない',
     '⑤ ３枚が どこにも おけず すてられないと ゲームおわり',
-    '⑥ スコア＝ブロック得点合計 × 面積占有率',
+    '⑥ スコア＝おいた ブロックの とくてんの ごうけい',
     '   ブロック得点 ＝ 基礎点 × MP（ボーナス倍率）',
   ];
   lines.forEach((l,i)=>tx(l,W/2-320,H/2-210+i*52,14,i%2===0?'#cce8ff':'#7aaec8','left'));
@@ -898,7 +959,8 @@ function _initGrid(){
 }
 function startGame(){
   G.stage=1; G.prevStagesTotal=0;
-  G.pieceLevels=new Array(PIECE_DEFS.length).fill(1);
+  G.pieceLevels=[...new Array(21).fill(1),...new Array(10).fill(0)];
+  G.unlockedSpecial=new Set();
   G.pendingRewardId=-1;
   _initGrid();
   document.getElementById('title-screen').classList.add('hidden');
@@ -1009,8 +1071,17 @@ cvs.addEventListener('pointerdown',e=>{
   if(G.phase==='stage_clear'){
     for(let i=0;i<3;i++){
       if(hit(BR['rw'+i],mx,my)){
-        G.pieceLevels[G.rewardChoices[i]]++;
-        G.pendingRewardId=G.rewardChoices[i];
+        const defId=G.rewardChoices[i];
+        const def=PIECE_DEFS[defId];
+        if(def.locked&&!G.unlockedSpecial.has(defId)){
+          // 初回解放: Lv.0 → Lv.1
+          G.unlockedSpecial.add(defId);
+          G.pieceLevels[defId]=1;
+        } else {
+          // 通常LvUp
+          G.pieceLevels[defId]++;
+        }
+        G.pendingRewardId=defId;
         nextStage();
         return;
       }
