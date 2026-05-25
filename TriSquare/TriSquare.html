@@ -370,6 +370,7 @@ let G={
   pendingRewardId:-1,                  // 報酬で選んだブロックのdefId (-1=なし)
   rewardChoices:[],                    // 報酬選択肢3つのdefId
   unlockedSpecial:new Set(),           // 解放済み特殊ブロックのidセット
+  rewardBonus:null,                    // {idx,text,col,defId} ボーナスLvUp表示用
 };
 
 // ============================================================
@@ -768,9 +769,8 @@ function startReward(){
   // 解放済み特殊ブロック一覧
   const unlockedSpecials=PIECE_DEFS.filter(d=>d.locked&&G.unlockedSpecial.has(d.id));
 
-  // 報酬用重みテーブル (cat10があれば追加)
+  // 報酬用重みテーブル (cat1〜9のみ; 解放済み特殊はcat9プールに合流)
   const weights=Object.assign({},REWARD_WEIGHTS[G.difficulty]||REWARD_WEIGHTS.normal);
-  if(unlockedSpecials.length>0) weights[10]=5;
 
   for(let slot=0;slot<3;slot++){
     // 5%の確率でロック中特殊ブロックを解放候補に
@@ -785,8 +785,12 @@ function startReward(){
     // 分類重みで抽選 → その分類からランダム選択
     const cat=rollWeightedCat(weights);
     let pool;
-    if(cat===10){
-      pool=unlockedSpecials.filter(d=>!usedIds.has(d.id)&&!usedShapes.has(PIECE_SHAPE[d.id]));
+    if(cat===9){
+      // cat9: 通常cat9ピース + 解放済み特殊ブロックを合流
+      pool=[
+        ...PIECE_DEFS.filter(d=>!d.locked&&d.cat===9&&!usedIds.has(d.id)&&!usedShapes.has(PIECE_SHAPE[d.id])),
+        ...unlockedSpecials.filter(d=>!usedIds.has(d.id)&&!usedShapes.has(PIECE_SHAPE[d.id])),
+      ];
     } else {
       pool=PIECE_DEFS.filter(d=>!d.locked&&d.cat===cat&&!usedIds.has(d.id)&&!usedShapes.has(PIECE_SHAPE[d.id]));
     }
@@ -860,6 +864,25 @@ function drawStageClear(){
       tx(curPts+'pt  ➡  '+nextPts+'pt', cx+cw/2, cy+ch-22, 20, catCol,'center',true);
     }
     BR['rw'+i]={x:cx,y:cy,w:cw,h:ch};
+  }
+
+  // ── ボーナスLvUp演出 (カード選択後の2タップ目を待つ) ──
+  if(G.rewardBonus){
+    const {idx,text,col}=G.rewardBonus;
+    const bcx=csx+idx*(cw+gap);
+    // 選択カードにオーバーレイ
+    ctx.save();
+    ctx.beginPath();ctx.roundRect(bcx,csy,cw,ch,14);ctx.clip();
+    ctx.fillStyle='rgba(0,0,0,0.60)';ctx.fillRect(bcx,csy,cw,ch);
+    ctx.restore();
+    rr(bcx,csy,cw,ch,14,null,col,3);
+    // ボーナステキスト (グロー付き)
+    ctx.save();
+    ctx.shadowColor=col; ctx.shadowBlur=24;
+    tx(text, bcx+cw/2, csy+ch/2-14, 48, col,'center',true);
+    ctx.shadowBlur=0; ctx.restore();
+    // タップ促進
+    tx('タップして　つぎへ', W/2, py+ph-30, 15, '#aaccee','center',false);
   }
 }
 function drawHowToScreen(){
@@ -1069,20 +1092,36 @@ cvs.addEventListener('pointerdown',e=>{
   if(howTo){if(hit(BR.htclose,mx,my)) howTo=false; return;}
   // Stage clear overlay — 3択カードを直接タップで選択
   if(G.phase==='stage_clear'){
+    // ボーナス演出中: どこかタップで次ステージへ
+    if(G.rewardBonus){
+      G.pendingRewardId=G.rewardBonus.defId;
+      G.rewardBonus=null;
+      nextStage();
+      return;
+    }
     for(let i=0;i<3;i++){
       if(hit(BR['rw'+i],mx,my)){
         const defId=G.rewardChoices[i];
         const def=PIECE_DEFS[defId];
+        // ボーナス抽選 (1%=GREAT!! +3Lv, 5%=GOOD!! +2Lv, 94%=+1Lv)
+        const r=Math.random();
+        let bonusLvs=1, bonusText=null, bonusCol=null;
+        if(r<0.01){bonusLvs=3;bonusText='GREAT!!';bonusCol='#c840ff';}
+        else if(r<0.06){bonusLvs=2;bonusText='GOOD!!';bonusCol='#ffe040';}
+        // レベル適用
         if(def.locked&&!G.unlockedSpecial.has(defId)){
-          // 初回解放: Lv.0 → Lv.1
           G.unlockedSpecial.add(defId);
-          G.pieceLevels[defId]=1;
+          G.pieceLevels[defId]=bonusLvs;        // 初回解放時はボーナスLvから開始
         } else {
-          // 通常LvUp
-          G.pieceLevels[defId]++;
+          G.pieceLevels[defId]+=bonusLvs;
         }
-        G.pendingRewardId=defId;
-        nextStage();
+        if(bonusText){
+          // ボーナス演出: 2タップ目を待つ
+          G.rewardBonus={idx:i,text:bonusText,col:bonusCol,defId};
+        } else {
+          G.pendingRewardId=defId;
+          nextStage();
+        }
         return;
       }
     }
