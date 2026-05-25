@@ -107,6 +107,23 @@ canvas{position:absolute;top:0;left:0;touch-action:none;}
 .player-item.selected{border-color:var(--green);background:#0a2a1a;}
 .player-name{font-size:1.15rem;font-weight:800;flex:1;text-align:left;color:var(--text-hi);}
 .delete-btn{background:#7a1a1a;color:#fff;border:none;width:30px;height:30px;border-radius:50%;cursor:pointer;font-weight:bold;line-height:30px;padding:0;font-size:1rem;}
+/* RANKING */
+.rank-box{background:#051528;padding:24px 28px;border-radius:24px;width:90%;max-width:760px;max-height:78vh;overflow-y:auto;border:2px solid var(--bdr);box-shadow:0 10px 40px rgba(0,0,0,0.5);display:flex;flex-direction:column;}
+.rank-title{font-size:1.4rem;color:var(--accent);margin-bottom:14px;text-align:center;border-bottom:2px dotted var(--bdr-dim);padding-bottom:10px;font-weight:800;}
+.rank-toggle{display:flex;gap:8px;justify-content:center;margin-bottom:10px;}
+.rank-toggle-btn{padding:6px 20px;border-radius:50px;border:2px solid var(--bdr);background:rgba(0,0,0,0.3);color:var(--text-dim);font-size:0.95rem;font-weight:800;cursor:pointer;font-family:inherit;transition:all 0.15s;}
+.rank-toggle-btn.active{background:var(--accent);color:#001020;border-color:#80d8ff;}
+.rank-list{list-style:none;margin:0 0 14px;padding:0;}
+.rank-list li{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid rgba(56,178,248,0.12);color:var(--text-main);font-size:0.98rem;}
+.rank-list li:first-child{border-top:1px solid rgba(56,178,248,0.12);}
+.rank-num{color:var(--text-dim);font-weight:800;width:28px;flex-shrink:0;font-size:0.88rem;}
+.rank-num.top3{color:#ffe040;font-size:1.05rem;}
+.rank-pname{flex:1;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rank-pname.me{color:var(--accent);}
+.rank-score{font-weight:800;font-size:1.05rem;color:#ffe040;white-space:nowrap;}
+.rank-sub{color:var(--text-dim);font-size:0.82rem;white-space:nowrap;}
+.rank-date{color:var(--text-dim);font-size:0.78rem;white-space:nowrap;}
+.rank-empty{text-align:center;color:var(--text-dim);padding:20px 0;font-size:0.92rem;width:100%;}
 </style>
 </head>
 <body>
@@ -127,7 +144,7 @@ canvas{position:absolute;top:0;left:0;touch-action:none;}
           <span id="current-player-name-display">ゲスト</span>
           <span style="font-size:0.8rem;opacity:0.7;">(へんこう)</span>
         </button>
-        <button id="btn-view-ranking" class="btn" style="background:linear-gradient(to bottom,#4a1a60,#28103a);border-color:#7a3aaa;">🏆 ランキング（準備中）</button>
+        <button id="btn-view-ranking" class="btn" style="background:linear-gradient(to bottom,#4a1a60,#28103a);border-color:#7a3aaa;">🏆 ランキング</button>
         <button class="btn btn-gray" onclick="location.href='../index.html'">🏠 INDEXへ</button>
       </div>
       <div id="difficulty-menu" class="hidden" style="display:flex;flex-direction:column;align-items:center;">
@@ -164,19 +181,96 @@ canvas{position:absolute;top:0;left:0;touch-action:none;}
     </div>
   </div>
 
-  <!-- RANKING (coming soon) -->
+  <!-- RANKING -->
   <div id="ranking-screen" class="ts-modal-bg hidden">
-    <div class="ts-modal-box" style="text-align:center;">
-      <h2>🏆 ランキング</h2>
-      <p style="font-size:3rem;margin:24px 0 16px;">🚧</p>
-      <p style="font-size:1.1rem;color:var(--text-main);">ランキング機能は近日公開予定です。</p>
-      <p style="margin-top:8px;font-size:0.9rem;color:var(--text-dim);">Coming Soon...</p>
-      <div style="margin-top:24px;">
+    <div class="rank-box">
+      <div class="rank-title">🏆 ランキング</div>
+      <div class="rank-toggle" style="margin-bottom:8px;">
+        <button id="btn-rank-diff-easy"   class="rank-toggle-btn" onclick="switchRankDiff('easy')">やさしい</button>
+        <button id="btn-rank-diff-normal" class="rank-toggle-btn active" onclick="switchRankDiff('normal')">ふつう</button>
+        <button id="btn-rank-diff-hard"   class="rank-toggle-btn" onclick="switchRankDiff('hard')">むずかしい</button>
+      </div>
+      <div class="rank-toggle">
+        <button id="btn-rank-local" class="rank-toggle-btn active" onclick="switchRankTab('local')">ローカル</button>
+        <button id="btn-rank-world" class="rank-toggle-btn"        onclick="switchRankTab('world')">ワールド</button>
+      </div>
+      <div id="rank-loading" style="text-align:center;color:var(--text-dim);padding:14px 0;display:none;">読み込み中…</div>
+      <ul id="rank-list" class="rank-list"></ul>
+      <div style="text-align:center;">
         <button id="btn-close-ranking" class="btn btn-gray" style="width:160px;">とじる</button>
       </div>
     </div>
   </div>
+
+  <!-- GAME OVER NAME INPUT (for guest players) -->
+  <div id="gameover-name-input" class="ts-modal-bg hidden" style="z-index:25;">
+    <div class="ts-modal-box" style="text-align:center;max-width:460px;">
+      <h2>🏆 スコアを登録する</h2>
+      <p style="font-size:0.88rem;color:var(--text-dim);margin-bottom:16px;">なまえをにゅうりょくしてください（12もじまで）</p>
+      <div style="display:flex;gap:10px;justify-content:center;margin-bottom:14px;">
+        <input type="text" id="gameover-name-field" class="input-name" placeholder="なまえ" maxlength="12" style="width:220px;">
+        <button id="gameover-name-submit" class="btn btn-green" style="width:auto;padding:10px 16px;">OK</button>
+      </div>
+      <button id="gameover-name-skip" class="btn btn-gray" style="width:160px;font-size:0.9rem;">スキップ</button>
+    </div>
+  </div>
 </div>
+
+<!-- Supabase (direct REST fetch — no library dependency) -->
+<script>
+(function(){
+  const _base = 'https://rpxassndgiunoqkxqcco.supabase.co/rest/v1';
+  const _key  = 'sb_publishable_Wnge6OPvSf5l2YEgaPg4rw_nj4CyYAH';
+  const _hdr  = { 'apikey': _key, 'Authorization': 'Bearer ' + _key,
+                  'Content-Type': 'application/json', 'Prefer': 'return=minimal' };
+
+  window.tsSaveOnlineScore = async (name, pointScore, stageScore, difficulty) => {
+    if ((pointScore||0) <= 0) return;
+    const res = await fetch(`${_base}/rankings`, {
+      method: 'POST',
+      headers: _hdr,
+      body: JSON.stringify({
+        game:        'trisquare',
+        difficulty:  difficulty  || 'normal',
+        player_name: name        || 'ゲスト',
+        point_score: pointScore  || 0,
+        stage_score: stageScore  || 0,
+        turns:       0,
+        class_name:  ''
+      })
+    });
+    if (!res.ok) { const t=await res.text(); throw new Error(`HTTP ${res.status}: ${t}`); }
+    console.log('Ranking: 登録成功', { name, pointScore });
+  };
+
+  window.tsLoadWorldRanking = async (difficulty) => {
+    try {
+      const q = new URLSearchParams({
+        select:      'player_name,point_score,stage_score,created_at',
+        game:        'eq.trisquare',
+        difficulty:  `eq.${difficulty || 'normal'}`,
+        point_score: 'gt.0',
+        order:       'point_score.desc,stage_score.desc',
+        limit:       '10'
+      });
+      const res = await fetch(`${_base}/rankings?${q}`, {
+        headers: { 'apikey': _key, 'Authorization': 'Bearer ' + _key }
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      return data.map(r => ({
+        name:   r.player_name,
+        score:  r.point_score,
+        stages: r.stage_score,
+        date:   r.created_at ? new Date(r.created_at).toLocaleDateString('ja-JP') : ''
+      }));
+    } catch(e) {
+      console.error('tsLoadWorldRanking error:', e);
+      return null;
+    }
+  };
+})();
+</script>
 
 <script>
 'use strict';
@@ -424,6 +518,7 @@ function checkGameOver(){
   if(G.hand.some((p,i)=>p&&G.placedSinceDiscard[i]>=5)) return;  // いずれかが捨てられる → まだゲームオーバーでない
   if(G.hand.some(p=>p&&anyValid(p))) return;
   G.phase='game_over';
+  onGameOver();
 }
 
 // ============================================================
@@ -1198,9 +1293,117 @@ function showTitle(){
   document.getElementById('title-screen').classList.remove('hidden');
   document.getElementById('title-main-menu').style.display='flex';
   document.getElementById('difficulty-menu').classList.add('hidden');
+  document.getElementById('gameover-name-input').classList.add('hidden');
   updPlayer();
 }
-function showRanking(){document.getElementById('ranking-screen').classList.remove('hidden');}
+// ============================================================
+//  RANKING
+// ============================================================
+const RANK_KEYS={easy:'trisquare_ranking_easy',normal:'trisquare_ranking_normal',hard:'trisquare_ranking_hard'};
+let rankTab='local', rankDiff='normal';
+
+function getLocalRanking(diff){
+  const key=RANK_KEYS[diff]||RANK_KEYS.normal;
+  try{return JSON.parse(localStorage.getItem(key)||'[]');}catch{return [];}
+}
+function saveLocalScore(name,totalScore,stages,diff){
+  const key=RANK_KEYS[diff]||RANK_KEYS.normal;
+  let r=getLocalRanking(diff);
+  const dateStr=new Date().toLocaleDateString('ja-JP');
+  r.push({name,score:totalScore,stages,date:dateStr});
+  r.sort((a,b)=>b.score-a.score);
+  r=r.slice(0,10);
+  localStorage.setItem(key,JSON.stringify(r));
+}
+function renderRankList(rows,myName){
+  const ul=document.getElementById('rank-list');
+  ul.innerHTML='';
+  if(!rows||rows.length===0){
+    ul.innerHTML='<li><span class="rank-empty">データがありません</span></li>';
+    return;
+  }
+  rows.forEach((r,i)=>{
+    const li=document.createElement('li');
+    const isMe=myName&&myName!=='ゲスト'&&r.name===myName;
+    const medals=['🥇','🥈','🥉'];
+    const numTxt=i<3?medals[i]:`${i+1}.`;
+    const numCls=i<3?'rank-num top3':'rank-num';
+    const nameCls=isMe?'rank-pname me':'rank-pname';
+    const stages=r.stages!=null?r.stages:(r.stage_score||0);
+    li.innerHTML=`<span class="${numCls}">${numTxt}</span>
+                  <span class="${nameCls}">${r.name||'ゲスト'}</span>
+                  <span class="rank-sub">STAGE ${stages}</span>
+                  <span class="rank-score">${(r.score||0).toLocaleString()}pt</span>
+                  ${r.date?`<span class="rank-date">${r.date}</span>`:''}`;
+    ul.appendChild(li);
+  });
+}
+function switchRankTab(tab){
+  rankTab=tab;
+  document.getElementById('btn-rank-local').classList.toggle('active',tab==='local');
+  document.getElementById('btn-rank-world').classList.toggle('active',tab==='world');
+  loadAndRender();
+}
+function switchRankDiff(diff){
+  rankDiff=diff;
+  ['easy','normal','hard'].forEach(d=>{
+    document.getElementById(`btn-rank-diff-${d}`).classList.toggle('active',d===diff);
+  });
+  loadAndRender();
+}
+async function loadAndRender(){
+  const loading=document.getElementById('rank-loading');
+  loading.style.display='block';
+  document.getElementById('rank-list').innerHTML='';
+  if(rankTab==='local'){
+    loading.style.display='none';
+    renderRankList(getLocalRanking(rankDiff),G.playerName);
+  } else {
+    const rows=await(window.tsLoadWorldRanking?window.tsLoadWorldRanking(rankDiff):Promise.resolve(null));
+    loading.style.display='none';
+    if(!rows){
+      document.getElementById('rank-list').innerHTML='<li><span class="rank-empty">取得に失敗しました</span></li>';
+      return;
+    }
+    renderRankList(rows,G.playerName);
+  }
+}
+function showRanking(){
+  rankTab='local';
+  rankDiff=G.difficulty||'normal';
+  ['easy','normal','hard'].forEach(d=>{
+    document.getElementById(`btn-rank-diff-${d}`).classList.toggle('active',d===rankDiff);
+  });
+  document.getElementById('btn-rank-local').classList.add('active');
+  document.getElementById('btn-rank-world').classList.remove('active');
+  document.getElementById('ranking-screen').classList.remove('hidden');
+  loadAndRender();
+}
+function closeRanking(){document.getElementById('ranking-screen').classList.add('hidden');}
+
+// ゲームオーバー: スコア保存＋名前入力フロー
+function submitGameOverScore(name){
+  const total=G.prevStagesTotal+G.score;
+  if(total<=0) return;
+  const stages=Math.max(0,G.stage-1);
+  const diff=G.difficulty||'normal';
+  saveLocalScore(name,total,stages,diff);
+  if(window.tsSaveOnlineScore){
+    window.tsSaveOnlineScore(name,total,stages,diff).catch(e=>console.warn('Online ranking error:',e));
+  }
+}
+function onGameOver(){
+  const total=G.prevStagesTotal+G.score;
+  if(total<=0) return;
+  if(G.playerName&&G.playerName!=='ゲスト'){
+    submitGameOverScore(G.playerName);
+  } else {
+    const fld=document.getElementById('gameover-name-field');
+    fld.value='';
+    document.getElementById('gameover-name-input').classList.remove('hidden');
+  }
+}
+
 function updPlayer(){document.getElementById('current-player-name-display').textContent=G.playerName;}
 
 document.getElementById('btn-start-menu').addEventListener('click',()=>{
@@ -1216,8 +1419,26 @@ document.getElementById('btn-back-to-menu').addEventListener('click',()=>{
   document.getElementById('btn-'+d).addEventListener('click',()=>{G.difficulty=d; startGame();});
 });
 document.getElementById('btn-view-ranking').addEventListener('click',showRanking);
-document.getElementById('btn-close-ranking').addEventListener('click',()=>document.getElementById('ranking-screen').classList.add('hidden'));
+document.getElementById('btn-close-ranking').addEventListener('click',closeRanking);
 document.getElementById('player-select-btn').addEventListener('click',openPM);
+// Game over name input
+document.getElementById('gameover-name-submit').addEventListener('click',()=>{
+  const n=document.getElementById('gameover-name-field').value.trim();
+  if(!n) return;
+  selP(n);  // プレーヤー名として保存
+  submitGameOverScore(n);
+  document.getElementById('gameover-name-input').classList.add('hidden');
+});
+document.getElementById('gameover-name-field').addEventListener('keydown',e=>{
+  if(e.key==='Enter'){
+    const n=e.target.value.trim(); if(!n) return;
+    selP(n); submitGameOverScore(n);
+    document.getElementById('gameover-name-input').classList.add('hidden');
+  }
+});
+document.getElementById('gameover-name-skip').addEventListener('click',()=>{
+  document.getElementById('gameover-name-input').classList.add('hidden');
+});
 document.getElementById('btn-close-player-manager').addEventListener('click',()=>document.getElementById('player-manager').classList.add('hidden'));
 document.getElementById('btn-add-player').addEventListener('click',addP);
 document.getElementById('input-new-player').addEventListener('keydown',e=>{if(e.key==='Enter')addP();});
