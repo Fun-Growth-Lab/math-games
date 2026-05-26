@@ -173,7 +173,7 @@ canvas{position:absolute;top:0;left:0;touch-action:none;}
             <button id="btn-normal" class="btn ts-diff-btn">ふつう<br><span style="font-size:0.78rem;opacity:0.85;">4 × 4</span></button>
           </div>
           <div class="diff-wrapper">
-            <button id="btn-hard" class="btn btn-red ts-diff-btn">むずかしい<br><span style="font-size:0.78rem;opacity:0.85;">5 × 5</span></button>
+            <button id="btn-hard" class="btn btn-red ts-diff-btn">むずかしい<br><span style="font-size:0.78rem;opacity:0.85;">八角形</span></button>
           </div>
         </div>
         <button id="btn-back-to-menu" class="btn btn-gray" style="width:200px;margin-top:6px;">もどる</button>
@@ -474,6 +474,7 @@ function setLayout(){
 let G={
   grid:null,
   gridCat:null,     // 各スロットを埋めた分類番号(1-9), 0=空
+  gridWall:null,    // 八角形の壁スロット (hard のみ)
   hand:[null,null,null],
   selHand:-1, hoverCell:null,
   score:0,          // このステージのスコア = Σ(basePts×Lv補正×MP)
@@ -508,7 +509,9 @@ function cellHasAny(r,c){
 function cellFull(r,c){
   if(!inB(r,c)) return false;
   const b=(r*GN+c)*4;
-  return (G.grid[b+0]&&G.grid[b+1])||(G.grid[b+2]&&G.grid[b+3]);
+  const w=G.gridWall;
+  const f=(i)=>G.grid[b+i]||(w?w[b+i]:0);
+  return (f(0)&&f(1))||(f(2)&&f(3));
 }
 // スロット単位の空き判定: 対角線ペアのみ共存可
 //   t=0(UL)↔t=1(LR) は干渉しない (\ 対角線で分割)
@@ -517,9 +520,10 @@ function cellFull(r,c){
 function slotFree(r,c,t){
   if(!inB(r,c)) return false;
   const b=(r*GN+c)*4;
-  if(G.grid[b+t]) return false;           // 同スロット占有
-  if(t<=1) return !(G.grid[b+2]||G.grid[b+3]); // t=0/1 ↔ t=2/3 干渉
-  return     !(G.grid[b+0]||G.grid[b+1]);       // t=2/3 ↔ t=0/1 干渉
+  const w=G.gridWall;
+  if(G.grid[b+t]||(w&&w[b+t])) return false;  // 同スロット占有 or 壁
+  if(t<=1) return !(G.grid[b+2]||G.grid[b+3]||(w&&(w[b+2]||w[b+3]))); // t=0/1 ↔ t=2/3 干渉
+  return     !(G.grid[b+0]||G.grid[b+1]||(w&&(w[b+0]||w[b+1])));       // t=2/3 ↔ t=0/1 干渉
 }
 // isFilled: スロット単位
 const isFilled=(r,c,t)=>!slotFree(r,c,t);
@@ -643,6 +647,15 @@ function drawGrid(){
         const catIdx=G.gridCat[base+t]-1;
         const col=catIdx>=0?CAT_COL[catIdx]:'#3fd68a';
         gridTri(r,c,t,col,'rgba(0,0,0,0.18)',0.5);
+      }
+    }
+    // 壁スロット (hard 八角形): 配置不可の角三角を暗く塗りつぶしエッジを強調
+    if(G.gridWall){
+      const wb=(r*GN+c)*4;
+      for(let wt=0;wt<4;wt++){
+        if(G.gridWall[wb+wt]){
+          gridTri(r,c,wt,C_BG,'rgba(56,178,248,0.45)',2);
+        }
       }
     }
     ctx.strokeStyle=C_LINE;ctx.lineWidth=1;
@@ -1092,7 +1105,8 @@ function pickBonusCell(){
     for(let dir=0;dir<4;dir++){
       const [ta,tb]=DIR_COVERED[dir];
       // このdirを覆う2つのtスロットが両方とも未占有なら空き
-      if(!G.grid[b+ta]&&!G.grid[b+tb]) available.push({r,c,dir});
+      const w=G.gridWall;
+      if(!G.grid[b+ta]&&!G.grid[b+tb]&&!(w&&(w[b+ta]||w[b+tb]))) available.push({r,c,dir});
     }
   }
   G.bonusCells=[];
@@ -1105,10 +1119,18 @@ function pickBonusCell(){
   }
 }
 function _initGrid(){
-  GN={easy:3,normal:4,hard:5}[G.difficulty]||5;
+  GN={easy:3,normal:4,hard:4}[G.difficulty]||4;
   setLayout();
   G.grid=new Uint8Array(GN*GN*4);
   G.gridCat=new Uint8Array(GN*GN*4);
+  G.gridWall=null;
+  if(G.difficulty==='hard'){
+    G.gridWall=new Uint8Array(GN*GN*4);
+    G.gridWall[gIdx(0,0,0)]=1;          // 左上角: t=0 が壁 → t=1 のみ配置可
+    G.gridWall[gIdx(0,GN-1,2)]=1;       // 右上角: t=2 が壁 → t=3 のみ配置可
+    G.gridWall[gIdx(GN-1,0,3)]=1;       // 左下角: t=3 が壁 → t=2 のみ配置可
+    G.gridWall[gIdx(GN-1,GN-1,1)]=1;    // 右下角: t=1 が壁 → t=0 のみ配置可
+  }
   // 報酬ブロックが選ばれていれば左スロットに確定配置
   const rewardPiece=G.pendingRewardId>=0
     ? {defId:G.pendingRewardId, rot:Math.floor(Math.random()*4), flipped:Math.random()<0.5}
