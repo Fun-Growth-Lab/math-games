@@ -124,6 +124,21 @@ canvas{position:absolute;top:0;left:0;touch-action:none;}
 .rank-sub{color:var(--text-dim);font-size:0.82rem;white-space:nowrap;}
 .rank-date{color:var(--text-dim);font-size:0.78rem;white-space:nowrap;}
 .rank-empty{text-align:center;color:var(--text-dim);padding:20px 0;font-size:0.92rem;width:100%;}
+/* ACHIEVEMENTS */
+.ach-box{background:#051528;padding:22px 28px;border-radius:24px;width:92%;max-width:900px;max-height:82vh;overflow-y:auto;border:2px solid var(--bdr);box-shadow:0 10px 40px rgba(0,0,0,0.5);}
+.ach-box::-webkit-scrollbar{width:6px;}
+.ach-box::-webkit-scrollbar-track{background:rgba(0,0,0,0.2);border-radius:3px;}
+.ach-box::-webkit-scrollbar-thumb{background:var(--bdr);border-radius:3px;}
+.ach-title{font-size:1.4rem;color:var(--accent);margin-bottom:16px;text-align:center;border-bottom:2px dotted var(--bdr-dim);padding-bottom:10px;font-weight:800;}
+.ach-section{margin-bottom:18px;}
+.ach-section-title{font-size:0.95rem;font-weight:800;margin-bottom:8px;letter-spacing:1px;}
+.ach-grid{display:flex;flex-wrap:wrap;gap:7px;}
+.ach-tile{width:66px;height:70px;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:800;text-align:center;border:2px solid;box-sizing:border-box;padding:4px 2px;gap:1px;}
+.ach-tile.locked{background:#060e1e;border-color:#0e2840;color:#2a4860;}
+.ach-tile.unlocked{box-shadow:0 0 10px rgba(0,0,0,0.3);}
+.ach-num{font-size:1.05rem;line-height:1.1;}
+.ach-label{font-size:0.6rem;line-height:1.2;opacity:0.9;}
+.ach-date{font-size:0.52rem;opacity:0.7;line-height:1.1;}
 </style>
 </head>
 <body>
@@ -145,6 +160,7 @@ canvas{position:absolute;top:0;left:0;touch-action:none;}
           <span style="font-size:0.8rem;opacity:0.7;">(へんこう)</span>
         </button>
         <button id="btn-view-ranking" class="btn" style="background:linear-gradient(to bottom,#4a1a60,#28103a);border-color:#7a3aaa;">🏆 ランキング</button>
+        <button id="btn-view-achievement" class="btn" style="background:linear-gradient(to bottom,#1a3a20,#0e2014);border-color:#3a8a50;">🎖️ 実績</button>
         <button class="btn btn-gray" onclick="location.href='../index.html'">🏠 INDEXへ</button>
       </div>
       <div id="difficulty-menu" class="hidden" style="display:flex;flex-direction:column;align-items:center;">
@@ -198,6 +214,17 @@ canvas{position:absolute;top:0;left:0;touch-action:none;}
       <ul id="rank-list" class="rank-list"></ul>
       <div style="text-align:center;">
         <button id="btn-close-ranking" class="btn btn-gray" style="width:160px;">とじる</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACHIEVEMENTS -->
+  <div id="achievement-screen" class="ts-modal-bg hidden">
+    <div class="ach-box">
+      <div class="ach-title">🎖️ 実績</div>
+      <div id="ach-content"></div>
+      <div style="text-align:center;margin-top:14px;">
+        <button id="btn-close-achievement" class="btn btn-gray" style="width:160px;">とじる</button>
       </div>
     </div>
   </div>
@@ -1106,6 +1133,7 @@ function startGame(){
 function nextStage(){
   G.prevStagesTotal+=G.score;  // このステージのスコアを累積
   G.stage++;
+  checkStageMilestones();  // ステージクリア直後にマイルストーン判定
   _initGrid();
 }
 
@@ -1215,6 +1243,7 @@ cvs.addEventListener('pointerdown',e=>{
         if(def.locked&&!G.unlockedSpecial.has(defId)){
           G.unlockedSpecial.add(defId);
           G.pieceLevels[defId]=bonusLvs;
+          checkSpecialMilestones();  // 特殊ブロック解放実績チェック
         } else {
           G.pieceLevels[defId]+=bonusLvs;
         }
@@ -1395,7 +1424,90 @@ function submitGameOverScore(name){
     window.tsSaveOnlineScore(name,total,stages,diff).catch(e=>console.warn('Online ranking error:',e));
   }
 }
+// ============================================================
+//  ACHIEVEMENTS
+// ============================================================
+const ACH_KEY='trisquare_achievements';
+const ACH_STAGE_NS=[10,20,30,40,50,60,70,80,90,100];
+const ACH_SPECIAL_NS=[3,5,7,10];
+const ACH_DIFF_COL={easy:'#3fd68a',normal:'#38b2f8',hard:'#f83870'};
+const ACH_DIFF_BG ={easy:'#0a2a18',normal:'#02101e',hard:'#200810'};
+const ACH_DIFF_LBL={easy:'やさしい',normal:'ふつう',hard:'むずかしい'};
+
+function getAchs(){
+  try{return JSON.parse(localStorage.getItem(ACH_KEY)||'{}');}catch{return {};}
+}
+function unlockAch(id){
+  const a=getAchs();
+  if(a[id]) return false;
+  a[id]=new Date().toLocaleDateString('ja-JP');
+  localStorage.setItem(ACH_KEY,JSON.stringify(a));
+  return true;
+}
+function checkStageMilestones(){
+  const cleared=G.stage-1;
+  const diff=G.difficulty;
+  for(const n of ACH_STAGE_NS){if(cleared>=n) unlockAch(`${diff}_s${n}`);}
+}
+function checkSpecialMilestones(){
+  const cnt=G.unlockedSpecial.size;
+  for(const n of ACH_SPECIAL_NS){if(cnt>=n) unlockAch(`special_${n}`);}
+}
+function renderAchievements(){
+  const achs=getAchs();
+  let html='';
+  // ── 難易度ごとのステージ実績 ──
+  for(const diff of ['easy','normal','hard']){
+    const col=ACH_DIFF_COL[diff], bg=ACH_DIFF_BG[diff];
+    html+=`<div class="ach-section">`;
+    html+=`<div class="ach-section-title" style="color:${col};">${ACH_DIFF_LBL[diff]}</div>`;
+    html+=`<div class="ach-grid">`;
+    for(const n of ACH_STAGE_NS){
+      const date=achs[`${diff}_s${n}`];
+      if(date){
+        html+=`<div class="ach-tile unlocked" style="background:${bg};border-color:${col};color:${col};">`+
+              `<span class="ach-num">S${n}</span>`+
+              `<span class="ach-label">ステージ</span>`+
+              `<span class="ach-date">${date}</span></div>`;
+      } else {
+        html+=`<div class="ach-tile locked">`+
+              `<span class="ach-num" style="font-size:0.9rem;">S${n}</span>`+
+              `<span class="ach-label">ステージ</span></div>`;
+      }
+    }
+    html+=`</div></div>`;
+  }
+  // ── 特殊ブロック実績 ──
+  const spLabels={3:'3種類',5:'5種類',7:'7種類',10:'全解放'};
+  html+=`<div class="ach-section">`;
+  html+=`<div class="ach-section-title" style="color:#ffe040;">✦ 特殊ブロック解放</div>`;
+  html+=`<div class="ach-grid">`;
+  for(const n of ACH_SPECIAL_NS){
+    const date=achs[`special_${n}`];
+    if(date){
+      html+=`<div class="ach-tile unlocked" style="background:#1a1600;border-color:#ffe040;color:#ffe040;">`+
+            `<span class="ach-num">🔓</span>`+
+            `<span class="ach-label">${spLabels[n]}</span>`+
+            `<span class="ach-date">${date}</span></div>`;
+    } else {
+      html+=`<div class="ach-tile locked">`+
+            `<span class="ach-num">🔒</span>`+
+            `<span class="ach-label">${spLabels[n]}</span></div>`;
+    }
+  }
+  html+=`</div></div>`;
+  document.getElementById('ach-content').innerHTML=html;
+}
+function openAchievements(){
+  renderAchievements();
+  document.getElementById('achievement-screen').classList.remove('hidden');
+}
+function closeAchievements(){
+  document.getElementById('achievement-screen').classList.add('hidden');
+}
+
 function onGameOver(){
+  checkStageMilestones();  // ゲームオーバー時に最終チェック
   const total=G.prevStagesTotal+G.score;
   if(total<=0) return;
   if(G.playerName&&G.playerName!=='ゲスト'){
@@ -1423,6 +1535,8 @@ document.getElementById('btn-back-to-menu').addEventListener('click',()=>{
 });
 document.getElementById('btn-view-ranking').addEventListener('click',showRanking);
 document.getElementById('btn-close-ranking').addEventListener('click',closeRanking);
+document.getElementById('btn-view-achievement').addEventListener('click',openAchievements);
+document.getElementById('btn-close-achievement').addEventListener('click',closeAchievements);
 document.getElementById('player-select-btn').addEventListener('click',openPM);
 // Game over name input
 document.getElementById('gameover-name-submit').addEventListener('click',()=>{
