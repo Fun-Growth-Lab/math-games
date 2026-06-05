@@ -220,13 +220,7 @@
 
         /* --- 3. 検索・フィルターエリア --- */
         .search-area-wrapper {
-            width: 95%;
-            max-width: 1400px;
-            margin: 16px auto 16px auto;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-            overflow: hidden;
+            display: none;
         }
 
         /* 常に見える上部2ボタン行 */
@@ -354,14 +348,31 @@
             box-shadow: 0 2px 8px rgba(249,115,22,0.35);
         }
 
-        /* --- 4. ゲームカードエリア --- */
-        .game-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-            gap: 14px;
+        /* --- 4. コンテンツセクション --- */
+        .content-section {
             width: 95%;
             max-width: 1400px;
             margin: 0 auto 40px auto;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: #111827;
+            margin: 32px 0 16px 0;
+            padding-bottom: 12px;
+            border-bottom: 3px solid #f97316;
+        }
+
+        .section-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 14px;
+        }
+
+        /* --- 4. ゲームカードエリア（非表示） --- */
+        .game-grid {
+            display: none;
         }
 
         .game-card {
@@ -1405,6 +1416,9 @@
 
     </div>
 
+    <!-- セクション表示用コンテナ -->
+    <div id="contentSections"></div>
+
     <footer>
         <div class="footer-accordions">
             <details class="info-accordion accent-blue">
@@ -1627,6 +1641,74 @@
                 else if (gradeRe.test(t)) tag.classList.add('tag-grade');
             });
         })();
+
+
+        // --- 6. コンテンツセクション別に再構成 ---
+        document.addEventListener('DOMContentLoaded', function() {
+            const contentTitles = {
+                'con-add': 'たしざん',
+                'con-sub': 'ひきざん',
+                'con-mul': 'かけざん',
+                'con-div': 'わりざん',
+                'con-frac': 'ぶんすう',
+                'con-dec': '小数',
+                'con-type': 'タイピング',
+                'con-map': '日本地図'
+            };
+
+            const container = document.getElementById('contentSections');
+            const allCards = Array.from(document.querySelectorAll('.game-grid .game-card'));
+
+            // セクションごとにカードを分類（複数セクションに属するカードは複数回含まれる）
+            const sections = {};
+            Object.keys(contentTitles).forEach(tag => {
+                sections[tag] = {
+                    title: contentTitles[tag],
+                    cards: []
+                };
+            });
+
+            // カードを分類
+            allCards.forEach(card => {
+                const dataTags = card.getAttribute('data-tags') || '';
+                const hasArithmetica = card.classList.contains('card-arithmetica');
+
+                Object.keys(contentTitles).forEach(conTag => {
+                    if (dataTags.includes(conTag)) {
+                        sections[conTag].cards.push({
+                            element: card.cloneNode(true),
+                            isArithmetica: hasArithmetica
+                        });
+                    }
+                });
+            });
+
+            // セクションを表示
+            Object.entries(sections).forEach(([conTag, sectionData]) => {
+                if (sectionData.cards.length === 0) return;
+
+                // アリスメティカを先頭に
+                sectionData.cards.sort((a, b) => b.isArithmetica - a.isArithmetica);
+
+                const section = document.createElement('div');
+                section.className = 'content-section';
+
+                const title = document.createElement('h2');
+                title.className = 'section-title';
+                title.textContent = sectionData.title;
+                section.appendChild(title);
+
+                const grid = document.createElement('div');
+                grid.className = 'section-grid';
+
+                sectionData.cards.forEach(item => {
+                    grid.appendChild(item.element);
+                });
+
+                section.appendChild(grid);
+                container.appendChild(section);
+            });
+        });
 
         // --- PWA: 自動インストールプロンプトを抑制 ---
         window.addEventListener('beforeinstallprompt', e => e.preventDefault());
