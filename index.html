@@ -358,14 +358,113 @@
             margin: 0 auto 40px auto;
         }
 
+        /* --- セクション見出し（案②：色丸アイコン＋ひとこと＋ゲーム数） --- */
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin: 36px 0 18px 0;
+            padding-bottom: 14px;
+            border-bottom: 2px solid #eef0f3;
+            position: relative;
+        }
+        .section-header::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            bottom: -2px;
+            width: 64px;
+            height: 4px;
+            border-radius: 4px;
+            background: var(--sec-color, #f97316);
+        }
+        .section-icon {
+            flex-shrink: 0;
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.6rem;
+            color: #fff;
+            background: var(--sec-color, #f97316);
+            box-shadow: 0 4px 12px var(--sec-shadow, rgba(249,115,22,0.35));
+        }
+        .section-text {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 0;
+        }
+        .section-title-row {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
         .section-title {
             font-size: 1.5rem;
             font-weight: 800;
             color: #111827;
-            margin: 32px 0 16px 0;
-            padding-bottom: 12px;
-            border-bottom: 3px solid #f97316;
+            margin: 0;
+            line-height: 1.1;
         }
+        .section-count {
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: var(--sec-color, #f97316);
+            background: var(--sec-tint, #fff7ed);
+            padding: 2px 10px;
+            border-radius: 20px;
+        }
+        .section-sub {
+            font-size: 0.9rem;
+            color: #6b7280;
+            font-weight: 500;
+        }
+        @media (max-width: 600px) {
+            .section-icon { width: 42px; height: 42px; font-size: 1.3rem; }
+            .section-title { font-size: 1.2rem; }
+            .section-sub { font-size: 0.78rem; }
+        }
+
+        /* --- セクションジャンプバー（コンパクト・スクロールで出現） --- */
+        .jump-bar {
+            position: fixed;
+            top: 58px;
+            left: 0;
+            width: 100%;
+            background: rgba(255,255,255,0.96);
+            backdrop-filter: blur(6px);
+            border-bottom: 1px solid #e5e7eb;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            z-index: 90;
+            display: flex;
+            justify-content: center;
+            gap: 6px;
+            padding: 6px 10px;
+            overflow-x: auto;
+            transform: translateY(-120%);
+            transition: transform 0.25s ease;
+        }
+        .jump-bar.visible { transform: translateY(0); }
+        .jump-bar::-webkit-scrollbar { display: none; }
+        .jump-btn {
+            flex-shrink: 0;
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            border: none;
+            background: #f3f4f6;
+            font-size: 1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.15s, background 0.15s;
+        }
+        .jump-btn:hover { transform: scale(1.12); background: var(--sec-tint, #fff7ed); }
 
         .section-grid {
             display: grid;
@@ -880,7 +979,7 @@
 
     <div class="game-grid">
 
-        <div class="game-card" data-tags="sub-math con-shape gr-1" style="border-top:4px solid #4caf50;">
+        <div class="game-card card-new" data-tags="sub-math con-shape gr-1" style="border-top:4px solid #4caf50;">
             <div class="card-title">トライスクエア</div>
             <div class="card-action-row">
                 <button class="btn-mini-action btn-howto" onclick="openModal('howto','トライスクエア',this)">📖 あそびかた</button>
@@ -1395,6 +1494,9 @@
 
     </div>
 
+    <!-- コンパクトなセクションジャンプバー（スクロールで出現） -->
+    <div id="jumpBar" class="jump-bar"></div>
+
     <!-- セクション表示用コンテナ -->
     <div id="contentSections"></div>
 
@@ -1607,28 +1709,27 @@
 
         // --- 6. コンテンツセクション別に再構成 ---
         document.addEventListener('DOMContentLoaded', function() {
-            const contentTitles = {
-                'con-add': 'たしざん',
-                'con-sub': 'ひきざん',
-                'con-mul': 'かけざん',
-                'con-div': 'わりざん',
-                'con-frac': 'ぶんすう',
-                'con-dec': '小数',
-                'con-shape': '図形',
-                'con-type': 'タイピング',
-                'con-map': '日本地図'
+            // 各能力の見出し情報（アイコン・色・ひとこと）
+            const contentInfo = {
+                'con-add':   { title: 'たしざん',   icon: '➕',  color: '#3b82f6', tint: '#eff6ff', sub: 'けいさんの きほんを きたえよう' },
+                'con-sub':   { title: 'ひきざん',   icon: '➖',  color: '#10b981', tint: '#ecfdf5', sub: 'ひく ちからを みにつけよう' },
+                'con-mul':   { title: 'かけざん',   icon: '✖️',  color: '#ef4444', tint: '#fef2f2', sub: '九九を マスターしよう' },
+                'con-div':   { title: 'わりざん',   icon: '➗',  color: '#8b5cf6', tint: '#f5f3ff', sub: 'わける かんがえかたを まなぼう' },
+                'con-frac':  { title: 'ぶんすう',   icon: '½',   color: '#ec4899', tint: '#fdf2f8', sub: 'ぶんすうと なかよくなろう' },
+                'con-dec':   { title: '小数',       icon: '．',  color: '#14b8a6', tint: '#f0fdfa', sub: '小数の しくみを つかもう' },
+                'con-shape': { title: '図形',       icon: '▲',   color: '#f59e0b', tint: '#fffbeb', sub: 'かたちの ちからを そだてよう' },
+                'con-type':  { title: 'タイピング', icon: '⌨️',  color: '#6366f1', tint: '#eef2ff', sub: 'はやく せいかくに うとう' },
+                'con-map':   { title: '日本地図',   icon: '🗾',  color: '#f97316', tint: '#fff7ed', sub: '日本の ちずを おぼえよう' }
             };
 
             const container = document.getElementById('contentSections');
+            const jumpBar = document.getElementById('jumpBar');
             const allCards = Array.from(document.querySelectorAll('.game-grid .game-card'));
 
             // セクションごとにカードを分類（複数セクションに属するカードは複数回含まれる）
             const sections = {};
-            Object.keys(contentTitles).forEach(tag => {
-                sections[tag] = {
-                    title: contentTitles[tag],
-                    cards: []
-                };
+            Object.keys(contentInfo).forEach(tag => {
+                sections[tag] = { cards: [] };
             });
 
             const gradeRe = /^\d年生/;
@@ -1638,7 +1739,7 @@
                 const dataTags = card.getAttribute('data-tags') || '';
                 const hasArithmetica = card.classList.contains('card-arithmetica');
 
-                Object.keys(contentTitles).forEach(conTag => {
+                Object.keys(contentInfo).forEach(conTag => {
                     if (dataTags.includes(conTag)) {
                         const clone = card.cloneNode(true);
                         // タグから学年だけ抽出して、大きく表示する形に置き換え
@@ -1666,27 +1767,59 @@
             Object.entries(sections).forEach(([conTag, sectionData]) => {
                 if (sectionData.cards.length === 0) return;
 
+                const info = contentInfo[conTag];
+
                 // アリスメティカを先頭に
                 sectionData.cards.sort((a, b) => b.isArithmetica - a.isArithmetica);
 
                 const section = document.createElement('div');
                 section.className = 'content-section';
+                section.id = 'sec-' + conTag;
+                section.style.setProperty('--sec-color', info.color);
+                section.style.setProperty('--sec-tint', info.tint);
 
-                const title = document.createElement('h2');
-                title.className = 'section-title';
-                title.textContent = sectionData.title;
-                section.appendChild(title);
+                // 見出し（案②：色丸アイコン＋タイトル＋ゲーム数＋ひとこと）
+                const header = document.createElement('div');
+                header.className = 'section-header';
+                header.innerHTML =
+                    '<div class="section-icon">' + info.icon + '</div>' +
+                    '<div class="section-text">' +
+                        '<div class="section-title-row">' +
+                            '<h2 class="section-title">' + info.title + '</h2>' +
+                            '<span class="section-count">' + sectionData.cards.length + 'つ</span>' +
+                        '</div>' +
+                        '<div class="section-sub">' + info.sub + '</div>' +
+                    '</div>';
+                section.appendChild(header);
 
                 const grid = document.createElement('div');
                 grid.className = 'section-grid';
-
-                sectionData.cards.forEach(item => {
-                    grid.appendChild(item.element);
-                });
-
+                sectionData.cards.forEach(item => grid.appendChild(item.element));
                 section.appendChild(grid);
+
                 container.appendChild(section);
+
+                // ジャンプバーにアイコンボタンを追加
+                if (jumpBar) {
+                    const btn = document.createElement('button');
+                    btn.className = 'jump-btn';
+                    btn.textContent = info.icon;
+                    btn.title = info.title;
+                    btn.style.setProperty('--sec-tint', info.tint);
+                    btn.addEventListener('click', () => {
+                        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    });
+                    jumpBar.appendChild(btn);
+                }
             });
+
+            // スクロールでジャンプバーを出し入れ
+            if (jumpBar) {
+                window.addEventListener('scroll', () => {
+                    if (window.scrollY > 320) jumpBar.classList.add('visible');
+                    else jumpBar.classList.remove('visible');
+                }, { passive: true });
+            }
         });
 
         // --- PWA: 自動インストールプロンプトを抑制 ---
