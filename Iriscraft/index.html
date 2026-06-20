@@ -162,7 +162,8 @@
     .cards-hdr { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
     .cards-title { font-size:1.15rem; font-weight:800; color:#333; }
     .cards-badge { background:#f0f0f0; border-radius:20px; padding:3px 12px; font-size:0.82rem; font-weight:800; color:#666; }
-    #card-grid { display:flex; flex-wrap:nowrap; gap:12px; justify-content:center; align-items:flex-start; }
+    #card-grid { display:flex; flex-wrap:wrap; gap:12px; justify-content:center; align-items:flex-start; }
+    #card-grid .card { transform:scale(0.82); transform-origin:top center; margin:0 -36px calc((1-0.82)*-380px); }
     #card-grid .card { transform:none; }
 
     /* ===== CARD（上下2段×左右3列） ===== */
@@ -271,9 +272,9 @@
       border-radius:18px; padding:38px 54px; box-shadow:0 12px 48px rgba(0,0,0,0.5); }
     .adv-title { font-size:1.8rem; font-weight:800; color:#fff; }
     .adv-sub { font-size:0.95rem; color:#b8aee0; margin-bottom:14px; }
-    .diff-btns { display:flex; gap:14px; margin-top:10px; }
-    .diff-btn { width:150px; display:flex; flex-direction:column; gap:4px; padding:18px 0; font-size:1.1rem !important; }
-    .diff-btn span { font-size:0.8rem; font-weight:700; opacity:0.9; }
+    .diff-btns { display:flex; gap:10px; margin-top:10px; flex-direction:column; align-items:stretch; max-width:260px; margin-left:auto; margin-right:auto; }
+    .diff-btn { width:100%; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:14px 20px; font-size:1.05rem !important; }
+    .diff-sub { font-size:0.8rem; font-weight:700; opacity:0.8; margin-left:auto; }
     .select-side-label { font-size:0.85rem; font-weight:800; color:#c8bef0; margin-bottom:8px; text-align:center; }
     .fighter-pick { cursor:pointer; transition:transform 0.1s; }
     .fighter-pick:hover { transform:translateY(-6px); }
@@ -391,9 +392,10 @@
     .dock-label { font-size:0.78rem; font-weight:800; color:#ddd; }
     .dock-choices { display:flex; gap:12px; }
     .dock-token { cursor:grab; touch-action:none; user-select:none;
-      border:2px solid rgba(255,255,255,0.35); border-radius:12px; padding:4px 12px;
-      background:rgba(255,255,255,0.08); font-size:2.2rem; line-height:1;
-      filter:drop-shadow(0 0 6px rgba(255,255,255,0.5)); transition:transform 0.1s; }
+      border:2px solid rgba(255,255,255,0.35); border-radius:12px; padding:4px 10px;
+      background:rgba(255,255,255,0.08); font-size:2.0rem; line-height:1.15;
+      filter:drop-shadow(0 0 6px rgba(255,255,255,0.5)); transition:transform 0.1s;
+      white-space:nowrap; display:inline-flex; align-items:center; gap:1px; }
     .dock-token:hover { border-color:#ffd454; transform:translateY(-3px); }
     .dock-inner .btn { min-width:120px; }
     /* ドラッグゴースト＆ドロップ先 */
@@ -478,6 +480,9 @@
       margin: 0 auto calc((1 - 0.78) * -350px);
     }
     #merge-overlay .fighter-hp { font-size:1.0rem; }
+    .merge-main .fighter-pick { cursor:pointer; border-radius:12px; transition:box-shadow 0.15s,outline 0.15s; outline:3px solid transparent; }
+    .merge-main .fighter-pick:not(.dead):hover { outline:3px solid #ffd454; box-shadow:0 0 18px rgba(255,212,84,0.5); }
+    .merge-main .fighter-pick.dead { opacity:0.4; cursor:not-allowed; }
 
     /* 出発画面カードのスケール（zoom不使用でWRレイアウト保持） */
     #depart-cards .card { transform:scale(0.72); transform-origin:top center; margin:0 -53px; }
@@ -637,11 +642,13 @@
     <div id="difficulty-overlay" class="adv-fullscreen">
       <div class="adv-panel">
         <div class="adv-title">難易度をえらぶ</div>
-        <div class="diff-btns">
-          <button class="btn btn-primary diff-btn" onclick="startAdventure('easy')">やさしい</button>
-          <button class="btn btn-change diff-btn"  onclick="startAdventure('normal')">ふつう</button>
-          <button class="btn btn-danger diff-btn"  onclick="startAdventure('hard')">むずかしい</button>
+        <div class="diff-btns" id="diff-btns" style="flex-direction:column;gap:10px;align-items:stretch;max-width:260px;margin:0 auto">
+          <button class="btn btn-primary diff-btn" id="diff-easy"    onclick="startAdventure('easy')">🌱 やさしい <span class="diff-sub">10階</span></button>
+          <button class="btn btn-change diff-btn"  id="diff-normal"  onclick="startAdventure('normal')">⚔️ ふつう <span class="diff-sub">20階</span></button>
+          <button class="btn btn-danger diff-btn"  id="diff-hard"    onclick="startAdventure('hard')">💀 むずかしい <span class="diff-sub">30階</span></button>
+          <button class="btn diff-btn"             id="diff-endless" onclick="startAdventure('endless')" style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid #7b2d8b;color:#d8b4fe">♾️ エンドレス <span class="diff-sub">∞階</span></button>
         </div>
+        <div id="diff-lock-msg" style="font-size:0.8rem;color:#888;margin-top:10px;text-align:center"></div>
       </div>
     </div>
 
@@ -692,6 +699,17 @@
       <div class="adv-panel" style="padding:26px 40px">
         <div class="adv-title" id="bonus-pick-title">どのカードに？</div>
         <div id="bonus-pick-cards" style="display:flex;gap:14px;margin-top:12px;justify-content:center"></div>
+      </div>
+    </div>
+
+    <!-- 新しい技プレビュー＆教える先選択 -->
+    <div id="bonus-new-tech-overlay" class="adv-fullscreen hidden">
+      <div class="adv-panel" style="padding:26px 36px;min-width:360px;max-width:480px;text-align:center">
+        <div class="adv-title" style="margin-bottom:14px">✨ 新しい技が現れた！</div>
+        <div id="new-tech-preview" class="skill-opt" style="margin:0 auto 16px;cursor:default;max-width:340px;text-align:left"></div>
+        <div style="font-size:0.9rem;color:#bbb;margin-bottom:12px">だれに教えますか？</div>
+        <div id="new-tech-cards" style="display:flex;flex-direction:column;gap:8px"></div>
+        <button class="btn btn-secondary" onclick="skipNewTech()" style="width:100%;margin-top:14px">おぼえさせない</button>
       </div>
     </div>
 
@@ -980,9 +998,9 @@ function multiAttrBonus(stats, recipe) {
   // レシピに含まれる属性が条件グループに含まれているか
   const overlap = g => recipeEls.filter(el => g.includes(el)).length;
 
-  if (q10.length >= 4 && overlap(q10) >= 3) return distinct >= 3 ? 4 : 2.5;
-  if (q15.length >= 3 && overlap(q15) >= 2) return distinct >= 3 ? 3.5 : 2;
-  if (q20.length >= 2 && overlap(q20) >= 2) return 2;
+  if (q10.length >= 4 && overlap(q10) >= 3) return distinct >= 3 ? 6 : 2;
+  if (q15.length >= 3 && overlap(q15) >= 2) return distinct >= 3 ? 4 : 4;
+  if (q20.length >= 2 && overlap(q20) >= 2) return 8;
   return 1;
 }
 
@@ -2144,6 +2162,7 @@ function goAdventure() {
   // 難易度選択を表示
   document.getElementById('difficulty-overlay').classList.remove('hidden');
   document.getElementById('battle-area').classList.add('hidden');
+  refreshDiffButtons();
 }
 
 // hex色 → rgba（透明度つき）
@@ -2268,22 +2287,52 @@ const BOSS_NAMES = [
   'コア','ミノ王','リヴァ','フェニ','スライ王','ヘド','グリ','ユグドラ',
 ];
 
-const DIFF_REROLLS = { easy: 0, normal: 0, hard: 0 };   // 強化素材のリロードは全難易度なし
-const DIFF_TRASH   = { easy: 0.0, normal: 0.15, hard: 0.30 };  // 敵が全力攻撃する確率
-const DIFF_POWER   = { easy: 1.1, normal: 1.35, hard: 1.7 };   // 敵の強さ倍率
+const DIFF_REROLLS = { easy: 0, normal: 0, hard: 0, endless: 0 };
+const DIFF_TRASH   = { easy: 0.0, normal: 0.15, hard: 0.30, endless: 0.30 };
+const DIFF_POWER   = { easy: 1.7, normal: 1.7, hard: 1.7, endless: 1.7 };
+const DIFF_FLOORS  = { easy: 10, normal: 20, hard: 30, endless: Infinity };
+const DIFF_ORDER   = ['easy', 'normal', 'hard', 'endless'];
+
+function getDiffClears() {
+  try { return JSON.parse(localStorage.getItem('iriscraft_clears') || '{}'); } catch { return {}; }
+}
+function markDiffCleared(diff) {
+  const c = getDiffClears(); c[diff] = true;
+  try { localStorage.setItem('iriscraft_clears', JSON.stringify(c)); } catch {}
+}
+function isDiffUnlocked(diff) {
+  if (diff === 'easy') return true;
+  const c = getDiffClears();
+  const idx = DIFF_ORDER.indexOf(diff);
+  return idx > 0 && !!c[DIFF_ORDER[idx - 1]];
+}
+
+function refreshDiffButtons() {
+  DIFF_ORDER.forEach(d => {
+    const btn = document.getElementById('diff-' + d);
+    if (!btn) return;
+    const unlocked = isDiffUnlocked(d);
+    btn.disabled = !unlocked;
+    btn.style.opacity = unlocked ? '1' : '0.4';
+    btn.style.cursor  = unlocked ? 'pointer' : 'not-allowed';
+  });
+  const msg = document.getElementById('diff-lock-msg');
+  const allUnlocked = DIFF_ORDER.every(isDiffUnlocked);
+  msg.textContent = allUnlocked ? '' : 'クリアすると次の難易度が解放されます';
+}
 
 function startAdventure(diff) {
+  if (!isDiffUnlocked(diff)) return;
   battle.difficulty = diff;
-  battle.maxFloor = 7;                         // 全難易度7階
+  battle.maxFloor = DIFF_FLOORS[diff];
   battle.floor = 1;
   battle.items = [];
-  // パーティを初期化（HP満タン）
   battle.party = cardStock.map(card => ({
     card, maxHp: card.stats.hp, curHp: card.stats.hp,
   }));
-  battle.activeIdx = 0;                        // 一番左が初期戦闘カード
+  battle.activeIdx = 0;
   enhancing = false;
-  document.getElementById('floor-max').textContent = battle.maxFloor;
+  document.getElementById('floor-max').textContent = battle.maxFloor === Infinity ? '∞' : battle.maxFloor;
   document.getElementById('difficulty-overlay').classList.add('hidden');
   document.getElementById('battle-area').classList.remove('hidden');
   arriveFloor();
@@ -3023,7 +3072,7 @@ function continueAfterVictory() {
   document.getElementById('victory-overlay').classList.add('hidden');
   document.getElementById('enemy-row').innerHTML = '';
   document.getElementById('player-row').innerHTML = '';
-  if (battle.floor >= battle.maxFloor) { clearGame(); return; }
+  if (battle.difficulty !== 'endless' && battle.floor >= battle.maxFloor) { clearGame(); return; }
   battle.party.forEach(p => {
     if (p.curHp > 0) p.curHp = Math.min(p.maxHp, p.curHp + Math.round(p.maxHp * 0.2));
   });
@@ -3091,6 +3140,7 @@ function renderBattleItems() {
 }
 
 let pendingBonus = null;
+let pendingNewTech = null;
 
 function showBonusSelect() {
   const holder = document.getElementById('bonus-choices');
@@ -3112,8 +3162,59 @@ function showBonusSelect() {
 
 function chooseBonus(b) {
   document.getElementById('bonus-overlay').classList.add('hidden');
-  if (b.target === 'party') { b.apply(); finishBonus(); }
-  else { pendingBonus = b; showBonusPick(); }
+  if (b.id === 'newTech') {
+    pendingBonus = b;
+    // 平均ステータスで技を先に生成してプレビュー表示
+    const avgStats = {};
+    ELEMENTS.forEach(e => {
+      avgStats[e.id] = Math.round(battle.party.reduce((s, p) => s + (p.card.stats[e.id] || 0), 0) / battle.party.length);
+    });
+    pendingNewTech = pickAutoTech(avgStats, 18, false);
+    showNewTechPreview();
+  } else if (b.target === 'party') {
+    b.apply(); finishBonus();
+  } else {
+    pendingBonus = b; showBonusPick();
+  }
+}
+
+function showNewTechPreview() {
+  const t = pendingNewTech;
+  const mHex = ELEM(t.mainEl).hex;
+  const preview = document.getElementById('new-tech-preview');
+  preview.style.background = hexA(mHex, 0.10);
+  preview.style.borderColor = mHex;
+  preview.innerHTML = `
+    <div class="sk-icon">${techEnergyHTML(t)}</div>
+    <div class="sk-info">
+      <div class="sk-name" style="color:${mHex}">${t.name} <span style="color:#E8A000">${'★'.repeat(t.rank||1)}</span></div>
+      <div style="font-size:0.72rem;color:#888">${t.desc || ''}</div>
+    </div>`;
+  const holder = document.getElementById('new-tech-cards');
+  holder.innerHTML = '';
+  battle.party.forEach(p => {
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-primary';
+    btn.style.cssText = 'width:100%;font-size:0.95rem;padding:8px 12px;';
+    btn.textContent = `${p.card.name} に教える`;
+    btn.onclick = () => teachNewTech(p.card);
+    holder.appendChild(btn);
+  });
+  document.getElementById('bonus-new-tech-overlay').classList.remove('hidden');
+}
+
+function teachNewTech(card) {
+  document.getElementById('bonus-new-tech-overlay').classList.add('hidden');
+  const t = pendingNewTech;
+  card.techs = card.techs || [];
+  if (card.techs.length < 2) { card.techs.push(t); finishBonus(); }
+  else openBonusTechPick(card, 'discard', t);
+}
+
+function skipNewTech() {
+  document.getElementById('bonus-new-tech-overlay').classList.add('hidden');
+  pendingNewTech = null;
+  finishBonus();
 }
 
 function showBonusPick() {
@@ -3131,12 +3232,7 @@ function showBonusPick() {
 function onBonusCardPicked(card) {
   document.getElementById('bonus-pick-overlay').classList.add('hidden');
   const b = pendingBonus;
-  if (b.id === 'newTech') {
-    const t = pickAutoTech(card.stats, 18, false);
-    card.techs = card.techs || [];
-    if (card.techs.length < 2) { card.techs.push(t); finishBonus(); }
-    else openBonusTechPick(card, 'discard', t);   // 捨てる技を選ぶ
-  } else if (b.id === 'starUp') {
+  if (b.id === 'starUp') {
     const cand = (card.techs || []).filter(t => (t.rank || 1) < 3);
     if (cand.length === 0) { finishBonus(); }      // 上げられる技なし
     else openBonusTechPick(card, 'star');
@@ -3176,6 +3272,7 @@ function openBonusTechPick(card, mode, newTech) {
 
 function finishBonus() {
   pendingBonus = null;
+  pendingNewTech = null;
   startEnhancement();
 }
 
@@ -3199,9 +3296,11 @@ function gameOver() {
 }
 function clearGame() {
   battle.inBattle = false;
+  if (battle.difficulty !== 'endless') markDiffCleared(battle.difficulty);
   document.getElementById('adv-result-icon').textContent = '🏆';
   document.getElementById('adv-result-title').textContent = 'クリア！';
-  document.getElementById('adv-result-sub').textContent = `塔のてっぺん（${battle.maxFloor}階）に到達した！`;
+  const floorLabel = battle.maxFloor === Infinity ? '∞' : battle.maxFloor;
+  document.getElementById('adv-result-sub').textContent = `塔のてっぺん（${floorLabel}階）に到達した！`;
   document.getElementById('adv-result-overlay').classList.remove('hidden');
 }
 
