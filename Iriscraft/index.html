@@ -388,7 +388,7 @@
       animation:bob 1s ease-in-out infinite; }
     /* 中央ドック */
     .dock-inner { display:flex; align-items:center; gap:12px; }
-    .dock-label { font-size:0.78rem; font-weight:800; color:#ddd; }
+    .dock-label { font-size:0.78rem; font-weight:800; color:#ddd; white-space:nowrap; flex-shrink:0; }
     .dock-choices { display:flex; gap:12px; }
     .dock-token { cursor:grab; touch-action:none; user-select:none;
       border:2px solid rgba(255,255,255,0.35); border-radius:12px; padding:4px 10px;
@@ -701,6 +701,15 @@
       </div>
     </div>
 
+    <!-- ボーナス：スキル選択 -->
+    <div id="bonus-skill-overlay" class="adv-fullscreen hidden">
+      <div class="adv-panel" style="padding:22px 28px;min-width:400px;max-width:520px;max-height:80vh;overflow-y:auto">
+        <div class="adv-title" style="margin-bottom:10px">🔮 スキルをえらぶ</div>
+        <div id="bonus-skill-list" style="display:flex;flex-direction:column;gap:4px"></div>
+        <button class="btn btn-secondary" onclick="applyBonusSkill(null,null)" style="width:100%;margin-top:12px">キャンセル</button>
+      </div>
+    </div>
+
     <!-- 新しい技プレビュー＆教える先選択 -->
     <div id="bonus-new-tech-overlay" class="adv-fullscreen hidden">
       <div class="adv-panel" style="padding:26px 36px;min-width:360px;max-width:560px;text-align:center">
@@ -865,8 +874,8 @@ const NORM_RATE = 0.6;          // ノーマルエネルギーは属性エネの
 //   ・個数倍率：1→1, 2→1.5, 3→2, 4→3
 //   ・色数倍率：1→1, 2→1.5, 3→2, 4→3（属性色のみ・ノーマルは数えない）
 // ================================================================
-const COUNT_MULT = { 1:1, 2:1.5, 3:2, 4:3 };
-const COLOR_MULT = { 0:1, 1:1, 2:1.5, 3:2, 4:3 };
+const COUNT_MULT = { 1:1.00, 2:0.95, 3:0.90, 4:0.85 };
+const COLOR_MULT = { 0:1, 1:1.0, 2:2.0, 3:3.0, 4:4.0 };
 
 // 技ランク（★）：状態異常の発生率を決める
 // ★1〜5 の倍率（威力・状態異常ともに共通、線形に +0.2ずつ）
@@ -886,6 +895,7 @@ const STATUS_INFO = {
   burn:      { emoji:'🔥', name:'やけど', turns:3 },
   freeze:    { emoji:'🧊', name:'こおり', turns:1 },
   paralysis: { emoji:'⚡', name:'まひ',   turns:3 },
+  poison:    { emoji:'☠️', name:'どく',   turns:3 },
 };
 
 // 命名
@@ -1227,6 +1237,30 @@ const SKILL_DEFS = {
   ],
 };
 
+// スキル効果値（ランクs/m/l）
+const SKILL_VALS = {
+  auto_heal:  { s:0.05, m:0.10, l:0.15 },
+  pre_heal:   { s:0.10, m:0.20, l:0.30 },
+  guts:       { s:1.20, m:1.50, l:2.00 },
+  drain:      { s:0.15, m:0.25, l:0.40 },
+  fighting:   { s:0.10, m:0.20, l:0.30 },
+  vitality:   { s:15,   m:25,   l:40   },
+  first_str:  { s:1.25, m:1.50, l:2.00 },
+  crit:       { s:0.10, m:0.20, l:0.30 },
+  multi:      { s:0.20, m:0.25, l:0.30 },
+  pursuit:    { s:0.20, m:0.40, l:0.60 },
+  weakness:   { s:0.25, m:0.50, l:0.75 },
+  allout:     { s:1.30, m:1.60, l:2.00 },
+  poison:     { s:0.25, m:0.35, l:0.50 },
+  full_guard: { s:0.10, m:0.20, l:0.30 },
+};
+// カードのスキル取得ヘルパー
+function getSkillVal(card, id) {
+  const sk = card.skill;
+  if (!sk || sk.id !== id) return null;
+  return (SKILL_VALS[id] || {})[sk.rank] ?? null;
+}
+
 // 図形数 → [小, 中, 大] の出現確率（%）
 function rankProbabilities(count) {
   const T = {
@@ -1546,7 +1580,7 @@ function doRegenerate() {
 function backToTitle() {
   if (typeof battle !== 'undefined') { battle.inBattle = false; clearTimeout(battle.turnTimer); }
   // 冒険画面の各オーバーレイを閉じる
-  ['game-clear-overlay','adv-result-overlay','rest-overlay','select-fighter-overlay','difficulty-overlay','battle-area','victory-overlay']
+  ['game-clear-overlay','adv-result-overlay','rest-overlay','select-fighter-overlay','difficulty-overlay','battle-area','victory-overlay','bonus-skill-overlay']
     .forEach(id => { const el = document.getElementById(id); if (el) el.classList.add('hidden'); });
   document.getElementById('game-screen').classList.add('hidden');
   document.getElementById('adventure-screen').classList.add('hidden');
@@ -2445,7 +2479,7 @@ function makeEnemy(floor) {
   }
   // むずかしいは強い技プール（2色2+1等）も使える
   const richTech = battle.difficulty === 'hard';
-  const techs = genTechCandidates(stats, /*starter*/ !richTech, 3);
+  const techs = genTechCandidates(stats, /*starter*/ !richTech, 2);
   const weak = pickWeakness(stats);
   return {
     name, stats, maxHp: stats.hp, curHp: stats.hp,
@@ -2787,14 +2821,20 @@ function attachChoiceToCard(i, choiceIdx) {
   } else {
     battle.phase = 'act';
     renderBattle();
-    setInstr('交代：カードをタップ／攻撃：技をタップ／全力攻撃：エネルギーをトラッシュして2倍');
+    setInstr('交代：カードをタップ／攻撃：技をタップ／全力攻撃：エネルギーをトラッシュして1.5倍');
   }
 }
 
 // 階層バトル開始（エネルギー初期化）
 function startBattle() {
   battle.inBattle = true;
-  battle.party.forEach(p => { p.energy = emptyEnergy(); p.status = []; });
+  battle.party.forEach(p => {
+    p.energy = emptyEnergy(); p.status = [];
+    p.reviveUsed = false; p.firstStrikeUsed = false;
+    // 先制回復
+    const preHealVal = getSkillVal(p.card, 'pre_heal');
+    if (preHealVal) p.curHp = Math.min(p.maxHp, p.curHp + Math.round(p.maxHp * preHealVal));
+  });
   battle.enemyTeam.forEach(e => { e.energy = emptyEnergy(); e.status = []; });
   if ((battle.items||[]).some(i => i.id === 'heal')) {
     battle.party.forEach(p => { if (p.curHp > 0) p.curHp = Math.min(p.maxHp, p.curHp + Math.round(p.maxHp * 0.05)); });
@@ -2841,6 +2881,13 @@ function beginPlayerTurn() {
     pushLog(`🧊 ${p.card.name}は こおっている！ エネルギーだけ付けられる`);
   } else {
     battle.frozenThisTurn = false;
+  }
+
+  // 自動回復スキル（このカードがアクティブなとき）
+  const autoHealVal = getSkillVal(p.card, 'auto_heal');
+  if (autoHealVal && p.curHp > 0) {
+    const heal = Math.max(1, Math.round(p.maxHp * autoHealVal));
+    p.curHp = Math.min(p.maxHp, p.curHp + heal);
   }
 
   // 再生の葉：生存中の全カードHP2%回復
@@ -2931,6 +2978,12 @@ function tickStatus(obj, name) {
     obj.curHp -= d;
     pushLog(`🔥 ${name}は やけどで <span class="log-dmg">${d}</span> ダメージ`);
   }
+  const poisons = obj.status.filter(s => s.type === 'poison').length;
+  if (poisons > 0) {
+    const poisDmg = Math.max(1, Math.round((obj.maxHp || 100) * 0.03 * poisons));
+    obj.curHp = (obj.curHp || 0) - poisDmg;
+    pushLog(`☠️ ${name}は 毒で ${poisDmg} ダメージ！`);
+  }
   const frozen = obj.status.some(s => s.type === 'freeze');
   obj.status.forEach(s => s.turns--);
   obj.status = obj.status.filter(s => s.turns > 0);
@@ -2963,18 +3016,84 @@ function useTech(t) {
     ? Object.fromEntries(Object.entries(p.card.stats).map(([k,v]) => [k, ELEMENTS.some(e=>e.id===k) ? v+amplifyBonus : v]))
     : p.card.stats;
   let dmg = techDamage(t, boostedStats, battle.enemy);
-  if (isTrash) { dmg *= 2; trashTechEnergy(p, t); }
+  if (isTrash) { dmg = Math.floor(dmg * 1.5); trashTechEnergy(p, t); }
+
+  // ★スキル：先手必勝（初回攻撃のみ）
+  const firstStrVal = getSkillVal(p.card, 'first_str');
+  if (firstStrVal && !p.firstStrikeUsed) { dmg = Math.floor(dmg * firstStrVal); p.firstStrikeUsed = true; }
+
+  // ★スキル：渾身（HP満タン）
+  const alloutVal = getSkillVal(p.card, 'allout');
+  if (alloutVal && p.curHp >= p.maxHp) dmg = Math.floor(dmg * alloutVal);
+
+  // ★スキル：根性（HP20%以下）
+  const gutsVal = getSkillVal(p.card, 'guts');
+  if (gutsVal && p.curHp / p.maxHp <= 0.20) dmg = Math.floor(dmg * gutsVal);
+
+  // ★スキル：追い打ち（敵HP50%以下）
+  const pursuitVal = getSkillVal(p.card, 'pursuit');
+  if (pursuitVal && battle.enemy.curHp / battle.enemy.maxHp <= 0.50) dmg = Math.floor(dmg * (1 + pursuitVal));
+
+  // ★スキル：弱点特攻（弱点命中時）
+  const weaknessVal = getSkillVal(p.card, 'weakness');
+  if (weaknessVal && t.mainEl === battle.enemy.weak) dmg = Math.floor(dmg * (1 + weaknessVal));
+
+  // ★スキル：会心の一撃
+  const critVal = getSkillVal(p.card, 'crit');
+  let isCrit = false;
+  if (critVal && Math.random() < critVal) { dmg *= 2; isCrit = true; }
+
   const swordCount = (battle.items||[]).filter(i => i.id === 'sword').length;
   if (swordCount > 0) dmg = Math.floor(dmg * Math.pow(1.10, swordCount));
   if ((battle.items||[]).some(i => i.id === 'ring') && t.mainEl === battle.enemy.weak) dmg = Math.floor(dmg * 1.25);
+
   battle.enemy.curHp -= dmg;
   battle.stageDamage = (battle.stageDamage || 0) + dmg;
   battle.stageTurns  = (battle.stageTurns  || 0) + 1;
+
+  const critTag = isCrit ? '<span class="log-crit">会心！</span> ' : '';
   const tag = isTrash ? '<span class="log-crit">トラッシュ攻撃！</span> ' : '';
-  pushLog(`${tag}${p.card.name}の<span style="color:${ELEM(t.mainEl).hex}">${t.name}</span>！ <span class="log-dmg">${dmg}</span> ダメージ`);
+  pushLog(`${tag}${critTag}${p.card.name}の<span style="color:${ELEM(t.mainEl).hex}">${t.name}</span>！ <span class="log-dmg">${dmg}</span> ダメージ`);
   applyStatusOnHit(t, battle.enemy, 'てき');
+
+  // ★スキル：ドレイン
+  const drainVal = getSkillVal(p.card, 'drain');
+  if (drainVal) {
+    const heal = Math.max(1, Math.round(dmg * drainVal));
+    p.curHp = Math.min(p.maxHp, p.curHp + heal);
+    pushLog(`💚 ${p.card.name}は ${heal} HP吸収した！`);
+  }
+
+  // ★スキル：毒刃（poison → burn-like status 'poison' turns:3）
+  const poisonVal = getSkillVal(p.card, 'poison');
+  if (poisonVal && Math.random() < poisonVal) {
+    if ((battle.enemy.status||[]).length < 3) {
+      battle.enemy.status = battle.enemy.status || [];
+      battle.enemy.status.push({ type:'poison', turns:3 });
+      pushLog(`☠️ ${battle.enemy.name}は 毒を受けた！`);
+    }
+  }
+
   renderBattle();
   flashDamage('fx-enemy', dmg);
+
+  // ★スキル：連続攻撃（敵が生きていれば）
+  const multiVal = getSkillVal(p.card, 'multi');
+  if (battle.enemy.curHp > 0 && multiVal && Math.random() < multiVal) {
+    setTimeout(() => {
+      if (!battle.inBattle || battle.enemy.curHp <= 0) { setTimeout(enemyTurn, 800); return; }
+      let dmg2 = Math.floor(techDamage(t, boostedStats, battle.enemy) * 0.60);
+      battle.enemy.curHp -= dmg2;
+      battle.stageDamage += dmg2;
+      pushLog(`💥 連続攻撃！ <span class="log-dmg">${dmg2}</span> ダメージ`);
+      renderBattle();
+      flashDamage('fx-enemy', dmg2);
+      if (battle.enemy.curHp <= 0) { setTimeout(onEnemyDefeated, 800); }
+      else { setTimeout(enemyTurn, 900); }
+    }, 600);
+    return;
+  }
+
   if (battle.enemy.curHp <= 0) { setTimeout(onEnemyDefeated, 800); }
   else { setTimeout(enemyTurn, 900); }
 }
@@ -3091,11 +3210,32 @@ function enemyTurn(skipSwap = false) {
     trashTechEnergy(e, best);
     // 一定確率で全力攻撃（残りエネルギーもトラッシュして2倍）
     let isTrash = false;
-    if (Math.random() < (DIFF_TRASH[battle.difficulty] || 0)) { isTrash = true; bestDmg *= 2; }
+    if (Math.random() < (DIFF_TRASH[battle.difficulty] || 0)) { isTrash = true; bestDmg = Math.floor(bestDmg * 1.5); }
     const guardCount = (battle.items||[]).filter(i => i.id === 'guard').length;
     if (guardCount > 0) bestDmg = Math.floor(bestDmg * Math.pow(0.9, guardCount));
     if ((battle.items||[]).some(i => i.id === 'resist_ring') && best.mainEl === p.card.resist) bestDmg = Math.floor(bestDmg * 0.75);
+    // ★スキル：完全ガード
+    const fullGuardVal = getSkillVal(p.card, 'full_guard');
+    if (fullGuardVal && Math.random() < fullGuardVal) {
+      pushLog(`🛡️ ${p.card.name}は 完全ガード！ ダメージを防いだ！`);
+      bestDmg = 0;
+    }
+    // ★スキル：不屈の闘志（HP50%以下）
+    const fightingVal = getSkillVal(p.card, 'fighting');
+    if (fightingVal && bestDmg > 0 && p.curHp / p.maxHp <= 0.50) bestDmg = Math.floor(bestDmg * (1 - fightingVal));
     p.curHp -= bestDmg;
+    // ★スキル：復活（1回限り）
+    if (p.curHp <= 0 && !p.reviveUsed) {
+      const sk = p.card.skill;
+      if (sk && sk.id === 'revive') {
+        p.curHp = 1; p.reviveUsed = true;
+        pushLog(`✨ ${p.card.name}は 復活した！`);
+        renderBattle();
+        flashDamage('fx-player', bestDmg);
+        setTimeout(beginPlayerTurn, 800);
+        return;
+      }
+    }
     const tag = isTrash ? '<span class="log-crit">全力攻撃！</span> ' : '';
     pushLog(`${tag}てきの<span style="color:${ELEM(best.mainEl).hex}">${best.name}</span>！ <span class="log-dmg">${bestDmg}</span> ダメージ`);
     applyStatusOnHit(best, p, p.card.name);   // プレイヤーに状態異常
@@ -3173,6 +3313,7 @@ const BONUS_POOL = [
     apply:(c, inst) => { c.stats[inst.el] += 50; } },
   { id:'newTech',  icon:'✨', name:'新しい技', desc:'えらんだカードに技を1つ追加（2つあるとき入替）', target:'card' },
   { id:'starUp',   icon:'⭐', name:'技を強化', desc:'技の★を1つ上げる（威力＆特殊効果率UP）', target:'card' },
+  { id:'learnSkill', icon:'🔮', name:'スキルを覚える', desc:'えらんだカードにパッシブスキルを1つ習得させる', target:'card' },
 ];
 
 // ===== アイテムプール =====
@@ -3300,7 +3441,9 @@ function showBonusPick() {
 function onBonusCardPicked(card) {
   document.getElementById('bonus-pick-overlay').classList.add('hidden');
   const b = pendingBonus;
-  if (b.id === 'starUp') {
+  if (b.id === 'learnSkill') {
+    openBonusSkillPick(card);
+  } else if (b.id === 'starUp') {
     const cand = (card.techs || []).filter(t => (t.rank || 1) < MAX_RANK);
     if (cand.length === 0) { finishBonus(); }      // 上げられる技なし
     else openBonusTechPick(card, 'star');
@@ -3342,6 +3485,40 @@ function finishBonus() {
   pendingBonus = null;
   pendingNewTech = null;
   startEnhancement();
+}
+
+// スキル選択（ボーナス用）
+let pendingSkillCard = null;
+function openBonusSkillPick(card) {
+  pendingSkillCard = card;
+  const container = document.getElementById('bonus-skill-list');
+  container.innerHTML = '';
+  // グループ名
+  const GROUP_NAMES = { circle:'回復・生命', triangle:'攻撃', rectangle:'防御', hexagon:'特殊' };
+  Object.entries(SKILL_DEFS).forEach(([group, defs]) => {
+    const gh = document.createElement('div');
+    gh.style.cssText = 'font-size:0.78rem;font-weight:800;color:#aaa;margin:6px 0 4px;';
+    gh.textContent = '── ' + (GROUP_NAMES[group] || group);
+    container.appendChild(gh);
+    defs.forEach(def => {
+      const ranks = def.lOnly ? ['l'] : ['s', 'm', 'l'];
+      const RANK_LABELS = { s:'小', m:'中', l:'大' };
+      ranks.forEach(rank => {
+        const div = document.createElement('div'); div.className = 'skill-opt';
+        div.style.cssText = 'cursor:pointer;padding:6px 10px;';
+        div.innerHTML = `<div class="sk-info"><div class="sk-name">${def.name}（${RANK_LABELS[rank]}）</div><div style="font-size:0.72rem;color:#888">${def.desc[rank]||''}</div></div>`;
+        div.onclick = () => applyBonusSkill(def.id, rank);
+        container.appendChild(div);
+      });
+    });
+  });
+  document.getElementById('bonus-skill-overlay').classList.remove('hidden');
+}
+function applyBonusSkill(id, rank) {
+  document.getElementById('bonus-skill-overlay').classList.add('hidden');
+  if (id && pendingSkillCard) pendingSkillCard.skill = { id, rank };
+  pendingSkillCard = null;
+  finishBonus();
 }
 
 // 次の階へ進む（強化完了後に呼ぶ）
@@ -3534,6 +3711,19 @@ function buildCardEl(card, opts) {
   const tcon = document.createElement('div'); tcon.className = 'card-techs';
   for (let i = 0; i < slots; i++) tcon.appendChild(techBoxEl(techs[i], card, isWeapon, '技 ' + (i+1)));
   el.appendChild(tcon);
+
+  // スキル表示（card.skillがあれば）
+  const sk = card.skill;
+  if (sk) {
+    const skDef = Object.values(SKILL_DEFS).flat().find(d => d.id === sk.id);
+    if (skDef) {
+      const RANK_LBL = { s:'小', m:'中', l:'大' };
+      const skDiv = document.createElement('div');
+      skDiv.style.cssText = 'font-size:0.68rem;font-weight:800;color:#c080ff;background:rgba(160,64,255,0.1);border:1px solid rgba(160,64,255,0.3);border-radius:6px;padding:2px 8px;margin:4px 8px 2px;text-align:center;';
+      skDiv.textContent = `🔮 ${skDef.name}（${RANK_LBL[sk.rank]||sk.rank}）`;
+      el.appendChild(skDiv);
+    }
+  }
 
   return el;
 }
