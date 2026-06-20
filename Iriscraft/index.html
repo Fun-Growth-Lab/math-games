@@ -713,11 +713,15 @@
     <!-- 新しい技プレビュー＆教える先選択 -->
     <div id="bonus-new-tech-overlay" class="adv-fullscreen hidden">
       <div class="adv-panel" style="padding:26px 36px;min-width:360px;max-width:580px;text-align:center">
-        <!-- Stage 1: 技を選ぶ -->
+        <!-- Stage 1: 技またはスキルを選ぶ -->
         <div id="new-tech-stage1">
           <div class="adv-title" style="margin-bottom:12px">✨ 技を1つえらぼう！</div>
           <div class="skill-opts" id="new-tech-choice-list" style="margin:0 auto 12px;max-width:460px;text-align:left"></div>
-          <button class="btn btn-secondary" onclick="skipNewTech()" style="min-width:200px;margin-top:8px">おぼえさせない</button>
+          <div style="display:flex;gap:10px;justify-content:center;margin-top:8px;flex-wrap:wrap">
+            <button class="btn btn-secondary" onclick="toggleLearnCardView()" style="min-width:140px">📋 カードを見る</button>
+            <button class="btn btn-secondary" onclick="skipNewTech()" style="min-width:140px">おぼえさせない</button>
+          </div>
+          <div id="learn-card-view" class="hidden" style="margin-top:14px;display:flex;gap:0;justify-content:center;flex-wrap:nowrap;overflow:visible"></div>
         </div>
         <!-- Stage 2: カードを選ぶ -->
         <div id="new-tech-stage2" class="hidden">
@@ -3007,7 +3011,7 @@ function useTech(t) {
     ? Object.fromEntries(Object.entries(p.card.stats).map(([k,v]) => [k, ELEMENTS.some(e=>e.id===k) ? v+amplifyBonus : v]))
     : p.card.stats;
   let dmg = techDamage(t, boostedStats, battle.enemy);
-  if (isTrash) { dmg = Math.floor(dmg * 1.5); trashTechEnergy(p, t); }
+  if (isTrash) { dmg = Math.floor(dmg * 2.0); trashTechEnergy(p, t); }
 
   // ★スキル：先手必勝（初回攻撃のみ）
   const firstStrVal = getSkillVal(p.card, 'first_str');
@@ -3302,9 +3306,8 @@ const BONUS_POOL = [
   { id:'elemAttr', icon:'🔆', target:'card',
     roll:(inst) => { inst.el = ELEM_ORDER[randInt(0,3)]; inst.name = `${ELEM_EMOJI[inst.el]}の力+50`; inst.desc = `えらんだカードの${ELEM(inst.el).name}属性を+50`; },
     apply:(c, inst) => { c.stats[inst.el] += 50; } },
-  { id:'newTech',  icon:'✨', name:'新しい技', desc:'えらんだカードに技を1つ追加（2つあるとき入替）', target:'card' },
+  { id:'learnTech', icon:'✨', name:'技を覚える', desc:'攻撃技かパッシブスキルを3択から1つえらんでカードに習得させる', target:'card' },
   { id:'starUp',   icon:'⭐', name:'技を強化', desc:'技の★を1つ上げる（威力＆特殊効果率UP）', target:'card' },
-  { id:'learnSkill', icon:'🔮', name:'スキルを覚える', desc:'えらんだカードにパッシブスキルを1つ習得させる', target:'card' },
 ];
 
 // ===== アイテムプール =====
@@ -3375,14 +3378,13 @@ function showBonusSelect() {
 
 function chooseBonus(b) {
   document.getElementById('bonus-overlay').classList.add('hidden');
-  if (b.id === 'newTech') {
+  if (b.id === 'learnTech') {
     pendingBonus = b;
-    // 3つの技候補を生成して選ばせる
     const avgStats = {};
     ELEMENTS.forEach(e => {
       avgStats[e.id] = Math.round(battle.party.reduce((s, p) => s + (p.card.stats[e.id] || 0), 0) / battle.party.length);
     });
-    pendingTechChoices = [pickAutoTech(avgStats, 18, false), pickAutoTech(avgStats, 18, false), pickAutoTech(avgStats, 18, false)];
+    pendingTechChoices = [genLearnChoice(avgStats), genLearnChoice(avgStats), genLearnChoice(avgStats)];
     showNewTechChoices();
   } else if (b.target === 'party') {
     b.apply(); finishBonus();
@@ -3391,38 +3393,88 @@ function chooseBonus(b) {
   }
 }
 
+// 技またはパッシブスキルをランダムに1つ生成（60%:攻撃技 / 40%:パッシブ）
+function genLearnChoice(avgStats) {
+  if (Math.random() < 0.60) {
+    const t = pickAutoTech(avgStats, 18, false);
+    return { type: 'tech', data: t };
+  } else {
+    const allDefs = Object.values(SKILL_DEFS).flat().filter(d => !d.lOnly);
+    const def = allDefs[randInt(0, allDefs.length - 1)];
+    const rank = rollTechRank(); // ★1:60% / ★2:30% / ★3:10%と同方式
+    return { type: 'skill', def, rank };
+  }
+}
+
 function showNewTechChoices() {
   const list = document.getElementById('new-tech-choice-list');
   list.innerHTML = '';
-  pendingTechChoices.forEach(t => {
-    const mHex = ELEM(t.mainEl).hex;
+  pendingTechChoices.forEach(choice => {
     const div = document.createElement('div'); div.className = 'skill-opt';
-    div.style.cssText = `background:${hexA(mHex,0.10)};border-color:${mHex};cursor:pointer;`;
-    div.innerHTML = `<div class="sk-icon">${techEnergyHTML(t)}</div>
-      <div class="sk-info">
-        <div class="sk-name" style="color:${mHex}">${t.name} <span style="color:#E8A000">${'★'.repeat(t.rank||1)}</span></div>
-        <div style="font-size:0.72rem;color:#888">${t.desc || ''}</div>
-      </div>`;
-    div.onclick = () => { pendingNewTech = t; showNewTechCardPick(); };
+    div.style.cursor = 'pointer';
+    if (choice.type === 'tech') {
+      const t = choice.data;
+      const mHex = ELEM(t.mainEl).hex;
+      div.style.cssText += `background:${hexA(mHex,0.10)};border-color:${mHex};cursor:pointer;`;
+      div.innerHTML = `<div class="sk-icon">${techEnergyHTML(t)}</div>
+        <div class="sk-info">
+          <div class="sk-name" style="color:${mHex}">⚔️ ${t.name} <span style="color:#E8A000">${'★'.repeat(t.rank||1)}</span></div>
+          <div style="font-size:0.72rem;color:#888">${t.desc || ''}</div>
+        </div>`;
+    } else {
+      const { def, rank } = choice;
+      div.style.cssText += 'background:rgba(160,64,255,0.10);border-color:rgba(160,64,255,0.5);cursor:pointer;';
+      div.innerHTML = `<div class="sk-icon" style="font-size:1.4rem">🔮</div>
+        <div class="sk-info">
+          <div class="sk-name" style="color:#c080ff">🔮 ${def.name} <span style="color:#E8A000">${'★'.repeat(rank)}</span></div>
+          <div style="font-size:0.72rem;color:#888">${def.desc[rank] || ''}</div>
+        </div>`;
+    }
+    div.onclick = () => { pendingNewTech = choice; showNewTechCardPick(); };
     list.appendChild(div);
   });
+  document.getElementById('learn-card-view').classList.add('hidden');
   document.getElementById('new-tech-stage1').classList.remove('hidden');
   document.getElementById('new-tech-stage2').classList.add('hidden');
   document.getElementById('bonus-new-tech-overlay').classList.remove('hidden');
 }
 
+function toggleLearnCardView() {
+  const panel = document.getElementById('learn-card-view');
+  if (!panel.classList.contains('hidden')) { panel.classList.add('hidden'); return; }
+  panel.innerHTML = '';
+  battle.party.forEach(p => {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'transform:scale(0.52);transform-origin:top center;margin:0 -82px -182px;flex-shrink:0;pointer-events:none;';
+    wrap.appendChild(buildCardEl(p.card, {noZoom:true}));
+    panel.appendChild(wrap);
+  });
+  panel.classList.remove('hidden');
+}
+
 function showNewTechCardPick() {
-  const t = pendingNewTech;
-  const mHex = ELEM(t.mainEl).hex;
+  const choice = pendingNewTech;
   const preview = document.getElementById('new-tech-preview');
-  preview.style.background = hexA(mHex, 0.10);
-  preview.style.borderColor = mHex;
-  preview.innerHTML = `
-    <div class="sk-icon">${techEnergyHTML(t)}</div>
-    <div class="sk-info">
-      <div class="sk-name" style="color:${mHex}">${t.name} <span style="color:#E8A000">${'★'.repeat(t.rank||1)}</span></div>
-      <div style="font-size:0.72rem;color:#888">${t.desc || ''}</div>
-    </div>`;
+  if (choice.type === 'tech') {
+    const t = choice.data;
+    const mHex = ELEM(t.mainEl).hex;
+    preview.style.background = hexA(mHex, 0.10);
+    preview.style.borderColor = mHex;
+    preview.innerHTML = `<div class="sk-icon">${techEnergyHTML(t)}</div>
+      <div class="sk-info">
+        <div class="sk-name" style="color:${mHex}">⚔️ ${t.name} <span style="color:#E8A000">${'★'.repeat(t.rank||1)}</span></div>
+        <div style="font-size:0.72rem;color:#888">${t.desc || ''}</div>
+      </div>`;
+  } else {
+    const { def, rank } = choice;
+    preview.style.background = 'rgba(160,64,255,0.10)';
+    preview.style.borderColor = 'rgba(160,64,255,0.5)';
+    preview.innerHTML = `<div class="sk-icon" style="font-size:1.4rem">🔮</div>
+      <div class="sk-info">
+        <div class="sk-name" style="color:#c080ff">🔮 ${def.name} <span style="color:#E8A000">${'★'.repeat(rank)}</span></div>
+        <div style="font-size:0.72rem;color:#888">${def.desc[rank] || ''}</div>
+      </div>`;
+  }
   const holder = document.getElementById('new-tech-cards');
   holder.innerHTML = '';
   battle.party.forEach(p => {
@@ -3441,10 +3493,16 @@ function showNewTechCardPick() {
 
 function teachNewTech(card) {
   document.getElementById('bonus-new-tech-overlay').classList.add('hidden');
-  const t = pendingNewTech;
-  card.techs = card.techs || [];
-  if (card.techs.length < 2) { card.techs.push(t); finishBonus(); }
-  else openBonusTechPick(card, 'discard', t);
+  const choice = pendingNewTech;
+  if (choice.type === 'skill') {
+    card.skill = { id: choice.def.id, rank: choice.rank };
+    finishBonus();
+  } else {
+    const t = choice.data;
+    card.techs = card.techs || [];
+    if (card.techs.length < 2) { card.techs.push(t); finishBonus(); }
+    else openBonusTechPick(card, 'discard', t);
+  }
 }
 
 function skipNewTech() {
