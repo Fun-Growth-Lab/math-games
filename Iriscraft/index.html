@@ -2753,9 +2753,16 @@ function attachChoiceToCard(i, choiceIdx) {
   else p.energy[ch.el]++;
   pushLog(`${p.card.name}に ${choiceLabel(ch)} をつけた`);
   battle.choices = null; battle.gained = null;
-  battle.phase = 'act';
-  renderBattle();
-  setInstr('交代：カードをタップ／攻撃：技をタップ／全力攻撃：エネルギーをトラッシュして2倍');
+  if (battle.frozenThisTurn) {
+    battle.phase = 'done';
+    pushLog(`🧊 こおっているので行動できない！`);
+    renderBattle();
+    setTimeout(enemyTurn, 800);
+  } else {
+    battle.phase = 'act';
+    renderBattle();
+    setInstr('交代：カードをタップ／攻撃：技をタップ／全力攻撃：エネルギーをトラッシュして2倍');
+  }
 }
 
 // 階層バトル開始（エネルギー初期化）
@@ -2803,11 +2810,11 @@ function beginPlayerTurn() {
     }, 900);
     return;
   }
-  if (frozen) {                                      // こおり：このターン何もできない
-    pushLog(`🧊 ${p.card.name}は こおって 動けない！`);
-    document.getElementById('turn-indicator').textContent = 'あなたのターン';
-    setTimeout(enemyTurn, 900);
-    return;
+  if (frozen) {                                      // こおり：攻撃・入れ替え不可、エネルギーだけ付けられる
+    battle.frozenThisTurn = true;
+    pushLog(`🧊 ${p.card.name}は こおっている！ エネルギーだけ付けられる`);
+  } else {
+    battle.frozenThisTurn = false;
   }
 
   // 再生の葉：生存中の全カードHP2%回復
