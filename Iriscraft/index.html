@@ -1,0 +1,3395 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <script>if(screen.orientation&&screen.orientation.lock){screen.orientation.lock('landscape').catch(function(){});}</script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Iriscraft</title>
+  <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      overflow: hidden; background: #d8d4d0;
+      font-family: "M PLUS Rounded 1c", sans-serif;
+      user-select: none; -webkit-user-select: none; touch-action: none;
+      display: flex; justify-content: center; align-items: center;
+      height: 100vh; width: 100vw;
+    }
+    #container {
+      width: 1280px; height: 720px; position: relative; background: #fafaf7;
+      box-shadow: 0 0 80px rgba(0,0,0,0.4); border-radius: 16px; overflow: hidden;
+      transform-origin: center center;
+    }
+    .hidden { display: none !important; }
+
+    /* ===== TITLE ===== */
+    #title-screen {
+      position: absolute; top:0; left:0; width:100%; height:100%;
+      background: linear-gradient(135deg, #fffaf0, #f4f0ff 50%, #fff0f8);
+      display: flex; flex-direction: column; justify-content: center; align-items: center;
+      z-index: 100;
+    }
+    .title-deco { font-size: 2.4rem; letter-spacing: 20px; margin-bottom: 20px; }
+    .title-h1 {
+      font-size: 5.5rem; font-weight: 800; letter-spacing: 10px;
+      background: linear-gradient(135deg, #D55E00, #56B4E9 40%, #009E73 70%, #E6C000);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+      margin-bottom: 10px;
+    }
+    .title-sub { font-size: 1.1rem; color: #9a8a80; letter-spacing: 6px; margin-bottom: 56px; }
+
+    /* ===== BUTTONS ===== */
+    .btn {
+      padding: 14px 32px; border-radius: 12px; border: none;
+      font-size: 1.1rem; font-weight: 800; font-family: inherit; cursor: pointer; margin: 0;
+      transition: transform 0.08s, box-shadow 0.08s; -webkit-tap-highlight-color: transparent;
+    }
+    .btn:active { transform: translateY(3px) !important; box-shadow: none !important; }
+    .btn-primary   { background: linear-gradient(180deg,#68c0ee,#2a80c0); color:white; box-shadow:0 5px 0 #1a5080; }
+    .btn-primary:hover   { transform:translateY(2px); box-shadow:0 3px 0 #1a5080; }
+    .btn-secondary { background: linear-gradient(180deg,#f8f8f8,#e8e8e8); color:#444; box-shadow:0 5px 0 #aaa; border:1px solid #ccc; }
+    .btn-secondary:hover { transform:translateY(2px); box-shadow:0 3px 0 #aaa; }
+    .btn-danger    { background: linear-gradient(180deg,#d988b4,#9a4a7a); color:white; box-shadow:0 5px 0 #6a2a50; }
+    .btn-danger:hover    { transform:translateY(2px); box-shadow:0 3px 0 #6a2a50; }
+    .btn-dim       { opacity:0.4; cursor:not-allowed; pointer-events:none; }
+    /* 切り取る・絵を変える：大きく目立たせる */
+    .btn-cut, .btn-change { font-size:1.35rem; padding:22px 32px; }
+    /* 絵を変える：オレンジ */
+    .btn-change { background:linear-gradient(180deg,#f0a850,#d07820); color:white; box-shadow:0 5px 0 #9a5410; }
+    .btn-change:hover { transform:translateY(2px); box-shadow:0 3px 0 #9a5410; }
+    /* タイトルへもどる：くすみグレー */
+    .btn-back { background:linear-gradient(180deg,#9aa0a8,#6a7078); color:white; box-shadow:0 5px 0 #484c52; }
+    .btn-back:hover { transform:translateY(2px); box-shadow:0 3px 0 #484c52; }
+    .btn-sm { padding:8px 16px; font-size:0.9rem; box-shadow:0 3px 0 #aaa; }
+
+    /* ===== GAME SCREEN ===== */
+    #game-screen { position:absolute; top:0; left:0; width:100%; height:100%; display:flex; }
+    #canvas-area {
+      position:relative; width:900px; height:720px; flex-shrink:0;
+      background:#e8e4e0; display:flex; align-items:center; justify-content:center;
+    }
+    #art-canvas { display:block; box-shadow:0 4px 28px rgba(0,0,0,0.2); }
+    #sel-frame {
+      position:absolute; width:200px; height:200px; border:2.5px dashed #333;
+      box-shadow:0 0 0 1.5px rgba(255,255,255,0.85); cursor:grab; background:rgba(255,255,255,0.06);
+    }
+    #sel-frame.dragging { cursor:grabbing; }
+    .fc { position:absolute; width:14px; height:14px; border-color:#111; border-style:solid; }
+    .fc.tl{top:-2px;left:-2px;border-width:3px 0 0 3px}
+    .fc.tr{top:-2px;right:-2px;border-width:3px 3px 0 0}
+    .fc.bl{bottom:-2px;left:-2px;border-width:0 0 3px 3px}
+    .fc.br{bottom:-2px;right:-2px;border-width:0 3px 3px 0}
+
+    /* ===== PANEL ===== */
+    #panel {
+      flex:1; background:white; border-left:1px solid #e0e0e0;
+      display:flex; flex-direction:column; padding:32px 22px 28px;
+    }
+    .panel-logo {
+      font-size:1.8rem; font-weight:800; letter-spacing:4px; margin-bottom:6px;
+      background:linear-gradient(135deg,#D55E00,#56B4E9);
+      -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+    }
+    .panel-inst { font-size:0.78rem; color:#aaa; line-height:1.8; margin-bottom:24px; }
+    .section-label { font-size:0.7rem; font-weight:800; letter-spacing:2px; color:#bbb; text-transform:uppercase; margin-bottom:10px; }
+    .color-bars { display:flex; flex-direction:column; gap:9px; }
+    .cbar-row { display:flex; align-items:center; gap:8px; }
+    .cbar-swatch { width:14px; height:14px; border-radius:3px; flex-shrink:0; }
+    .cbar-name { font-size:0.72rem; font-weight:700; color:#777; min-width:40px; flex-shrink:0; }
+    .cbar-bg { flex:1; height:12px; background:#f0f0f0; border-radius:6px; overflow:hidden; }
+    .cbar-fill { height:100%; border-radius:6px; width:0%; transition:width 0.6s cubic-bezier(0.4,0,0.2,1); }
+    .cbar-pct { font-size:0.78rem; font-weight:800; color:#333; min-width:36px; text-align:right; }
+    .panel-btns { margin-top:auto; display:flex; flex-direction:column; gap:13px; }
+    .panel-btns .btn { width:100%; }
+
+    /* ===== OVERLAYS ===== */
+    .overlay {
+      position:absolute; top:0; left:0; width:100%; height:100%;
+      background:rgba(0,0,0,0.52); display:flex; align-items:center; justify-content:center; z-index:200;
+    }
+    .dialog-box {
+      background:white; border-radius:20px; padding:28px 36px; text-align:center;
+      box-shadow:0 12px 48px rgba(0,0,0,0.28);
+    }
+    .dialog-canvas { display:block; margin:0 auto 14px; border:2px solid #e0e0e0; box-shadow:0 3px 14px rgba(0,0,0,0.1); }
+    .dialog-msg { font-size:1.25rem; font-weight:800; color:#333; margin-bottom:6px; }
+    .dialog-sub { font-size:0.78rem; color:#aaa; margin-bottom:18px; }
+    .dialog-btns { display:flex; gap:10px; justify-content:center; }
+
+    /* Result */
+    .result-top { display:flex; gap:24px; align-items:stretch; margin-bottom:14px; }
+    .res-rows { display:flex; flex-direction:column; justify-content:space-between; gap:8px; min-width:300px; flex:1; }
+    .rbar-row { display:flex; align-items:center; gap:9px; flex:1; }
+    .rbar-swatch { width:18px; height:18px; border-radius:4px; flex-shrink:0; }
+    .rbar-name { font-size:1.0rem; font-weight:800; color:#666; min-width:30px; flex-shrink:0; }
+    .rbar-bg { flex:1; height:18px; background:#f0f0f0; border-radius:9px; overflow:hidden; }
+    .rbar-fill { height:100%; border-radius:9px; width:0%; transition:width 0.8s cubic-bezier(0.4,0,0.2,1); }
+    .rbar-val  { font-size:1.05rem; font-weight:800; color:#333; min-width:30px; text-align:right; }
+    .rbar-boost { font-size:0.95rem; color:#B8860B; font-weight:800; white-space:nowrap; min-width:70px; text-align:left; padding-left:4px; }
+    .info-box {
+      background:#f8f8f8; border:1px solid #eee; border-radius:8px;
+      padding:10px 16px; margin-bottom:14px; max-width:620px;
+      font-size:0.92rem; color:#555; font-weight:700; line-height:1.7;
+    }
+    .info-box .orb-list { display:inline-flex; flex-wrap:wrap; gap:4px 12px; vertical-align:middle; }
+    .info-box span.fig-num { font-size:1.4rem; font-weight:800; color:#333; margin:0 3px; }
+
+    /* ===== SKILL SELECTION ===== */
+    #skill-select-overlay .dialog-box { min-width:520px; }
+    .skill-opts { display:flex; flex-direction:column; gap:8px; margin:14px 0; }
+    .skill-opt {
+      display:flex; align-items:center; gap:12px;
+      padding:10px 14px; border:2.5px solid #e0e0e0; border-radius:12px;
+      cursor:pointer; transition:all 0.1s; text-align:left;
+    }
+    .skill-opt:hover  { filter:brightness(0.96); }
+    .skill-opt.sel    { border-width:3px; box-shadow:0 4px 14px rgba(0,0,0,0.18); filter:brightness(0.96); }
+    .skill-opt.dimmed { opacity:0.35; cursor:not-allowed; pointer-events:none; }
+    .sk-icon  { font-size:1.1rem; flex-shrink:0; min-width:32px; text-align:center; white-space:nowrap; letter-spacing:-2px; }
+    .sk-info  { flex:1; }
+    .sk-name  { font-size:0.95rem; font-weight:800; }
+    .sk-uses  { font-size:0.88rem; font-weight:800; min-width:40px; text-align:right; }
+    .sk-check {
+      width:24px; height:24px; border-radius:50%; flex-shrink:0;
+      background:#56B4E9; color:white; font-size:0.9rem; font-weight:800;
+      display:flex; align-items:center; justify-content:center;
+      opacity:0; transition:opacity 0.12s; margin-left:4px;
+    }
+    .skill-opt.sel .sk-check { opacity:1; }
+
+    /* ===== CARDS OVERLAY ===== */
+    #cards-overlay .dialog-box { width:1260px; max-width:99%; padding:20px 24px; }
+    .cards-hdr { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+    .cards-title { font-size:1.15rem; font-weight:800; color:#333; }
+    .cards-badge { background:#f0f0f0; border-radius:20px; padding:3px 12px; font-size:0.82rem; font-weight:800; color:#666; }
+    #card-grid { display:flex; flex-wrap:nowrap; gap:12px; justify-content:center; align-items:flex-start; }
+    #card-grid .card { transform:none; }
+
+    /* ===== CARD（上下2段×左右3列） ===== */
+    .card {
+      width:440px;
+      background: linear-gradient(170deg, #fffefa 0%, #f2f4ff 100%);
+      border: 2.5px solid #c0a030;
+      border-radius: 12px; padding: 9px 11px;
+      display: flex; flex-direction: column; gap: 8px;
+      box-shadow: 0 0 0 1px rgba(255,240,140,0.7) inset,
+                  0 6px 18px rgba(0,0,0,0.22), 0 2px 6px rgba(0,0,0,0.12);
+      flex-shrink: 0;
+    }
+    /* 上段：左=イラスト / 中=属性4つ / 右=弱点・抵抗（大） */
+    .card-top { display:flex; gap:9px; align-items:stretch; }
+    .card-col-img { flex-shrink:0; display:flex; }   /* イラストのみ・HP行は外へ */
+    .card-col-mid { flex:1; display:flex; min-width:0; }
+    .card-col-wr  { width:90px; flex-shrink:0; display:flex; flex-direction:column; gap:7px; }
+
+    /* イラスト枠（card-top高さいっぱい・正方形） */
+    .card-img-box {
+      height:100%; aspect-ratio:1/1; position:relative; align-self:stretch;
+      border:1px solid rgba(192,160,48,0.35); border-radius:6px;
+      overflow:hidden; background:#f4f4f0;
+    }
+    .card-img-box canvas { display:block; width:100%; height:100%; }
+    .card-energy-strip { position:absolute; left:0; right:0; bottom:0;
+      display:flex; gap:3px; align-items:center; padding:4px 6px; min-height:0;
+      background:rgba(0,0,0,0.65); font-size:1.8rem; line-height:1; flex-wrap:wrap; }
+    .card-energy-strip:empty { display:none; }
+
+    /* HP（フル幅バー） */
+    .card-hp-row { display:flex; align-items:center; gap:7px; flex-shrink:0; }
+    .card-hp-lbl { font-size:1.05rem; font-weight:800; color:#888; min-width:28px; }
+    .card-hp-bg  { flex:1; height:22px; background:#e8e8e8; border-radius:11px; overflow:hidden; }
+    .card-hp-fill { height:100%; background:#34d399; border-radius:11px; width:100%; transition:background 0.4s; }
+    .card-hp-num { font-size:1.15rem; font-weight:800; color:#445; min-width:46px; text-align:right; }
+
+    /* 属性（縦リスト・4行） */
+    .card-attrs-col { flex:1; display:flex; flex-direction:column; gap:6px; }
+    .card-attr2 { display:flex; align-items:center; gap:6px; flex:1; min-height:36px;
+      background:rgba(255,255,255,0.65); border:1px solid rgba(192,160,48,0.35); border-radius:6px; padding:2px 8px; }
+    .card-attr2-emoji { font-size:1.35rem; flex-shrink:0; }
+    .card-attr2-grade { font-family:"M PLUS Rounded 1c",sans-serif; font-weight:900; font-size:1.3rem;
+      -webkit-text-stroke:2px rgba(255,255,255,0.9); paint-order:stroke fill; min-width:30px; text-align:center; flex-shrink:0; }
+    .card-attr2-val { font-weight:800; flex:1; text-align:right; font-size:1.25rem; }
+
+    /* 技（横いっぱい・2段：名前+★ / エネ・ダメージ数値） */
+    .card-techs { display:flex; flex-direction:row; gap:7px; flex-shrink:0; }
+    .card-tech-name-row { display:flex; align-items:center; gap:5px; }
+    .card-tech-stars { color:#E8A000; font-size:1.0rem; }
+    .card-tech { display:flex; flex-direction:column; justify-content:center; align-items:center; gap:4px; border:1.5px solid; border-radius:6px;
+      padding:6px 10px; flex:1; text-align:center; }
+    .card-tech.empty { border-style:dashed; border-color:#ddd; }
+    .card-tech-name { font-size:1.05rem; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.1; }
+    .card-tech-energy { font-size:1.9rem; flex-shrink:0; letter-spacing:-2px; line-height:1.1; }
+    .card-tech-dmg { color:#333; font-size:2.0rem; font-weight:900; }
+
+    /* 弱点・抵抗（右列・大きな縦ボックス） */
+    .card-wr-box { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
+      border-radius:7px; padding:4px 2px; font-size:0.7rem; font-weight:800; border:2px solid; }
+    .card-wr-box .wk-mark { font-size:1.5rem; font-weight:900; line-height:1; }
+    .card-wr-box .wk-elem { font-size:2.6rem; line-height:1; }
+
+    /* スキルボックス（色付き・中央寄せ2行） */
+    .card-skill {
+      flex:1; min-height:0; border:1.5px solid; border-radius:7px;
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      padding:2px 4px; overflow:hidden; gap:2px;
+    }
+    .card-skill.empty { border-style:dashed; border-color:#ddd; background:none; }
+    .card-skill-name { font-size:0.62rem; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; text-align:center; }
+    .card-skill-lv   { font-size:0.52rem; font-weight:800; white-space:nowrap; letter-spacing:0.5px; }
+    .card-skill-empty-lbl { font-size:0.55rem; font-weight:700; color:#ccc; }
+
+    /* サイコロの面（一列表示） */
+    .card-dice {
+      display:flex; gap:3px; flex-shrink:0; align-items:center; justify-content:center;
+      background:rgba(255,255,255,0.5); border:1px solid rgba(192,160,48,0.3);
+      border-radius:6px; padding:3px;
+    }
+    .dice-face {
+      width:15px; height:15px; border-radius:3px; flex-shrink:0;
+      border:1px solid rgba(0,0,0,0.2);
+      box-shadow:0 1px 1px rgba(0,0,0,0.15);
+      overflow:hidden; position:relative;
+    }
+    .dice-face-half { position:absolute; top:0; width:50%; height:100%; }
+    .dice-num { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+      color:#fff; font-size:0.6rem; font-weight:800; text-shadow:0 1px 1px rgba(0,0,0,0.7); z-index:2; }
+
+    /* カード拡大表示 */
+    #card-zoom-overlay { z-index:300; cursor:pointer; }
+    #card-zoom-holder { transform:scale(1.7); transform-origin:center; }
+    #card-grid .card { cursor:pointer; transition:transform 0.1s; }
+    #card-grid .card:hover { transform:translateY(-3px); box-shadow:0 0 0 1px rgba(255,240,140,0.7) inset, 0 10px 22px rgba(0,0,0,0.28); }
+
+    /* ===== ADVENTURE / BATTLE ===== */
+    #adventure-screen { position:absolute; inset:0;
+      background:linear-gradient(180deg,#2a2440,#15101f); color:#e8e0ff; }
+    .adv-fullscreen { position:absolute; inset:0; z-index:10;
+      display:flex; align-items:center; justify-content:center;
+      background:rgba(10,6,20,0.82); }
+    .adv-panel { text-align:center; display:flex; flex-direction:column; align-items:center; gap:8px;
+      background:linear-gradient(180deg,#2e2848,#1c1730); border:2px solid #5a4a90;
+      border-radius:18px; padding:38px 54px; box-shadow:0 12px 48px rgba(0,0,0,0.5); }
+    .adv-title { font-size:1.8rem; font-weight:800; color:#fff; }
+    .adv-sub { font-size:0.95rem; color:#b8aee0; margin-bottom:14px; }
+    .diff-btns { display:flex; gap:14px; margin-top:10px; }
+    .diff-btn { width:150px; display:flex; flex-direction:column; gap:4px; padding:18px 0; font-size:1.1rem !important; }
+    .diff-btn span { font-size:0.8rem; font-weight:700; opacity:0.9; }
+    .select-side-label { font-size:0.85rem; font-weight:800; color:#c8bef0; margin-bottom:8px; text-align:center; }
+    .fighter-pick { cursor:pointer; transition:transform 0.1s; }
+    .fighter-pick:hover { transform:translateY(-6px); }
+    .fighter-pick.dead { filter:grayscale(1) brightness(0.55); cursor:not-allowed; pointer-events:none; }
+    .fighter-hp { text-align:center;color:#fff;font-weight:800;margin-top:7px;font-size:0.95rem; }
+    /* 敵カード（味方カードと同構成・色違い） */
+    .card-enemy { border-color:#a04a6a !important;
+      background:linear-gradient(170deg,#fff0f4,#ffe4ee) !important;
+      box-shadow:0 0 0 1px rgba(255,180,200,0.7) inset, 0 6px 18px rgba(0,0,0,0.4) !important; }
+    /* 選択画面の行：味方と敵を同じ高さ・大きさで */
+    .select-row { display:flex; gap:26px; align-items:flex-start; justify-content:center; margin-top:16px;
+      zoom:1.12; }
+    .select-group { display:flex; flex-direction:column; align-items:center; }
+    .select-cards { display:flex; gap:14px; align-items:flex-start; }
+    /* 敵カード */
+    .enemy-card {
+      width:166px; background:linear-gradient(180deg,#3a2438,#241624);
+      border:2.5px solid #a04a6a; border-radius:12px; padding:9px;
+      display:flex; flex-direction:column; gap:6px; color:#fce;
+      box-shadow:0 6px 18px rgba(0,0,0,0.4);
+    }
+    .enemy-card-name { font-size:0.82rem; font-weight:800; text-align:center; color:#fff; }
+    .enemy-card-img { width:148px; height:100px; border-radius:6px; background:#1a0e16;
+      display:flex; align-items:center; justify-content:center; font-size:3rem; align-self:center; }
+    .enemy-card-hp { font-size:0.75rem; font-weight:800; }
+    .enemy-card-hpbar { height:8px; background:rgba(0,0,0,0.4); border-radius:4px; overflow:hidden; }
+    .enemy-card-hpbar > div { height:100%; background:linear-gradient(90deg,#e05070,#a02850); }
+    .enemy-card-attrs { display:grid; grid-template-columns:1fr 1fr; gap:3px; }
+    .enemy-card-attr { display:flex; align-items:center; gap:3px; font-size:0.72rem; font-weight:800; }
+    .enemy-card-attr-icon { width:9px; height:9px; border-radius:2px; }
+    .enemy-card-wr { font-size:0.72rem; font-weight:800; display:flex; flex-direction:column; gap:2px; }
+
+    .battle-top { position:absolute; top:0; left:0; right:0; height:48px;
+      display:flex; align-items:center; justify-content:space-between; padding:0 20px;
+      background:rgba(0,0,0,0.3); }
+    .floor-info { font-size:1.2rem; font-weight:800; color:#ffe; }
+    .floor-info span { color:#ffd454; }
+
+    #turn-indicator { font-size:1.0rem; font-weight:800; color:#ffe0a0; }
+    /* 左=カード / 右=メッセージ */
+    #battle-area { position:absolute; inset:0; display:flex; flex-direction:column; }
+    .battle-top { position:static; height:32px; flex-shrink:0; }
+    .battle-main { flex:1; display:flex; min-height:0; }
+    .battle-left { flex:1; display:flex; flex-direction:column; min-width:0; position:relative; }
+    #energy-dock-center { display:flex; justify-content:center; pointer-events:none; flex-shrink:0; }
+    #energy-dock-center .dock-inner { pointer-events:auto; background:rgba(20,14,30,0.9);
+      border:1px solid rgba(255,255,255,0.2); border-radius:14px; padding:8px 18px; width:100%; }
+    .enemy-zone, .player-zone { flex:1; display:flex; align-items:center; min-height:0; position:relative; }
+    .battle-rightpanel { width:300px; flex-shrink:0; display:flex; flex-direction:column; gap:10px;
+      padding:12px; background:rgba(0,0,0,0.22); border-left:1px solid rgba(255,255,255,0.12); }
+    .battle-rightpanel #turn-indicator { font-size:1.1rem; font-weight:800; color:#ffe0a0; text-align:center; }
+    .battle-rightpanel #battle-instr { font-size:0.92rem; font-weight:800; color:#fff; text-align:center; min-height:2.4em; }
+    .battle-rightpanel .btn { width:100%; }
+    .battle-rightpanel .battle-log { position:static; transform:none; width:auto; flex:1;
+      display:flex; flex-direction:column; justify-content:flex-end; align-items:stretch; gap:2px; overflow:hidden; }
+    .battle-rightpanel .log-line { background:rgba(0,0,0,0.3); font-size:0.8rem; padding:2px 8px; text-align:left; }
+
+    /* 1ゾーン：左スロット・場(中央)・右スロット */
+    .zone-row { flex:1; display:flex; align-items:center; justify-content:center; gap:8px; overflow:visible; }
+    /* zone-slot幅 = カード実幅440px × scale0.72 = 317px */
+    .zone-slot, .zone-row > .battle-card-wrap { width:317px; flex-shrink:0; overflow:visible; }
+    .zone-slot { display:flex; align-items:center; overflow:visible; }
+    /* 控えカードを外端（画面端）寄せ */
+    .zone-slot.left  { justify-content:flex-start; }
+    .zone-slot.right { justify-content:flex-end; }
+    /* 全カード同じスケール＋ネガティブマージンでレイアウト幅を視覚幅に圧縮 */
+    .zone-row { padding:0 20px; }
+    .zone-row .battle-card-wrap { transform:scale(0.72); transform-origin:center;
+      margin:0 -61px; transition:transform 0.15s; }
+    .zone-row .battle-card-wrap.fwd { z-index:5; }
+    /* 控えカード：小さめ（scale0.62）＋縦・横オフセットでゾーン内に収める */
+    .player-zone .zone-slot.left  .battle-card-wrap.bench { transform:translateY(38px) translateX(-50px) scale(0.62); opacity:0.88; margin:0 -84px; }
+    .player-zone .zone-slot.right .battle-card-wrap.bench { transform:translateY(38px) translateX(50px)  scale(0.62); opacity:0.88; margin:0 -84px; }
+    .enemy-zone  .zone-slot.left  .battle-card-wrap.bench { transform:translateY(-38px) translateX(-50px) scale(0.62); opacity:0.88; margin:0 -84px; }
+    .enemy-zone  .zone-slot.right .battle-card-wrap.bench { transform:translateY(-38px) translateX(50px)  scale(0.62); opacity:0.88; margin:0 -84px; }
+    /* ゾーンからはみ出た控えカードをクリップ */
+    .enemy-zone, .player-zone { overflow:hidden; }
+
+    .battle-card-wrap { display:flex; flex-direction:column; align-items:center; gap:4px; cursor:pointer; position:relative; }
+    .enemy-zone .active-wrap .battle-card-wrap { cursor:default; }
+    .card.active-card { outline:4px solid #ffd454; outline-offset:2px; }
+    .card.dead { filter:grayscale(1) brightness(0.55); }
+
+    /* エネルギー表示（カードの下） */
+    .energy-pool { display:flex; gap:2px; justify-content:center; flex-wrap:wrap; min-height:24px;
+      font-size:1.3rem; line-height:1; max-width:170px; }
+
+    /* 技ボタン化 */
+    .card-tech.usable { cursor:pointer; box-shadow:0 0 8px rgba(255,212,84,0.9); }
+    .card-tech.usable.trash-ready { box-shadow:0 0 10px rgba(255,80,60,0.95); border-color:#ff503c !important; }
+    .card-tech-dmg.dmg-trash { color:#ff2d2d; font-size:0.86rem; }
+    /* クリアボーナス選択 */
+    .bonus-card { width:180px; min-height:150px; cursor:pointer;
+      background:linear-gradient(170deg,#2e2848,#1c1730); border:2px solid #5a4a90; border-radius:14px;
+      padding:16px 12px; display:flex; flex-direction:column; align-items:center; gap:8px; transition:all 0.12s; }
+    .bonus-card:hover { border-color:#ffd454; transform:translateY(-5px); box-shadow:0 8px 20px rgba(0,0,0,0.4); }
+    .bonus-icon { font-size:2.6rem; }
+    .bonus-name { font-size:1.05rem; font-weight:800; color:#fff; text-align:center; }
+    .bonus-desc { font-size:0.8rem; color:#b8aee0; text-align:center; line-height:1.4; }
+
+    /* 状態異常バッジ（カード名の横に inline 表示） */
+    .status-badges { display:inline-flex; gap:2px; margin-left:6px; vertical-align:middle; }
+    .status-badge { font-size:1.0rem; background:rgba(0,0,0,0.55); border-radius:8px; padding:1px 4px;
+      border:1px solid rgba(255,255,255,0.3); }
+    .card-tech.unusable { opacity:0.4; }
+    #trash-btn.trash-on { box-shadow:0 0 12px rgba(255,80,60,0.9); filter:brightness(1.15); }
+
+    /* 獲得エネルギー（右パネル） */
+    #gained-energy-box { display:flex; flex-direction:row; align-items:center; justify-content:center; gap:8px;
+      min-height:60px; color:#ffe0a0; font-weight:800; }
+    .gained-token { font-size:3rem; filter:drop-shadow(0 0 10px rgba(255,255,255,0.7));
+      animation:bob 1s ease-in-out infinite; }
+    /* 中央ドック */
+    .dock-inner { display:flex; align-items:center; gap:12px; }
+    .dock-label { font-size:0.78rem; font-weight:800; color:#ddd; }
+    .dock-choices { display:flex; gap:12px; }
+    .dock-token { cursor:grab; touch-action:none; user-select:none;
+      border:2px solid rgba(255,255,255,0.35); border-radius:12px; padding:4px 12px;
+      background:rgba(255,255,255,0.08); font-size:2.2rem; line-height:1;
+      filter:drop-shadow(0 0 6px rgba(255,255,255,0.5)); transition:transform 0.1s; }
+    .dock-token:hover { border-color:#ffd454; transform:translateY(-3px); }
+    .dock-inner .btn { min-width:120px; }
+    /* ドラッグゴースト＆ドロップ先 */
+    .drag-ghost { position:fixed; transform:translate(-50%,-50%); z-index:600; pointer-events:none;
+      font-size:2.4rem; filter:drop-shadow(0 0 8px rgba(255,255,255,0.9)); }
+    .battle-card-wrap.drop-hover .card { outline:4px dashed #4ad04a; outline-offset:2px; }
+    /* バトルログ見出し */
+    .battle-items-title { font-size:0.72rem; font-weight:800; color:#c0a030; border-top:1px solid rgba(255,255,255,0.12); padding-top:4px; padding-bottom:2px; text-transform:uppercase; letter-spacing:0.08em; }
+    #battle-items { display:flex; flex-wrap:wrap; gap:4px; min-height:24px; margin-bottom:4px; }
+    .battle-item-badge { background:rgba(0,0,0,0.5); border:1px solid rgba(255,200,50,0.5); border-radius:8px; padding:2px 7px; font-size:0.85rem; color:#ffe; white-space:nowrap; }
+    .battle-log-title { font-size:0.72rem; font-weight:800; color:#9a90c0; border-top:1px solid rgba(255,255,255,0.12);
+      padding-top:6px; margin-top:2px; }
+    @keyframes bob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-5px)} }
+
+    /* ダメージ表示＆シェイク */
+    .dmg-pop { position:absolute; top:30%; left:50%; transform:translateX(-50%);
+      font-size:2.2rem; font-weight:900; color:#ff5a3a; z-index:20; pointer-events:none;
+      -webkit-text-stroke:3px #fff; paint-order:stroke fill;
+      animation:dmgPop 0.8s ease-out forwards; }
+    @keyframes dmgPop { 0%{opacity:0;transform:translate(-50%,10px) scale(0.6)} 25%{opacity:1;transform:translate(-50%,-10px) scale(1.2)} 100%{opacity:0;transform:translate(-50%,-50px) scale(1)} }
+    .shake { animation:shake 0.4s; }
+    @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} }
+
+    .combatant {
+      background:linear-gradient(180deg,rgba(255,255,255,0.1),rgba(255,255,255,0.04));
+      border:1.5px solid rgba(255,255,255,0.25); border-radius:14px; padding:12px 16px; }
+    .cb-name { font-size:1.1rem; font-weight:800; color:#fff; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; gap:10px; }
+    .cb-hpbar-bg { height:16px; background:rgba(0,0,0,0.4); border-radius:8px; overflow:hidden; margin-bottom:4px; }
+    .cb-hpbar-fill { height:100%; background:linear-gradient(90deg,#3cd070,#28a050); border-radius:8px; transition:width 0.3s; }
+    .cb-hp-num { font-size:0.85rem; font-weight:800; color:#dfe; text-align:right; }
+    .cb-attrs { display:flex; gap:10px; margin-top:6px; }
+    .cb-attr { display:flex; align-items:center; gap:3px; font-size:0.8rem; font-weight:800; color:#fff; }
+    .cb-attr-icon { width:11px; height:11px; border-radius:2px; }
+    .cb-wr { display:flex; gap:14px; margin-top:6px; font-size:0.8rem; font-weight:700; }
+    .cb-weak { color:#ff8a8a; } .cb-resist { color:#8ab4ff; }
+    .cb-dice { display:flex; gap:4px; margin-top:8px; align-items:center; }
+    .cb-dice .dice-face { width:18px; height:18px; }
+
+    .battle-log { position:absolute; bottom:40px; left:50%; transform:translateX(-50%);
+      width:500px; display:flex; flex-direction:column; gap:3px; align-items:center; pointer-events:none; }
+    .battle-log .log-line:not(:last-child) { opacity:0.55; }
+    /* ダイス出目の強調表示 */
+    .dice-face.rolled { outline:3px solid #ffd454; outline-offset:1px;
+      transform:scale(1.35); box-shadow:0 0 10px #ffd454; transition:all 0.15s; }
+    .log-line { font-size:0.95rem; font-weight:700; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.8);
+      background:rgba(0,0,0,0.35); padding:3px 14px; border-radius:12px; }
+    .log-dmg { color:#ffd454; }
+    .log-crit { color:#ff7a4a; font-size:1.05rem; }
+
+    /* カード名 */
+    .card-name {
+      height:26px; flex-shrink:0;
+      display:flex; align-items:center; justify-content:center;
+      font-size:1.0rem; font-weight:800; color:#5a4010;
+      letter-spacing:0.5px; overflow:hidden; white-space:nowrap;
+      border-bottom:1px solid rgba(192,160,48,0.3);
+      padding-bottom:2px;
+    }
+    .card-name.empty { color:#ccc; font-weight:700; }
+
+    /* 強化バナー */
+    #enhance-banner { position:absolute; top:0; left:0; right:0; z-index:90;
+      background:linear-gradient(90deg,#7a4a18,#a06830); color:#fff; text-align:center;
+      padding:8px; font-weight:800; font-size:1rem; box-shadow:0 2px 8px rgba(0,0,0,0.3); }
+    /* 合成・スキル再選択オーバーレイ */
+    #merge-overlay .dialog-box { display:flex; gap:20px; align-items:flex-start; padding:16px 20px; max-width:98%; }
+    .merge-sidebar { width:150px; flex-shrink:0; display:flex; flex-direction:column; text-align:left; }
+    .merge-sidebar .dialog-msg { font-size:1rem; margin-bottom:6px; }
+    .merge-sidebar .dialog-sub { font-size:0.76rem; color:#888; margin-bottom:0; }
+    .merge-side-label { font-size:0.8rem; font-weight:800; padding:3px 6px; border-radius:4px; white-space:nowrap; }
+    .merge-side-label.mat  { color:#b07820; background:rgba(176,120,32,0.1); margin-top:14px; }
+    .merge-side-label.pick { color:#555;    background:rgba(0,0,0,0.06);     margin-top:auto; padding-top:12px; }
+    .merge-main { flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; }
+    #merge-choices { display:flex; gap:10px; justify-content:center; }
+    #merge-material { display:flex; justify-content:center; }
+    .merge-main .fighter-pick {
+      transform:scale(0.58); transform-origin:top center;
+      margin: 0 -80px calc((1 - 0.58) * -350px);
+    }
+    .merge-main #merge-material .card {
+      transform:scale(0.78); transform-origin:top center;
+      margin: 0 auto calc((1 - 0.78) * -350px);
+    }
+    #merge-overlay .fighter-hp { font-size:1.0rem; }
+
+    /* 出発画面カードのスケール（zoom不使用でWRレイアウト保持） */
+    #depart-cards .card { transform:scale(0.72); transform-origin:top center; margin:0 -53px; }
+  </style>
+</head>
+<body>
+<div id="container">
+
+  <!-- TITLE -->
+  <div id="title-screen">
+    <div class="title-deco">
+      <span style="color:#D55E00">●</span>
+      <span style="color:#56B4E9">■</span>
+      <span style="color:#009E73">▲</span>
+      <span style="color:#E6C000">◆</span>
+    </div>
+    <h1 class="title-h1">Iriscraft</h1>
+    <p class="title-sub">色と図形の世界へ</p>
+    <button class="btn btn-primary" onclick="startGame()" style="min-width:220px;font-size:1.2rem;padding:15px 40px">あそぶ</button>
+  </div>
+
+  <!-- GAME -->
+  <div id="game-screen" class="hidden">
+    <div id="enhance-banner" class="hidden">⚒ 強化カードを作ろう！ 図形を切り取ってください</div>
+    <div id="canvas-area">
+      <canvas id="art-canvas" width="840" height="600"></canvas>
+      <div id="sel-frame">
+        <div class="fc tl"></div><div class="fc tr"></div>
+        <div class="fc bl"></div><div class="fc br"></div>
+      </div>
+    </div>
+    <div id="panel">
+      <div class="panel-logo">Iriscraft</div>
+      <p class="panel-inst" id="panel-inst">枠をドラッグして場所を選び<br>「切り取る」を押してください。<br>カードを<b>3枚</b>つくって冒険へ！</p>
+      <p class="section-label">色の面積</p>
+      <div class="color-bars" id="side-bars"></div>
+      <div class="panel-btns">
+        <button class="btn btn-primary btn-cut" onclick="showConfirm()">✂ 切り取る</button>
+        <button class="btn btn-change" onclick="doRegenerate()">🎨 絵を変える</button>
+        <button class="btn btn-secondary" onclick="showCards()">🃏 カードを見る</button>
+        <button class="btn btn-back" onclick="backToTitle()">🏠 タイトルへもどる</button>
+      </div>
+    </div>
+
+    <!-- Confirm -->
+    <div id="confirm-overlay" class="overlay hidden">
+      <div class="dialog-box">
+        <canvas id="confirm-canvas" class="dialog-canvas" width="200" height="200"></canvas>
+        <p class="dialog-msg">ここで切り取りますか？</p>
+        <p class="dialog-sub">この範囲の色の面積を計算します</p>
+        <div class="dialog-btns">
+          <button class="btn btn-danger"  onclick="hideConfirm()">やりなおす</button>
+          <button class="btn btn-primary" onclick="doCut()">切り取る！</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Result -->
+    <div id="result-overlay" class="overlay hidden">
+      <div class="dialog-box">
+        <p class="dialog-msg" style="margin-bottom:14px">切り取り結果</p>
+        <div class="result-top">
+          <canvas id="result-canvas" class="dialog-canvas" width="200" height="200" style="margin:0;flex-shrink:0"></canvas>
+          <div class="res-rows" id="res-rows"></div>
+        </div>
+        <div class="info-box" id="info-box"></div>
+        <div class="dialog-btns">
+          <button class="btn btn-secondary" onclick="closeResult()">やりなおす</button>
+          <button class="btn btn-primary"   id="result-make-btn" onclick="finalizeCard()">カードを作る！</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Skill Selection -->
+    <div id="skill-select-overlay" class="overlay hidden">
+      <div class="dialog-box">
+        <p class="dialog-msg">技を２つ選ぶ</p>
+        <p class="dialog-sub">図形が多いほど技の候補が増える</p>
+        <div class="skill-opts" id="skill-opts"></div>
+        <div class="dialog-btns">
+          <button class="btn btn-primary btn-dim" id="skill-confirm-btn" onclick="finalizeCard()">カードを作る！</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 合成（強化先を選ぶ） -->
+    <div id="merge-overlay" class="overlay hidden">
+      <div class="dialog-box">
+        <!-- 左列: 説明テキスト -->
+        <div class="merge-sidebar">
+          <p class="dialog-msg">どのカードを<br>強化する？</p>
+          <p class="dialog-sub">全カードを1回ずつ強化するまで、同じカードは強化できません</p>
+          <div class="merge-side-label mat">▲ 強化素材<br>（この値が増える）</div>
+          <div class="merge-side-label pick">▼ 強化する<br>カードをえらぶ</div>
+        </div>
+        <!-- 右列: カード -->
+        <div class="merge-main">
+          <div id="merge-material"></div>
+          <div id="merge-choices"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 強化完了メッセージ -->
+    <div id="enhance-done-overlay" class="overlay hidden">
+      <div class="dialog-box" style="text-align:center">
+        <div style="font-size:3rem;margin-bottom:10px">✨</div>
+        <p class="dialog-msg" id="enhance-done-msg">カードが強化された！</p>
+        <p class="dialog-sub" id="enhance-done-sub"></p>
+        <div class="dialog-btns" style="margin-top:18px">
+          <button class="btn btn-primary" onclick="afterEnhanceDone()" style="min-width:200px">つぎの階へ →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- スキル再選択 -->
+    <div id="reskill-overlay" class="overlay hidden">
+      <div class="dialog-box" style="min-width:520px">
+        <p class="dialog-msg">技をえらび直す</p>
+        <p class="dialog-sub">今の技2つ＋強化カードの技2つ から2つえらぶ</p>
+        <div class="skill-opts" id="reskill-opts"></div>
+        <div class="dialog-btns">
+          <button class="btn btn-primary btn-dim" id="reskill-confirm-btn" onclick="confirmReskill()">決定！</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Depart -->
+    <div id="depart-overlay" class="overlay hidden">
+      <div class="dialog-box" style="text-align:center;max-width:98%">
+        <p class="dialog-msg" style="margin-bottom:14px">このカードで冒険に出ます！</p>
+        <div id="depart-cards" style="display:flex;gap:10px;justify-content:center;overflow:visible"></div>
+        <div class="dialog-btns" style="margin-top:20px;flex-direction:column;align-items:center;gap:10px">
+          <button class="btn btn-primary" onclick="goAdventure()" style="min-width:220px;font-size:1.2rem;padding:14px">出発！</button>
+          <button class="btn btn-secondary" onclick="showDepartReset()" style="min-width:160px">やりなおす</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 出発画面「やりなおす」確認ダイアログ -->
+    <div id="depart-reset-overlay" class="overlay hidden">
+      <div class="dialog-box" style="text-align:center;max-width:420px">
+        <p class="dialog-msg" style="margin-bottom:8px">タイトルにもどりますか？</p>
+        <p style="font-size:0.95rem;color:#888;margin-bottom:18px">カード作成の内容はリセットされます</p>
+        <div class="dialog-btns">
+          <button class="btn btn-danger"    onclick="confirmDepartReset()">はい</button>
+          <button class="btn btn-secondary" onclick="hideDepartReset()">いいえ</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== ADVENTURE ===== -->
+  <div id="adventure-screen" class="hidden">
+
+    <!-- 難易度選択 -->
+    <div id="difficulty-overlay" class="adv-fullscreen">
+      <div class="adv-panel">
+        <div class="adv-title">難易度をえらぶ</div>
+        <div class="diff-btns">
+          <button class="btn btn-primary diff-btn" onclick="startAdventure('easy')">やさしい</button>
+          <button class="btn btn-change diff-btn"  onclick="startAdventure('normal')">ふつう</button>
+          <button class="btn btn-danger diff-btn"  onclick="startAdventure('hard')">むずかしい</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- バトル画面（左=カード / 右=メッセージ） -->
+    <div id="battle-area" class="hidden">
+      <div class="battle-main" style="margin-top:0">
+        <!-- 左：カード（敵=奥 / 自分=手前） -->
+        <div class="battle-left">
+          <div class="enemy-zone"><div class="zone-row" id="enemy-row"></div></div>
+          <div class="player-zone"><div class="zone-row" id="player-row"></div></div>
+        </div>
+
+        <!-- 右：情報＆バトルログ -->
+        <div class="battle-rightpanel">
+          <div class="floor-info" style="text-align:center;margin-bottom:6px"><span id="floor-num">1</span>F / <span id="floor-max">7</span>F</div>
+          <div id="turn-indicator">あなたのターン</div>
+          <div id="battle-instr">あなたのターン</div>
+          <div class="battle-items-title">アイテム</div>
+          <div id="battle-items"></div>
+          <div class="battle-log-title">バトルログ</div>
+          <div class="battle-log" id="battle-log"></div>
+          <!-- エネルギー操作（右パネル下部） -->
+          <div id="energy-dock-center"><div id="gained-energy-box"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- クリア報酬（ランダム1つ・お知らせ） -->
+    <div id="reward-overlay" class="adv-fullscreen hidden" onclick="rewardNext()">
+      <div class="adv-panel" style="padding:30px 50px;text-align:center">
+        <div style="font-size:3rem;margin-bottom:8px" id="reward-icon">🎁</div>
+        <div class="adv-title" id="reward-name">ボーナス！</div>
+        <p class="adv-sub" id="reward-sub">クリックでつぎへ</p>
+      </div>
+    </div>
+
+    <!-- ボーナス選択 -->
+    <div id="bonus-overlay" class="adv-fullscreen hidden">
+      <div class="adv-panel" style="padding:26px 40px">
+        <div class="adv-title">ボーナスをえらぶ</div>
+        <div id="bonus-choices" style="display:flex;gap:14px;margin-top:16px;justify-content:center"></div>
+        <button class="btn btn-secondary" onclick="showCards()" style="margin-top:16px;min-width:160px">カードを見る</button>
+      </div>
+    </div>
+
+    <!-- ボーナス：カード選択 -->
+    <div id="bonus-pick-overlay" class="adv-fullscreen hidden">
+      <div class="adv-panel" style="padding:26px 40px">
+        <div class="adv-title" id="bonus-pick-title">どのカードに？</div>
+        <div id="bonus-pick-cards" style="display:flex;gap:14px;margin-top:12px;justify-content:center"></div>
+      </div>
+    </div>
+
+    <!-- ボーナス：技選択（入替・⭐アップ） -->
+    <div id="bonus-tech-overlay" class="adv-fullscreen hidden">
+      <div class="adv-panel" style="padding:26px 40px;min-width:480px">
+        <div class="adv-title" id="bonus-tech-title">技をえらぶ</div>
+        <div class="skill-opts" id="bonus-tech-list" style="margin-top:14px"></div>
+      </div>
+    </div>
+
+    <!-- カード選出 -->
+    <div id="select-fighter-overlay" class="adv-fullscreen hidden">
+      <div class="adv-panel" style="padding:26px 44px">
+        <div class="adv-title" id="select-fighter-title">戦うカードをえらぶ</div>
+        <div class="select-row">
+          <div class="select-group">
+            <div class="select-side-label">手持ちのカード</div>
+            <div class="select-cards" id="fighter-choices"></div>
+          </div>
+          <div style="font-size:1.8rem;color:#b8aee0;font-weight:800;align-self:center">VS</div>
+          <div class="select-group">
+            <div class="select-side-label">あらわれた敵</div>
+            <div id="select-enemy-card"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 休憩所 -->
+    <div id="rest-overlay" class="adv-fullscreen hidden">
+      <div class="adv-panel">
+        <div style="font-size:3rem;margin-bottom:10px">🏕️</div>
+        <div class="adv-title">休憩所</div>
+        <p class="adv-sub">全カードのHPが完全回復した！</p>
+        <button class="btn btn-primary" onclick="leaveRest()" style="width:240px">先へすすむ</button>
+      </div>
+    </div>
+
+    <!-- 勝利（クリックでつぎへ） -->
+    <div id="victory-overlay" class="adv-fullscreen hidden" onclick="continueAfterVictory()" style="background:rgba(10,6,20,0.5)">
+      <div class="adv-panel" style="padding:28px 48px">
+        <div style="font-size:2.6rem;margin-bottom:8px">🎉</div>
+        <div class="adv-title" id="victory-msg">敵をたおした！</div>
+        <p class="adv-sub">クリックでつぎへ</p>
+      </div>
+    </div>
+
+    <!-- 結果（クリア/ゲームオーバー） -->
+    <!-- アイテム取得演出 -->
+    <div id="item-get-overlay" class="adv-fullscreen hidden" onclick="onItemGetContinue()" style="z-index:50">
+      <div class="adv-panel" style="text-align:center;padding:32px 48px;min-width:320px;max-width:480px">
+        <div style="font-size:0.9rem;font-weight:800;color:#f0c040;letter-spacing:0.1em;margin-bottom:14px">📦 宝箱を手に入れた！</div>
+        <div id="item-get-icon" style="font-size:4rem;margin-bottom:10px;line-height:1.1"></div>
+        <div id="item-get-name" style="font-size:1.7rem;font-weight:900;color:#fff;margin-bottom:10px"></div>
+        <div id="item-get-desc" style="font-size:1.0rem;color:#ccc;line-height:1.5;margin-bottom:20px;padding:10px 14px;background:rgba(255,255,255,0.08);border-radius:10px"></div>
+        <p class="adv-sub" style="opacity:0.6">タップでつぎへ</p>
+      </div>
+    </div>
+
+    <div id="adv-result-overlay" class="adv-fullscreen hidden">
+      <div class="adv-panel">
+        <div id="adv-result-icon" style="font-size:3.5rem;margin-bottom:10px"></div>
+        <div class="adv-title" id="adv-result-title"></div>
+        <p class="adv-sub" id="adv-result-sub"></p>
+        <button class="btn btn-primary" onclick="backToTitle()" style="width:240px">タイトルへもどる</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card Viewer（全画面共通・container直下で常にアクセス可能） -->
+  <div id="cards-overlay" class="overlay hidden" style="z-index:9000">
+    <div class="dialog-box">
+      <div class="cards-hdr">
+        <span class="cards-title">🃏 カード一覧</span>
+        <span class="cards-badge" id="card-count-badge">0 / 3</span>
+      </div>
+      <div id="card-grid"></div>
+      <div style="margin-top:16px;text-align:center">
+        <button class="btn btn-secondary" onclick="hideCards()" style="min-width:160px">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card Zoom（全画面共通） -->
+  <div id="card-zoom-overlay" class="overlay hidden" style="z-index:9100" onclick="hideCardZoom()">
+    <div id="card-zoom-holder"></div>
+  </div>
+
+</div>
+
+<script>
+// ================================================================
+//  CONFIG ── ここの数値でゲームバランスを調整できます
+// ================================================================
+const CW = 840, CH = 600;       // アートキャンバスサイズ (px)
+const COX = 30,  COY = 60;      // canvasArea内のオフセット
+const FW = 200,  FH = 200;      // 切り取り枠サイズ (px)
+const DISPLAY_ALPHA = 0.82;     // 表示用 globalAlpha（重なりの深度感）
+const COLOR_THRESHOLD = 60;     // ピクセル色分類の最大距離
+
+// ★ 図形数とサイズ ── チューニング用
+const SHAPE_COUNT_MIN = 30;     // 図形の最小数
+const SHAPE_COUNT_MAX = 40;     // 図形の最大数
+const SHAPE_SIZE_MIN  = 70;     // 図形の最小サイズ (px)
+const SHAPE_SIZE_MAX  = 240;    // 図形の最大サイズ (px)  ← 枠より大きくてOK
+
+// ★ オーブ数とサイズ ── チューニング用
+const ORB_COUNT_MIN = 10;
+const ORB_COUNT_MAX = 30;
+// オーブサイズ定義（大中小・等確率）
+const ORB_SIZES = [
+  { key:'s', radius:10, mult:1.2, label:'小' },
+  { key:'m', radius:14, mult:1.4, label:'中' },
+  { key:'l', radius:18, mult:1.6, label:'大' },
+];
+
+// ================================================================
+//  ELEMENTS（4属性）
+// ================================================================
+const ELEMENTS = [
+  { id:'fire',    name:'炎', hex:'#D55E00', rgb:[213, 94,  0  ] },
+  { id:'ice',     name:'氷', hex:'#56B4E9', rgb:[86,  180, 233] },
+  { id:'wind',    name:'風', hex:'#009E73', rgb:[0,   158, 115] },
+  { id:'thunder', name:'雷', hex:'#E6C000', rgb:[230, 192, 0  ] },
+];
+const ELEM_ORDER = ELEMENTS.map(e => e.id);
+const ELEM = id => ELEMENTS.find(e => e.id === id);
+const ELEM_EMOJI = { fire:'🔥', ice:'🧊', wind:'💨', thunder:'⚡', norm:'⬜' };
+const NORM = 'norm';
+const NORM_RATE = 0.6;          // ノーマルエネルギーは属性エネの0.6倍の威力
+
+// ================================================================
+//  TECHNIQUES（技）
+//  威力 = ベース合計 × 個数倍率(総エネ) × 色数倍率(属性色数) × 相性
+//   ・属性エネ1つ = その色のステータス値（基準100）
+//   ・ノーマルエネ1つ = 主属性ステータスの0.6倍
+//   ・個数倍率：1→1, 2→1.5, 3→2, 4→3
+//   ・色数倍率：1→1, 2→1.5, 3→2, 4→3（属性色のみ・ノーマルは数えない）
+// ================================================================
+const COUNT_MULT = { 1:1, 2:1.5, 3:2, 4:3 };
+const COLOR_MULT = { 0:1, 1:1, 2:1.5, 3:2, 4:3 };
+
+// 技ランク（★）：状態異常の発生率を決める
+const RANK_PROC = { 1:0.05, 2:0.10, 3:0.15 };   // ★1/★2/★3 の発生率
+function rollTechRank() {                        // ★1:60% / ★2:30% / ★3:10%
+  const r = Math.random();
+  return r < 0.6 ? 1 : (r < 0.9 ? 2 : 3);
+}
+// 属性 → 状態異常タイプ
+const ELEM_STATUS = { fire:'burn', ice:'freeze', wind:'gust', thunder:'paralysis' };
+const STATUS_INFO = {
+  burn:      { emoji:'🔥', name:'やけど', turns:3 },
+  freeze:    { emoji:'🧊', name:'こおり', turns:1 },
+  paralysis: { emoji:'⚡', name:'まひ',   turns:3 },
+};
+
+// 命名
+const TECH_ROOT = { fire:'炎', ice:'氷', wind:'風', thunder:'雷' };
+const SINGLE_SUFFIX = { 1:'ショット', 2:'バースト', 3:'カノン', 4:'ノヴァ' };
+const DUAL_SUFFIX   = { 2:'', 3:'嵐', 4:'波動' };
+const PAIR_NAME = {
+  'fire,ice':'スチーム', 'fire,wind':'熱風', 'fire,thunder':'プラズマ',
+  'ice,wind':'吹雪', 'ice,thunder':'氷電', 'wind,thunder':'疾風',
+};
+function pairName(a, b) {
+  const k = [a, b].sort((x, y) => ELEM_ORDER.indexOf(x) - ELEM_ORDER.indexOf(y)).join(',');
+  return PAIR_NAME[k] || 'ミックス';
+}
+function techName(mainEl, distinctAttr, total, hasNorm) {
+  if (distinctAttr <= 1) return TECH_ROOT[mainEl] + (SINGLE_SUFFIX[total] || '');
+  if (distinctAttr === 2) return (PAIR_NAME_FROM(mainEl)) + (DUAL_SUFFIX[total] || '');
+  if (distinctAttr === 3) return 'トライ' + TECH_ROOT[mainEl];
+  return 'プリズム';
+}
+let _pairCtx = null;
+function PAIR_NAME_FROM() { return _pairCtx || 'ミックス'; }
+
+// 技を生成：counts={fire:n, ..., norm:n}
+function makeTech(counts) {
+  const normN = counts[NORM] || 0;
+  const attr = Object.entries(counts).filter(([el, n]) => el !== NORM && n > 0)
+    .map(([el, n]) => ({ el, n, r: Math.random() }));
+  attr.sort((a, b) => (b.n - a.n) || (a.r - b.r));   // 多い順、同数は抽選
+  const distinctAttr = attr.length;
+  const total = attr.reduce((s, e) => s + e.n, 0) + normN;
+  const mainEl = distinctAttr ? attr[0].el : 'fire';
+  _pairCtx = distinctAttr >= 2 ? pairName(attr[0].el, attr[1].el) : null;
+  const name = techName(mainEl, distinctAttr, total, normN > 0);
+  const arr = attr.map(e => ({ el: e.el, n: e.n }));
+  if (normN > 0) arr.push({ el: NORM, n: normN });
+  return { counts: arr, distinctAttr, total, normCount: normN, mainEl, name, rank: rollTechRank() };
+}
+
+// 技のダメージ（相性込み）
+function techDamage(tech, stats, defender) {
+  let base = 0;
+  tech.counts.forEach(c => {
+    if (c.el === NORM) base += c.n * NORM_RATE * (stats[tech.mainEl] || 0);
+    else               base += c.n * (stats[c.el] || 0);
+  });
+  let dmg = base * (COUNT_MULT[tech.total] || 1) * (COLOR_MULT[tech.distinctAttr] || 1);
+  let mult = 1;
+  if (defender) {
+    if (tech.mainEl === defender.weak)   mult = 2;
+    if (tech.mainEl === defender.resist) mult = 0.5;
+  }
+  return Math.floor(dmg * mult);
+}
+
+// 技の必要エネルギー表記用：[{el,n},...]
+// 候補となる技レシピを列挙
+function enumerateTechRecipes(starter) {
+  const recipes = [];
+  const ids = ELEM_ORDER;
+  // 単色（ノーマル混在パターン含む）
+  ids.forEach(a => {
+    recipes.push({ [a]:1 });
+    recipes.push({ [a]:1, norm:1 });          // 🔥⬜
+    recipes.push({ [a]:2 });
+    recipes.push({ [a]:3 });                      // スターターも3エネ単色（10%）
+    if (!starter) {
+      recipes.push({ [a]:1, norm:2 });        // 🔥⬜⬜
+      recipes.push({ [a]:2, norm:1 });        // 🔥🔥⬜
+      recipes.push({ [a]:3 });
+      recipes.push({ [a]:3, norm:1 });        // 🔥🔥🔥⬜
+      recipes.push({ [a]:4 });
+    }
+  });
+  // 2色
+  for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) {
+    const a = ids[i], b = ids[j];
+    recipes.push({ [a]:1, [b]:1 });           // 🔥🧊
+    if (!starter) {
+      recipes.push({ [a]:1, [b]:1, norm:1 }); // 🔥🧊⬜
+      recipes.push({ [a]:2, [b]:1 }); recipes.push({ [a]:1, [b]:2 });
+      recipes.push({ [a]:2, [b]:1, norm:1 }); recipes.push({ [a]:1, [b]:2, norm:1 });
+      recipes.push({ [a]:2, [b]:2 });
+      recipes.push({ [a]:3, [b]:1 }); recipes.push({ [a]:1, [b]:3 });
+    }
+  }
+  if (!starter) {
+    // 3色
+    for (let i = 0; i < ids.length; i++) for (let j = i+1; j < ids.length; j++) for (let k = j+1; k < ids.length; k++) {
+      const t = [ids[i], ids[j], ids[k]];
+      recipes.push({ [t[0]]:1, [t[1]]:1, [t[2]]:1 });
+      recipes.push({ [t[0]]:1, [t[1]]:1, [t[2]]:1, norm:1 });  // 3色＋⬜
+      t.forEach(big => recipes.push({ [t[0]]:(big===t[0]?2:1), [t[1]]:(big===t[1]?2:1), [t[2]]:(big===t[2]?2:1) }));
+    }
+    // 4色
+    recipes.push({ fire:1, ice:1, wind:1, thunder:1 });
+  }
+  return recipes;
+}
+
+// 合計エネルギー数の出現確率
+const ENERGY_DIST         = { 1:0.20, 2:0.40, 3:0.30, 4:0.10 };
+const ENERGY_DIST_STARTER = { 1:0.30, 2:0.60, 3:0.10 };
+
+function recipeTotal(r) { let s = 0; for (const el in r) s += r[el]; return s; }
+
+// 合計エネルギー数を分布から抽選（利用可能な数の中で再正規化）
+function rollEnergyTotal(availTotals, dist) {
+  dist = dist || ENERGY_DIST;
+  let sum = 0; availTotals.forEach(t => sum += (dist[t] || 0));
+  let r = Math.random() * sum;
+  for (const t of availTotals) { r -= (dist[t] || 0); if (r <= 0) return t; }
+  return availTotals[availTotals.length - 1];
+}
+
+// カードの色の強さに応じて技候補を生成（K個）
+// バランスよく複数属性が高いとき、その属性を含む技のスコアを倍増
+function multiAttrBonus(stats, recipe) {
+  const total = ELEMENTS.reduce((s, e) => s + (stats[e.id] || 0), 0);
+  if (total === 0) return 1;
+  const pct = el => (stats[el] || 0) / total;
+  const recipeEls = ELEMENTS.map(e => e.id).filter(el => (recipe[el] || 0) > 0);
+  const distinct = recipeEls.length;
+  if (distinct <= 1) return 1; // 単色技はボーナスなし
+
+  // 各しきい値を満たす属性群
+  const q10 = ELEMENTS.filter(e => pct(e.id) >= 0.10).map(e => e.id);
+  const q15 = ELEMENTS.filter(e => pct(e.id) >= 0.15).map(e => e.id);
+  const q20 = ELEMENTS.filter(e => pct(e.id) >= 0.20).map(e => e.id);
+
+  // レシピに含まれる属性が条件グループに含まれているか
+  const overlap = g => recipeEls.filter(el => g.includes(el)).length;
+
+  if (q10.length >= 4 && overlap(q10) >= 3) return distinct >= 3 ? 4 : 2.5;
+  if (q15.length >= 3 && overlap(q15) >= 2) return distinct >= 3 ? 3.5 : 2;
+  if (q20.length >= 2 && overlap(q20) >= 2) return 2;
+  return 1;
+}
+
+function genTechCandidates(stats, starter, k) {
+  const recipes = enumerateTechRecipes(starter);
+  // 合計エネルギー数ごとにグループ化＋スコア（強い色ほど高い、バランス属性はボーナス）
+  const byTotal = {};
+  recipes.forEach(r => {
+    const tot = recipeTotal(r);
+    let s = 0; for (const el in r) s += r[el] * (stats[el] || 0);
+    s *= multiAttrBonus(stats, r);
+    (byTotal[tot] = byTotal[tot] || []).push({ r, score: s });
+  });
+  const availTotals = Object.keys(byTotal).map(Number).sort((a, b) => a - b);
+
+  const out = [], seen = new Set();
+  let guard = 0;
+  while (out.length < k && guard++ < 200) {
+    const tot = rollEnergyTotal(availTotals, starter ? ENERGY_DIST_STARTER : ENERGY_DIST);
+    const pool = byTotal[tot];
+    // そのエネルギー数の中でスコア上位＋ゆらぎで1つ選ぶ
+    const pick = pool
+      .map(p => ({ p, w: p.score * (0.5 + Math.random()) }))
+      .sort((a, b) => b.w - a.w);
+    let chosen = null;
+    for (const c of pick) { const t = makeTech(c.p.r); if (!seen.has(t.name)) { chosen = t; break; } }
+    if (chosen) { seen.add(chosen.name); out.push(chosen); }
+    // どのエネルギー数も尽きたら終了
+    if (out.length >= recipes.length) break;
+  }
+  return out;
+}
+
+// 図形合計 → エネルギー数（多いほど高エネ＝強い技になりやすい）
+function energyByFigure(figTotal, maxEnergy) {
+  let lvl = 1 + figTotal / 8;                  // 0→1, 8→2, 16→3, 24→4
+  let e = Math.round(lvl + (Math.random() - 0.5) * 1.6);
+  return Math.max(1, Math.min(maxEnergy, e));
+}
+
+// カード作成時に技を1つ自動選択（最も面積の大きい属性の単色技）
+function pickAutoTech(stats, figTotal, starter) {
+  // 最大ステータスの属性（同値は抽選）
+  const mainEl = ELEMENTS
+    .map(e => ({ id:e.id, val:stats[e.id], r:Math.random() }))
+    .sort((a, b) => (b.val - a.val) || (a.r - b.r))[0].id;
+  const maxEnergy = starter ? 3 : 4;           // 初期は最大3エネ／強化は最大4エネ
+  const total = energyByFigure(figTotal, maxEnergy);
+  // 35%でノーマルエネルギーを1つ混ぜる（属性1つは必ず残す）
+  const norm = (total >= 2 && Math.random() < 0.35) ? 1 : 0;
+  const counts = { [mainEl]: total - norm };
+  if (norm) counts.norm = norm;
+  return makeTech(counts);
+}
+
+// 図形合計 → 技候補数
+function techCandidateCount(figTotal) {
+  if (figTotal <= 5)  return 2;
+  if (figTotal <= 9)  return 3;
+  if (figTotal <= 13) return 4;
+  if (figTotal <= 17) return 5;
+  return 6;
+}
+
+// ================================================================
+//  SKILLS（特殊能力）
+//  図形グループ × スキル × ランク（小/中/大）
+// ================================================================
+// 図形グループのメタ情報（アイコン・配色）
+const SKILL_GROUPS = {
+  circle:    { icon:'○', label:'回復・生命', bg:'#e8f8f0', border:'#2e9c5a', nameColor:'#1a6e3c' },
+  triangle:  { icon:'△', label:'攻撃',       bg:'#fff0e8', border:'#e06020', nameColor:'#9a3010' },
+  rectangle: { icon:'□', label:'防御',       bg:'#e8f0ff', border:'#3060c0', nameColor:'#1a3888' },
+  hexagon:   { icon:'⬡', label:'特殊',       bg:'#f4e8ff', border:'#8040c0', nameColor:'#5a1a98' },
+};
+
+// ランク表記
+const RANK_LABEL = { s:'小', m:'中', l:'大' };
+
+// 各グループのスキル定義。desc は {s,m,l} でランクごとの説明。
+const SKILL_DEFS = {
+  circle: [
+    { id:'auto_heal', name:'自動回復',   desc:{
+      s:'毎ターン、自分の最大HPの5%ぶん回復する',
+      m:'毎ターン、自分の最大HPの10%ぶん回復する',
+      l:'毎ターン、自分の最大HPの15%ぶん回復する' } },
+    { id:'pre_heal',  name:'先制回復',   desc:{
+      s:'バトル開始時に自分の最大HPの10%ぶん回復する',
+      m:'バトル開始時に自分の最大HPの20%ぶん回復する',
+      l:'バトル開始時に自分の最大HPの30%ぶん回復する' } },
+    { id:'guts',      name:'根性',       desc:{
+      s:'自分のHPが20%以下のとき、攻撃力が1.2倍になる',
+      m:'自分のHPが20%以下のとき、攻撃力が1.5倍になる',
+      l:'自分のHPが20%以下のとき、攻撃力が2.0倍になる' } },
+    { id:'drain',     name:'ドレイン攻撃', desc:{
+      s:'攻撃で与えたダメージの15%ぶん自分のHPを回復する',
+      m:'攻撃で与えたダメージの25%ぶん自分のHPを回復する',
+      l:'攻撃で与えたダメージの40%ぶん自分のHPを回復する' } },
+    { id:'fighting',  name:'不屈の闘志', desc:{
+      s:'自分のHPが50%以下のとき、受けるダメージが10%減る',
+      m:'自分のHPが50%以下のとき、受けるダメージが20%減る',
+      l:'自分のHPが50%以下のとき、受けるダメージが30%減る' } },
+    { id:'revive',    name:'復活',       lOnly:true, desc:{
+      l:'バトル中に1度だけ、自分のHPが0になっても耐える' } },
+    { id:'vitality',  name:'生命力',     desc:{
+      s:'自分の最大HPが15ふえる',
+      m:'自分の最大HPが25ふえる',
+      l:'自分の最大HPが40ふえる' } },
+  ],
+  triangle: [
+    { id:'first_str', name:'先手必勝',   desc:{
+      s:'バトル最初の攻撃のダメージが1.25倍になる',
+      m:'バトル最初の攻撃のダメージが1.5倍になる',
+      l:'バトル最初の攻撃のダメージが2.0倍になる' } },
+    { id:'crit',      name:'会心の一撃', desc:{
+      s:'攻撃時10%の確率でダメージが2倍になる',
+      m:'攻撃時20%の確率でダメージが2倍になる',
+      l:'攻撃時30%の確率でダメージが2倍になる' } },
+    { id:'multi',     name:'連続攻撃',   desc:{
+      s:'20%の確率でもう一度攻撃する（2回目以降は威力60%・連鎖あり）',
+      m:'25%の確率でもう一度攻撃する（2回目以降は威力60%・連鎖あり）',
+      l:'30%の確率でもう一度攻撃する（2回目以降は威力60%・連鎖あり）' } },
+    { id:'pursuit',   name:'追い打ち',   desc:{
+      s:'敵のHPが50%以下のとき、ダメージが20%ふえる',
+      m:'敵のHPが50%以下のとき、ダメージが40%ふえる',
+      l:'敵のHPが50%以下のとき、ダメージが60%ふえる' } },
+    { id:'weakness',  name:'弱点特攻',   desc:{
+      s:'敵の弱点をつくとき、ダメージがさらに25%ふえる',
+      m:'敵の弱点をつくとき、ダメージがさらに50%ふえる',
+      l:'敵の弱点をつくとき、ダメージがさらに75%ふえる' } },
+    { id:'allout',    name:'渾身',       desc:{
+      s:'自分のHPが満タンのとき、攻撃ダメージが1.3倍になる',
+      m:'自分のHPが満タンのとき、攻撃ダメージが1.6倍になる',
+      l:'自分のHPが満タンのとき、攻撃ダメージが2.0倍になる' } },
+    { id:'poison',    name:'毒刃',       desc:{
+      s:'25%の確率で毒を与える（毎ターン敵HPの3%減少）',
+      m:'35%の確率で毒を与える（毎ターン敵HPの4%減少）',
+      l:'50%の確率で毒を与える（毎ターン敵HPの5%減少）' } },
+  ],
+  rectangle: [
+    { id:'full_guard', name:'完全ガード', desc:{
+      s:'10%の確率で受けるダメージを完全に0にする',
+      m:'20%の確率で受けるダメージを完全に0にする',
+      l:'30%の確率で受けるダメージを完全に0にする' } },
+    { id:'iron_wall',  name:'鉄壁',       desc:{
+      s:'受けるダメージがつねに10%減る',
+      m:'受けるダメージがつねに20%減る',
+      l:'受けるダメージがつねに30%減る' } },
+    { id:'reflect',    name:'反射',       desc:{
+      s:'受けたダメージの10%を敵に跳ね返す',
+      m:'受けたダメージの20%を敵に跳ね返す',
+      l:'受けたダメージの30%を敵に跳ね返す' } },
+    { id:'defense',    name:'堅守',       desc:{
+      s:'1ターン目に受けるダメージが半分になる',
+      m:'2ターン目までに受けるダメージが半分になる',
+      l:'3ターン目までに受けるダメージが半分になる' } },
+    { id:'counter',    name:'カウンター', desc:{
+      s:'攻撃を受けたとき10%の確率で同じダメージを返す',
+      m:'攻撃を受けたとき20%の確率で同じダメージを返す',
+      l:'攻撃を受けたとき30%の確率で同じダメージを返す' } },
+    { id:'immobile',   name:'不動',       desc:{
+      s:'敵の会心(2倍)を1.5倍に抑える',
+      m:'敵の会心(2倍)を1.2倍に抑える',
+      l:'敵の会心(2倍)を完全に無効にする' } },
+    { id:'tenacity',   name:'執念',       desc:{
+      s:'自分のHPが0になる攻撃を10%の確率で耐えてHP1で残る',
+      m:'自分のHPが0になる攻撃を20%の確率で耐えてHP1で残る',
+      l:'自分のHPが0になる攻撃を30%の確率で耐えてHP1で残る' } },
+  ],
+  hexagon: [
+    { id:'omni',      name:'全能',       desc:{
+      s:'すべての属性の力が5%アップする',
+      m:'すべての属性の力が10%アップする',
+      l:'すべての属性の力が20%アップする' } },
+    { id:'timestop',  name:'時間停止',   desc:{
+      s:'10%の確率で敵のターンをスキップさせる',
+      m:'20%の確率で敵のターンをスキップさせる',
+      l:'30%の確率で敵のターンをスキップさせる' } },
+    { id:'aura',      name:'覇気',       desc:{
+      s:'すべての敵の攻撃力を10%下げる',
+      m:'すべての敵の攻撃力を20%下げる',
+      l:'すべての敵の攻撃力を30%下げる' } },
+  ],
+};
+
+// 図形数 → [小, 中, 大] の出現確率（%）
+function rankProbabilities(count) {
+  const T = {
+    0:[90,10,0], 1:[80,20,0], 2:[70,30,0], 3:[60,30,10], 4:[50,40,10],
+    5:[40,40,20], 6:[30,50,20], 7:[20,50,30], 8:[10,60,30], 9:[0,60,40],
+    10:[0,50,50], 11:[0,40,60], 12:[0,30,70], 13:[0,20,80], 14:[0,10,90],
+  };
+  if (count >= 15) return [0, 0, 100];
+  return T[count] || [90, 10, 0];
+}
+
+// 確率配分からランク(s/m/l)を抽選
+function rollRank(count) {
+  const [ps, pm, pl] = rankProbabilities(count);
+  const r = Math.random() * 100;
+  if (r < ps) return 's';
+  if (r < ps + pm) return 'm';
+  return 'l';
+}
+
+// ================================================================
+//  ORB_DEFS（オーブ定義）
+// ================================================================
+const ORB_DEFS = {
+  fire:    { name:'炎オーブ', hex:'#FF4422', glow:'#FF8866', light:'#FFBBAA', stat:'fire'    },
+  wind:    { name:'風オーブ', hex:'#22BB44', glow:'#66DD88', light:'#AAEEBB', stat:'wind'    },
+  ice:     { name:'氷オーブ', hex:'#3366FF', glow:'#66AAFF', light:'#AACCFF', stat:'ice'     },
+  thunder: { name:'雷オーブ', hex:'#FFCC00', glow:'#FFEE66', light:'#FFEEAA', stat:'thunder' },
+  white:   { name:'HPオーブ', hex:'#DDDDDD', glow:'#FFFFFF', light:'#FFFFFF', stat:'hp'      },
+};
+const ORB_TYPES = Object.keys(ORB_DEFS);
+// orbsFound[type] = 最大倍率（1.2/1.4/1.6）または undefined
+
+// ================================================================
+//  CARD ILLUSTRATION IMAGES
+//  各画像 1254×1254 / 4×4 = 16体 / 1体あたり 313.5px 正方形
+// ================================================================
+const CARD_FILES = ['card_image_1','card_image_2','card_image_3','card_image_4','card_image_5'];
+const LEGEND_FILE = 'card_image_6';   // 伝説カード（通常出現しない）
+const ENEMY_CARD_FILES = ['enemy_card_image_1','enemy_card_image_2','enemy_card_image_3'];
+const ENEMY_BOSS_FILE  = 'enemy_card_image_4';
+const CARD_IMAGES = {};
+const ILLUS_COLS = 4, ILLUS_ROWS = 4;
+const ILLUS_W = 1254 / 4, ILLUS_H = 1254 / 4; // 313.5px 正方形
+
+// 伝説カード名（card_image_6 の 4×4 = 16種、81〜96）
+const LEGENDARY_NAMES = [
+  'バハムート','てんま','アヌビス','ウロボロス','ベヒーモス','ヴァルキリー','コアトル','ユグドラ',
+  'シルニュル','バジリスク','リヴァ','たまも','ガネーシャ','クラーケン','フェンリル','ガルーダ',
+];
+
+// キャラクター名（fileIndex*16 + row*4 + col の順）
+const CHARACTER_NAMES = [
+  // セット1（card_image_1）
+  'プチドラ','ユニコ','ほほう','ふたば','らおん','きのこん','フェニィ','くらげん',
+  'けろぽん','ペガん','サボた','ぺんぺん','もこ','ぽんた','グリフ','こん太',
+  // セット2（card_image_2）
+  'リヴァ','かめきち','まんどら','ケルる','わたげ','らっこ','ピクシー','ウーぱ',
+  'ヒポポ','くり','どんぐり','まんた','ぷるる','しろくま','はすのん','きゅうび',
+  // セット3（card_image_3）
+  'タウロス','せかいじゅ','ごま','マンティ','いちごん','ぱたぱた','スフィン','まりも',
+  'こあら','ランタン','いるかん','カメレ','フェンり','ひまわり','れっさー','イエティ',
+  // セット4（card_image_4）
+  'サンだ','くもる','はりー','アルラ','ぶんぶん','はむち','キリン','もみじ',
+  'カモノ','ガル','てんとう','むささ','ワイバ','かぼちゃ','なまけ','ひとぼし',
+  // セット5（card_image_5）
+  'ミミック','ころごれ','ゴブ','やなぎん','だんぼ','キウイ','ケツァ','くりす',
+  'カピば','ともしび','クリお','センザン','キメラ','うつぼん','ありくい','コンパス',
+];
+
+function characterName(fileIndex, col, row) {
+  return CHARACTER_NAMES[fileIndex * 16 + row * 4 + col] || '';
+}
+
+// 敵ENEMY_NAMES[i] → イラスト（16名×3シート = 48体）
+function enemyIllus(nameIdx) {
+  const fileIdx = Math.floor(nameIdx / 16);
+  const local  = nameIdx % 16;
+  return { file: ENEMY_CARD_FILES[Math.min(fileIdx, 2)], col: local % 4, row: Math.floor(local / 4) };
+}
+
+function preloadCardImages() {
+  [...CARD_FILES, LEGEND_FILE, ...ENEMY_CARD_FILES, ENEMY_BOSS_FILE].forEach(name => {
+    const img = new Image();
+    img.src = `images/${name}.png`;
+    CARD_IMAGES[name] = img;
+  });
+}
+
+// カードイラスト枠（横長）。正方形イラストは枠の高さに合わせて中央配置
+const CARD_IMG_W = 200, CARD_IMG_H = 200;     // 正方形（枠も正方形にして全身表示）
+
+function drawIllustration(ctx2, file, col, row) {
+  const img = CARD_IMAGES[file];
+  if (!img) return;
+  const draw = () => {
+    const sx = col * ILLUS_W, sy = row * ILLUS_H;
+    ctx2.drawImage(img, sx, sy, ILLUS_W, ILLUS_H, 0, 0, CARD_IMG_W, CARD_IMG_H);  // 正方形→正方形
+  };
+  img.complete ? draw() : (img.onload = draw);
+}
+
+// ================================================================
+//  SCALE
+// ================================================================
+let scale = 1;
+const cont = document.getElementById('container');
+function fitContainer() {
+  scale = Math.min(window.innerWidth / 1280, window.innerHeight / 720);
+  cont.style.transform = `scale(${scale})`;
+}
+window.addEventListener('resize', fitContainer);
+fitContainer();
+
+// ================================================================
+//  TITLE
+// ================================================================
+function startGame() {
+  document.getElementById('title-screen').classList.add('hidden');
+  document.getElementById('game-screen').classList.remove('hidden');
+  document.getElementById('enhance-banner').classList.add('hidden');
+  enhancing = false; cardStock.length = 0;
+  document.getElementById('panel-inst').innerHTML =
+    '枠をドラッグして場所を選び<br>「切り取る」を押してください。<br>カードを<b>3枚</b>つくって冒険へ！';
+  preloadCardImages();
+  buildSideBars();
+  generateArt();
+  resetFrame();
+  updateLiveAnalysis();
+}
+
+// ================================================================
+//  CANVAS（表示用 + 解析用）
+// ================================================================
+const artCanvas = document.getElementById('art-canvas');
+const ctx       = artCanvas.getContext('2d');
+const analysisCanvas = document.createElement('canvas');
+analysisCanvas.width = CW; analysisCanvas.height = CH;
+const actx = analysisCanvas.getContext('2d');
+
+const rand    = (a, b) => a + Math.random() * (b - a);
+const randInt = (a, b) => Math.floor(rand(a, b + 1));
+
+// 図形タイプの確率（六角形・八角形はレア）
+function randomShapeType() {
+  const r = Math.random();
+  if (r < 0.28) return 'circle';    // 28%
+  if (r < 0.58) return 'triangle';  // 30%
+  if (r < 0.88) return 'rectangle'; // 30%
+  return 'hexagon';                  // 12%
+}
+
+// 塗りモード: 1=60%, 2=50%, 3=40%  の3択（等確率）
+function randomFillMode() {
+  return randInt(1, 3);
+}
+
+// 世界座標でサブパスを追加（beginPath は呼ばない）
+function addSubPath(ctx2, type, x, y, size, rot, hR) {
+  const r = size / 2;
+  if (type === 'circle') {
+    ctx2.moveTo(x + r, y);
+    ctx2.arc(x, y, r, 0, Math.PI * 2);
+  } else if (type === 'triangle') {
+    const cos = Math.cos(rot), sin = Math.sin(rot);
+    [[0,-r],[r*.866,r*.5],[-r*.866,r*.5]].forEach(([lx,ly], i) => {
+      const wx = x + lx*cos - ly*sin, wy = y + lx*sin + ly*cos;
+      i === 0 ? ctx2.moveTo(wx, wy) : ctx2.lineTo(wx, wy);
+    });
+    ctx2.closePath();
+  } else if (type === 'rectangle') {
+    const w=size, h=size*hR, cos=Math.cos(rot), sin=Math.sin(rot);
+    [[-w/2,-h/2],[w/2,-h/2],[w/2,h/2],[-w/2,h/2]].forEach(([lx,ly], i) => {
+      const wx = x+lx*cos-ly*sin, wy = y+lx*sin+ly*cos;
+      i === 0 ? ctx2.moveTo(wx, wy) : ctx2.lineTo(wx, wy);
+    });
+    ctx2.closePath();
+  } else {
+    const n = type === 'hexagon' ? 6 : 8;
+    for (let i = 0; i < n; i++) {
+      const a = rot + 2*Math.PI*i/n;
+      const px = x + r*Math.cos(a), py = y + r*Math.sin(a);
+      i === 0 ? ctx2.moveTo(px, py) : ctx2.lineTo(px, py);
+    }
+    ctx2.closePath();
+  }
+}
+
+// buildPath は addSubPath のラッパー（他箇所との互換用）
+function buildPath(ctx2, type, x, y, size, rot, hR) {
+  ctx2.beginPath();
+  addSubPath(ctx2, type, x, y, size, rot, hR);
+}
+
+// 世界座標AABBを計算
+function computeBBox(type, x, y, size, rot, hR, pad) {
+  const r = size / 2;
+  let pts;
+  if (type === 'circle') {
+    return { x1:x-r-pad, y1:y-r-pad, x2:x+r+pad, y2:y+r+pad };
+  } else if (type === 'triangle') {
+    const cos=Math.cos(rot),sin=Math.sin(rot);
+    pts=[[0,-r],[r*.866,r*.5],[-r*.866,r*.5]].map(([lx,ly])=>[x+lx*cos-ly*sin,y+lx*sin+ly*cos]);
+  } else if (type === 'rectangle') {
+    const w=size,h=size*hR,cos=Math.cos(rot),sin=Math.sin(rot);
+    pts=[[-w/2,-h/2],[w/2,-h/2],[w/2,h/2],[-w/2,h/2]].map(([lx,ly])=>[x+lx*cos-ly*sin,y+lx*sin+ly*cos]);
+  } else {
+    const n=type==='hexagon'?6:8;
+    pts=Array.from({length:n},(_,i)=>[x+r*Math.cos(rot+2*Math.PI*i/n),y+r*Math.sin(rot+2*Math.PI*i/n)]);
+  }
+  return {
+    x1:Math.min(...pts.map(p=>p[0]))-pad, y1:Math.min(...pts.map(p=>p[1]))-pad,
+    x2:Math.max(...pts.map(p=>p[0]))+pad, y2:Math.max(...pts.map(p=>p[1]))+pad,
+  };
+}
+
+// 図形を指定コンテキストへ描画（fillMode 0-4）
+function drawShape(ctx2, type, x, y, size, rot, hR, fillMode, lw, hex) {
+  const bbox = computeBBox(type, x, y, size, rot, hR, fillMode === 0 ? lw/2 : 0);
+
+  // 外側パス＋内側パスを一つにまとめて evenodd で塗る
+  // → 内側は描画されず、後ろの図形（または白背景）がそのまま透けて見える
+  ctx2.save();
+  ctx2.beginPath();
+  addSubPath(ctx2, type, x, y, size, rot, hR);           // 外側
+  if (fillMode > 0) {
+    // 内側パス（同形・縮小）→ evenodd で穴になる
+    // innerScale = sqrt(1 - 塗り率) で面積比が正確
+    const fillRates = [0.6, 0.5, 0.4, 0.2]; // mode1=60%, mode2=50%, mode3=40%
+    const innerScale = Math.sqrt(1 - fillRates[fillMode - 1]);
+    addSubPath(ctx2, type, x, y, size * innerScale, rot, hR); // 内側（穴）
+  }
+  ctx2.fillStyle = hex;
+  ctx2.fill('evenodd');
+  ctx2.restore();
+  return bbox;
+}
+
+// オーブを円形（宝石風）で描画（display canvasのみ）
+function drawOrb(x, y, r, type) {
+  const d = ORB_DEFS[type];
+  ctx.save();
+
+  // 強いグロー
+  ctx.shadowBlur = 24; ctx.shadowColor = d.glow;
+
+  // 放射グラデーション（中心白→淡色→属性色）
+  const g = ctx.createRadialGradient(x - r*.28, y - r*.32, r*.04, x, y, r);
+  g.addColorStop(0,   '#ffffff');
+  g.addColorStop(.28, d.light);
+  g.addColorStop(1,   d.hex);
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2); ctx.fill();
+
+  // 宝石ハイライト（小さな白い光点）
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = 'rgba(255,255,255,0.72)';
+  ctx.beginPath(); ctx.arc(x - r*.28, y - r*.30, r*.22, 0, Math.PI*2); ctx.fill();
+
+  ctx.restore();
+}
+
+let shapeRects = [], orbData = [];
+
+function generateArt() {
+  ctx.fillStyle  = '#ffffff'; ctx.fillRect(0, 0, CW, CH);
+  actx.fillStyle = '#ffffff'; actx.fillRect(0, 0, CW, CH);
+  shapeRects = []; orbData = [];
+
+  const count = randInt(SHAPE_COUNT_MIN, SHAPE_COUNT_MAX);
+  for (let i = 0; i < count; i++) {
+    const el  = ELEMENTS[randInt(0, ELEMENTS.length-1)];
+    const tp  = randomShapeType();
+    const sz  = rand(SHAPE_SIZE_MIN, SHAPE_SIZE_MAX);
+    const x   = rand(-12, CW+12), y = rand(-12, CH+12);
+    const rot = rand(0, Math.PI*2), hR = rand(0.45, 1.6);
+    const fm  = randomFillMode();
+    const lw  = rand(3, 8);
+
+    // 表示用（重なりに深度感）
+    ctx.globalAlpha = DISPLAY_ALPHA;
+    const bbox = drawShape(ctx, tp, x, y, sz, rot, hR, fm, lw, el.hex);
+    ctx.globalAlpha = 1.0;
+
+    // 解析用（完全不透明・正確な色計測）
+    drawShape(actx, tp, x, y, sz, rot, hR, fm, lw, el.hex);
+
+    shapeRects.push({ ...bbox, shapeType: tp });
+  }
+
+  // オーブ（表示用のみ、最前面）
+  const oc = randInt(ORB_COUNT_MIN, ORB_COUNT_MAX);
+  for (let i = 0; i < oc; i++) {
+    const tp   = ORB_TYPES[randInt(0, ORB_TYPES.length - 1)];
+    const sz   = ORB_SIZES[randInt(0, 2)];  // 大中小を等確率で選択
+    const r    = sz.radius;
+    const x    = rand(r + 12, CW - r - 12);
+    const y    = rand(r + 12, CH - r - 12);
+    drawOrb(x, y, r, tp);
+    orbData.push({ x, y, r, type: tp, size: sz.key, mult: sz.mult });
+  }
+}
+
+function doRegenerate() {
+  // 強化中はリロード回数制限
+  if (enhancing) {
+    if (battle.enhanceRerolls !== Infinity) {
+      if (battle.enhanceRerolls <= 0) return;
+      battle.enhanceRerolls--;
+    }
+    generateArt(); resetFrame(); updateLiveAnalysis(); updateChangeBtn();
+    return;
+  }
+  generateArt(); resetFrame(); updateLiveAnalysis();
+}
+
+function backToTitle() {
+  if (typeof battle !== 'undefined') { battle.inBattle = false; clearTimeout(battle.turnTimer); }
+  // 冒険画面の各オーバーレイを閉じる
+  ['adv-result-overlay','rest-overlay','select-fighter-overlay','difficulty-overlay','battle-area','victory-overlay']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.classList.add('hidden'); });
+  document.getElementById('game-screen').classList.add('hidden');
+  document.getElementById('adventure-screen').classList.add('hidden');
+  document.getElementById('title-screen').classList.remove('hidden');
+}
+
+// ================================================================
+//  SIDE BARS
+// ================================================================
+function buildSideBars() {
+  const el = document.getElementById('side-bars');
+  el.innerHTML = '';
+  // 白を先頭にして4属性が続く順（結果画面と同じ順）
+  const items = [
+    { name:'白', hex:'#ffffff', border:true, key:'w' },
+    ...ELEMENTS.map((e, i) => ({ ...e, key: i })),
+  ];
+  items.forEach(e => {
+    const sw   = e.border ? 'background:#fff;border:1.5px solid #ccc' : `background:${e.hex}`;
+    const fill = e.border ? '#aac8e8' : e.hex;
+    el.innerHTML += `
+      <div class="cbar-row">
+        <div class="cbar-swatch" style="${sw}"></div>
+        <div class="cbar-name">${e.name}</div>
+        <div class="cbar-bg"><div class="cbar-fill" id="sb-bar-${e.key}" style="background:${fill}"></div></div>
+        <div class="cbar-pct" id="sb-pct-${e.key}">—</div>
+      </div>`;
+  });
+}
+function applySideBars(pcts) {
+  ELEMENTS.forEach((_, i) => {
+    const b = document.getElementById(`sb-bar-${i}`); if (b) b.style.width = pcts[i].toFixed(1)+'%';
+    const p = document.getElementById(`sb-pct-${i}`); if (p) p.textContent  = Math.round(pcts[i])+'%';
+  });
+  const bw=document.getElementById('sb-bar-w'); if(bw) bw.style.width=pcts[4].toFixed(1)+'%';
+  const pw=document.getElementById('sb-pct-w'); if(pw) pw.textContent=Math.round(pcts[4])+'%';
+}
+function resetSideBars() {
+  ELEMENTS.forEach((_, i) => {
+    const b=document.getElementById(`sb-bar-${i}`); if(b){b.style.width='0%';}
+    const p=document.getElementById(`sb-pct-${i}`); if(p){p.textContent='—';}
+  });
+  const bw=document.getElementById('sb-bar-w'); if(bw) bw.style.width='0%';
+  const pw=document.getElementById('sb-pct-w'); if(pw) pw.textContent='—';
+}
+
+// ================================================================
+//  FRAME DRAG
+// ================================================================
+const frame = document.getElementById('sel-frame');
+let isDragging=false, dragStartX=0, dragStartY=0, frameStartX=0, frameStartY=0;
+
+function resetFrame() {
+  frame.style.left = (COX + (CW-FW)/2) + 'px';
+  frame.style.top  = (COY + (CH-FH)/2) + 'px';
+}
+function getLogical(e) {
+  const t=e.touches?e.touches[0]:e, r=cont.getBoundingClientRect();
+  return { x:(t.clientX-r.left)/scale, y:(t.clientY-r.top)/scale };
+}
+function anyOverlayOpen() {
+  return ['confirm-overlay','result-overlay','skill-select-overlay','cards-overlay']
+    .some(id => !document.getElementById(id).classList.contains('hidden'));
+}
+frame.addEventListener('mousedown', onDown);
+frame.addEventListener('touchstart', onDown, {passive:false});
+document.addEventListener('mousemove', onMove);
+document.addEventListener('touchmove',  onMove, {passive:false});
+document.addEventListener('mouseup',  onUp);
+document.addEventListener('touchend', onUp);
+
+function onDown(e) {
+  if (anyOverlayOpen()) return;
+  e.preventDefault(); isDragging=true; frame.classList.add('dragging');
+  const p=getLogical(e); dragStartX=p.x; dragStartY=p.y;
+  frameStartX=parseFloat(frame.style.left)||0; frameStartY=parseFloat(frame.style.top)||0;
+}
+function onMove(e) {
+  if (!isDragging) return; e.preventDefault();
+  const p = getLogical(e);
+  frame.style.left = Math.max(COX, Math.min(COX+CW-FW, frameStartX+(p.x-dragStartX))) + 'px';
+  frame.style.top  = Math.max(COY, Math.min(COY+CH-FH, frameStartY+(p.y-dragStartY))) + 'px';
+  updateLiveAnalysis();
+}
+function onUp() { isDragging=false; frame.classList.remove('dragging'); }
+
+// ドラッグ中（および初期表示）のリアルタイム面積計算
+function updateLiveAnalysis() {
+  if (anyOverlayOpen()) return;
+  const reg = getRegion();
+  if (reg.x < 0 || reg.y < 0 || reg.x + reg.w > CW || reg.y + reg.h > CH) return;
+  applySideBars(analyzeRegion(reg.x, reg.y, reg.w, reg.h));
+}
+
+// ================================================================
+//  COLOR ANALYSIS（解析用canvasを使用）
+// ================================================================
+function getRegion() {
+  return {
+    x: Math.round(parseFloat(frame.style.left) - COX),
+    y: Math.round(parseFloat(frame.style.top)  - COY),
+    w: FW, h: FH,
+  };
+}
+function colorDist(r1,g1,b1,r2,g2,b2) {
+  return Math.sqrt((r1-r2)**2+(g1-g2)**2+(b1-b2)**2);
+}
+function analyzeRegion(x, y, w, h) {
+  const data = actx.getImageData(x, y, w, h).data;
+  const counts = new Array(ELEMENTS.length + 1).fill(0);
+  for (let i = 0; i < data.length; i += 4) {
+    let minD = Infinity, minI = ELEMENTS.length;
+    ELEMENTS.forEach((e, ei) => {
+      const d = colorDist(data[i],data[i+1],data[i+2], e.rgb[0],e.rgb[1],e.rgb[2]);
+      if (d < minD) { minD=d; minI=ei; }
+    });
+    if (minD > COLOR_THRESHOLD) minI = ELEMENTS.length;
+    counts[minI]++;
+  }
+  const total = w * h;
+  return counts.map(c => c / total * 100);
+}
+function countShapesByType(rx, ry, rw, rh) {
+  const c = { circle:0, triangle:0, rectangle:0, hexagon:0 };
+  shapeRects.forEach(s => {
+    if (s.x2>rx && s.x1<rx+rw && s.y2>ry && s.y1<ry+rh) c[s.shapeType]++;
+  });
+  return c;
+}
+function getOrbsInRegion(rx, ry, rw, rh) {
+  // 属性×サイズの組み合わせごとにカウント → 配列で返す
+  const tally = {};
+  orbData.forEach(o => {
+    if (o.x+o.r>rx && o.x-o.r<rx+rw && o.y+o.r>ry && o.y-o.r<ry+rh) {
+      const key = `${o.type}:${o.size}`;
+      if (!tally[key]) tally[key] = { type:o.type, size:o.size, mult:o.mult, count:0 };
+      tally[key].count++;
+    }
+  });
+  return Object.values(tally); // [{type, size, mult, count}, ...]
+}
+
+// サイズごとのボーナス値（大+0.6、中+0.4、小+0.2）
+const ORB_BONUS = { l: 0.6, m: 0.4, s: 0.2 };
+
+// 属性ごとの倍率を返す（サイズ別ボーナス合算：1 + Σボーナス）
+// 例）大×1 + 中×2 → 1 + 0.6 + 0.4 + 0.4 = ×2.4
+function orbMaxMults(orbsList) {
+  const bonus = {};
+  orbsList.forEach(o => {
+    bonus[o.type] = (bonus[o.type] || 0) + ORB_BONUS[o.size] * o.count;
+  });
+  const mults = {};
+  Object.entries(bonus).forEach(([type, b]) => { mults[type] = 1 + b; });
+  return mults;
+}
+
+// ================================================================
+//  CUT FLOW
+// ================================================================
+let pendingCard = null;
+
+function showConfirm() {
+  const reg = getRegion();
+  document.getElementById('confirm-canvas').getContext('2d')
+    .drawImage(artCanvas, reg.x, reg.y, reg.w, reg.h, 0, 0, 200, 200);
+  document.getElementById('confirm-overlay').classList.remove('hidden');
+}
+function hideConfirm() { document.getElementById('confirm-overlay').classList.add('hidden'); }
+
+function doCut() {
+  hideConfirm();
+  const reg          = getRegion();
+  const rawPcts      = analyzeRegion(reg.x, reg.y, reg.w, reg.h);
+  const orbsFound    = getOrbsInRegion(reg.x, reg.y, reg.w, reg.h);
+  const shapeCounts  = countShapesByType(reg.x, reg.y, reg.w, reg.h);
+  const totalShapes  = shapeRects.filter(s=>s.x2>reg.x&&s.x1<reg.x+reg.w&&s.y2>reg.y&&s.y1<reg.y+reg.h).length;
+
+  // 属性ごとの最大倍率を取得してステータス計算
+  const orbMults = orbMaxMults(orbsFound);
+  const om = t => orbMults[t] || 1.0;
+  const stats = {
+    fire:    Math.round(rawPcts[0] * om('fire')),
+    ice:     Math.round(rawPcts[1] * om('ice')),
+    wind:    Math.round(rawPcts[2] * om('wind')),
+    thunder: Math.round(rawPcts[3] * om('thunder')),
+    hp:      Math.round((rawPcts[4] * om('white') + 50) * 5),
+  };
+
+  applySideBars(rawPcts);
+
+  // カット画像（表示用canvasから）
+  const imgCvs = document.createElement('canvas');
+  imgCvs.width = 144; imgCvs.height = 144;
+  imgCvs.getContext('2d').drawImage(artCanvas, reg.x, reg.y, reg.w, reg.h, 0, 0, 144, 144);
+  pendingCard = { imageUrl: imgCvs.toDataURL(), stats, rawPcts, orbsFound, shapeCounts, skills:[] };
+
+  // 結果画面を構築
+  document.getElementById('result-canvas').getContext('2d')
+    .drawImage(artCanvas, reg.x, reg.y, reg.w, reg.h, 0, 0, 200, 200);
+
+  // バー行（HP最初 → 4属性）
+  const resRows = document.getElementById('res-rows');
+  resRows.innerHTML = '';
+
+  // バーのMAX = 4属性の最大値のみ（HPは除外）
+  const maxPct = Math.max(...rawPcts.slice(0, 4));
+
+  // HP行：バーなし・計算式で表示
+  const whiteRaw     = Math.round(rawPcts[4]);
+  const hpMult       = om('white');
+  const whiteBoosted = Math.round(rawPcts[4] * hpMult);
+  const hpFinal      = stats.hp;
+  const hpFormula    = hpMult > 1.0
+    ? `(${whiteBoosted}★ + 50) × 5 = <strong>${hpFinal}</strong>`
+    : `(${whiteRaw} + 50) × 5 = <strong>${hpFinal}</strong>`;
+  resRows.innerHTML += `
+    <div class="rbar-row">
+      <div class="rbar-swatch" style="background:#fff;border:1.5px solid #ccc"></div>
+      <div class="rbar-name">HP</div>
+      <div style="flex:1;font-size:1.0rem;font-weight:700;color:#555;padding-left:4px;text-align:left">${hpFormula}</div>
+    </div>`;
+
+  // 4属性行（バーあり）
+  ELEMENTS.forEach((e, i) => {
+    const raw     = Math.round(rawPcts[i]);
+    const boosted = orbMults[e.id] ? stats[e.id] : null;
+    resRows.innerHTML += makeResRow(e.hex, e.hex, e.name, rawPcts[i], raw, boosted, maxPct);
+  });
+
+  requestAnimationFrame(() => {
+    document.querySelectorAll('.rbar-fill-anim').forEach(el => {
+      el.style.width = el.dataset.target;
+    });
+  });
+
+  // オーブ情報 + 図形数
+  const orbItems = orbsFound
+    .sort((a, b) => ORB_TYPES.indexOf(a.type) - ORB_TYPES.indexOf(b.type) || b.mult - a.mult)
+    .map(o => {
+      const sz = ORB_SIZES.find(s => s.key === o.size);
+      return `<span>${ORB_DEFS[o.type].name}（${sz.label}）×${o.count}</span>`;
+    }).join('');
+  document.getElementById('info-box').innerHTML =
+    `図形数：<span class="fig-num">${totalShapes}</span>` +
+    (orbItems ? `　オーブ：<span class="orb-list">${orbItems}</span>` : '');
+
+  document.getElementById('result-make-btn').textContent = enhancing ? '強化カードを作る！' : 'カードを作る！';
+  document.getElementById('result-overlay').classList.remove('hidden');
+}
+
+function makeResRow(swatchBg, fillBg, label, pct, rawVal, boostedVal, maxPct) {
+  const barW = maxPct > 0 ? (pct / maxPct * 100).toFixed(1) : 0;
+  const boostHtml = boostedVal !== null && boostedVal !== rawVal
+    ? `<span class="rbar-boost">→ ${boostedVal}★</span>`
+    : '<span class="rbar-boost"></span>';
+  return `
+    <div class="rbar-row">
+      <div class="rbar-swatch" style="background:${swatchBg}"></div>
+      <div class="rbar-name">${label}</div>
+      <div class="rbar-bg"><div class="rbar-fill rbar-fill-anim" data-target="${barW}%" style="background:${fillBg};width:0%"></div></div>
+      <div class="rbar-val">${rawVal}</div>
+      ${boostHtml}
+    </div>`;
+}
+
+function closeResult() {
+  document.getElementById('result-overlay').classList.add('hidden');
+  pendingCard = null;
+}
+
+// ================================================================
+//  TECHNIQUE SELECTION（技選択）
+// ================================================================
+let selectedTechs = [];
+let techOptions = [];
+function techPickCount() { return enhancing ? 1 : 2; }   // 強化カードは技1つ
+
+// 技の必要エネルギーを絵文字で表示
+function techEnergyHTML(tech) {
+  return tech.counts.map(c => ELEM_EMOJI[c.el].repeat(c.n)).join('');
+}
+
+function goToSkillSelect() {
+  document.getElementById('result-overlay').classList.add('hidden');
+  selectedTechs = [];
+  const pc = techPickCount();
+  document.querySelector('#skill-select-overlay .dialog-msg').textContent = `技を${pc===1?'１':'２'}つ選ぶ`;
+  buildTechOpts();
+  document.getElementById('skill-select-overlay').classList.remove('hidden');
+}
+function backToResult() {
+  document.getElementById('skill-select-overlay').classList.add('hidden');
+  document.getElementById('result-overlay').classList.remove('hidden');
+}
+
+function buildTechOpts() {
+  const el = document.getElementById('skill-opts');
+  el.innerHTML = '';
+  const figTotal = Object.values(pendingCard.shapeCounts).reduce((a, b) => a + b, 0);
+  const k = techCandidateCount(figTotal);
+  techOptions = genTechCandidates(pendingCard.stats, /*starter*/ !enhancing, k);
+
+  techOptions.forEach((t, i) => {
+    const mHex = ELEM(t.mainEl).hex;
+    const dmg = techDamage(t, pendingCard.stats, null);
+    const div = document.createElement('div');
+    div.className = 'skill-opt'; div.dataset.idx = i;
+    div.style.background = hexA(mHex, 0.10); div.style.borderColor = mHex;
+    div.innerHTML = `
+      <div class="sk-icon">${techEnergyHTML(t)}</div>
+      <div class="sk-info">
+        <div class="sk-name" style="color:${mHex}">${t.name}</div>
+        <div style="font-size:0.7rem;color:#888;margin-top:2px">威力 ${dmg}（${ELEM(t.mainEl).name}属性）</div>
+      </div>
+      <div class="sk-check">✓</div>`;
+    div.addEventListener('click', () => toggleTech(div, i));
+    el.appendChild(div);
+  });
+
+  const pc = techPickCount();
+  if (techOptions.length <= pc) {
+    el.querySelectorAll('.skill-opt').forEach(div => {
+      if (selectedTechs.length < pc) toggleTech(div, +div.dataset.idx);
+    });
+  }
+  updateConfirmBtn();
+}
+
+function toggleTech(div, idx) {
+  const pc = techPickCount();
+  const pos = selectedTechs.findIndex(s => s.optIdx === idx);
+  if (pos >= 0) { selectedTechs.splice(pos, 1); div.classList.remove('sel'); }
+  else {
+    if (selectedTechs.length >= pc) return;
+    selectedTechs.push({ optIdx: idx, tech: techOptions[idx] });
+    div.classList.add('sel');
+  }
+  updateConfirmBtn();
+}
+
+function updateConfirmBtn() {
+  const pc = techPickCount();
+  const need = Math.min(pc, techOptions.length);
+  const ok   = selectedTechs.length >= need && need > 0;
+  document.getElementById('skill-confirm-btn').classList.toggle('btn-dim', !ok);
+}
+
+// ================================================================
+//  DICE（サイコロ）
+//  初期サイコロ：6面 = 単色4色 + 1番大きい色 + 2番目に大きい色
+// ================================================================
+function makeInitialDice(stats) {
+  // 4属性を値の大きい順に並べる（同値はランダムで順序決定）
+  const ranked = ELEMENTS
+    .map(e => ({ id:e.id, name:e.name, hex:e.hex, val:stats[e.id], r:Math.random() }))
+    .sort((a, b) => (b.val - a.val) || (b.r - a.r));
+
+  const faces = [];
+  // 4面：単色（炎・氷・風・雷の確定枠）
+  ELEMENTS.forEach(e => faces.push({ type:'single', colors:[e.id] }));
+  // 5面目：1番大きい色 / 6面目：2番目に大きい色
+  faces.push({ type:'single', colors:[ranked[0].id] });
+  faces.push({ type:'single', colors:[ranked[1].id] });
+
+  // 並びはランダムにシャッフル
+  for (let i = faces.length - 1; i > 0; i--) {
+    const j = randInt(0, i);
+    [faces[i], faces[j]] = [faces[j], faces[i]];
+  }
+  return faces;
+}
+
+// 弱点＝最小属性 / 抵抗＝最大属性（同値は抽選、両者は別属性）
+function pickWeakness(stats) {
+  return ELEMENTS
+    .map(e => ({ id:e.id, val:stats[e.id], r:Math.random() }))
+    .sort((a, b) => (a.val - b.val) || (a.r - b.r))[0].id;
+}
+function pickResistance(stats, weak) {
+  const cand = ELEMENTS.filter(e => e.id !== weak)
+    .map(e => ({ id:e.id, val:stats[e.id], r:Math.random() }))
+    .sort((a, b) => (b.val - a.val) || (a.r - b.r));
+  return cand[0].id;
+}
+
+// ================================================================
+//  CARD FINALIZE
+// ================================================================
+const cardStock = [];
+const MAX_PARTY = 3;  // 冒険に連れていくカード数
+
+// 特化に応じてイラスト（シート＝最大属性／枠内＝2番目の属性で変化）
+function chooseIllustration(rawPcts) {
+  const vals = [rawPcts[0], rawPcts[1], rawPcts[2], rawPcts[3], rawPcts[4]]; // 炎氷風雷＋白(HP)
+  let primary = 0;
+  for (let i = 1; i < 5; i++) if (vals[i] > vals[primary]) primary = i;
+  const fileIdx = primary;                                   // card_image_(primary+1)
+  const rem = [0,1,2,3,4].filter(i => i !== primary);        // 残り4属性（昇順固定）
+  const secondary = rem.reduce((b, i) => vals[i] > vals[b] ? i : b, rem[0]);
+  const row = rem.indexOf(secondary);                        // 0〜3：2番目の属性の位置
+  const col = Math.max(0, Math.min(3, Math.floor(vals[secondary] / 8))); // 0〜3：2番目の強さ
+  return { fileIdx, col, row };
+}
+
+function finalizeCard() {
+  if (!pendingCard) return;
+  let illustration, name;
+  if (enhancing) {
+    // 強化カードは武器イメージ（モンスターを割り当てない）
+    illustration = { weapon: true };
+    name = '強化カード';
+  } else {
+    const pick = chooseIllustration(pendingCard.rawPcts);  // 特化に応じてシート・絵を決定
+    illustration = { file: CARD_FILES[pick.fileIdx], col: pick.col, row: pick.row };
+    name = characterName(pick.fileIdx, pick.col, pick.row);
+  }
+  const weakTmp = pickWeakness(pendingCard.stats);
+  const figTotal = Object.values(pendingCard.shapeCounts).reduce((a, b) => a + b, 0);
+  const autoTech = pickAutoTech(pendingCard.stats, figTotal, !enhancing);  // 技を1つ自動選択
+  const card = {
+    ...pendingCard,
+    techs: [autoTech],                          // 技1つ（最大2つまで保持可）
+    illustration,
+    name,
+    weak: weakTmp,
+    resist: pickResistance(pendingCard.stats, weakTmp),
+    enhanceCount: 0,
+    level: 1,
+  };
+  pendingCard = null;
+  document.getElementById('result-overlay').classList.add('hidden');
+
+  if (enhancing) {
+    openMerge(card);                            // 強化カードとして合成画面へ
+    return;
+  }
+
+  cardStock.push(card);
+  if (cardStock.length >= MAX_PARTY) {
+    showDepart();   // 3枚そろったら冒険へ
+  } else {
+    showCards();
+    doRegenerate();
+  }
+}
+
+// ================================================================
+//  ENHANCEMENT（強化カード作成・合成）
+// ================================================================
+let enhancing = false;
+let enhanceCard = null;
+const ENHANCE_DIVISOR = 2;                 // 強化カードの値の 1/2 を加算
+const enhInc = v => Math.round(v / ENHANCE_DIVISOR);
+
+function startEnhancement() {
+  enhancing = true;
+  battle.enhanceRerolls = DIFF_REROLLS[battle.difficulty];   // 絵のリロード可能回数
+  document.getElementById('adventure-screen').classList.add('hidden');
+  document.getElementById('battle-area').classList.add('hidden');
+  document.getElementById('game-screen').classList.remove('hidden');
+  document.getElementById('enhance-banner').classList.remove('hidden');
+  updateChangeBtn();
+  generateArt(); resetFrame(); updateLiveAnalysis();
+}
+
+// 「絵を変える」ボタンの状態（強化時はリロード制限）
+function updateChangeBtn() {
+  const btn = document.querySelector('.btn-change');
+  if (!btn) return;
+  if (enhancing) {
+    const r = battle.enhanceRerolls;
+    const inf = (r === Infinity);
+    btn.textContent = inf ? '🎨 絵を変える' : `🎨 絵を変える（残り${Math.max(0,r)}）`;
+    btn.classList.toggle('btn-dim', !inf && r <= 0);
+    document.getElementById('panel-inst').innerHTML =
+      '「切り取る」で<b>強化カード</b>を作ろう！<br>手持ちのカードを強くできます。';
+  } else {
+    btn.textContent = '🎨 絵を変える';
+    btn.classList.remove('btn-dim');
+  }
+}
+
+// 合成画面：強化先カードを選ぶ
+function openMerge(card) {
+  enhanceCard = card;
+  const overlay = document.getElementById('merge-overlay');
+  const holder  = document.getElementById('merge-choices');
+  holder.innerHTML = '';
+
+  // 均等強化ルール：最小強化回数のカードのみ強化可
+  const minCount = Math.min(...cardStock.map(c => c.enhanceCount));
+
+  cardStock.forEach(target => {
+    const eligible = target.enhanceCount === minCount;
+    const wrap = document.createElement('div');
+    wrap.className = 'fighter-pick' + (eligible ? '' : ' dead');
+    const cardEl = buildCardEl(target, {noZoom:true});
+    const tag = document.createElement('div');
+    tag.className = 'fighter-hp';
+    tag.textContent = eligible ? `Lv.${target.level} → Lv.${target.level+1}` : '強化できません';
+    wrap.appendChild(cardEl); wrap.appendChild(tag);
+    if (eligible) wrap.addEventListener('click', () => applyMerge(target));
+    holder.appendChild(wrap);
+  });
+
+  // 強化カード（素材）プレビュー：実際に増える量（+N）を表示
+  const matHolder = document.getElementById('merge-material');
+  matHolder.innerHTML = '';
+  const matCard = buildCardEl(card, {noZoom:true});
+  // 属性値・HPを「＋増加量」に置き換え
+  const valEls = matCard.querySelectorAll('.card-attr2-val');
+  ELEMENTS.forEach((x, idx) => {
+    if (valEls[idx]) { valEls[idx].textContent = '+' + enhInc(card.stats[x.id]); valEls[idx].style.color = '#2e9c5a'; }
+  });
+  const hpNum = matCard.querySelector('.card-hp-num');
+  if (hpNum) { hpNum.textContent = '+' + enhInc(card.stats.hp); hpNum.style.color = '#2e9c5a'; }
+  // グレード文字は紛らわしいので隠す
+  matCard.querySelectorAll('.card-attr2-grade').forEach(g => g.style.visibility = 'hidden');
+  matHolder.appendChild(matCard);
+
+  overlay.classList.remove('hidden');
+}
+
+// 合成を適用：ステータス +1/4、スキル再選択へ
+function applyMerge(target) {
+  const e = enhanceCard;
+  ELEMENTS.forEach(x => { target.stats[x.id] += enhInc(e.stats[x.id]); });
+  const hpGain = enhInc(e.stats.hp);
+  target.stats.hp += hpGain;
+  // パーティのHP上限も更新（その場で回復）
+  const pe = battle.party.find(p => p.card === target);
+  if (pe) { pe.maxHp = target.stats.hp; pe.curHp = Math.min(pe.maxHp, pe.curHp + hpGain); }
+  // サイコロを再構築（新ステータス順）
+  target.dice = makeInitialDice(target.stats);
+  target.enhanceCount++;
+  target.level = (target.level || 1) + 1;
+
+  // 伝説カード抽選：Lvが3/6/9になった瞬間、1%で変身
+  target.becameLegend = false;
+  if ([3, 6, 9].includes(target.level) && !target.legendary && Math.random() < 0.01) {
+    const idx = randInt(0, LEGENDARY_NAMES.length - 1);
+    target.legendary = true;
+    target.illustration = { file: LEGEND_FILE, col: idx % 4, row: Math.floor(idx / 4) };
+    target.name = LEGENDARY_NAMES[idx];
+    target.becameLegend = true;
+  }
+
+  document.getElementById('merge-overlay').classList.add('hidden');
+
+  // 技の合成：現在の技 + 強化カードの技。2つ以内ならそのまま追加、超えるなら選び直し
+  const combined = [...(target.techs || []), ...(e.techs || [])];
+  if (combined.length <= 2) {
+    target.techs = combined;
+    showEnhanceDone(target);
+  } else {
+    openReskill(target, e);   // 3つ → 2つ選ぶ
+  }
+}
+
+// 技の再選択：現在2つ + 強化カードの2つ → 4つから2つ
+function openReskill(target, e) {
+  const pool = [];
+  (target.techs || []).forEach(t => pool.push({ tech:t, src:'現' }));
+  (e.techs || []).forEach(t => pool.push({ tech:t, src:'新' }));
+  reskillTarget = target;
+  reskillPool = pool;
+  reskillSelected = [];
+
+  const holder = document.getElementById('reskill-opts');
+  holder.innerHTML = '';
+  pool.forEach((item, i) => {
+    const t = item.tech;
+    const mHex = ELEM(t.mainEl).hex;
+    const div = document.createElement('div');
+    div.className = 'skill-opt'; div.dataset.idx = i;
+    div.style.background = hexA(mHex, 0.10); div.style.borderColor = mHex;
+    div.innerHTML = `
+      <div class="sk-icon">${techEnergyHTML(t)}</div>
+      <div class="sk-info">
+        <div class="sk-name" style="color:${mHex}">${t.name} <span style="font-size:0.7rem;color:#aaa">[${item.src}]</span></div>
+        <div style="font-size:0.7rem;color:#888;margin-top:2px">${ELEM(t.mainEl).name}属性</div>
+      </div>
+      <div class="sk-check">✓</div>`;
+    div.addEventListener('click', () => toggleReskill(div, i));
+    holder.appendChild(div);
+  });
+  updateReskillBtn();
+  document.getElementById('reskill-overlay').classList.remove('hidden');
+}
+
+let reskillTarget = null, reskillPool = [], reskillSelected = [];
+
+function toggleReskill(div, idx) {
+  const pos = reskillSelected.indexOf(idx);
+  if (pos >= 0) { reskillSelected.splice(pos, 1); div.classList.remove('sel'); }
+  else { if (reskillSelected.length >= 2) return; reskillSelected.push(idx); div.classList.add('sel'); }
+  updateReskillBtn();
+}
+function updateReskillBtn() {
+  document.getElementById('reskill-confirm-btn').classList.toggle('btn-dim', reskillSelected.length !== 2);
+}
+function confirmReskill() {
+  if (reskillSelected.length !== 2) return;
+  reskillTarget.techs = reskillSelected.map(i => reskillPool[i].tech);
+  document.getElementById('reskill-overlay').classList.add('hidden');
+  showEnhanceDone(reskillTarget);
+}
+
+// 強化完了メッセージ（伝説 or 通常）
+function showEnhanceDone(target) {
+  const doneIcon = document.querySelector('#enhance-done-overlay .dialog-box > div');
+  if (target.becameLegend) {
+    if (doneIcon) doneIcon.textContent = '🌟';
+    document.getElementById('enhance-done-msg').innerHTML =
+      `<span style="color:#d4a000">★伝説★</span> ${target.name} が覚醒した！`;
+    document.getElementById('enhance-done-sub').textContent =
+      `Lv.${target.level} ／ とても珍しいカードだ！`;
+  } else {
+    if (doneIcon) doneIcon.textContent = '✨';
+    document.getElementById('enhance-done-msg').textContent = `${target.name} が強化された！`;
+    document.getElementById('enhance-done-sub').textContent = `Lv.${target.level} になった！`;
+  }
+  document.getElementById('enhance-done-overlay').classList.remove('hidden');
+}
+
+function afterEnhanceDone() {
+  document.getElementById('enhance-done-overlay').classList.add('hidden');
+  enhancing = false; enhanceCard = null;
+  document.getElementById('enhance-banner').classList.add('hidden');
+  proceedNextFloor();
+}
+
+function showDepartReset() { document.getElementById('depart-reset-overlay').classList.remove('hidden'); }
+function hideDepartReset() { document.getElementById('depart-reset-overlay').classList.add('hidden'); }
+function confirmDepartReset() {
+  document.getElementById('depart-reset-overlay').classList.add('hidden');
+  document.getElementById('depart-overlay').classList.add('hidden');
+  backToTitle();
+}
+
+// 出発演出（3枚を並べて表示）→ 冒険画面へ
+function showDepart() {
+  document.getElementById('cards-overlay').classList.add('hidden');
+  const holder = document.getElementById('depart-cards');
+  holder.innerHTML = '';
+  cardStock.forEach(c => holder.appendChild(buildCardEl(c, {noZoom:true})));
+  document.getElementById('depart-overlay').classList.remove('hidden');
+}
+function goAdventure() {
+  document.getElementById('depart-overlay').classList.add('hidden');
+  document.getElementById('game-screen').classList.add('hidden');
+  document.getElementById('adventure-screen').classList.remove('hidden');
+  // 難易度選択を表示
+  document.getElementById('difficulty-overlay').classList.remove('hidden');
+  document.getElementById('battle-area').classList.add('hidden');
+}
+
+// hex色 → rgba（透明度つき）
+function hexA(hex, a) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;
+}
+
+// 属性値 → グレード
+function getGrade(val) {
+  if (val >= 121) return { letter:'SSS', color:'#C000B0' };
+  if (val >= 101) return { letter:'SS',  color:'#FF2D2D' };
+  if (val >=  85) return { letter:'S',   color:'#E8960C' };
+  if (val >=  71) return { letter:'A',   color:'#DD2200' };
+  if (val >=  56) return { letter:'B',   color:'#E06800' };
+  if (val >=  41) return { letter:'C',   color:'#55A000' };
+  if (val >=  26) return { letter:'D',   color:'#2266CC' };
+  if (val >=  16) return { letter:'E',   color:'#5599CC' };
+  if (val >=   6) return { letter:'F',   color:'#999999' };
+  return             { letter:'G',   color:'#777777' };
+}
+
+// ================================================================
+//  CARD VIEWER
+// ================================================================
+function showCards() {
+  const grid = document.getElementById('card-grid');
+  grid.innerHTML = '';
+  document.getElementById('card-count-badge').textContent = `${cardStock.length} / ${MAX_PARTY}`;
+  if (cardStock.length === 0) {
+    grid.innerHTML = '<p style="color:#bbb;font-weight:700;padding:60px 0;width:100%">まだカードがありません</p>';
+  } else {
+    const minCount = Math.min(...cardStock.map(c => c.enhanceCount));
+    cardStock.forEach(c => {
+      const cardEl = buildCardEl(c);
+      // 強化中：強化できないカードは灰色＋ラベル
+      if (enhancing && c.enhanceCount !== minCount) {
+        const wrap = document.createElement('div'); wrap.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:4px';
+        cardEl.style.filter = 'grayscale(1) brightness(0.6)';
+        const lbl = document.createElement('div'); lbl.style.cssText = 'font-weight:800;color:#c0392b;font-size:0.85rem';
+        lbl.textContent = '強化できません';
+        wrap.appendChild(cardEl); wrap.appendChild(lbl);
+        grid.appendChild(wrap);
+      } else {
+        grid.appendChild(cardEl);
+      }
+    });
+  }
+  document.getElementById('cards-overlay').classList.remove('hidden');
+}
+function hideCards() { document.getElementById('cards-overlay').classList.add('hidden'); }
+
+function showCardZoom(card) {
+  const holder = document.getElementById('card-zoom-holder');
+  holder.innerHTML = '';
+  const cardEl = buildCardEl(card, {noZoom:true});
+  cardEl.style.cursor = 'default';
+  cardEl.addEventListener('click', e => e.stopPropagation()); // カード自体のクリックは閉じない
+  holder.appendChild(cardEl);
+  document.getElementById('card-zoom-overlay').classList.remove('hidden');
+}
+function hideCardZoom() { document.getElementById('card-zoom-overlay').classList.add('hidden'); }
+
+// ================================================================
+//  BATTLE / ADVENTURE
+// ================================================================
+const battle = {
+  floor: 1, maxFloor: 10,
+  party: [],          // {card, maxHp, curHp}
+  activeIdx: -1,      // 戦闘中のカードindex
+  enemy: null,        // 現在の敵
+  mode: 0,            // 0=手動, 1=自動等速, 2=倍速, 3=3倍速
+  turnTimer: null,
+  inBattle: false,
+  pendingFn: null,    // 手動モードで次に実行する処理
+  items: [],          // 取得済みアイテム
+};
+
+const MODE_LABELS = ['✋ 手動', '▶ 自動', '⏩ 倍速', '⏩⏩ 3倍速'];
+const MODE_DELAYS = [0, 950, 480, 320];  // 各モードの待ち時間(ms)
+
+// 次の処理へ進む（手動=クリック待ち / 自動=タイマー）
+function advance(fn) {
+  battle.pendingFn = fn;
+  const hint = document.getElementById('battle-hint');
+  if (battle.mode === 0) {
+    hint.classList.remove('hidden');   // クリック待ち
+  } else {
+    hint.classList.add('hidden');
+    clearTimeout(battle.turnTimer);
+    battle.turnTimer = setTimeout(runPending, MODE_DELAYS[battle.mode]);
+  }
+}
+function runPending() {
+  const fn = battle.pendingFn;
+  battle.pendingFn = null;
+  if (fn) fn();
+}
+function onBattleClick() {
+  if (battle.mode === 0 && battle.pendingFn) runPending();
+}
+function cycleMode() {
+  battle.mode = (battle.mode + 1) % 4;
+  document.getElementById('speed-btn').textContent = MODE_LABELS[battle.mode];
+  // 手動→自動に切り替えたら、待機中の処理を進める
+  if (battle.mode > 0 && battle.pendingFn) advance(battle.pendingFn);
+}
+
+// シート1: 闇・アンデッド系 (indices 0–15)
+// シート2: 毒・植物・昆虫・深海系 (indices 16–31)
+// シート3: 無機物・擬態・機械系 (indices 32–47)
+const ENEMY_NAMES = [
+  'スケル','ドロン','ゾン太','ミイラ','デモパ','ガゴ','スライム','死神',
+  'ゴブリ','ヘルワン','カトッ','アーマ','キメラ','ウルフ','ドロワ','メドゥ',
+  'キノコ','マンク','スパイ','プラン','スコル','タラン','スポア','アング',
+  'ビートル','ジェリ','カクタ','ブライ','ワイバ','カエる','ワスプ','リーチ',
+  'ミミック','ゴーレム','パペ','ガゴ','ミラー','ロボ','ブック','ラクー',
+  'サンド','キャン','ポタ','コンパ','アイア','ガゴ','ゴブリ','ハンド',
+];
+const BOSS_NAMES = [
+  'デモ王','ドラ王','リッチ','クラ王','ヴァル','ベヘも','フェン','スフィ',
+  'コア','ミノ王','リヴァ','フェニ','スライ王','ヘド','グリ','ユグドラ',
+];
+
+const DIFF_REROLLS = { easy: 0, normal: 0, hard: 0 };   // 強化素材のリロードは全難易度なし
+const DIFF_TRASH   = { easy: 0.0, normal: 0.15, hard: 0.30 };  // 敵が全力攻撃する確率
+const DIFF_POWER   = { easy: 1.1, normal: 1.35, hard: 1.7 };   // 敵の強さ倍率
+
+function startAdventure(diff) {
+  battle.difficulty = diff;
+  battle.maxFloor = 7;                         // 全難易度7階
+  battle.floor = 1;
+  battle.items = [];
+  // パーティを初期化（HP満タン）
+  battle.party = cardStock.map(card => ({
+    card, maxHp: card.stats.hp, curHp: card.stats.hp,
+  }));
+  battle.activeIdx = 0;                        // 一番左が初期戦闘カード
+  enhancing = false;
+  document.getElementById('floor-max').textContent = battle.maxFloor;
+  document.getElementById('difficulty-overlay').classList.add('hidden');
+  document.getElementById('battle-area').classList.remove('hidden');
+  arriveFloor();
+}
+
+// 階層に到着
+function arriveFloor() {
+  document.getElementById('floor-num').textContent = battle.floor;
+
+  // 5の倍数かつ10の倍数でない → 休憩所
+  if (battle.floor % 5 === 0 && battle.floor % 10 !== 0) {
+    battle.party.forEach(p => p.curHp = p.maxHp); // 完全回復
+    document.getElementById('rest-overlay').classList.remove('hidden');
+    return;
+  }
+
+  // 敵チーム（3体）を生成してバトル開始
+  battle.enemyTeam = [makeEnemy(battle.floor), makeEnemy(battle.floor), makeEnemy(battle.floor)];
+  // 同名モンスターに番号付与（2体目→２、3体目→３）
+  const dupCount = {}, dupSeen = {};
+  battle.enemyTeam.forEach(e => { dupCount[e.name] = (dupCount[e.name] || 0) + 1; });
+  battle.enemyTeam.forEach(e => {
+    if (dupCount[e.name] > 1) {
+      dupSeen[e.name] = (dupSeen[e.name] || 0) + 1;
+      if (dupSeen[e.name] > 1) e.name += ['２','３'][dupSeen[e.name] - 2];
+    }
+  });
+  battle.enemyIdx = 0;
+  battle.enemy = battle.enemyTeam[0];
+  startBattle();
+}
+
+function leaveRest() {
+  document.getElementById('rest-overlay').classList.add('hidden');
+  battle.floor++;
+  arriveFloor();
+}
+
+// 敵生成
+function makeEnemy(floor) {
+  const isBoss = floor >= 7;                    // 最上階はボス
+  let scale = (1 + (floor - 1) * 0.14) * (DIFF_POWER[battle.difficulty] || 1.1);
+  if (isBoss) scale *= 1.25;
+
+  const baseHp = (rand(70, 100)) * scale;
+  // 得意属性：40%で2属性が高い（2色攻撃を狙う／むずかしいほど2属性が出やすい）
+  const pool = [...ELEM_ORDER];
+  const p1 = pool.splice(randInt(0, pool.length - 1), 1)[0];
+  const twoChance = battle.difficulty === 'hard' ? 0.55 : battle.difficulty === 'normal' ? 0.4 : 0.25;
+  const p2 = (Math.random() < twoChance) ? pool.splice(randInt(0, pool.length - 1), 1)[0] : null;
+  const stats = { hp: Math.round(baseHp * 3) };
+  ELEM_ORDER.forEach(el => {
+    stats[el] = (el === p1 || el === p2)
+      ? Math.round(rand(30, 46) * scale)        // 得意属性は高い
+      : Math.round(rand(6, 14) * scale);        // それ以外は低め
+  });
+  let name, illus;
+  if (isBoss) {
+    const bossIdx = randInt(0, BOSS_NAMES.length - 1);
+    name = '【ボス】' + BOSS_NAMES[bossIdx];
+    illus = { file: ENEMY_BOSS_FILE, col: bossIdx % 4, row: Math.floor(bossIdx / 4) };
+  } else {
+    const nameIdx = randInt(0, ENEMY_NAMES.length - 1);
+    name = ENEMY_NAMES[nameIdx];
+    illus = enemyIllus(nameIdx);
+  }
+  // むずかしいは強い技プール（2色2+1等）も使える
+  const richTech = battle.difficulty === 'hard';
+  const techs = genTechCandidates(stats, /*starter*/ !richTech, 3);
+  const weak = pickWeakness(stats);
+  return {
+    name, stats, maxHp: stats.hp, curHp: stats.hp,
+    weak, resist: pickResistance(stats, weak),
+    isBoss, illus, techs, energy: emptyEnergy(), status: [],
+  };
+}
+
+// 敵カード（味方と同じ横長2カラム）
+function buildEnemyCard(e) {
+  const el = document.createElement('div'); el.className = 'card card-enemy';
+
+  // 名前
+  const nameRow = document.createElement('div'); nameRow.className = 'card-name';
+  nameRow.textContent = '👹 ' + e.name;
+  el.appendChild(nameRow);
+
+  // 上段：左=画像+HP / 中=属性4つ / 右=弱点・抵抗
+  const top = document.createElement('div'); top.className = 'card-top';
+
+  // 左列：イラストのみ（HPバーは外に出す）
+  const colImg = document.createElement('div'); colImg.className = 'card-col-img';
+  const imgBox = document.createElement('div'); imgBox.className = 'card-img-box';
+  const mainElBg = ELEMENTS.map(x => ({ id:x.id, val:e.stats[x.id]||0 })).sort((a,b) => b.val - a.val)[0].id;
+  imgBox.style.background = hexA(ELEM(mainElBg).hex, 0.18);
+  if (e.illus) {
+    const cvs = document.createElement('canvas');
+    cvs.width = CARD_IMG_W; cvs.height = CARD_IMG_H;
+    cvs.style.cssText = 'width:100%;height:100%;display:block;';
+    drawIllustration(cvs.getContext('2d'), e.illus.file, e.illus.col, e.illus.row);
+    imgBox.appendChild(cvs);
+  } else {
+    const ei = document.createElement('div');
+    ei.style.cssText = 'width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:3rem;background:#1a0e16;';
+    ei.textContent = '👹';
+    imgBox.appendChild(ei);
+  }
+  const strip = document.createElement('div'); strip.className = 'card-energy-strip'; imgBox.appendChild(strip);
+  colImg.appendChild(imgBox);
+  top.appendChild(colImg);
+
+  // 中列：属性4つ
+  const colMid = document.createElement('div'); colMid.className = 'card-col-mid';
+  const attrs = document.createElement('div'); attrs.className = 'card-attrs-col';
+  ELEMENTS.forEach(x => attrs.appendChild(attrRowEl(x.id, e.stats[x.id])));
+  colMid.appendChild(attrs);
+  top.appendChild(colMid);
+
+  // 右列：弱点・抵抗
+  if (e.weak) {
+    const colWr = document.createElement('div'); colWr.className = 'card-col-wr';
+    colWr.appendChild(wrBoxEl('weak', e.weak));
+    colWr.appendChild(wrBoxEl('resist', e.resist));
+    top.appendChild(colWr);
+  }
+
+  el.appendChild(top);
+
+  // HPバー（フル幅・card-topの下）
+  const hpRow = document.createElement('div'); hpRow.className = 'card-hp-row';
+  hpRow.innerHTML = `
+    <span class="card-hp-lbl">HP</span>
+    <div class="card-hp-bg"><div class="card-hp-fill"></div></div>
+    <span class="card-hp-num">${Math.max(0,e.curHp)}</span>`;
+  el.appendChild(hpRow);
+
+  // 下段：技を横いっぱいに2つ
+  const tcon = document.createElement('div'); tcon.className = 'card-techs';
+  for (let i = 0; i < 2; i++) tcon.appendChild(techBoxEl((e.techs||[])[i], { stats:e.stats }, false, '技'));
+  el.appendChild(tcon);
+
+  return el;
+}
+
+// カード選出（左:手持ち3枚 / 右:敵カード）
+function promptSelectFighter() {
+  const aliveCount = battle.party.filter(p => p.curHp > 0).length;
+  if (aliveCount === 0) { gameOver(); return; }
+
+  const holder = document.getElementById('fighter-choices');
+  holder.innerHTML = '';
+  battle.party.forEach((p, i) => {
+    const dead = p.curHp <= 0;
+    const wrap = document.createElement('div');
+    wrap.className = 'fighter-pick' + (dead ? ' dead' : '');
+    const cardEl = buildCardEl(p.card, {noZoom:true});
+    // 現在HPをカード上に反映
+    const hpFill = cardEl.querySelector('.card-hp-fill');
+    const hpNum  = cardEl.querySelector('.card-hp-num');
+    if (hpFill) setHpFill(hpFill, p.curHp, p.maxHp);
+    if (hpNum)  hpNum.textContent = Math.max(0, p.curHp);
+    const hpTag = document.createElement('div');
+    hpTag.className = 'fighter-hp';
+    hpTag.textContent = dead ? '戦闘不能' : `HP ${p.curHp}/${p.maxHp}`;
+    wrap.appendChild(cardEl); wrap.appendChild(hpTag);
+    if (!dead) {
+      wrap.addEventListener('click', () => onFighterChosen(i));
+    }
+    holder.appendChild(wrap);
+  });
+
+  // 敵カードを右に表示
+  const enemyHolder = document.getElementById('select-enemy-card');
+  enemyHolder.innerHTML = '';
+  enemyHolder.appendChild(buildEnemyCard(battle.enemy));
+
+  document.getElementById('select-fighter-overlay').classList.remove('hidden');
+}
+
+// 空のエネルギープール
+function emptyEnergy() { return { fire:0, ice:0, wind:0, thunder:0, norm:0 }; }
+// プール合計（ノーマル含む）
+function poolTotal(pool) { return ['fire','ice','wind','thunder','norm'].reduce((s,el)=>s+(pool[el]||0),0); }
+// 技が使えるか
+function canUseTech(pool, tech) {
+  // 属性スロットはその色で、ノーマルスロットは任意エネで支払う
+  for (const c of tech.counts) {
+    if (c.el === NORM) continue;
+    if ((pool[c.el] || 0) < c.n) return false;
+  }
+  return poolTotal(pool) >= tech.total;      // 合計が総コスト以上ならノーマル分も支払える
+}
+function setInstr(html) { document.getElementById('battle-instr').innerHTML = html; }
+
+// 1枚分のバトルカード（カード＋下にエネルギー表示）を生成（味方）
+function buildBattleCard(p, i) {
+  const dead = p.curHp <= 0;
+  const wrap = document.createElement('div'); wrap.className = 'battle-card-wrap';
+  wrap.dataset.partyIdx = i;
+
+  const card = buildCardEl(p.card, {noZoom:true});
+  const f = card.querySelector('.card-hp-fill'), n = card.querySelector('.card-hp-num');
+  if (f) setHpFill(f, p.curHp, p.maxHp);
+  if (n) n.textContent = Math.max(0, p.curHp);
+  if (i === battle.activeIdx) card.classList.add('active-card');
+  if (dead) card.classList.add('dead');
+
+  // 技ボタン化（場のカードのみ・act中）
+  if (i === battle.activeIdx && battle.phase === 'act' && !dead) {
+    const techEls = card.querySelectorAll('.card-tech');
+    (p.card.techs || []).forEach((t, ti) => {
+      const te = techEls[ti]; if (!te) return;
+      if (canUseTech(p.energy, t)) {
+        te.classList.add('usable');
+        if (battle.trashMode) {
+          te.classList.add('trash-ready');
+          // 威力表示を2倍＆赤に
+          const dmgEl = te.querySelector('.card-tech-dmg');
+          if (dmgEl) { dmgEl.textContent = Math.floor(techDamage(t, p.card.stats, null) * 2); dmgEl.classList.add('dmg-trash'); }
+        }
+        te.onclick = (ev) => { ev.stopPropagation(); useTech(t); };
+      } else te.classList.add('unusable');
+    });
+  }
+  // エネルギーをイラスト下ストリップへ
+  const strip = card.querySelector('.card-energy-strip');
+  if (strip) strip.innerHTML = energyStripHTML(p.energy);
+  wrap.appendChild(card);
+  addStatusBadges(wrap, p.status);
+
+  wrap.onclick = () => onPartyCardClick(i);
+  return wrap;
+}
+
+// 敵カードのラッパー（カード内ストリップにエネルギー）
+function buildEnemyWrap(e) {
+  const wrap = document.createElement('div'); wrap.className = 'battle-card-wrap';
+  const card = buildEnemyCard(e);
+  const f = card.querySelector('.card-hp-fill'), n = card.querySelector('.card-hp-num');
+  if (f) setHpFill(f, e.curHp, e.maxHp);
+  if (n) n.textContent = Math.max(0, e.curHp);
+  const strip = card.querySelector('.card-energy-strip');
+  if (strip) strip.innerHTML = energyStripHTML(e.energy);
+  wrap.appendChild(card);
+  addStatusBadges(wrap, e.status);
+  return wrap;
+}
+
+// HPバーの色（割合に応じてグラデーション）
+function hpColor(ratio) {
+  if (ratio > 0.5) return '#34d399';   // エメラルドグリーン
+  if (ratio > 0.25) return '#fbbf24';  // アンバーゴールド
+  return '#fb7185';                     // ローズレッド
+}
+function setHpFill(fill, cur, max) {
+  const r = Math.max(0, cur / max);
+  fill.style.width = (r * 100) + '%';
+  fill.style.background = hpColor(r);
+}
+
+// 状態異常バッジ（カード名の横に表示）
+function addStatusBadges(wrap, status) {
+  if (!status || !status.length) return;
+  const nameEl = wrap.querySelector('.card-name');
+  if (!nameEl) return;
+  const sb = document.createElement('span'); sb.className = 'status-badges';
+  sb.innerHTML = status.slice(0, 3).map(s =>
+    `<span class="status-badge">${STATUS_INFO[s.type].emoji}</span>`).join('');
+  nameEl.appendChild(sb);
+}
+
+// エネルギーストリップ用（属性＋ノーマル）
+function energyStripHTML(pool) {
+  let s = ELEM_ORDER.map(el => ELEM_EMOJI[el].repeat(pool[el] || 0)).join('');
+  s += ELEM_EMOJI.norm.repeat(pool.norm || 0);
+  return s;
+}
+
+// 左/中央/右の3スロットでゾーンを組む（場は常に中央）
+function fillZone(rowId, activeWrap, benchWraps) {
+  const row = document.getElementById(rowId);
+  row.innerHTML = '';
+  const left  = document.createElement('div'); left.className  = 'zone-slot left';
+  const right = document.createElement('div'); right.className = 'zone-slot right';
+  if (benchWraps[0]) { benchWraps[0].classList.add('bench'); left.appendChild(benchWraps[0]); }
+  if (benchWraps[1]) { benchWraps[1].classList.add('bench'); right.appendChild(benchWraps[1]); }
+  row.appendChild(left); row.appendChild(activeWrap); row.appendChild(right);
+}
+
+// 戦闘の描画
+function renderBattle() {
+  // 敵
+  const eActive = buildEnemyWrap(battle.enemy); eActive.classList.add('fwd'); eActive.id = 'fx-enemy';
+  const eBench = battle.enemyTeam.map((e, i) => ({ e, i }))
+    .filter(o => o.i !== battle.enemyIdx && o.e.curHp > 0)
+    .map(o => buildEnemyWrap(o.e));
+  fillZone('enemy-row', eActive, eBench);
+
+  // 味方
+  const pActive = buildBattleCard(battle.party[battle.activeIdx], battle.activeIdx);
+  pActive.classList.add('fwd'); pActive.id = 'fx-player';
+  const pBench = battle.party.map((p, i) => ({ p, i })).filter(o => o.i !== battle.activeIdx)
+    .map(o => buildBattleCard(o.p, o.i));
+  fillZone('player-row', pActive, pBench);
+
+  renderEnergyDock();
+}
+
+// ダメージ表示＋シェイク（wrap要素のid指定）
+function flashDamage(wrapId, dmg) {
+  const wrap = document.getElementById(wrapId);
+  if (!wrap) return;
+  wrap.classList.add('shake');
+  const pop = document.createElement('div'); pop.className = 'dmg-pop'; pop.textContent = '-' + dmg;
+  wrap.appendChild(pop);
+  setTimeout(() => { wrap.classList.remove('shake'); pop.remove(); }, 800);
+}
+
+// エネルギー候補の見た目（type:'attr'/'norm2'）
+function choiceLabel(ch) {
+  if (ch.type === 'double') return ELEM_EMOJI[ch.el] + ELEM_EMOJI[ch.el];
+  if (ch.type === 'norm2')  return ELEM_EMOJI.norm + ELEM_EMOJI.norm;
+  return ELEM_EMOJI[ch.el];
+}
+
+// 中央ドック：choose=2択(ドラッグ) / act=トラッシュ＆なにもしない
+function renderEnergyDock() {
+  const dock = document.getElementById('energy-dock-center');
+  dock.innerHTML = '';
+  if (battle.turn !== 'player') return;
+  const inner = document.createElement('div'); inner.className = 'dock-inner';
+
+  if (battle.phase === 'choose' && battle.choices) {
+    const lbl = document.createElement('div'); lbl.className = 'dock-label';
+    lbl.textContent = 'カードにドラッグでつける';
+    const row = document.createElement('div'); row.className = 'dock-choices';
+    battle.choices.forEach((ch, idx) => {
+      const tok = document.createElement('div'); tok.className = 'dock-token';
+      tok.innerHTML = choiceLabel(ch);
+      tok.addEventListener('pointerdown', e => startEnergyDrag(e, idx));
+      row.appendChild(tok);
+    });
+    inner.appendChild(lbl); inner.appendChild(row);
+  } else if (battle.phase === 'act') {
+    const tBtn = document.createElement('button');
+    tBtn.className = 'btn btn-danger btn-sm' + (battle.trashMode ? ' trash-on' : '');
+    tBtn.textContent = battle.trashMode ? '🔥全力モード ON（エネルギートラッシュ）' : '全力モード OFF';
+    tBtn.onclick = toggleTrash;
+    const cBtn = document.createElement('button');
+    cBtn.className = 'btn btn-secondary btn-sm';
+    cBtn.textContent = 'なにもしない';
+    cBtn.onclick = endPlayerTurn;
+    inner.appendChild(tBtn); inner.appendChild(cBtn);
+  } else { return; }
+  dock.appendChild(inner);
+}
+
+// ===== エネルギーのドラッグ付与 =====
+let dragChoiceIdx = null, dragGhost = null;
+function startEnergyDrag(e, idx) {
+  if (battle.turn !== 'player' || battle.phase !== 'choose') return;
+  e.preventDefault();
+  dragChoiceIdx = idx;
+  dragGhost = document.createElement('div'); dragGhost.className = 'drag-ghost';
+  dragGhost.innerHTML = choiceLabel(battle.choices[idx]);
+  document.body.appendChild(dragGhost);
+  moveEnergyDrag(e);
+  window.addEventListener('pointermove', moveEnergyDrag);
+  window.addEventListener('pointerup', endEnergyDrag);
+}
+function moveEnergyDrag(e) {
+  if (dragGhost) { dragGhost.style.left = e.clientX + 'px'; dragGhost.style.top = e.clientY + 'px'; }
+  document.querySelectorAll('.battle-card-wrap.drop-hover').forEach(c => c.classList.remove('drop-hover'));
+  const w = cardWrapUnder(e); if (w) w.classList.add('drop-hover');
+}
+function endEnergyDrag(e) {
+  window.removeEventListener('pointermove', moveEnergyDrag);
+  window.removeEventListener('pointerup', endEnergyDrag);
+  const w = cardWrapUnder(e);
+  document.querySelectorAll('.battle-card-wrap.drop-hover').forEach(c => c.classList.remove('drop-hover'));
+  if (dragGhost) { dragGhost.remove(); dragGhost = null; }
+  if (w && dragChoiceIdx != null && w.dataset.partyIdx !== undefined) {
+    attachChoiceToCard(+w.dataset.partyIdx, dragChoiceIdx);
+  }
+  dragChoiceIdx = null;
+}
+function cardWrapUnder(e) {
+  const els = document.elementsFromPoint(e.clientX, e.clientY);
+  for (const el of els) {
+    const w = el.closest && el.closest('.battle-card-wrap');
+    if (w && w.dataset.partyIdx !== undefined) return w;
+  }
+  return null;
+}
+function attachChoiceToCard(i, choiceIdx) {
+  const p = battle.party[i];
+  if (!p || p.curHp <= 0 || battle.phase !== 'choose') return;
+  const ch = battle.choices[choiceIdx];
+  if (ch.type === 'norm2') p.energy.norm += 2;
+  else if (ch.type === 'double') p.energy[ch.el] += 2;
+  else p.energy[ch.el]++;
+  pushLog(`${p.card.name}に ${choiceLabel(ch)} をつけた`);
+  battle.choices = null; battle.gained = null;
+  battle.phase = 'act';
+  renderBattle();
+  setInstr('交代：カードをタップ／攻撃：技をタップ／全力攻撃：エネルギーをトラッシュして2倍');
+}
+
+// 階層バトル開始（エネルギー初期化）
+function startBattle() {
+  battle.inBattle = true;
+  battle.party.forEach(p => { p.energy = emptyEnergy(); p.status = []; });
+  battle.enemyTeam.forEach(e => { e.energy = emptyEnergy(); e.status = []; });
+  if ((battle.items||[]).some(i => i.id === 'heal')) {
+    battle.party.forEach(p => { if (p.curHp > 0) p.curHp = Math.min(p.maxHp, p.curHp + Math.round(p.maxHp * 0.05)); });
+  }
+  renderBattleItems();
+  // 一番左の生存カードを場に
+  battle.activeIdx = battle.party.findIndex(p => p.curHp > 0);
+  clearLog();
+  beginPlayerTurn();
+}
+
+// エネルギー候補を抽選（boostアイテムで3択、ダブルチャージアイテムで2個付与チャンス）
+function rollTwoChoices() {
+  const hasBoost = (battle.items||[]).some(i => i.id === 'boost');
+  const count = (hasBoost && Math.random() < 0.50) ? 3 : 2;
+  const pool = [...ELEM_ORDER];
+  const choices = [];
+  for (let i = 0; i < count && pool.length > 0; i++) {
+    const el = pool.splice(randInt(0, pool.length - 1), 1)[0];
+    const hasDbl = (battle.items||[]).some(it => it.id === `dbl_${el}`);
+    choices.push(hasDbl && Math.random() < 0.20 ? { type:'double', el } : { type:'attr', el });
+  }
+  return choices;
+}
+
+// プレイヤーターン開始：状態処理 → エネルギー2択
+function beginPlayerTurn() {
+  if (!battle.inBattle) return;
+  battle.turn = 'player';
+  const p = battle.party[battle.activeIdx];
+  const { frozen } = tickStatus(p, p.card.name);   // やけど・継続減少
+  renderBattle();
+
+  if (p.curHp <= 0) {                                // やけどで倒れた
+    pushLog(`${p.card.name} は たおれた…`);
+    setTimeout(() => {
+      const idx = battle.party.findIndex(x => x.curHp > 0);
+      if (idx < 0) { gameOver(); } else { battle.activeIdx = idx; beginPlayerTurn(); }
+    }, 900);
+    return;
+  }
+  if (frozen) {                                      // こおり：このターン何もできない
+    pushLog(`🧊 ${p.card.name}は こおって 動けない！`);
+    document.getElementById('turn-indicator').textContent = 'あなたのターン';
+    setTimeout(enemyTurn, 900);
+    return;
+  }
+
+  // 再生の葉：生存中の全カードHP2%回復
+  if ((battle.items||[]).some(i => i.id === 'leaf')) {
+    battle.party.forEach(x => {
+      if (x.curHp > 0) x.curHp = Math.min(x.maxHp, x.curHp + Math.max(1, Math.round(x.maxHp * 0.02)));
+    });
+  }
+  // 混沌の宝珠：生存カードにランダム属性エネルギー+1
+  (battle.items||[]).filter(i => i.id === 'chaos').forEach(() => {
+    const alive = battle.party.filter(x => x.curHp > 0);
+    const tgt = alive[randInt(0, alive.length - 1)];
+    const el = ELEM_ORDER[randInt(0, 3)];
+    tgt.energy[el]++;
+    pushLog(`🎲 混沌の宝珠！ ${tgt.card.name}に ${ELEM_EMOJI[el]} 追加`);
+  });
+
+  battle.choices = rollTwoChoices();
+  battle.gained = null;
+  battle.phase = 'choose';
+  battle.trashMode = false;
+  document.getElementById('turn-indicator').textContent = 'あなたのターン';
+  renderBattle();
+  setInstr('エネルギーをカードにドラッグ');
+}
+
+// 味方カードのクリック（act中は交代）
+function onPartyCardClick(i) {
+  if (battle.turn !== 'player' || battle.phase !== 'act') return;
+  if (battle.party[i].curHp <= 0) return;
+  battle.activeIdx = i;                      // 交代（自由）
+  renderBattle();
+}
+
+
+// トラッシュ攻撃モード切替
+function toggleTrash() {
+  if (battle.turn !== 'player' || battle.phase !== 'act') return;
+  battle.trashMode = !battle.trashMode;
+  renderBattle();              // 技ボタン＆ドックの見た目更新
+  renderEnergyDock();
+}
+
+// 技に使ったエネルギーをトラッシュ（ノーマルスロットは自動：ノーマル→属性の順）
+function trashTechEnergy(entry, tech) {
+  tech.counts.forEach(c => { if (c.el !== NORM) entry.energy[c.el] -= c.n; });
+  let need = tech.normCount;
+  for (const el of ['norm', 'fire', 'ice', 'wind', 'thunder']) {
+    while (need > 0 && (entry.energy[el] || 0) > 0) { entry.energy[el]--; need--; }
+  }
+}
+
+// ===== 状態異常 =====
+// 命中時に技ランクで状態異常を抽選し、相手へ付与
+function applyStatusOnHit(attackerTech, defender, defName) {
+  let proc = RANK_PROC[attackerTech.rank] || 0;
+  const defIsPlayer = battle.party.includes(defender);
+  if (defIsPlayer && (battle.items||[]).some(i => i.id === 'protection')) proc *= 0.5;
+  if (Math.random() >= proc) return;
+  const stype = ELEM_STATUS[attackerTech.mainEl];
+  if (stype === 'gust') {
+    // 突風：相手のエネルギーを1つランダムに吹き飛ばす
+    const have = [];
+    ['fire','ice','wind','thunder','norm'].forEach(el => { for (let i=0;i<(defender.energy[el]||0);i++) have.push(el); });
+    if (have.length) {
+      const el = have[randInt(0, have.length - 1)];
+      defender.energy[el]--;
+      pushLog(`💨 突風！ ${defName}のエネルギー ${ELEM_EMOJI[el]} が吹き飛んだ`);
+    }
+  } else {
+    if (defender.status.length >= 3) return;       // 重複は3つまで
+    const info = STATUS_INFO[stype];
+    defender.status.push({ type: stype, turns: info.turns });
+    pushLog(`${info.emoji} ${defName}は ${info.name}になった！`);
+  }
+}
+
+// ターン開始時の状態処理（やけどダメージ・凍結判定・継続減少）
+// 戻り値 { frozen }
+function tickStatus(obj, name) {
+  const burns = obj.status.filter(s => s.type === 'burn').length;
+  if (burns > 0) {
+    const d = Math.round(obj.maxHp * 0.05 * burns);
+    obj.curHp -= d;
+    pushLog(`🔥 ${name}は やけどで <span class="log-dmg">${d}</span> ダメージ`);
+  }
+  const frozen = obj.status.some(s => s.type === 'freeze');
+  obj.status.forEach(s => s.turns--);
+  obj.status = obj.status.filter(s => s.turns > 0);
+  return { frozen };
+}
+// まひの不発判定
+function paralysisMiss(obj) {
+  const stacks = obj.status.filter(s => s.type === 'paralysis').length;
+  return Math.random() < 0.1 * stacks;
+}
+
+// 技を使う
+function useTech(t) {
+  if (battle.turn !== 'player' || battle.phase !== 'act') return;
+  const p = battle.party[battle.activeIdx];
+  const isTrash = battle.trashMode;
+  battle.phase = 'done';
+  battle.trashMode = false;
+
+  // まひでミス
+  if (paralysisMiss(p)) {
+    pushLog(`⚡ ${p.card.name}は しびれて 技がでなかった！`);
+    renderBattle();
+    setTimeout(enemyTurn, 900);
+    return;
+  }
+
+  const amplifyBonus = (battle.items||[]).filter(i => i.id === 'amplify').length * 10;
+  const boostedStats = amplifyBonus > 0
+    ? Object.fromEntries(Object.entries(p.card.stats).map(([k,v]) => [k, ELEMENTS.some(e=>e.id===k) ? v+amplifyBonus : v]))
+    : p.card.stats;
+  let dmg = techDamage(t, boostedStats, battle.enemy);
+  if (isTrash) { dmg *= 2; trashTechEnergy(p, t); }
+  const swordCount = (battle.items||[]).filter(i => i.id === 'sword').length;
+  if (swordCount > 0) dmg = Math.floor(dmg * Math.pow(1.10, swordCount));
+  if ((battle.items||[]).some(i => i.id === 'ring') && t.mainEl === battle.enemy.weak) dmg = Math.floor(dmg * 1.25);
+  battle.enemy.curHp -= dmg;
+  const tag = isTrash ? '<span class="log-crit">トラッシュ攻撃！</span> ' : '';
+  pushLog(`${tag}${p.card.name}の<span style="color:${ELEM(t.mainEl).hex}">${t.name}</span>！ <span class="log-dmg">${dmg}</span> ダメージ`);
+  applyStatusOnHit(t, battle.enemy, 'てき');
+  renderBattle();
+  flashDamage('fx-enemy', dmg);
+  if (battle.enemy.curHp <= 0) { setTimeout(onEnemyDefeated, 800); }
+  else { setTimeout(enemyTurn, 900); }
+}
+
+// 敵を1体倒した
+function onEnemyDefeated() {
+  // 生存中の次の敵を探す
+  const nextIdx = battle.enemyTeam.findIndex((e, i) => i !== battle.enemyIdx && e.curHp > 0);
+  if (nextIdx >= 0) {
+    battle.enemyIdx = nextIdx;
+    battle.enemy = battle.enemyTeam[nextIdx];
+    pushLog(`👹 ${battle.enemy.name} が出てきた！`);
+    renderBattle();
+    // 新しい敵が出てきた → プレイヤーのターン（ボーナス行動）
+    setTimeout(beginPlayerTurn, 900);
+  } else {
+    floorCleared();   // 全滅
+  }
+}
+
+// ためる（攻撃せずターン終了）
+function endPlayerTurn() {
+  if (battle.turn !== 'player' || battle.phase !== 'act') return;
+  const p = battle.party[battle.activeIdx];
+  pushLog(`${p.card.name}は なにもしなかった`);
+  battle.phase = 'done';
+  renderEnergyDock();
+  setTimeout(enemyTurn, 700);
+}
+
+// 敵AI：付けると最も得をする色を選ぶ（弱点を突く強技に近づける）
+function enemyChooseEnergy(e, targetCard) {
+  let bestEl = ELEM_ORDER[randInt(0, 3)], bestScore = -1;
+  ELEM_ORDER.forEach(el => {
+    // この色を1つ足したと仮定
+    const sim = { ...e.energy }; sim[el] = (sim[el] || 0) + 1;
+    let score = 0;
+    (e.techs || []).forEach(t => {
+      if (canUseTech(sim, t)) {
+        score = Math.max(score, techDamage(t, e.stats, targetCard));   // 使える技の最大ダメージ
+      } else {
+        // まだ使えない技も「あと何個で撃てるか」で少し加点（強技を育てる）
+        const need = t.total - poolTotal(sim);
+        const attrOk = t.counts.every(c => c.el === NORM || (sim[c.el] || 0) >= c.n || c.el === el);
+        if (attrOk && need <= 1) score = Math.max(score, techDamage(t, e.stats, targetCard) * 0.4);
+      }
+    });
+    if (score > bestScore) { bestScore = score; bestEl = el; }
+  });
+  return bestEl;
+}
+
+// 敵のターン（自動）。skipSwap=true のとき入れ替え判断をスキップ
+function enemyTurn(skipSwap = false) {
+  if (!battle.inBattle) return;
+  battle.turn = 'enemy';
+  document.getElementById('turn-indicator').textContent = 'てきのターン';
+  renderEnergyDock();
+  setInstr('てきのターン…');
+  const e = battle.enemy;
+
+  // 敵の状態処理（やけど・凍結）
+  const { frozen } = tickStatus(e, e.name);
+  renderBattle();
+  if (e.curHp <= 0) { setTimeout(onEnemyDefeated, 800); return; }   // やけど撃破
+  if (frozen) {
+    pushLog(`🧊 ${e.name}は こおって 動けない！`);
+    setTimeout(beginPlayerTurn, 900);
+    return;
+  }
+
+  // 控えへの入れ替え判断（HP30%以下・控えが居れば50%で交代）→ 交代後もそのままターン継続
+  if (!skipSwap) {
+    const hpRatio = e.curHp / e.maxHp;
+    if (hpRatio < 0.3) {
+      const alive = battle.enemyTeam.map((en, i) => ({ en, i }))
+        .filter(o => o.i !== battle.enemyIdx && o.en.curHp > 0);
+      if (alive.length > 0 && Math.random() < 0.5) {
+        const swap = alive[Math.floor(Math.random() * alive.length)];
+        battle.enemyIdx = swap.i;
+        battle.enemy = swap.en;
+        pushLog(`👹 てきは ${battle.enemy.name} と交代した！`);
+        renderBattle();
+        setTimeout(() => enemyTurn(true), 900);
+        return;
+      }
+    }
+  }
+
+  const target = battle.party[battle.activeIdx];
+  // エネルギー獲得：相手の弱点を突く最強技に近づく色を選ぶ
+  const g = enemyChooseEnergy(e, target.card);
+  e.energy[g]++;
+  renderBattle();
+  const usable = (e.techs || []).filter(t => canUseTech(e.energy, t));
+  setTimeout(() => {
+    if (usable.length === 0) {
+      pushLog(`てきは ${ELEM_EMOJI[g]} エネルギーをためた`);
+      setTimeout(beginPlayerTurn, 800);
+      return;
+    }
+    const p = battle.party[battle.activeIdx];
+    // まひでミス
+    if (paralysisMiss(e)) {
+      pushLog(`⚡ ${e.name}は しびれて 技がでなかった！`);
+      setTimeout(beginPlayerTurn, 800);
+      return;
+    }
+    // 最大ダメージ技（弱点込み）を選ぶ
+    let best = usable[0], bestDmg = -1;
+    usable.forEach(t => { const d = techDamage(t, e.stats, p.card); if (d > bestDmg) { bestDmg = d; best = t; } });
+    // 技のエネルギーを常に消費（プレイヤーと対称に）
+    trashTechEnergy(e, best);
+    // 一定確率で全力攻撃（残りエネルギーもトラッシュして2倍）
+    let isTrash = false;
+    if (Math.random() < (DIFF_TRASH[battle.difficulty] || 0)) { isTrash = true; bestDmg *= 2; }
+    const guardCount = (battle.items||[]).filter(i => i.id === 'guard').length;
+    if (guardCount > 0) bestDmg = Math.floor(bestDmg * Math.pow(0.9, guardCount));
+    if ((battle.items||[]).some(i => i.id === 'resist_ring') && best.mainEl === p.card.resist) bestDmg = Math.floor(bestDmg * 0.75);
+    p.curHp -= bestDmg;
+    const tag = isTrash ? '<span class="log-crit">全力攻撃！</span> ' : '';
+    pushLog(`${tag}てきの<span style="color:${ELEM(best.mainEl).hex}">${best.name}</span>！ <span class="log-dmg">${bestDmg}</span> ダメージ`);
+    applyStatusOnHit(best, p, p.card.name);   // プレイヤーに状態異常
+    renderBattle();
+    flashDamage('fx-player', bestDmg);
+    if (p.curHp <= 0) {
+      pushLog(`${p.card.name} は たおれた…`);
+      setTimeout(() => {
+        const idx = battle.party.findIndex(x => x.curHp > 0);
+        if (idx < 0) { gameOver(); }
+        else { battle.activeIdx = idx; beginPlayerTurn(); }
+      }, 900);
+    } else {
+      setTimeout(beginPlayerTurn, 800);
+    }
+  }, 700);
+}
+
+// 階層クリア（敵3体撃破）
+function floorCleared() {
+  battle.inBattle = false;
+  clearTimeout(battle.turnTimer);
+  document.getElementById('energy-dock-center').innerHTML = '';
+  setInstr('クリア！ クリックでつぎへ');
+  document.getElementById('victory-msg').innerHTML =
+    `<span style="font-size:2.6rem">ステージ ${battle.floor} クリア！</span>`;
+  document.getElementById('victory-overlay').classList.remove('hidden');
+}
+
+// 勝利後「つぎへ」クリック
+function continueAfterVictory() {
+  document.getElementById('victory-overlay').classList.add('hidden');
+  document.getElementById('enemy-row').innerHTML = '';
+  document.getElementById('player-row').innerHTML = '';
+  if (battle.floor >= battle.maxFloor) { clearGame(); return; }
+  battle.party.forEach(p => {
+    if (p.curHp > 0) p.curHp = Math.min(p.maxHp, p.curHp + Math.round(p.maxHp * 0.2));
+  });
+  // 宝箱からランダムアイテム1個 → 専用演出オーバーレイで表示
+  const newItem = { ...ITEM_POOL[randInt(0, ITEM_POOL.length - 1)] };
+  if (newItem.onGain) newItem.onGain();
+  battle.items.push(newItem);
+  renderBattleItems();
+  document.getElementById('item-get-icon').textContent = newItem.icon;
+  document.getElementById('item-get-name').textContent = newItem.name;
+  document.getElementById('item-get-desc').textContent = newItem.desc;
+  document.getElementById('item-get-overlay').classList.remove('hidden');
+}
+
+function onItemGetContinue() {
+  document.getElementById('item-get-overlay').classList.add('hidden');
+  showBonusSelect();
+}
+
+// ===== クリアボーナス =====
+const BONUS_POOL = [
+  { id:'allHp',    icon:'❤️', name:'みんなのHP+50', desc:'全カードの最大HP+50', target:'party',
+    apply:() => battle.party.forEach(p => { p.card.stats.hp += 50; p.maxHp = p.card.stats.hp; p.curHp += 50; }) },
+  { id:'fullHeal', icon:'🩹', name:'ぜんかいふく', desc:'全カードのHPを全回復', target:'party',
+    apply:() => battle.party.forEach(p => { if (p.curHp > 0) p.curHp = p.maxHp; }) },
+  { id:'oneAttr',  icon:'💎', name:'1枚を強化', desc:'えらんだカードの全属性+20', target:'card',
+    apply:(c) => ELEMENTS.forEach(e => c.stats[e.id] += 20) },
+  { id:'oneHp',    icon:'💪', name:'1枚のHP+100', desc:'えらんだカードの最大HP+100', target:'card',
+    apply:(c) => { c.stats.hp += 100; const pe = battle.party.find(p => p.card === c); if (pe) { pe.maxHp = c.stats.hp; pe.curHp += 100; } } },
+  { id:'elemAttr', icon:'🔆', target:'card',
+    roll:(inst) => { inst.el = ELEM_ORDER[randInt(0,3)]; inst.name = `${ELEM_EMOJI[inst.el]}の力+50`; inst.desc = `えらんだカードの${ELEM(inst.el).name}属性を+50`; },
+    apply:(c, inst) => { c.stats[inst.el] += 50; } },
+  { id:'newTech',  icon:'✨', name:'新しい技', desc:'えらんだカードに技を1つ追加（2つあるとき入替）', target:'card' },
+  { id:'starUp',   icon:'⭐', name:'技を強化', desc:'技の★を1つ上げる（特殊効果率UP）', target:'card' },
+];
+
+// ===== アイテムプール =====
+const ITEM_POOL = [
+  { id:'dbl_fire',    icon:'🔥🔥', name:'炎ダブルチャージ',   desc:'毎ターン20%の確率で🔥🔥が選択肢に登場', el:'fire' },
+  { id:'dbl_ice',     icon:'🧊🧊', name:'氷ダブルチャージ',   desc:'毎ターン20%の確率で🧊🧊が選択肢に登場', el:'ice' },
+  { id:'dbl_wind',    icon:'💨💨', name:'風ダブルチャージ',   desc:'毎ターン20%の確率で💨💨が選択肢に登場', el:'wind' },
+  { id:'dbl_thunder', icon:'⚡⚡', name:'雷ダブルチャージ',   desc:'毎ターン20%の確率で⚡⚡が選択肢に登場', el:'thunder' },
+  { id:'heal',        icon:'💉',   name:'回復薬',             desc:'バトル開始時に全員HP5%回復' },
+  { id:'guard',       icon:'🛡️',  name:'防御の盾',           desc:'受けるダメージを10%軽減（重複OK）' },
+  { id:'sword',       icon:'⚔️',  name:'攻撃の剣',           desc:'与えるダメージを10%アップ（重複OK）' },
+  { id:'boost',       icon:'✨',   name:'エナジーブースター', desc:'50%の確率でエネルギーの選択肢が3択になる' },
+  { id:'leaf',        icon:'🌿',   name:'再生の葉',           desc:'ターン開始時に全カードのHPを2%回復' },
+  { id:'ring',        icon:'🎯',   name:'弱点の指輪',         desc:'弱点属性へのダメージ倍率が×2→×2.5に強化' },
+  { id:'resist_ring', icon:'💠',   name:'抵抗の指輪',         desc:'自分の抵抗属性への被ダメージをさらに×0.75に軽減' },
+  { id:'amplify',     icon:'🔮',   name:'魔力増幅器',         desc:'所持中は全カードの全属性+10（重複OK）' },
+  { id:'chaos',       icon:'🎲',   name:'混沌の宝珠',         desc:'毎ターンランダムカードにランダム属性エネルギー+1' },
+  { id:'crown',       icon:'👑',   name:'英雄の冠',           desc:'取得時に全カードの最大HP+50（重複OK）',
+    onGain: () => battle.party.forEach(p => { p.card.stats.hp += 50; p.maxHp += 50; p.curHp = Math.min(p.maxHp, p.curHp + 50); }) },
+];
+
+function renderBattleItems() {
+  const el = document.getElementById('battle-items'); if (!el) return;
+  el.innerHTML = '';
+  (battle.items || []).forEach(it => {
+    const b = document.createElement('span'); b.className = 'battle-item-badge';
+    b.title = it.desc;
+    b.textContent = it.icon + ' ' + it.name;
+    el.appendChild(b);
+  });
+}
+
+let pendingBonus = null;
+
+function showBonusSelect() {
+  const holder = document.getElementById('bonus-choices');
+  holder.innerHTML = '';
+  const pool = [...BONUS_POOL];
+  const picks = [];
+  for (let i = 0; i < 3 && pool.length; i++) picks.push(pool.splice(randInt(0, pool.length - 1), 1)[0]);
+  picks.forEach(b => {
+    const inst = { ...b };
+    if (inst.roll) inst.roll(inst);
+    const div = document.createElement('div'); div.className = 'bonus-card';
+    div.innerHTML = `<div class="bonus-icon">${inst.icon}</div>
+      <div class="bonus-name">${inst.name}</div><div class="bonus-desc">${inst.desc}</div>`;
+    div.onclick = () => chooseBonus(inst);
+    holder.appendChild(div);
+  });
+  document.getElementById('bonus-overlay').classList.remove('hidden');
+}
+
+function chooseBonus(b) {
+  document.getElementById('bonus-overlay').classList.add('hidden');
+  if (b.target === 'party') { b.apply(); finishBonus(); }
+  else { pendingBonus = b; showBonusPick(); }
+}
+
+function showBonusPick() {
+  const holder = document.getElementById('bonus-pick-cards');
+  holder.innerHTML = '';
+  battle.party.forEach(p => {
+    const wrap = document.createElement('div'); wrap.style.cursor = 'pointer'; wrap.style.transform = 'scale(0.78)';
+    wrap.appendChild(buildCardEl(p.card, {noZoom:true}));
+    wrap.onclick = () => onBonusCardPicked(p.card);
+    holder.appendChild(wrap);
+  });
+  document.getElementById('bonus-pick-overlay').classList.remove('hidden');
+}
+
+function onBonusCardPicked(card) {
+  document.getElementById('bonus-pick-overlay').classList.add('hidden');
+  const b = pendingBonus;
+  if (b.id === 'newTech') {
+    const t = pickAutoTech(card.stats, 18, false);
+    card.techs = card.techs || [];
+    if (card.techs.length < 2) { card.techs.push(t); finishBonus(); }
+    else openBonusTechPick(card, 'discard', t);   // 捨てる技を選ぶ
+  } else if (b.id === 'starUp') {
+    const cand = (card.techs || []).filter(t => (t.rank || 1) < 3);
+    if (cand.length === 0) { finishBonus(); }      // 上げられる技なし
+    else openBonusTechPick(card, 'star');
+  } else {
+    b.apply(card, b); finishBonus();
+  }
+}
+
+// 技選択（discard=入替で捨てる技 / star=★を上げる技）
+function openBonusTechPick(card, mode, newTech) {
+  const title = document.getElementById('bonus-tech-title');
+  title.textContent = mode === 'discard' ? '入れ替えで捨てる技をえらぶ' : '★を上げる技をえらぶ';
+  const list = document.getElementById('bonus-tech-list');
+  list.innerHTML = '';
+  (card.techs || []).forEach((t, i) => {
+    const disabled = mode === 'star' && (t.rank || 1) >= 3;
+    const mHex = ELEM(t.mainEl).hex;
+    const div = document.createElement('div');
+    div.className = 'skill-opt' + (disabled ? ' dimmed' : '');
+    div.style.background = hexA(mHex, 0.10); div.style.borderColor = mHex;
+    div.innerHTML = `
+      <div class="sk-icon">${techEnergyHTML(t)}</div>
+      <div class="sk-info">
+        <div class="sk-name" style="color:${mHex}">${t.name} <span style="color:#E8A000">${'★'.repeat(t.rank||1)}</span></div>
+        <div style="font-size:0.7rem;color:#888">${ELEM(t.mainEl).name}属性${mode==='discard'?'（これを捨てる）':'（★+1）'}</div>
+      </div>`;
+    if (!disabled) div.onclick = () => {
+      if (mode === 'discard') card.techs[i] = newTech;
+      else t.rank = Math.min(3, (t.rank || 1) + 1);
+      document.getElementById('bonus-tech-overlay').classList.add('hidden');
+      finishBonus();
+    };
+    list.appendChild(div);
+  });
+  document.getElementById('bonus-tech-overlay').classList.remove('hidden');
+}
+
+function finishBonus() {
+  pendingBonus = null;
+  startEnhancement();
+}
+
+// 次の階へ進む（強化完了後に呼ぶ）
+function proceedNextFloor() {
+  battle.floor++;
+  battle.activeIdx = -1;  // 必ずカードを選び直す
+  document.getElementById('game-screen').classList.add('hidden');
+  document.getElementById('adventure-screen').classList.remove('hidden');
+  document.getElementById('battle-area').classList.remove('hidden');
+  arriveFloor();
+}
+
+function gameOver() {
+  battle.inBattle = false;
+  clearTimeout(battle.turnTimer);
+  document.getElementById('adv-result-icon').textContent = '💀';
+  document.getElementById('adv-result-title').textContent = 'ゲームオーバー';
+  document.getElementById('adv-result-sub').textContent = `${battle.floor}階で力つきた…`;
+  document.getElementById('adv-result-overlay').classList.remove('hidden');
+}
+function clearGame() {
+  battle.inBattle = false;
+  document.getElementById('adv-result-icon').textContent = '🏆';
+  document.getElementById('adv-result-title').textContent = 'クリア！';
+  document.getElementById('adv-result-sub').textContent = `塔のてっぺん（${battle.maxFloor}階）に到達した！`;
+  document.getElementById('adv-result-overlay').classList.remove('hidden');
+}
+
+// バトルログ
+function pushLog(html) {
+  const log = document.getElementById('battle-log');
+  const line = document.createElement('div'); line.className = 'log-line';
+  line.innerHTML = html;
+  log.appendChild(line);
+  while (log.children.length > 6) log.removeChild(log.firstChild);
+}
+function clearLog() { document.getElementById('battle-log').innerHTML = ''; }
+
+// 画像ボックスを作る（共通）＋エネルギーストリップ
+function buildCardImage(card) {
+  const imgBox = document.createElement('div'); imgBox.className = 'card-img-box';
+  if (card.illustration && card.illustration.weapon) {
+    const w = document.createElement('div');
+    w.style.cssText = 'width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:3rem;background:linear-gradient(160deg,#e8e0d0,#c8bca8);';
+    w.textContent = '⚔';
+    imgBox.appendChild(w);
+  } else {
+    const cvs = document.createElement('canvas');
+    cvs.width = CARD_IMG_W; cvs.height = CARD_IMG_H;
+    const ctx2 = cvs.getContext('2d');
+    const bgImg = new Image(); bgImg.src = card.imageUrl;
+    bgImg.onload = () => {
+      ctx2.filter = 'blur(4px)';
+      ctx2.drawImage(bgImg, 0, 0, 144, 144, -4, -4, CARD_IMG_W + 8, CARD_IMG_H + 8);
+      ctx2.filter = 'none';
+      ctx2.fillStyle = 'rgba(255,255,255,0.55)';
+      ctx2.fillRect(0, 0, CARD_IMG_W, CARD_IMG_H);
+      if (card.illustration) drawIllustration(ctx2, card.illustration.file, card.illustration.col, card.illustration.row);
+    };
+    imgBox.appendChild(cvs);
+  }
+  // エネルギーストリップ（バトル時に内容を入れる）
+  const strip = document.createElement('div'); strip.className = 'card-energy-strip';
+  imgBox.appendChild(strip);
+  return imgBox;
+}
+
+// 属性1行（縦リスト用）
+function attrRowEl(id, val) {
+  const grade = getGrade(val);
+  const sizeMap = { S:'0.86rem', A:'0.8rem', B:'0.74rem' };
+  const fsize = sizeMap[grade.letter] || '0.66rem';
+  const row = document.createElement('div'); row.className = 'card-attr2';
+  row.innerHTML = `
+    <span class="card-attr2-emoji">${ELEM_EMOJI[id]}</span>
+    <span class="card-attr2-grade" style="color:${grade.color}">${grade.letter}</span>
+    <span class="card-attr2-val" style="color:${grade.color};font-size:${fsize}">${val}</span>`;
+  return row;
+}
+
+// 弱点 or 抵抗の1行（属性行と同じ高さ）
+function wrRowEl(kind, el) {
+  const row = document.createElement('div'); row.className = 'card-wr-row ' + kind;
+  row.innerHTML = `${kind === 'weak' ? '弱点' : '抵抗'}<span class="wk-emoji">${el ? ELEM_EMOJI[el] : '—'}</span>`;
+  return row;
+}
+// 弱点・抵抗の縦大ボックス（右列用）
+function wrBoxEl(kind, el) {
+  const box = document.createElement('div'); box.className = 'card-wr-box ' + kind;
+  const mark = kind === 'weak' ? '×' : '◎';
+  const elemData = el ? ELEM(el) : null;
+  if (elemData) {
+    const hex = elemData.hex;
+    box.style.background = hex + '22';      // 属性色の薄い背景
+    box.style.borderColor = hex;
+    box.style.color = hex;
+  } else {
+    box.style.background = 'rgba(180,180,180,0.15)';
+    box.style.borderColor = '#ccc';
+    box.style.color = '#999';
+  }
+  box.innerHTML = `<span class="wk-mark">${mark}</span><span class="wk-elem">${el ? ELEM_EMOJI[el] : '—'}</span>`;
+  return box;
+}
+
+// （旧）弱点・抵抗の縦2段ボックス（互換のため残置）
+function weakResistEl(weak, resist) {
+  const col = document.createElement('div'); col.className = 'card-wr';
+  col.appendChild(wrRowEl('weak', weak));
+  col.appendChild(wrRowEl('resist', resist));
+  return col;
+}
+
+// 技ボックス1つ
+function techBoxEl(t, card, isWeapon, slotLabel) {
+  const div = document.createElement('div');
+  if (t) {
+    const mHex = ELEM(t.mainEl).hex;
+    const dmg  = techDamage(t, card.stats, null);
+    div.className = 'card-tech';
+    div.style.background = hexA(mHex, 0.10); div.style.borderColor = mHex;
+    const stars = '★'.repeat(t.rank || 1);
+    div.innerHTML = `
+      <div class="card-tech-name-row">
+        <span class="card-tech-name" style="color:${mHex}">${t.name}</span>
+        <span class="card-tech-stars">${stars}</span>
+      </div>
+      <div class="card-tech-energy">${techEnergyHTML(t)}</div>
+      ${isWeapon ? '' : `<div class="card-tech-dmg">${dmg}</div>`}`;
+  } else {
+    div.className = 'card-tech empty';
+    div.innerHTML = `<span class="card-skill-empty-lbl">${slotLabel}</span>`;
+  }
+  return div;
+}
+
+// カード（横長2カラム：左=画像/HP/技、右=属性/弱点）
+function buildCardEl(card, opts) {
+  const el = document.createElement('div'); el.className = 'card';
+  if (!opts || !opts.noZoom) el.addEventListener('click', () => showCardZoom(card));
+  const isWeapon = card.illustration && card.illustration.weapon;
+
+  // 名前バー（最上段）
+  const nameRow = document.createElement('div');
+  nameRow.className = card.name ? 'card-name' : 'card-name empty';
+  const lvTxt = (card.level && card.level > 1) ? ` <span style="color:#c0860c">Lv.${card.level}</span>`
+              : (card.level ? ` <span style="color:#aaa">Lv.1</span>` : '');
+  nameRow.innerHTML = (card.name || '名前未設定') + lvTxt;
+  el.appendChild(nameRow);
+
+  // 上段：左=イラスト+HP / 中=属性4つ / 右=弱点・抵抗
+  const top = document.createElement('div'); top.className = 'card-top';
+
+  // 左列：イラストのみ（HPバーは外に出す）
+  const colImg = document.createElement('div'); colImg.className = 'card-col-img';
+  colImg.appendChild(buildCardImage(card));
+  top.appendChild(colImg);
+
+  // 中列：属性4つ
+  const colMid = document.createElement('div'); colMid.className = 'card-col-mid';
+  const attrs = document.createElement('div'); attrs.className = 'card-attrs-col';
+  ELEMENTS.forEach(e => attrs.appendChild(attrRowEl(e.id, card.stats[e.id])));
+  colMid.appendChild(attrs);
+  top.appendChild(colMid);
+
+  // 右列：弱点・抵抗
+  if (card.weak && !isWeapon) {
+    const colWr = document.createElement('div'); colWr.className = 'card-col-wr';
+    colWr.appendChild(wrBoxEl('weak', card.weak));
+    colWr.appendChild(wrBoxEl('resist', card.resist));
+    top.appendChild(colWr);
+  }
+
+  el.appendChild(top);
+
+  // HPバー（フル幅・card-topの下）
+  const hpRow = document.createElement('div'); hpRow.className = 'card-hp-row';
+  hpRow.innerHTML = `
+    <span class="card-hp-lbl">HP</span>
+    <div class="card-hp-bg"><div class="card-hp-fill"></div></div>
+    <span class="card-hp-num">${card.stats.hp}</span>`;
+  el.appendChild(hpRow);
+
+  // 下段：技を横いっぱいに2つ
+  const techs = card.techs || [];
+  const slots = isWeapon ? 1 : 2;
+  const tcon = document.createElement('div'); tcon.className = 'card-techs';
+  for (let i = 0; i < slots; i++) tcon.appendChild(techBoxEl(techs[i], card, isWeapon, '技 ' + (i+1)));
+  el.appendChild(tcon);
+
+  return el;
+}
+
+// サイコロ1面の見た目を作る（num: 1〜6 を白文字で表示）
+function buildDiceFace(face, num) {
+  const d = document.createElement('div'); d.className = 'dice-face';
+  const hex = id => (ELEMENTS.find(e => e.id === id) || {}).hex || '#ccc';
+  if (face.type === 'single') {
+    d.style.background = hex(face.colors[0]);
+  } else {
+    d.style.background = hex(face.colors[1]);
+    const half = document.createElement('div');
+    half.className = 'dice-face-half';
+    half.style.left = '0'; half.style.background = hex(face.colors[0]);
+    d.appendChild(half);
+  }
+  if (num != null) {
+    const lbl = document.createElement('span');
+    lbl.className = 'dice-num'; lbl.textContent = num;
+    d.appendChild(lbl);
+  }
+  return d;
+}
+</script>
+</body>
+</html>
