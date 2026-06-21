@@ -1233,6 +1233,32 @@ const SKILL_DEFS = {
       1:'HP0の攻撃を10%で耐える', 2:'HP0の攻撃を15%で耐える', 3:'HP0の攻撃を20%で耐える',
       4:'HP0の攻撃を25%で耐える', 5:'HP0の攻撃を30%で耐える' } },
   ],
+  synergy: [
+    { id:'splash',    name:'スプラッシュ', desc:{
+      1:'攻撃時、控え敵全体に40%のダメージ', 2:'攻撃時、控え敵全体に46%のダメージ',
+      3:'攻撃時、控え敵全体に52%のダメージ', 4:'攻撃時、控え敵全体に56%のダメージ',
+      5:'攻撃時、控え敵全体に60%のダメージ' } },
+    { id:'penetrate', name:'貫通',         desc:{
+      1:'攻撃時、控えランダム1体に10%の貫通ダメ', 2:'攻撃時、控えランダム1体に13%の貫通ダメ',
+      3:'攻撃時、控えランダム1体に16%の貫通ダメ', 4:'攻撃時、控えランダム1体に18%の貫通ダメ',
+      5:'攻撃時、控えランダム1体に20%の貫通ダメ' } },
+    { id:'amplify',   name:'増幅',         desc:{
+      1:'技の威力+10%', 2:'技の威力+15%', 3:'技の威力+20%', 4:'技の威力+25%', 5:'技の威力+30%' } },
+    { id:'catalyst',  name:'触媒',         desc:{
+      1:'特殊効果の発生率+3%', 2:'特殊効果の発生率+5%', 3:'特殊効果の発生率+7%',
+      4:'特殊効果の発生率+9%', 5:'特殊効果の発生率+10%' } },
+    { id:'frugal',    name:'節約',         desc:{
+      1:'トラッシュ攻撃でエネ20%残る', 2:'トラッシュ攻撃でエネ30%残る',
+      3:'トラッシュ攻撃でエネ40%残る', 4:'トラッシュ攻撃でエネ45%残る',
+      5:'トラッシュ攻撃でエネ50%残る' } },
+    { id:'charge',    name:'蓄電',         desc:{
+      1:'ターン開始時にランダムエネ+1', 2:'ターン開始時にランダムエネ+1',
+      3:'ターン開始時にランダムエネ+1', 4:'ターン開始時にランダムエネ+1',
+      5:'ターン開始時にランダムエネ+2' } },
+    { id:'weak_amp',  name:'弱点増幅',     desc:{
+      1:'弱点時の倍率×2→×2.1', 2:'弱点時の倍率×2→×2.2', 3:'弱点時の倍率×2→×2.3',
+      4:'弱点時の倍率×2→×2.4', 5:'弱点時の倍率×2→×2.5' } },
+  ],
 };
 
 // スキル効果値（ランク1〜5）rank1=小, rank3=中, rank5=大
@@ -1251,6 +1277,13 @@ const SKILL_VALS = {
   reflect:    { 1:0.10, 2:0.15,  3:0.20, 4:0.25,  5:0.30 },
   counter:    { 1:0.10, 2:0.15,  3:0.20, 4:0.25,  5:0.30 },
   tenacity:   { 1:0.10, 2:0.15,  3:0.20, 4:0.25,  5:0.30 },
+  splash:     { 1:0.40, 2:0.46,  3:0.52, 4:0.56,  5:0.60 },
+  penetrate:  { 1:0.10, 2:0.13,  3:0.16, 4:0.18,  5:0.20 },
+  amplify:    { 1:0.10, 2:0.15,  3:0.20, 4:0.25,  5:0.30 },
+  catalyst:   { 1:0.03, 2:0.05,  3:0.07, 4:0.09,  5:0.10 },
+  frugal:     { 1:0.20, 2:0.30,  3:0.40, 4:0.45,  5:0.50 },
+  charge:     { 1:1,    2:1,     3:1,    4:1,     5:2    },
+  weak_amp:   { 1:2.1,  2:2.2,   3:2.3,  4:2.4,   5:2.5  },
 };
 // カードのスキル取得ヘルパー
 function getSkillVal(card, id) {
@@ -2858,6 +2891,16 @@ function beginPlayerTurn() {
     p.curHp = Math.min(p.maxHp, p.curHp + heal);
   }
 
+  // ★スキル：蓄電（ターン開始時にランダムエネ追加）
+  const chargeVal = getSkillVal(p.card, 'charge');
+  if (chargeVal && p.curHp > 0) {
+    for (let i = 0; i < chargeVal; i++) {
+      const el = ELEM_ORDER[randInt(0, 3)];
+      p.energy[el]++;
+      pushLog(`⚡ 蓄電！ ${p.card.name}に ${ELEM_EMOJI[el]} 追加`);
+    }
+  }
+
   // 再生の葉：生存中の全カードHP2%回復
   if ((battle.items||[]).some(i => i.id === 'leaf')) {
     battle.party.forEach(x => {
@@ -2931,6 +2974,12 @@ function applyStatusOnHit(attackerTech, defender, defName) {
   let proc = RANK_PROC_VAL[attackerTech.rank || 1] || 0.05;
   const defIsPlayer = battle.party.includes(defender);
   if (defIsPlayer && (battle.items||[]).some(i => i.id === 'protection')) proc *= 0.5;
+  // ★スキル：触媒（状態異常発生率UP）
+  const activeP = battle.party[battle.activeIdx];
+  if (activeP && !defIsPlayer) {
+    const catalystVal = getSkillVal(activeP.card, 'catalyst');
+    if (catalystVal) proc += catalystVal;
+  }
   if (Math.random() >= proc) return;
   const stype = ELEM_STATUS[attackerTech.mainEl];
   if (stype === 'gust') {
@@ -2997,7 +3046,27 @@ function useTech(t) {
     ? Object.fromEntries(Object.entries(p.card.stats).map(([k,v]) => [k, ELEMENTS.some(e=>e.id===k) ? v+amplifyBonus : v]))
     : p.card.stats;
   let dmg = techDamage(t, boostedStats, battle.enemy);
+
+  // ★スキル：増幅（技威力UP）
+  const amplifyVal = getSkillVal(p.card, 'amplify');
+  if (amplifyVal) dmg = Math.floor(dmg * (1 + amplifyVal));
+
+  // ★スキル：弱点増幅（弱点時の倍率を×2→×N）
+  const weakAmpVal = getSkillVal(p.card, 'weak_amp');
+  if (weakAmpVal && t.mainEl === battle.enemy.weak) dmg = Math.floor(dmg / 2 * weakAmpVal);
+
   if (isTrash) { dmg = Math.floor(dmg * 2.0); trashTechEnergy(p, t); }
+
+  // ★スキル：節約（トラッシュ時にエネ一部返還）
+  const frugalVal = getSkillVal(p.card, 'frugal');
+  if (isTrash && frugalVal) {
+    const restore = Math.floor(t.total * frugalVal);
+    for (let i = 0; i < restore; i++) {
+      const el = ELEM_ORDER[randInt(0, 3)];
+      p.energy[el]++;
+    }
+    if (restore > 0) pushLog(`♻️ 節約！ エネルギー${restore}個返還`);
+  }
 
   // ★スキル：先手必勝（初回攻撃のみ）
   const firstStrVal = getSkillVal(p.card, 'first_str');
@@ -3021,8 +3090,9 @@ function useTech(t) {
 
   // ★スキル：会心の一撃
   const critVal = getSkillVal(p.card, 'crit');
+  const catalystValForCrit = getSkillVal(p.card, 'catalyst');
   let isCrit = false;
-  if (critVal && Math.random() < critVal) { dmg *= 2; isCrit = true; }
+  if (critVal && Math.random() < critVal + (catalystValForCrit || 0)) { dmg *= 2; isCrit = true; }
 
   const swordCount = (battle.items||[]).filter(i => i.id === 'sword').length;
   if (swordCount > 0) dmg = Math.floor(dmg * Math.pow(1.10, swordCount));
@@ -3045,6 +3115,30 @@ function useTech(t) {
     pushLog(`💚 ${p.card.name}は ${heal} HP吸収した！`);
   }
 
+  // ★スキル：スプラッシュ（控え全体にダメージ）
+  const splashVal = getSkillVal(p.card, 'splash');
+  if (splashVal && battle.enemyBench) {
+    const splashDmg = Math.max(1, Math.floor(dmg * splashVal));
+    battle.enemyBench.forEach(be => {
+      if (be && be.curHp > 0) {
+        be.curHp = Math.max(0, be.curHp - splashDmg);
+        pushLog(`💦 スプラッシュ！ ${be.name}に <span class="log-dmg">${splashDmg}</span> ダメージ`);
+      }
+    });
+  }
+
+  // ★スキル：貫通（控えランダム1体に弱点抵抗無視ダメージ）
+  const penetrateVal = getSkillVal(p.card, 'penetrate');
+  if (penetrateVal && battle.enemyBench) {
+    const living = battle.enemyBench.filter(be => be && be.curHp > 0);
+    if (living.length > 0) {
+      const target = living[randInt(0, living.length - 1)];
+      const penDmg = Math.max(1, Math.floor(dmg * penetrateVal));
+      target.curHp = Math.max(0, target.curHp - penDmg);
+      pushLog(`🎯 貫通！ ${target.name}に <span class="log-dmg">${penDmg}</span> ダメージ（弱点抵抗無視）`);
+    }
+  }
+
   // ★スキル：毒刃（poison → burn-like status 'poison' turns:3）
   const poisonVal = getSkillVal(p.card, 'poison');
   if (poisonVal && Math.random() < poisonVal) {
@@ -3060,7 +3154,7 @@ function useTech(t) {
 
   // ★スキル：連続攻撃（敵が生きていれば）
   const multiVal = getSkillVal(p.card, 'multi');
-  if (battle.enemy.curHp > 0 && multiVal && Math.random() < multiVal) {
+  if (battle.enemy.curHp > 0 && multiVal && Math.random() < multiVal + (catalystValForCrit || 0)) {
     setTimeout(() => {
       if (!battle.inBattle || battle.enemy.curHp <= 0) { setTimeout(enemyTurn, 800); return; }
       let dmg2 = Math.floor(techDamage(t, boostedStats, battle.enemy) * 0.60);
