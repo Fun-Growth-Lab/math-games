@@ -3941,15 +3941,36 @@ function buildCardImage(card) {
     const cvs = document.createElement('canvas');
     cvs.width = CARD_IMG_W; cvs.height = CARD_IMG_H;
     const ctx2 = cvs.getContext('2d');
-    const bgImg = new Image(); bgImg.src = card.imageUrl;
-    bgImg.onload = () => {
-      ctx2.filter = 'blur(4px)';
-      ctx2.drawImage(bgImg, 0, 0, 144, 144, -4, -4, CARD_IMG_W + 8, CARD_IMG_H + 8);
-      ctx2.filter = 'none';
-      ctx2.fillStyle = 'rgba(255,255,255,0.55)';
-      ctx2.fillRect(0, 0, CARD_IMG_W, CARD_IMG_H);
-      if (card.illustration) drawIllustration(ctx2, card.illustration.file, card.illustration.col, card.illustration.row);
-    };
+
+    // 背景画像とスプライト画像の両方が揃ってから描画する
+    function imgReady(img) {
+      return new Promise(res => {
+        if (!img) { res(); return; }
+        if (img.complete) { res(); return; }
+        img.addEventListener('load',  res, { once: true });
+        img.addEventListener('error', res, { once: true });
+      });
+    }
+
+    const bgImg = new Image();
+    bgImg.src = card.imageUrl;
+    const sprImg = card.illustration ? CARD_IMAGES[card.illustration.file] : null;
+
+    Promise.all([imgReady(bgImg), imgReady(sprImg)]).then(() => {
+      if (bgImg.naturalWidth) {
+        ctx2.filter = 'blur(4px)';
+        ctx2.drawImage(bgImg, 0, 0, 144, 144, -4, -4, CARD_IMG_W + 8, CARD_IMG_H + 8);
+        ctx2.filter = 'none';
+        ctx2.fillStyle = 'rgba(255,255,255,0.55)';
+        ctx2.fillRect(0, 0, CARD_IMG_W, CARD_IMG_H);
+      }
+      if (sprImg && sprImg.naturalWidth) {
+        const sx = card.illustration.col * ILLUS_W;
+        const sy = card.illustration.row * ILLUS_H;
+        ctx2.drawImage(sprImg, sx, sy, ILLUS_W, ILLUS_H, 0, 0, CARD_IMG_W, CARD_IMG_H);
+      }
+    });
+
     imgBox.appendChild(cvs);
   }
   // エネルギーストリップ（バトル時に内容を入れる）
