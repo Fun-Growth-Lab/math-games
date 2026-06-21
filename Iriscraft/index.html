@@ -1304,19 +1304,19 @@ const LEGENDARY_NAMES = [
 
 // キャラクター名（fileIndex*16 + row*4 + col の順）
 const CHARACTER_NAMES = [
-  // セット1（card_image_1）
-  'プチドラ','ユニコ','ほほう','ふたば','らおん','きのこん','フェニィ','くらげん',
-  'けろぽん','ペガん','サボた','ぺんぺん','もこ','ぽんた','グリフ','こん太',
-  // セット2（card_image_2）
-  'リヴァ','かめきち','まんどら','ケルる','わたげ','らっこ','ピクシー','ウーぱ',
-  'ヒポポ','くり','どんぐり','まんた','ぷるる','しろくま','はすのん','きゅうび',
-  // セット3（card_image_3）
-  'タウロス','せかいじゅ','ごま','マンティ','いちごん','ぱたぱた','スフィン','まりも',
-  'こあら','ランタン','いるかん','カメレ','フェンり','ひまわり','れっさー','イエティ',
-  // セット4（card_image_4）
-  'サンだ','くもる','はりー','アルラ','ぶんぶん','はむち','キリン','もみじ',
-  'カモノ','ガル','てんとう','むささ','ワイバ','かぼちゃ','なまけ','ひとぼし',
-  // セット5（card_image_5）
+  // セット1（card_image_1 炎）
+  'レッドラ','フェニィ','ヴォルカ','メラメラ','レオン','サラマ','キツネ','マッチ',
+  'サニィ','チャコル','ホット','イモムー','ランタン','オンスル','ケツァル','パンダ',
+  // セット2（card_image_2 氷）
+  'ヒュードラ','イエティ','ユキノコ','ユキハ','ペンペン','アーク','フェアリー','ゴレム',
+  'フローラ','ワルラ','クマクマ','アイシクル','クローバ','ナーワ','オウル','オーロ',
+  // セット3（card_image_3 風）
+  'ウィンドラ','バイソン','クラウン','ワタワ','ハムハム','スイフィ','フェアリ','メイプ',
+  'ミルル','モモン','ウィン','トルネ','クラウシープ','バブル','グリフ','チャイム',
+  // セット4（card_image_4 雷）
+  'サンドラ','エレパリ','エレイレ','クラウド','ゲッコー','キャッタ','フェアリー','ゴレム',
+  'バッテリ','バンブル','スパク','シュル','スラグ','ジェリ','サンダ','スタチ',
+  // セット5（card_image_5 HP）
   'ミミック','ころごれ','ゴブ','やなぎん','だんぼ','キウイ','ケツァ','くりす',
   'カピば','ともしび','クリお','センザン','キメラ','うつぼん','ありくい','コンパス',
 ];
@@ -1964,15 +1964,23 @@ const cardStock = [];
 const MAX_PARTY = 3;  // 冒険に連れていくカード数
 
 // 特化に応じてイラスト（シート＝最大属性／枠内＝2番目の属性で変化）
+// HP(白)は50%以上の場合のみcard_image_5を使用
 function chooseIllustration(rawPcts) {
-  const vals = [rawPcts[0], rawPcts[1], rawPcts[2], rawPcts[3], rawPcts[4]]; // 炎氷風雷＋白(HP)
-  let primary = 0;
-  for (let i = 1; i < 5; i++) if (vals[i] > vals[primary]) primary = i;
+  const vals = [rawPcts[0], rawPcts[1], rawPcts[2], rawPcts[3]]; // 炎氷風雷
+  const whitePct = rawPcts[4]; // 白(HP)
+  // 白が50%以上ならHP画像
+  let primary;
+  if (whitePct >= 50) {
+    primary = 4;
+  } else {
+    primary = 0;
+    for (let i = 1; i < 4; i++) if (vals[i] > vals[primary]) primary = i;
+  }
   const fileIdx = primary;                                   // card_image_(primary+1)
-  const rem = [0,1,2,3,4].filter(i => i !== primary);        // 残り4属性（昇順固定）
-  const secondary = rem.reduce((b, i) => vals[i] > vals[b] ? i : b, rem[0]);
+  const rem = [0,1,2,3,4].filter(i => i !== primary);
+  const secondary = rem.reduce((b, i) => (rawPcts[i]||0) > (rawPcts[b]||0) ? i : b, rem[0]);
   const row = rem.indexOf(secondary);                        // 0〜3：2番目の属性の位置
-  const col = Math.max(0, Math.min(3, Math.floor(vals[secondary] / 8))); // 0〜3：2番目の強さ
+  const col = Math.max(0, Math.min(3, Math.floor((rawPcts[secondary]||0) / 8)));
   return { fileIdx, col, row };
 }
 
@@ -2238,16 +2246,16 @@ function hexA(hex, a) {
 
 // 属性値 → グレード
 function getGrade(val) {
-  if (val >= 121) return { letter:'SSS', color:'#C000B0' };
-  if (val >= 101) return { letter:'SS',  color:'#FF2D2D' };
-  if (val >=  85) return { letter:'S',   color:'#E8960C' };
-  if (val >=  71) return { letter:'A',   color:'#DD2200' };
-  if (val >=  56) return { letter:'B',   color:'#E06800' };
-  if (val >=  41) return { letter:'C',   color:'#55A000' };
-  if (val >=  26) return { letter:'D',   color:'#2266CC' };
-  if (val >=  16) return { letter:'E',   color:'#5599CC' };
-  if (val >=   6) return { letter:'F',   color:'#999999' };
-  return             { letter:'G',   color:'#777777' };
+  if (val >= 250) return { letter:'SSS', color:'#C000B0' };
+  if (val >= 200) return { letter:'SS',  color:'#FF2D2D' };
+  if (val >= 150) return { letter:'S',   color:'#E8960C' };
+  if (val >= 100) return { letter:'A',   color:'#DD2200' };
+  if (val >=  70) return { letter:'B',   color:'#E06800' };
+  if (val >=  50) return { letter:'C',   color:'#55A000' };
+  if (val >=  30) return { letter:'D',   color:'#2266CC' };
+  if (val >=  20) return { letter:'E',   color:'#5599CC' };
+  if (val >=  10) return { letter:'F',   color:'#999999' };
+  return              { letter:'G',   color:'#777777' };
 }
 
 // ================================================================
