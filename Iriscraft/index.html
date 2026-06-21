@@ -486,27 +486,28 @@
     /* 出発画面カードのスケール（zoom不使用でWRレイアウト保持） */
     #depart-cards .card { transform:scale(0.72); transform-origin:top center; margin:0 -65px; }
 
-    /* 伝説変化演出オーバーレイ */
+    /* 伝説変化演出オーバーレイ（container外に配置、position:fixedが正常動作） */
     #legend-overlay {
-      position:fixed; inset:0; z-index:9000;
+      position:fixed; inset:0; z-index:9999;
       display:flex; flex-direction:column; align-items:center; justify-content:center;
-      background:rgba(0,0,0,0); pointer-events:none;
-      transition:background 1.0s;
+      background:rgba(20,8,40,0.92);
+      transition:background 0.8s, opacity 0.4s;
     }
+    .legend-overlay-hidden { opacity:0 !important; pointer-events:none !important; }
     #legend-overlay.blackout { background:rgba(0,0,0,1); }
     #legend-msg {
-      font-size:1.8rem; font-weight:900; color:#fff;
+      font-size:2.0rem; font-weight:900; color:#fff;
       text-shadow:0 0 20px #ffd454, 0 0 40px #ffaa00;
       opacity:0; transform:scale(0.8);
       transition:opacity 0.6s, transform 0.6s;
-      margin-bottom:32px; text-align:center;
+      margin-bottom:32px; text-align:center; line-height:1.5;
     }
     #legend-msg.show { opacity:1; transform:scale(1); }
     #legend-card-wrap {
-      opacity:0; transform:scale(0.5);
+      opacity:0; transform:scale(0.5) translateY(30px);
       transition:opacity 0.7s, transform 0.7s;
     }
-    #legend-card-wrap.show { opacity:1; transform:scale(1); }
+    #legend-card-wrap.show { opacity:1; transform:scale(1) translateY(0); }
     #legend-new-name {
       font-size:2.2rem; font-weight:900; color:#ffd454;
       text-shadow:0 0 30px #ffaa00;
@@ -613,13 +614,6 @@
           <div id="merge-choices"></div>
         </div>
       </div>
-    </div>
-
-    <!-- 伝説変化演出 -->
-    <div id="legend-overlay" class="hidden">
-      <div id="legend-msg"></div>
-      <div id="legend-card-wrap"></div>
-      <div id="legend-new-name"></div>
     </div>
 
     <!-- 強化完了メッセージ -->
@@ -749,11 +743,11 @@
 
     <!-- 新しい技プレビュー＆教える先選択 -->
     <div id="bonus-new-tech-overlay" class="adv-fullscreen hidden">
-      <div class="adv-panel" style="padding:26px 36px;min-width:360px;max-width:580px;text-align:center">
+      <div class="adv-panel" style="padding:26px 36px;min-width:420px;max-width:680px;text-align:center">
         <!-- Stage 1: 技またはスキルを選ぶ -->
         <div id="new-tech-stage1">
           <div class="adv-title" style="margin-bottom:12px">✨ 技を1つえらぼう！</div>
-          <div class="skill-opts" id="new-tech-choice-list" style="margin:0 auto 12px;max-width:460px;text-align:left"></div>
+          <div class="skill-opts" id="new-tech-choice-list" style="margin:0 auto 12px;max-width:560px;text-align:left"></div>
           <div style="display:flex;gap:10px;justify-content:center;margin-top:8px;flex-wrap:wrap">
             <button class="btn btn-secondary" onclick="toggleLearnCardView()" style="min-width:140px">📋 カードを見る</button>
             <button class="btn btn-secondary" onclick="skipNewTech()" style="min-width:140px">おぼえさせない</button>
@@ -872,6 +866,13 @@
     <div id="card-zoom-holder"></div>
   </div>
 
+</div>
+
+<!-- 伝説変化演出（container外に配置してposition:fixedが正しく機能するようにする） -->
+<div id="legend-overlay" class="legend-overlay-hidden">
+  <div id="legend-msg"></div>
+  <div id="legend-card-wrap"></div>
+  <div id="legend-new-name"></div>
 </div>
 
 <script>
@@ -3184,32 +3185,46 @@ function checkLegendaryCondition(card) {
   const e = [s.fire, s.ice, s.wind, s.thunder];
   const en = ['fire','ice','wind','thunder'];
 
-  // A: 単属性SSS（250以上）
+  // row0 A: 単属性SSS（250以上）→ col = その属性
   for (let i = 0; i < 4; i++) {
     if (e[i] >= 250) return { type:'A', row:0, col:i, attrs:[en[i]] };
   }
-  // B: 2属性SS（200以上）
-  const bPairs = [[0,1],[0,3],[1,2],[2,3]]; // 炎氷, 炎雷, 氷風, 風雷
+
+  // row1 B: 2属性SS（200以上）→ 4ペア
+  // col0:炎氷 col1:炎雷 col2:氷風 col3:風雷
+  const bPairs = [[0,1],[0,3],[1,2],[2,3]];
   for (let pi = 0; pi < bPairs.length; pi++) {
     const [a, b] = bPairs[pi];
     if (e[a] >= 200 && e[b] >= 200) return { type:'B', row:1, col:pi, attrs:[en[a], en[b]] };
   }
-  // B: その他ペア（炎風 or 氷雷）→ 既存Bスロットに抽選
-  if (e[0]>=200 && e[2]>=200) return { type:'B', row:1, col:Math.random()<0.5?0:1, attrs:['fire','wind'] };
-  if (e[1]>=200 && e[3]>=200) return { type:'B', row:1, col:Math.random()<0.5?2:3, attrs:['ice','thunder'] };
+  // 対角ペア（炎風・氷雷）は既存Bスロットに収容
+  if (e[0]>=200 && e[2]>=200) return { type:'B', row:1, col:randInt(0,1), attrs:['fire','wind'] };
+  if (e[1]>=200 && e[3]>=200) return { type:'B', row:1, col:randInt(2,3), attrs:['ice','thunder'] };
 
-  // C: 3属性S（150以上）
+  // row2 C: 3属性S（150以上）→ 4通り
   const cGroups = [[0,1,2],[0,1,3],[0,2,3],[1,2,3]];
   for (let ci = 0; ci < cGroups.length; ci++) {
     if (cGroups[ci].every(i => e[i] >= 150)) return { type:'C', row:2, col:ci, attrs:cGroups[ci].map(i=>en[i]) };
   }
-  // D: 4属性A（100以上）
-  if (e.every(v => v >= 100)) return { type:'D', row:3, col:0, attrs:en };
-  // E: HP特化
-  if (s.hp >= 600 && e.some(v => v >= 100)) return { type:'E', row:3, col:1, attrs:['hp'] };
-  if (s.hp >= 400 && e.filter(v=>v>=70).length >= 2) return { type:'E', row:3, col:2, attrs:['hp'] };
-  // F: 万能
-  if (e.every(v => v >= 70) && s.hp >= 350) return { type:'F', row:3, col:3, attrs:[...en,'hp'] };
+
+  // row3 D: 4属性A（100以上）→ col0
+  if (e.every(v => v >= 100)) return { type:'D', row:3, col:0, attrs:[...en] };
+
+  // row3 E: 1属性200以上 かつ 他1属性以上150（半特化型）→ col1
+  for (let i = 0; i < 4; i++) {
+    if (e[i] >= 200) {
+      const support = [0,1,2,3].filter(j => j !== i && e[j] >= 150);
+      if (support.length >= 1) return { type:'E', row:3, col:1, attrs:[en[i], ...support.map(j=>en[j])] };
+    }
+  }
+
+  // row3 E2: 2属性S（150以上）→ col2（B条件未満のペア）
+  const highIdx = [0,1,2,3].filter(i => e[i] >= 150);
+  if (highIdx.length >= 2) return { type:'E2', row:3, col:2, attrs:highIdx.slice(0,2).map(i=>en[i]) };
+
+  // row3 F: 4属性B（70以上）→ col3
+  if (e.every(v => v >= 70)) return { type:'F', row:3, col:3, attrs:[...en] };
+
   return null;
 }
 
@@ -3221,9 +3236,10 @@ function applyLegendaryBoost(card, cond) {
     case 'A': cond.attrs.forEach(k => boost(k, 0.20)); break;
     case 'B': cond.attrs.forEach(k => boost(k, 0.15)); break;
     case 'C': cond.attrs.forEach(k => boost(k, 0.12)); break;
-    case 'D': ['fire','ice','wind','thunder'].forEach(k => boost(k, 0.10)); break;
-    case 'E': boost('hp', 0.20); ['fire','ice','wind','thunder'].filter(k=>s[k]>=70).forEach(k=>boost(k,0.10)); break;
-    case 'F': ['fire','ice','wind','thunder'].forEach(k=>boost(k,0.10)); boost('hp',0.10); break;
+    case 'D': ['fire','ice','wind','thunder'].forEach(k => boost(k, 0.12)); break;
+    case 'E':  boost(cond.attrs[0], 0.20); cond.attrs.slice(1).forEach(k => boost(k, 0.10)); break;
+    case 'E2': cond.attrs.forEach(k => boost(k, 0.15)); break;
+    case 'F':  ['fire','ice','wind','thunder'].forEach(k => boost(k, 0.10)); break;
   }
   // HP上昇分をcurHpにも反映（バトル中）
   const pp = battle.party.find(p => p.card === card);
@@ -3234,14 +3250,17 @@ function applyLegendaryBoost(card, cond) {
 function triggerLegendaryTransform(p, cond, callback) {
   const card = p.card;
   const oldName = card.name;
-  // 伝説カードデータを決定
   const legendName = LEGENDARY_NAMES[cond.row * 4 + cond.col];
   const overlay = document.getElementById('legend-overlay');
   const msgEl   = document.getElementById('legend-msg');
   const cardWrap = document.getElementById('legend-card-wrap');
   const nameEl   = document.getElementById('legend-new-name');
 
-  overlay.classList.remove('hidden');
+  // ログ：変化開始
+  pushLog(`おや？ <span style="color:#ffd454">${oldName}</span> のようすが！？`);
+
+  // オーバーレイを表示（フェードイン）
+  overlay.classList.remove('legend-overlay-hidden');
   overlay.classList.remove('blackout');
   msgEl.classList.remove('show');
   cardWrap.classList.remove('show');
@@ -3249,7 +3268,7 @@ function triggerLegendaryTransform(p, cond, callback) {
   cardWrap.innerHTML = '';
   nameEl.textContent = '';
 
-  // Step1 (0s): メッセージ表示
+  // Step1 (0.1s): メッセージ表示
   setTimeout(() => {
     msgEl.innerHTML = `おや？<br><span style="color:#ffd454">${oldName}</span><br>のようすが！？`;
     msgEl.classList.add('show');
@@ -3258,7 +3277,7 @@ function triggerLegendaryTransform(p, cond, callback) {
   // Step2 (1.2s): 元カードを中央に大きく表示
   setTimeout(() => {
     const cardEl = buildCardEl(card, {noZoom:true});
-    cardEl.style.cssText = 'transform:scale(0.85);transform-origin:top center;';
+    cardEl.style.cssText = 'transform:scale(0.85);transform-origin:top center;display:inline-block;';
     cardWrap.innerHTML = '';
     cardWrap.appendChild(cardEl);
     cardWrap.classList.add('show');
@@ -3269,40 +3288,52 @@ function triggerLegendaryTransform(p, cond, callback) {
     overlay.classList.add('blackout');
   }, 2600);
 
-  // Step4 (3.5s): カードを伝説に変化（ブラックアウト中）
+  // Step4 (3.5s): カードを伝説に変化（ブラックアウト中） ＋ ログ出力
   setTimeout(() => {
+    // 変化前のステータスを記録
+    const before = {
+      fire: card.stats.fire, ice: card.stats.ice,
+      wind: card.stats.wind, thunder: card.stats.thunder, hp: card.stats.hp,
+    };
     card.legendary = true;
     card.illustration = { file: LEGEND_FILE, col: cond.col, row: cond.row };
     card.name = legendName;
     applyLegendaryBoost(card, cond);
+    // 変化後のログ
+    const STAT_LABELS = { fire:'炎', ice:'氷', wind:'風', thunder:'雷', hp:'HP' };
+    const STAT_COLORS = { fire:'#ff6030', ice:'#50b0ff', wind:'#80e060', thunder:'#ffd020', hp:'#ff5090' };
+    ['fire','ice','wind','thunder','hp'].forEach(k => {
+      const diff = card.stats[k] - before[k];
+      if (diff > 0) pushLog(`⬆️ ${STAT_LABELS[k]}が <span style="color:${STAT_COLORS[k]};font-weight:900">+${diff}</span> 上がった！`);
+    });
   }, 3500);
 
-  // Step5 (3.8s): ブラックアウト解除 + 新カード表示
+  // Step5 (3.9s): ブラックアウト解除 + 新カード表示
   setTimeout(() => {
     overlay.classList.remove('blackout');
     msgEl.classList.remove('show');
-    msgEl.innerHTML = '✨ 伝説の姿に覚醒！';
-    const newCardEl = buildCardEl(card, {noZoom:true});
-    newCardEl.style.cssText = 'transform:scale(0.85);transform-origin:top center;';
-    cardWrap.innerHTML = '';
-    cardWrap.appendChild(newCardEl);
     setTimeout(() => {
+      msgEl.innerHTML = `✨ 伝説の姿に覚醒！`;
+      const newCardEl = buildCardEl(card, {noZoom:true});
+      newCardEl.style.cssText = 'transform:scale(0.85);transform-origin:top center;display:inline-block;';
+      cardWrap.innerHTML = '';
+      cardWrap.appendChild(newCardEl);
       msgEl.classList.add('show');
       nameEl.textContent = `★ ${legendName} ★`;
       nameEl.classList.add('show');
-    }, 100);
-  }, 3800);
+    }, 200);
+  }, 3900);
 
-  // Step6 (5.2s): 演出終了
+  // Step6 (5.5s): 演出終了
   setTimeout(() => {
-    overlay.classList.add('hidden');
+    overlay.classList.add('legend-overlay-hidden');
     overlay.classList.remove('blackout');
     msgEl.classList.remove('show');
     cardWrap.classList.remove('show');
     nameEl.classList.remove('show');
     renderBattle();
     callback();
-  }, 5200);
+  }, 5500);
 }
 
 // 伝説チェック付き撃破処理（プレイヤー攻撃専用）
@@ -3632,23 +3663,23 @@ function showNewTechChoices() {
   list.innerHTML = '';
   pendingTechChoices.forEach(choice => {
     const div = document.createElement('div'); div.className = 'skill-opt';
-    div.style.cursor = 'pointer';
+    div.style.padding = '16px 20px';
     if (choice.type === 'tech') {
       const t = choice.data;
       const mHex = ELEM(t.mainEl).hex;
-      div.style.cssText += `background:${hexA(mHex,0.10)};border-color:${mHex};cursor:pointer;`;
-      div.innerHTML = `<div class="sk-icon">${techEnergyHTML(t)}</div>
+      div.style.cssText += `background:${hexA(mHex,0.12)};border-color:${mHex};cursor:pointer;padding:16px 20px;`;
+      div.innerHTML = `<div class="sk-icon" style="font-size:1.8rem;min-width:48px">${techEnergyHTML(t)}</div>
         <div class="sk-info">
-          <div class="sk-name" style="color:${mHex}">⚔️ ${t.name} <span style="color:#E8A000">${'★'.repeat(t.rank||1)}</span></div>
-          <div style="font-size:0.72rem;color:#888">${t.desc || ''}</div>
+          <div class="sk-name" style="color:${mHex};font-size:1.15rem">⚔️ ${t.name} <span style="color:#E8A000;font-size:1.1rem">${'★'.repeat(t.rank||1)}</span></div>
+          <div style="font-size:0.85rem;color:#888;margin-top:4px">${t.desc || ''}</div>
         </div>`;
     } else {
       const { def, rank } = choice;
-      div.style.cssText += 'background:rgba(160,64,255,0.10);border-color:rgba(160,64,255,0.5);cursor:pointer;';
-      div.innerHTML = `<div class="sk-icon" style="font-size:1.4rem">🔮</div>
+      div.style.cssText += 'background:rgba(160,64,255,0.12);border-color:rgba(160,64,255,0.5);cursor:pointer;padding:16px 20px;';
+      div.innerHTML = `<div class="sk-icon" style="font-size:1.8rem;min-width:48px">🔮</div>
         <div class="sk-info">
-          <div class="sk-name" style="color:#c080ff">🔮 ${def.name} <span style="color:#E8A000">${'★'.repeat(rank)}</span></div>
-          <div style="font-size:0.72rem;color:#888">${def.desc[rank] || ''}</div>
+          <div class="sk-name" style="color:#c080ff;font-size:1.15rem">🔮 ${def.name} <span style="color:#E8A000;font-size:1.1rem">${'★'.repeat(rank)}</span></div>
+          <div style="font-size:0.85rem;color:#888;margin-top:4px">${def.desc[rank] || ''}</div>
         </div>`;
     }
     div.onclick = () => { pendingNewTech = choice; showNewTechCardPick(); };
@@ -3724,12 +3755,31 @@ function teachNewTech(card) {
   }
 }
 
+// 技のエネルギーキー（同コスト判定用）
+function techEnergyKey(t) {
+  return t.counts.map(c => `${c.el}:${c.n}`).sort().join(',');
+}
+
 function applyLearnChoice(card, choice) {
   if (choice.type === 'skill') {
     card.skill = { id: choice.def.id, rank: choice.rank };
   } else {
     card.techs = card.techs || [];
-    card.techs.push(choice.data);
+    const newT = choice.data;
+    const key = techEnergyKey(newT);
+    const dup = card.techs.find(t => techEnergyKey(t) === key);
+    if (dup) {
+      // 同コストの技が既存 → ランクの高い方を+1して合成
+      if ((newT.rank||1) > (dup.rank||1)) {
+        card.techs.splice(card.techs.indexOf(dup), 1);
+        newT.rank = Math.min(5, (newT.rank||1) + 1);
+        card.techs.push(newT);
+      } else {
+        dup.rank = Math.min(5, (dup.rank||1) + 1);
+      }
+    } else {
+      card.techs.push(newT);
+    }
   }
 }
 
