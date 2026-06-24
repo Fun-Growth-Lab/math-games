@@ -3127,26 +3127,22 @@ function useTech(t) {
 
   // ★スキル：スプラッシュ（控え全体にダメージ）
   const splashVal = getSkillVal(p.card, 'splash');
-  if (splashVal && battle.enemyBench) {
+  const enemyBench = battle.enemyTeam.filter((en, i) => i !== battle.enemyIdx && en.curHp > 0);
+  if (splashVal && enemyBench.length > 0) {
     const splashDmg = Math.max(1, Math.floor(dmg * splashVal));
-    battle.enemyBench.forEach(be => {
-      if (be && be.curHp > 0) {
-        be.curHp = Math.max(0, be.curHp - splashDmg);
-        pushLog(`💦 スプラッシュ！ ${be.name}に <span class="log-dmg">${splashDmg}</span> ダメージ`);
-      }
+    enemyBench.forEach(be => {
+      be.curHp = Math.max(0, be.curHp - splashDmg);
+      pushLog(`💦 スプラッシュ！ ${be.name}に <span class="log-dmg">${splashDmg}</span> ダメージ`);
     });
   }
 
   // ★スキル：貫通（控えランダム1体に弱点抵抗無視ダメージ）
   const penetrateVal = getSkillVal(p.card, 'penetrate');
-  if (penetrateVal && battle.enemyBench) {
-    const living = battle.enemyBench.filter(be => be && be.curHp > 0);
-    if (living.length > 0) {
-      const target = living[randInt(0, living.length - 1)];
-      const penDmg = Math.max(1, Math.floor(dmg * penetrateVal));
-      target.curHp = Math.max(0, target.curHp - penDmg);
-      pushLog(`🎯 貫通！ ${target.name}に <span class="log-dmg">${penDmg}</span> ダメージ（弱点抵抗無視）`);
-    }
+  if (penetrateVal && enemyBench.length > 0) {
+    const target = enemyBench[randInt(0, enemyBench.length - 1)];
+    const penDmg = Math.max(1, Math.floor(dmg * penetrateVal));
+    target.curHp = Math.max(0, target.curHp - penDmg);
+    pushLog(`🎯 貫通！ ${target.name}に <span class="log-dmg">${penDmg}</span> ダメージ（弱点抵抗無視）`);
   }
 
   // ★スキル：毒刃（poison → burn-like status 'poison' turns:3）
@@ -3415,9 +3411,10 @@ function enemyTurn(skipSwap = false) {
 
   // 敵の状態処理（やけど・凍結）
   const { frozen } = tickStatus(e, e.name);
-  renderBattle();
-  if (e.curHp <= 0) { setTimeout(onEnemyDefeated, 800); return; }   // やけど撃破
+  // やけど撃破・凍結時だけ先にレンダリング（HP変化を見せる）
+  if (e.curHp <= 0) { renderBattle(); setTimeout(onEnemyDefeated, 800); return; }
   if (frozen) {
+    renderBattle();
     pushLog(`🧊 ${e.name}は こおって 動けない！`);
     setTimeout(beginPlayerTurn, 900);
     return;
@@ -3445,7 +3442,7 @@ function enemyTurn(skipSwap = false) {
   // エネルギー獲得：相手の弱点を突く最強技に近づく色を選ぶ
   const g = enemyChooseEnergy(e, target.card);
   e.energy[g]++;
-  renderBattle();
+  renderBattle();  // エネルギー獲得後に1回だけレンダリング（取得前の古い値を表示しない）
   const usable = (e.techs || []).filter(t => canUseTech(e.energy, t));
   setTimeout(() => {
     if (usable.length === 0) {
@@ -3456,6 +3453,7 @@ function enemyTurn(skipSwap = false) {
     const p = battle.party[battle.activeIdx];
     // まひでミス
     if (paralysisMiss(e)) {
+      pushLog(`てきは ${ELEM_EMOJI[g]} エネルギーをためた`);
       pushLog(`⚡ ${e.name}は しびれて 技がでなかった！`);
       setTimeout(beginPlayerTurn, 800);
       return;
@@ -3463,6 +3461,7 @@ function enemyTurn(skipSwap = false) {
     // 最大ダメージ技（弱点込み）を選ぶ
     let best = usable[0], bestDmg = -1;
     usable.forEach(t => { const d = techDamage(t, e.stats, p.card); if (d > bestDmg) { bestDmg = d; best = t; } });
+    pushLog(`てきは ${ELEM_EMOJI[g]} エネルギーをためた（合計: ${energyStripHTML(e.energy)}）`);
     // 技のエネルギーを常に消費（プレイヤーと対称に）
     trashTechEnergy(e, best);
     // 一定確率で全力攻撃（残りエネルギーもトラッシュして2倍）
