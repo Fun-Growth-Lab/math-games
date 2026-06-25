@@ -640,6 +640,23 @@
       </div>
     </div>
 
+    <!-- 技のひらめきオーバーレイ -->
+    <div id="inspiration-overlay" class="overlay hidden" style="z-index:9000">
+      <div class="dialog-box" style="text-align:center;min-width:480px">
+        <div style="font-size:3rem;margin-bottom:8px">💡</div>
+        <p class="dialog-msg" id="inspiration-card-name"></p>
+        <p class="dialog-sub" style="margin-bottom:12px">パッシブスキルをひらめいた！</p>
+        <div id="inspiration-skill-box" style="background:rgba(160,64,255,0.10);border:1.5px solid rgba(160,64,255,0.5);border-radius:10px;padding:12px 16px;margin:0 auto 18px;max-width:340px;text-align:left">
+          <div style="font-size:1.1rem;font-weight:800;color:#c080ff" id="inspiration-skill-name"></div>
+          <div style="font-size:0.78rem;color:#888;margin-top:4px" id="inspiration-skill-desc"></div>
+        </div>
+        <div class="dialog-btns">
+          <button class="btn btn-primary" onclick="acceptInspiration()">おぼえる</button>
+          <button class="btn btn-secondary" onclick="skipInspiration()">やめておく</button>
+        </div>
+      </div>
+    </div>
+
     <!-- スキル再選択 -->
     <div id="reskill-overlay" class="overlay hidden">
       <div class="dialog-box" style="min-width:520px">
@@ -2515,7 +2532,7 @@ function leaveRest() {
   document.getElementById('rest-overlay').classList.add('hidden');
   if (battle.restBeforeBonus) {
     battle.restBeforeBonus = false;
-    showBonusSelect();
+    runInspirationLottery(showBonusSelect);
     return;
   }
   battle.floor++;
@@ -3582,7 +3599,7 @@ function onItemGetContinue() {
     battle.restDoneForFloor = nextFloor;
     document.getElementById('rest-overlay').classList.remove('hidden');
   } else {
-    showBonusSelect();
+    runInspirationLottery(showBonusSelect);
   }
 }
 
@@ -3650,6 +3667,52 @@ function renderBattleItems() {
 let pendingBonus = null;
 let pendingNewTech = null;
 let pendingTechChoices = [];
+
+// ===== 技のひらめき抽選 =====
+let _inspirationQueue = [];
+let _inspirationDoneCb = null;
+let _inspirationCard = null;
+let _inspirationChoice = null;
+
+function runInspirationLottery(doneCb) {
+  const hits = battle.party.filter(() => Math.random() < 0.10).map(p => p.card);
+  if (hits.length === 0) { doneCb(); return; }
+  _inspirationQueue = hits;
+  _inspirationDoneCb = doneCb;
+  _processNextInspiration();
+}
+
+function _processNextInspiration() {
+  if (_inspirationQueue.length === 0) { _inspirationDoneCb(); return; }
+  _inspirationCard = _inspirationQueue.shift();
+  const allDefs = Object.values(SKILL_DEFS).flat().filter(d => !d.lOnly);
+  const def = allDefs[randInt(0, allDefs.length - 1)];
+  const rank = rollTechRank();
+  _inspirationChoice = { type: 'skill', def, rank };
+  document.getElementById('inspiration-card-name').textContent = _inspirationCard.name + ' がひらめいた！';
+  document.getElementById('inspiration-skill-name').textContent =
+    `🔮 ${def.name}（${'★'.repeat(rank)}）`;
+  document.getElementById('inspiration-skill-desc').textContent = def.desc[rank] || '';
+  document.getElementById('inspiration-overlay').classList.remove('hidden');
+}
+
+function acceptInspiration() {
+  document.getElementById('inspiration-overlay').classList.add('hidden');
+  const card = _inspirationCard;
+  const choice = _inspirationChoice;
+  const totalSlots = (card.techs || []).length + (card.skill ? 1 : 0);
+  if (totalSlots < 2) {
+    applyLearnChoice(card, choice);
+    _processNextInspiration();
+  } else {
+    openUnifiedReplacePick(card, choice, _processNextInspiration);
+  }
+}
+
+function skipInspiration() {
+  document.getElementById('inspiration-overlay').classList.add('hidden');
+  _processNextInspiration();
+}
 
 function showBonusSelect() {
   const holder = document.getElementById('bonus-choices');
@@ -3870,7 +3933,8 @@ function applyLearnChoice(card, choice) {
   }
 }
 
-function openUnifiedReplacePick(card, newChoice) {
+function openUnifiedReplacePick(card, newChoice, afterCb) {
+  const done = afterCb || finishBonus;
   document.getElementById('bonus-tech-title').textContent = '入れ替えるスロットをえらぶ';
   const list = document.getElementById('bonus-tech-list');
   list.innerHTML = '';
@@ -3887,11 +3951,7 @@ function openUnifiedReplacePick(card, newChoice) {
       card.techs.splice(i, 1);
       const mergedInfo = applyLearnChoice(card, newChoice);
       document.getElementById('bonus-tech-overlay').classList.add('hidden');
-      if (mergedInfo) {
-        showTechLevelUp(mergedInfo.name, mergedInfo.newRank, finishBonus);
-      } else {
-        finishBonus();
-      }
+      if (mergedInfo) { showTechLevelUp(mergedInfo.name, mergedInfo.newRank, done); } else { done(); }
     };
     list.appendChild(div);
   });
@@ -3909,14 +3969,17 @@ function openUnifiedReplacePick(card, newChoice) {
       card.skill = null;
       const mergedInfo = applyLearnChoice(card, newChoice);
       document.getElementById('bonus-tech-overlay').classList.add('hidden');
-      if (mergedInfo) {
-        showTechLevelUp(mergedInfo.name, mergedInfo.newRank, finishBonus);
-      } else {
-        finishBonus();
-      }
+      if (mergedInfo) { showTechLevelUp(mergedInfo.name, mergedInfo.newRank, done); } else { done(); }
     };
     list.appendChild(div);
   }
+  // スキップ（そのまま次へ）
+  const skipDiv = document.createElement('div'); skipDiv.className = 'skill-opt';
+  skipDiv.style.cssText = 'border-color:#aaa;background:rgba(0,0,0,0.04);cursor:pointer';
+  skipDiv.innerHTML = `<div class="sk-icon" style="font-size:1.4rem">❌</div>
+    <div class="sk-info"><div class="sk-name" style="color:#888">おぼえない（スキップ）</div></div>`;
+  skipDiv.onclick = () => { document.getElementById('bonus-tech-overlay').classList.add('hidden'); done(); };
+  list.appendChild(skipDiv);
   document.getElementById('bonus-tech-overlay').classList.remove('hidden');
 }
 
