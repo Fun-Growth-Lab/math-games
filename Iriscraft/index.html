@@ -702,9 +702,9 @@
       <div class="adv-panel">
         <div class="adv-title">難易度をえらぶ</div>
         <div class="diff-btns" id="diff-btns" style="flex-direction:column;gap:10px;align-items:stretch;max-width:260px;margin:0 auto">
-          <button class="btn btn-primary diff-btn" id="diff-easy"    onclick="startAdventure('easy')">🌱 やさしい <span class="diff-sub">10階</span></button>
-          <button class="btn btn-change diff-btn"  id="diff-normal"  onclick="startAdventure('normal')">⚔️ ふつう <span class="diff-sub">20階</span></button>
-          <button class="btn btn-danger diff-btn"  id="diff-hard"    onclick="startAdventure('hard')">💀 むずかしい <span class="diff-sub">30階</span></button>
+          <button class="btn btn-primary diff-btn" id="diff-easy"    onclick="startAdventure('easy')">🌱 やさしい <span class="diff-sub">7階</span></button>
+          <button class="btn btn-change diff-btn"  id="diff-normal"  onclick="startAdventure('normal')">⚔️ ふつう <span class="diff-sub">10階</span></button>
+          <button class="btn btn-danger diff-btn"  id="diff-hard"    onclick="startAdventure('hard')">💀 むずかしい <span class="diff-sub">13階</span></button>
           <button class="btn diff-btn"             id="diff-endless" onclick="startAdventure('endless')" style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid #7b2d8b;color:#d8b4fe">♾️ エンドレス <span class="diff-sub">∞階</span></button>
         </div>
         <div id="diff-lock-msg" style="font-size:0.8rem;color:#888;margin-top:10px;text-align:center"></div>
@@ -2443,9 +2443,23 @@ const BOSS_NAMES = [
 ];
 
 const DIFF_REROLLS = { easy: 0, normal: 0, hard: 0, endless: 0 };
-const DIFF_TRASH   = { easy: 0.0, normal: 0.15, hard: 0.30, endless: 0.30 };
-const DIFF_POWER   = { easy: 1.5, normal: 1.6, hard: 1.65, endless: 1.7 };
-const DIFF_FLOORS  = { easy: 10, normal: 20, hard: 30, endless: Infinity };
+const DIFF_TRASH   = { easy: 0.0, normal: 0.20, hard: 0.35, endless: 0.35 };
+// 難易度別：基本倍率・フロアごとの成長率
+const DIFF_POWER        = { easy: 1.0, normal: 2.0, hard: 3.5,  endless: 3.5  };
+const DIFF_FLOOR_GROWTH = { easy: 0.14, normal: 0.18, hard: 0.22, endless: 0.22 };
+const DIFF_FLOORS  = { easy: 7, normal: 10, hard: 13, endless: Infinity };
+
+// 難易度・階数から敵のスケールを計算
+// endless は13Fを超えると10%/Fで加速度的に強くなる
+function calcEnemyScale(floor, diff) {
+  const base   = DIFF_POWER[diff]        || 1.0;
+  const growth = DIFF_FLOOR_GROWTH[diff] || 0.14;
+  let scale = (1 + (floor - 1) * growth) * base;
+  if (diff === 'endless' && floor > 13) {
+    scale *= Math.pow(1.10, floor - 13);
+  }
+  return scale;
+}
 const DIFF_ORDER   = ['easy', 'normal', 'hard', 'endless'];
 
 function getDiffClears() {
@@ -2541,15 +2555,17 @@ function leaveRest() {
 
 // 敵生成
 function makeEnemy(floor) {
-  const isBoss = battle.difficulty !== 'endless' && floor >= battle.maxFloor;
-  let scale = (1 + (floor - 1) * 0.14) * (DIFF_POWER[battle.difficulty] || 1.1);
-  if (isBoss) scale *= 1.25;
+  const diff = battle.difficulty;
+  const isBoss = diff !== 'endless' && floor >= battle.maxFloor;
+  let scale = calcEnemyScale(floor, diff);
+  if (isBoss) scale *= 1.30;
 
   const baseHp = (rand(70, 100)) * scale;
-  // 得意属性：40%で2属性が高い（2色攻撃を狙う／むずかしいほど2属性が出やすい）
+  // 得意属性：難易度が高いほど2属性持ちが増える
   const pool = [...ELEM_ORDER];
   const p1 = pool.splice(randInt(0, pool.length - 1), 1)[0];
-  const twoChance = battle.difficulty === 'hard' ? 0.55 : battle.difficulty === 'normal' ? 0.4 : 0.25;
+  const twoChance = (diff === 'hard' || diff === 'endless') ? 0.65
+                  : diff === 'normal' ? 0.50 : 0.25;
   const p2 = (Math.random() < twoChance) ? pool.splice(randInt(0, pool.length - 1), 1)[0] : null;
   const stats = { hp: Math.round(baseHp * 3) };
   ELEM_ORDER.forEach(el => {
@@ -2567,8 +2583,8 @@ function makeEnemy(floor) {
     name = ENEMY_NAMES[nameIdx];
     illus = enemyIllus(nameIdx);
   }
-  // むずかしいは強い技プール（2色2+1等）も使える
-  const richTech = battle.difficulty === 'hard';
+  // ふつう以上は強い技プール（2色2+1等）も使える
+  const richTech = diff === 'hard' || diff === 'normal' || diff === 'endless';
   const techs = genTechCandidates(stats, /*starter*/ !richTech, 2);
   const weak = pickWeakness(stats);
   return {
