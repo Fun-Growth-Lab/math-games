@@ -164,8 +164,8 @@
     .cards-hdr { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
     .cards-title { font-size:1.15rem; font-weight:800; color:#333; }
     .cards-badge { background:#f0f0f0; border-radius:20px; padding:3px 12px; font-size:0.82rem; font-weight:800; color:#666; }
-    #card-grid { display:flex; flex-wrap:nowrap; overflow-x:auto; gap:8px; justify-content:flex-start; align-items:flex-start; }
-    #card-grid .card { transform:scale(0.78); transform-origin:top center; margin:0 -57px -82px; }
+    #card-grid { display:flex; flex-wrap:nowrap; overflow-x:hidden; gap:8px; justify-content:center; align-items:flex-start; }
+    #card-grid .card { transform:scale(0.70); transform-origin:top center; margin:0 -78px -112px; }
 
     /* ===== CARD（上下2段×左右3列） ===== */
     .card {
@@ -260,7 +260,7 @@
     #card-zoom-overlay { z-index:300; cursor:pointer; }
     #card-zoom-holder { transform:scale(1.7); transform-origin:center; }
     #card-grid .card { cursor:pointer; transition:transform 0.1s; }
-    #card-grid .card:hover { transform:scale(0.78) translateY(-5px); box-shadow:0 0 0 1px rgba(255,240,140,0.7) inset, 0 10px 22px rgba(0,0,0,0.28); }
+    #card-grid .card:hover { transform:scale(0.70) translateY(-5px); box-shadow:0 0 0 1px rgba(255,240,140,0.7) inset, 0 10px 22px rgba(0,0,0,0.28); }
 
     /* ===== ADVENTURE / BATTLE ===== */
     #adventure-screen { position:absolute; inset:0;
@@ -2332,7 +2332,8 @@ function showCards() {
   } else {
     const minCount = Math.min(...cardStock.map(c => c.enhanceCount));
     cardStock.forEach(c => {
-      const cardEl = buildCardEl(c);
+      const pe = battle.party ? battle.party.find(p => p.card === c) : null;
+      const cardEl = buildCardEl(c, pe ? { curHp: pe.curHp } : {});
       // 強化中：強化できないカードは灰色＋ラベル
       if (enhancing && c.enhanceCount !== minCount) {
         const wrap = document.createElement('div'); wrap.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:4px';
@@ -2480,8 +2481,8 @@ function arriveFloor() {
   battle.stageDamage = 0;
   battle.stageTurns  = 0;
 
-  // 5の倍数かつ10の倍数でない → 休憩所
-  if (battle.floor % 5 === 0 && battle.floor % 10 !== 0) {
+  // 5の倍数かつ10の倍数でない → 休憩所（前のフロアのボーナス前に既に表示済みならスキップ）
+  if (battle.floor % 5 === 0 && battle.floor % 10 !== 0 && battle.restDoneForFloor !== battle.floor) {
     battle.party.forEach(p => p.curHp = p.maxHp); // 完全回復
     document.getElementById('rest-overlay').classList.remove('hidden');
     return;
@@ -2510,6 +2511,11 @@ function arriveFloor() {
 
 function leaveRest() {
   document.getElementById('rest-overlay').classList.add('hidden');
+  if (battle.restBeforeBonus) {
+    battle.restBeforeBonus = false;
+    showBonusSelect();
+    return;
+  }
   battle.floor++;
   arriveFloor();
 }
@@ -3566,7 +3572,16 @@ function continueAfterVictory() {
 
 function onItemGetContinue() {
   document.getElementById('item-get-overlay').classList.add('hidden');
-  showBonusSelect();
+  // 次のフロアが休憩所なら先に休憩させてからボーナスへ
+  const nextFloor = battle.floor + 1;
+  if (nextFloor % 5 === 0 && nextFloor % 10 !== 0 && battle.difficulty !== 'endless') {
+    battle.party.forEach(p => { p.curHp = p.maxHp; });
+    battle.restBeforeBonus = true;
+    battle.restDoneForFloor = nextFloor;
+    document.getElementById('rest-overlay').classList.remove('hidden');
+  } else {
+    showBonusSelect();
+  }
 }
 
 // ===== クリアボーナス =====
