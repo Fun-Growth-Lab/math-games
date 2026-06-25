@@ -630,6 +630,16 @@
       </div>
     </div>
 
+    <!-- 技レベルアップ通知 -->
+    <div id="tech-levelup-overlay" class="overlay hidden" style="z-index:9000">
+      <div class="dialog-box" style="text-align:center;cursor:pointer" onclick="techLevelUpNext()">
+        <div style="font-size:3rem;margin-bottom:8px">⚔️✨</div>
+        <p class="dialog-msg" id="tech-levelup-msg">技がレベルアップ！</p>
+        <p class="dialog-sub" id="tech-levelup-sub"></p>
+        <div style="margin-top:18px;color:#aaa;font-size:0.75rem">タップして続ける</div>
+      </div>
+    </div>
+
     <!-- スキル再選択 -->
     <div id="reskill-overlay" class="overlay hidden">
       <div class="dialog-box" style="min-width:520px">
@@ -2176,13 +2186,19 @@ function applyMerge(target) {
   document.getElementById('merge-overlay').classList.add('hidden');
 
   // 技の合成：現在の技 + 強化カードの技。同コスト技は統合してから判定
-  const combined = mergeTechList([...(target.techs || []), ...(e.techs || [])]);
-  if (combined.length <= 2) {
-    target.techs = combined;
-    showEnhanceDone(target);
+  const { result: combined, merged: mergedInfo } = mergeTechList([...(target.techs || []), ...(e.techs || [])]);
+  target.techs = combined;
+  const afterMerge = () => {
+    if (combined.length <= 2) {
+      showEnhanceDone(target);
+    } else {
+      openReskill(target);
+    }
+  };
+  if (mergedInfo) {
+    showTechLevelUp(mergedInfo.name, mergedInfo.newRank, afterMerge);
   } else {
-    target.techs = combined;   // 統合済みリストを reskill のベースにする
-    openReskill(target);      // 3つ以上 → 2つ選ぶ
+    afterMerge();
   }
 }
 
@@ -3756,8 +3772,12 @@ function teachNewTech(card) {
   const choice = pendingNewTech;
   const totalSlots = (card.techs || []).length + (card.skill ? 1 : 0);
   if (totalSlots < 2) {
-    applyLearnChoice(card, choice);
-    finishBonus();
+    const mergedInfo = applyLearnChoice(card, choice);
+    if (mergedInfo) {
+      showTechLevelUp(mergedInfo.name, mergedInfo.newRank, finishBonus);
+    } else {
+      finishBonus();
+    }
   } else {
     openUnifiedReplacePick(card, choice);
   }
@@ -3769,8 +3789,10 @@ function techEnergyKey(t) {
 }
 
 // 技リストを合成（同コスト技はランク高い方+1に統合）
+// 戻り値: { result: Tech[], merged: {name, newRank} | null }
 function mergeTechList(techs) {
   const result = [];
+  let merged = null;
   for (const t of techs) {
     const key = techEnergyKey(t);
     const dup = result.find(r => techEnergyKey(r) === key);
@@ -3779,19 +3801,35 @@ function mergeTechList(techs) {
         result.splice(result.indexOf(dup), 1);
         t.rank = Math.min(5, (t.rank||1) + 1);
         result.push(t);
+        merged = { name: t.name, newRank: t.rank };
       } else {
         dup.rank = Math.min(5, (dup.rank||1) + 1);
+        merged = { name: dup.name, newRank: dup.rank };
       }
     } else {
       result.push(t);
     }
   }
-  return result;
+  return { result, merged };
+}
+
+// 技レベルアップポップアップ
+let _techLevelUpCallback = null;
+function showTechLevelUp(name, newRank, callback) {
+  _techLevelUpCallback = callback;
+  document.getElementById('tech-levelup-msg').textContent = `${name} がレベルアップしました！`;
+  document.getElementById('tech-levelup-sub').innerHTML = `${'★'.repeat(newRank)}<span style="color:#aaa">${'☆'.repeat(5-newRank)}</span>`;
+  document.getElementById('tech-levelup-overlay').classList.remove('hidden');
+}
+function techLevelUpNext() {
+  document.getElementById('tech-levelup-overlay').classList.add('hidden');
+  if (_techLevelUpCallback) { const cb = _techLevelUpCallback; _techLevelUpCallback = null; cb(); }
 }
 
 function applyLearnChoice(card, choice) {
   if (choice.type === 'skill') {
     card.skill = { id: choice.def.id, rank: choice.rank };
+    return null;
   } else {
     card.techs = card.techs || [];
     const newT = choice.data;
@@ -3803,11 +3841,14 @@ function applyLearnChoice(card, choice) {
         card.techs.splice(card.techs.indexOf(dup), 1);
         newT.rank = Math.min(5, (newT.rank||1) + 1);
         card.techs.push(newT);
+        return { name: newT.name, newRank: newT.rank };
       } else {
         dup.rank = Math.min(5, (dup.rank||1) + 1);
+        return { name: dup.name, newRank: dup.rank };
       }
     } else {
       card.techs.push(newT);
+      return null;
     }
   }
 }
@@ -3827,9 +3868,13 @@ function openUnifiedReplacePick(card, newChoice) {
       </div>`;
     div.onclick = () => {
       card.techs.splice(i, 1);
-      applyLearnChoice(card, newChoice);
+      const mergedInfo = applyLearnChoice(card, newChoice);
       document.getElementById('bonus-tech-overlay').classList.add('hidden');
-      finishBonus();
+      if (mergedInfo) {
+        showTechLevelUp(mergedInfo.name, mergedInfo.newRank, finishBonus);
+      } else {
+        finishBonus();
+      }
     };
     list.appendChild(div);
   });
@@ -3845,9 +3890,13 @@ function openUnifiedReplacePick(card, newChoice) {
       </div>`;
     div.onclick = () => {
       card.skill = null;
-      applyLearnChoice(card, newChoice);
+      const mergedInfo = applyLearnChoice(card, newChoice);
       document.getElementById('bonus-tech-overlay').classList.add('hidden');
-      finishBonus();
+      if (mergedInfo) {
+        showTechLevelUp(mergedInfo.name, mergedInfo.newRank, finishBonus);
+      } else {
+        finishBonus();
+      }
     };
     list.appendChild(div);
   }
