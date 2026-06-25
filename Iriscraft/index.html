@@ -2175,21 +2175,21 @@ function applyMerge(target) {
 
   document.getElementById('merge-overlay').classList.add('hidden');
 
-  // 技の合成：現在の技 + 強化カードの技。2つ以内ならそのまま追加、超えるなら選び直し
-  const combined = [...(target.techs || []), ...(e.techs || [])];
+  // 技の合成：現在の技 + 強化カードの技。同コスト技は統合してから判定
+  const combined = mergeTechList([...(target.techs || []), ...(e.techs || [])]);
   if (combined.length <= 2) {
     target.techs = combined;
     showEnhanceDone(target);
   } else {
-    openReskill(target, e);   // 3つ → 2つ選ぶ
+    target.techs = combined;   // 統合済みリストを reskill のベースにする
+    openReskill(target);      // 3つ以上 → 2つ選ぶ
   }
 }
 
-// 技の再選択：現在2つ + 強化カードの2つ → 4つから2つ
-function openReskill(target, e) {
-  const pool = [];
-  (target.techs || []).forEach(t => pool.push({ tech:t, src:'現' }));
-  (e.techs || []).forEach(t => pool.push({ tech:t, src:'新' }));
+// 技の再選択：統合済みリスト（target.techs）から2つ選ぶ
+function openReskill(target) {
+  // target.techs は applyMerge で mergeTechList 済みの統合リスト
+  const pool = (target.techs || []).map(t => ({ tech: t }));
   reskillTarget = target;
   reskillPool = pool;
   reskillSelected = [];
@@ -2205,7 +2205,7 @@ function openReskill(target, e) {
     div.innerHTML = `
       <div class="sk-icon">${techEnergyHTML(t)}</div>
       <div class="sk-info">
-        <div class="sk-name" style="color:${mHex}">${t.name} <span style="font-size:0.7rem;color:#aaa">[${item.src}]</span></div>
+        <div class="sk-name" style="color:${mHex}">${t.name} <span style="color:#E8A000">${'★'.repeat(t.rank||1)}</span></div>
         <div style="font-size:0.7rem;color:#888;margin-top:2px">${ELEM(t.mainEl).name}属性</div>
       </div>
       <div class="sk-check">✓</div>`;
@@ -3766,6 +3766,27 @@ function teachNewTech(card) {
 // 技のエネルギーキー（同コスト判定用）
 function techEnergyKey(t) {
   return t.counts.map(c => `${c.el}:${c.n}`).sort().join(',');
+}
+
+// 技リストを合成（同コスト技はランク高い方+1に統合）
+function mergeTechList(techs) {
+  const result = [];
+  for (const t of techs) {
+    const key = techEnergyKey(t);
+    const dup = result.find(r => techEnergyKey(r) === key);
+    if (dup) {
+      if ((t.rank||1) > (dup.rank||1)) {
+        result.splice(result.indexOf(dup), 1);
+        t.rank = Math.min(5, (t.rank||1) + 1);
+        result.push(t);
+      } else {
+        dup.rank = Math.min(5, (dup.rank||1) + 1);
+      }
+    } else {
+      result.push(t);
+    }
+  }
+  return result;
 }
 
 function applyLearnChoice(card, choice) {
