@@ -165,7 +165,7 @@
     .cards-title { font-size:1.15rem; font-weight:800; color:#333; }
     .cards-badge { background:#f0f0f0; border-radius:20px; padding:3px 12px; font-size:0.82rem; font-weight:800; color:#666; }
     #card-grid { display:flex; flex-wrap:nowrap; overflow-x:hidden; gap:8px; justify-content:center; align-items:flex-start; }
-    #card-grid .card { transform:scale(0.70); transform-origin:top center; margin:0 -78px -112px; }
+    #card-grid .card { transform:scale(0.70); transform-origin:top center; margin:0 -78px -148px; }
 
     /* ===== CARD（上下2段×左右3列） ===== */
     .card {
@@ -213,15 +213,15 @@
     .card-attr2-val { font-weight:800; flex:1; text-align:right; font-size:1.6rem; }
 
     /* 技（横いっぱい・2段：名前+★ / エネ・ダメージ数値） */
-    .card-techs { display:flex; flex-direction:row; gap:7px; flex-shrink:0; }
-    .card-tech-name-row { display:flex; align-items:center; gap:5px; }
-    .card-tech-stars { color:#E8A000; font-size:1.0rem; }
-    .card-tech { display:flex; flex-direction:column; justify-content:center; align-items:center; gap:4px; border:1.5px solid; border-radius:6px;
-      padding:6px 10px; flex:1; text-align:center; }
+    .card-techs { display:grid; grid-template-columns:1fr 1fr; gap:5px; flex-shrink:0; }
+    .card-tech-name-row { display:flex; align-items:center; gap:3px; }
+    .card-tech-stars { color:#E8A000; font-size:0.75rem; }
+    .card-tech { display:flex; flex-direction:column; justify-content:center; align-items:center; gap:2px; border:1.5px solid; border-radius:6px;
+      padding:4px 6px; text-align:center; }
     .card-tech.empty { border-style:dashed; border-color:#ddd; }
-    .card-tech-name { font-size:1.25rem; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.1; }
-    .card-tech-energy { font-size:2.2rem; flex-shrink:0; letter-spacing:-2px; line-height:1.1; }
-    .card-tech-dmg { color:#333; font-size:2.3rem; font-weight:900; }
+    .card-tech-name { font-size:0.85rem; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.1; }
+    .card-tech-energy { font-size:1.4rem; flex-shrink:0; letter-spacing:-2px; line-height:1.1; }
+    .card-tech-dmg { color:#333; font-size:1.4rem; font-weight:900; }
 
     /* 弱点・抵抗（右列・大きな縦ボックス） */
     .card-wr-box { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
@@ -591,7 +591,7 @@
     <!-- Skill Selection -->
     <div id="skill-select-overlay" class="overlay hidden">
       <div class="dialog-box">
-        <p class="dialog-msg">技を２つ選ぶ</p>
+        <p class="dialog-msg">技を４つ選ぶ</p>
         <p class="dialog-sub">図形が多いほど技の候補が増える</p>
         <div class="skill-opts" id="skill-opts"></div>
         <div class="dialog-btns">
@@ -634,7 +634,7 @@
     <div id="reskill-overlay" class="overlay hidden">
       <div class="dialog-box" style="min-width:520px">
         <p class="dialog-msg">技をえらび直す</p>
-        <p class="dialog-sub">今の技2つ＋強化カードの技2つ から2つえらぶ</p>
+        <p class="dialog-sub">合成後の技リストから残す４つをえらぶ</p>
         <div class="skill-opts" id="reskill-opts"></div>
         <div class="dialog-btns">
           <button class="btn btn-primary btn-dim" id="reskill-confirm-btn" onclick="confirmReskill()">決定！</button>
@@ -1322,6 +1322,12 @@ function getSkillVal(card, id) {
   const sk = card.skill;
   if (!sk || sk.id !== id) return null;
   return (SKILL_VALS[id] || {})[Number(sk.rank) || sk.rank] ?? null;
+}
+function getEnemySkillVal(e, id) {
+  for (const sk of [e.skill, e.skill2]) {
+    if (sk && sk.id === id) return (SKILL_VALS[id] || {})[Number(sk.rank) || sk.rank] ?? null;
+  }
+  return null;
 }
 
 // 図形数 → [小, 中, 大] の出現確率（%）
@@ -2208,7 +2214,7 @@ function applyMerge(target) {
   const { result: combined, merged: mergedInfo } = mergeTechList([...(target.techs || []), ...(e.techs || [])]);
   target.techs = combined;
   const afterMerge = () => {
-    if (combined.length <= 2) {
+    if (combined.length <= 4) {
       showEnhanceDone(target);
     } else {
       openReskill(target);
@@ -2256,14 +2262,14 @@ let reskillTarget = null, reskillPool = [], reskillSelected = [];
 function toggleReskill(div, idx) {
   const pos = reskillSelected.indexOf(idx);
   if (pos >= 0) { reskillSelected.splice(pos, 1); div.classList.remove('sel'); }
-  else { if (reskillSelected.length >= 2) return; reskillSelected.push(idx); div.classList.add('sel'); }
+  else { if (reskillSelected.length >= 4) return; reskillSelected.push(idx); div.classList.add('sel'); }
   updateReskillBtn();
 }
 function updateReskillBtn() {
-  document.getElementById('reskill-confirm-btn').classList.toggle('btn-dim', reskillSelected.length !== 2);
+  document.getElementById('reskill-confirm-btn').classList.toggle('btn-dim', reskillSelected.length !== 4);
 }
 function confirmReskill() {
-  if (reskillSelected.length !== 2) return;
+  if (reskillSelected.length !== 4) return;
   reskillTarget.techs = reskillSelected.map(i => reskillPool[i].tech);
   document.getElementById('reskill-overlay').classList.add('hidden');
   showEnhanceDone(reskillTarget);
@@ -2586,12 +2592,24 @@ function makeEnemy(floor) {
   }
   // ふつう以上は強い技プール（2色2+1等）も使える
   const richTech = diff === 'hard' || diff === 'normal' || diff === 'endless';
-  const techs = genTechCandidates(stats, /*starter*/ !richTech, 2);
+  // フロアによる技構成
+  let numAttackTechs, numPassives;
+  if (floor === 1)      { numAttackTechs = 1; numPassives = 0; }
+  else if (floor <= 4)  { numAttackTechs = 2; numPassives = 0; }
+  else if (floor <= 7)  { numAttackTechs = 2; numPassives = 1; }
+  else                  { numAttackTechs = 2; numPassives = 2; }
+  if (isBoss) { numAttackTechs = Math.min(numAttackTechs + 1, 3); }
+  const techs = genTechCandidates(stats, /*starter*/ !richTech, numAttackTechs);
+  // パッシブスキル
+  const allSkillDefs = Object.values(SKILL_DEFS).flat().filter(d => !d.lOnly);
+  const eSkill  = numPassives >= 1 ? { id: allSkillDefs[randInt(0,allSkillDefs.length-1)].id, rank: rollTechRank() } : null;
+  const eSkill2 = numPassives >= 2 ? { id: allSkillDefs[randInt(0,allSkillDefs.length-1)].id, rank: rollTechRank() } : null;
   const weak = pickWeakness(stats);
   return {
     name, stats, maxHp: stats.hp, curHp: stats.hp,
     weak, resist: pickResistance(stats, weak),
-    isBoss, illus, techs, energy: emptyEnergy(), status: [],
+    isBoss, illus, techs, skill: eSkill, skill2: eSkill2,
+    energy: emptyEnergy(), status: [], gutsUsed: false,
   };
 }
 
@@ -2604,6 +2622,8 @@ function buildEnemyCard(e) {
     weak: e.weak,
     resist: e.resist,
     techs: e.techs || [],
+    skill: e.skill || null,
+    skill2: e.skill2 || null,
   };
   return buildCardEl(fakeCard, { noZoom: true, isEnemy: true, curHp: e.curHp });
 }
@@ -3166,7 +3186,18 @@ function useTech(t) {
   if (swordCount > 0) dmg = Math.floor(dmg * Math.pow(1.10, swordCount));
   if ((battle.items||[]).some(i => i.id === 'ring') && t.mainEl === battle.enemy.weak) dmg = Math.floor(dmg * 1.25);
 
+  // 敵パッシブ：鉄壁・完全ガードによるダメージ軽減
+  const eIronWall  = getEnemySkillVal(battle.enemy, 'iron_wall');
+  const eFullGuard = getEnemySkillVal(battle.enemy, 'full_guard');
+  if (eIronWall)  dmg = Math.max(1, Math.floor(dmg * (1 - eIronWall)));
+  if (eFullGuard) dmg = Math.max(1, Math.floor(dmg * (1 - eFullGuard)));
   battle.enemy.curHp -= dmg;
+  // 敵パッシブ：根性（1度だけHPが1以下になると1で踏みとどまる）
+  const eGuts = getEnemySkillVal(battle.enemy, 'guts');
+  if (eGuts && battle.enemy.curHp <= 0 && !battle.enemy.gutsUsed) {
+    battle.enemy.curHp = 1; battle.enemy.gutsUsed = true;
+    pushLog(`${battle.enemy.name} は 根性で耐えた！`);
+  }
   battle.stageDamage = (battle.stageDamage || 0) + dmg;
   battle.stageTurns  = (battle.stageTurns  || 0) + 1;
 
@@ -3222,7 +3253,15 @@ function useTech(t) {
     setTimeout(() => {
       if (!battle.inBattle || battle.enemy.curHp <= 0) { setTimeout(enemyTurn, 800); return; }
       let dmg2 = Math.floor(techDamage(t, boostedStats, battle.enemy) * 0.60);
+      const eIW2 = getEnemySkillVal(battle.enemy, 'iron_wall');
+      const eFG2 = getEnemySkillVal(battle.enemy, 'full_guard');
+      if (eIW2) dmg2 = Math.max(1, Math.floor(dmg2 * (1 - eIW2)));
+      if (eFG2) dmg2 = Math.max(1, Math.floor(dmg2 * (1 - eFG2)));
       battle.enemy.curHp -= dmg2;
+      if (getEnemySkillVal(battle.enemy, 'guts') && battle.enemy.curHp <= 0 && !battle.enemy.gutsUsed) {
+        battle.enemy.curHp = 1; battle.enemy.gutsUsed = true;
+        pushLog(`${battle.enemy.name} は 根性で耐えた！`);
+      }
       battle.stageDamage += dmg2;
       pushLog(`💥 連続攻撃！ <span class="log-dmg">${dmg2}</span> ダメージ`);
       renderBattle();
@@ -3500,6 +3539,13 @@ function enemyTurn(skipSwap = false) {
   // エネルギー獲得：相手の弱点を突く最強技に近づく色を選ぶ
   const g = enemyChooseEnergy(e, target.card);
   e.energy[g]++;
+  // 敵パッシブ：自動回復
+  const eAutoHeal = getEnemySkillVal(e, 'auto_heal');
+  if (eAutoHeal && e.curHp > 0) {
+    const healed = Math.max(1, Math.round(e.maxHp * eAutoHeal));
+    e.curHp = Math.min(e.maxHp, e.curHp + healed);
+    pushLog(`${e.name} は HPを ${healed} 回復した`);
+  }
   renderBattle();  // エネルギー獲得後に1回だけレンダリング（取得前の古い値を表示しない）
   const usable = (e.techs || []).filter(t => canUseTech(e.energy, t));
   setTimeout(() => {
@@ -3707,8 +3753,8 @@ function acceptInspiration() {
   document.getElementById('inspiration-overlay').classList.add('hidden');
   const card = _inspirationCard;
   const choice = _inspirationChoice;
-  const totalSlots = (card.techs || []).length + (card.skill ? 1 : 0);
-  if (totalSlots < 2) {
+  const totalSlots = (card.techs || []).length + (card.skill ? 1 : 0) + (card.skill2 ? 1 : 0);
+  if (totalSlots < 4) {
     applyLearnChoice(card, choice);
     _processNextInspiration();
   } else {
@@ -3856,8 +3902,8 @@ function showNewTechCardPick() {
 function teachNewTech(card) {
   document.getElementById('bonus-new-tech-overlay').classList.add('hidden');
   const choice = pendingNewTech;
-  const totalSlots = (card.techs || []).length + (card.skill ? 1 : 0);
-  if (totalSlots < 2) {
+  const totalSlots = (card.techs || []).length + (card.skill ? 1 : 0) + (card.skill2 ? 1 : 0);
+  if (totalSlots < 4) {
     const mergedInfo = applyLearnChoice(card, choice);
     if (mergedInfo) {
       showTechLevelUp(mergedInfo.name, mergedInfo.newRank, finishBonus);
@@ -3914,7 +3960,8 @@ function techLevelUpNext() {
 
 function applyLearnChoice(card, choice) {
   if (choice.type === 'skill') {
-    card.skill = { id: choice.def.id, rank: choice.rank };
+    if (!card.skill) { card.skill = { id: choice.def.id, rank: choice.rank }; }
+    else { card.skill2 = { id: choice.def.id, rank: choice.rank }; }
     return null;
   } else {
     card.techs = card.techs || [];
@@ -3961,8 +4008,8 @@ function openUnifiedReplacePick(card, newChoice, afterCb) {
     };
     list.appendChild(div);
   });
-  if (card.skill) {
-    const sk = card.skill;
+  [['skill', 'skill'], ['skill2', 'skill2']].forEach(([prop]) => {
+    const sk = card[prop]; if (!sk) return;
     const skDef = Object.values(SKILL_DEFS).flat().find(d => d.id === sk.id);
     const div = document.createElement('div'); div.className = 'skill-opt';
     div.style.background = 'rgba(160,64,255,0.10)'; div.style.borderColor = 'rgba(160,64,255,0.5)';
@@ -3972,13 +4019,13 @@ function openUnifiedReplacePick(card, newChoice, afterCb) {
         <div style="font-size:0.7rem;color:#888">これを捨てる</div>
       </div>`;
     div.onclick = () => {
-      card.skill = null;
+      card[prop] = null;
       const mergedInfo = applyLearnChoice(card, newChoice);
       document.getElementById('bonus-tech-overlay').classList.add('hidden');
       if (mergedInfo) { showTechLevelUp(mergedInfo.name, mergedInfo.newRank, done); } else { done(); }
     };
     list.appendChild(div);
-  }
+  });
   // スキップ（そのまま次へ）
   const skipDiv = document.createElement('div'); skipDiv.className = 'skill-opt';
   skipDiv.style.cssText = 'border-color:#aaa;background:rgba(0,0,0,0.04);cursor:pointer';
@@ -4324,11 +4371,12 @@ function buildCardEl(card, opts) {
     <span class="card-hp-num">${(opts && opts.curHp != null) ? Math.max(0, opts.curHp) : card.stats.hp}</span>`;
   el.appendChild(hpRow);
 
-  // 下段：スロット（攻撃技＋パッシブスキル合わせて最大2つ）
-  const maxSlots = isWeapon ? 1 : 2;
+  // 下段：スロット（攻撃技＋パッシブスキル合わせて最大4つ）
+  const maxSlots = isWeapon ? 1 : 4;
   const allSlots = [];
   (card.techs || []).forEach(t => allSlots.push({ type:'tech', data:t }));
-  if (card.skill) allSlots.push({ type:'skill', data:card.skill });
+  if (card.skill)  allSlots.push({ type:'skill', data:card.skill });
+  if (card.skill2) allSlots.push({ type:'skill', data:card.skill2 });
   while (allSlots.length < maxSlots) allSlots.push(null);
   allSlots.length = maxSlots;
   const tcon = document.createElement('div'); tcon.className = 'card-techs';
