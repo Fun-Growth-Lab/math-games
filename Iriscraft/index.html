@@ -2568,18 +2568,30 @@ function makeEnemy(floor) {
   if (isBoss) scale *= 1.30;
 
   const baseHp = (rand(70, 100)) * scale;
-  // 得意属性：難易度が高いほど2属性持ちが増える
+  // 敵タイプ抽選：①1属性特化65% ②2属性特化30% ③3属性特化4% ④4属性特化1%
+  const typeRoll = Math.random();
+  const numFocus = typeRoll < 0.65 ? 1 : typeRoll < 0.95 ? 2 : typeRoll < 0.99 ? 3 : 4;
+  // HP強化タイプ：5%の確率で発動（属性ステータス-20%、HP×1.5）
+  const hpBoostType = Math.random() < 0.05;
+  // 得意属性をnumFocus個ランダム選出
   const pool = [...ELEM_ORDER];
-  const p1 = pool.splice(randInt(0, pool.length - 1), 1)[0];
-  const twoChance = (diff === 'hard' || diff === 'endless') ? 0.65
-                  : diff === 'normal' ? 0.50 : 0.25;
-  const p2 = (Math.random() < twoChance) ? pool.splice(randInt(0, pool.length - 1), 1)[0] : null;
+  const focusEls = [];
+  for (let i = 0; i < numFocus; i++) {
+    focusEls.push(pool.splice(randInt(0, pool.length - 1), 1)[0]);
+  }
+  // タイプ別の得意属性値レンジ（①=100%, ②=50%, ③=30%, ④=20%基準）
+  const strongRanges = { 1:[32,48], 2:[16,24], 3:[10,15], 4:[7,11] };
+  const [sMin, sMax] = strongRanges[numFocus];
   const stats = { hp: Math.round(baseHp * 3) };
   ELEM_ORDER.forEach(el => {
-    stats[el] = (el === p1 || el === p2)
-      ? Math.round(rand(30, 46) * scale)        // 得意属性は高い
-      : Math.round(rand(6, 14) * scale);        // それ以外は低め
+    stats[el] = focusEls.includes(el)
+      ? Math.round(rand(sMin, sMax) * scale)   // 得意属性
+      : Math.round(rand(4, 9) * scale);         // 非得意属性
   });
+  if (hpBoostType) {
+    stats.hp = Math.round(stats.hp * 1.5);
+    ELEM_ORDER.forEach(el => { stats[el] = Math.round(stats[el] * 0.8); });
+  }
   let name, illus;
   if (isBoss) {
     const bossIdx = randInt(0, BOSS_NAMES.length - 1);
