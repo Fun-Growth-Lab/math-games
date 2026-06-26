@@ -2546,6 +2546,7 @@ function leaveRest() {
   document.getElementById('rest-overlay').classList.add('hidden');
   if (battle.restBeforeBonus) {
     battle.restBeforeBonus = false;
+    battle.isRestBonus = true;
     runInspirationLottery(showBonusSelect);
     return;
   }
@@ -3620,20 +3621,10 @@ function onItemGetContinue() {
 }
 
 // ===== クリアボーナス =====
-const BONUS_POOL = [
-  { id:'allHp',    icon:'❤️', name:'みんなのHP+50', desc:'全カードの最大HP+50', target:'party',
-    apply:() => battle.party.forEach(p => { p.card.stats.hp += 50; p.maxHp = p.card.stats.hp; p.curHp += 50; }) },
-  { id:'fullHeal', icon:'🩹', name:'ぜんかいふく', desc:'全カードのHPを全回復', target:'party',
-    apply:() => battle.party.forEach(p => { if (p.curHp > 0) p.curHp = p.maxHp; }) },
-  { id:'oneAttr',  icon:'💎', name:'1枚を強化', desc:'えらんだカードの全属性+20', target:'card',
-    apply:(c) => ELEMENTS.forEach(e => c.stats[e.id] += 20) },
-  { id:'oneHp',    icon:'💪', name:'1枚のHP+100', desc:'えらんだカードの最大HP+100', target:'card',
-    apply:(c) => { c.stats.hp += 100; const pe = battle.party.find(p => p.card === c); if (pe) { pe.maxHp = c.stats.hp; pe.curHp += 100; } } },
-  { id:'elemAttr', icon:'🔆', target:'card',
-    roll:(inst) => { inst.el = ELEM_ORDER[randInt(0,3)]; inst.name = `${ELEM_EMOJI[inst.el]}の力+50`; inst.desc = `えらんだカードの${ELEM(inst.el).name}属性を+50`; },
-    apply:(c, inst) => { c.stats[inst.el] += 50; } },
-  { id:'learnTech', icon:'✨', name:'技を覚える', desc:'攻撃技かパッシブスキルを3択から1つえらんでカードに習得させる', target:'card' },
-  { id:'starUp',   icon:'⭐', name:'技を強化', desc:'技の★を1つ上げる（威力＆特殊効果率UP）', target:'card' },
+const BONUS_OPTIONS = [
+  { id:'fullHeal', icon:'🩹', name:'ぜんかいふく', desc:'全カードのHPを全回復' },
+  { id:'learnTech', icon:'✨', name:'技を覚える', desc:'攻撃技かパッシブスキルを3択から1つえらんでカードに習得させる' },
+  { id:'starUp',   icon:'⭐', name:'技を強化', desc:'えらんだカードの技の★を1つ上げる（威力＆特殊効果率UP）' },
 ];
 
 // ===== アイテムプール =====
@@ -3731,18 +3722,16 @@ function skipInspiration() {
 }
 
 function showBonusSelect() {
+  const isRest = !!battle.isRestBonus;
+  battle.isRestBonus = false;
   const holder = document.getElementById('bonus-choices');
   holder.innerHTML = '';
-  const pool = [...BONUS_POOL];
-  const picks = [];
-  for (let i = 0; i < 3 && pool.length; i++) picks.push(pool.splice(randInt(0, pool.length - 1), 1)[0]);
-  picks.forEach(b => {
-    const inst = { ...b };
-    if (inst.roll) inst.roll(inst);
+  const opts = isRest ? BONUS_OPTIONS.filter(b => b.id !== 'fullHeal') : BONUS_OPTIONS;
+  opts.forEach(b => {
     const div = document.createElement('div'); div.className = 'bonus-card';
-    div.innerHTML = `<div class="bonus-icon">${inst.icon}</div>
-      <div class="bonus-name">${inst.name}</div><div class="bonus-desc">${inst.desc}</div>`;
-    div.onclick = () => chooseBonus(inst);
+    div.innerHTML = `<div class="bonus-icon">${b.icon}</div>
+      <div class="bonus-name">${b.name}</div><div class="bonus-desc">${b.desc}</div>`;
+    div.onclick = () => chooseBonus(b);
     holder.appendChild(div);
   });
   document.getElementById('bonus-overlay').classList.remove('hidden');
@@ -3750,7 +3739,10 @@ function showBonusSelect() {
 
 function chooseBonus(b) {
   document.getElementById('bonus-overlay').classList.add('hidden');
-  if (b.id === 'learnTech') {
+  if (b.id === 'fullHeal') {
+    battle.party.forEach(p => { if (p.curHp > 0) p.curHp = p.maxHp; });
+    finishBonus();
+  } else if (b.id === 'learnTech') {
     pendingBonus = b;
     const avgStats = {};
     ELEMENTS.forEach(e => {
@@ -3758,8 +3750,6 @@ function chooseBonus(b) {
     });
     pendingTechChoices = [genLearnChoice(avgStats), genLearnChoice(avgStats), genLearnChoice(avgStats)];
     showNewTechChoices();
-  } else if (b.target === 'party') {
-    b.apply(); finishBonus();
   } else {
     pendingBonus = b; showBonusPick();
   }
