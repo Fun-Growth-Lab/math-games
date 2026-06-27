@@ -2340,7 +2340,9 @@ function showEnhanceDone(target) {
 }
 
 function afterEnhanceDone() {
-  document.getElementById('enhance-done-overlay').classList.add('hidden');
+  const ov = document.getElementById('enhance-done-overlay');
+  if (ov.classList.contains('hidden')) return;  // 二重クリック防止
+  ov.classList.add('hidden');
   enhancing = false; enhanceCard = null;
   document.getElementById('enhance-banner').classList.add('hidden');
   proceedNextFloor();
@@ -2554,7 +2556,18 @@ function startAdventure(diff) {
     card, maxHp: card.stats.hp, curHp: card.stats.hp,
   }));
   battle.activeIdx = 0;
+  battle.restBeforeBonus = false;
+  battle.restDoneForFloor = 0;
+  battle.isRestBonus = false;
+  battle.inBattle = false;
   enhancing = false;
+  // 前のゲームのオーバーレイが残っていないようにリセット
+  ['rest-overlay','victory-overlay','item-get-overlay','bonus-overlay','bonus-pick-overlay',
+   'bonus-skill-overlay','bonus-new-tech-overlay','bonus-tech-overlay','inspiration-overlay',
+   'tech-levelup-overlay','enhance-done-overlay','reskill-overlay','merge-overlay'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('hidden');
+  });
   document.getElementById('floor-max').textContent = battle.maxFloor === Infinity ? '∞' : battle.maxFloor;
   document.getElementById('difficulty-overlay').classList.add('hidden');
   document.getElementById('battle-area').classList.remove('hidden');
@@ -3758,7 +3771,9 @@ function floorCleared() {
 
 // 勝利後「つぎへ」クリック
 function continueAfterVictory() {
-  document.getElementById('victory-overlay').classList.add('hidden');
+  const vo = document.getElementById('victory-overlay');
+  if (vo.classList.contains('hidden')) return;  // 二重クリック防止
+  vo.classList.add('hidden');
   document.getElementById('enemy-row').innerHTML = '';
   document.getElementById('player-row').innerHTML = '';
   if (battle.difficulty !== 'endless' && battle.floor >= battle.maxFloor) { clearGame(); return; }
@@ -3777,7 +3792,9 @@ function continueAfterVictory() {
 }
 
 function onItemGetContinue() {
-  document.getElementById('item-get-overlay').classList.add('hidden');
+  const ig = document.getElementById('item-get-overlay');
+  if (ig.classList.contains('hidden')) return;  // 二重クリック防止
+  ig.classList.add('hidden');
   // 次のフロアが休憩所なら先に休憩させてからボーナスへ
   const nextFloor = battle.floor + 1;
   if (nextFloor % 5 === 0 && nextFloor % 10 !== 0 && battle.difficulty !== 'endless') {
@@ -4317,6 +4334,7 @@ function backFromBonusTechPick() {
 }
 
 function finishBonus() {
+  if (enhancing) return;  // 二重呼び出し防止
   pendingBonus = null;
   pendingNewTech = null;
   startEnhancement();
