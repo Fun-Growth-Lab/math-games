@@ -471,8 +471,8 @@
     .merge-side-label { font-size:0.8rem; font-weight:800; padding:3px 6px; border-radius:4px; white-space:nowrap; }
     .merge-side-label.mat  { color:#b07820; background:rgba(176,120,32,0.1); margin-top:14px; }
     .merge-side-label.pick { color:#555;    background:rgba(0,0,0,0.06);     margin-top:auto; padding-top:12px; }
-    .merge-main { flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; min-width:0; overflow:hidden; }
-    #merge-choices { display:flex; gap:10px; justify-content:flex-start; flex-wrap:nowrap; overflow-x:auto; width:100%; box-sizing:border-box; }
+    .merge-main { flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; min-width:0; overflow:visible; }
+    #merge-choices { display:flex; gap:10px; justify-content:center; flex-wrap:nowrap; overflow-x:visible; width:100%; box-sizing:border-box; }
     #merge-material { display:flex; justify-content:center; width:100%; }
     .merge-main .fighter-pick {
       transform:scale(0.58); transform-origin:top center;
@@ -773,6 +773,7 @@
       <div class="adv-panel" style="padding:26px 40px;min-width:480px">
         <div class="adv-title" id="bonus-tech-title">技をえらぶ</div>
         <div class="skill-opts" id="bonus-tech-list" style="margin-top:14px"></div>
+        <button class="btn" id="bonus-tech-back-btn" style="margin-top:14px;display:none" onclick="backFromBonusTechPick()">← もどる</button>
       </div>
     </div>
 
@@ -2183,7 +2184,12 @@ function openMerge(card) {
     tag.className = 'fighter-hp';
     tag.textContent = eligible ? `Lv.${target.level} → Lv.${target.level+1}` : '強化できません';
     wrap.appendChild(cardEl); wrap.appendChild(tag);
-    if (eligible) wrap.addEventListener('click', () => applyMerge(target));
+    if (eligible) {
+      let _touchMoved = false;
+      wrap.addEventListener('touchstart', () => { _touchMoved = false; }, { passive: true });
+      wrap.addEventListener('touchmove',  () => { _touchMoved = true;  }, { passive: true });
+      wrap.addEventListener('click', () => { if (_touchMoved) return; applyMerge(target); });
+    }
     holder.appendChild(wrap);
   });
 
@@ -4248,11 +4254,16 @@ function onBonusCardPicked(card) {
 }
 
 // 技選択（discard=入替で捨てる技 / star=★を上げる技）
+let _bonusTechCard = null;
 function openBonusTechPick(card, mode, newTech) {
+  _bonusTechCard = card;
   const title = document.getElementById('bonus-tech-title');
   title.textContent = mode === 'discard' ? '入れ替えで捨てる技をえらぶ' : '★を上げる技をえらぶ';
   const list = document.getElementById('bonus-tech-list');
   list.innerHTML = '';
+  // star モードのみ「もどる」ボタンを表示（discard は必須選択）
+  const backBtn = document.getElementById('bonus-tech-back-btn');
+  backBtn.style.display = mode === 'star' ? '' : 'none';
   (card.techs || []).forEach((t, i) => {
     const disabled = mode === 'star' && (t.rank || 1) >= MAX_RANK;
     const mHex = ELEM(t.mainEl).hex;
@@ -4274,6 +4285,11 @@ function openBonusTechPick(card, mode, newTech) {
     list.appendChild(div);
   });
   document.getElementById('bonus-tech-overlay').classList.remove('hidden');
+}
+
+function backFromBonusTechPick() {
+  document.getElementById('bonus-tech-overlay').classList.add('hidden');
+  showBonusPick();
 }
 
 function finishBonus() {
@@ -4549,6 +4565,12 @@ function buildCardEl(card, opts) {
     <span class="card-hp-lbl">HP</span>
     <div class="card-hp-bg"><div class="card-hp-fill"></div></div>
     <span class="card-hp-num">${(opts && opts.curHp != null) ? Math.max(0, opts.curHp) : card.stats.hp}</span>`;
+  if (opts && opts.curHp != null) {
+    const fill = hpRow.querySelector('.card-hp-fill');
+    const r = Math.max(0, opts.curHp / card.stats.hp);
+    fill.style.width = (r * 100) + '%';
+    fill.style.background = r > 0.5 ? '#34d399' : r > 0.25 ? '#fbbf24' : '#fb7185';
+  }
   el.appendChild(hpRow);
 
   // 下段：スロット（攻撃技＋パッシブスキル合わせて最大4つ）
