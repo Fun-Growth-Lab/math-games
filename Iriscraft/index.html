@@ -1301,13 +1301,19 @@ const SKILL_DEFS = {
       1:'特殊効果の発生率+10%', 2:'特殊効果の発生率+15%', 3:'特殊効果の発生率+20%',
       4:'特殊効果の発生率+25%', 5:'特殊効果の発生率+30%' } },
     { id:'frugal',    name:'節約',         desc:{
-      1:'全力攻撃でエネルギー50%返還', 2:'全力攻撃でエネルギー55%返還',
-      3:'全力攻撃でエネルギー60%返還', 4:'全力攻撃でエネルギー65%返還',
-      5:'全力攻撃でエネルギー70%返還' } },
-    { id:'charge',    name:'蓄電',         desc:{
-      1:'ターン開始時にランダムエネ+1', 2:'ターン開始時にランダムエネ+1',
-      3:'ターン開始時にランダムエネ+1', 4:'ターン開始時にランダムエネ+1',
-      5:'ターン開始時にランダムエネ+2' } },
+      1:'全力攻撃でエネルギー消費しないことがある（30%）', 2:'全力攻撃でエネルギー消費しないことがある（40%）',
+      3:'全力攻撃でエネルギー消費しないことがある（50%）', 4:'全力攻撃でエネルギー消費しないことがある（60%）',
+      5:'全力攻撃でエネルギー消費しないことがある（70%）' } },
+    { id:'gen_fire',    name:'自然発生（炎）', desc:{
+      1:'ターン開始時に炎エネルギーを得ることがある（10%）', 2:'（20%）', 3:'（30%）', 4:'（40%）', 5:'（50%）' } },
+    { id:'gen_ice',     name:'自然発生（氷）', desc:{
+      1:'ターン開始時に氷エネルギーを得ることがある（10%）', 2:'（20%）', 3:'（30%）', 4:'（40%）', 5:'（50%）' } },
+    { id:'gen_wind',    name:'自然発生（風）', desc:{
+      1:'ターン開始時に風エネルギーを得ることがある（10%）', 2:'（20%）', 3:'（30%）', 4:'（40%）', 5:'（50%）' } },
+    { id:'gen_thunder', name:'自然発生（雷）', desc:{
+      1:'ターン開始時に雷エネルギーを得ることがある（10%）', 2:'（20%）', 3:'（30%）', 4:'（40%）', 5:'（50%）' } },
+    { id:'gen_all',     name:'自然発生（全）', desc:{
+      1:'ターン開始時にランダムエネルギーを得ることがある（20%）', 2:'（40%）', 3:'（60%）', 4:'（80%）', 5:'（100%）' } },
     { id:'weak_amp',  name:'弱点増幅',     desc:{
       1:'弱点時の倍率×2→×2.5', 2:'弱点時の倍率×2→×2.75', 3:'弱点時の倍率×2→×3.0',
       4:'弱点時の倍率×2→×3.25', 5:'弱点時の倍率×2→×3.5' } },
@@ -1334,8 +1340,12 @@ const SKILL_VALS = {
   penetrate:  { 1:0.10,  2:0.15,  3:0.20,  4:0.25,  5:0.30  },
   amplify:    { 1:0.10,  2:0.20,  3:0.30,  4:0.40,  5:0.50  },
   catalyst:   { 1:0.10,  2:0.15,  3:0.20,  4:0.25,  5:0.30  },
-  frugal:     { 1:0.50,  2:0.55,  3:0.60,  4:0.65,  5:0.70  },
-  charge:     { 1:1,     2:1,     3:1,     4:1,     5:2     },
+  frugal:     { 1:0.30,  2:0.40,  3:0.50,  4:0.60,  5:0.70  },
+  gen_fire:   { 1:0.10,  2:0.20,  3:0.30,  4:0.40,  5:0.50  },
+  gen_ice:    { 1:0.10,  2:0.20,  3:0.30,  4:0.40,  5:0.50  },
+  gen_wind:   { 1:0.10,  2:0.20,  3:0.30,  4:0.40,  5:0.50  },
+  gen_thunder:{ 1:0.10,  2:0.20,  3:0.30,  4:0.40,  5:0.50  },
+  gen_all:    { 1:0.20,  2:0.40,  3:0.60,  4:0.80,  5:1.00  },
   weak_amp:   { 1:2.50,  2:2.75,  3:3.00,  4:3.25,  5:3.50  },
 };
 // カードのスキル取得ヘルパー
@@ -3095,16 +3105,20 @@ function beginPlayerTurn() {
     if (p.curHp > 0) { const heal = Math.max(1, Math.round(p.maxHp * v)); p.curHp = Math.min(p.maxHp, p.curHp + heal); }
   });
 
-  // ★スキル：蓄電（ターン開始時にランダムエネ追加）
-  getSkillVals(p.card, 'charge').forEach(v => {
-    if (p.curHp > 0) {
-      for (let i = 0; i < v; i++) {
+  // ★スキル：自然発生（ターン開始時に確率でエネルギー追加）
+  if (p.curHp > 0) {
+    [['gen_fire','fire'],['gen_ice','ice'],['gen_wind','wind'],['gen_thunder','thunder']].forEach(([id, el]) => {
+      getSkillVals(p.card, id).forEach(v => {
+        if (Math.random() < v) { p.energy[el]++; pushLog(`✨ 自然発生！ ${p.card.name}に ${ELEM_EMOJI[el]} 追加`); }
+      });
+    });
+    getSkillVals(p.card, 'gen_all').forEach(v => {
+      if (Math.random() < v) {
         const el = ELEM_ORDER[randInt(0, 3)];
-        p.energy[el]++;
-        pushLog(`⚡ 蓄電！ ${p.card.name}に ${ELEM_EMOJI[el]} 追加`);
+        p.energy[el]++; pushLog(`✨ 自然発生！ ${p.card.name}に ${ELEM_EMOJI[el]} 追加`);
       }
-    }
-  });
+    });
+  }
 
   // 再生の葉：生存中の全カードHP2%回復
   if ((battle.items||[]).some(i => i.id === 'leaf')) {
@@ -3259,17 +3273,14 @@ function useTech(t) {
   const weakAmpVal = getSkillVal(p.card, 'weak_amp');
   if (weakAmpVal && t.mainEl === battle.enemy.weak) dmg = Math.floor(dmg / 2 * weakAmpVal);
 
-  if (isTrash) { dmg = Math.floor(dmg * 2.0); trashTechEnergy(p, t); }
-
-  // ★スキル：節約（トラッシュ時にエネ一部返還）
-  const frugalVal = getSkillVal(p.card, 'frugal');
-  if (isTrash && frugalVal) {
-    const restore = Math.floor(t.total * frugalVal);
-    for (let i = 0; i < restore; i++) {
-      const el = ELEM_ORDER[randInt(0, 3)];
-      p.energy[el]++;
+  if (isTrash) {
+    dmg = Math.floor(dmg * 2.0);
+    const frugalVal = getSkillVal(p.card, 'frugal');
+    if (frugalVal && Math.random() < frugalVal) {
+      pushLog(`♻️ 節約！ エネルギーを消費しなかった`);
+    } else {
+      trashTechEnergy(p, t);
     }
-    if (restore > 0) pushLog(`♻️ 節約！ エネルギー${restore}個返還`);
   }
 
   // ★スキル：先手必勝（初回攻撃のみ）
