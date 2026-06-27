@@ -3047,7 +3047,8 @@ function rollTwoChoices() {
   const choices = [];
   for (let i = 0; i < count && pool.length > 0; i++) {
     const el = pool.splice(randInt(0, pool.length - 1), 1)[0];
-    const dblItems = (battle.items||[]).filter(it => it.el1 === el || it.el2 === el);
+    // el1（主属性）が一致するアイテムのみ発動対象
+    const dblItems = (battle.items||[]).filter(it => it.el1 === el);
     let triggered = null;
     for (const it of dblItems) { if (Math.random() < 0.20) { triggered = it; break; } }
     choices.push(triggered ? { type:'double', el1: triggered.el1, el2: triggered.el2 } : { type:'attr', el });
@@ -3789,35 +3790,32 @@ const ITEM_POOL = [
 ];
 
 // アイテム生成：50%でダブルエネルギー系、残りは通常プール
+// el1 = 主属性（発動トリガー）、el2 = 副属性（ボーナス）
+// 上限カウントは主属性(el1)のみ。20%×5個=100%で必ず2個になるため上限5。
 function rollNewItem() {
   if (Math.random() < 0.50) {
-    // 各属性の現在のダブル系アイテム数を集計（上限5 = 20%×5 = 100%）
+    // 主属性ごとのダブル系アイテム数を集計
     const elCounts = {};
     ELEM_ORDER.forEach(el => { elCounts[el] = 0; });
-    (battle.items || []).forEach(it => {
-      if (it.el1) {
-        elCounts[it.el1]++;
-        if (it.el2 && it.el2 !== it.el1) elCounts[it.el2]++;
-      }
-    });
+    (battle.items || []).forEach(it => { if (it.el1) elCounts[it.el1]++; });
     const available = ELEM_ORDER.filter(el => elCounts[el] < 5);
     if (available.length > 0) {
       const el1 = available[randInt(0, available.length - 1)];
       const n1 = ELEM(el1).name;
       if (Math.random() < 0.50) {
-        // 同属性ダブル
+        // 同属性ダブル（例：炎炎）
         return { id:`dbl_${el1}`, icon: ELEM_EMOJI[el1]+ELEM_EMOJI[el1],
           name:`${n1}ダブルチャージ`,
-          desc:`${ELEM_EMOJI[el1]}が選択肢に登場したとき20%で${ELEM_EMOJI[el1]}×2になる`,
+          desc:`${ELEM_EMOJI[el1]}が選択肢に登場したとき20%で${ELEM_EMOJI[el1]}${ELEM_EMOJI[el1]}になる`,
           el1, el2: el1 };
       } else {
-        // 異属性ダブル
+        // 異属性ダブル（例：炎氷 = 炎が出たとき炎+氷になる）
         const others = ELEM_ORDER.filter(e => e !== el1);
         const el2 = others[randInt(0, others.length - 1)];
         const n2 = ELEM(el2).name;
         return { id:`dbl_${el1}_${el2}`, icon: ELEM_EMOJI[el1]+ELEM_EMOJI[el2],
           name:`${n1}${n2}チャージ`,
-          desc:`${ELEM_EMOJI[el1]}か${ELEM_EMOJI[el2]}が選択肢に登場したとき20%で${ELEM_EMOJI[el1]}${ELEM_EMOJI[el2]}になる`,
+          desc:`${ELEM_EMOJI[el1]}が選択肢に登場したとき20%で${ELEM_EMOJI[el1]}${ELEM_EMOJI[el2]}になる`,
           el1, el2 };
       }
     }
