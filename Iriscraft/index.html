@@ -479,8 +479,8 @@
       margin: 0 -97px -176px;
     }
     .merge-main #merge-material .card {
-      transform:scale(0.78); transform-origin:top center;
-      margin: 0 auto -92px;
+      transform:scale(0.62); transform-origin:top center;
+      margin: 0 auto -159px;
     }
     #merge-overlay .fighter-hp { font-size:1.0rem; }
     .merge-main .fighter-pick { cursor:pointer; border-radius:12px; transition:box-shadow 0.15s,outline 0.15s; outline:3px solid transparent; }
@@ -1239,8 +1239,8 @@ const SKILL_DEFS = {
       4:'自分のHPが50%以下のとき、攻撃力が1.4倍になる',
       5:'自分のHPが50%以下のとき、攻撃力が1.5倍になる' } },
     { id:'drain',     name:'ドレイン攻撃', desc:{
-      1:'ダメージの30%HP回復', 2:'ダメージの35%HP回復',
-      3:'ダメージの40%HP回復', 4:'ダメージの45%HP回復', 5:'ダメージの50%HP回復' } },
+      1:'ダメージの10%HP回復', 2:'ダメージの15%HP回復',
+      3:'ダメージの20%HP回復', 4:'ダメージの25%HP回復', 5:'ダメージの30%HP回復' } },
     { id:'fighting',  name:'不屈の闘志', desc:{
       1:'HP50%以下で被ダメ30%減', 2:'HP50%以下で被ダメ35%減',
       3:'HP50%以下で被ダメ40%減', 4:'HP50%以下で被ダメ45%減', 5:'HP50%以下で被ダメ50%減' } },
@@ -1312,7 +1312,7 @@ const SKILL_DEFS = {
 const SKILL_VALS = {
   auto_heal:  { 1:0.10,  2:0.15,  3:0.20,  4:0.25,  5:0.30  },
   guts:       { 1:1.10,  2:1.20,  3:1.30,  4:1.40,  5:1.50  },
-  drain:      { 1:0.30,  2:0.35,  3:0.40,  4:0.45,  5:0.50  },
+  drain:      { 1:0.10,  2:0.15,  3:0.20,  4:0.25,  5:0.30  },
   fighting:   { 1:0.30,  2:0.35,  3:0.40,  4:0.45,  5:0.50  },
   crit:       { 1:0.10,  2:0.15,  3:0.20,  4:0.25,  5:0.30  },
   multi:      { 1:0.30,  2:0.35,  3:0.40,  4:0.45,  5:0.50  },
@@ -2134,8 +2134,7 @@ function finalizeCard() {
 // ================================================================
 let enhancing = false;
 let enhanceCard = null;
-const ENHANCE_DIVISOR = 2;                 // 強化カードの値の 1/2 を加算
-const enhInc = v => Math.round(v / ENHANCE_DIVISOR);
+const enhInc = v => v;                     // 強化カードの値をそのまま加算
 
 function startEnhancement() {
   enhancing = true;
@@ -2672,7 +2671,7 @@ function makeEnemy(floor) {
     focusEls.push(pool.splice(randInt(0, pool.length - 1), 1)[0]);
   }
   // タイプ別の得意属性値レンジ（①=100%, ②=50%, ③=30%, ④=20%基準）
-  const strongRanges = { 1:[32,48], 2:[16,24], 3:[10,15], 4:[7,11] };
+  const strongRanges = { 1:[40,58], 2:[20,29], 3:[13,19], 4:[9,14] };
   const [sMin, sMax] = strongRanges[numFocus];
   const stats = { hp: Math.round(baseHp * 3) };
   ELEM_ORDER.forEach(el => {
@@ -2918,7 +2917,7 @@ function flashDamage(wrapId, dmg) {
 
 // エネルギー候補の見た目（type:'attr'/'norm2'）
 function choiceLabel(ch) {
-  if (ch.type === 'double') return ELEM_EMOJI[ch.el] + ELEM_EMOJI[ch.el];
+  if (ch.type === 'double') return ELEM_EMOJI[ch.el1] + ELEM_EMOJI[ch.el2];
   if (ch.type === 'norm2')  return ELEM_EMOJI.norm + ELEM_EMOJI.norm;
   return ELEM_EMOJI[ch.el];
 }
@@ -3002,7 +3001,7 @@ function attachChoiceToCard(i, choiceIdx) {
   if (!p || p.curHp <= 0 || battle.phase !== 'choose') return;
   const ch = battle.choices[choiceIdx];
   if (ch.type === 'norm2') p.energy.norm += 2;
-  else if (ch.type === 'double') p.energy[ch.el] += 2;
+  else if (ch.type === 'double') { p.energy[ch.el1]++; p.energy[ch.el2]++; }
   else p.energy[ch.el]++;
   pushLog(`${p.card.name}に ${choiceLabel(ch)} をつけた`);
   battle.choices = null; battle.gained = null;
@@ -3048,8 +3047,10 @@ function rollTwoChoices() {
   const choices = [];
   for (let i = 0; i < count && pool.length > 0; i++) {
     const el = pool.splice(randInt(0, pool.length - 1), 1)[0];
-    const hasDbl = (battle.items||[]).some(it => it.id === `dbl_${el}`);
-    choices.push(hasDbl && Math.random() < 0.20 ? { type:'double', el } : { type:'attr', el });
+    const dblItems = (battle.items||[]).filter(it => it.el1 === el || it.el2 === el);
+    let triggered = null;
+    for (const it of dblItems) { if (Math.random() < 0.20) { triggered = it; break; } }
+    choices.push(triggered ? { type:'double', el1: triggered.el1, el2: triggered.el2 } : { type:'attr', el });
   }
   return choices;
 }
@@ -3741,7 +3742,7 @@ function continueAfterVictory() {
     if (p.curHp > 0) p.curHp = Math.min(p.maxHp, p.curHp + Math.round(p.maxHp * 0.2));
   });
   // 宝箱からランダムアイテム1個 → 専用演出オーバーレイで表示
-  const newItem = { ...ITEM_POOL[randInt(0, ITEM_POOL.length - 1)] };
+  const newItem = rollNewItem();
   if (newItem.onGain) newItem.onGain();
   battle.items.push(newItem);
   renderBattleItems();
@@ -3772,12 +3773,8 @@ const BONUS_OPTIONS = [
   { id:'starUp',   icon:'⭐', name:'技を強化', desc:'えらんだカードの技の★を1つ上げる（威力＆特殊効果率UP）' },
 ];
 
-// ===== アイテムプール =====
+// ===== アイテムプール（ダブルチャージ系は rollNewItem で動的生成） =====
 const ITEM_POOL = [
-  { id:'dbl_fire',    icon:'🔥🔥', name:'炎ダブルチャージ',   desc:'毎ターン20%の確率で🔥🔥が選択肢に登場', el:'fire' },
-  { id:'dbl_ice',     icon:'🧊🧊', name:'氷ダブルチャージ',   desc:'毎ターン20%の確率で🧊🧊が選択肢に登場', el:'ice' },
-  { id:'dbl_wind',    icon:'💨💨', name:'風ダブルチャージ',   desc:'毎ターン20%の確率で💨💨が選択肢に登場', el:'wind' },
-  { id:'dbl_thunder', icon:'⚡⚡', name:'雷ダブルチャージ',   desc:'毎ターン20%の確率で⚡⚡が選択肢に登場', el:'thunder' },
   { id:'heal',        icon:'💉',   name:'回復薬',             desc:'バトル開始時に全員HP5%回復' },
   { id:'guard',       icon:'🛡️',  name:'防御の盾',           desc:'受けるダメージを10%軽減（重複OK）' },
   { id:'sword',       icon:'⚔️',  name:'攻撃の剣',           desc:'与えるダメージを10%アップ（重複OK）' },
@@ -3790,6 +3787,44 @@ const ITEM_POOL = [
   { id:'crown',       icon:'👑',   name:'英雄の冠',           desc:'取得時に全カードの最大HP+50（重複OK）',
     onGain: () => battle.party.forEach(p => { p.card.stats.hp += 50; p.maxHp += 50; p.curHp = Math.min(p.maxHp, p.curHp + 50); }) },
 ];
+
+// アイテム生成：50%でダブルエネルギー系、残りは通常プール
+function rollNewItem() {
+  if (Math.random() < 0.50) {
+    // 各属性の現在のダブル系アイテム数を集計（上限5 = 20%×5 = 100%）
+    const elCounts = {};
+    ELEM_ORDER.forEach(el => { elCounts[el] = 0; });
+    (battle.items || []).forEach(it => {
+      if (it.el1) {
+        elCounts[it.el1]++;
+        if (it.el2 && it.el2 !== it.el1) elCounts[it.el2]++;
+      }
+    });
+    const available = ELEM_ORDER.filter(el => elCounts[el] < 5);
+    if (available.length > 0) {
+      const el1 = available[randInt(0, available.length - 1)];
+      const n1 = ELEM(el1).name;
+      if (Math.random() < 0.50) {
+        // 同属性ダブル
+        return { id:`dbl_${el1}`, icon: ELEM_EMOJI[el1]+ELEM_EMOJI[el1],
+          name:`${n1}ダブルチャージ`,
+          desc:`${ELEM_EMOJI[el1]}が選択肢に登場したとき20%で${ELEM_EMOJI[el1]}×2になる`,
+          el1, el2: el1 };
+      } else {
+        // 異属性ダブル
+        const others = ELEM_ORDER.filter(e => e !== el1);
+        const el2 = others[randInt(0, others.length - 1)];
+        const n2 = ELEM(el2).name;
+        return { id:`dbl_${el1}_${el2}`, icon: ELEM_EMOJI[el1]+ELEM_EMOJI[el2],
+          name:`${n1}${n2}チャージ`,
+          desc:`${ELEM_EMOJI[el1]}か${ELEM_EMOJI[el2]}が選択肢に登場したとき20%で${ELEM_EMOJI[el1]}${ELEM_EMOJI[el2]}になる`,
+          el1, el2 };
+      }
+    }
+  }
+  // 通常アイテム
+  return { ...ITEM_POOL[randInt(0, ITEM_POOL.length - 1)] };
+}
 
 function renderBattleItems() {
   const el = document.getElementById('battle-items'); if (!el) return;
@@ -4193,7 +4228,7 @@ function showBonusPick() {
   battle.party.forEach(p => {
     const wrap = document.createElement('div');
     wrap.style.cssText = 'cursor:pointer;transform:scale(0.78);transform-origin:top center;margin:0 -57px -92px;flex-shrink:0;';
-    wrap.appendChild(buildCardEl(p.card, {noZoom:true}));
+    wrap.appendChild(buildCardEl(p.card, {noZoom:true, curHp: p.curHp}));
     wrap.onclick = () => onBonusCardPicked(p.card);
     holder.appendChild(wrap);
   });
