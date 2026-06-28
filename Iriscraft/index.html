@@ -2370,12 +2370,14 @@ function pickResistance(stats, weak) {
 const cardStock = [];
 const MAX_PARTY = 3;  // 冒険に連れていくカード数
 
-// 特化に応じてイラスト（シート＝最大属性／枠内＝2番目の属性で変化）
-// HP(白)は50%以上の場合のみcard_image_5を使用
-function chooseIllustration(rawPcts) {
+// ① シート＝最大属性（HP50%以上ならHP画像）
+// ② 列(col)＝図形の種類カウントで加重ランダム（多い図形ほど出やすいが確定ではない）
+//    circle=0, triangle=1, rectangle=2, hexagon=3
+// ③ 行(row)＝2番目の属性の種類（従来どおり）
+function chooseIllustration(rawPcts, shapeCounts) {
+  // ① primary sheet
   const vals = [rawPcts[0], rawPcts[1], rawPcts[2], rawPcts[3]]; // 炎氷風雷
-  const whitePct = rawPcts[4]; // 白(HP)
-  // 白が50%以上ならHP画像
+  const whitePct = rawPcts[4];
   let primary;
   if (whitePct >= 50) {
     primary = 4;
@@ -2383,11 +2385,23 @@ function chooseIllustration(rawPcts) {
     primary = 0;
     for (let i = 1; i < 4; i++) if (vals[i] > vals[primary]) primary = i;
   }
-  const fileIdx = primary;                                   // card_image_(primary+1)
+  const fileIdx = primary;
+
+  // ② col: 図形種カウントで加重ランダム（各カウント+1で完全排除なし）
+  const SHAPE_ORDER = ['circle', 'triangle', 'rectangle', 'hexagon'];
+  const weights = SHAPE_ORDER.map(k => (shapeCounts[k] || 0) + 1);
+  const totalW = weights.reduce((a, b) => a + b, 0);
+  let rnd = Math.random() * totalW, col = 0;
+  for (let i = 0; i < weights.length; i++) {
+    rnd -= weights[i];
+    if (rnd <= 0) { col = i; break; }
+  }
+
+  // ③ row: 2番目に多い属性の種類
   const rem = [0,1,2,3,4].filter(i => i !== primary);
   const secondary = rem.reduce((b, i) => (rawPcts[i]||0) > (rawPcts[b]||0) ? i : b, rem[0]);
-  const row = rem.indexOf(secondary);                        // 0〜3：2番目の属性の位置
-  const col = Math.max(0, Math.min(3, Math.floor((rawPcts[secondary]||0) / 8)));
+  const row = rem.indexOf(secondary);
+
   return { fileIdx, col, row };
 }
 
@@ -2399,7 +2413,7 @@ function finalizeCard() {
     illustration = { weapon: true };
     name = '強化カード';
   } else {
-    const pick = chooseIllustration(pendingCard.rawPcts);  // 特化に応じてシート・絵を決定
+    const pick = chooseIllustration(pendingCard.rawPcts, pendingCard.shapeCounts);  // 特化に応じてシート・絵を決定
     illustration = { file: CARD_FILES[pick.fileIdx], col: pick.col, row: pick.row };
     name = characterName(pick.fileIdx, pick.col, pick.row);
   }
