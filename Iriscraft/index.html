@@ -576,11 +576,12 @@
         <button class="rank-tab-btn active" onclick="switchRankTab('local')">ローカル</button>
         <button class="rank-tab-btn"        onclick="switchRankTab('world')">ワールド</button>
       </div>
-      <!-- world: login area -->
-      <div id="rank-login-area" class="hidden" style="margin-bottom:10px">
-        <div id="rank-user-name" style="font-size:0.82rem;color:#888;margin-bottom:6px"></div>
-        <button id="rank-btn-login"  class="btn btn-secondary" style="font-size:0.82rem;padding:6px 18px;min-width:0;margin-right:6px">Googleでログイン</button>
-        <button id="rank-btn-logout" class="btn btn-secondary hidden" style="font-size:0.82rem;padding:6px 18px;min-width:0">ログアウト</button>
+      <!-- world: player name area -->
+      <div id="rank-login-area" class="hidden" style="margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:8px">
+        <span style="font-size:0.82rem;color:#888">なまえ：</span>
+        <input id="rank-player-name" type="text" maxlength="16" placeholder="ななしさん"
+          style="font-size:0.88rem;padding:4px 10px;border:1.5px solid #ccc;border-radius:8px;width:130px;font-family:inherit">
+        <button onclick="savePlayerName()" style="font-size:0.8rem;padding:4px 12px;border:none;border-radius:8px;background:#2a80c0;color:#fff;cursor:pointer;font-family:inherit;font-weight:700">保存</button>
       </div>
       <div id="rank-loading" style="display:none;font-size:0.82rem;color:#aaa;padding:10px 0">読み込み中…</div>
       <table id="rank-table" style="width:100%;border-collapse:collapse;font-size:0.88rem"></table>
@@ -1818,6 +1819,15 @@ function getRankKey(diff) { return `iriscraft_ranking_${diff}`; }
 function getLocalRanking(diff) {
   try { return JSON.parse(localStorage.getItem(getRankKey(diff)) || '[]'); } catch { return []; }
 }
+const PLAYER_NAME_KEY = 'iriscraft_player_name';
+function getPlayerName() {
+  return localStorage.getItem(PLAYER_NAME_KEY) || 'ななしさん';
+}
+function savePlayerName() {
+  const val = document.getElementById('rank-player-name').value.trim();
+  if (val) { localStorage.setItem(PLAYER_NAME_KEY, val); }
+}
+
 function saveRankEntry(floor, score, diff) {
   // ローカル保存
   const key = getRankKey(diff);
@@ -1827,15 +1837,18 @@ function saveRankEntry(floor, score, diff) {
   list.sort((a, b) => b.floor - a.floor || b.score - a.score);
   list = list.slice(0, 10);
   localStorage.setItem(key, JSON.stringify(list));
-  // ワールドランキングへ送信（ログイン済みのとき）
-  if (window.currentUser && window.saveOnlineScore_iris && floor >= 1) {
-    window.saveOnlineScore_iris(window.currentUser.uid, window.currentUser.displayName, floor, score, diff)
+  // ワールドランキングへ送信
+  if (window.saveOnlineScore_iris && floor >= 1) {
+    window.saveOnlineScore_iris(getPlayerName(), floor, score, diff)
       .catch(e => console.error('Ranking: world save error', e));
   }
 }
 function openRanking() {
   _rankDiff = (typeof battle !== 'undefined' && battle.difficulty) ? battle.difficulty : 'normal';
-  _rankTab  = window.currentUser ? 'world' : 'local';
+  _rankTab  = 'local';
+  // プレイヤー名をinputに反映
+  const nameInput = document.getElementById('rank-player-name');
+  if (nameInput) nameInput.value = getPlayerName();
   _updateRankTabs();
   _loadAndRender();
   document.getElementById('ranking-overlay').classList.remove('hidden');
@@ -1845,12 +1858,11 @@ function switchRankDiff(diff) { _rankDiff = diff; _updateRankTabs(); _loadAndRen
 function switchRankTab(tab)   { _rankTab  = tab;  _updateRankTabs(); _loadAndRender(); }
 function _updateRankTabs() {
   const diffBtns = document.querySelectorAll('#rank-diff-tabs .rank-tab-btn');
-  const labels   = ['easy','normal','hard','endless'];
-  diffBtns.forEach((b, i) => b.classList.toggle('active', labels[i] === _rankDiff));
+  ['easy','normal','hard','endless'].forEach((d, i) =>
+    diffBtns[i].classList.toggle('active', d === _rankDiff));
   const modeBtns = document.querySelectorAll('#rank-mode-tabs .rank-tab-btn');
   modeBtns[0].classList.toggle('active', _rankTab === 'local');
   modeBtns[1].classList.toggle('active', _rankTab === 'world');
-  // ワールドタブのときだけログインエリアを表示
   document.getElementById('rank-login-area').classList.toggle('hidden', _rankTab !== 'world');
 }
 async function _loadAndRender() {
@@ -1859,37 +1871,42 @@ async function _loadAndRender() {
   tbl.innerHTML = '';
   if (_rankTab === 'local') {
     loading.style.display = 'none';
-    _renderRankRows(getLocalRanking(_rankDiff), null);
-    return;
-  }
-  // world
-  if (!window.currentUser) {
-    loading.style.display = 'none';
-    tbl.innerHTML = `<tr><td colspan="4" style="color:#bbb;padding:16px 0">Googleでログインするとワールドランキングが表示されます</td></tr>`;
+    _renderRankRows(getLocalRanking(_rankDiff));
     return;
   }
   loading.style.display = 'block';
-  const rows = await (window.loadWorldRanking_iris ? window.loadWorldRanking_iris(_rankDiff) : Promise.resolve(null));
+  const rows = await (window.loadWorldRanking_iris
+    ? window.loadWorldRanking_iris(_rankDiff)
+    : Promise.resolve(null));
   loading.style.display = 'none';
   if (!rows) {
-    tbl.innerHTML = `<tr><td colspan="4" style="color:#bbb;padding:16px 0">取得に失敗しました</td></tr>`;
+    tbl.innerHTML = `<tr><td colspan="5" style="color:#bbb;padding:16px 0">取得に失敗しました</td></tr>`;
     return;
   }
-  _renderRankRows(rows, window.currentUser.uid);
+  _renderRankRows(rows);
 }
-function _renderRankRows(rows, myUid) {
+function _renderRankRows(rows) {
   const tbl = document.getElementById('rank-table');
   const MEDALS = ['🥇','🥈','🥉'];
-  let html = `<tr><th>#</th><th>なまえ</th><th>階層</th><th>スコア</th><th>日付</th></tr>`;
-  if (rows.length === 0) {
-    html += `<tr><td colspan="5" style="color:#bbb;padding:16px 0">まだ記録がありません</td></tr>`;
+  const myName = getPlayerName();
+  // ローカルは name 列なし（4列）、ワールドは name 列あり（5列）
+  const isWorld = _rankTab === 'world';
+  let html = isWorld
+    ? `<tr><th>#</th><th>なまえ</th><th>階層</th><th>スコア</th><th>日付</th></tr>`
+    : `<tr><th>#</th><th>階層</th><th>スコア</th><th>日付</th></tr>`;
+  if (!rows || rows.length === 0) {
+    const cols = isWorld ? 5 : 4;
+    html += `<tr><td colspan="${cols}" style="color:#bbb;padding:16px 0">まだ記録がありません</td></tr>`;
   } else {
     rows.forEach((r, i) => {
-      const isMine = myUid && r.uid === myUid;
-      const medal  = MEDALS[i] || (i + 1);
-      const name   = r.name || 'ゲスト';
+      const medal = MEDALS[i] || (i + 1);
+      const isMine = isWorld && r.name === myName;
       const style  = isMine ? 'background:#fffbe8;font-weight:800' : '';
-      html += `<tr style="${style}"><td>${medal}</td><td>${name}</td><td>${r.floor}階</td><td>${(r.score||0).toLocaleString()}</td><td>${r.date||''}</td></tr>`;
+      if (isWorld) {
+        html += `<tr style="${style}"><td>${medal}</td><td>${r.name||'ゲスト'}</td><td>${r.floor}階</td><td>${(r.score||0).toLocaleString()}</td><td>${r.date||''}</td></tr>`;
+      } else {
+        html += `<tr><td>${medal}</td><td>${r.floor}階</td><td>${(r.score||0).toLocaleString()}</td><td>${r.date||''}</td></tr>`;
+      }
     });
   }
   tbl.innerHTML = html;
@@ -5097,81 +5114,62 @@ function buildDiceFace(face, num) {
 }
 </script>
 
-<!-- Firebase -->
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut }
-      from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-  import { getFirestore, collection, addDoc, getDocs, serverTimestamp }
-      from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+<!-- Supabase (direct REST fetch) -->
+<script>
+(function(){
+  const _base = 'https://rpxassndgiunoqkxqcco.supabase.co/rest/v1';
+  const _key  = 'sb_publishable_Wnge6OPvSf5l2YEgaPg4rw_nj4CyYAH';
+  const _hdr  = { 'apikey': _key, 'Authorization': 'Bearer ' + _key,
+                  'Content-Type': 'application/json', 'Prefer': 'return=minimal' };
 
-  const cfg = {
-    apiKey:"AIzaSyBCg5dCEM89UmYYhfGqVeRf_VrUlg8_o-4",
-    authDomain:"math-braves.firebaseapp.com", projectId:"math-braves",
-    storageBucket:"math-braves.firebasestorage.app",
-    messagingSenderId:"217117619290",
-    appId:"1:217117619290:web:d227feb603970d3948d463"
-  };
-  const app  = initializeApp(cfg);
-  const auth = getAuth(app);
-  const db   = getFirestore(app);
-  const prov = new GoogleAuthProvider();
-
-  window.currentUser = null;
-
-  // ログインボタン（ランキングオーバーレイ内）
-  const bL = document.getElementById('rank-btn-login');
-  const bO = document.getElementById('rank-btn-logout');
-  bL.onclick = () => signInWithPopup(auth, prov).catch(() => alert('ログインに失敗しました'));
-  bO.onclick = () => signOut(auth).catch(console.error);
-
-  onAuthStateChanged(auth, u => {
-    window.currentUser = u ? { uid: u.uid, displayName: u.displayName || 'ななしさん' } : null;
-    bL.classList.toggle('hidden', !!u);
-    bO.classList.toggle('hidden', !u);
-    const nameEl = document.getElementById('rank-user-name');
-    nameEl.textContent = u ? `ログイン中：${u.displayName || 'ななしさん'}` : '';
-  });
-
-  // スコア送信（floor優先）
-  window.saveOnlineScore_iris = async (uid, name, floor, score, difficulty) => {
+  // スコア送信（floor → point_score、score → stage_score）
+  window.saveOnlineScore_iris = async (name, floor, score, difficulty) => {
     if (!floor || floor < 1) return;
-    try {
-      const col = `scores_iriscraft_${difficulty || 'normal'}`;
-      const date = new Date().toLocaleDateString('ja-JP');
-      await addDoc(collection(db, col), {
-        uid, name: name || 'ななしさん', floor, score: score || 0,
-        date, createdAt: serverTimestamp()
-      });
-      console.log('Iriscraft ranking: saved', { floor, score, difficulty });
-    } catch(e) {
-      console.error('Iriscraft ranking: save error', e);
-    }
+    const res = await fetch(`${_base}/rankings`, {
+      method: 'POST',
+      headers: _hdr,
+      body: JSON.stringify({
+        game:        'iriscraft',
+        difficulty:  difficulty   || 'normal',
+        player_name: name         || 'ななしさん',
+        point_score: floor        || 0,
+        stage_score: score        || 0,
+        turns:       0,
+        class_name:  ''
+      })
+    });
+    if (!res.ok) { const t = await res.text(); throw new Error(`HTTP ${res.status}: ${t}`); }
+    console.log('Iriscraft ranking: 登録成功', { name, floor, score, difficulty });
   };
 
   // ワールドランキング取得（floor降順 → score降順、トップ10）
   window.loadWorldRanking_iris = async (difficulty) => {
     try {
-      const col = `scores_iriscraft_${difficulty || 'normal'}`;
-      const snap = await getDocs(collection(db, col));
-      const rows = [];
-      snap.forEach(d => { const data = d.data(); if (data.floor > 0) rows.push(data); });
-      // UID別に最高記録のみ残す
-      const best = {};
-      rows.forEach(r => {
-        if (!best[r.uid] || r.floor > best[r.uid].floor ||
-           (r.floor === best[r.uid].floor && r.score > best[r.uid].score)) {
-          best[r.uid] = r;
-        }
+      const q = new URLSearchParams({
+        select:      'player_name,point_score,stage_score,created_at',
+        game:        'eq.iriscraft',
+        difficulty:  `eq.${difficulty || 'normal'}`,
+        point_score: 'gt.0',
+        order:       'point_score.desc,stage_score.desc',
+        limit:       '10'
       });
-      return Object.values(best)
-        .sort((a, b) => b.floor - a.floor || b.score - a.score)
-        .slice(0, 10);
+      const res = await fetch(`${_base}/rankings?${q}`, {
+        headers: { 'apikey': _key, 'Authorization': 'Bearer ' + _key }
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      return data.map(r => ({
+        name:  r.player_name,
+        floor: r.point_score,
+        score: r.stage_score,
+        date:  r.created_at ? new Date(r.created_at).toLocaleDateString('ja-JP') : ''
+      }));
     } catch(e) {
-      console.error('Iriscraft ranking: load error', e);
+      console.error('Iriscraft ranking: 読み込みエラー', e);
       return null;
     }
   };
+})();
 </script>
 </body>
 </html>
