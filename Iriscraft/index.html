@@ -464,7 +464,7 @@
       background:linear-gradient(90deg,#7a4a18,#a06830); color:#fff; text-align:center;
       padding:8px; font-weight:800; font-size:1rem; box-shadow:0 2px 8px rgba(0,0,0,0.3); }
     /* 合成・スキル再選択オーバーレイ */
-    #merge-overlay .dialog-box { display:flex; gap:20px; align-items:flex-start; padding:16px 20px; max-width:98%; }
+    #merge-overlay .dialog-box { display:flex; gap:20px; align-items:flex-start; padding:16px 28px; width:min(98%, 1100px); }
     .merge-sidebar { width:150px; flex-shrink:0; display:flex; flex-direction:column; text-align:left; }
     .merge-sidebar .dialog-msg { font-size:1rem; margin-bottom:6px; }
     .merge-sidebar .dialog-sub { font-size:0.76rem; color:#888; margin-bottom:0; }
@@ -1299,8 +1299,9 @@ const SKILL_DEFS = {
       3:'被攻撃時20%で同ダメ返す（弱点・抵抗無視）', 4:'被攻撃時25%で同ダメ返す（弱点・抵抗無視）',
       5:'被攻撃時30%で同ダメ返す（弱点・抵抗無視）' } },
     { id:'tenacity',   name:'執念',       desc:{
-      1:'HP0の攻撃を10%で耐える', 2:'HP0の攻撃を15%で耐える', 3:'HP0の攻撃を20%で耐える',
-      4:'HP0の攻撃を25%で耐える', 5:'HP0の攻撃を30%で耐える' } },
+      1:'HPが０になってしまう攻撃を10%の確率で耐える', 2:'HPが０になってしまう攻撃を15%の確率で耐える',
+      3:'HPが０になってしまう攻撃を20%の確率で耐える', 4:'HPが０になってしまう攻撃を25%の確率で耐える',
+      5:'HPが０になってしまう攻撃を30%の確率で耐える' } },
   ],
   synergy: [
     { id:'splash',    name:'スプラッシュ', desc:{
@@ -2632,9 +2633,12 @@ function arriveFloor() {
     return;
   }
 
-  // 最終フロア：ボス1体
+  // 最終フロア：ボス1体 + 通常敵2体
   if (battle.difficulty !== 'endless' && battle.floor >= battle.maxFloor) {
-    battle.enemyTeam = [makeEnemy(battle.floor)];
+    const boss = makeEnemy(battle.floor);
+    const sub1 = makeEnemy(battle.floor - 1);
+    const sub2 = makeEnemy(battle.floor - 1);
+    battle.enemyTeam = [boss, sub1, sub2];
   } else {
     // 敵チーム（3体）を生成してバトル開始
     battle.enemyTeam = [makeEnemy(battle.floor), makeEnemy(battle.floor), makeEnemy(battle.floor)];
@@ -2670,7 +2674,7 @@ function leaveRest() {
 // ②2属性: 2属性技1つ確定 + タイプ違いの1~2属性技
 // ③3属性: 3属性技1つ確定 + タイプ違いの1~3属性技
 // ④4属性: 3属性技1つ確定 + タイプ違いの1~4属性技
-function makeEnemyTechs(stats, focusEls, numFocus, numAttackTechs, richTech) {
+function makeEnemyTechs(stats, focusEls, numFocus, numAttackTechs, richTech, maxEnergy = 3) {
   // focus属性を強い順にソート
   const sf = [...focusEls].sort((a, b) => (stats[b] || 0) - (stats[a] || 0));
   const techs = [];
@@ -2679,7 +2683,7 @@ function makeEnemyTechs(stats, focusEls, numFocus, numAttackTechs, richTech) {
     // ①: 同じfocus属性の1属性技を必要数分
     const el = sf[0];
     for (let i = 0; i < numAttackTechs; i++) {
-      techs.push(makeTech({ [el]: randInt(1, 3) }));
+      techs.push(makeTech({ [el]: randInt(1, maxEnergy) }));
     }
     return techs;
   }
@@ -2688,13 +2692,13 @@ function makeEnemyTechs(stats, focusEls, numFocus, numAttackTechs, richTech) {
   let tech1;
   if (numFocus === 2) {
     // 2属性技：強い方がmainEl
-    tech1 = makeTech({ [sf[0]]: randInt(2, 3), [sf[1]]: 1 });
+    tech1 = makeTech({ [sf[0]]: randInt(maxEnergy > 1 ? 2 : 1, maxEnergy), [sf[1]]: 1 });
   } else if (numFocus === 3) {
     // 3属性技
-    tech1 = makeTech({ [sf[0]]: 2, [sf[1]]: 1, [sf[2]]: 1 });
+    tech1 = makeTech({ [sf[0]]: Math.min(2, maxEnergy), [sf[1]]: 1, [sf[2]]: 1 });
   } else {
     // 4属性から上位3つで3属性技
-    tech1 = makeTech({ [sf[0]]: 2, [sf[1]]: 1, [sf[2]]: 1 });
+    tech1 = makeTech({ [sf[0]]: Math.min(2, maxEnergy), [sf[1]]: 1, [sf[2]]: 1 });
   }
   techs.push(tech1);
 
@@ -2710,9 +2714,9 @@ function makeEnemyTechs(stats, focusEls, numFocus, numAttackTechs, richTech) {
     const maxAttr2 = Math.min(numFocus, ELEM_ORDER.length);
     const numAttr2 = randInt(1, maxAttr2);
     if (numAttr2 === 1) {
-      techs.push(makeTech({ [newMainEl]: randInt(1, 3) }));
+      techs.push(makeTech({ [newMainEl]: randInt(1, maxEnergy) }));
     } else {
-      const recipe = { [newMainEl]: randInt(2, 3) };
+      const recipe = { [newMainEl]: randInt(maxEnergy > 1 ? 2 : 1, maxEnergy) };
       // 追加属性：focus属性優先、次に残りの属性
       const extra = [...sf.filter(e => e !== newMainEl),
                      ...ELEM_ORDER.filter(e => e !== newMainEl && !focusEls.includes(e))];
@@ -2737,7 +2741,7 @@ function makeEnemy(floor) {
   let scale = calcEnemyScale(floor, diff);
   if (isBoss) scale *= 1.30;
 
-  const baseHp = (rand(70, 100)) * scale;
+  const baseHp = (rand(70, 100)) * scale * (isBoss ? 10 : 1);
   // 敵タイプ抽選：①1属性特化65% ②2属性特化30% ③3属性特化4% ④4属性特化1%
   const typeRoll = Math.random();
   const numFocus = typeRoll < 0.65 ? 1 : typeRoll < 0.95 ? 2 : typeRoll < 0.99 ? 3 : 4;
@@ -2774,6 +2778,8 @@ function makeEnemy(floor) {
   }
   // ふつう以上は強い技プール（2色2+1等）も使える
   const richTech = diff === 'hard' || diff === 'normal' || diff === 'endless';
+  // 低階層では必要エネルギーが少ない技を選ぶ
+  const maxEnergy = floor <= 1 ? 1 : floor <= 3 ? 2 : 3;
   // フロアによる技構成
   let numAttackTechs, numPassives;
   if (floor === 1)      { numAttackTechs = 1; numPassives = 0; }
@@ -2781,7 +2787,7 @@ function makeEnemy(floor) {
   else if (floor <= 7)  { numAttackTechs = 2; numPassives = 1; }
   else                  { numAttackTechs = 2; numPassives = 2; }
   if (isBoss) { numAttackTechs = Math.min(numAttackTechs + 1, 3); }
-  const techs = makeEnemyTechs(stats, focusEls, numFocus, numAttackTechs, richTech);
+  const techs = makeEnemyTechs(stats, focusEls, numFocus, numAttackTechs, richTech, maxEnergy);
   // パッシブスキル
   const allSkillDefs = Object.values(SKILL_DEFS).flat().filter(d => !d.lOnly);
   const eSkill  = numPassives >= 1 ? { id: allSkillDefs[randInt(0,allSkillDefs.length-1)].id, rank: rollTechRank() } : null;
@@ -4358,8 +4364,9 @@ function onBonusCardPicked(card) {
   if (b.id === 'learnSkill') {
     openBonusSkillPick(card);
   } else if (b.id === 'starUp') {
-    const cand = (card.techs || []).filter(t => (t.rank || 1) < MAX_RANK);
-    if (cand.length === 0) { finishBonus(); }      // 上げられる技なし
+    const techCand  = (card.techs || []).filter(t => (t.rank || 1) < MAX_RANK);
+    const skillCand = [card.skill, card.skill2].filter(sk => sk && (sk.rank || 1) < MAX_RANK);
+    if (techCand.length === 0 && skillCand.length === 0) { finishBonus(); }
     else openBonusTechPick(card, 'star');
   } else {
     b.apply(card, b); finishBonus();
@@ -4397,6 +4404,29 @@ function openBonusTechPick(card, mode, newTech) {
     };
     list.appendChild(div);
   });
+  // star モードのみパッシブスキルも表示
+  if (mode === 'star') {
+    [card.skill, card.skill2].forEach(sk => {
+      if (!sk) return;
+      const disabled = (sk.rank || 1) >= MAX_RANK;
+      const def = Object.values(SKILL_DEFS).flat().find(d => d.id === sk.id);
+      const div = document.createElement('div');
+      div.className = 'skill-opt' + (disabled ? ' dimmed' : '');
+      div.style.borderColor = '#9a7acc';
+      div.innerHTML = `
+        <div class="sk-icon" style="font-size:1.5rem">🔮</div>
+        <div class="sk-info">
+          <div class="sk-name" style="color:#b090e8">${def ? def.name : sk.id} <span style="color:#E8A000">${'★'.repeat(sk.rank||1)}</span></div>
+          <div style="font-size:0.7rem;color:#888">パッシブスキル（★+1）</div>
+        </div>`;
+      if (!disabled) div.onclick = () => {
+        sk.rank = Math.min(MAX_RANK, (sk.rank || 1) + 1);
+        document.getElementById('bonus-tech-overlay').classList.add('hidden');
+        finishBonus();
+      };
+      list.appendChild(div);
+    });
+  }
   document.getElementById('bonus-tech-overlay').classList.remove('hidden');
 }
 
