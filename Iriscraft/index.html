@@ -536,6 +536,22 @@
     <h1 class="title-h1">Iriscraft</h1>
     <p class="title-sub">色と図形の世界へ</p>
     <button class="btn btn-primary" onclick="startGame()" style="min-width:220px;font-size:1.2rem;padding:15px 40px">あそぶ</button>
+    <button class="btn btn-secondary" onclick="openSettings()" style="margin-top:12px;min-width:160px;font-size:1rem">⚙ 設定</button>
+  </div>
+
+  <!-- SETTINGS OVERLAY -->
+  <div id="settings-overlay" class="overlay hidden" style="z-index:9500">
+    <div class="dialog-box" style="text-align:center;min-width:340px;max-width:480px">
+      <div style="font-size:2rem;margin-bottom:8px">⚙</div>
+      <p class="dialog-msg" style="margin-bottom:4px">設定</p>
+      <p class="dialog-sub" style="margin-bottom:20px">言語 / Language</p>
+      <div id="lang-btns" style="display:flex;flex-direction:column;gap:10px;align-items:stretch;margin-bottom:24px">
+        <button class="btn" id="lang-btn-simple" onclick="selectLanguage('simple')" style="font-size:1rem;padding:12px">かんたんなにほんご</button>
+        <button class="btn" id="lang-btn-ja"     onclick="selectLanguage('ja')"     style="font-size:1rem;padding:12px">日本語</button>
+        <button class="btn" id="lang-btn-en"     onclick="selectLanguage('en')"     style="font-size:1rem;padding:12px">English</button>
+      </div>
+      <button class="btn btn-secondary" onclick="closeSettings()" style="min-width:140px">とじる</button>
+    </div>
   </div>
 
   <!-- GAME -->
@@ -1487,6 +1503,35 @@ fitContainer();
 // ================================================================
 //  TITLE
 // ================================================================
+// ================================================================
+//  SETTINGS
+// ================================================================
+let currentLanguage = 'ja';
+
+function openSettings() {
+  updateLangButtons();
+  document.getElementById('settings-overlay').classList.remove('hidden');
+}
+function closeSettings() {
+  document.getElementById('settings-overlay').classList.add('hidden');
+}
+function selectLanguage(lang) {
+  currentLanguage = lang;
+  updateLangButtons();
+  // 将来: applyLanguage(lang);
+}
+function updateLangButtons() {
+  ['simple','ja','en'].forEach(l => {
+    const btn = document.getElementById('lang-btn-' + l);
+    if (!btn) return;
+    btn.style.background = currentLanguage === l
+      ? 'linear-gradient(180deg,#7c5cbf,#5a3a99)'
+      : '';
+    btn.style.color = currentLanguage === l ? '#fff' : '';
+    btn.style.fontWeight = currentLanguage === l ? '900' : '';
+  });
+}
+
 function startGame() {
   document.getElementById('title-screen').classList.add('hidden');
   document.getElementById('game-screen').classList.remove('hidden');
@@ -3329,12 +3374,6 @@ function useTech(t) {
   if (eIronWall)  dmg = Math.max(1, Math.floor(dmg * (1 - eIronWall)));
   if (eFullGuard) dmg = Math.max(1, Math.floor(dmg * (1 - eFullGuard)));
   battle.enemy.curHp -= dmg;
-  // 敵パッシブ：根性（1度だけHPが1以下になると1で踏みとどまる）
-  const eGuts = getEnemySkillVal(battle.enemy, 'guts');
-  if (eGuts && battle.enemy.curHp <= 0 && !battle.enemy.gutsUsed) {
-    battle.enemy.curHp = 1; battle.enemy.gutsUsed = true;
-    pushLog(`${battle.enemy.name} は 根性で耐えた！`);
-  }
   battle.stageDamage = (battle.stageDamage || 0) + dmg;
   battle.stageTurns  = (battle.stageTurns  || 0) + 1;
 
@@ -3394,10 +3433,6 @@ function useTech(t) {
       if (eIW2) dmg2 = Math.max(1, Math.floor(dmg2 * (1 - eIW2)));
       if (eFG2) dmg2 = Math.max(1, Math.floor(dmg2 * (1 - eFG2)));
       battle.enemy.curHp -= dmg2;
-      if (getEnemySkillVal(battle.enemy, 'guts') && battle.enemy.curHp <= 0 && !battle.enemy.gutsUsed) {
-        battle.enemy.curHp = 1; battle.enemy.gutsUsed = true;
-        pushLog(`${battle.enemy.name} は 根性で耐えた！`);
-      }
       battle.stageDamage += dmg2;
       pushLog(`💥 連続攻撃！ <span class="log-dmg">${dmg2}</span> ダメージ`);
       renderBattle();
@@ -3707,6 +3742,9 @@ function enemyTurn(skipSwap = false) {
     // 一定確率で全力攻撃（残りエネルギーもトラッシュして2倍）
     let isTrash = false;
     if (Math.random() < (DIFF_TRASH[battle.difficulty] || 0)) { isTrash = true; bestDmg = Math.floor(bestDmg * 1.5); }
+    // 敵パッシブ：根性（HP50%以下で攻撃力アップ）
+    const eGuts = getEnemySkillVal(e, 'guts');
+    if (eGuts && e.curHp / e.maxHp <= 0.50) bestDmg = Math.floor(bestDmg * eGuts);
     const guardCount = (battle.items||[]).filter(i => i.id === 'guard').length;
     if (guardCount > 0) bestDmg = Math.floor(bestDmg * Math.pow(0.9, guardCount));
     if ((battle.items||[]).some(i => i.id === 'resist_ring') && best.mainEl === p.card.resist) bestDmg = Math.floor(bestDmg * 0.75);
@@ -3720,7 +3758,39 @@ function enemyTurn(skipSwap = false) {
     getSkillVals(p.card, 'fighting').forEach(v => {
       if (bestDmg > 0 && p.curHp / p.maxHp <= 0.50) bestDmg = Math.floor(bestDmg * (1 - v));
     });
+    // ★スキル：鉄壁（常時ダメージ軽減）
+    getSkillVals(p.card, 'iron_wall').forEach(v => {
+      if (bestDmg > 0) bestDmg = Math.max(1, Math.floor(bestDmg * (1 - v)));
+    });
     p.curHp -= bestDmg;
+    // ★スキル：反射（受けたダメージの一部を敵に返す）
+    let counterKilledEnemy = false;
+    if (bestDmg > 0) {
+      getSkillVals(p.card, 'reflect').forEach(v => {
+        const refDmg = Math.max(1, Math.floor(bestDmg * v));
+        battle.enemy.curHp -= refDmg;
+        pushLog(`🪞 ${p.card.name}は <span class="log-dmg">${refDmg}</span> ダメージを反射！`);
+        if (battle.enemy.curHp <= 0) counterKilledEnemy = true;
+      });
+      // ★スキル：カウンター（確率で同ダメを返す）
+      getSkillVals(p.card, 'counter').forEach(v => {
+        if (Math.random() < v) {
+          battle.enemy.curHp -= bestDmg;
+          pushLog(`⚡ カウンター！ ${p.card.name}は <span class="log-dmg">${bestDmg}</span> ダメージを返した！`);
+          if (battle.enemy.curHp <= 0) counterKilledEnemy = true;
+        }
+      });
+    }
+    // ★スキル：執念（HP0になる攻撃を確率で耐える）
+    if (p.curHp <= 0) {
+      for (const v of getSkillVals(p.card, 'tenacity')) {
+        if (Math.random() < v) {
+          p.curHp = 1;
+          pushLog(`💪 ${p.card.name}は 執念で耐えた！`);
+          break;
+        }
+      }
+    }
     // ★スキル：復活（1回限り）
     if (p.curHp <= 0 && !p.reviveUsed) {
       const hasRevive = [p.card.skill, p.card.skill2].some(sk => sk && sk.id === 'revive');
@@ -3738,7 +3808,9 @@ function enemyTurn(skipSwap = false) {
     applyStatusOnHit(best, p, p.card.name);   // プレイヤーに状態異常
     renderBattle();
     flashDamage('fx-player', bestDmg);
-    if (p.curHp <= 0) {
+    if (counterKilledEnemy) {
+      setTimeout(onEnemyDefeated, 800);
+    } else if (p.curHp <= 0) {
       pushLog(`${p.card.name} は たおれた…`);
       setTimeout(() => {
         const idx = battle.party.findIndex(x => x.curHp > 0);
