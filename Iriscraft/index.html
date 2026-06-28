@@ -38,7 +38,25 @@
       -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
       margin-bottom: 10px;
     }
-    .title-sub { font-size: 1.1rem; color: #9a8a80; letter-spacing: 6px; margin-bottom: 56px; }
+    .title-sub { font-size: 1.1rem; color: #9a8a80; letter-spacing: 6px; margin-bottom: 32px; }
+
+    /* ===== RANKING / ACHIEVE ===== */
+    .rank-tab-btn {
+      padding: 6px 18px; border-radius: 20px; border: 1.5px solid #ccc;
+      font-size: 0.85rem; font-weight: 700; font-family: inherit; cursor: pointer;
+      background: #f0f0f0; color: #666; transition: background 0.12s, color 0.12s;
+    }
+    .rank-tab-btn.active { background: #2a80c0; color: #fff; border-color: #2a80c0; }
+    #rank-table th { font-size:0.78rem; color:#888; border-bottom:1px solid #eee; padding:4px 6px; }
+    #rank-table td { padding:5px 6px; border-bottom:1px solid #f0f0f0; }
+    #rank-table tr:first-child td { color:#E6C000; font-weight:800; }
+    #rank-table tr:nth-child(2) td { color:#aaa; font-weight:700; }
+    #rank-table tr:nth-child(3) td { color:#cd7f32; font-weight:700; }
+    .achieve-card { width:80px; text-align:center; }
+    .achieve-card canvas { border-radius:8px; display:block; margin:0 auto 4px; }
+    .achieve-card .ac-name { font-size:0.65rem; color:#555; line-height:1.2; word-break:break-all; }
+    .achieve-card.undiscovered canvas { filter:grayscale(1) brightness(0.4); }
+    .achieve-card.undiscovered .ac-name { color:#bbb; }
 
     /* ===== BUTTONS ===== */
     .btn {
@@ -535,8 +553,42 @@
     </div>
     <h1 class="title-h1">Iriscraft</h1>
     <p class="title-sub">色と図形の世界へ</p>
-    <button class="btn btn-primary" onclick="startGame()" style="min-width:220px;font-size:1.2rem;padding:15px 40px">あそぶ</button>
-    <button class="btn btn-secondary" onclick="openSettings()" style="margin-top:12px;min-width:160px;font-size:1rem">⚙ 設定</button>
+    <button class="btn btn-primary"   onclick="startGame()"    style="min-width:220px;font-size:1.2rem;padding:15px 40px;margin-top:0">あそぶ</button>
+    <button class="btn btn-secondary" onclick="openRanking()"  style="min-width:220px;font-size:1.2rem;padding:15px 40px;margin-top:12px">🏆 ランキング</button>
+    <button class="btn btn-secondary" onclick="openAchieve()"  style="min-width:220px;font-size:1.2rem;padding:15px 40px;margin-top:12px">📖 実績</button>
+    <button class="btn btn-secondary" onclick="openSettings()" style="min-width:220px;font-size:1.2rem;padding:15px 40px;margin-top:12px">⚙ 設定</button>
+  </div>
+
+  <!-- RANKING OVERLAY -->
+  <div id="ranking-overlay" class="overlay hidden" style="z-index:9200">
+    <div class="dialog-box" style="min-width:360px;max-width:520px;max-height:90vh;overflow-y:auto;text-align:center">
+      <div style="font-size:1.4rem;font-weight:800;color:#E6C000;margin-bottom:12px">🏆 ランキング</div>
+      <!-- difficulty tabs -->
+      <div id="rank-diff-tabs" style="display:flex;gap:6px;justify-content:center;margin-bottom:8px;flex-wrap:wrap">
+        <button class="rank-tab-btn active" onclick="switchRankDiff('easy')">やさしい</button>
+        <button class="rank-tab-btn"        onclick="switchRankDiff('normal')">ふつう</button>
+        <button class="rank-tab-btn"        onclick="switchRankDiff('hard')">むずかしい</button>
+        <button class="rank-tab-btn"        onclick="switchRankDiff('endless')">エンドレス</button>
+      </div>
+      <!-- local/world tabs -->
+      <div id="rank-mode-tabs" style="display:flex;gap:6px;justify-content:center;margin-bottom:14px">
+        <button class="rank-tab-btn active" onclick="switchRankTab('local')">ローカル</button>
+        <button class="rank-tab-btn"        onclick="switchRankTab('world')">ワールド</button>
+      </div>
+      <div id="rank-world-note" class="hidden" style="font-size:0.8rem;color:#aaa;margin-bottom:8px">ワールドランキングは現在準備中です</div>
+      <table id="rank-table" style="width:100%;border-collapse:collapse;font-size:0.88rem"></table>
+      <button class="btn btn-secondary" onclick="closeRanking()" style="margin-top:18px;min-width:140px">とじる</button>
+    </div>
+  </div>
+
+  <!-- ACHIEVEMENT OVERLAY -->
+  <div id="achieve-overlay" class="overlay hidden" style="z-index:9200">
+    <div class="dialog-box" style="min-width:360px;max-width:600px;max-height:90vh;overflow-y:auto;text-align:center">
+      <div style="font-size:1.4rem;font-weight:800;color:#b090e8;margin-bottom:4px">📖 実績</div>
+      <div id="achieve-count" style="font-size:0.82rem;color:#888;margin-bottom:14px"></div>
+      <div id="achieve-grid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;justify-items:center"></div>
+      <button class="btn btn-secondary" onclick="closeAchieve()" style="margin-top:18px;min-width:140px">とじる</button>
+    </div>
   </div>
 
   <!-- SETTINGS OVERLAY -->
@@ -1732,6 +1784,123 @@ function doRegenerate() {
   generateArt(); resetFrame(); updateLiveAnalysis();
 }
 
+// ================================================================
+//  RANKING
+// ================================================================
+const RANK_DIFFS = ['easy','normal','hard','endless'];
+let _rankDiff = 'normal';
+let _rankTab  = 'local';
+
+function getRankKey(diff) { return `iriscraft_ranking_${diff}`; }
+function getLocalRanking(diff) {
+  try { return JSON.parse(localStorage.getItem(getRankKey(diff)) || '[]'); } catch { return []; }
+}
+function saveRankEntry(floor, score, diff) {
+  const key = getRankKey(diff);
+  let list = getLocalRanking(diff);
+  const date = new Date().toLocaleDateString('ja-JP');
+  list.push({ floor, score, date });
+  list.sort((a, b) => b.floor - a.floor || b.score - a.score);
+  list = list.slice(0, 10);
+  localStorage.setItem(key, JSON.stringify(list));
+}
+function openRanking() {
+  _rankDiff = 'normal';
+  _rankTab  = 'local';
+  _updateRankTabs();
+  renderRankTable();
+  document.getElementById('ranking-overlay').classList.remove('hidden');
+}
+function closeRanking() { document.getElementById('ranking-overlay').classList.add('hidden'); }
+function switchRankDiff(diff) { _rankDiff = diff; _updateRankTabs(); renderRankTable(); }
+function switchRankTab(tab)   { _rankTab  = tab;  _updateRankTabs(); renderRankTable(); }
+function _updateRankTabs() {
+  const diffBtns = document.querySelectorAll('#rank-diff-tabs .rank-tab-btn');
+  const labels   = ['easy','normal','hard','endless'];
+  diffBtns.forEach((b, i) => b.classList.toggle('active', labels[i] === _rankDiff));
+  const modeBtns = document.querySelectorAll('#rank-mode-tabs .rank-tab-btn');
+  modeBtns[0].classList.toggle('active', _rankTab === 'local');
+  modeBtns[1].classList.toggle('active', _rankTab === 'world');
+  document.getElementById('rank-world-note').classList.toggle('hidden', _rankTab !== 'world');
+}
+function renderRankTable() {
+  const tbl = document.getElementById('rank-table');
+  if (_rankTab === 'world') { tbl.innerHTML = ''; return; }
+  const rows = getLocalRanking(_rankDiff);
+  let html = `<tr><th>#</th><th>階層</th><th>スコア</th><th>日付</th></tr>`;
+  if (rows.length === 0) {
+    html += `<tr><td colspan="4" style="color:#bbb;padding:16px 0">まだ記録がありません</td></tr>`;
+  } else {
+    rows.forEach((r, i) => {
+      html += `<tr><td>${i + 1}</td><td>${r.floor}階</td><td>${r.score.toLocaleString()}</td><td>${r.date}</td></tr>`;
+    });
+  }
+  tbl.innerHTML = html;
+}
+
+// ================================================================
+//  ACHIEVEMENTS (card collection)
+// ================================================================
+const ACHIEVE_KEY = 'iriscraft_cards_discovered';
+function getDiscoveredCards() {
+  try { return JSON.parse(localStorage.getItem(ACHIEVE_KEY) || '[]'); } catch { return []; }
+}
+function recordDiscoveredCard(fileIdx, col, row, name) {
+  const id = `${fileIdx}:${col}:${row}`;
+  const list = getDiscoveredCards();
+  if (!list.find(c => c.id === id)) {
+    list.push({ id, fileIdx, col, row, name });
+    localStorage.setItem(ACHIEVE_KEY, JSON.stringify(list));
+  }
+}
+function openAchieve() {
+  const grid = document.getElementById('achieve-grid');
+  grid.innerHTML = '';
+  const discovered = getDiscoveredCards();
+  const discSet = new Set(discovered.map(c => c.id));
+  const discMap = {};
+  discovered.forEach(c => { discMap[c.id] = c; });
+  let total = 0, found = 0;
+  // 5 file sets × 16 cards each = 80 cards
+  for (let fi = 0; fi < CARD_FILES.length; fi++) {
+    for (let r = 0; r < 4; r++) {
+      for (let c = 0; c < 4; c++) {
+        total++;
+        const id = `${fi}:${c}:${r}`;
+        const isFound = discSet.has(id);
+        if (isFound) found++;
+        const name = isFound ? (discMap[id]?.name || characterName(fi, c, r)) : '???';
+        const div = document.createElement('div');
+        div.className = 'achieve-card' + (isFound ? '' : ' undiscovered');
+        const cvs = document.createElement('canvas');
+        cvs.width = 64; cvs.height = 64;
+        cvs.style.cssText = 'width:64px;height:64px;border-radius:8px;display:block;margin:0 auto 4px;';
+        div.appendChild(cvs);
+        const label = document.createElement('div');
+        label.className = 'ac-name';
+        label.textContent = name;
+        div.appendChild(label);
+        grid.appendChild(div);
+        // draw: use raw sprite coords scaled to 64×64
+        (function(canvas, fileIdx2, col2, row2) {
+          const img = CARD_IMAGES[CARD_FILES[fileIdx2]];
+          if (!img) return;
+          const doDraw = () => {
+            if (!img.naturalWidth) return;
+            const ctx2 = canvas.getContext('2d');
+            ctx2.drawImage(img, col2 * ILLUS_W, row2 * ILLUS_H, ILLUS_W, ILLUS_H, 0, 0, 64, 64);
+          };
+          if (img.complete && img.naturalWidth) doDraw();
+          else img.addEventListener('load', doDraw, { once: true });
+        })(cvs, fi, c, r);
+      }
+    }
+  }
+  document.getElementById('achieve-count').textContent = `発見済み ${found} / ${total}`;
+  document.getElementById('achieve-overlay').classList.remove('hidden');
+}
+function closeAchieve() { document.getElementById('achieve-overlay').classList.add('hidden'); }
+
 function backToTitle() {
   if (typeof battle !== 'undefined') { battle.inBattle = false; clearTimeout(battle.turnTimer); }
   // 冒険画面の各オーバーレイを閉じる
@@ -2182,6 +2351,10 @@ function finalizeCard() {
     return;
   }
 
+  // 実績：カード発見記録
+  if (illustration && !illustration.weapon) {
+    recordDiscoveredCard(illustration.fileIdx ?? CARD_FILES.indexOf(illustration.file), illustration.col, illustration.row, name);
+  }
   cardStock.push(card);
   if (cardStock.length >= MAX_PARTY) {
     showDepart();   // 3枚そろったら冒険へ
@@ -2321,28 +2494,44 @@ let reskillMax = 4;
 
 function openReskill(target) {
   // target.techs は applyMerge で mergeTechList 済みの統合リスト
-  const pool = (target.techs || []).map(t => ({ tech: t }));
+  // パッシブスキルも含めたプールを構築
+  const pool = (target.techs || []).map(t => ({ type: 'tech', tech: t }));
+  [target.skill, target.skill2].forEach(sk => {
+    if (sk) pool.push({ type: 'skill', skill: sk });
+  });
   reskillTarget = target;
   reskillPool = pool;
   reskillSelected = [];
-  const skillCount = (target.skill ? 1 : 0) + (target.skill2 ? 1 : 0);
-  reskillMax = 4 - skillCount;
+  reskillMax = 4;
 
   const holder = document.getElementById('reskill-opts');
   holder.innerHTML = '';
   pool.forEach((item, i) => {
-    const t = item.tech;
-    const mHex = ELEM(t.mainEl).hex;
     const div = document.createElement('div');
     div.className = 'skill-opt'; div.dataset.idx = i;
-    div.style.background = hexA(mHex, 0.10); div.style.borderColor = mHex;
-    div.innerHTML = `
-      <div class="sk-icon">${techEnergyHTML(t)}</div>
-      <div class="sk-info">
-        <div class="sk-name" style="color:${mHex}">${t.name} <span style="color:#E8A000">${'★'.repeat(t.rank||1)}</span></div>
-        <div style="font-size:0.7rem;color:#888;margin-top:2px">${ELEM(t.mainEl).name}属性</div>
-      </div>
-      <div class="sk-check">✓</div>`;
+    if (item.type === 'skill') {
+      const sk = item.skill;
+      const def = Object.values(SKILL_DEFS).flat().find(d => d.id === sk.id);
+      div.style.background = hexA('#9a7acc', 0.10); div.style.borderColor = '#9a7acc';
+      div.innerHTML = `
+        <div class="sk-icon" style="font-size:1.5rem">🔮</div>
+        <div class="sk-info">
+          <div class="sk-name" style="color:#b090e8">${def ? def.name : sk.id} <span style="color:#E8A000">${'★'.repeat(sk.rank||1)}</span></div>
+          <div style="font-size:0.7rem;color:#888;margin-top:2px">パッシブスキル</div>
+        </div>
+        <div class="sk-check">✓</div>`;
+    } else {
+      const t = item.tech;
+      const mHex = ELEM(t.mainEl).hex;
+      div.style.background = hexA(mHex, 0.10); div.style.borderColor = mHex;
+      div.innerHTML = `
+        <div class="sk-icon">${techEnergyHTML(t)}</div>
+        <div class="sk-info">
+          <div class="sk-name" style="color:${mHex}">${t.name} <span style="color:#E8A000">${'★'.repeat(t.rank||1)}</span></div>
+          <div style="font-size:0.7rem;color:#888;margin-top:2px">${ELEM(t.mainEl).name}属性</div>
+        </div>
+        <div class="sk-check">✓</div>`;
+    }
     div.addEventListener('click', () => toggleReskill(div, i));
     holder.appendChild(div);
   });
@@ -2363,7 +2552,11 @@ function updateReskillBtn() {
 }
 function confirmReskill() {
   if (reskillSelected.length !== reskillMax) return;
-  reskillTarget.techs = reskillSelected.map(i => reskillPool[i].tech);
+  const chosen = reskillSelected.map(i => reskillPool[i]);
+  reskillTarget.techs = chosen.filter(x => x.type === 'tech').map(x => x.tech);
+  const skills = chosen.filter(x => x.type === 'skill').map(x => x.skill);
+  reskillTarget.skill  = skills[0] || null;
+  reskillTarget.skill2 = skills[1] || null;
   document.getElementById('reskill-overlay').classList.add('hidden');
   showEnhanceDone(reskillTarget);
 }
@@ -2550,16 +2743,14 @@ const DIFF_POWER        = { easy: 1.0, normal: 2.0, hard: 3.5,  endless: 3.5  };
 const DIFF_FLOOR_GROWTH = { easy: 0.14, normal: 0.18, hard: 0.22, endless: 0.22 };
 const DIFF_FLOORS  = { easy: 7, normal: 10, hard: 13, endless: Infinity };
 
-// 難易度・階数から敵のスケールを計算
-// endless は13Fを超えると10%/Fで加速度的に強くなる
+// 難易度・階数から敵のスケールを計算（全難易度・2次関数）
+// endless は2次関数のみで何階でも対応（指数補正なし）
 function calcEnemyScale(floor, diff) {
   const base   = DIFF_POWER[diff]        || 1.0;
   const growth = DIFF_FLOOR_GROWTH[diff] || 0.14;
-  let scale = (1 + (floor - 1) * growth) * base;
-  if (diff === 'endless' && floor > 13) {
-    scale *= Math.pow(1.10, floor - 13);
-  }
-  return scale;
+  const f = floor - 1;
+  // scale = (1 + f·g + f²·g·0.25) × base
+  return (1 + f * growth + f * f * growth * 0.25) * base;
 }
 const DIFF_ORDER   = ['easy', 'normal', 'hard', 'endless'];
 
@@ -2680,55 +2871,64 @@ function makeEnemyTechs(stats, focusEls, numFocus, numAttackTechs, richTech, max
   const techs = [];
 
   if (numFocus === 1) {
-    // ①: 同じfocus属性の1属性技を必要数分
+    // ①: 同じfocus属性の1属性技を必要数分（コストが重複しないようにする）
     const el = sf[0];
+    const usedCosts = new Set();
     for (let i = 0; i < numAttackTechs; i++) {
-      techs.push(makeTech({ [el]: randInt(1, maxEnergy) }));
+      // 未使用コストを選ぶ（全コスト使い切ったらリセット）
+      const available = [];
+      for (let c = 1; c <= maxEnergy; c++) { if (!usedCosts.has(c)) available.push(c); }
+      if (available.length === 0) { usedCosts.clear(); for (let c = 1; c <= maxEnergy; c++) available.push(c); }
+      const cost = available[randInt(0, available.length - 1)];
+      usedCosts.add(cost);
+      techs.push(makeTech({ [el]: cost }));
     }
     return techs;
   }
 
+  // 使用済みmainElを追跡して重複を防ぐ
+  const usedMainEls = new Set();
+
   // 1つ目の技（numFocusに応じた多属性技）
   let tech1;
   if (numFocus === 2) {
-    // 2属性技：強い方がmainEl
     tech1 = makeTech({ [sf[0]]: randInt(maxEnergy > 1 ? 2 : 1, maxEnergy), [sf[1]]: 1 });
   } else if (numFocus === 3) {
-    // 3属性技
     tech1 = makeTech({ [sf[0]]: Math.min(2, maxEnergy), [sf[1]]: 1, [sf[2]]: 1 });
   } else {
-    // 4属性から上位3つで3属性技
     tech1 = makeTech({ [sf[0]]: Math.min(2, maxEnergy), [sf[1]]: 1, [sf[2]]: 1 });
   }
   techs.push(tech1);
+  usedMainEls.add(tech1.mainEl);
 
-  // 2つ目の技：tech1とmainElが異なる
+  // 2つ目の技：tech1とmainElが必ず異なる属性を使う
   if (numAttackTechs >= 2) {
     const mainEl1 = tech1.mainEl;
-    // 2番目のfocus属性（それ以外ならランダム）をnewMainElに
-    const otherFocus = sf.filter(e => e !== mainEl1);
+    // 未使用のfocus属性 → なければ未使用のELEM_ORDER属性
+    const otherFocus = sf.filter(e => !usedMainEls.has(e));
     const newMainEl = otherFocus.length > 0
       ? otherFocus[0]
-      : ELEM_ORDER.filter(e => e !== mainEl1)[randInt(0, 2)];
-    // ②=1-2属性 ③=1-3属性 ④=1-4属性
+      : ELEM_ORDER.filter(e => !usedMainEls.has(e))[0] || ELEM_ORDER.filter(e => e !== mainEl1)[0];
     const maxAttr2 = Math.min(numFocus, ELEM_ORDER.length);
     const numAttr2 = randInt(1, maxAttr2);
     if (numAttr2 === 1) {
       techs.push(makeTech({ [newMainEl]: randInt(1, maxEnergy) }));
     } else {
       const recipe = { [newMainEl]: randInt(maxEnergy > 1 ? 2 : 1, maxEnergy) };
-      // 追加属性：focus属性優先、次に残りの属性
       const extra = [...sf.filter(e => e !== newMainEl),
                      ...ELEM_ORDER.filter(e => e !== newMainEl && !focusEls.includes(e))];
       for (let i = 0; i < numAttr2 - 1 && i < extra.length; i++) recipe[extra[i]] = 1;
       techs.push(makeTech(recipe));
     }
+    usedMainEls.add(newMainEl);
   }
 
-  // 3つ目の技（ボスのみ）：スタッツ準拠でランダム生成
+  // 3つ目の技（ボスのみ）：未使用mainElの技を優先して選ぶ
   if (numAttackTechs >= 3) {
-    const extra = genTechCandidates(stats, !richTech, 1);
-    if (extra.length > 0) techs.push(extra[0]);
+    const candidates = genTechCandidates(stats, !richTech, 6);
+    const fresh = candidates.find(t => !usedMainEls.has(t.mainEl));
+    const pick = fresh || candidates[0];
+    if (pick) techs.push(pick);
   }
 
   return techs;
@@ -2743,8 +2943,11 @@ function makeEnemy(floor) {
 
   const baseHp = (rand(70, 100)) * scale * (isBoss ? 10 : 1);
   // 敵タイプ抽選：①1属性特化65% ②2属性特化30% ③3属性特化4% ④4属性特化1%
+  // ボスは必ず2属性以上
   const typeRoll = Math.random();
-  const numFocus = typeRoll < 0.65 ? 1 : typeRoll < 0.95 ? 2 : typeRoll < 0.99 ? 3 : 4;
+  const numFocus = isBoss
+    ? (typeRoll < 0.60 ? 2 : typeRoll < 0.90 ? 3 : 4)
+    : (typeRoll < 0.65 ? 1 : typeRoll < 0.95 ? 2 : typeRoll < 0.99 ? 3 : 4);
   // HP強化タイプ：5%の確率で発動（属性ステータス-20%、HP×1.5）
   const hpBoostType = Math.random() < 0.05;
   // 得意属性をnumFocus個ランダム選出
@@ -3986,7 +4189,7 @@ function runInspirationLottery(doneCb) {
 }
 
 function _processNextInspiration() {
-  if (_inspirationQueue.length === 0) { _inspirationDoneCb(); return; }
+  if (_inspirationQueue.length === 0) { const cb = _inspirationDoneCb; _inspirationDoneCb = null; if (cb) cb(); return; }
   _inspirationCard = _inspirationQueue.shift();
   const card = _inspirationCard;
   const allDefs = Object.values(SKILL_DEFS).flat().filter(d => !d.lOnly);
@@ -3996,7 +4199,7 @@ function _processNextInspiration() {
   _inspirationChoice = { type: 'skill', def, rank };
   document.getElementById('inspiration-card-name').textContent = _inspirationCard.name + ' がひらめいた！';
   document.getElementById('inspiration-skill-name').textContent =
-    `🔮 ${def.name}（${'★'.repeat(rank)}）`;
+    `🔮 ${def.name} ${'★'.repeat(rank)}`;
   document.getElementById('inspiration-skill-desc').textContent = def.desc[rank] || '';
   // カード表示
   const cardHolder = document.getElementById('inspiration-card-holder');
@@ -4026,6 +4229,7 @@ function skipInspiration() {
 }
 
 function showBonusSelect() {
+  if (enhancing) return;  // 強化中に二重呼び出し防止
   const isRest = !!battle.isRestBonus;
   battle.isRestBonus = false;
   const holder = document.getElementById('bonus-choices');
@@ -4489,6 +4693,7 @@ function proceedNextFloor() {
 function gameOver() {
   battle.inBattle = false;
   clearTimeout(battle.turnTimer);
+  saveRankEntry(battle.floor, battle.totalScore || 0, battle.difficulty);
   document.getElementById('adv-result-icon').textContent = '💀';
   document.getElementById('adv-result-title').textContent = 'ゲームオーバー';
   document.getElementById('adv-result-sub').textContent = `${battle.floor}階で力つきた…`;
@@ -4496,6 +4701,7 @@ function gameOver() {
 }
 function clearGame() {
   battle.inBattle = false;
+  saveRankEntry(battle.difficulty !== 'endless' ? battle.maxFloor : battle.floor, battle.totalScore || 0, battle.difficulty);
   if (battle.difficulty !== 'endless') markDiffCleared(battle.difficulty);
   const floorLabel = battle.maxFloor === Infinity ? '∞' : battle.maxFloor;
   const diffNames = { easy:'やさしい', normal:'ふつう', hard:'むずかしい', endless:'エンドレス' };
