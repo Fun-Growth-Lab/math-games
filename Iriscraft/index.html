@@ -2817,11 +2817,11 @@ function _renderRankRows(rows) {
 // ================================================================
 const ACHIEVE_KEY = 'iriscraft_cards_discovered';
 // All possible cards: 5 regular files + 1 legend file, 16 each = 96 total
-const ALL_COLLECT_FILES = [...CARD_FILES, LEGEND_FILE];
+const ALL_COLLECT_FILES = [...CARD_FILES, LEGEND_FILE, ENEMY_BOSS_FILE];
 function getAllCollectNames() {
   return currentLanguage === 'en'
-    ? [...CHARACTER_NAMES_EN, ...LEGENDARY_NAMES_EN]
-    : [...CHARACTER_NAMES, ...LEGENDARY_NAMES];
+    ? [...CHARACTER_NAMES_EN, ...LEGENDARY_NAMES_EN, ...BOSS_NAMES_EN]
+    : [...CHARACTER_NAMES, ...LEGENDARY_NAMES, ...BOSS_NAMES];
 }
 
 let _achievePage = 0;
@@ -2876,7 +2876,8 @@ function _renderAchievePage() {
   const slice = all.slice(start, start + ACHIEVE_PER_PAGE);
 
   const found = all.filter(c => discSet.has(`${c.fi}:${c.c}:${c.r}`)).length;
-  document.getElementById('achieve-count').textContent = `発見済み ${found} / ${all.length}`;
+  const countLabel = currentLanguage === 'en' ? `Discovered ${found} / ${all.length}` : currentLanguage === 'simple' ? `はっけん ${found} / ${all.length}` : `発見済み ${found} / ${all.length}`;
+  document.getElementById('achieve-count').textContent = countLabel;
   document.getElementById('achieve-page-label').textContent = `${_achievePage + 1} / ${totalPages}`;
   document.getElementById('achieve-prev').style.opacity = _achievePage === 0 ? '0.3' : '1';
   document.getElementById('achieve-next').style.opacity = _achievePage === totalPages - 1 ? '0.3' : '1';
@@ -3787,6 +3788,19 @@ const BOSS_NAMES = [
   'デモ王','ドラ王','リッチ','クラ王','ヴァル','ベヘも','フェン','スフィ',
   'コア','ミノ王','リヴァ','フェニ','スライ王','ヘド','グリ','ユグドラ',
 ];
+const BOSS_NAMES_EN = [
+  'Demon King','Dragon King','Lich','Crag King','Val','Behemoth','Fenrir','Sphinx',
+  'Core','Minotaur King','Levia','Phoenix','Slime King','Hydra','Griffin','Yggdrasil',
+];
+function getBossName(idx) {
+  return currentLanguage === 'en' ? BOSS_NAMES_EN[idx] : BOSS_NAMES[idx];
+}
+function getBossPrefix() {
+  return currentLanguage === 'en' ? '[BOSS] ' : currentLanguage === 'simple' ? '【ボス】' : '【ボス】';
+}
+function isEndlessBossFloor(floor) {
+  return battle.difficulty === 'endless' && floor % 10 === 0 && floor > 0;
+}
 
 const DIFF_REROLLS = { easy: 0, normal: 0, hard: 0, endless: 0 };
 const DIFF_TRASH   = { easy: 0.0, normal: 0.20, hard: 0.35, endless: 0.35 };
@@ -3876,11 +3890,11 @@ function arriveFloor() {
     return;
   }
 
-  // 最終フロア：ボス1体 + 通常敵2体
-  if (battle.difficulty !== 'endless' && battle.floor >= battle.maxFloor) {
+  // 最終フロア or エンドレス10の倍数：ボス1体 + 通常敵2体
+  if ((battle.difficulty !== 'endless' && battle.floor >= battle.maxFloor) || isEndlessBossFloor(battle.floor)) {
     const boss = makeEnemy(battle.floor);
-    const sub1 = makeEnemy(battle.floor - 1);
-    const sub2 = makeEnemy(battle.floor - 1);
+    const sub1 = makeEnemy(Math.max(1, battle.floor - 1));
+    const sub2 = makeEnemy(Math.max(1, battle.floor - 1));
     battle.enemyTeam = [boss, sub1, sub2];
   } else {
     // 敵チーム（3体）を生成してバトル開始
@@ -3989,7 +4003,7 @@ function makeEnemyTechs(stats, focusEls, numFocus, numAttackTechs, richTech, max
 // 敵生成
 function makeEnemy(floor) {
   const diff = battle.difficulty;
-  const isBoss = diff !== 'endless' && floor >= battle.maxFloor;
+  const isBoss = (diff !== 'endless' && floor >= battle.maxFloor) || isEndlessBossFloor(floor);
   let scale = calcEnemyScale(floor, diff);
   if (isBoss) scale *= 1.30;
 
@@ -4024,8 +4038,11 @@ function makeEnemy(floor) {
   let name, illus;
   if (isBoss) {
     const bossIdx = randInt(0, BOSS_NAMES.length - 1);
-    name = '【ボス】' + BOSS_NAMES[bossIdx];
+    name = getBossPrefix() + getBossName(bossIdx);
     illus = { file: ENEMY_BOSS_FILE, col: bossIdx % 4, row: Math.floor(bossIdx / 4) };
+    // コレクションに登録（ボスを倒した際に発見済みとする）
+    const bossFileIdx = ALL_COLLECT_FILES.indexOf(ENEMY_BOSS_FILE);
+    if (bossFileIdx >= 0) recordDiscoveredCard(bossFileIdx, illus.col, illus.row, getBossName(bossIdx));
   } else {
     const nameIdx = randInt(0, ENEMY_NAMES.length - 1);
     name = ENEMY_NAMES[nameIdx];
