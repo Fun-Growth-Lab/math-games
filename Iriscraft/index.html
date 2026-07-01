@@ -3530,8 +3530,25 @@ let enhancing = false;
 let enhanceCard = null;
 const enhInc = v => v;                     // 強化カードの値をそのまま加算
 
+// ===== 一時デバッグHUD（強化カードイベントの二重発生バグ調査用）=====
+let _debugEnhanceCount = 0;
+let _debugBattleCount = 0;
+function _debugHud() {
+  let el = document.getElementById('debug-hud');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'debug-hud';
+    el.style.cssText = 'position:fixed;top:4px;right:4px;z-index:99999;background:rgba(0,0,0,0.65);color:#0f0;font-size:11px;font-family:monospace;padding:3px 7px;border-radius:6px;pointer-events:none;white-space:pre;line-height:1.4';
+    document.body.appendChild(el);
+  }
+  el.textContent = `F:${battle.floor} 強化:${_debugEnhanceCount} 戦闘:${_debugBattleCount}`;
+}
+
 function startEnhancement() {
   enhancing = true;
+  _debugEnhanceCount++;
+  console.warn('[DEBUG] startEnhancement呼び出し', { floor: battle.floor, enhanceCount: _debugEnhanceCount, stack: new Error().stack });
+  _debugHud();
   battle.enhanceRerolls = DIFF_REROLLS[battle.difficulty];   // 絵のリロード可能回数
   document.getElementById('adventure-screen').classList.add('hidden');
   document.getElementById('battle-area').classList.add('hidden');
@@ -3963,6 +3980,7 @@ function refreshDiffButtons() {
 
 function startAdventure(diff) {
   if (!isDiffUnlocked(diff)) return;
+  _debugEnhanceCount = 0; _debugBattleCount = 0;
   battle.difficulty = diff;
   battle.maxFloor = DIFF_FLOORS[diff];
   battle.floor = 1;
@@ -3992,6 +4010,8 @@ function startAdventure(diff) {
 
 // 階層に到着
 function arriveFloor() {
+  console.warn('[DEBUG] arriveFloor呼び出し', { floor: battle.floor, restDoneForFloor: battle.restDoneForFloor, restBeforeBonus: battle.restBeforeBonus });
+  _debugHud();
   document.getElementById('floor-num').textContent = battle.floor;
   battle.stageDamage = 0;
   battle.stageTurns  = 0;
@@ -4517,6 +4537,9 @@ function attachChoiceToCard(i, choiceIdx) {
 
 // 階層バトル開始（エネルギー初期化）
 function startBattle() {
+  _debugBattleCount++;
+  console.warn('[DEBUG] startBattle呼び出し', { floor: battle.floor, battleCount: _debugBattleCount, enhanceCount: _debugEnhanceCount });
+  _debugHud();
   battle.inBattle = true;
   battle.party.forEach(p => {
     p.energy = emptyEnergy(); p.status = [];
@@ -5291,6 +5314,7 @@ function floorCleared() {
 function continueAfterVictory() {
   const vo = document.getElementById('victory-overlay');
   if (vo.classList.contains('hidden')) return;  // 二重クリック防止
+  console.warn('[DEBUG] continueAfterVictory呼び出し', { floor: battle.floor });
   vo.classList.add('hidden');
   document.getElementById('enemy-row').innerHTML = '';
   document.getElementById('player-row').innerHTML = '';
@@ -5312,6 +5336,7 @@ function continueAfterVictory() {
 function onItemGetContinue() {
   const ig = document.getElementById('item-get-overlay');
   if (ig.classList.contains('hidden')) return;  // 二重クリック防止
+  console.warn('[DEBUG] onItemGetContinue呼び出し', { floor: battle.floor });
   ig.classList.add('hidden');
   // 次のフロアが休憩所なら先に休憩させてからボーナスへ
   const nextFloor = battle.floor + 1;
@@ -5512,6 +5537,7 @@ function skipInspiration() {
 }
 
 function showBonusSelect() {
+  console.warn('[DEBUG] showBonusSelect呼び出し', { floor: battle.floor, enhancing, isRestBonus: battle.isRestBonus });
   if (enhancing) return;  // 強化中に二重呼び出し防止
   const isRest = !!battle.isRestBonus;
   battle.isRestBonus = false;
