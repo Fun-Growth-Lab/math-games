@@ -562,7 +562,7 @@
     <button onclick="openRanking()"  style="min-width:220px;font-size:1.2rem;padding:15px 40px;margin-top:12px;border:none;border-radius:14px;font-family:inherit;font-weight:800;cursor:pointer;background:linear-gradient(180deg,#f5c842,#d4900a);color:#fff;box-shadow:0 5px 0 #9a6000;transition:transform .08s,box-shadow .08s" onmousedown="this.style.transform='translateY(3px)';this.style.boxShadow='none'" onmouseup="this.style.transform='';this.style.boxShadow='0 5px 0 #9a6000'" data-i18n="btn.ranking">🏆 ランキング</button>
     <button onclick="openAchieve()"  style="min-width:220px;font-size:1.2rem;padding:15px 40px;margin-top:12px;border:none;border-radius:14px;font-family:inherit;font-weight:800;cursor:pointer;background:linear-gradient(180deg,#b47de8,#7a40c0);color:#fff;box-shadow:0 5px 0 #4a2080;transition:transform .08s,box-shadow .08s" onmousedown="this.style.transform='translateY(3px)';this.style.boxShadow='none'" onmouseup="this.style.transform='';this.style.boxShadow='0 5px 0 #4a2080'" data-i18n="btn.collection">📖 コレクション</button>
     <button onclick="openSettings()" style="min-width:220px;font-size:1.2rem;padding:15px 40px;margin-top:12px;border:none;border-radius:14px;font-family:inherit;font-weight:800;cursor:pointer;background:linear-gradient(180deg,#7ab8e8,#3a78c0);color:#fff;box-shadow:0 5px 0 #1a4880;transition:transform .08s,box-shadow .08s" onmousedown="this.style.transform='translateY(3px)';this.style.boxShadow='none'" onmouseup="this.style.transform='';this.style.boxShadow='0 5px 0 #1a4880'" data-i18n="btn.settings">⚙ 設定</button>
-    <a href="../index.html" style="display:block;min-width:220px;font-size:1rem;padding:10px 40px;margin-top:18px;border:none;border-radius:14px;font-family:inherit;font-weight:800;cursor:pointer;background:none;color:#b0a090;text-decoration:none;letter-spacing:1px" data-i18n="btn.toindex">🏠 INDEXへ</a>
+    <a href="../index.html" style="display:block;min-width:220px;font-size:1rem;padding:10px 40px;margin-top:18px;border-radius:14px;font-family:inherit;font-weight:800;cursor:pointer;background:linear-gradient(180deg,#aaa,#787878);color:#fff;box-shadow:0 5px 0 #505050;text-decoration:none;letter-spacing:1px;text-align:center;box-sizing:border-box" data-i18n="btn.toindex">🏠 INDEXへ</a>
   </div>
 
   <!-- RANKING OVERLAY -->
@@ -2528,9 +2528,9 @@ const ENERGY_BOOST_PAIRS = [
 ];
 function energyBoostDesc(pair) {
   const el1 = ELEM(pair[0]).name, el2 = ELEM(pair[1]).name;
-  if (currentLanguage === 'en') return `Usable if you have any 1 energy. Gain 1 random ${el1} or ${el2} energy (no cost).`;
-  if (currentLanguage === 'simple') return `エネルギーを1つでももっていればつかえる。${el1}か${el2}のエネルギーをランダムで1つえる（きえない）。`;
-  return `エネルギーを1つでも持っていれば使える。${el1}か${el2}のエネルギーをランダムで1つ得る（消費なし）。`;
+  if (currentLanguage === 'en') return `Gain 1 random ${el1} or ${el2} energy`;
+  if (currentLanguage === 'simple') return `${el1}か${el2}のエネルギーのどちらかをランダムで1つえる`;
+  return `${el1}か${el2}のエネルギーのどちらかをランダムで1つ得る`;
 }
 function makeEnergyBoostTech(pair, rank) {
   const root = getTechRoot();
@@ -3444,7 +3444,7 @@ const MAX_PARTY = 3;  // 冒険に連れていくカード数
 // ② 列(col)＝図形の種類カウントで加重ランダム（多い図形ほど出やすいが確定ではない）
 //    circle=0, triangle=1, rectangle=2, hexagon=3
 // ③ 行(row)＝2番目の属性の種類（従来どおり）
-function chooseIllustration(rawPcts, shapeCounts) {
+function chooseIllustration(rawPcts, shapeCounts, usedSet) {
   // ① primary sheet
   const vals = [rawPcts[0], rawPcts[1], rawPcts[2], rawPcts[3]]; // 炎氷風雷
   const whitePct = rawPcts[4];
@@ -3462,11 +3462,16 @@ function chooseIllustration(rawPcts, shapeCounts) {
   const col = SHAPE_ORDER.reduce((best, k, i) =>
     (shapeCounts[k] || 0) > (shapeCounts[SHAPE_ORDER[best]] || 0) ? i : best, 0);
 
-  // ③ row: 2番目に多い属性の種類
+  // ③ row: 2番目に多い属性の種類（既に手持ちに同じキャラがいる場合は次点の属性を試す）
   const rem = [0,1,2,3,4].filter(i => i !== primary);
-  const secondary = rem.reduce((b, i) => (rawPcts[i]||0) > (rawPcts[b]||0) ? i : b, rem[0]);
-  const row = rem.indexOf(secondary);
-
+  const remSorted = [...rem].sort((a, b) => (rawPcts[b] || 0) - (rawPcts[a] || 0));
+  if (usedSet && usedSet.size > 0) {
+    for (const secondary of remSorted) {
+      const row = rem.indexOf(secondary);
+      if (!usedSet.has(`${fileIdx}-${col}-${row}`)) return { fileIdx, col, row };
+    }
+  }
+  const row = rem.indexOf(remSorted[0]);
   return { fileIdx, col, row };
 }
 
@@ -3478,7 +3483,9 @@ function finalizeCard() {
     illustration = { weapon: true };
     name = '強化カード';
   } else {
-    const pick = chooseIllustration(pendingCard.rawPcts, pendingCard.shapeCounts);  // 特化に応じてシート・絵を決定
+    const usedSet = new Set(cardStock.map(c =>
+      `${CARD_FILES.indexOf(c.illustration.file)}-${c.illustration.col}-${c.illustration.row}`));
+    const pick = chooseIllustration(pendingCard.rawPcts, pendingCard.shapeCounts, usedSet);  // 特化に応じてシート・絵を決定（既存カードと重複しないよう調整）
     illustration = { file: CARD_FILES[pick.fileIdx], col: pick.col, row: pick.row };
     name = characterName(pick.fileIdx, pick.col, pick.row);
   }
@@ -4026,7 +4033,11 @@ function leaveRest() {
     runInspirationLottery(showBonusSelect);
     return;
   }
-  battle.floor++;
+  // arriveFloor()自身の休憩判定で表示されたケース（主にエンドレスモード）：
+  // フロアを進めず、この階の休憩を完了マークしてから同じ階のバトルへ進む
+  // （以前は battle.floor++ していたため、この階の戦闘とボーナス/強化カード作成が
+  //  丸ごとスキップされ、フロア数とカード作成回数がズレる原因になっていた）
+  battle.restDoneForFloor = battle.floor;
   arriveFloor();
 }
 
