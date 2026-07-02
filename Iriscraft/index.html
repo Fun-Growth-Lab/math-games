@@ -282,7 +282,7 @@
 
     /* カード拡大表示 */
     #card-zoom-overlay { z-index:300; cursor:pointer; }
-    #card-zoom-holder { transform:scale(1.7); transform-origin:center; }
+    #card-zoom-holder { transform:scale(1.05); transform-origin:center; }
     #card-grid .card { cursor:pointer; transition:transform 0.1s; }
     #card-grid .card:hover { transform:scale(0.70) translateY(-5px); box-shadow:0 0 0 1px rgba(255,240,140,0.7) inset, 0 10px 22px rgba(0,0,0,0.28); }
 
@@ -5115,26 +5115,120 @@ function endPlayerTurn() {
   setTimeout(enemyTurn, 700);
 }
 
-// 敵AI：付けると最も得をする色を選ぶ（弱点を突く強技に近づける）
-function enemyChooseEnergy(e, targetCard) {
-  let bestEl = ELEM_ORDER[randInt(0, 3)], bestScore = -1;
+// ===== 敵AI：判断ヘルパー =====
+
+// 今の（自分の）エネルギーで撃てる最大威力の技（無ければnull）
+function bestUsableTechFor(en, targetCard) {
+  const usable = (en.techs || []).filter(t => canUseTech(en.energy, t));
+  if (usable.length === 0) return null;
+  let best = usable[0], bestDmg = -1;
+  usable.forEach(t => { const d = techDamage(t, en.stats, targetCard); if (d > bestDmg) { bestDmg = d; best = t; } });
+  return { tech: best, dmg: bestDmg };
+}
+
+// 弱点属性の技に「あとどれだけ近いか」を威力換算スコアで返す（既に撃てるなら大きい値）
+function nearestWeaknessProgress(en, targetCard) {
+  let best = 0;
+  (en.techs || []).forEach(t => {
+    if (t.mainEl !== targetCard.weak) return;
+    const need = Math.max(0, t.total - poolTotal(en.energy));
+    const d = techDamage(t, en.stats, targetCard);
+    const score = d / (1 + need);   // 必要エネが少ないほど高評価
+    if (score > best) best = score;
+  });
+  return best;
+}
+
+// プレイヤーが「今すぐ」繰り出せる最大ダメージ＝脅威度の見積り
+function estimatePlayerThreat(p, enemyCard) {
+  if (!p || p.curHp <= 0) return 0;
+  const usable = (p.card.techs || []).filter(t => canUseTech(p.energy, t));
+  if (usable.length === 0) return 0;
+  return Math.max(...usable.map(t => techDamage(t, p.card.stats, enemyCard)));
+}
+
+// スコアに応じた重み付きランダム選択（全候補に最低保証を持たせ、たまに次点も選ばれるようにする）
+function weightedPick(scoreMap) {
+  const entries = Object.entries(scoreMap);
+  const total = entries.reduce((s, [, v]) => s + Math.max(0, v), 0);
+  if (total <= 0) return entries[randInt(0, entries.length - 1)][0];
+  const floor = total * 0.08;
+  const weighted = entries.map(([k, v]) => [k, Math.max(0, v) + floor]);
+  const wTotal = weighted.reduce((s, [, v]) => s + v, 0);
+  let r = Math.random() * wTotal;
+  for (const [k, v] of weighted) { if ((r -= v) <= 0) return k; }
+  return weighted[weighted.length - 1][0];
+}
+
+// 敵AI：付けると得をする色を、スコアに応じた重み付きランダムで選ぶ（弱点を突く強技に近づける）
+// playerEntry があれば、プレイヤーの脅威度（今すぐ繰り出せる最大ダメージ）も考慮して
+// 「悠長に育てている場合ではない」ときは今すぐ撃てる技を強く優先する
+function enemyChooseEnergy(e, targetCard, playerEntry) {
+  const threat = estimatePlayerThreat(playerEntry, e);
+  const urgent = threat > 0 && threat >= e.curHp * 0.6;   // 次の一撃で大きく削られる/落とされかねない
+  const partialCreditMult = urgent ? 0.15 : 0.4;
+  const scores = {};
   ELEM_ORDER.forEach(el => {
-    // この色を1つ足したと仮定
     const sim = { ...e.energy }; sim[el] = (sim[el] || 0) + 1;
     let score = 0;
     (e.techs || []).forEach(t => {
       if (canUseTech(sim, t)) {
-        score = Math.max(score, techDamage(t, e.stats, targetCard));   // 使える技の最大ダメージ
+        score = Math.max(score, techDamage(t, e.stats, targetCard));
       } else {
-        // まだ使えない技も「あと何個で撃てるか」で少し加点（強技を育てる）
         const need = t.total - poolTotal(sim);
         const attrOk = t.counts.every(c => c.el === NORM || (sim[c.el] || 0) >= c.n || c.el === el);
-        if (attrOk && need <= 1) score = Math.max(score, techDamage(t, e.stats, targetCard) * 0.4);
+        if (attrOk && need <= 1) score = Math.max(score, techDamage(t, e.stats, targetCard) * partialCreditMult);
       }
     });
-    if (score > bestScore) { bestScore = score; bestEl = el; }
+    if (el === targetCard.weak) score *= 1.25;   // 弱点属性を育てるボーナス
+    scores[el] = score;
   });
-  return bestEl;
+  return weightedPick(scores);
+}
+
+// 攻撃前：控えの方が明確に有利な一撃を持っていれば入れ替える（HPに関係ない戦術的交代）
+function considerProactiveSwap(e, target) {
+  const myBest = bestUsableTechFor(e, target.card);
+  const myScore = myBest ? myBest.dmg : 0;
+  const bench = battle.enemyTeam.map((en, i) => ({ en, i })).filter(o => o.i !== battle.enemyIdx && o.en.curHp > 0);
+  let candidate = null, candidateScore = myScore;
+  bench.forEach(o => {
+    const b = bestUsableTechFor(o.en, target.card);
+    if (b && b.dmg > candidateScore * 1.3) { candidate = o; candidateScore = b.dmg; }
+  });
+  if (candidate && Math.random() < 0.65) {
+    battle.enemyIdx = candidate.i;
+    battle.enemy = candidate.en;
+    return true;
+  }
+  return false;
+}
+
+// 攻撃できないとき：既に技が使える控えがいれば交代して打たせる（機会損失の解消）
+function considerRescueSwap(target) {
+  const bench = battle.enemyTeam.map((en, i) => ({ en, i })).filter(o => o.i !== battle.enemyIdx && o.en.curHp > 0);
+  const ready = bench.map(o => ({ ...o, best: bestUsableTechFor(o.en, target.card) })).filter(o => o.best);
+  if (ready.length === 0) return false;
+  ready.sort((a, b) => b.best.dmg - a.best.dmg);
+  const pick = (ready.length > 1 && Math.random() < 0.25) ? ready[1] : ready[0];
+  battle.enemyIdx = pick.i;
+  battle.enemy = pick.en;
+  return true;
+}
+
+// 誰も攻撃できないとき：次ターンに向けて一番有望な（弱点技に近い）敵を残す
+function chooseBestStandbyMember(targetCard) {
+  const all = battle.enemyTeam.map((en, i) => ({ en, i })).filter(o => o.en.curHp > 0);
+  if (all.length <= 1) return false;
+  const scored = all.map(o => ({ ...o, score: nearestWeaknessProgress(o.en, targetCard) * (0.85 + Math.random() * 0.3) }));
+  scored.sort((a, b) => b.score - a.score);
+  const best = scored[0];
+  if (best.i !== battle.enemyIdx && Math.random() < 0.5) {
+    battle.enemyIdx = best.i;
+    battle.enemy = best.en;
+    return true;
+  }
+  return false;
 }
 
 // 敵のターン（自動）。skipSwap=true のとき入れ替え判断をスキップ
@@ -5176,8 +5270,17 @@ function enemyTurn(skipSwap = false) {
   }
 
   const target = battle.party[battle.activeIdx];
-  // エネルギー獲得：相手の弱点を突く最強技に近づく色を選ぶ
-  const g = enemyChooseEnergy(e, target.card);
+
+  // 攻撃前：控えの方が明確に有利な一撃を持っていれば入れ替える
+  if (!skipSwap && considerProactiveSwap(e, target)) {
+    pushLog(tlog('log.enemy.swap', battle.enemy.name));
+    renderBattle();
+    setTimeout(() => enemyTurn(true), 900);
+    return;
+  }
+
+  // エネルギー獲得：相手の弱点を突く強技に近づく色を、プレイヤーの脅威度も加味して選ぶ
+  const g = enemyChooseEnergy(e, target.card, target);
   e.energy[g]++;
   // 敵パッシブ：自動回復
   const eAutoHeal = getEnemySkillVal(e, 'auto_heal');
@@ -5190,7 +5293,20 @@ function enemyTurn(skipSwap = false) {
   const usable = (e.techs || []).filter(t => canUseTech(e.energy, t));
   setTimeout(() => {
     if (usable.length === 0) {
+      // 既に技が使える控えがいれば交代して打たせる（機会損失の解消）
+      if (considerRescueSwap(target)) {
+        pushLog(tlog('log.enemy.charge', ELEM_EMOJI[g]));
+        pushLog(tlog('log.enemy.swap', battle.enemy.name));
+        renderBattle();
+        setTimeout(() => enemyTurn(true), 900);
+        return;
+      }
+      // 誰も攻撃できない → 次ターンに向けて一番有望な敵を残す
+      if (chooseBestStandbyMember(target.card)) {
+        pushLog(tlog('log.enemy.swap', battle.enemy.name));
+      }
       pushLog(tlog('log.enemy.charge', ELEM_EMOJI[g]));
+      renderBattle();
       setTimeout(beginPlayerTurn, 800);
       return;
     }
