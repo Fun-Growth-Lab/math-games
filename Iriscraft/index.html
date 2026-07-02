@@ -1480,8 +1480,11 @@ const SKILL_DEFS = {
       1:'弱点時の倍率×2→×2.5', 2:'弱点時の倍率×2→×2.75', 3:'弱点時の倍率×2→×3.0',
       4:'弱点時の倍率×2→×3.25', 5:'弱点時の倍率×2→×3.5' } },
     { id:'free_swap', name:'身軽',         desc:{
-      1:'このカードが交代するとき、30%の確率でコストが0になる', 2:'40%の確率でコストが0になる',
-      3:'50%の確率でコストが0になる', 4:'65%の確率でコストが0になる', 5:'80%の確率でコストが0になる' } },
+      1:'このカードが交代するとき、50%の確率でコストが0になる（戦闘中1回まで）',
+      2:'50%の確率でコストが0になる（戦闘中2回まで）',
+      3:'50%の確率でコストが0になる（戦闘中3回まで）',
+      4:'50%の確率でコストが0になる（戦闘中4回まで）',
+      5:'50%の確率でコストが0になる（戦闘中5回まで）' } },
   ],
 };
 
@@ -1512,8 +1515,10 @@ const SKILL_VALS = {
   gen_thunder:{ 1:0.10,  2:0.20,  3:0.30,  4:0.40,  5:0.50  },
   gen_all:    { 1:0.20,  2:0.40,  3:0.60,  4:0.80,  5:1.00  },
   weak_amp:      { 1:2.50,  2:2.75,  3:3.00,  4:3.25,  5:3.50  },
-  free_swap:     { 1:0.30,  2:0.40,  3:0.50,  4:0.65,  5:0.80  },
+  // 身軽：発生確率は★によらず一定（FREE_SWAP_CHANCE）。値は戦闘中の使用可能回数（★の数だけ）
+  free_swap:     { 1:1,     2:2,     3:3,     4:4,     5:5     },
 };
+const FREE_SWAP_CHANCE = 0.5;
 
 // ブースト技（技として使用、属性値を1回分だけ上げる。効果は使うたびに重複加算）
 const BOOST_TECH_PCT   = { 1:0.10, 2:0.125, 3:0.15,  4:0.175, 5:0.20 };
@@ -2400,7 +2405,7 @@ const SKILL_DESCS = {
     gen_thunder: { 1:'ターンはじめにかみなりエネルギーをえることがある（10%）', 2:'20%', 3:'30%', 4:'40%', 5:'50%' },
     gen_all:     { 1:'ターンはじめにランダムエネルギーをえることがある（20%）', 2:'40%', 3:'60%', 4:'80%', 5:'100%' },
     weak_amp:      { 1:'じゃくてんのばいりつ×2→×2.5', 2:'×2.75', 3:'×3.0', 4:'×3.25', 5:'×3.5' },
-    free_swap:     { 1:'このカードがこうたいするとき、30%のかくりつでコストが0になる', 2:'40%', 3:'50%', 4:'65%', 5:'80%' },
+    free_swap:     { 1:'このカードがこうたいするとき、50%のかくりつでコストが0になる（せんとう中1かいまで）', 2:'（せんとう中2かいまで）', 3:'（せんとう中3かいまで）', 4:'（せんとう中4かいまで）', 5:'（せんとう中5かいまで）' },
   },
   en: {
     auto_heal:   { 1:'Restore 10% max HP each turn', 2:'Restore 15% max HP each turn', 3:'Restore 20% max HP each turn', 4:'Restore 25% max HP each turn', 5:'Restore 30% max HP each turn' },
@@ -2428,7 +2433,7 @@ const SKILL_DESCS = {
     gen_thunder: { 1:'10% chance to gain Thunder energy at turn start', 2:'20%', 3:'30%', 4:'40%', 5:'50%' },
     gen_all:     { 1:'20% chance to gain a random energy at turn start', 2:'40%', 3:'60%', 4:'80%', 5:'100%' },
     weak_amp:      { 1:'Weakness multiplier ×2→×2.5', 2:'×2.75', 3:'×3.0', 4:'×3.25', 5:'×3.5' },
-    free_swap:     { 1:'30% chance this card swaps at no cost', 2:'40%', 3:'50%', 4:'65%', 5:'80%' },
+    free_swap:     { 1:'50% chance this card swaps at no cost (up to 1x per battle)', 2:'(up to 2x per battle)', 3:'(up to 3x per battle)', 4:'(up to 4x per battle)', 5:'(up to 5x per battle)' },
   }
 };
 function skillDesc(id, rank) {
@@ -4581,12 +4586,16 @@ function startBattle() {
     p.energy = emptyEnergy(); p.status = [];
     p.reviveUsed = false; p.firstStrikeUsed = false;
     p.statBoostPct = { fire:0, ice:0, wind:0, thunder:0 };
+    p.freeSwapUsesLeft = Math.max(0, ...getSkillVals(p.card, 'free_swap'), 0);
     // 先制回復
     getSkillVals(p.card, 'pre_heal').forEach(v => {
       p.curHp = Math.min(p.maxHp, p.curHp + Math.round(p.maxHp * v));
     });
   });
-  battle.enemyTeam.forEach(e => { e.energy = emptyEnergy(); e.status = []; });
+  battle.enemyTeam.forEach(e => {
+    e.energy = emptyEnergy(); e.status = [];
+    e.freeSwapUsesLeft = Math.max(0, getEnemySkillVal(e, 'free_swap') || 0);
+  });
   if ((battle.items||[]).some(i => i.id === 'heal')) {
     battle.party.forEach(p => { if (p.curHp > 0) p.curHp = Math.min(p.maxHp, p.curHp + Math.round(p.maxHp * 0.05)); });
   }
@@ -4699,9 +4708,9 @@ function onPartyCardClick(i) {
   const outgoing = battle.party[battle.activeIdx];
   const costActive = (battle.playerTurnCount || 1) >= 2;
   if (costActive) {
-    // ★スキル：身軽（確率でこのカードの交代コストが0になる）
-    const freeChance = Math.max(0, ...getSkillVals(outgoing.card, 'free_swap'), 0);
-    if (freeChance > 0 && Math.random() < freeChance) {
+    // ★スキル：身軽（戦闘中★の回数まで、一定確率でこのカードの交代コストが0になる）
+    if ((outgoing.freeSwapUsesLeft || 0) > 0 && Math.random() < FREE_SWAP_CHANCE) {
+      outgoing.freeSwapUsesLeft--;
       pushLog(tlog('log.freeswap', outgoing.card.name));
       performPartySwap(i);
       return;
@@ -5294,18 +5303,25 @@ function enemyPickSwapTrashColor(entry) {
   return cols[0];
 }
 // 2ターン目以降、エネルギーを持っていなければ交代できない
-// （★スキル「身軽」を持つ場合は確率でエネルギー無しでも交代できる）
+// （★スキル「身軽」を持つ場合、戦闘中の残り回数がある限り一定確率でエネルギー無しでも交代できる）
 function enemyCanSwap(entry) {
   if ((battle.enemyTurnCount || 1) < 2) return true;
   if (hasAnyEnergy(entry)) return true;
-  const freeChance = getEnemySkillVal(entry, 'free_swap') || 0;
-  return freeChance > 0 && Math.random() < freeChance;
+  if ((entry.freeSwapUsesLeft || 0) > 0 && Math.random() < FREE_SWAP_CHANCE) {
+    entry.freeSwapUsesLeft--;
+    entry._freeSwapPending = true;   // paySwapCostIfApplicableで再抽選・再トラッシュしないためのフラグ
+    return true;
+  }
+  return false;
 }
 function paySwapCostIfApplicable(entry) {
   if ((battle.enemyTurnCount || 1) < 2) return null;
-  // ★スキル：身軽（確率でコスト0）
-  const freeChance = getEnemySkillVal(entry, 'free_swap') || 0;
-  if (freeChance > 0 && Math.random() < freeChance) return null;
+  if (entry._freeSwapPending) { entry._freeSwapPending = false; return null; }
+  // ★スキル：身軽（エネルギーがあっても、残り回数がある限り一定確率でコスト0）
+  if ((entry.freeSwapUsesLeft || 0) > 0 && Math.random() < FREE_SWAP_CHANCE) {
+    entry.freeSwapUsesLeft--;
+    return null;
+  }
   const el = enemyPickSwapTrashColor(entry);
   if (el) { entry.energy[el]--; return el; }
   return null;
