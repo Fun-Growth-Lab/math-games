@@ -486,7 +486,7 @@
       background:linear-gradient(90deg,#7a4a18,#a06830); color:#fff; text-align:center;
       padding:8px; font-weight:800; font-size:1rem; box-shadow:0 2px 8px rgba(0,0,0,0.3); }
     /* 合成・スキル再選択オーバーレイ */
-    #merge-overlay .dialog-box { display:flex; gap:20px; align-items:flex-start; padding:16px 28px; width:min(98%, 1100px); }
+    #merge-overlay .dialog-box { display:flex; gap:20px; align-items:flex-start; padding:16px 28px; width:min(98%, 1300px); }
     .merge-sidebar { width:150px; flex-shrink:0; display:flex; flex-direction:column; text-align:left; }
     .merge-sidebar .dialog-msg { font-size:1rem; margin-bottom:6px; }
     .merge-sidebar .dialog-sub { font-size:0.76rem; color:#888; margin-bottom:0; }
@@ -494,11 +494,11 @@
     .merge-side-label.mat  { color:#b07820; background:rgba(176,120,32,0.1); margin-top:14px; }
     .merge-side-label.pick { color:#555;    background:rgba(0,0,0,0.06);     margin-top:auto; padding-top:12px; }
     .merge-main { flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; min-width:0; overflow:visible; }
-    #merge-choices { display:flex; gap:10px; justify-content:center; flex-wrap:nowrap; overflow-x:visible; width:100%; box-sizing:border-box; }
+    #merge-choices { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; overflow-x:visible; width:100%; box-sizing:border-box; }
     #merge-material { display:flex; justify-content:center; width:100%; }
     .merge-main .fighter-pick {
-      transform:scale(0.58); transform-origin:top center;
-      margin: 0 -97px -176px;
+      transform:scale(0.54); transform-origin:top center;
+      margin: 0 -120px -164px;
     }
     .merge-main #merge-material .card {
       transform:scale(0.62); transform-origin:top center;
@@ -5521,14 +5521,7 @@ function _processNextInspiration() {
 
 function acceptInspiration() {
   document.getElementById('inspiration-overlay').classList.add('hidden');
-  const card = _inspirationCard;
-  const choice = _inspirationChoice;
-  const totalSlots = (card.techs || []).length + (card.skill ? 1 : 0) + (card.skill2 ? 1 : 0);
-  if (totalSlots < 4) {
-    maybeApplySkillChoice(card, choice, _processNextInspiration);
-  } else {
-    openUnifiedReplacePick(card, choice, _processNextInspiration);
-  }
+  routeLearnChoice(_inspirationCard, _inspirationChoice, _processNextInspiration);
 }
 
 function skipInspiration() {
@@ -5633,10 +5626,11 @@ function toggleLearnCardView() {
   const panel = document.getElementById('learn-card-view');
   if (!panel.classList.contains('hidden')) { panel.classList.add('hidden'); return; }
   panel.innerHTML = '';
-  battle.party.forEach(p => {
+  cardStock.forEach(c => {
+    const pe = battle.party.find(p => p.card === c);
     const wrap = document.createElement('div');
     wrap.style.cssText = 'transform:scale(0.52);transform-origin:top center;margin:0 -102px -201px;flex-shrink:0;pointer-events:none;';
-    wrap.appendChild(buildCardEl(p.card, {noZoom:true}));
+    wrap.appendChild(buildCardEl(c, pe ? { curHp: pe.curHp } : {}));
     panel.appendChild(wrap);
   });
   panel.classList.remove('hidden');
@@ -5667,14 +5661,15 @@ function showNewTechCardPick() {
   }
   const holder = document.getElementById('new-tech-cards');
   holder.innerHTML = '';
-  battle.party.forEach(p => {
+  cardStock.forEach(c => {
+    const pe = battle.party.find(p => p.card === c);
     const wrap = document.createElement('div');
     wrap.style.cssText = 'cursor:pointer;transform:scale(0.52);transform-origin:top center;margin:0 -102px -201px;transition:filter 0.15s;flex-shrink:0;';
-    wrap.title = `${p.card.name} に教える`;
-    wrap.appendChild(buildCardEl(p.card, {noZoom:true}));
+    wrap.title = `${c.name} に教える`;
+    wrap.appendChild(buildCardEl(c, pe ? { curHp: pe.curHp } : {}));
     wrap.onmouseenter = () => wrap.style.filter = 'drop-shadow(0 0 12px #ffd454)';
     wrap.onmouseleave = () => wrap.style.filter = '';
-    wrap.onclick = () => teachNewTech(p.card);
+    wrap.onclick = () => teachNewTech(c);
     holder.appendChild(wrap);
   });
   document.getElementById('new-tech-stage1').classList.add('hidden');
@@ -5683,13 +5678,7 @@ function showNewTechCardPick() {
 
 function teachNewTech(card) {
   document.getElementById('bonus-new-tech-overlay').classList.add('hidden');
-  const choice = pendingNewTech;
-  const totalSlots = (card.techs || []).length + (card.skill ? 1 : 0) + (card.skill2 ? 1 : 0);
-  if (totalSlots < 4) {
-    maybeApplySkillChoice(card, choice, finishBonus);
-  } else {
-    openUnifiedReplacePick(card, choice);
-  }
+  routeLearnChoice(card, pendingNewTech, finishBonus);
 }
 
 // 技のエネルギーキー（同コスト判定用）
@@ -5773,11 +5762,26 @@ function confirmSkillMerge(doMerge) {
     card[dupSlot].rank = mergedRank;
     showTechLevelUp(skillName(choice.def.id), mergedRank, afterCb);
   } else {
-    // 空きスロットに追加（なければ skill2 を上書き）
-    if (!card.skill) { card.skill = { id: choice.def.id, rank: choice.rank }; }
-    else if (!card.skill2) { card.skill2 = { id: choice.def.id, rank: choice.rank }; }
-    else { card.skill2 = { id: choice.def.id, rank: choice.rank }; }
-    afterCb();
+    // ２つ持つ：空きスキルスロットがあればそこへ。無ければ捨てるものを選ばせる
+    if (!card.skill) { card.skill = { id: choice.def.id, rank: choice.rank }; afterCb(); }
+    else if (!card.skill2) { card.skill2 = { id: choice.def.id, rank: choice.rank }; afterCb(); }
+    else { openUnifiedReplacePick(card, choice, afterCb); }
+  }
+}
+
+// 技・スキル習得の入り口：重複スキルなら統合/２つ持つを先に確認し、
+// 空きが本当に必要なときだけスロット入れ替え（捨てる技を選ぶ）画面に進む
+function routeLearnChoice(card, choice, afterCb) {
+  if (choice.type === 'skill') {
+    const dupSlot = card.skill?.id === choice.def.id ? 'skill'
+                  : card.skill2?.id === choice.def.id ? 'skill2' : null;
+    if (dupSlot) { maybeApplySkillChoice(card, choice, afterCb); return; }
+  }
+  const totalSlots = (card.techs || []).length + (card.skill ? 1 : 0) + (card.skill2 ? 1 : 0);
+  if (totalSlots < 4) {
+    maybeApplySkillChoice(card, choice, afterCb);
+  } else {
+    openUnifiedReplacePick(card, choice, afterCb);
   }
 }
 
@@ -5866,11 +5870,12 @@ function skipNewTech() {
 function showBonusPick() {
   const holder = document.getElementById('bonus-pick-cards');
   holder.innerHTML = '';
-  battle.party.forEach(p => {
+  cardStock.forEach(c => {
+    const pe = battle.party.find(p => p.card === c);
     const wrap = document.createElement('div');
     wrap.style.cssText = 'cursor:pointer;transform:scale(0.78);transform-origin:top center;margin:0 -57px -92px;flex-shrink:0;';
-    wrap.appendChild(buildCardEl(p.card, {noZoom:true, curHp: p.curHp}));
-    wrap.onclick = () => onBonusCardPicked(p.card);
+    wrap.appendChild(buildCardEl(c, pe ? { curHp: pe.curHp } : {}));
+    wrap.onclick = () => onBonusCardPicked(c);
     holder.appendChild(wrap);
   });
   document.getElementById('bonus-pick-overlay').classList.remove('hidden');
@@ -5979,7 +5984,7 @@ function openBonusSkillPick(card) {
       ranks.forEach(rank => {
         const div = document.createElement('div'); div.className = 'skill-opt';
         div.style.cssText = 'cursor:pointer;padding:6px 10px;';
-        div.innerHTML = `<div class="sk-info"><div class="sk-name">${skillName(def.id)}（${RANK_LABELS[rank]}）</div><div style="font-size:0.72rem;color:#888">${def.desc[rank]||''}</div></div>`;
+        div.innerHTML = `<div class="sk-info"><div class="sk-name">${skillName(def.id)}（${RANK_LABELS[rank]}）</div><div style="font-size:0.72rem;color:#888">${skillDesc(def.id, rank)}</div></div>`;
         div.onclick = () => applyBonusSkill(def.id, rank);
         container.appendChild(div);
       });
@@ -6186,15 +6191,14 @@ function techBoxEl(t, card, isWeapon, slotLabel) {
 }
 
 function skillSlotEl(sk) {
-  const skDef = Object.values(SKILL_DEFS).flat().find(d => d.id === sk.id);
   const div = document.createElement('div');
   div.className = 'card-tech';
   div.style.background = 'rgba(160,64,255,0.10)';
   div.style.borderColor = 'rgba(160,64,255,0.5)';
-  const desc = skDef && skDef.desc[sk.rank] ? skDef.desc[sk.rank] : '';
+  const desc = skillDesc(sk.id, sk.rank || 1);
   div.innerHTML = `
     <div class="card-tech-name-row">
-      <span class="card-tech-name" style="color:#c080ff">🔮 ${skDef ? skDef.name : sk.id}</span>
+      <span class="card-tech-name" style="color:#c080ff">🔮 ${skillName(sk.id)}</span>
       <span class="card-tech-stars">${'★'.repeat(sk.rank || 1)}</span>
     </div>
     <div style="font-size:0.82rem;color:#a060e0;margin-top:2px;text-align:center;line-height:1.2;overflow:hidden;max-height:2.6em">${desc}</div>`;
