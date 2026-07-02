@@ -2209,6 +2209,7 @@ const LOGSTRINGS = {
     'log.enemy.swap': (name) => `👹 てきは ${name} と交代した！`,
     'log.enemy.swapcost': (name, emoji) => `🔄 ${name}は 交代のため ${emoji} をトラッシュした`,
     'log.swapcost': (name, emoji) => `🔄 ${name}は 交代のため ${emoji} をトラッシュした`,
+    'log.swapblocked': (name) => `🚫 ${name}は エネルギーが無く交代できない！`,
     'log.enemy.heal': (name, hp) => `${name} は HPを ${hp} 回復した`,
     'log.enemy.charge': (energy) => `てきは ${energy} エネルギーをためた`,
     'log.enemy.paralyzed': (name) => `⚡ ${name}は しびれて 技がでなかった！`,
@@ -2251,6 +2252,7 @@ const LOGSTRINGS = {
     'log.enemy.swap': (name) => `👹 てきは ${name} とこうたいした！`,
     'log.enemy.swapcost': (name, emoji) => `🔄 ${name}は こうたいのため ${emoji} をトラッシュした`,
     'log.swapcost': (name, emoji) => `🔄 ${name}は こうたいのため ${emoji} をトラッシュした`,
+    'log.swapblocked': (name) => `🚫 ${name}は エネルギーがなくてこうたいできない！`,
     'log.enemy.heal': (name, hp) => `${name} は HPを ${hp} かいふくした`,
     'log.enemy.charge': (energy) => `てきは ${energy} エネルギーをためた`,
     'log.enemy.paralyzed': (name) => `⚡ ${name}はしびれてわざがでなかった！`,
@@ -2293,6 +2295,7 @@ const LOGSTRINGS = {
     'log.enemy.swap': (name) => `👹 Enemy swapped to ${name}!`,
     'log.enemy.swapcost': (name, emoji) => `🔄 ${name} discarded ${emoji} to swap`,
     'log.swapcost': (name, emoji) => `🔄 ${name} discarded ${emoji} to swap`,
+    'log.swapblocked': (name) => `🚫 ${name} has no energy and cannot swap!`,
     'log.enemy.heal': (name, hp) => `${name} recovered ${hp} HP`,
     'log.enemy.charge': (energy) => `Enemy charged ${energy} energy`,
     'log.enemy.paralyzed': (name) => `⚡ ${name} is paralyzed — skill failed!`,
@@ -4686,7 +4689,13 @@ function onPartyCardClick(i) {
   if (battle.frozenThisTurn) return;   // こおり中は入れ替え不可
   const outgoing = battle.party[battle.activeIdx];
   const costActive = (battle.playerTurnCount || 1) >= 2;
-  if (costActive && hasAnyEnergy(outgoing)) {
+  if (costActive) {
+    if (!hasAnyEnergy(outgoing)) {
+      // エネルギーが無いと交代できない（逃げられない）
+      pushLog(tlog('log.swapblocked', outgoing.card.name));
+      renderBattle();
+      return;
+    }
     _pendingSwapIdx = i;
     openSwapCostPicker(outgoing);
     return;
@@ -5259,7 +5268,7 @@ function enemyChooseEnergy(e, targetCard, playerEntry) {
   return weightedPick(scores);
 }
 
-// 交代コスト：2ターン目以降、交代元のエネルギーを1つトラッシュする（無ければ無料）
+// 交代コスト：2ターン目以降、交代元のエネルギーを1つトラッシュする（エネルギーが無ければ交代自体できない＝逃げられない）
 // AIはどの色を捨てるか自動選択：無色優先、次に一番少ない色を優先し、育てている大きな色は温存する
 function enemyPickSwapTrashColor(entry) {
   const cols = ['norm', ...ELEM_ORDER].filter(c => (entry.energy[c] || 0) > 0);
@@ -5267,6 +5276,11 @@ function enemyPickSwapTrashColor(entry) {
   if (entry.energy.norm > 0) return 'norm';
   cols.sort((a, b) => (entry.energy[a] || 0) - (entry.energy[b] || 0));
   return cols[0];
+}
+// 2ターン目以降、エネルギーを持っていなければ交代できない
+function enemyCanSwap(entry) {
+  if ((battle.enemyTurnCount || 1) < 2) return true;
+  return ['norm', ...ELEM_ORDER].some(el => (entry.energy[el] || 0) > 0);
 }
 function paySwapCostIfApplicable(entry) {
   if ((battle.enemyTurnCount || 1) < 2) return null;
@@ -5277,6 +5291,7 @@ function paySwapCostIfApplicable(entry) {
 
 // 攻撃前：控えの方が明確に有利な一撃を持っていれば入れ替える（HPに関係ない戦術的交代）
 function considerProactiveSwap(e, target) {
+  if (!enemyCanSwap(e)) return false;
   const myBest = bestUsableTechFor(e, target.card);
   const myScore = myBest ? myBest.dmg : 0;
   const costActive = (battle.enemyTurnCount || 1) >= 2;
@@ -5300,6 +5315,7 @@ function considerProactiveSwap(e, target) {
 // 攻撃できないとき：既に技が使える控えがいれば交代して打たせる（機会損失の解消）
 function considerRescueSwap(target) {
   const e = battle.enemy;
+  if (!enemyCanSwap(e)) return false;
   const bench = battle.enemyTeam.map((en, i) => ({ en, i })).filter(o => o.i !== battle.enemyIdx && o.en.curHp > 0);
   const ready = bench.map(o => ({ ...o, best: bestUsableTechFor(o.en, target.card) })).filter(o => o.best);
   if (ready.length === 0) return false;
@@ -5314,6 +5330,7 @@ function considerRescueSwap(target) {
 
 // 誰も攻撃できないとき：次ターンに向けて一番有望な（弱点技に近い）敵を残す
 function chooseBestStandbyMember(targetCard) {
+  if (!enemyCanSwap(battle.enemy)) return false;
   const all = battle.enemyTeam.map((en, i) => ({ en, i })).filter(o => o.en.curHp > 0);
   if (all.length <= 1) return false;
   const scored = all.map(o => ({ ...o, score: nearestWeaknessProgress(o.en, targetCard) * (0.85 + Math.random() * 0.3) }));
@@ -5355,7 +5372,7 @@ function enemyTurn(skipSwap = false) {
   // 控えへの入れ替え判断（HP30%以下・控えが居れば50%で交代）→ 交代後もそのままターン継続
   if (!skipSwap) {
     const hpRatio = e.curHp / e.maxHp;
-    if (hpRatio < 0.3) {
+    if (hpRatio < 0.3 && enemyCanSwap(e)) {
       const alive = battle.enemyTeam.map((en, i) => ({ en, i }))
         .filter(o => o.i !== battle.enemyIdx && o.en.curHp > 0);
       if (alive.length > 0 && Math.random() < 0.5) {
