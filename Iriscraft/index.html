@@ -230,6 +230,9 @@
     .card-attr2 { display:flex; align-items:center; gap:6px; flex:1; min-height:36px;
       background:rgba(255,255,255,0.65); border:1px solid rgba(192,160,48,0.35); border-radius:6px; padding:2px 8px; }
     .card-attr2-emoji { font-size:1.7rem; flex-shrink:0; }
+    /* エネルギー属性アイコン（energy.pngのスプライトから1コマ切り出し表示） */
+    .elem-icon { display:inline-block; width:1em; height:1em; vertical-align:-0.15em;
+      background-image:url('images/energy.png'); background-repeat:no-repeat; background-size:500% 100%; }
     .card-attr2-grade { font-family:"M PLUS Rounded 1c",sans-serif; font-weight:900; font-size:1.7rem;
       -webkit-text-stroke:2px rgba(255,255,255,0.9); paint-order:stroke fill; min-width:36px; text-align:center; flex-shrink:0; }
     .card-attr2-val { font-weight:800; flex:1; text-align:right; font-size:1.6rem; }
@@ -1130,6 +1133,16 @@ const ELEMENTS = [
 const ELEM_ORDER = ELEMENTS.map(e => e.id);
 const ELEM = id => ELEMENTS.find(e => e.id === id);
 const ELEM_EMOJI = { fire:'🔥', ice:'🧊', wind:'🍃', thunder:'⚡', norm:'⚛️' };
+// energy.png（横2030×縦400、炎・氷・風・雷・無色の順で5コマ）から1コマ分を切り出して表示するアイコン
+// 技名やアイテムのicon文字列（長さで文字サイズを計算する箇所がある）には使わず、
+// 見た目だけのアイコン表示（ログ・技コスト・属性値・エネルギードック等）に使う
+const ELEM_ICON_INDEX = { fire:0, ice:1, wind:2, thunder:3, norm:4 };
+function elemIconHTML(el, sizeEm) {
+  const idx = ELEM_ICON_INDEX[el];
+  if (idx === undefined) return ELEM_EMOJI[el] || '';
+  const sizeStyle = sizeEm ? `width:${sizeEm}em;height:${sizeEm}em;` : '';
+  return `<span class="elem-icon" style="background-position:${idx * 25}% 0;${sizeStyle}"></span>`;
+}
 const NORM = 'norm';
 const NORM_RATE = 0.6;          // ノーマルエネルギーは属性エネの0.6倍の威力
 
@@ -3394,7 +3407,7 @@ function techPickCount() { return enhancing ? 1 : 2; }   // 強化カードは�
 
 // 技の必要エネルギーを絵文字で表示
 function techEnergyHTML(tech) {
-  return tech.counts.map(c => ELEM_EMOJI[c.el].repeat(c.n)).join('');
+  return tech.counts.map(c => elemIconHTML(c.el).repeat(c.n)).join('');
 }
 
 function goToSkillSelect() {
@@ -4511,10 +4524,10 @@ function energyStripHTML(pool) {
   if (!pool) return '';
   let s = ELEM_ORDER.map(el => {
     const n = Math.max(0, Math.floor(pool[el] || 0));
-    return ELEM_EMOJI[el].repeat(n);
+    return elemIconHTML(el).repeat(n);
   }).join('');
   const norm = Math.max(0, Math.floor(pool.norm || 0));
-  s += ELEM_EMOJI.norm.repeat(norm);
+  s += elemIconHTML('norm').repeat(norm);
   return s;
 }
 
@@ -4560,9 +4573,9 @@ function flashDamage(wrapId, dmg) {
 
 // エネルギー候補の見た目（type:'attr'/'norm2'）
 function choiceLabel(ch) {
-  if (ch.type === 'double') return ELEM_EMOJI[ch.el1] + ELEM_EMOJI[ch.el2];
-  if (ch.type === 'norm2')  return ELEM_EMOJI.norm + ELEM_EMOJI.norm;
-  return ELEM_EMOJI[ch.el];
+  if (ch.type === 'double') return elemIconHTML(ch.el1) + elemIconHTML(ch.el2);
+  if (ch.type === 'norm2')  return elemIconHTML('norm') + elemIconHTML('norm');
+  return elemIconHTML(ch.el);
 }
 
 // 中央ドック：choose=2択(ドラッグ) / act=トラッシュ＆なにもしない
@@ -4783,7 +4796,7 @@ function maybeTransferEnergyOnFaint(p) {
         const tgt = allies[randInt(0, allies.length - 1)];
         tgt.energy[el] = (tgt.energy[el] || 0) + 1;
         p.energy[el]--;
-        pushLog(tlog('log.energylegacy', p.card.name, tgt.card.name, ELEM_EMOJI[el]));
+        pushLog(tlog('log.energylegacy', p.card.name, tgt.card.name, elemIconHTML(el)));
       }
     }
   });
@@ -4823,13 +4836,13 @@ function beginPlayerTurn() {
   if (p.curHp > 0) {
     [['gen_fire','fire'],['gen_ice','ice'],['gen_wind','wind'],['gen_thunder','thunder']].forEach(([id, el]) => {
       getSkillVals(p.card, id).forEach(v => {
-        if (Math.random() < v) { p.energy[el]++; pushLog(tlog('log.gennature', p.card.name, ELEM_EMOJI[el])); }
+        if (Math.random() < v) { p.energy[el]++; pushLog(tlog('log.gennature', p.card.name, elemIconHTML(el))); }
       });
     });
     getSkillVals(p.card, 'gen_all').forEach(v => {
       if (Math.random() < v) {
         const el = ELEM_ORDER[randInt(0, 3)];
-        p.energy[el]++; pushLog(tlog('log.gennature', p.card.name, ELEM_EMOJI[el]));
+        p.energy[el]++; pushLog(tlog('log.gennature', p.card.name, elemIconHTML(el)));
       }
     });
     if (!p.statBoostPct) p.statBoostPct = { fire:0, ice:0, wind:0, thunder:0 };
@@ -4847,7 +4860,7 @@ function beginPlayerTurn() {
     const tgt = alive[randInt(0, alive.length - 1)];
     const el = ELEM_ORDER[randInt(0, 3)];
     tgt.energy[el]++;
-    pushLog(tlog('log.chaos', tgt.card.name, ELEM_EMOJI[el]));
+    pushLog(tlog('log.chaos', tgt.card.name, elemIconHTML(el)));
   });
 
   battle.choices = rollTwoChoices();
@@ -4909,7 +4922,7 @@ function openSwapCostPicker(outgoing) {
     if (n <= 0) return;
     const tok = document.createElement('div');
     tok.className = 'dock-token';
-    tok.textContent = ELEM_EMOJI[el];
+    tok.innerHTML = elemIconHTML(el);
     tok.onclick = () => confirmSwapCost(el);
     holder.appendChild(tok);
   });
@@ -4920,7 +4933,7 @@ function confirmSwapCost(el) {
   const outgoing = battle.party[battle.activeIdx];
   if (outgoing.energy[el] > 0) {
     outgoing.energy[el]--;
-    pushLog(tlog('log.swapcost', outgoing.card.name, ELEM_EMOJI[el]));
+    pushLog(tlog('log.swapcost', outgoing.card.name, elemIconHTML(el)));
   }
   const i = _pendingSwapIdx; _pendingSwapIdx = null;
   if (i != null) performPartySwap(i);
@@ -4981,7 +4994,7 @@ function applyStatusOnHit(attackerTech, defender, defName) {
     if (have.length) {
       const el = have[randInt(0, have.length - 1)];
       defender.energy[el]--;
-      pushLog(tlog('log.gust', defName, ELEM_EMOJI[el]));
+      pushLog(tlog('log.gust', defName, elemIconHTML(el)));
     }
   } else {
     if (defender.status.length >= 3) return;       // 重複は3つまで
@@ -5038,12 +5051,12 @@ function useTech(t) {
   if (t.utility === 'energyBoost') {
     const el = t.pair[randInt(0, 1)];
     p.energy[el] = (p.energy[el] || 0) + 1;
-    pushLog(tlog('log.energyboost', p.card.name, ELEM_EMOJI[el]));
+    pushLog(tlog('log.energyboost', p.card.name, elemIconHTML(el)));
     const bonusRate = ENERGY_CHARGE_BONUS_RATE[t.rank || 1] || ENERGY_CHARGE_BONUS_RATE[1];
     if (Math.random() < bonusRate) {
       const el2 = t.pair[randInt(0, 1)];
       p.energy[el2] = (p.energy[el2] || 0) + 1;
-      pushLog(tlog('log.energyboost', p.card.name, ELEM_EMOJI[el2]));
+      pushLog(tlog('log.energyboost', p.card.name, elemIconHTML(el2)));
     }
     renderBattle();
     setTimeout(enemyTurn, 900);
@@ -5055,7 +5068,7 @@ function useTech(t) {
   if (t.utility === 'statBoost') {
     if (!p.statBoostPct) p.statBoostPct = { fire:0, ice:0, wind:0, thunder:0 };
     p.statBoostPct[t.boostEl] = (p.statBoostPct[t.boostEl] || 0) + t.boostPct;
-    pushLog(tlog('log.boost', p.card.name, ELEM_EMOJI[t.boostEl], Math.round(p.statBoostPct[t.boostEl] * 100)));
+    pushLog(tlog('log.boost', p.card.name, elemIconHTML(t.boostEl), Math.round(p.statBoostPct[t.boostEl] * 100)));
     renderBattle();
     setTimeout(enemyTurn, 900);
     return;
@@ -5547,7 +5560,7 @@ function considerProactiveSwap(e, target) {
   });
   if (candidate && Math.random() < 0.65) {
     const trashed = paySwapCostIfApplicable(e);
-    if (trashed) pushLog(tlog('log.enemy.swapcost', e.name, ELEM_EMOJI[trashed]));
+    if (trashed) pushLog(tlog('log.enemy.swapcost', e.name, elemIconHTML(trashed)));
     battle.enemyIdx = candidate.i;
     battle.enemy = candidate.en;
     return true;
@@ -5565,7 +5578,7 @@ function considerRescueSwap(target) {
   ready.sort((a, b) => b.best.dmg - a.best.dmg);
   const pick = (ready.length > 1 && Math.random() < 0.25) ? ready[1] : ready[0];
   const trashed = paySwapCostIfApplicable(e);
-  if (trashed) pushLog(tlog('log.enemy.swapcost', e.name, ELEM_EMOJI[trashed]));
+  if (trashed) pushLog(tlog('log.enemy.swapcost', e.name, elemIconHTML(trashed)));
   battle.enemyIdx = pick.i;
   battle.enemy = pick.en;
   return true;
@@ -5582,7 +5595,7 @@ function chooseBestStandbyMember(targetCard) {
   if (best.i !== battle.enemyIdx && Math.random() < 0.5) {
     const outgoing = battle.enemy;
     const trashed = paySwapCostIfApplicable(outgoing);
-    if (trashed) pushLog(tlog('log.enemy.swapcost', outgoing.name, ELEM_EMOJI[trashed]));
+    if (trashed) pushLog(tlog('log.enemy.swapcost', outgoing.name, elemIconHTML(trashed)));
     battle.enemyIdx = best.i;
     battle.enemy = best.en;
     return true;
@@ -5621,7 +5634,7 @@ function enemyTurn(skipSwap = false) {
       if (alive.length > 0 && Math.random() < 0.5) {
         const swap = alive[Math.floor(Math.random() * alive.length)];
         const trashed = paySwapCostIfApplicable(e);
-        if (trashed) pushLog(tlog('log.enemy.swapcost', e.name, ELEM_EMOJI[trashed]));
+        if (trashed) pushLog(tlog('log.enemy.swapcost', e.name, elemIconHTML(trashed)));
         battle.enemyIdx = swap.i;
         battle.enemy = swap.en;
         pushLog(tlog('log.enemy.swap', battle.enemy.name));
@@ -5660,7 +5673,7 @@ function enemyTurn(skipSwap = false) {
     if (usable.length === 0) {
       // 既に技が使える控えがいれば交代して打たせる（機会損失の解消）
       if (considerRescueSwap(target)) {
-        pushLog(tlog('log.enemy.charge', ELEM_EMOJI[g]));
+        pushLog(tlog('log.enemy.charge', elemIconHTML(g)));
         pushLog(tlog('log.enemy.swap', battle.enemy.name));
         renderBattle();
         setTimeout(() => enemyTurn(true), 900);
@@ -5670,7 +5683,7 @@ function enemyTurn(skipSwap = false) {
       if (chooseBestStandbyMember(target.card)) {
         pushLog(tlog('log.enemy.swap', battle.enemy.name));
       }
-      pushLog(tlog('log.enemy.charge', ELEM_EMOJI[g]));
+      pushLog(tlog('log.enemy.charge', elemIconHTML(g)));
       renderBattle();
       setTimeout(beginPlayerTurn, 800);
       return;
@@ -5678,7 +5691,7 @@ function enemyTurn(skipSwap = false) {
     const p = battle.party[battle.activeIdx];
     // まひでミス
     if (paralysisMiss(e)) {
-      pushLog(tlog('log.enemy.charge', ELEM_EMOJI[g]));
+      pushLog(tlog('log.enemy.charge', elemIconHTML(g)));
       pushLog(tlog('log.enemy.paralyzed', e.name));
       setTimeout(beginPlayerTurn, 800);
       return;
@@ -5686,7 +5699,7 @@ function enemyTurn(skipSwap = false) {
     // 最大ダメージ技（弱点込み）を選ぶ
     let best = usable[0], bestDmg = -1;
     usable.forEach(t => { const d = techDamage(t, e.stats, p.card); if (d > bestDmg) { bestDmg = d; best = t; } });
-    pushLog(tlog('log.enemy.charge.total', ELEM_EMOJI[g], energyStripHTML(e.energy)));
+    pushLog(tlog('log.enemy.charge.total', elemIconHTML(g), energyStripHTML(e.energy)));
     // 技のエネルギーを常に消費（プレイヤーと対称に）
     trashTechEnergy(e, best);
     // 一定確率で全力攻撃（残りエネルギーもトラッシュして2倍）。ボスは耐久型なので全力攻撃はしない
@@ -6628,7 +6641,7 @@ function attrRowEl(id, val) {
   const grade = getGrade(val);
   const row = document.createElement('div'); row.className = 'card-attr2';
   row.innerHTML = `
-    <span class="card-attr2-emoji">${ELEM_EMOJI[id]}</span>
+    <span class="card-attr2-emoji">${elemIconHTML(id)}</span>
     <span class="card-attr2-grade" style="color:${grade.color}">${grade.letter}</span>
     <span class="card-attr2-val" style="color:${grade.color}">${val}</span>`;
   return row;
@@ -6637,7 +6650,7 @@ function attrRowEl(id, val) {
 // 弱点 or 抵抗の1行（属性行と同じ高さ）
 function wrRowEl(kind, el) {
   const row = document.createElement('div'); row.className = 'card-wr-row ' + kind;
-  row.innerHTML = `${kind === 'weak' ? '弱点' : '抵抗'}<span class="wk-emoji">${el ? ELEM_EMOJI[el] : '—'}</span>`;
+  row.innerHTML = `${kind === 'weak' ? '弱点' : '抵抗'}<span class="wk-emoji">${el ? elemIconHTML(el) : '—'}</span>`;
   return row;
 }
 // 弱点・抵抗の縦大ボックス（右列用）
@@ -6655,7 +6668,7 @@ function wrBoxEl(kind, el) {
     box.style.borderColor = '#ccc';
     box.style.color = '#999';
   }
-  box.innerHTML = `<span class="wk-mark">${mark}</span><span class="wk-elem">${el ? ELEM_EMOJI[el] : '—'}</span>`;
+  box.innerHTML = `<span class="wk-mark">${mark}</span><span class="wk-elem">${el ? elemIconHTML(el) : '—'}</span>`;
   return box;
 }
 
@@ -6693,7 +6706,7 @@ function techBoxEl(t, card, isWeapon, slotLabel) {
         <div class="card-tech-bottom">
           <div class="card-tech-energy">${techEnergyHTML(t)}</div>
           <div class="card-tech-sep">→</div>
-          <div class="card-tech-dmg" style="font-size:1.2rem">${ELEM_EMOJI[t.pair[0]]}/${ELEM_EMOJI[t.pair[1]]}</div>
+          <div class="card-tech-dmg" style="font-size:1.2rem">${elemIconHTML(t.pair[0])}/${elemIconHTML(t.pair[1])}</div>
         </div>`;
     } else if (t.utility === 'statBoost') {
       div.innerHTML = `
