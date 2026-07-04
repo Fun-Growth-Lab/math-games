@@ -1491,6 +1491,9 @@ const SKILL_DEFS = {
       3:'コストが0になる（戦闘中3回まで）',
       4:'コストが0になる（戦闘中4回まで）',
       5:'コストが0になる（戦闘中5回まで）' } },
+    { id:'energy_legacy', name:'エネルギー継承', desc:{
+      1:'HPが0になったとき、持っているエネルギーを1つずつ、生きている仲間にランダムで渡すことがある（60%）',
+      2:'（70%）', 3:'（80%）', 4:'（90%）', 5:'（100%）' } },
   ],
 };
 
@@ -1523,6 +1526,7 @@ const SKILL_VALS = {
   weak_amp:      { 1:2.50,  2:2.75,  3:3.00,  4:3.25,  5:3.50  },
   // 身軽：発生確率は★によらず一定（FREE_SWAP_CHANCE）。値は戦闘中の使用可能回数（★の数だけ）
   free_swap:     { 1:1,     2:2,     3:3,     4:4,     5:5     },
+  energy_legacy: { 1:0.60,  2:0.70,  3:0.80,  4:0.90,  5:1.00  },
 };
 const FREE_SWAP_CHANCE = 1.0;
 
@@ -2251,6 +2255,7 @@ const LOGSTRINGS = {
     'log.counter': (name, dmg) => `⚡ カウンター！ ${name}は <span class="log-dmg">${dmg}</span> ダメージを返した！`,
     'log.tenacity': (name) => `💪 ${name}は 執念で耐えた！`,
     'log.revive': (name) => `✨ ${name}は 復活した！`,
+    'log.energylegacy': (name, target, emoji) => `${emoji} ${name}のエネルギーが ${target}に 引き継がれた！`,
     'log.enemy.attack': (tag, techHtml, dmg) => `${tag}てきの${techHtml}！ <span class="log-dmg">${dmg}</span> ダメージ`,
     'log.player.fallen': (name) => `${name} は たおれた…`,
   },
@@ -2296,6 +2301,7 @@ const LOGSTRINGS = {
     'log.counter': (name, dmg) => `⚡ カウンター！ ${name}は <span class="log-dmg">${dmg}</span> ダメージをかえした！`,
     'log.tenacity': (name) => `💪 ${name}はしゅうねんでたえた！`,
     'log.revive': (name) => `✨ ${name}はふっかつした！`,
+    'log.energylegacy': (name, target, emoji) => `${emoji} ${name}のエネルギーが ${target}にひきつがれた！`,
     'log.enemy.attack': (tag, techHtml, dmg) => `${tag}てきの${techHtml}！ <span class="log-dmg">${dmg}</span> ダメージ`,
     'log.player.fallen': (name) => `${name} はたおれた…`,
   },
@@ -2341,6 +2347,7 @@ const LOGSTRINGS = {
     'log.counter': (name, dmg) => `⚡ Counter! ${name} returned <span class="log-dmg">${dmg}</span> damage!`,
     'log.tenacity': (name) => `💪 ${name} survived with Tenacity!`,
     'log.revive': (name) => `✨ ${name} revived!`,
+    'log.energylegacy': (name, target, emoji) => `${emoji} ${name}'s energy was passed on to ${target}!`,
     'log.enemy.attack': (tag, techHtml, dmg) => `${tag}Enemy's ${techHtml}! <span class="log-dmg">${dmg}</span> dmg`,
     'log.player.fallen': (name) => `${name} has fallen…`,
   }
@@ -2374,7 +2381,7 @@ const SKILL_NAMES = {
     full_guard:'完全ガード', iron_wall:'鉄壁', reflect:'反射', counter:'カウンター', tenacity:'執念',
     splash:'スプラッシュ', penetrate:'貫通', amplify:'増幅', catalyst:'触媒', frugal:'節約',
     gen_fire:'自然発生（炎）', gen_ice:'自然発生（氷）', gen_wind:'自然発生（風）', gen_thunder:'自然発生（雷）', gen_all:'自然発生（全）',
-    weak_amp:'弱点増幅', free_swap:'身軽',
+    weak_amp:'弱点増幅', free_swap:'身軽', energy_legacy:'エネルギー継承',
   },
   simple: {
     auto_heal:'じどうかいふく', guts:'こんじょう', drain:'ドレインこうげき', fighting:'まけないこころ',
@@ -2382,7 +2389,7 @@ const SKILL_NAMES = {
     full_guard:'かんぜんガード', iron_wall:'てっぺき', reflect:'はんしゃ', counter:'カウンター', tenacity:'しゅうねん',
     splash:'スプラッシュ', penetrate:'かんつう', amplify:'ぞうふく', catalyst:'しょくばい', frugal:'せつやく',
     gen_fire:'しぜんはっせい（ほのお）', gen_ice:'しぜんはっせい（こおり）', gen_wind:'しぜんはっせい（かぜ）', gen_thunder:'しぜんはっせい（かみなり）', gen_all:'しぜんはっせい（ぜん）',
-    weak_amp:'じゃくてんぞうふく', free_swap:'みがるさ',
+    weak_amp:'じゃくてんぞうふく', free_swap:'みがるさ', energy_legacy:'エネルギーけいしょう',
   },
   en: {
     auto_heal:'Auto Heal', guts:'Guts', drain:'Drain Attack', fighting:'Iron Will',
@@ -2390,7 +2397,7 @@ const SKILL_NAMES = {
     full_guard:'Full Guard', iron_wall:'Iron Wall', reflect:'Reflect', counter:'Counter', tenacity:'Tenacity',
     splash:'Splash', penetrate:'Penetrate', amplify:'Amplify', catalyst:'Catalyst', frugal:'Frugal',
     gen_fire:'Gen Fire', gen_ice:'Gen Ice', gen_wind:'Gen Wind', gen_thunder:'Gen Thunder', gen_all:'Gen All',
-    weak_amp:'Weak Amplify', free_swap:'Light Step',
+    weak_amp:'Weak Amplify', free_swap:'Light Step', energy_legacy:'Energy Legacy',
   }
 };
 function skillName(id) {
@@ -2430,6 +2437,7 @@ const SKILL_DESCS = {
     gen_all:     { 1:'ターンはじめにランダムエネルギーをえることがある（20%）', 2:'40%', 3:'60%', 4:'80%', 5:'100%' },
     weak_amp:      { 1:'じゃくてんのばいりつ×2→×2.5', 2:'×2.75', 3:'×3.0', 4:'×3.25', 5:'×3.5' },
     free_swap:     { 1:'このカードがこうたいするとき、コストが0になる（せんとう中1かいまで）', 2:'（せんとう中2かいまで）', 3:'（せんとう中3かいまで）', 4:'（せんとう中4かいまで）', 5:'（せんとう中5かいまで）' },
+    energy_legacy: { 1:'HPが0になったとき、もっているエネルギーを1つずつ、いきているなかまにランダムでわたすことがある（60%）', 2:'（70%）', 3:'（80%）', 4:'（90%）', 5:'（100%）' },
   },
   en: {
     auto_heal:   { 1:'Restore 10% max HP each turn', 2:'Restore 15% max HP each turn', 3:'Restore 20% max HP each turn', 4:'Restore 25% max HP each turn', 5:'Restore 30% max HP each turn' },
@@ -2458,6 +2466,7 @@ const SKILL_DESCS = {
     gen_all:     { 1:'20% chance to gain a random energy at turn start', 2:'40%', 3:'60%', 4:'80%', 5:'100%' },
     weak_amp:      { 1:'Weakness multiplier ×2→×2.5', 2:'×2.75', 3:'×3.0', 4:'×3.25', 5:'×3.5' },
     free_swap:     { 1:'This card swaps at no cost (up to 1x per battle)', 2:'(up to 2x per battle)', 3:'(up to 3x per battle)', 4:'(up to 4x per battle)', 5:'(up to 5x per battle)' },
+    energy_legacy: { 1:'When this card faints, each of its energy has a chance to be randomly passed to a surviving ally (60%)', 2:'(70%)', 3:'(80%)', 4:'(90%)', 5:'(100%)' },
   }
 };
 function skillDesc(id, rank) {
@@ -4753,6 +4762,26 @@ function rollTwoChoices() {
   return choices;
 }
 
+// ★スキル：エネルギー継承（HPが0になったとき、持っているエネルギーを1つずつ確率で生存中の仲間にランダムで渡す）
+function maybeTransferEnergyOnFaint(p) {
+  const vals = getSkillVals(p.card, 'energy_legacy');
+  if (!vals.length) return;
+  const rate = vals[0];
+  const allies = battle.party.filter(x => x !== p && x.curHp > 0);
+  if (!allies.length) return;
+  ['fire', 'ice', 'wind', 'thunder', 'norm'].forEach(el => {
+    const n = p.energy[el] || 0;
+    for (let i = 0; i < n; i++) {
+      if (Math.random() < rate) {
+        const tgt = allies[randInt(0, allies.length - 1)];
+        tgt.energy[el] = (tgt.energy[el] || 0) + 1;
+        p.energy[el]--;
+        pushLog(tlog('log.energylegacy', p.card.name, tgt.card.name, ELEM_EMOJI[el]));
+      }
+    }
+  });
+}
+
 // プレイヤーターン開始：状態処理 → エネルギー2択
 function beginPlayerTurn() {
   if (!battle.inBattle) return;
@@ -4762,6 +4791,7 @@ function beginPlayerTurn() {
   renderBattle();
 
   if (p.curHp <= 0) {                                // やけどで倒れた
+    maybeTransferEnergyOnFaint(p);
     pushLog(tlog('log.fallen', p.card.name));
     setTimeout(() => {
       const idx = battle.party.findIndex(x => x.curHp > 0);
@@ -5695,6 +5725,7 @@ function enemyTurn(skipSwap = false) {
     if (counterKilledEnemy) {
       setTimeout(onEnemyDefeated, 800);
     } else if (p.curHp <= 0) {
+      maybeTransferEnergyOnFaint(p);
       pushLog(tlog('log.player.fallen', p.card.name));
       setTimeout(() => {
         const idx = battle.party.findIndex(x => x.curHp > 0);
