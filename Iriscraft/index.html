@@ -61,6 +61,7 @@
     .achieve-card .ac-name { font-size:0.65rem; color:#555; line-height:1.2; word-break:break-all; }
     .achieve-card.undiscovered canvas { }
     .achieve-card.undiscovered .ac-name { color:#bbb; }
+    .achieve-card.partial .ac-name { opacity:0.7; }
 
     /* ===== BUTTONS ===== */
     .btn {
@@ -3000,7 +3001,18 @@ function recordDiscoveredCard(fileIdx, col, row, name) {
   const id = `${fileIdx}:${col}:${row}`;
   const list = getDiscoveredCards();
   if (!list.find(c => c.id === id)) {
-    list.push({ id, fileIdx, col, row, name });
+    list.push({ id, fileIdx, col, row, name, cleared: false });
+    localStorage.setItem(ACHIEVE_KEY, JSON.stringify(list));
+  }
+}
+// そのキャラでアドベンチャーをクリアしたとき、コレクションの表示を100%にする
+function markCardCleared(fileIdx, col, row) {
+  if (fileIdx == null || fileIdx < 0) return;
+  const id = `${fileIdx}:${col}:${row}`;
+  const list = getDiscoveredCards();
+  const entry = list.find(c => c.id === id);
+  if (entry && !entry.cleared) {
+    entry.cleared = true;
     localStorage.setItem(ACHIEVE_KEY, JSON.stringify(list));
   }
 }
@@ -3054,11 +3066,12 @@ function _renderAchievePage() {
   slice.forEach(({ fi, c, r, name }) => {
     const id = `${fi}:${c}:${r}`;
     const isFound = discSet.has(id);
+    const isCleared = isFound && !!discMap[id]?.cleared;
     const displayName = isFound ? (discMap[id]?.name || name) : '???';
     const file = ALL_COLLECT_FILES[fi];
 
     const div = document.createElement('div');
-    div.className = 'achieve-card' + (isFound ? '' : ' undiscovered');
+    div.className = 'achieve-card' + (isFound ? (isCleared ? '' : ' partial') : ' undiscovered');
     div.style.cursor = isFound ? 'pointer' : 'default';
 
     const cvs = document.createElement('canvas');
@@ -3077,12 +3090,21 @@ function _renderAchievePage() {
       const doDraw = () => {
         if (!img.naturalWidth) return;
         const ctx2 = cvs.getContext('2d');
-        ctx2.drawImage(img, c * ILLUS_W, r * ILLUS_H, ILLUS_W, ILLUS_H, 0, 0, 96, 96);
         if (!isFound) {
+          // 未発見：完全にシルエット化
+          ctx2.drawImage(img, c * ILLUS_W, r * ILLUS_H, ILLUS_W, ILLUS_H, 0, 0, 96, 96);
           ctx2.globalCompositeOperation = 'source-atop';
           ctx2.fillStyle = '#999';
           ctx2.fillRect(0, 0, 96, 96);
           ctx2.globalCompositeOperation = 'source-over';
+        } else if (!isCleared) {
+          // 発見済みだが未クリア：半分くらいしか見えない状態
+          ctx2.globalAlpha = 0.5;
+          ctx2.drawImage(img, c * ILLUS_W, r * ILLUS_H, ILLUS_W, ILLUS_H, 0, 0, 96, 96);
+          ctx2.globalAlpha = 1;
+        } else {
+          // クリア済み：完全に見える
+          ctx2.drawImage(img, c * ILLUS_W, r * ILLUS_H, ILLUS_W, ILLUS_H, 0, 0, 96, 96);
         }
       };
       if (img.complete && img.naturalWidth) doDraw();
@@ -3719,6 +3741,8 @@ function applyMerge(target) {
   target.becameLegend = false;
   if ([3, 6, 9].includes(target.level) && !target.legendary && Math.random() < 0.01) {
     const idx = randInt(0, LEGENDARY_NAMES.length - 1);
+    // 変化前の姿もクリア時にコレクションで100%表示できるよう記録しておく
+    target.preLegendId = { fileIdx: CARD_FILES.indexOf(target.illustration.file), col: target.illustration.col, row: target.illustration.row };
     target.legendary = true;
     target.illustration = { file: LEGEND_FILE, col: idx % 4, row: Math.floor(idx / 4) };
     target.name = legendaryName(idx);
@@ -5318,6 +5342,8 @@ function triggerLegendaryTransform(p, cond, callback) {
       fire: card.stats.fire, ice: card.stats.ice,
       wind: card.stats.wind, thunder: card.stats.thunder, hp: card.stats.hp,
     };
+    // 変化前の姿もクリア時にコレクションで100%表示できるよう記録しておく
+    card.preLegendId = { fileIdx: CARD_FILES.indexOf(card.illustration.file), col: card.illustration.col, row: card.illustration.row };
     card.legendary = true;
     card.illustration = { file: LEGEND_FILE, col: cond.col, row: cond.row };
     card.name = legendName;
@@ -6537,6 +6563,14 @@ function clearGame() {
   battle.inBattle = false;
   saveRankEntry(battle.difficulty !== 'endless' ? battle.maxFloor : battle.floor, battle.totalScore || 0, battle.difficulty);
   if (battle.difficulty !== 'endless') markDiffCleared(battle.difficulty);
+  // クリア時の手持ちカードはコレクションで100%表示にする（伝説に変化した場合は変化前の姿も）
+  battle.party.forEach(p => {
+    const card = p.card;
+    if (!card || !card.illustration || card.illustration.weapon) return;
+    const fileIdx = card.legendary ? ALL_COLLECT_FILES.indexOf(LEGEND_FILE) : CARD_FILES.indexOf(card.illustration.file);
+    markCardCleared(fileIdx, card.illustration.col, card.illustration.row);
+    if (card.preLegendId) markCardCleared(card.preLegendId.fileIdx, card.preLegendId.col, card.preLegendId.row);
+  });
   const floorLabel = battle.maxFloor === Infinity ? '∞' : battle.maxFloor;
   const diffNames = {
     easy: t('rank.diff.easy'), normal: t('rank.diff.normal'),
