@@ -427,6 +427,8 @@
     .drag-ghost { position:fixed; transform:translate(-50%,-50%); z-index:600; pointer-events:none;
       font-size:2.4rem; filter:drop-shadow(0 0 8px rgba(255,255,255,0.9)); }
     .battle-card-wrap.drop-hover .card { outline:4px dashed #4ad04a; outline-offset:2px; }
+    .card-tech.drag-hover { outline:3px dashed #4ad0e0; outline-offset:1px; }
+    .card-tech.dragging { opacity:0.4; }
     /* バトルログ見出し */
     .battle-items-title { font-size:0.72rem; font-weight:800; color:#c0a030; border-top:1px solid rgba(255,255,255,0.12); padding-top:4px; padding-bottom:2px; text-transform:uppercase; letter-spacing:0.08em; }
     #battle-items { display:flex; flex-wrap:wrap; gap:4px; min-height:24px; margin-bottom:4px; }
@@ -2544,13 +2546,13 @@ const ENERGY_BOOST_PAIRS = [
 ];
 function energyBoostDesc(pair, rank) {
   const el1 = ELEM(pair[0]).name, el2 = ELEM(pair[1]).name;
-  const pct = Math.round((ENERGY_CHARGE_SUCCESS_RATE[rank] || ENERGY_CHARGE_SUCCESS_RATE[1]) * 100);
-  if (currentLanguage === 'en') return `${pct}% chance to gain 1 random ${el1} or ${el2} energy`;
-  if (currentLanguage === 'simple') return `${pct}%のかくりつで${el1}か${el2}のエネルギーのどちらかをランダムで1つえる`;
-  return `${pct}%の確率で${el1}か${el2}のエネルギーのどちらかをランダムで1つ得る`;
+  const pct = Math.round((ENERGY_CHARGE_BONUS_RATE[rank] || ENERGY_CHARGE_BONUS_RATE[1]) * 100);
+  if (currentLanguage === 'en') return `Gain 1 random ${el1} or ${el2} energy (${pct}% chance for a 2nd one too)`;
+  if (currentLanguage === 'simple') return `${el1}か${el2}のエネルギーをランダムで1つえる（${pct}%のかくりつでもう1つ）`;
+  return `${el1}か${el2}のエネルギーをランダムで1つ得る（${pct}%の確率でもう1つ追加）`;
 }
-// ★ランクによる成功率（★1=60%〜★5=100%）
-const ENERGY_CHARGE_SUCCESS_RATE = { 1:0.60, 2:0.70, 3:0.80, 4:0.90, 5:1.00 };
+// ★ランクによる「もう1つ追加で得る」確率（★1=10%〜★5=50%）。基本の1つは100%確定で得られる
+const ENERGY_CHARGE_BONUS_RATE = { 1:0.10, 2:0.20, 3:0.30, 4:0.40, 5:0.50 };
 function makeEnergyBoostTech(pair, rank) {
   const suffix = currentLanguage === 'en' ? ' Charge' : 'チャージ';
   const emoji = ELEM_EMOJI[pair[0]] + ELEM_EMOJI[pair[1]];
@@ -2665,9 +2667,11 @@ function startGame() {
   document.getElementById('game-screen').classList.remove('hidden');
   document.getElementById('enhance-banner').classList.add('hidden');
   enhancing = false; cardStock.length = 0;
+  _debugEnhanceCount = 0; _debugBattleCount = 0;
   document.getElementById('panel-inst').innerHTML = t('panel.inst');
   const regenBtn = document.getElementById('regen-btn');
   if (regenBtn) regenBtn.classList.remove('hidden');
+  updateChangeBtn();   // 前回セッションの「残り◯回」表示・btn-dimが残らないようリセット
   preloadCardImages();
   buildSideBars();
   generateArt();
@@ -4379,12 +4383,15 @@ function buildBattleCard(p, i) {
   if (i === battle.activeIdx) card.classList.add('active-card');
   if (dead) card.classList.add('dead');
 
-  // 技ボタン化（場のカードのみ・act中）
+  // 技ボタン化（場のカードのみ・act中）。タップで攻撃、ドラッグで並び替え（永続）
   if (i === battle.activeIdx && battle.phase === 'act' && !dead) {
     const techEls = card.querySelectorAll('.card-tech');
     (p.card.techs || []).forEach((t, ti) => {
       const te = techEls[ti]; if (!te) return;
-      if (canUseTech(p.energy, t)) {
+      te.dataset.techIdx = ti;
+      te.style.touchAction = 'none';
+      const usable = canUseTech(p.energy, t);
+      if (usable) {
         te.classList.add('usable');
         if (battle.trashMode && t.utility !== 'energyBoost' && t.utility !== 'statBoost') {
           te.classList.add('trash-ready');
@@ -4392,8 +4399,8 @@ function buildBattleCard(p, i) {
           const dmgEl = te.querySelector('.card-tech-dmg');
           if (dmgEl) { dmgEl.textContent = Math.floor(techDamage(t, p.card.stats, null) * 2); dmgEl.classList.add('dmg-trash'); }
         }
-        te.onclick = (ev) => { ev.stopPropagation(); useTech(t); };
       } else te.classList.add('unusable');
+      te.addEventListener('pointerdown', (ev) => { ev.stopPropagation(); startTechDrag(ev, ti, usable ? t : null); });
     });
   }
   // ブーストがあれば属性値表示を更新
@@ -4599,6 +4606,63 @@ function cardWrapUnder(e) {
     if (w && w.dataset.partyIdx !== undefined) return w;
   }
   return null;
+}
+
+// ===== 技のドラッグ並び替え（タップ=攻撃／ドラッグ=入れ替え、変更は永続） =====
+let _techDragIdx = null, _techDragTech = null, _techDragMoved = false;
+let _techDragStartX = 0, _techDragStartY = 0;
+function startTechDrag(ev, ti, usableTech) {
+  _techDragIdx = ti;
+  _techDragTech = usableTech;
+  _techDragMoved = false;
+  _techDragStartX = ev.clientX; _techDragStartY = ev.clientY;
+  window.addEventListener('pointermove', moveTechDrag);
+  window.addEventListener('pointerup', endTechDrag);
+}
+function moveTechDrag(ev) {
+  const dx = ev.clientX - _techDragStartX, dy = ev.clientY - _techDragStartY;
+  if (!_techDragMoved && Math.hypot(dx, dy) > 10) {
+    _techDragMoved = true;
+    const srcEl = document.querySelector(`.battle-card-wrap .card-tech[data-tech-idx="${_techDragIdx}"]`);
+    if (srcEl) srcEl.classList.add('dragging');
+  }
+  document.querySelectorAll('.card-tech.drag-hover').forEach(c => c.classList.remove('drag-hover'));
+  if (_techDragMoved) {
+    const target = techSlotUnder(ev);
+    if (target) target.classList.add('drag-hover');
+  }
+}
+function endTechDrag(ev) {
+  window.removeEventListener('pointermove', moveTechDrag);
+  window.removeEventListener('pointerup', endTechDrag);
+  document.querySelectorAll('.card-tech.drag-hover').forEach(c => c.classList.remove('drag-hover'));
+  document.querySelectorAll('.card-tech.dragging').forEach(c => c.classList.remove('dragging'));
+  if (_techDragMoved) {
+    const targetEl = techSlotUnder(ev);
+    if (targetEl && targetEl.dataset.techIdx !== undefined) {
+      swapTechs(_techDragIdx, +targetEl.dataset.techIdx);
+    }
+  } else if (_techDragTech) {
+    useTech(_techDragTech);   // 移動が無ければ通常のタップ＝攻撃
+  }
+  _techDragIdx = null; _techDragTech = null; _techDragMoved = false;
+}
+function techSlotUnder(ev) {
+  const els = document.elementsFromPoint(ev.clientX, ev.clientY);
+  for (const el of els) {
+    const w = el.closest && el.closest('.card-tech[data-tech-idx]');
+    if (w) return w;
+  }
+  return null;
+}
+// 技の並び順を入れ替える（p.card.techsを直接書き換えるため戦闘後も永続）
+function swapTechs(a, b) {
+  if (a === b) return;
+  const p = battle.party[battle.activeIdx];
+  const techs = p.card.techs;
+  if (!techs || a >= techs.length || b >= techs.length) return;
+  [techs[a], techs[b]] = [techs[b], techs[a]];
+  renderBattle();
 }
 function attachChoiceToCard(i, choiceIdx) {
   const p = battle.party[i];
@@ -4917,15 +4981,16 @@ function useTech(t) {
   }
 
   // エネルギーチャージ技：ダメージ無し、エネルギーを1つでも持っていれば使用可（消費なし）
-  // ★ランクによる成功率判定を行い、成功時のみ対象2属性のどちらかをランダムで+1
+  // 対象2属性のどちらかをランダムで+1（必ず成功）。★ランクに応じた確率でもう1つ追加で得る
   if (t.utility === 'energyBoost') {
-    const successRate = ENERGY_CHARGE_SUCCESS_RATE[t.rank || 1] || ENERGY_CHARGE_SUCCESS_RATE[1];
-    if (Math.random() < successRate) {
-      const el = t.pair[randInt(0, 1)];
-      p.energy[el] = (p.energy[el] || 0) + 1;
-      pushLog(tlog('log.energyboost', p.card.name, ELEM_EMOJI[el]));
-    } else {
-      pushLog(tlog('log.energyboostfail', p.card.name));
+    const el = t.pair[randInt(0, 1)];
+    p.energy[el] = (p.energy[el] || 0) + 1;
+    pushLog(tlog('log.energyboost', p.card.name, ELEM_EMOJI[el]));
+    const bonusRate = ENERGY_CHARGE_BONUS_RATE[t.rank || 1] || ENERGY_CHARGE_BONUS_RATE[1];
+    if (Math.random() < bonusRate) {
+      const el2 = t.pair[randInt(0, 1)];
+      p.energy[el2] = (p.energy[el2] || 0) + 1;
+      pushLog(tlog('log.energyboost', p.card.name, ELEM_EMOJI[el2]));
     }
     renderBattle();
     setTimeout(enemyTurn, 900);
