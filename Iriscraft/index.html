@@ -4141,8 +4141,10 @@ function arriveFloor() {
       }
     });
   }
-  battle.enemyIdx = 0;
-  battle.enemy = battle.enemyTeam[0];
+  // ボス戦は最初のターンから控え（非ボス）を出す。ボスは控えが全滅するまで最後に温存
+  battle.enemyIdx = battle.enemyTeam.findIndex(en => !en.isBoss);
+  if (battle.enemyIdx < 0) battle.enemyIdx = 0;
+  battle.enemy = battle.enemyTeam[battle.enemyIdx];
   startBattle();
 }
 
@@ -5368,8 +5370,10 @@ function onEnemyDefeatedByPlayer(p) {
 // 敵を1体倒した
 function onEnemyDefeated() {
   if (!battle.inBattle) return;   // 戦闘離脱後の遅延コールバック対策
-  // 生存中の次の敵を探す
-  const nextIdx = battle.enemyTeam.findIndex((e, i) => i !== battle.enemyIdx && e.curHp > 0);
+  // 生存中の次の敵を探す（ボスは他の控えが生きている間は後回し＝最後に登場）
+  const alive = battle.enemyTeam.map((e, i) => ({ e, i })).filter(o => o.i !== battle.enemyIdx && o.e.curHp > 0);
+  const candidates = excludeBossIfOthersAlive(alive.map(o => ({ en: o.e, i: o.i })));
+  const nextIdx = candidates.length ? candidates[0].i : -1;
   if (nextIdx >= 0) {
     battle.enemyIdx = nextIdx;
     battle.enemy = battle.enemyTeam[nextIdx];
@@ -5498,6 +5502,31 @@ function paySwapCostIfApplicable(entry) {
   return null;
 }
 
+// ボス戦：ボスは最後に登場させたいので、他に生きている控え（非ボス）がいる間は
+// 交代候補やスタンバイ選定からボスを除外する（全員倒れて残りがボスだけになれば解禁）
+function excludeBossIfOthersAlive(candidates) {
+  const othersNonBossAlive = battle.enemyTeam.some(en => en.curHp > 0 && !en.isBoss);
+  if (!othersNonBossAlive) return candidates;
+  return candidates.filter(o => !o.en.isBoss);
+}
+
+// ボス戦：控えが戦闘中の間も、控え台にいるボスへエネルギーを裏で溜めておく
+// （ボスが登場した時にはすでに力を蓄えている演出。抽選はボス6:控え4に偏らせる）
+function grantBenchEnergy() {
+  if (!battle.enemyTeam.some(en => en.isBoss)) return;
+  const bench = battle.enemyTeam.map((en, i) => ({ en, i })).filter(o => o.i !== battle.enemyIdx && o.en.curHp > 0);
+  if (!bench.length) return;
+  const bossEntry = bench.find(o => o.en.isBoss);
+  const subEntries = bench.filter(o => !o.en.isBoss);
+  let target = null;
+  if (bossEntry && subEntries.length) target = (Math.random() < 0.6) ? bossEntry : subEntries[randInt(0, subEntries.length - 1)];
+  else if (bossEntry) target = bossEntry;
+  else if (subEntries.length) target = subEntries[randInt(0, subEntries.length - 1)];
+  if (!target) return;
+  const el = ELEM_ORDER[randInt(0, 3)];
+  target.en.energy[el] = (target.en.energy[el] || 0) + 1;
+}
+
 // 攻撃前：控えの方が明確に有利な一撃を持っていれば入れ替える（HPに関係ない戦術的交代）
 function considerProactiveSwap(e, target) {
   if (!enemyCanSwap(e)) return false;
@@ -5505,7 +5534,7 @@ function considerProactiveSwap(e, target) {
   const myScore = myBest ? myBest.dmg : 0;
   const costActive = (battle.enemyTurnCount || 1) >= 2;
   const threshold = costActive ? 1.5 : 1.3;   // コストがある時はより明確な利得がないと動かない
-  const bench = battle.enemyTeam.map((en, i) => ({ en, i })).filter(o => o.i !== battle.enemyIdx && o.en.curHp > 0);
+  const bench = excludeBossIfOthersAlive(battle.enemyTeam.map((en, i) => ({ en, i })).filter(o => o.i !== battle.enemyIdx && o.en.curHp > 0));
   let candidate = null, candidateScore = myScore;
   bench.forEach(o => {
     const b = bestUsableTechFor(o.en, target.card);
@@ -5525,7 +5554,7 @@ function considerProactiveSwap(e, target) {
 function considerRescueSwap(target) {
   const e = battle.enemy;
   if (!enemyCanSwap(e)) return false;
-  const bench = battle.enemyTeam.map((en, i) => ({ en, i })).filter(o => o.i !== battle.enemyIdx && o.en.curHp > 0);
+  const bench = excludeBossIfOthersAlive(battle.enemyTeam.map((en, i) => ({ en, i })).filter(o => o.i !== battle.enemyIdx && o.en.curHp > 0));
   const ready = bench.map(o => ({ ...o, best: bestUsableTechFor(o.en, target.card) })).filter(o => o.best);
   if (ready.length === 0) return false;
   ready.sort((a, b) => b.best.dmg - a.best.dmg);
@@ -5540,7 +5569,7 @@ function considerRescueSwap(target) {
 // 誰も攻撃できないとき：次ターンに向けて一番有望な（弱点技に近い）敵を残す
 function chooseBestStandbyMember(targetCard) {
   if (!enemyCanSwap(battle.enemy)) return false;
-  const all = battle.enemyTeam.map((en, i) => ({ en, i })).filter(o => o.en.curHp > 0);
+  const all = excludeBossIfOthersAlive(battle.enemyTeam.map((en, i) => ({ en, i })).filter(o => o.en.curHp > 0));
   if (all.length <= 1) return false;
   const scored = all.map(o => ({ ...o, score: nearestWeaknessProgress(o.en, targetCard) * (0.85 + Math.random() * 0.3) }));
   scored.sort((a, b) => b.score - a.score);
@@ -5582,8 +5611,8 @@ function enemyTurn(skipSwap = false) {
   if (!skipSwap) {
     const hpRatio = e.curHp / e.maxHp;
     if (hpRatio < 0.3 && enemyCanSwap(e)) {
-      const alive = battle.enemyTeam.map((en, i) => ({ en, i }))
-        .filter(o => o.i !== battle.enemyIdx && o.en.curHp > 0);
+      const alive = excludeBossIfOthersAlive(battle.enemyTeam.map((en, i) => ({ en, i }))
+        .filter(o => o.i !== battle.enemyIdx && o.en.curHp > 0));
       if (alive.length > 0 && Math.random() < 0.5) {
         const swap = alive[Math.floor(Math.random() * alive.length)];
         const trashed = paySwapCostIfApplicable(e);
@@ -5611,6 +5640,8 @@ function enemyTurn(skipSwap = false) {
   // エネルギー獲得：相手の弱点を突く強技に近づく色を、プレイヤーの脅威度も加味して選ぶ
   const g = enemyChooseEnergy(e, target.card, target);
   e.energy[g]++;
+  // ボス戦：控えが戦っている間もボスへエネルギーを裏で溜めておく（ボス6:控え4の抽選）
+  grantBenchEnergy();
   // 敵パッシブ：自動回復
   const eAutoHeal = getEnemySkillVal(e, 'auto_heal');
   if (eAutoHeal && e.curHp > 0) {
@@ -5653,9 +5684,9 @@ function enemyTurn(skipSwap = false) {
     pushLog(tlog('log.enemy.charge.total', ELEM_EMOJI[g], energyStripHTML(e.energy)));
     // 技のエネルギーを常に消費（プレイヤーと対称に）
     trashTechEnergy(e, best);
-    // 一定確率で全力攻撃（残りエネルギーもトラッシュして2倍）
+    // 一定確率で全力攻撃（残りエネルギーもトラッシュして2倍）。ボスは耐久型なので全力攻撃はしない
     let isTrash = false;
-    if (Math.random() < (DIFF_TRASH[battle.difficulty] || 0)) { isTrash = true; bestDmg = Math.floor(bestDmg * 1.5); }
+    if (!e.isBoss && Math.random() < (DIFF_TRASH[battle.difficulty] || 0)) { isTrash = true; bestDmg = Math.floor(bestDmg * 1.5); }
     // 敵パッシブ：根性（HP50%以下で攻撃力アップ）
     const eGuts = getEnemySkillVal(e, 'guts');
     if (eGuts && e.curHp / e.maxHp <= 0.50) bestDmg = Math.floor(bestDmg * eGuts);
