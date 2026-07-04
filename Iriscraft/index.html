@@ -4383,6 +4383,16 @@ function buildBattleCard(p, i) {
   if (i === battle.activeIdx) card.classList.add('active-card');
   if (dead) card.classList.add('dead');
 
+  // ブースト中なら技威力の再計算に使う（属性値表示・技威力表示の両方で使用）
+  const boostPct = p.statBoostPct || {};
+  const hasBoost = ELEMENTS.some(e => boostPct[e.id] > 0);
+  const boostedStats = hasBoost
+    ? Object.fromEntries(Object.entries(p.card.stats).map(([k,v]) => {
+        if (!ELEMENTS.some(e=>e.id===k)) return [k,v];
+        return [k, boostPct[k] ? v + Math.floor(v * boostPct[k]) : v];
+      }))
+    : p.card.stats;
+
   // 技ボタン化（場のカードのみ・act中）。タップで攻撃、ドラッグで並び替え（永続）
   if (i === battle.activeIdx && battle.phase === 'act' && !dead) {
     const techEls = card.querySelectorAll('.card-tech');
@@ -4398,14 +4408,20 @@ function buildBattleCard(p, i) {
           // 威力表示を2倍＆赤に
           const dmgEl = te.querySelector('.card-tech-dmg');
           if (dmgEl) { dmgEl.textContent = Math.floor(techDamage(t, p.card.stats, null) * 2); dmgEl.classList.add('dmg-trash'); }
+        } else if (hasBoost && t.utility !== 'energyBoost' && t.utility !== 'statBoost') {
+          // ブースト中の技威力を再計算してオレンジ強調表示
+          const dmgEl = te.querySelector('.card-tech-dmg');
+          if (dmgEl) {
+            dmgEl.textContent = techDamage(t, boostedStats, null);
+            dmgEl.style.cssText = 'color:#ff9900;border:1px solid #ff9900;border-radius:3px;padding:0 2px;font-weight:900';
+          }
         }
       } else te.classList.add('unusable');
       te.addEventListener('pointerdown', (ev) => { ev.stopPropagation(); startTechDrag(ev, ti, usable ? t : null); });
     });
   }
   // ブーストがあれば属性値表示を更新
-  const boostPct = p.statBoostPct || {};
-  if (ELEMENTS.some(e => boostPct[e.id] > 0)) {
+  if (hasBoost) {
     const attrRows = card.querySelectorAll('.card-attr2');
     ELEMENTS.forEach((e, idx) => {
       const pct = boostPct[e.id] || 0;
