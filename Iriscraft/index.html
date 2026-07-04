@@ -4307,7 +4307,7 @@ function makeEnemy(floor) {
     const bossIdx = randInt(0, BOSS_NAMES.length - 1);
     name = getBossPrefix() + getBossName(bossIdx);
     illus = { file: ENEMY_BOSS_FILE, col: bossIdx % 4, row: Math.floor(bossIdx / 4) };
-    // コレクションに登録（ボスを倒した際に発見済みとする）
+    // コレクションに登録（遭遇した時点で発見済み＝50%表示。倒すとonEnemyDefeated()で100%表示にする）
     const bossFileIdx = ALL_COLLECT_FILES.indexOf(ENEMY_BOSS_FILE);
     if (bossFileIdx >= 0) recordDiscoveredCard(bossFileIdx, illus.col, illus.row, getBossName(bossIdx));
   } else {
@@ -5401,6 +5401,12 @@ function onEnemyDefeatedByPlayer(p) {
 // 敵を1体倒した
 function onEnemyDefeated() {
   if (!battle.inBattle) return;   // 戦闘離脱後の遅延コールバック対策
+  // ボスを倒したら、コレクションでの表示を100%にする（遭遇しただけでは50%）
+  const defeated = battle.enemy;
+  if (defeated && defeated.isBoss && defeated.illus) {
+    const bossFileIdx = ALL_COLLECT_FILES.indexOf(ENEMY_BOSS_FILE);
+    markCardCleared(bossFileIdx, defeated.illus.col, defeated.illus.row);
+  }
   // 生存中の次の敵を探す（ボスは他の控えが生きている間は後回し＝最後に登場）
   const alive = battle.enemyTeam.map((e, i) => ({ e, i })).filter(o => o.i !== battle.enemyIdx && o.e.curHp > 0);
   const candidates = excludeBossIfOthersAlive(alive.map(o => ({ en: o.e, i: o.i })));
