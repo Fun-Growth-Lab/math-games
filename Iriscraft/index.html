@@ -3710,20 +3710,29 @@ function applyMerge(target) {
   }
 
   // 技の合成：現在の技 + 強化カードの技。同コスト技は統合してから判定
-  const { result: combined, merged: mergedInfo } = mergeTechList([...(target.techs || []), ...(e.techs || [])]);
-  target.techs = combined;
-  const afterMerge = () => {
-    const skillCount = (target.skill ? 1 : 0) + (target.skill2 ? 1 : 0);
-    if (combined.length + skillCount <= 4) {
-      showEnhanceDone(target);
+  // ここで例外が起きると完了処理(showEnhanceDone→afterEnhanceDone)が
+  // 一切呼ばれず、強化中フラグやリロード回数が中途半端に残ってしまう
+  // （2連続強化に見える不具合の原因になり得るため）、必ず完了画面まで
+  // たどり着けるようフォールバックする
+  try {
+    const { result: combined, merged: mergedInfo } = mergeTechList([...(target.techs || []), ...(e.techs || [])]);
+    target.techs = combined;
+    const afterMerge = () => {
+      const skillCount = (target.skill ? 1 : 0) + (target.skill2 ? 1 : 0);
+      if (combined.length + skillCount <= 4) {
+        showEnhanceDone(target);
+      } else {
+        openReskill(target);
+      }
+    };
+    if (mergedInfo) {
+      showTechLevelUp(mergedInfo.name, mergedInfo.newRank, afterMerge);
     } else {
-      openReskill(target);
+      afterMerge();
     }
-  };
-  if (mergedInfo) {
-    showTechLevelUp(mergedInfo.name, mergedInfo.newRank, afterMerge);
-  } else {
-    afterMerge();
+  } catch (err) {
+    console.error('[BUG] applyMergeの技合成処理で例外発生、強化完了画面へフォールバック', err);
+    showEnhanceDone(target);
   }
 }
 
@@ -3828,7 +3837,17 @@ function afterEnhanceDone() {
   ov.classList.add('hidden');
   enhancing = false; enhanceCard = null;
   document.getElementById('enhance-banner').classList.add('hidden');
-  proceedNextFloor();
+  // 万一 proceedNextFloor() 内で例外が起きても強化中フラグ・画面が
+  // 中途半端に残らないよう、確実にクロップ画面を閉じてから進める
+  document.getElementById('game-screen').classList.add('hidden');
+  try {
+    proceedNextFloor();
+  } catch (err) {
+    console.error('[BUG] afterEnhanceDone→proceedNextFloorで例外発生', err);
+    // 復旧：強制的にフロアへ進める
+    document.getElementById('adventure-screen').classList.remove('hidden');
+    document.getElementById('battle-area').classList.remove('hidden');
+  }
 }
 
 function showDepartReset() { document.getElementById('depart-reset-overlay').classList.remove('hidden'); }
@@ -6004,9 +6023,14 @@ function teachNewTech(card) {
 }
 
 // 技のエネルギーキー（同コスト判定用）
+// 技の同一性判定キー：エネルギーコストだけでなく、utility技は種類ごとに
+// 固有の識別子（pair・boostElなど）を必ず含める（同コストの別技を誤って
+// 統合しないようにするため）
 function techEnergyKey(t) {
   const base = t.counts.map(c => `${c.el}:${c.n}`).sort().join(',');
-  return t.utility === 'energyBoost' ? `${base}|${[...t.pair].sort().join('-')}` : base;
+  if (t.utility === 'energyBoost') return `energyBoost|${base}|${[...t.pair].sort().join('-')}`;
+  if (t.utility === 'statBoost')   return `statBoost|${base}|${t.boostEl}`;
+  return `attack|${base}`;
 }
 
 // 技リストを合成（同コスト技はランク高い方+1に統合）
