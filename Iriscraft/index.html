@@ -240,7 +240,7 @@
     .card-tech-name-row { display:flex; align-items:center; justify-content:center; gap:3px; width:100%; }
     .card-tech-stars { color:#E8A000; font-size:1.05rem; flex-shrink:0; }
     .card-tech { display:flex; flex-direction:column; justify-content:flex-start; align-items:center; gap:3px; border:1.5px solid; border-radius:6px;
-      padding:6px 6px 4px; text-align:center; min-height:76px; }
+      padding:6px 6px 4px; text-align:center; min-height:76px; position:relative; }
     .card-tech.empty { border-style:dashed; border-color:#ddd; justify-content:center; }
     .card-tech-name { font-size:1.2rem; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.15; max-width:100%; }
     .card-tech-bottom { display:flex; align-items:center; justify-content:center; gap:0; width:100%; flex:1; }
@@ -2586,7 +2586,11 @@ function makeEnergyBoostTech(pair, rank) {
 //  一時的に上げる。効果は使うたびに重複加算。ブースト＝1エネ、ハイブースト＝2エネ）
 // ================================================================
 function statBoostDesc(el, pct) {
-  return `${ELEM_EMOJI[el]}+${Math.round(pct * 100)}%`;
+  const elName = ELEM(el).name;
+  const pctTxt = Math.round(pct * 100);
+  if (currentLanguage === 'en') return `Raises ${elName} stat by ${pctTxt}% (stacks with repeated use)`;
+  if (currentLanguage === 'simple') return `${elName}のぞくせいちを${pctTxt}%あげる（なんかいでもかさねてつかえる）`;
+  return `${elName}の属性値を${pctTxt}%上げる（何度でも重ねて使える）`;
 }
 function makeStatBoostTech(el, isHi, rank) {
   const r = rank || rollTechRank();
@@ -6715,6 +6719,24 @@ function techNameFontStyle(name, starCount) {
   return `font-size:${(1.2 * scale).toFixed(2)}rem`;
 }
 
+// アイテムと同じく、タップ（クリック）で説明をポップアップ表示する（ブースト・ハイブースト・チャージ・パッシブスキル用）
+function attachDescTip(el, desc) {
+  if (!desc) return;
+  el.style.cursor = 'pointer';
+  el.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const existing = el.querySelector('.item-tip-pop');
+    document.querySelectorAll('.item-tip-pop').forEach(t => t.remove());
+    if (existing) return;
+    const tip = document.createElement('div');
+    tip.className = 'item-tip-pop';
+    tip.textContent = desc;
+    tip.style.cssText = 'position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);background:#222;color:#eee;font-size:0.72rem;padding:5px 9px;border-radius:6px;white-space:normal;width:max-content;max-width:200px;text-align:center;line-height:1.35;z-index:100;border:1px solid #555;pointer-events:none;';
+    el.appendChild(tip);
+  });
+  document.addEventListener('click', () => document.querySelectorAll('.item-tip-pop').forEach(t => t.remove()), { once: true });
+}
+
 // 技ボックス1つ
 function techBoxEl(t, card, isWeapon, slotLabel) {
   const div = document.createElement('div');
@@ -6735,6 +6757,7 @@ function techBoxEl(t, card, isWeapon, slotLabel) {
           <div class="card-tech-sep">→</div>
           <div class="card-tech-dmg" style="font-size:1.2rem">${ELEM_EMOJI[t.pair[0]]}/${ELEM_EMOJI[t.pair[1]]}</div>
         </div>`;
+      attachDescTip(div, t.desc);
     } else if (t.utility === 'statBoost') {
       div.innerHTML = `
         <div class="card-tech-name-row">
@@ -6746,6 +6769,7 @@ function techBoxEl(t, card, isWeapon, slotLabel) {
           <div class="card-tech-sep">|</div>
           <div class="card-tech-dmg" style="font-size:1.1rem">+${Math.round(t.boostPct * 100)}%</div>
         </div>`;
+      attachDescTip(div, t.desc);
     } else {
       const dmg = techDamage(t, card.stats, null);
       div.innerHTML = `
@@ -6780,6 +6804,7 @@ function skillSlotEl(sk) {
       <span class="card-tech-stars">${stars}</span>
     </div>
     <div style="font-size:0.82rem;color:#a060e0;margin-top:2px;text-align:center;line-height:1.2;overflow:hidden;max-height:2.6em">${desc}</div>`;
+  attachDescTip(div, desc);
   return div;
 }
 
