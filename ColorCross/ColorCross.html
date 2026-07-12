@@ -266,38 +266,44 @@ const MARK_WEIGHT=[80,15,4,1,0];
 // 初期配置するマークの総数
 const INITIAL_MARK_COUNT=10;
 // カードの数字 1〜4 の出現確率
-const CARD_NUM_WEIGHT=[30,40,20,10];
+const CARD_NUM_WEIGHT=[40,30,20,10];
 // 使用する色の数
 const COLOR_COUNT=3;
 // おじゃまブロックの初期出現確率(%)。20ターンごとに+1%され、MAX100%
 const GARBAGE_BASE=0;
 // アイテム関連
 const MAX_ITEMS=8;
-const ITEM_DROP_CHANCE=0.10;
-const ITEM_TYPES=['cardChange','removeTri','removeSquare','removeRed','removeBlue','removeGreen','removeGarbage','star','joker','all1','all4'];
-// col：用途ごとの色分け（手札変化＝紫／形リムーブ＝青緑／色リムーブ＝それぞれの色／おじゃまリムーブ＝グレー／パッシブ＝金）
+// おじゃまブロックの代わりに宝箱が出現する確率。宝箱を壊すと100%でアイテムを入手（おじゃまブロックは0%）
+const CHEST_CHANCE=0.10;
+const ITEM_TYPES=['cardChange','removeTri','removeSquare','removeGarbage','star','joker','all1','all4','triUp','squareUp','pentaUp','hexUp','redUp','blueUp','greenUp'];
+// col：用途ごとの色分け（手札変化＝紫／形リムーブ＝青緑／色ランクアップ＝それぞれの色／おじゃまリムーブ＝グレー／パッシブ＝金／図形ランクアップ＝ピンク）
 const ITEM_COL={
-  hand:  {bg:'#f4f0fb', border:'#c8b8ec', text:'#7a40c0'},
-  shape: {bg:'#eef5fb', border:'#a8cdec', text:'#2f6fa8'},
-  red:   {bg:'#fff0f0', border:'#ffb3b3', text:'#c0504a'},
-  blue:  {bg:'#eef8ff', border:'#b3d9fb', text:'#2f6fa8'},
-  green: {bg:'#eefdf5', border:'#b8f0d0', text:'#2f9060'},
-  gold:  {bg:'#fff8e0', border:'#ffe040', text:'#d4900a'},
-  gray:  {bg:'#f2f0f4', border:'#c0b8c8', text:'#5c5560'},
+  hand:   {bg:'#f4f0fb', border:'#c8b8ec', text:'#7a40c0'},
+  shape:  {bg:'#eef5fb', border:'#a8cdec', text:'#2f6fa8'},
+  red:    {bg:'#fff0f0', border:'#ffb3b3', text:'#c0504a'},
+  blue:   {bg:'#eef8ff', border:'#b3d9fb', text:'#2f6fa8'},
+  green:  {bg:'#eefdf5', border:'#b8f0d0', text:'#2f9060'},
+  gold:   {bg:'#fff8e0', border:'#ffe040', text:'#d4900a'},
+  gray:   {bg:'#f2f0f4', border:'#c0b8c8', text:'#5c5560'},
+  rankup: {bg:'#fdf0fa', border:'#e8a0d8', text:'#a03090'},
 };
 // label/shortはSTRINGS辞書（item.<type>.label / item.<type>.short）で言語別に管理する
 const ITEM_DEFS={
   cardChange:   {col:'hand'},
   removeTri:    {col:'shape'},
   removeSquare: {col:'shape'},
-  removeRed:    {col:'red'},
-  removeBlue:   {col:'blue'},
-  removeGreen:  {col:'green'},
   removeGarbage:{col:'gray'},
   star:         {col:'gold'},
   joker:        {col:'hand'},
   all1:         {col:'hand'},
   all4:         {col:'hand'},
+  triUp:        {col:'rankup'},
+  squareUp:     {col:'rankup'},
+  pentaUp:      {col:'rankup'},
+  hexUp:        {col:'rankup'},
+  redUp:        {col:'red'},
+  blueUp:       {col:'blue'},
+  greenUp:      {col:'green'},
 };
 // ============================================================
 //  I18N（かんたんなにほんご／日本語／English）
@@ -347,9 +353,8 @@ const STRINGS={
     'howto.l3':'③ 消えなければマークを動かす・カードを捨てて次のマークを呼び込もう（1ターン経過）',
     'howto.l4':'④ 同じ色・形のマーク同士を重ねると「合体」！育てるほど高得点に',
     'howto.l5':'⑤ ⭐をたくさん消すと👑が出現して倍率アップ。倍率が高いほど大量得点に',
-    'howto.l6':'⑥ アイテムを手に入れたら中央パネルからいつでも使おう',
+    'howto.l6':'⑥ おじゃまブロックの代わりに10%で🎁宝箱が出現。壊すと100%でアイテムが手に入り、中央パネルからいつでも使える',
     'howto.l7':'⑦ マークが置けなくなったらゲームオーバー。エンドレスで高得点を目指そう！',
-    'howto.ref':'△×2　□×3　⬠×4　六角形×5　☆×10',
     'joker.picker.title':'🃏 色と数字をえらんでね',
     'endpanel.title':'ゲームオーバー',
     'endpanel.turnslabel':'ターン数',
@@ -361,19 +366,40 @@ const STRINGS={
     'flash.itemdrop':'アイテム!',
     'flash.garbagebreak':'こわれた!',
     'flash.crownspawn':'👑出現!',
+    'flash.chestspawn':'🎁出現!',
     'item.discardmode':'捨てるアイテムをえらんでね',
     'item.panellabel':'アイテム',
     'item.cardChange.label':'カードチェンジ',    'item.cardChange.short':'CARD',
     'item.removeTri.label':'△リムーブ',          'item.removeTri.short':'△',
     'item.removeSquare.label':'□リムーブ',        'item.removeSquare.short':'□',
-    'item.removeRed.label':'赤リムーブ',          'item.removeRed.short':'赤',
-    'item.removeBlue.label':'青リムーブ',         'item.removeBlue.short':'青',
-    'item.removeGreen.label':'緑リムーブ',        'item.removeGreen.short':'緑',
     'item.removeGarbage.label':'おじゃまリムーブ', 'item.removeGarbage.short':'🧹',
     'item.star.label':'スターチャーム',           'item.star.short':'⭐',
     'item.joker.label':'ジョーカー',              'item.joker.short':'🃏',
     'item.all1.label':'ALL 1',                   'item.all1.short':'ALL1',
     'item.all4.label':'ALL 4',                   'item.all4.short':'ALL4',
+    'item.triUp.label':'△ランクアップ',    'item.triUp.short':'△↑',
+    'item.squareUp.label':'□ランクアップ', 'item.squareUp.short':'□↑',
+    'item.pentaUp.label':'五角形ランクアップ',
+    'item.hexUp.label':'六角形ランクアップ',
+    'item.redUp.label':'赤ランクアップ',   'item.redUp.short':'赤↑',
+    'item.blueUp.label':'青ランクアップ',  'item.blueUp.short':'青↑',
+    'item.greenUp.label':'緑ランクアップ', 'item.greenUp.short':'緑↑',
+    'btn.yes':'はい',
+    'btn.no':'いいえ',
+    'item.cardChange.confirm':'手札を全て入れ替えますが、よろしいですか？',
+    'item.removeTri.confirm':'盤面の△をすべて消しますが、よろしいですか？',
+    'item.removeSquare.confirm':'盤面の□をすべて消しますが、よろしいですか？',
+    'item.removeGarbage.confirm':'盤面のおじゃまブロックをすべて消しますが、よろしいですか？',
+    'item.triUp.confirm':'盤面の△をすべて□にランクアップさせますが、よろしいですか？',
+    'item.squareUp.confirm':'盤面の□をすべて⬠にランクアップさせますが、よろしいですか？',
+    'item.pentaUp.confirm':'盤面の五角形をすべて六角形にランクアップさせますが、よろしいですか？',
+    'item.hexUp.confirm':'盤面の六角形をすべて☆にランクアップさせますが、よろしいですか？',
+    'item.redUp.confirm':'☆以外の赤の図形をすべて1ランクアップさせますが、よろしいですか？',
+    'item.blueUp.confirm':'☆以外の青の図形をすべて1ランクアップさせますが、よろしいですか？',
+    'item.greenUp.confirm':'☆以外の緑の図形をすべて1ランクアップさせますが、よろしいですか？',
+    'item.joker.confirm':'手札の1枚がジョーカーになりますが、よろしいですか？',
+    'item.all1.confirm':'手札をすべて赤1・青1・緑1にしますが、よろしいですか？',
+    'item.all4.confirm':'手札をすべて赤4・青4・緑4にしますが、よろしいですか？',
   },
   simple:{
     'btn.settings':'⚙ せってい',
@@ -391,17 +417,33 @@ const STRINGS={
     'howto.l3':'③ きえなければマークをうごかす・カードをすてて、つぎのマークをよびこもう（1ターンすすむ）',
     'howto.l4':'④ おなじいろ・かたちのマークどうしをかさねると「がったい」！そだてるほどこうとくてんに',
     'howto.l5':'⑤ ⭐をたくさんけすと👑があらわれてばいりつアップ。ばいりつがたかいほどたくさんとくてん',
-    'howto.l6':'⑥ アイテムをてにいれたらまんなかのパネルからいつでもつかおう',
+    'howto.l6':'⑥ おじゃまブロックのかわりに10%で🎁たからばこがでる。こわすと100%でアイテムがもらえ、まんなかのパネルからいつでもつかえる',
     'howto.l7':'⑦ マークがおけなくなったらゲームオーバー。エンドレスでこうとくてんをめざそう！',
-    'howto.ref':'△×2　□×3　⬠×4　ろっかくけい×5　☆×10',
     'joker.picker.title':'🃏 いろとすうじをえらんでね',
     'endpanel.turnslabel':'ターンのかず',
     'flash.merge':'がったい!',
     'flash.crownspawn':'👑とうじょう!',
+    'flash.chestspawn':'🎁とうじょう!',
     'item.discardmode':'すてるアイテムをえらんでね',
-    'item.removeRed.label':'あかリムーブ',   'item.removeRed.short':'あか',
-    'item.removeBlue.label':'あおリムーブ',  'item.removeBlue.short':'あお',
-    'item.removeGreen.label':'みどりリムーブ','item.removeGreen.short':'みどり',
+    'item.pentaUp.label':'ごかくけいランクアップ',
+    'item.hexUp.label':'ろっかくけいランクアップ',
+    'item.redUp.label':'あかランクアップ',   'item.redUp.short':'あか↑',
+    'item.blueUp.label':'あおランクアップ',  'item.blueUp.short':'あお↑',
+    'item.greenUp.label':'みどりランクアップ','item.greenUp.short':'みどり↑',
+    'item.cardChange.confirm':'てふだをぜんぶいれかえますが、よろしいですか？',
+    'item.removeTri.confirm':'ばんめんの△をぜんぶけしますが、よろしいですか？',
+    'item.removeSquare.confirm':'ばんめんの□をぜんぶけしますが、よろしいですか？',
+    'item.removeGarbage.confirm':'ばんめんのおじゃまブロックをぜんぶけしますが、よろしいですか？',
+    'item.triUp.confirm':'ばんめんの△をぜんぶ□にランクアップさせますが、よろしいですか？',
+    'item.squareUp.confirm':'ばんめんの□をぜんぶ⬠にランクアップさせますが、よろしいですか？',
+    'item.pentaUp.confirm':'ばんめんのごかくけいをぜんぶろっかくけいにランクアップさせますが、よろしいですか？',
+    'item.hexUp.confirm':'ばんめんのろっかくけいをぜんぶ☆にランクアップさせますが、よろしいですか？',
+    'item.redUp.confirm':'☆いがいのあかのずけいをぜんぶ1ランクアップさせますが、よろしいですか？',
+    'item.blueUp.confirm':'☆いがいのあおのずけいをぜんぶ1ランクアップさせますが、よろしいですか？',
+    'item.greenUp.confirm':'☆いがいのみどりのずけいをぜんぶ1ランクアップさせますが、よろしいですか？',
+    'item.joker.confirm':'てふだの1まいがジョーカーになりますが、よろしいですか？',
+    'item.all1.confirm':'てふだをぜんぶあか1・あお1・みどり1にしますが、よろしいですか？',
+    'item.all4.confirm':'てふだをぜんぶあか4・あお4・みどり4にしますが、よろしいですか？',
   },
   en:{
     'title.sub':'Color & Shape Puzzle',
@@ -447,9 +489,8 @@ const STRINGS={
     'howto.l3':'③ Nothing to clear? Move a mark or discard a card for a new one (uses 1 turn)',
     'howto.l4':'④ Stack matching marks of the same color and shape to "merge" them — bigger marks score more',
     'howto.l5':'⑤ Clear lots of ⭐ to summon 👑 and boost your multiplier — the higher it goes, the more you score',
-    'howto.l6':'⑥ Got an item? Use it anytime from the center panel',
+    'howto.l6':'⑥ A 🎁 chest (10% chance, instead of Garbage) always drops an item — use it from the center panel',
     'howto.l7':'⑦ Game Over when no marks can be placed — see how high you can score in this endless mode!',
-    'howto.ref':'△×2　□×3　⬠×4　Hexagon×5　☆×10',
     'joker.picker.title':'🃏 Choose a color and number',
     'endpanel.title':'GAME OVER',
     'endpanel.turnslabel':'Turns',
@@ -461,17 +502,38 @@ const STRINGS={
     'flash.itemdrop':'Item!',
     'flash.garbagebreak':'Broken!',
     'flash.crownspawn':'👑 Spawned!',
+    'flash.chestspawn':'🎁 Spawned!',
     'item.discardmode':'Choose an item to discard',
     'item.panellabel':'Items',
     'item.cardChange.label':'Card Change',
     'item.removeTri.label':'Triangle Remove',
     'item.removeSquare.label':'Square Remove',
-    'item.removeRed.label':'Red Remove',      'item.removeRed.short':'Red',
-    'item.removeBlue.label':'Blue Remove',    'item.removeBlue.short':'Blue',
-    'item.removeGreen.label':'Green Remove',  'item.removeGreen.short':'Green',
     'item.removeGarbage.label':'Garbage Remove',
     'item.star.label':'Star Charm',
     'item.joker.label':'Joker',
+    'item.triUp.label':'Triangle Rank Up',
+    'item.squareUp.label':'Square Rank Up',
+    'item.pentaUp.label':'Pentagon Rank Up',
+    'item.hexUp.label':'Hexagon Rank Up',
+    'item.redUp.label':'Red Rank Up',     'item.redUp.short':'Red↑',
+    'item.blueUp.label':'Blue Rank Up',   'item.blueUp.short':'Blue↑',
+    'item.greenUp.label':'Green Rank Up', 'item.greenUp.short':'Green↑',
+    'btn.yes':'Yes',
+    'btn.no':'No',
+    'item.cardChange.confirm':'Replace your whole hand — are you sure?',
+    'item.removeTri.confirm':'Clear all △ on the board — are you sure?',
+    'item.removeSquare.confirm':'Clear all □ on the board — are you sure?',
+    'item.removeGarbage.confirm':'Clear all Garbage Blocks on the board — are you sure?',
+    'item.triUp.confirm':'Rank up every △ on the board to □ — are you sure?',
+    'item.squareUp.confirm':'Rank up every □ on the board to ⬠ — are you sure?',
+    'item.pentaUp.confirm':'Rank up every Pentagon on the board to Hexagon — are you sure?',
+    'item.hexUp.confirm':'Rank up every Hexagon on the board to ☆ — are you sure?',
+    'item.redUp.confirm':'Rank up every red mark (except ☆) by one — are you sure?',
+    'item.blueUp.confirm':'Rank up every blue mark (except ☆) by one — are you sure?',
+    'item.greenUp.confirm':'Rank up every green mark (except ☆) by one — are you sure?',
+    'item.joker.confirm':'Turn one hand card into a Joker — are you sure?',
+    'item.all1.confirm':'Set your whole hand to Red 1, Blue 1, Green 1 — are you sure?',
+    'item.all4.confirm':'Set your whole hand to Red 4, Blue 4, Green 4 — are you sure?',
   },
 };
 let currentLang=localStorage.getItem('cc_lang')||'ja';
@@ -495,6 +557,7 @@ function applyLanguage(){
 
 function itemLabel(type){ return T('item.'+type+'.label'); }
 function itemShort(type){ return T('item.'+type+'.short'); }
+function itemConfirmMsg(type){ return T('item.'+type+'.confirm'); }
 
 function randInt(n){return Math.floor(Math.random()*n);}
 function weightedIndex(weights){
@@ -538,6 +601,7 @@ let G={
   turnScoreAccum:0,         // 現在のターン中に得たスコアの合計（ランキングの「ターンMAX」用）
   bestTurnScore:0,          // 今回のゲームでの1ターン合計の最高スコア
   jokerPicker:null,         // ジョーカーカードの色・数字選択中 {handIdx}
+  itemConfirm:null,         // アイテム使用の確認待ち {index,type}
 };
 // 盤面にある☆マークの数（スコア倍率のもとになる）
 function countStars(){
@@ -636,6 +700,15 @@ function buildShapePath(cx,cy,r,type){
       break;
   }
 }
+// 小さな図形アイコン（⬠⬡は文字だと小サイズで丸つぶれして見えるため、テキストの代わりに使う）
+function drawShapeIcon(cx,cy,r,type,color){
+  ctx.save();
+  ctx.lineJoin='round';
+  buildShapePath(cx,cy,r,type);
+  ctx.fillStyle=color; ctx.fill();
+  ctx.lineWidth=1.5; ctx.strokeStyle='rgba(0,0,0,0.25)'; ctx.stroke();
+  ctx.restore();
+}
 // マークをはっきり見せるため：白ふち→塗り→濃い輪郭 の順に重ねて描く（ステッカー風）
 function drawMarkShape(cx,cy,r,type,color,alpha=1){
   ctx.save();
@@ -665,6 +738,15 @@ function drawGarbageBlock(x,y){
   ctx.closePath();
   ctx.fillStyle=grad; ctx.fill();
   ctx.lineWidth=2.5; ctx.strokeStyle='#413c46'; ctx.stroke();
+  ctx.restore();
+}
+// 🎁宝箱：隣接マスが消えると100%アイテムを落とす
+function drawChest(x,y){
+  const cx=x+CELL/2, cy=y+CELL/2, size=CELL*0.56;
+  ctx.save();
+  ctx.font=`${size}px 'Nunito','M PLUS Rounded 1c',sans-serif`;
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText('🎁',cx,cy+2);
   ctx.restore();
 }
 // 👑クラウン：消すことはできないが動かせる特別なコマ
@@ -698,7 +780,7 @@ function initGame(){
   G.hand=[makeCard(),makeCard(),makeCard()];
   G.selHand=-1; G.selMark=null; G.selBoardCard=null; G.hoverCell=null; G.pendingChoice=null;
   G.totalScore=0; G.displayScore=0; G.bestSingleScore=0; G.turns=0; G.actionLogCount=0;
-  G.items=[]; G.pendingItemDiscard=false; G.starsClearedTotal=0; G.jokerPicker=null;
+  G.items=[]; G.pendingItemDiscard=false; G.starsClearedTotal=0; G.jokerPicker=null; G.itemConfirm=null;
   G.starCounterDisplay=0; G.starCounterNextStepAt=null;
   G.turnScoreAccum=0; G.bestTurnScore=0;
   G.flow=null;
@@ -732,7 +814,7 @@ function moveMark(fr,fc,tr_,tc_){
   let merged=false;
   G.actionLogCount=0; G.turnScoreAccum=0;
   if(dst){
-    if(dst.kind==='garbage') return; // おじゃまブロックの上には置けない
+    if(dst.kind==='garbage'||dst.kind==='chest') return; // おじゃまブロック・宝箱の上には置けない
     if(dst.kind==='card'){ swapMarkAndCard(fr,fc,tr_,tc_); return; } // カードとマークを入れ替え
     if(src.kind==='mark'&&dst.kind==='mark'&&dst.color===src.color&&dst.type===src.type){
       if(dst.type>=MARK_MULT.length-1) return; // ☆同士はこれ以上合体できない（最大ランクのため）
@@ -806,12 +888,18 @@ function discardBoardCard(r,c){
   G.flow={stage:'preSpawnEval', spawnCount:1};
   runFlow();
 }
-function spawnGarbage(){
+// おじゃまブロックの代わりに10%の確率で宝箱を出現させる。宝箱は隣接マスが消えると100%アイテムを落とす
+function spawnObstacle(){
   const spawnable=emptyCells();
   if(!spawnable.length) return;
   const {r,c}=spawnable[randInt(spawnable.length)];
-  G.board[idx(r,c)]={kind:'garbage'};
-  G.flash.push({r,c,text:T('flash.garbage'),ttl:60,rise:16,col:'#7a7a86'});
+  if(Math.random()<CHEST_CHANCE){
+    G.board[idx(r,c)]={kind:'chest'};
+    G.flash.push({r,c,text:T('flash.chestspawn'),ttl:60,rise:16,col:'#d4900a'});
+  } else {
+    G.board[idx(r,c)]={kind:'garbage'};
+    G.flash.push({r,c,text:T('flash.garbage'),ttl:60,rise:16,col:'#7a7a86'});
+  }
 }
 // 出たばかりのマークが、置いた瞬間にすぐ消えてしまわないか判定する
 function wouldInstantlyResolve(mark,r,c){
@@ -833,8 +921,9 @@ function wouldInstantlyResolve(mark,r,c){
   }
   return false;
 }
-// マークが消えた位置の上下左右にあるおじゃまブロックも一緒に消す（5%の確率でアイテムを落とす）
-function clearAdjacentGarbage(r,c){
+// マークが消えた位置の上下左右にあるおじゃまブロック・宝箱も一緒に消す
+// おじゃまブロックからはアイテムは出ない。宝箱は100%の確率でアイテムを落とす
+function clearAdjacentObstacles(r,c){
   const dirs=[[-1,0],[1,0],[0,-1],[0,1]];
   for(const [dr,dc] of dirs){
     const nr=r+dr,nc=c+dc;
@@ -842,16 +931,16 @@ function clearAdjacentGarbage(r,c){
     const cell=G.board[idx(nr,nc)];
     if(cell&&cell.kind==='garbage'){
       G.board[idx(nr,nc)]=null;
-      if(Math.random()<ITEM_DROP_CHANCE){
-        addItem(ITEM_TYPES[randInt(ITEM_TYPES.length)]);
-        G.flash.push({r:nr,c:nc,text:T('flash.itemdrop'),ttl:55,rise:14,col:'#a76bea'});
-      }
       G.flash.push({r:nr,c:nc,text:T('flash.garbagebreak'),ttl:50,rise:12,col:'#7a7a86'});
+    } else if(cell&&cell.kind==='chest'){
+      G.board[idx(nr,nc)]=null;
+      addItem(ITEM_TYPES[randInt(ITEM_TYPES.length)]);
+      G.flash.push({r:nr,c:nc,text:T('flash.itemdrop'),ttl:55,rise:14,col:'#a76bea'});
     }
   }
 }
 // ============================================================
-//  ITEMS（おじゃまブロックを壊すと10%でドロップ。個数上限8個）
+//  ITEMS（🎁宝箱を壊すと100%でドロップ。おじゃまブロックからは出ない。個数上限8個）
 // ============================================================
 // アイテムを1つ入手する。8個持っている時はどれかを選んで捨てるまで操作できなくする
 function addItem(type){
@@ -861,6 +950,7 @@ function addItem(type){
 }
 // アイテムを使う（捨てる選択中の場合はそのアイテムを捨てるだけになる）
 // ⭐は使用できないアイテムのため、タップすると捨てるだけになる
+// それ以外は、はい/いいえの確認ポップアップを開いてから効果を発動する
 function useItem(index){
   if(G.pendingChoice) return;
   const type=G.items[index];
@@ -871,26 +961,45 @@ function useItem(index){
     return;
   }
   if(type==='star') return; // ⭐は使用不可。タップしても何も起きず、持っている間ずっと効果が続く
-  G.items.splice(index,1);
-  applyItemEffect(type);
+  G.itemConfirm={index,type};
+}
+// 確認ポップアップで「はい」が押された時だけ実際にアイテムを消費して効果を発動する
+function confirmItemUse(yes){
+  const ic=G.itemConfirm;
+  if(!ic) return;
+  G.itemConfirm=null;
+  if(!yes) return;
+  if(G.items[ic.index]!==ic.type) return; // 念のため（発動時点で状態が変わっていないか確認）
+  G.items.splice(ic.index,1);
+  applyItemEffect(ic.type);
 }
 function removeMarksByType(type){
   for(let r=0;r<GN;r++) for(let c=0;c<GN;c++){
     const cell=G.board[idx(r,c)];
     if(cell&&cell.kind==='mark'&&cell.type===type){
       G.board[idx(r,c)]=null;
-      clearAdjacentGarbage(r,c);
+      clearAdjacentObstacles(r,c);
     }
   }
 }
-function removeMarksByColor(color){
+// 盤面にある「指定の形」のマークを色を問わずすべて1ランク上げる（△→□→⬠→⬡→☆）
+function rankUpByType(type){
+  if(type>=MARK_MULT.length-1) return; // ☆はこれ以上ランクアップできない
+  const targets=[];
   for(let r=0;r<GN;r++) for(let c=0;c<GN;c++){
     const cell=G.board[idx(r,c)];
-    if(cell&&cell.kind==='mark'&&cell.color===color){
-      G.board[idx(r,c)]=null;
-      clearAdjacentGarbage(r,c);
-    }
+    if(cell&&cell.kind==='mark'&&cell.type===type) targets.push({r,c});
   }
+  targets.forEach(({r,c})=>{ G.board[idx(r,c)].type=type+1; });
+}
+// 盤面にある「指定の色」のマークを、形を問わずすべて1ランク上げる（☆はこれ以上ランクアップできないので対象外）
+function rankUpByColor(color){
+  const targets=[];
+  for(let r=0;r<GN;r++) for(let c=0;c<GN;c++){
+    const cell=G.board[idx(r,c)];
+    if(cell&&cell.kind==='mark'&&cell.color===color&&cell.type<MARK_MULT.length-1) targets.push({r,c});
+  }
+  targets.forEach(({r,c})=>{ G.board[idx(r,c)].type+=1; });
 }
 function removeAllGarbage(){
   for(let r=0;r<GN;r++) for(let c=0;c<GN;c++){
@@ -903,10 +1012,14 @@ function applyItemEffect(type){
     case 'cardChange': G.hand=[makeCard(),makeCard(),makeCard()]; break;
     case 'removeTri':    removeMarksByType(0); break; // △
     case 'removeSquare': removeMarksByType(1); break; // □
-    case 'removeRed':   removeMarksByColor(0); break;
-    case 'removeBlue':  removeMarksByColor(1); break;
-    case 'removeGreen': removeMarksByColor(2); break;
     case 'removeGarbage': removeAllGarbage(); break;
+    case 'triUp':    rankUpByType(0); break; // △→□
+    case 'squareUp': rankUpByType(1); break; // □→⬠
+    case 'pentaUp':  rankUpByType(2); break; // ⬠→⬡
+    case 'hexUp':    rankUpByType(3); break; // ⬡→☆
+    case 'redUp':   rankUpByColor(0); break;
+    case 'blueUp':  rankUpByColor(1); break;
+    case 'greenUp': rankUpByColor(2); break;
     case 'joker': {
       const idxs=[0,1,2].filter(i=>G.hand[i]&&!G.hand[i].joker);
       if(idxs.length){
@@ -931,9 +1044,9 @@ function resolveGroup(r,c,color,num,type,grp){
   if(gained>G.bestSingleScore) G.bestSingleScore=gained;
   G.flash.push({r,c,text:'+'+gained.toLocaleString(),ttl:60,rise:16,col:'#d4900a'});
   const isStarGroup=type===MARK_MULT.length-1;
-  for(const g of grp){ G.board[idx(g.r,g.c)]=null; clearAdjacentGarbage(g.r,g.c); }
+  for(const g of grp){ G.board[idx(g.r,g.c)]=null; clearAdjacentObstacles(g.r,g.c); }
   G.board[idx(r,c)]=null;
-  clearAdjacentGarbage(r,c); // カード自身が消えたことで隣接するおじゃまブロックも消える
+  clearAdjacentObstacles(r,c); // カード自身が消えたことで隣接するおじゃまブロックも消える
   if(isStarGroup) addStarsCleared(grp.length);
   const factors=[num, ...grp.map(()=>MARK_MULT[type])];
   if(comboMult!==1) factors.push(comboMult.toFixed(1));
@@ -1042,7 +1155,7 @@ function runFlow(){
       const chance=Math.min(100, GARBAGE_BASE+Math.floor(G.turns/20));
       if(Math.random()*100<chance){
         if(emptyCells().length===0){ triggerGameOver(); return; }
-        spawnGarbage();
+        spawnObstacle();
       }
       finishAction();
       return;
@@ -1116,6 +1229,8 @@ function drawBoard(){
       tx(cell.num,x+CELL/2,y+CELL/2,42,COLORS[cell.color],'center',true);
     } else if(cell&&cell.kind==='garbage'){
       drawGarbageBlock(x,y);
+    } else if(cell&&cell.kind==='chest'){
+      drawChest(x,y);
     } else if(cell&&cell.kind==='crown'){
       drawCrown(x+CELL/2,y+CELL/2,CELL*0.62);
     }
@@ -1135,7 +1250,7 @@ function drawBoard(){
     const src=G.board[idx(G.selMark.r,G.selMark.c)];
     const dst=G.board[idx(r,c)];
     const isMergeable = dst&&src&&src.kind==='mark'&&dst.kind==='mark'&&dst.color===src.color && dst.type===src.type;
-    const blocked = dst&&dst.kind==='garbage';
+    const blocked = dst&&(dst.kind==='garbage'||dst.kind==='chest');
     if(!blocked){
       const {x,y}=cellXY(r,c);
       if(src&&src.kind==='mark'){ ctx.save();ctx.globalAlpha=0.5; drawMarkShape(x+CELL/2,y+CELL/2,CELL*0.33,src.type,COLORS[src.color]); ctx.restore(); }
@@ -1299,8 +1414,20 @@ function drawMidPanel(){
       const def=ITEM_DEFS[item];
       const col=ITEM_COL[def.col]||ITEM_COL.hand;
       rr(bx,by,cellW,cellH,10, discardMode?'#fff0f0':col.bg, discardMode?'#ff8a8a':col.border,2);
-      tx(itemShort(item), bx+cellW/2, by+cellH/2-11,20,col.text,'center',true);
-      tx(itemLabel(item), bx+cellW/2, by+cellH-13,10,col.text,'center');
+      if(item==='pentaUp'||item==='hexUp'){
+        // ⬠⬡は文字だと小サイズで丸つぶれするため、図形アイコン＋矢印で表示する
+        const shapeType=item==='pentaUp'?2:3;
+        const iconR=11, arrowText='↑';
+        ctx.font=`800 18px 'Nunito','M PLUS Rounded 1c',sans-serif`;
+        const arrowW=ctx.measureText(arrowText).width;
+        const groupW=iconR*2+4+arrowW;
+        const startX=bx+cellW/2-groupW/2, iconY=by+cellH/2-14;
+        drawShapeIcon(startX+iconR, iconY, iconR, shapeType, col.text);
+        tx(arrowText, startX+iconR*2+4+arrowW/2, iconY, 18, col.text, 'center', true);
+      } else {
+        tx(itemShort(item), bx+cellW/2, by+cellH/2-14,18,col.text,'center',true);
+      }
+      tx(itemLabel(item), bx+cellW/2, by+cellH-15,13,col.text,'center',true);
     } else {
       rr(bx,by,cellW,cellH,10,'#fbfbf9','#e4e0da',1.5);
     }
@@ -1391,6 +1518,21 @@ function drawRightPanel(){
 }
 
 let howTo=false;
+// あそびかたの図形×倍率の参考行。⬠⬡は文字だと小サイズで丸つぶれするため図形アイコンで描く
+function drawShapeRefLine(x,y,fontSize){
+  ctx.textAlign='left'; ctx.textBaseline='middle';
+  ctx.font=`400 ${fontSize}px 'Nunito','M PLUS Rounded 1c',sans-serif`;
+  ctx.fillStyle='#3a3a44';
+  let cx=x;
+  const gap=16;
+  const put=(s)=>{ ctx.fillText(s,cx,y); cx+=ctx.measureText(s).width+gap; };
+  const iconR=fontSize*0.42;
+  put('△×2'); put('□×3');
+  drawShapeIcon(cx+iconR,y,iconR,2,'#3a3a44'); cx+=iconR*2+4;
+  put('×4');
+  drawShapeIcon(cx+iconR,y,iconR,3,'#3a3a44'); cx+=iconR*2+4;
+  put('×5'); put('☆×10');
+}
 function drawHowToScreen(){
   ctx.fillStyle='rgba(30,20,10,0.55)';ctx.fillRect(0,0,W,H);
   const pw=880, ph=520, px=W/2-pw/2, py=H/2-ph/2;
@@ -1399,10 +1541,11 @@ function drawHowToScreen(){
   const lines=[
     T('howto.l1'), T('howto.l2'), T('howto.l3'), T('howto.l4'),
     T('howto.l5'), T('howto.l6'), T('howto.l7'),
-    T('howto.ref'),
   ];
   const lineH=40;
   lines.forEach((l,i)=>tx(l,W/2-pw/2+30,py+84+i*lineH,15,'#3a3a44','left'));
+  // 参考行：⬠⬡は小サイズだと文字が丸つぶれして見えるため、図形アイコンを直接描画する
+  drawShapeRefLine(W/2-pw/2+30, py+84+lines.length*lineH, 15);
   BR.htclose={x:W/2-70,y:py+ph-64,w:140,h:44};
   rr(W/2-70,py+ph-64,140,44,10,'#f6f4f0','#f0a850',2);
   tx(T('btn.close'),W/2,py+ph-42,17,'#3a3a44','center',true);
@@ -1450,6 +1593,46 @@ function drawJokerPicker(){
     }
   }
 }
+// 長い文章をキャンバス幅に合わせて複数行に折り返す（スペース区切りの言語は単語単位、日本語は1文字単位）
+function wrapLines(text,maxWidth,fontSize){
+  ctx.font=`400 ${fontSize}px 'Nunito','M PLUS Rounded 1c',sans-serif`;
+  const lines=[];
+  if(text.includes(' ')){
+    let cur='';
+    text.split(' ').forEach(w=>{
+      const test=cur?cur+' '+w:w;
+      if(cur&&ctx.measureText(test).width>maxWidth){ lines.push(cur); cur=w; } else cur=test;
+    });
+    if(cur) lines.push(cur);
+  } else {
+    let cur='';
+    for(const ch of text){
+      const test=cur+ch;
+      if(cur&&ctx.measureText(test).width>maxWidth){ lines.push(cur); cur=ch; } else cur=test;
+    }
+    if(cur) lines.push(cur);
+  }
+  return lines;
+}
+// アイテム使用前の確認ポップアップ（はい/いいえ）
+function drawItemConfirm(){
+  const ic=G.itemConfirm; if(!ic) return;
+  ctx.fillStyle='rgba(30,20,10,0.55)'; ctx.fillRect(0,0,W,H);
+  const pw=560, fontSize=17, lineH=26;
+  const lines=wrapLines(itemConfirmMsg(ic.type), pw-60, fontSize);
+  const ph=150+lines.length*lineH;
+  const px=W/2-pw/2, py=H/2-ph/2;
+  rr(px,py,pw,ph,18,'#ffffff','#f0a850',3);
+  tx(itemLabel(ic.type), W/2, py+36, 20,'#d4900a','center',true);
+  lines.forEach((l,i)=>tx(l, W/2, py+76+i*lineH, fontSize,'#3a3a44','center'));
+  const btnY=py+ph-60;
+  BR.itemConfirmYes={x:W/2-140,y:btnY,w:120,h:44};
+  rr(W/2-140,btnY,120,44,10,'#28a040','#1a7030',2);
+  tx(T('btn.yes'),W/2-80,btnY+22,17,'#fff','center',true);
+  BR.itemConfirmNo={x:W/2+20,y:btnY,w:120,h:44};
+  rr(W/2+20,btnY,120,44,10,'#e05656','#a03030',2);
+  tx(T('btn.no'),W/2+80,btnY+22,17,'#fff','center',true);
+}
 function drawGame(){
   ctx.fillStyle=C_BG;ctx.fillRect(0,0,W,H);
   BR={};
@@ -1460,6 +1643,7 @@ function drawGame(){
   if(G.phase==='game_over') drawEndPanel(T('endpanel.title'),'#3a78c0','#3a78c0');
   if(howTo) drawHowToScreen();
   if(G.jokerPicker) drawJokerPicker();
+  if(G.itemConfirm) drawItemConfirm();
   G.flash=G.flash.filter(f=>{ f.ttl--; f.rise+=0.5; return f.ttl>0; });
 }
 
@@ -1496,6 +1680,13 @@ cvs.addEventListener('pointerdown',e=>{
   }
   if(G.phase!=='game') return;
   if(G.starCounterDisplay<G.starsClearedTotal) return; // ⭐カウンターのアニメーション中は操作を受け付けない
+
+  // アイテム使用の確認中：はい/いいえのみ受け付ける
+  if(G.itemConfirm){
+    if(hit(BR.itemConfirmYes,mx,my)) confirmItemUse(true);
+    else if(hit(BR.itemConfirmNo,mx,my)) confirmItemUse(false);
+    return;
+  }
 
   // ジョーカーの色・数字を選択中：グリッドをタップして選ぶか、外側タップで一旦閉じる
   if(G.jokerPicker){
@@ -1569,7 +1760,7 @@ cvs.addEventListener('pointerdown',e=>{
       cvs.setPointerCapture(e.pointerId);
       return;
     }
-    if(cellObj&&cellObj.kind==='garbage'){ return; } // おじゃまブロックへは動かせない
+    if(cellObj&&(cellObj.kind==='garbage'||cellObj.kind==='chest')){ return; } // おじゃまブロック・宝箱へは動かせない
     // カードの上なら入れ替え、マークの上なら合体か入れ替え、空きマスなら移動（moveMarkが内部で判定する）
     moveMark(G.selMark.r,G.selMark.c,cell.r,cell.c);
     return;
