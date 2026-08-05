@@ -523,20 +523,19 @@
         .howto-item-title { font-size: 1.0rem; font-weight: 800; color: var(--text-hi); margin-bottom: 3px; }
         .howto-item-body { font-size: 0.86rem; color: var(--text-dim); line-height: 1.65; }
 
-        #tutorial-banner {
-            position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
-            z-index: 90; width: 640px; max-width: 92%;
-            background: rgba(20,16,10,0.92); border: 2px solid #ffd24a; border-radius: 14px;
-            padding: 8px 22px; text-align: center; box-shadow: 0 4px 18px rgba(0,0,0,0.5);
+        .tutorial-spotlight {
+            position: relative; z-index: 150; border-radius: 12px;
+            outline: 4px solid #ffd24a; outline-offset: 4px;
+            box-shadow: 0 0 0 4px #ffd24a, 0 0 26px 8px rgba(255,210,74,0.8);
         }
-        .tutorial-banner-phase { font-size: 0.78rem; font-weight: 800; color: #ffd24a; letter-spacing: 1px; margin-bottom: 2px; }
-        .tutorial-banner-step { font-size: 1.02rem; font-weight: 800; color: var(--text-hi); }
-        .tutorial-banner-checklist { display: flex; gap: 10px; justify-content: center; margin-top: 6px; }
-        .tutorial-banner-check { font-size: 0.9rem; color: var(--text-dim); opacity: 0.5; }
-        .tutorial-banner-check.done { color: #6adf6a; opacity: 1; }
-        .cs-tutorial-row { border-color: #ffd24a !important; background: rgba(255,210,74,0.1); }
-        .cs-tutorial-row:hover { background: rgba(255,210,74,0.2); }
-        .tutorial-inv-hint { font-size: 0.85rem; color: #ffd24a; font-weight: 700; text-align: center; margin: -4px 0 10px; }
+        #tutorial-spotlight-caption {
+            position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+            z-index: 160; width: 700px; max-width: 92%;
+            background: rgba(20,16,10,0.95); border: 2px solid #ffd24a; border-radius: 14px;
+            padding: 14px 26px; text-align: center; box-shadow: 0 4px 18px rgba(0,0,0,0.6);
+        }
+        #tutorial-spotlight-text { font-size: 1.02rem; font-weight: 700; color: var(--text-hi); margin-bottom: 12px; line-height: 1.6; }
+
 
         /* ==================== EXP RESULT ==================== */
         .exp-result { text-align: center; }
@@ -798,6 +797,10 @@
             <p class="title-sub">ひとふでめいきゅう</p>
             <p class="title-dev" data-i18n="title_dev">（開発中）</p>
             <button id="btn-start" class="btn btn-green" data-i18n="btn_game_start" onclick="goToJobSelect()">ゲームスタート</button>
+            <div id="btn-continue-row" class="hidden" style="display:flex; gap:10px; width:100%;">
+                <button id="btn-continue" class="btn btn-green" style="flex:1;" data-i18n="btn_continue" onclick="continueGame()">続きから</button>
+                <button id="btn-new-game" class="btn btn-gray" style="flex:1;" data-i18n="btn_new_game" onclick="confirmNewGame()">初めから</button>
+            </div>
             <button id="btn-name-register" class="btn btn-gray" onclick="openNameRegister()">👤 名前の登録</button>
             <button id="btn-ranking" class="btn btn-gray" data-i18n="btn_ranking" onclick="openRanking()">🏆 ランキング</button>
             <button id="btn-settings" class="btn btn-gray" data-i18n="btn_settings" onclick="openSettings()">⚙️ 設定</button>
@@ -872,10 +875,16 @@
         </div>
     </div>
 
-    <div id="tutorial-banner" class="hidden">
-        <div class="tutorial-banner-phase"></div>
-        <div class="tutorial-banner-step"></div>
-        <div class="tutorial-banner-checklist"></div>
+    <div id="tutorial-msg-overlay" class="overlay hidden" style="z-index:300;">
+        <div class="ov-box" style="max-width:560px; text-align:center;">
+            <p class="ov-desc center" id="tutorial-msg-text" style="font-size:1.15rem; font-weight:700; margin-bottom:22px;"></p>
+            <button class="btn btn-green btn-sm" onclick="closeTutorialMessage()">OK</button>
+        </div>
+    </div>
+
+    <div id="tutorial-spotlight-caption" class="hidden">
+        <p id="tutorial-spotlight-text"></p>
+        <button class="btn btn-green btn-sm" onclick="advanceTutorialSpotlight()">OK</button>
     </div>
 
     <!-- ==================== DUNGEON ==================== -->
@@ -1037,6 +1046,17 @@
         </div>
     </div>
 
+    <div id="new-game-confirm-overlay" class="overlay hidden">
+        <div class="ov-box" style="text-align:center;">
+            <div class="ov-title" data-i18n="new_game_confirm_title">⚠️ 初めから始めますか？</div>
+            <p class="ov-desc center" data-i18n="new_game_confirm_body">保存されている続きのデータは消えてしまいます。よろしいですか？</p>
+            <div style="display:flex; gap:16px; justify-content:center;">
+                <button class="btn btn-green btn-sm" data-i18n="btn_yes_new_game" onclick="doNewGame()">はい、初めから</button>
+                <button class="btn btn-gray btn-sm" data-i18n="btn_cancel" onclick="cancelNewGame()">やめる</button>
+            </div>
+        </div>
+    </div>
+
     <div id="tutorial-complete-overlay" class="overlay hidden">
         <div class="ov-box" style="text-align:center;">
             <div class="ov-title" data-i18n="tutorial_complete_title">🎉 チュートリアル完了！</div>
@@ -1157,7 +1177,6 @@
             <div class="ov-title" style="text-align:center;" data-i18n="inventory_title">🎒 道具の整理</div>
             <div id="inv-tabs" style="display:flex; gap:8px; justify-content:center; margin-bottom:10px;"></div>
             <p class="panel-placeholder" style="text-align:center;" data-i18n="inv_placeholder">同じ道具（材質・種類が同じ）同士をタップすると合成できます</p>
-            <p id="tutorial-inv-hint" class="tutorial-inv-hint hidden"></p>
             <div id="inv-grid"></div>
             <div style="text-align:center;">
                 <button class="btn btn-green btn-sm hidden" id="inv-proceed-btn" style="margin-top:12px;">たたかう ▶</button>
@@ -1298,6 +1317,11 @@ function renderSettingsScreen(){
 const UI_TEXT = {
     title_dev: { ja: '（開発中）', ja_easy: '（かいはつちゅう）', en: '(In Development)' },
     btn_game_start: { ja: 'ゲームスタート', ja_easy: 'はじめる', en: 'Start Game' },
+    btn_continue: { ja: '続きから', ja_easy: 'つづきから', en: 'Continue' },
+    btn_new_game: { ja: '初めから', ja_easy: 'はじめから', en: 'New Game' },
+    new_game_confirm_title: { ja: '⚠️ 初めから始めますか？', ja_easy: '⚠️ はじめから はじめますか？', en: '⚠️ Start a New Game?' },
+    new_game_confirm_body: { ja: '保存されている続きのデータは消えてしまいます。よろしいですか？', ja_easy: 'ほぞんされている つづきの データは きえてしまいます。よろしいですか？', en: 'Your saved progress will be deleted. Are you sure?' },
+    btn_yes_new_game: { ja: 'はい、初めから', ja_easy: 'はい、はじめから', en: 'Yes, Start New' },
     btn_index: { ja: '🏠 INDEXへ', ja_easy: '🏠 いちらんへ', en: '🏠 To Index' },
     btn_settings: { ja: '⚙️ 設定', ja_easy: '⚙️ せってい', en: '⚙️ Settings' },
 
@@ -1381,22 +1405,25 @@ const UI_TEXT = {
     howto_other_6_body: { ja: '5F・10F・15Fはボス階。ボスは通常の敵よりずっと強く、種族によって見た目や得意なステータスが変わる。', ja_easy: '5F・10F・15Fは ボスの かい。ボスは ふつうの てきより ずっと つよく、しゅぞくに よって みための や とくいな ステータスが かわる。', en: 'Floors 5, 10, and 15 are boss floors. Bosses are much stronger than regular enemies, and their appearance and strong stats vary by species.' },
 
     tutorial_job_row_label: { ja: '🔰 チュートリアル', ja_easy: '🔰 チュートリアル（れんしゅう）', en: '🔰 Tutorial' },
-    tutorial_phase_prep: { ja: '⚔️🔧 戦闘準備フェーズ', ja_easy: '⚔️🔧 せんとうじゅんびフェーズ', en: '⚔️🔧 Battle Prep Phase' },
-    tutorial_step_chest: { ja: '①宝箱を鍵で開けてみよう！', ja_easy: '①たからばこを かぎで あけてみよう！', en: '① Open a treasure chest with a key!' },
-    tutorial_step_item: { ja: '②装備強化アイテムを拾おう！', ja_easy: '②そうびを つよくする アイテムを ひろおう！', en: '② Pick up an equipment-boosting item!' },
-    tutorial_step_potion: { ja: '③ポーションを拾おう！', ja_easy: '③ポーションを ひろおう！', en: '③ Pick up a potion!' },
-    tutorial_step_synth: { ja: '④同じ道具を2つ選んで合成しよう！', ja_easy: '④おなじ どうぐを 2つ えらんで ごうせいしよう！', en: '④ Pick two identical items and synthesize them!' },
-    tutorial_step_disenchant: { ja: '⑤道具を分解して装備に反映させよう！', ja_easy: '⑤どうぐを ぶんかいして そうびに いかそう！', en: '⑤ Disenchant an item onto your equipped gear!' },
-    tutorial_step_combo: { ja: '⑥マークをつなげてコンボを出そう！', ja_easy: '⑥マークを つなげて コンボを だそう！', en: '⑥ Chain marks together to build a combo!' },
-    tutorial_step_potionuse: { ja: '⑦ポーションを使ってみよう！', ja_easy: '⑦ポーションを つかってみよう！', en: '⑦ Try using a potion!' },
-    tutorial_all_done_label: { ja: 'その調子！ゴールを目指そう', ja_easy: 'そのちょうし！ゴールを めざそう', en: "Great! Now head for the goal." },
-    tutorial_wrong_move_msg: { ja: 'チュートリアルでは、決められたマスへ進もう！', ja_easy: 'チュートリアルでは、きめられた マスへ すすもう！', en: 'In the tutorial, move to the highlighted next cell!' },
-    tutorial_goal_need_potion_msg: { ja: 'ゴールへ行く前に、ポーションを使ってみよう！', ja_easy: 'ゴールへ いく まえに、ポーションを つかってみよう！', en: 'Before heading to the goal, try using a potion!' },
+    tutorial_tour_map: { ja: 'ここが探索マップ。矢印キーやクリックでマスを移動して、ダンジョンを進みます。', ja_easy: 'ここが たんさくマップ。やじるしキーや クリックで マスを うごいて、ダンジョンを すすみます。', en: 'This is the exploration map. Move between cells with the arrow keys or by clicking to advance through the dungeon.' },
+    tutorial_tour_dginfo: { ja: 'ここはダンジョン情報。今いる階層と、持っている鍵の数を確認できます。', ja_easy: 'ここは ダンジョンじょうほう。いま いる かいそうと、もっている かぎの かずが かくにんできます。', en: 'This is the dungeon info panel. Check your current floor and how many keys you have.' },
+    tutorial_tour_status: { ja: 'ここはステータス。レベルや経験値、HP、装備している道具を確認できます。', ja_easy: 'ここは ステータス。レベルや けいけんち、HP、そうびしている どうぐが かくにんできます。', en: 'This is your status panel. Check your level, EXP, HP, and equipped gear.' },
+    tutorial_tour_battlemap: { ja: 'ここが戦闘マップ。マスを進んで武器・防具・魔道具のマークを集めます。', ja_easy: 'ここが せんとうマップ。マスを すすんで ぶき・ぼうぐ・まほうのどうぐの マークを あつめます。', en: 'This is the battle map. Move across cells to collect weapon, armor, and magic marks.' },
+    tutorial_tour_battlestatus: { ja: 'ここは味方と敵のステータス。HPやコンボ数、攻撃力・防御力・魔力を確認できます。', ja_easy: 'ここは みかたと てきの ステータス。HPや コンボかず、こうげきりょく・ぼうぎょりょく・まりょくが かくにんできます。', en: "This shows your and the enemy's status. Check HP, combo count, and ATK/DEF/MAG." },
+    tutorial_explore_intro_msg: { ja: '①鍵を取って宝箱を開け、ゴールを目指そう！（通り道は自由。宝箱を取ってからゴールしよう）', ja_easy: '①かぎを とって たからばこを あけ、ゴールを めざそう！（とおる みちは じゆう。たからばこを とってから ゴールしよう）', en: '① Grab a key, open a chest, and head for the goal! (Any route is fine — just open a chest before reaching the goal.)' },
+    tutorial_explore_fail_nochest_msg: { ja: '宝箱を取らずにゴールしてしまった…もう一度挑戦しよう！', ja_easy: 'たからばこを とらずに ゴールしてしまった…もういちど ちょうせんしよう！', en: "You reached the goal without opening a chest... let's try again!" },
+    tutorial_explore_fail_stuck_msg: { ja: '行き止まりになってしまった…もう一度挑戦しよう！', ja_easy: 'いきどまりに なってしまった…もういちど ちょうせんしよう！', en: "You've hit a dead end... let's try again!" },
+    tutorial_prep_synth_msg: { ja: '②木の剣を2つ選んで合成しよう！', ja_easy: '②きの けんを 2つ えらんで ごうせいしよう！', en: '② Pick two Wooden Swords and synthesize them!' },
+    tutorial_prep_synth_first_msg: { ja: 'その木の剣は、まず2つ合成するのに使うよ！先に合成を試してみよう。', ja_easy: 'その きの けんは、まず 2つ ごうせいするのに つかうよ！さきに ごうせいを ためしてみよう。', en: 'Those Wooden Swords are for synthesizing together first! Try synthesizing them before disenchanting.' },
+    tutorial_prep_disenchant_msg: { ja: '③木の弓を分解して、装備に攻撃力アップのスキルを受け継がせよう！', ja_easy: '③きの ゆみを ぶんかいして、そうびに こうげきりょくアップの スキルを ひきつがせよう！', en: '③ Disenchant the Wooden Bow to pass its ATK Up skill onto your gear!' },
+    tutorial_prep_done_msg: { ja: '準備ばっちり！「たたかう」を押して戦闘へ進もう。', ja_easy: 'じゅんび ばっちり！「たたかう」を おして せんとうへ すすもう。', en: "You're all set! Press Fight to head into battle." },
+    tutorial_battle_intro_msg: { ja: 'マークをつなげるとコンボが増えて、攻撃力・防御力・魔力がアップするよ！ゴールにいる敵を倒そう。', ja_easy: 'マークを つなげると コンボが ふえて、こうげきりょく・ぼうぎょりょく・まりょくが アップするよ！ゴールに いる てきを たおそう。', en: 'Chaining marks together builds combo, boosting your ATK/DEF/MAG! Defeat the enemy waiting at the goal.' },
+    tutorial_potion_prompt_msg: { ja: 'ダメージを受けたね。ポーションを使ってみよう！', ja_easy: 'ダメージを うけたね。ポーションを つかってみよう！', en: "You've taken damage. Try using a potion!" },
+    tutorial_battle_fail_stuck_msg: { ja: '行き止まりになってしまった…もう一度挑戦しよう！', ja_easy: 'いきどまりに なってしまった…もういちど ちょうせんしよう！', en: "You've hit a dead end... let's try again!" },
+    tutorial_battle_fail_hp_msg: { ja: 'HPが0になってしまった…全回復してもう一度挑戦しよう！', ja_easy: 'HPが 0に なってしまった…ぜんかいふくして もういちど ちょうせんしよう！', en: 'Your HP hit 0... fully healing up so you can try again!' },
     tutorial_complete_title: { ja: '🎉 チュートリアル完了！', ja_easy: '🎉 チュートリアル かんりょう！', en: '🎉 Tutorial Complete!' },
     tutorial_complete_body: { ja: '基本の遊び方はこれでバッチリ！さっそく本編に挑戦してみよう。', ja_easy: 'きほんの あそびかたは これで バッチリ！さっそく ほんばんに ちょうせんしてみよう。', en: "You've mastered the basics! Now try the real adventure." },
     tutorial_complete_ok: { ja: 'タイトルへ戻る', ja_easy: 'タイトルへ もどる', en: 'Return to Title' },
-    tutorial_inv_hint_prep: { ja: '④同じ道具を2つ選んで合成し、⑤不要な道具を分解して装備に反映させよう。両方できたら「たたかう」を押せるようになるよ。', ja_easy: '④おなじ どうぐを 2つ えらんで ごうせいし、⑤いらない どうぐを ぶんかいして そうびに いかそう。りょうほう できたら「たたかう」が おせるようになるよ。', en: 'Synthesize two identical items ④, then disenchant one onto your gear ⑤. Do both to unlock the Fight button.' },
-    tutorial_inv_hint_done: { ja: '準備ばっちり！「たたかう」を押して戦闘へ進もう。', ja_easy: 'じゅんび ばっちり！「たたかう」を おして せんとうへ すすもう。', en: "You're all set! Press Fight to head into battle." },
 
     perfect_banner: { ja: '🎯 パーフェクト！', ja_easy: '🎯 パーフェクト！', en: '🎯 Perfect!' },
     exp_gained_label: { ja: '獲得経験値', ja_easy: 'もらった けいけんち', en: 'EXP Gained' },
@@ -2151,6 +2178,155 @@ function createPlayer(){
 let player = createPlayer();
 let floorItemsObtained = []; // このフロアで宝箱から入手したアイテム（結果画面で公開）
 
+// ============================================================
+// SAVE / LOAD（ローカルセーブ。探索・バトル中の操作のたびに自動保存し、
+// タイトル画面の「続きから」で中断した場所からそのまま再開できる。チュートリアル中は保存しない）
+// ============================================================
+const SAVE_KEY = 'hitofudeMeikyuuSave';
+
+function hasSave(){
+    try { return !!localStorage.getItem(SAVE_KEY); } catch (e){ return false; }
+}
+function clearSave(){
+    try { localStorage.removeItem(SAVE_KEY); } catch (e){}
+}
+function refreshTitleButtons(){
+    const has = hasSave();
+    document.getElementById('btn-start').classList.toggle('hidden', has);
+    document.getElementById('btn-continue-row').classList.toggle('hidden', !has);
+}
+// name/statLabelはgetterで毎回言語に応じて解決されるため、保存にはプレーンなフィールドだけを使う
+function serializeGearItem(it){
+    return { defId: it.defId, category: it.category, practice: it.practice, skills: it.skills.slice(), plusLevel: it.plusLevel || 0 };
+}
+function rehydrateGearItem(saved){
+    return makeGearItem(saved.defId, saved.category, saved.practice, saved.skills, saved.plusLevel);
+}
+function autoSaveGame(){
+    if (tutorialActive) return;
+    if (currentMode !== 'explore' && currentMode !== 'battle') return;
+    // initFloor()/initBattleRound()がまだ走っていない一瞬（startGame()冒頭など）は状態が未生成なので保存しない
+    if (currentMode === 'explore' && (!visited || !start || !goal)) return;
+    if (currentMode === 'battle' && (!bVisited || !bStart || !bGoal)) return;
+    const data = {
+        version: 1,
+        selectedJob, selectedGender, selectedDifficulty,
+        floor, currentMode,
+        player: {
+            level: player.level, exp: player.exp, expToNext: player.expToNext,
+            baseMaxHp: player.baseMaxHp, hp: player.hp, maxHp: player.maxHp,
+            gear: {
+                weapon: serializeGearItem(player.gear.weapon),
+                armor: serializeGearItem(player.gear.armor),
+                magic: serializeGearItem(player.gear.magic)
+            },
+            inventory: player.inventory.map(serializeGearItem),
+            potions: Object.assign({}, player.potions),
+            score: player.score, perfectCount: player.perfectCount,
+            job: player.job, gender: player.gender
+        }
+    };
+    if (currentMode === 'explore'){
+        data.explore = {
+            start, goal, current,
+            visited: Array.from(visited),
+            keys, chests, dots, dotSpecial,
+            keyTaken: keyTaken.slice(), chestOpened: chestOpened.slice(), dotTaken: dotTaken.slice(),
+            keyCounts: Object.assign({}, keyCounts),
+            floorItemsObtained: floorItemsObtained.map(serializeGearItem)
+        };
+    } else {
+        data.battle = {
+            bStart, bGoal, bCurrent,
+            bVisited: Array.from(bVisited),
+            bMarks, bMarkTaken: bMarkTaken.slice(),
+            bCombo, bLastMarkCategory, bTotal: Object.assign({}, bTotal), bArmorCritGuard,
+            enemyHp, enemyMaxHp, battleRound,
+            enemySpeciesKey: currentEnemySpecies.key,
+            bossRevivalsLeft
+        };
+    }
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch (e){}
+}
+function continueGame(){
+    let data;
+    try { data = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e){ data = null; }
+    if (!data){ goToJobSelect(); return; }
+    selectedJob = data.selectedJob;
+    selectedGender = data.selectedGender;
+    selectedDifficulty = data.selectedDifficulty;
+    floor = data.floor;
+    const p = data.player;
+    player = {
+        level: p.level, exp: p.exp, expToNext: p.expToNext,
+        baseMaxHp: p.baseMaxHp, hp: p.hp, maxHp: p.maxHp,
+        gear: {
+            weapon: rehydrateGearItem(p.gear.weapon),
+            armor: rehydrateGearItem(p.gear.armor),
+            magic: rehydrateGearItem(p.gear.magic)
+        },
+        inventory: p.inventory.map(rehydrateGearItem),
+        potions: p.potions,
+        score: p.score, perfectCount: p.perfectCount,
+        job: p.job, gender: p.gender
+    };
+    document.getElementById('title-screen').classList.add('hidden');
+    document.getElementById('dg-floor-disp').textContent = floor + 'F';
+    renderStatus();
+    renderCharacterPortraits();
+
+    if (data.currentMode === 'explore'){
+        currentMode = 'explore';
+        const ex = data.explore;
+        start = ex.start; goal = ex.goal; current = ex.current;
+        visited = new Set(ex.visited);
+        keys = ex.keys; chests = ex.chests; dots = ex.dots; dotSpecial = ex.dotSpecial;
+        keyTaken = ex.keyTaken; chestOpened = ex.chestOpened; dotTaken = ex.dotTaken;
+        keyCounts = ex.keyCounts;
+        floorItemsObtained = ex.floorItemsObtained.map(rehydrateGearItem);
+        document.getElementById('battle-screen').classList.add('hidden');
+        document.getElementById('dungeon-screen').classList.remove('hidden');
+        setMsg('');
+        renderMap();
+    } else {
+        currentMode = 'battle';
+        const bt = data.battle;
+        bStart = bt.bStart; bGoal = bt.bGoal; bCurrent = bt.bCurrent;
+        bVisited = new Set(bt.bVisited);
+        bMarks = bt.bMarks; bMarkTaken = bt.bMarkTaken;
+        bCombo = bt.bCombo; bLastMarkCategory = bt.bLastMarkCategory;
+        bTotal = bt.bTotal; bArmorCritGuard = bt.bArmorCritGuard;
+        enemyHp = bt.enemyHp; enemyMaxHp = bt.enemyMaxHp; battleRound = bt.battleRound;
+        const boss = isBossFloor(floor);
+        currentEnemySpecies = (boss ? BOSS_SPECIES : ENEMY_SPECIES).find(s => s.key === bt.enemySpeciesKey) || ENEMY_SPECIES[0];
+        bossRevivalsLeft = bt.bossRevivalsLeft;
+        battleEnded = false;
+        document.getElementById('dungeon-screen').classList.add('hidden');
+        document.getElementById('battle-screen').classList.remove('hidden');
+        document.getElementById('bt-enemy-name').textContent = (boss ? '👑 ' : '') + currentEnemySpecies.name;
+        document.getElementById('bt-ally-name').textContent = getCurPlayerName();
+        document.getElementById('br-ally-label').textContent = getCurPlayerName();
+        document.getElementById('br-enemy-label').textContent = currentEnemySpecies.name;
+        document.getElementById('bt-floor-label').textContent = floor + 'F';
+        document.getElementById('bt-enemy-portrait').classList.toggle('bt-boss-frame', boss);
+        document.getElementById('br-enemy-illust').classList.toggle('bt-boss-frame', boss);
+        renderEnemyPortrait();
+        renderBattleMap();
+        renderBattleStatus();
+    }
+}
+function confirmNewGame(){
+    document.getElementById('new-game-confirm-overlay').classList.remove('hidden');
+}
+function cancelNewGame(){
+    document.getElementById('new-game-confirm-overlay').classList.add('hidden');
+}
+function doNewGame(){
+    document.getElementById('new-game-confirm-overlay').classList.add('hidden');
+    clearSave();
+    goToJobSelect();
+}
+
 const ENEMY_DEFEAT_EXP = 100;
 
 // 装備中のhp_pctスキル分だけ、レベル由来の最大HP（baseMaxHp）に上乗せする。
@@ -2204,6 +2380,7 @@ function renderStatus(){
         return `<div class="dg-gear-item">${bonusMark}<img src="${g.icon}" alt="${g.name}"><span class="dg-gear-stat">${g.statLabel}：<b style="color:${CATEGORY_COLOR[cat]};">${effectiveValue(g)}</b></span><span class="dg-gear-stat">${ui('label_stat_count')}：<b>${effectiveCount(g)}</b></span>${skillsHtml}</div>`;
     }).join('');
     updatePotionButtons();
+    autoSaveGame();
 }
 
 // ============================================================
@@ -2222,6 +2399,7 @@ function updatePotionButtons(){
     });
 }
 function openPotionMenu(){
+    if (isTutorialBlocking()) return;
     renderPotionList();
     document.getElementById('potion-overlay').classList.remove('hidden');
 }
@@ -2252,10 +2430,6 @@ function usePotion(tierKey){
     const healAmt = Math.round(player.maxHp * tier.ratio);
     player.hp = Math.min(player.maxHp, player.hp + healAmt);
     player.potions[tierKey] = count - 1;
-    if (tutorialActive && currentMode === 'battle'){
-        tutorialFlags.potionUse = true;
-        renderTutorialBanner();
-    }
     renderStatus();
     if (currentMode === 'battle') renderBattleStatus();
     // バトルステージの合間（battle-result-overlay）で使った場合、そこに表示中のHPバーもその場で更新する
@@ -2268,7 +2442,6 @@ function usePotion(tierKey){
 function key(r,c){ return r + ',' + c; }
 
 function pickStartGoal(){
-    if (tutorialActive){ start = { r: 1, c: 1 }; goal = { r: 5, c: 5 }; return; }
     const i1 = Math.floor(Math.random() * VALID_CELLS.length);
     let i2;
     do { i2 = Math.floor(Math.random() * VALID_CELLS.length); } while (i2 === i1);
@@ -2288,118 +2461,121 @@ function pickDistinctCells(cells, n){
 }
 
 // ============================================================
-// TUTORIAL（村人の練習プレイ。探索1回・戦闘1回を、決められた手順どおりに強制的に辿らせる）
-// マップは固定レイアウトにし、次に進めるマスも常に1つに絞ることで、一筆書きの自由度がある中でも
-// 手順の前後関係を確実に守らせる（自由に歩き回らせると迷って詰む恐れがあるための対策）
+// TUTORIAL（村人の練習プレイ。探索1回・戦闘1回を、要所ごとのOKポップアップで案内しながら体験させる）
+// マス移動そのものは制限せず自由に遊ばせ、目的（宝箱を取ってゴール等）を達成できなければ
+// その場でやり直させる方式にすることで、5×5マスの見た目を隠さず・詰みの心配もなくす
 // ============================================================
 let tutorialActive = false;
-let tutorialPathIndex = 1;       // 次に進める探索マスのインデックス（TUTORIAL_EXPLORE_PATH基準）
-let tutorialBattlePathIndex = 1; // 次に進める戦闘マスのインデックス（TUTORIAL_BATTLE_PATH基準）
-let tutorialFlags = { chest: false, item: false, potion: false, synth: false, disenchant: false, combo: false, potionUse: false };
+let tutorialFlags = { chest: false, synth: false, disenchant: false };
+let tutorialPotionPrompted = false;
+let tutorialMsgOkCallback = null;
+const TUTORIAL_ENEMY_STATS = { hp: 150, atk: 60, def: 0, mag: 0 }; // 数発は耐えるが最終的には必ず倒せる練習用の数値
 
-const TUTORIAL_EXPLORE_PATH = [
-    { r: 1, c: 1 }, { r: 1, c: 2 }, { r: 1, c: 3 }, { r: 2, c: 3 },
-    { r: 3, c: 3 }, { r: 3, c: 4 }, { r: 4, c: 4 }, { r: 5, c: 4 }, { r: 5, c: 5 }
+// OKボタン付きの案内ポップアップ。okにコールバックを渡すと、OKを押した直後に実行される
+function showTutorialMessage(text, onOk){
+    document.getElementById('tutorial-msg-text').textContent = text;
+    tutorialMsgOkCallback = onOk || null;
+    document.getElementById('tutorial-msg-overlay').classList.remove('hidden');
+}
+function closeTutorialMessage(){
+    document.getElementById('tutorial-msg-overlay').classList.add('hidden');
+    const cb = tutorialMsgOkCallback;
+    tutorialMsgOkCallback = null;
+    if (cb) cb();
+}
+
+// 操作説明の前に、画面の各エリアが何を表すかを1つずつ枠で囲んで案内する（OKで次のエリアへ）
+const TUTORIAL_EXPLORE_TOUR = [
+    { selector: '#dungeon-screen #map-grid', textKey: 'tutorial_tour_map' },
+    { selector: '#dungeon-screen .dg-info-compact', textKey: 'tutorial_tour_dginfo' },
+    { selector: '#dungeon-screen .bt-compact', textKey: 'tutorial_tour_status' }
 ];
-const TUTORIAL_BATTLE_PATH = [
-    { r: 1, c: 1 }, { r: 1, c: 2 }, { r: 1, c: 3 }, { r: 1, c: 4 },
-    { r: 2, c: 4 }, { r: 3, c: 4 }, { r: 4, c: 4 }, { r: 5, c: 4 }, { r: 5, c: 5 }
+const TUTORIAL_BATTLE_TOUR = [
+    { selector: '#battle-screen #battle-grid', textKey: 'tutorial_tour_battlemap' },
+    { selector: '#battle-screen .screen-right', textKey: 'tutorial_tour_battlestatus' }
 ];
-const TUTORIAL_STEPS = [
-    { flag: 'chest',      phase: 'explore', num: '①', labelKey: 'tutorial_step_chest' },
-    { flag: 'item',       phase: 'explore', num: '②', labelKey: 'tutorial_step_item' },
-    { flag: 'potion',     phase: 'explore', num: '③', labelKey: 'tutorial_step_potion' },
-    { flag: 'synth',      phase: 'prep',    num: '④', labelKey: 'tutorial_step_synth' },
-    { flag: 'disenchant', phase: 'prep',    num: '⑤', labelKey: 'tutorial_step_disenchant' },
-    { flag: 'combo',      phase: 'battle',  num: '⑥', labelKey: 'tutorial_step_combo' },
-    { flag: 'potionUse',  phase: 'battle',  num: '⑦', labelKey: 'tutorial_step_potionuse' }
-];
-const TUTORIAL_PHASE_LABEL_KEY = { explore: 'howto_sec_explore', prep: 'tutorial_phase_prep', battle: 'howto_sec_battle' };
-const TUTORIAL_ENEMY_STATS = { hp: 60, atk: 1, def: 0, mag: 0 }; // 絶対に負けない・数手で倒せる練習用の数値
+let tutorialSpotlightSteps = [];
+let tutorialSpotlightIndex = 0;
+let tutorialSpotlightDoneCallback = null;
+
+function startTutorialSpotlight(steps, onDone){
+    tutorialSpotlightSteps = steps;
+    tutorialSpotlightIndex = 0;
+    tutorialSpotlightDoneCallback = onDone || null;
+    showTutorialSpotlightStep();
+}
+function showTutorialSpotlightStep(){
+    const step = tutorialSpotlightSteps[tutorialSpotlightIndex];
+    const el = document.querySelector(step.selector);
+    if (el) el.classList.add('tutorial-spotlight');
+    document.getElementById('tutorial-spotlight-text').textContent = ui(step.textKey);
+    document.getElementById('tutorial-spotlight-caption').classList.remove('hidden');
+}
+function advanceTutorialSpotlight(){
+    const step = tutorialSpotlightSteps[tutorialSpotlightIndex];
+    const el = document.querySelector(step.selector);
+    if (el) el.classList.remove('tutorial-spotlight');
+    tutorialSpotlightIndex++;
+    if (tutorialSpotlightIndex >= tutorialSpotlightSteps.length){
+        document.getElementById('tutorial-spotlight-caption').classList.add('hidden');
+        const cb = tutorialSpotlightDoneCallback;
+        tutorialSpotlightDoneCallback = null;
+        if (cb) cb();
+        return;
+    }
+    showTutorialSpotlightStep();
+}
+function cancelTutorialSpotlight(){
+    document.querySelectorAll('.tutorial-spotlight').forEach(el => el.classList.remove('tutorial-spotlight'));
+    document.getElementById('tutorial-spotlight-caption').classList.add('hidden');
+    tutorialSpotlightDoneCallback = null;
+}
+
+// 案内ポップアップ・画面ツアーの表示中は、OK以外の操作（移動・他のボタン）を受け付けない
+function isTutorialBlocking(){
+    if (!tutorialActive) return false;
+    if (!document.getElementById('tutorial-msg-overlay').classList.contains('hidden')) return true;
+    if (!document.getElementById('tutorial-spotlight-caption').classList.contains('hidden')) return true;
+    return false;
+}
 
 function startTutorial(){
     document.getElementById('job-select-screen').classList.add('hidden');
     tutorialActive = true;
-    tutorialPathIndex = 1;
-    tutorialBattlePathIndex = 1;
-    tutorialFlags = { chest: false, item: false, potion: false, synth: false, disenchant: false, combo: false, potionUse: false };
+    tutorialFlags = { chest: false, synth: false, disenchant: false };
+    tutorialPotionPrompted = false;
     selectedJob = 'villager';
     selectedGender = 'male';
     selectedDifficulty = 'normal';
     startGame();
-    document.getElementById('tutorial-banner').classList.remove('hidden');
-    renderTutorialBanner();
+    startTutorialSpotlight(TUTORIAL_EXPLORE_TOUR, () => {
+        showTutorialMessage(ui('tutorial_explore_intro_msg'));
+    });
 }
 
 function resetTutorialState(){
     tutorialActive = false;
-    tutorialPathIndex = 1;
-    tutorialBattlePathIndex = 1;
-    tutorialFlags = { chest: false, item: false, potion: false, synth: false, disenchant: false, combo: false, potionUse: false };
-    document.getElementById('tutorial-banner').classList.add('hidden');
+    tutorialFlags = { chest: false, synth: false, disenchant: false };
+    tutorialPotionPrompted = false;
+    tutorialMsgOkCallback = null;
+    cancelTutorialSpotlight();
+    document.getElementById('tutorial-msg-overlay').classList.add('hidden');
     document.getElementById('tutorial-complete-overlay').classList.add('hidden');
 }
 
-function renderTutorialBanner(){
-    if (!tutorialActive) return;
-    const banner = document.getElementById('tutorial-banner');
-    if (!banner) return;
-    const current = TUTORIAL_STEPS.find(s => !tutorialFlags[s.flag]);
-    const phaseKey = current ? current.phase : 'battle';
-    const phaseLabel = ui(TUTORIAL_PHASE_LABEL_KEY[phaseKey]);
-    const stepLabel = current ? ui(current.labelKey) : ui('tutorial_all_done_label');
-    const checklist = TUTORIAL_STEPS.map(s => `<span class="tutorial-banner-check${tutorialFlags[s.flag] ? ' done' : ''}">${s.num}</span>`).join('');
-    banner.innerHTML = `
-        <div class="tutorial-banner-phase">${phaseLabel}</div>
-        <div class="tutorial-banner-step">${stepLabel}</div>
-        <div class="tutorial-banner-checklist">${checklist}</div>
-    `;
-}
-
-function pickTutorialFloorObjects(){
-    const goldKey = KEY_TYPES.find(k => k.type === 'gold');
-    const goldChest = CHEST_TIERS.find(t => t.type === 'gold');
-    keys = [{ r: 1, c: 2, type: goldKey.type, name: goldKey.name, img: goldKey.img }];
-    chests = [{ r: 1, c: 3, type: goldChest.type, name: goldChest.name, img: goldChest.img, category: 'weapon' }];
-    const usedSet = new Set([key(1, 2), key(1, 3)]);
-    dots = [];
-    for (let r = 1; r <= 5; r++){
-        for (let c = 1; c <= 5; c++){
-            if (r === start.r && c === start.c) continue;
-            if (r === goal.r && c === goal.c) continue;
-            if (usedSet.has(key(r, c))) continue;
-            dots.push({ r, c });
-        }
-    }
-    dotSpecial = dots.map(d => {
-        if (d.r === 3 && d.c === 3) return { type: 'item', category: 'armor', amount: 1 };
-        if (d.r === 4 && d.c === 4) return { type: 'heal', tierKey: 'p30' };
-        return null;
-    });
-}
-
-function pickTutorialBattleMarks(){
-    bMarks = [
-        { r: 1, c: 2, category: 'weapon' },
-        { r: 1, c: 3, category: 'weapon' },
-        { r: 1, c: 4, category: 'armor' }
-    ];
-    bMarkTaken = new Array(bMarks.length).fill(false);
+// 目的を達成できなかった場合、ゲームオーバー画面は出さずにOKポップアップの後にこの階をやり直させる
+function retryTutorialExplore(msgKey){
+    showTutorialMessage(ui(msgKey), () => { initFloor(); });
 }
 
 function updateTutorialInvUI(){
     const proceedBtn = document.getElementById('inv-proceed-btn');
-    const hintEl = document.getElementById('tutorial-inv-hint');
-    if (!hintEl || !proceedBtn) return;
+    if (!proceedBtn) return;
     if (!tutorialActive || invContext !== 'floor-clear'){
-        hintEl.classList.add('hidden');
         proceedBtn.disabled = false;
         return;
     }
-    const ready = tutorialFlags.synth && tutorialFlags.disenchant;
-    proceedBtn.disabled = !ready;
-    hintEl.classList.remove('hidden');
-    hintEl.textContent = ready ? ui('tutorial_inv_hint_done') : ui('tutorial_inv_hint_prep');
+    proceedBtn.disabled = !(tutorialFlags.synth && tutorialFlags.disenchant);
 }
 
 function showTutorialComplete(){
@@ -2408,12 +2584,10 @@ function showTutorialComplete(){
 }
 function closeTutorialComplete(){
     document.getElementById('tutorial-complete-overlay').classList.add('hidden');
-    resetTutorialState();
-    returnTitle();
+    returnTitle(); // returnTitle()内でresetTutorialState()が呼ばれる（tutorialActive===trueのうちにautoSaveGame()をスキップさせるため、ここでは呼ばない）
 }
 
 function pickFloorObjects(){
-    if (tutorialActive){ pickTutorialFloorObjects(); return; }
     const candidates = [];
     for (let r = 1; r <= 5; r++){
         for (let c = 1; c <= 5; c++){
@@ -2671,27 +2845,21 @@ function renderMap(){
     document.getElementById('dg-key-gold').textContent = keyCounts.gold;
     document.getElementById('dg-key-silver').textContent = keyCounts.silver;
     document.getElementById('dg-key-wood').textContent = keyCounts.wood;
+    autoSaveGame();
 }
 
 // ============================================================
 // MOVEMENT
 // ============================================================
 function tryMoveTo(r,c){
+    if (isTutorialBlocking()) return;
     if (r < 1 || r > 5 || c < 1 || c > 5) return;
-    if (tutorialActive){
-        const expected = TUTORIAL_EXPLORE_PATH[tutorialPathIndex];
-        if (!expected || r !== expected.r || c !== expected.c){
-            setMsg(ui('tutorial_wrong_move_msg'));
-            return;
-        }
-    }
     if (!isAdjacent(current, r, c)) return;
     const k = key(r,c);
     if (visited.has(k)) return;
 
     current = { r, c };
     visited.add(k);
-    if (tutorialActive) tutorialPathIndex++;
 
     const gotKeyIdx = findKeyIndexAt(current.r, current.c);
     const atChestIdx = findChestIndexAt(current.r, current.c);
@@ -2711,11 +2879,7 @@ function tryMoveTo(r,c){
             player.inventory.push(dropped); // 在庫は消えないので、選ばなくても後で合成に使える
             player.score += CHEST_SCORE[chest.type] || 0;
             setMsg(uif('popup_chest_get', chest.name));
-            if (tutorialActive){
-                // 合成の手順を体験してもらうため、同じ道具をもう1つ複製して渡す
-                player.inventory.push(makeGearItem(dropped.defId, dropped.category, dropped.practice, dropped.skills, dropped.plusLevel));
-                tutorialFlags.chest = true;
-            }
+            if (tutorialActive) tutorialFlags.chest = true;
         } else {
             setMsg(uif('popup_chest_locked', chest.name));
         }
@@ -2727,7 +2891,6 @@ function tryMoveTo(r,c){
             gear.plusLevel = Math.min(MAX_PLUS_LEVEL, (gear.plusLevel || 0) + special.amount);
             renderStatus();
             showDgPopup(`${gear.name}<br>+${special.amount}`, '#ffd24a');
-            if (tutorialActive) tutorialFlags.item = true;
         } else if (special && special.type === 'practice'){
             const gear = player.gear[special.category];
             const gearName = gear.name;
@@ -2739,18 +2902,29 @@ function tryMoveTo(r,c){
             player.potions[potionTier.key] = (player.potions[potionTier.key] || 0) + 1;
             updatePotionButtons();
             showDgPopup(uif('popup_potion_get', potionTier.name), potionTier.color);
-            if (tutorialActive) tutorialFlags.potion = true;
         }
     }
 
     renderMap();
-    if (tutorialActive) renderTutorialBanner();
 
     if (current.r === goal.r && current.c === goal.c){
+        if (tutorialActive){
+            if (!tutorialFlags.chest){
+                retryTutorialExplore('tutorial_explore_fail_nochest_msg');
+                return;
+            }
+            // 合成・分解の手順を体験してもらうため、木の剣をもう1つ・スキル付きの木の弓を1つ渡す
+            player.inventory.push(makeGearItem('weapon_sword_0', 'weapon', PRACTICE_START.common));
+            player.inventory.push(makeGearItem('weapon_bow_0', 'weapon', PRACTICE_START.common, ['stat_pct']));
+        }
         onReachGoal();
         return;
     }
     if (!bfsCanReach(current, goal, visited)){
+        if (tutorialActive){
+            retryTutorialExplore('tutorial_explore_fail_stuck_msg');
+            return;
+        }
         showGameOver();
     }
 }
@@ -2787,7 +2961,6 @@ let enemyHp = 0, enemyMaxHp = 0; // 敵を倒すまでバトル全体で維持�
 let battleRound = 1; // バトルステージ番号（決着がつかず続くたびに+1）
 
 function pickBattleStartGoal(){
-    if (tutorialActive){ bStart = { r: 1, c: 1 }; bGoal = { r: 5, c: 5 }; return; }
     const i1 = Math.floor(Math.random() * VALID_CELLS.length);
     let i2;
     do { i2 = Math.floor(Math.random() * VALID_CELLS.length); } while (i2 === i1);
@@ -2813,7 +2986,6 @@ function capSpawnCounts(){
 }
 
 function pickBattleMarks(){
-    if (tutorialActive){ pickTutorialBattleMarks(); return; }
     const candidates = [];
     for (let r = 1; r <= 5; r++){
         for (let c = 1; c <= 5; c++){
@@ -2915,9 +3087,10 @@ function renderEnemyPortrait(){
 function initBattleEncounter(isRetry){
     currentMode = 'battle';
     if (tutorialActive){
-        // 戦闘フェーズで必ずポーションを使う手順を体験できるよう、切れていたら1つ補充する
+        // ダメージを受けた後にポーションを使う手順を体験できるよう、切れていたら1つ補充する
         player.potions.p30 = Math.max(1, player.potions.p30 || 0);
         updatePotionButtons();
+        tutorialPotionPrompted = false;
     }
     const boss = isBossFloor(floor);
     bossRevivalsLeft = BOSS_REVIVE_COUNT[floor] || 0;
@@ -2938,6 +3111,11 @@ function initBattleEncounter(isRetry){
     // initBattleRound()がコンボポップアップを一旦隠すため、ボス出現の演出はその後に出す
     if (boss){
         showFadingPopup('bt-combo-popup', `<div class="combo-popup-num" style="color:#ff4d4d;">${ui('boss_appear_popup')}</div>`, 1500, 500);
+    }
+    if (tutorialActive){
+        startTutorialSpotlight(TUTORIAL_BATTLE_TOUR, () => {
+            showTutorialMessage(ui('tutorial_battle_intro_msg'));
+        });
     }
 }
 
@@ -3027,6 +3205,7 @@ function renderBattleStatus(){
             <span class="bt-value-num" style="color:${c};">${CATEGORY_ICON[cat]}${enemyValueFor[cat]}</span>
         </div>`;
     }).join('');
+    autoSaveGame();
 }
 
 function renderBattleMap(){
@@ -3068,26 +3247,15 @@ function renderBattleMap(){
 }
 
 function battleTryMoveTo(r,c){
+    if (isTutorialBlocking()) return;
     if (battleEnded) return;
     if (r < 1 || r > 5 || c < 1 || c > 5) return;
-    if (tutorialActive){
-        const expected = TUTORIAL_BATTLE_PATH[tutorialBattlePathIndex];
-        if (!expected || r !== expected.r || c !== expected.c){
-            showFadingPopup('bt-combo-popup', `<div class="combo-popup-num" style="color:#ff4d4d;">${ui('tutorial_wrong_move_msg')}</div>`, 900, 400);
-            return;
-        }
-        if (r === bGoal.r && c === bGoal.c && !(tutorialFlags.combo && tutorialFlags.potionUse)){
-            showFadingPopup('bt-combo-popup', `<div class="combo-popup-num" style="color:#ff4d4d;">${ui('tutorial_goal_need_potion_msg')}</div>`, 1200, 500);
-            return;
-        }
-    }
     if (!isAdjacent(bCurrent, r, c)) return;
     const k = key(r,c);
     if (bVisited.has(k)) return;
 
     bCurrent = { r, c };
     bVisited.add(k);
-    if (tutorialActive) tutorialBattlePathIndex++;
 
     const markIdx = findBattleMarkIndexAt(r,c);
     if (markIdx !== -1 && !bMarkTaken[markIdx]){
@@ -3103,7 +3271,6 @@ function battleTryMoveTo(r,c){
                 const bonus = (comboPctStacks > 0 && Math.random() < 0.25 * comboPctStacks) ? 2 : 1;
                 bCombo += bonus;
             }
-            if (tutorialActive && bCombo >= 2) tutorialFlags.combo = true;
         }
         bLastMarkCategory = category;
 
@@ -3136,7 +3303,6 @@ function battleTryMoveTo(r,c){
 
     renderBattleMap();
     renderBattleStatus();
-    if (tutorialActive) renderTutorialBanner();
 
     if (bCurrent.r === bGoal.r && bCurrent.c === bGoal.c){
         battleEnded = true;
@@ -3144,6 +3310,10 @@ function battleTryMoveTo(r,c){
         return;
     }
     if (!bfsCanReach(bCurrent, bGoal, bVisited)){
+        if (tutorialActive){
+            showTutorialMessage(ui('tutorial_battle_fail_stuck_msg'), () => { initBattleRound(); });
+            return;
+        }
         showGameOver();
     }
 }
@@ -3336,6 +3506,10 @@ function finishBattleResult(){
     }
     document.getElementById('br-next-btn').classList.remove('hidden');
     document.getElementById('br-potion-btn').disabled = false;
+    if (tutorialActive && !tutorialPotionPrompted && player.hp < player.maxHp){
+        tutorialPotionPrompted = true;
+        showTutorialMessage(ui('tutorial_potion_prompt_msg'));
+    }
 }
 
 // 決着がつかなかった場合、新しいマップは挟まずに、今のラウンドで手に入れた数値のまま
@@ -3351,6 +3525,7 @@ function continueAfterBattleResult(){
 }
 
 function showGameClear(){
+    clearSave();
     document.getElementById('battle-screen').classList.add('hidden');
     // クリアした職業インデックスiと難易度から、次の職業(i+1)がその難易度以下すべてで解放される
     const idx = JOB_ORDER.indexOf(player.job);
@@ -3441,6 +3616,16 @@ document.addEventListener('keydown', (e) => {
     const battleHidden = document.getElementById('battle-screen').classList.contains('hidden');
     if (dungeonHidden && battleHidden) return;
 
+    if (e.key === 'Enter' && !document.getElementById('tutorial-msg-overlay').classList.contains('hidden')){
+        e.preventDefault();
+        closeTutorialMessage();
+        return;
+    }
+    if (e.key === 'Enter' && !document.getElementById('tutorial-spotlight-caption').classList.contains('hidden')){
+        e.preventDefault();
+        advanceTutorialSpotlight();
+        return;
+    }
     if (e.key === 'Enter' && !document.getElementById('floor-result-overlay').classList.contains('hidden')){
         e.preventDefault();
         confirmFloorResult();
@@ -3781,7 +3966,7 @@ function tutorialRowHtml(){
     const iconHtml = portraitSrc
         ? `<img class="cs-job-row-icon" src="${portraitSrc}" alt="${ui('tutorial_job_row_label')}">`
         : `<div class="cs-job-row-icon-empty">？</div>`;
-    return `<div class="cs-job-row cs-tutorial-row" onclick="startTutorial()">
+    return `<div class="cs-job-row" onclick="startTutorial()">
         ${iconHtml}
         <span class="cs-job-row-name">${ui('tutorial_job_row_label')}</span>
     </div>`;
@@ -3859,12 +4044,12 @@ function renderCharacterPortraits(){
 
 function startGame(){
     floor = 1;
+    currentMode = 'explore';
     player = createPlayer();
     player.job = selectedJob || 'villager';
     player.gender = selectedGender || 'male';
     renderStatus();
     renderCharacterPortraits();
-    currentMode = 'explore';
     document.getElementById('title-screen').classList.add('hidden');
     document.getElementById('battle-screen').classList.add('hidden');
     document.getElementById('dungeon-screen').classList.remove('hidden');
@@ -3872,6 +4057,8 @@ function startGame(){
 }
 
 function returnTitle(){
+    if (isTutorialBlocking()) return;
+    autoSaveGame();
     resetTutorialState();
     document.getElementById('dungeon-screen').classList.add('hidden');
     document.getElementById('battle-screen').classList.add('hidden');
@@ -3886,6 +4073,7 @@ function returnTitle(){
     document.getElementById('name-register-screen').classList.add('hidden');
     document.getElementById('ranking-screen').classList.add('hidden');
     document.getElementById('title-screen').classList.remove('hidden');
+    refreshTitleButtons();
 }
 
 const NEXT_RARITY = { common: 'rare', rare: 'epic', epic: 'legendary', legendary: null };
@@ -3941,6 +4129,16 @@ function nextFloor(){
 
 // 探索中・バトル中どちらの失敗（HP0・道を見失う）もやり直し機能は用意せず、常にゲームオーバーにする
 function showGameOver(){
+    if (tutorialActive){
+        // チュートリアルは勝敗をランキングに残さず、その場でHPを全回復してやり直させる
+        showTutorialMessage(ui('tutorial_battle_fail_hp_msg'), () => {
+            player.hp = player.maxHp;
+            renderStatus();
+            initBattleRound();
+        });
+        return;
+    }
+    clearSave();
     recordRunResult(false);
     setupWorldSubmitUI('go');
     document.getElementById('gameover-overlay').classList.remove('hidden');
@@ -3957,6 +4155,7 @@ function setupWorldSubmitUI(which){
 }
 
 function openHowTo(){
+    if (isTutorialBlocking()) return;
     document.getElementById('howto-overlay').classList.remove('hidden');
 }
 function closeHowTo(){
@@ -4034,6 +4233,7 @@ function setInvSort(mode){
 }
 
 function openInventory(context){
+    if (isTutorialBlocking()) return;
     invContext = context || 'browse';
     invActiveTab = 'weapon';
     invSelectedIndex = null;
@@ -4054,6 +4254,9 @@ function openInventory(context){
     }
     updateTutorialInvUI();
     document.getElementById('inventory-overlay').classList.remove('hidden');
+    if (tutorialActive && invContext === 'floor-clear' && !tutorialFlags.synth){
+        showTutorialMessage(ui('tutorial_prep_synth_msg'));
+    }
 }
 function closeInventory(){
     document.getElementById('inventory-overlay').classList.add('hidden');
@@ -4069,6 +4272,7 @@ function switchInvTab(cat){
 }
 
 function startBattleFromOrganize(){
+    if (isTutorialBlocking()) return;
     closeInventory();
     document.getElementById('dungeon-screen').classList.add('hidden');
     document.getElementById('battle-screen').classList.remove('hidden');
@@ -4142,6 +4346,10 @@ function promptDisenchant(idx){
     const source = list[idx];
     const target = list[0];
     if (!source || idx === 0) return;
+    if (tutorialActive && !tutorialFlags.synth && source.defId === 'weapon_sword_0'){
+        showTutorialMessage(ui('tutorial_prep_synth_first_msg'));
+        return;
+    }
     pendingDisenchantIdx = idx;
     document.getElementById('disenchant-confirm-msg').innerHTML = uif('disenchant_confirm_msg', source.name, target.name);
     document.getElementById('disenchant-confirm-overlay').classList.remove('hidden');
@@ -4164,15 +4372,22 @@ function doDisenchantInInventory(idx){
     const target = list[0];
     const source = list[idx];
     if (!source || idx === 0) return;
-    if (tutorialActive){ tutorialFlags.disenchant = true; updateTutorialInvUI(); }
+    if (tutorialActive && !tutorialFlags.disenchant){
+        tutorialFlags.disenchant = true;
+        updateTutorialInvUI();
+        if (tutorialFlags.synth){
+            showTutorialMessage(ui('tutorial_prep_done_msg'));
+        }
+    }
     // 練度：20%分をそのまま加算。＋値：＋の数だけ30%抽選し、当たった回数がそのまま引き継がれる。
-    // スキル：持っている数だけ40%抽選し、当たったものだけ引き継がれる
+    // スキル：持っている数だけ40%抽選し、当たったものだけ引き継がれる（チュートリアル中だけは必ず引き継ぐ）
     const practiceGain = Math.round(source.practice * DISENCHANT_PRACTICE_RATE);
     let plusGain = 0;
     for (let i = 0; i < (source.plusLevel || 0); i++){
         if (Math.random() < DISENCHANT_PLUS_TRANSFER_RATE) plusGain++;
     }
-    const inheritedSkills = source.skills.filter(() => Math.random() < DISENCHANT_SKILL_TRANSFER_RATE);
+    const skillTransferRate = tutorialActive ? 1 : DISENCHANT_SKILL_TRANSFER_RATE;
+    const inheritedSkills = source.skills.filter(() => Math.random() < skillTransferRate);
     const newPractice = target.practice + practiceGain;
     const newPlus = Math.min(MAX_PLUS_LEVEL, (target.plusLevel || 0) + plusGain);
     const newSkills = target.skills.concat(inheritedSkills);
@@ -4195,7 +4410,11 @@ function doSynthesizeInInventory(idxA, idxB){
     const itemA = list[idxA], itemB = list[idxB];
     const merged = synthesizeItems(itemA, itemB);
     if (!merged) return;
-    if (tutorialActive){ tutorialFlags.synth = true; updateTutorialInvUI(); }
+    if (tutorialActive && !tutorialFlags.synth){
+        tutorialFlags.synth = true;
+        updateTutorialInvUI();
+        showTutorialMessage(tutorialFlags.disenchant ? ui('tutorial_prep_done_msg') : ui('tutorial_prep_disenchant_msg'));
+    }
     pendingSynthesis = { cat, itemA, itemB, idxA, idxB, merged };
     invSelectedIndex = null;
     renderInventory();
@@ -4289,6 +4508,7 @@ requestAnimationFrame(scaleContainer);
 setTimeout(scaleContainer, 100);
 applyI18n();
 updateNameRegisterBtn();
+refreshTitleButtons();
 </script>
 </body>
 </html>
