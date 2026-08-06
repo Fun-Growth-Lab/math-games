@@ -581,6 +581,25 @@
         /* How to play */
         #howto-overlay .ov-box { max-width:800px; max-height:82vh; overflow-y:auto; text-align:left; }
 
+        /* ==================== TUTORIAL ==================== */
+        #tutorial-msg-overlay, #tutorial-complete-overlay { z-index:500; }
+        .tutorial-spotlight {
+            position:relative; z-index:160; border-radius:12px;
+            box-shadow:inset 0 0 0 4px #ffd24a, inset 0 0 22px 4px rgba(255,210,74,0.75);
+        }
+        #tutorial-spotlight-caption {
+            position:absolute; bottom:16px; left:50%; transform:translateX(-50%);
+            z-index:170; width:700px; max-width:92%;
+            background:rgba(20,16,10,0.95); border:2px solid #ffd24a; border-radius:14px;
+            padding:14px 26px; text-align:center; box-shadow:0 4px 18px rgba(0,0,0,0.6);
+        }
+        #tutorial-spotlight-text { font-size:1.02rem; font-weight:700; color:var(--text-hi); margin-bottom:12px; line-height:1.6; }
+        .cs-tutorial-row { cursor:pointer; border:2px solid #ffd24a; border-radius:10px; padding:2px; margin-bottom:8px; }
+        .cs-tutorial-row .cs-class-info { background:rgba(255,210,74,0.10); }
+        .cs-tutorial-row:hover .cs-class-info { background:rgba(255,210,74,0.18); }
+        .cs-tutorial-start { flex-shrink:0; width:342px; display:flex; align-items:center; justify-content:center;
+            font-size:1.1rem; font-weight:800; color:#ffd24a; }
+
         /* ==================== RANKING ==================== */
         #ranking-overlay { position:absolute; top:0; left:0; width:100%; height:100%;
             background:rgba(0,0,0,0.88); display:flex; justify-content:center; align-items:center;
@@ -1153,6 +1172,25 @@
         </div>
     </div>
 
+    <!-- Tutorial overlays -->
+    <div id="tutorial-msg-overlay" class="overlay hidden">
+        <div class="ov-box" style="max-width:560px; text-align:center;">
+            <p class="ov-desc" id="tutorial-msg-text" style="font-size:1.15rem; font-weight:700; margin-bottom:22px; color:var(--text-hi);"></p>
+            <button class="btn btn-green btn-sm" onclick="closeTutorialMessage()">OK</button>
+        </div>
+    </div>
+    <div id="tutorial-spotlight-caption" class="hidden">
+        <p id="tutorial-spotlight-text"></p>
+        <button class="btn btn-green btn-sm" onclick="advanceTutorialSpotlight()">OK</button>
+    </div>
+    <div id="tutorial-complete-overlay" class="overlay hidden">
+        <div class="ov-box" style="text-align:center;">
+            <div class="ov-title" id="tutorial-complete-title">🎉 チュートリアル完了！</div>
+            <p class="ov-desc" id="tutorial-complete-body">基本の遊び方はこれでバッチリ！さっそく本編に挑戦してみよう。</p>
+            <button class="btn btn-green btn-sm" id="tutorial-complete-btn" onclick="closeTutorialComplete()">タイトルへ戻る</button>
+        </div>
+    </div>
+
     <!-- Drag ghost (hand cards) -->
     <div id="drag-ghost" class="card">
         <div class="c-suit s-none" id="gh-suit"></div>
@@ -1315,6 +1353,21 @@ const STRINGS = {
     howto6:'<b>■ 敵のスキル</b>　2・6・10…ターン目に特殊スキルを使う（そのターンは攻撃しない）。光っているときは次に使うサイン。',
     howto7:'<b>■ ステージクリア</b>　HP最大値の1/3回復。シールドはリセット。カード1枚を選んでデッキに追加し、代わりに1枚捨てる。スキルも1つ選べる。',
     howto8:'<b>■ 共鳴スキル🔮</b>　すぐ下のスキルの効果を倍増させる。ただし共鳴スキルと直下のスキルが同時に発動したときのみ効果あり。直下スキルが未発動の場合は不発。',
+    // Tutorial
+    tutorialRowLabel:'🔰 チュートリアル',
+    tutorialRowDesc:'実際にバトルしながら遊び方を覚えよう',
+    tutorial_tour_left:'ここは自分の情報。HPとシールドを確認できます。',
+    tutorial_tour_skills:'ここはスキル欄。式の結果や使ったカードのマークが条件に合うと、自動で発動するよ。1つずつ見てみよう！',
+    tutorial_tour_skill_mark:'①のスキルは「♥マーク」が条件。式に♥のカードが入っていると自動で発動するよ。',
+    tutorial_tour_skill_mult:'②のスキルは「3の倍数」が条件。計算結果が3の倍数になると自動で発動するよ。',
+    tutorial_tour_right:'ここは敵の情報。HPや攻撃力、使ってくるスキルを確認できます。',
+    tutorial_tour_hand:'これが手札。カードを式の枠にドラッグして使います。',
+    tutorial_tour_formula:'ここが式の枠。カードを2枚並べると自動で計算され、「攻撃！」ボタンで敵にダメージを与えられます。',
+    tutorial_msg_intro:'手札からカードを2枚、式の枠（□）にドラッグしてみよう！式ができたら「攻撃！」ボタンを押して敵を攻撃だ！',
+    tutorial_msg_retry:'HPが0になってしまったけど大丈夫、全回復してもう一度チャレンジしよう！',
+    tutorialCompleteTitle:'🎉 チュートリアル完了！',
+    tutorialCompleteBody:'基本の遊び方はこれでバッチリ！さっそく本編に挑戦してみよう。',
+    tutorialCompleteBtn:'タイトルへ戻る',
     // Player manager
     playerMgrTitle:'👤 プレーヤーを選ぶ',
     playerMgrDesc:'ひらがなで入力してね（最大12文字）',
@@ -1514,6 +1567,21 @@ const STRINGS = {
     howto6:'<b>■ てきのスキル</b>　2・6・10…ターンめにとくしゅスキルをつかう（そのターンはこうげきしない）。ひかっているときはつぎにつかうサイン。',
     howto7:'<b>■ ステージクリア</b>　HPさいだいちの1/3かいふく。シールドはリセット。カード1まいをえらんでデッキにくわえ、かわりに1まいすてる。スキルも1つえらべる。',
     howto8:'<b>■ きょうめいスキル🔮</b>　すぐしたのスキルのこうかをばいぞうさせる。ただしきょうめいスキルとちょっかのスキルがどうじにはつどうしたときのみこうかあり。ちょっかスキルがみはつどうのばあいはふはつ。',
+    // Tutorial
+    tutorialRowLabel:'🔰 チュートリアル',
+    tutorialRowDesc:'じっさいにバトルしながらあそびかたをおぼえよう',
+    tutorial_tour_left:'ここはじぶんのじょうほう。HPとシールドをかくにんできます。',
+    tutorial_tour_skills:'ここはスキルらん。しきのけっかやつかったカードのマークがじょうけんにあうと、じどうではつどうするよ。1つずつみてみよう！',
+    tutorial_tour_skill_mark:'①のスキルは「♥マーク」がじょうけん。しきに♥のカードがはいっているとじどうではつどうするよ。',
+    tutorial_tour_skill_mult:'②のスキルは「3のばいすう」がじょうけん。けいさんけっかが3のばいすうになるとじどうではつどうするよ。',
+    tutorial_tour_right:'ここはてきのじょうほう。HPやこうげきりょく、つかってくるスキルをかくにんできます。',
+    tutorial_tour_hand:'これがてふだ。カードをしきのわくにドラッグしてつかいます。',
+    tutorial_tour_formula:'ここがしきのわく。カードを2まいならべるとじどうでけいさんされ、「こうげき！」ボタンでてきにダメージをあたえられます。',
+    tutorial_msg_intro:'てふだからカードを2まい、しきのわく（□）にドラッグしてみよう！しきができたら「こうげき！」ボタンをおしててきをこうげきだ！',
+    tutorial_msg_retry:'HPが0になっちゃったけどだいじょうぶ、ぜんかいふくしてもういちどチャレンジしよう！',
+    tutorialCompleteTitle:'🎉 チュートリアルかんりょう！',
+    tutorialCompleteBody:'きほんのあそびかたはこれでバッチリ！さっそくほんぺんにちょうせんしてみよう。',
+    tutorialCompleteBtn:'タイトルへもどる',
     playerMgrTitle:'👤 プレーヤーをえらぶ',
     playerMgrDesc:'ひらがなでにゅうりょくしてね（さいだい12もじ）',
     playerMgrPlaceholder:'なまえをにゅうりょく',
@@ -1697,6 +1765,21 @@ const STRINGS = {
     howto6:'<b>■ Enemy Skills</b>　Used on turns 2, 6, 10… (no attack that turn). Glowing means next use is coming.',
     howto7:'<b>■ Stage Clear</b>　Recover 1/3 of max HP. Shield resets. Add 1 card and discard 1. Choose 1 skill.',
     howto8:'<b>■ Resonate🔮</b>　Multiplies the skill directly below. Only works when both trigger at the same time. No effect if the lower skill does not trigger.',
+    // Tutorial
+    tutorialRowLabel:'🔰 Tutorial',
+    tutorialRowDesc:'Learn the ropes with a real practice battle',
+    tutorial_tour_left:'This is your status. Check your HP and shield here.',
+    tutorial_tour_skills:'This is your skill panel. Skills auto-trigger when the result or the suits used match their condition. Let’s look at each one!',
+    tutorial_tour_skill_mark:'Skill ① triggers on a "♥ suit" condition — it fires automatically when a ♥ card is used in the formula.',
+    tutorial_tour_skill_mult:'Skill ② triggers on a "multiple of 3" condition — it fires automatically when the result is a multiple of 3.',
+    tutorial_tour_right:'This is the enemy status. Check its HP, attack power, and skills here.',
+    tutorial_tour_hand:'This is your hand. Drag cards into the formula slots to use them.',
+    tutorial_tour_formula:'This is the formula area. Place 2 cards to calculate automatically, then press "Attack!" to damage the enemy.',
+    tutorial_msg_intro:'Drag 2 cards from your hand into the formula slots (□)! Once the formula is set, press "Attack!" to hit the enemy!',
+    tutorial_msg_retry:'Your HP hit 0, but no worries — you’re fully healed, try again!',
+    tutorialCompleteTitle:'🎉 Tutorial Complete!',
+    tutorialCompleteBody:'You’ve got the basics down! Time to try the real game.',
+    tutorialCompleteBtn:'Back to Title',
     playerMgrTitle:'👤 Choose Player',
     playerMgrDesc:'Enter name in hiragana (max 12 chars)',
     playerMgrPlaceholder:'Enter name',
@@ -1969,6 +2052,11 @@ function applyLang(){
     qa('.bonus-deck-btn').forEach(b=>{ b.textContent=t('bonusDeckBtn'); });
     // Slot stop button
     const slotStop=s('slot-stop-btn'); if(slotStop) slotStop.textContent=t('slotStop');
+
+    // Tutorial overlays
+    const tutCT=s('tutorial-complete-title'); if(tutCT) tutCT.textContent=t('tutorialCompleteTitle');
+    const tutCB=s('tutorial-complete-body');  if(tutCB) tutCB.textContent=t('tutorialCompleteBody');
+    const tutCBtn=s('tutorial-complete-btn'); if(tutCBtn) tutCBtn.textContent=t('tutorialCompleteBtn');
 
     // Re-render char grid if it's open (to update class names/bonus descs)
     if(s('char-select-screen') && !s('char-select-screen').classList.contains('hidden')){
@@ -2328,7 +2416,7 @@ function renderPList() {
 }
 function openPlayerMgr()  { renderPList(); document.getElementById('player-mgr').classList.remove('hidden'); }
 function closePlayerMgr() { document.getElementById('player-mgr').classList.add('hidden'); }
-function openHowTo()  { document.getElementById('howto-overlay').classList.remove('hidden'); }
+function openHowTo()  { if(isTutorialBlocking()) return; document.getElementById('howto-overlay').classList.remove('hidden'); }
 function closeHowTo() { document.getElementById('howto-overlay').classList.add('hidden'); }
 
 // ============================================================
@@ -2399,6 +2487,7 @@ function claimSession(){
     try{ localStorage.setItem(SESSION_KEY, _sessionToken); }catch(e){}
 }
 function autoSave(state){
+    if(tutorialActive) return; // never overwrite the real save with tutorial state
     if(_sessionToken && localStorage.getItem(SESSION_KEY) !== _sessionToken) return;
     if(state) G.saveState = state;
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(G)); } catch(e){}
@@ -3433,6 +3522,7 @@ function applyEnemyDamage(dmg){
 }
 
 function doAttack(){
+    if(isTutorialBlocking()) return;
     if(!G.s1||!G.s2||G.phase!=='player') return;
     G.phase='anim'; updateHandChangeBtn();
     const c1=G.s1, c2=G.s2;
@@ -3895,6 +3985,7 @@ function showVictory(){
     // Hide enemy illustration during bonus selection
     document.getElementById('enemy-wrap').style.visibility='hidden';
     document.getElementById('vs-area').style.visibility='hidden';
+    if(tutorialActive){ showTutorialComplete(); return; }
     // Show deck/discard as if already reshuffled (total / 0)
     const totalCards = G.deck.length + G.discard.length + G.hand.length + (G.s1?1:0) + (G.s2?1:0);
     document.getElementById('rp-deck').textContent = totalCards;
@@ -3933,6 +4024,12 @@ function showVictory(){
 function showGameover(){
     _dispCalcS1=null; _dispCalcS2=null; // clear formula display
     _clearTriggeredSkills();
+    if(tutorialActive){
+        G.pHP=G.pMaxHP; G.shield=G.initShield||0;
+        updateHP();
+        showTutorialMessage(t('tutorial_msg_retry'));
+        return;
+    }
     submitScore(G.eIdx);  // enemies defeated before dying
     clearSave();  // remove save on game over
     const _goDisp=document.getElementById('go-score-disp');
@@ -4362,6 +4459,7 @@ function confirmPopupNo(){
     if(_confirmNoCb) _confirmNoCb();
 }
 function confirmHandChange(){
+    if(isTutorialBlocking()) return;
     if(G.handChanges <= 0 || G.phase !== 'player') return;
     const remaining = G.handChanges;
     showConfirmPopup(
@@ -4396,6 +4494,7 @@ function suitCountHTML(cards){
 }
 
 function openDeckView(){
+    if(isTutorialBlocking()) return;
     const allCards=[...G.deck,...G.discard,...G.hand];
     if(G.s1) allCards.push(G.s1);
     if(G.s2) allCards.push(G.s2);
@@ -4510,10 +4609,13 @@ function setupEnemyUI(idx){
 // SCREEN TRANSITIONS
 // ============================================================
 function doReturnTitle(){
-    // Don't save if game is over (gameover or clear screen)
+    if(isTutorialBlocking()) return;
+    const wasTutorial = tutorialActive;
+    resetTutorialState();
+    // Don't save if game is over (gameover or clear screen), or if this was the tutorial run
     const isOver = !document.getElementById('gameover-overlay').classList.contains('hidden')
                 || !document.getElementById('clear-overlay').classList.contains('hidden');
-    if(G && G.pMaxHP && !isOver) autoSave();
+    if(G && G.pMaxHP && !isOver && !wasTutorial) autoSave();
     ['battle-screen','victory-overlay','gameover-overlay','clear-overlay',
      'card-rew-overlay','skill-rew-overlay','howto-overlay','forget-skill-overlay',
      'deck-view-overlay','powerup-overlay','discard-card-overlay','ranking-overlay',
@@ -4522,6 +4624,109 @@ function doReturnTitle(){
     document.getElementById('title-screen').classList.remove('hidden');
     refreshTitleButtons();
     pendingNewSkill=null;
+}
+
+// ============================================================
+// TUTORIAL
+// ============================================================
+// Interactive practice mode: always available from the class-select screen,
+// no first-time auto-show and no completion flag is persisted (matches HitofudeMeikyuu).
+let tutorialActive = false;
+let tutorialSpotlightSteps = [];
+let tutorialSpotlightIndex = 0;
+let tutorialSpotlightDoneCallback = null;
+let tutorialMsgOkCallback = null;
+
+const TUTORIAL_BATTLE_TOUR = [
+    { selector: '#left-panel',   textKey: 'tutorial_tour_left' },
+    { selector: '#skills-sec',   textKey: 'tutorial_tour_skills' },
+    { selector: '#sk0',          textKey: 'tutorial_tour_skill_mark' },
+    { selector: '#sk1',          textKey: 'tutorial_tour_skill_mult' },
+    { selector: '#right-panel',  textKey: 'tutorial_tour_right' },
+    { selector: '#hand-area',    textKey: 'tutorial_tour_hand' },
+    { selector: '#formula-area', textKey: 'tutorial_tour_formula' },
+];
+
+function startTutorialSpotlight(steps, onDone){
+    tutorialSpotlightSteps = steps;
+    tutorialSpotlightIndex = 0;
+    tutorialSpotlightDoneCallback = onDone || null;
+    showTutorialSpotlightStep();
+}
+function showTutorialSpotlightStep(){
+    const step = tutorialSpotlightSteps[tutorialSpotlightIndex];
+    const el = document.querySelector(step.selector);
+    if(el) el.classList.add('tutorial-spotlight');
+    document.getElementById('tutorial-spotlight-text').textContent = t(step.textKey);
+    document.getElementById('tutorial-spotlight-caption').classList.remove('hidden');
+}
+function advanceTutorialSpotlight(){
+    const step = tutorialSpotlightSteps[tutorialSpotlightIndex];
+    const el = document.querySelector(step.selector);
+    if(el) el.classList.remove('tutorial-spotlight');
+    tutorialSpotlightIndex++;
+    if(tutorialSpotlightIndex >= tutorialSpotlightSteps.length){
+        document.getElementById('tutorial-spotlight-caption').classList.add('hidden');
+        const cb = tutorialSpotlightDoneCallback;
+        tutorialSpotlightDoneCallback = null;
+        if(cb) cb();
+        return;
+    }
+    showTutorialSpotlightStep();
+}
+function cancelTutorialSpotlight(){
+    const step = tutorialSpotlightSteps[tutorialSpotlightIndex];
+    if(step){
+        const el = document.querySelector(step.selector);
+        if(el) el.classList.remove('tutorial-spotlight');
+    }
+    tutorialSpotlightSteps = []; tutorialSpotlightIndex = 0; tutorialSpotlightDoneCallback = null;
+    document.getElementById('tutorial-spotlight-caption').classList.add('hidden');
+}
+function showTutorialMessage(text, onOk){
+    document.getElementById('tutorial-msg-text').textContent = text;
+    tutorialMsgOkCallback = onOk || null;
+    document.getElementById('tutorial-msg-overlay').classList.remove('hidden');
+}
+function closeTutorialMessage(){
+    document.getElementById('tutorial-msg-overlay').classList.add('hidden');
+    const cb = tutorialMsgOkCallback; tutorialMsgOkCallback = null;
+    if(cb) cb();
+}
+function isTutorialBlocking(){
+    if(!tutorialActive) return false;
+    if(!document.getElementById('tutorial-msg-overlay').classList.contains('hidden')) return true;
+    if(!document.getElementById('tutorial-spotlight-caption').classList.contains('hidden')) return true;
+    return false;
+}
+function resetTutorialState(){
+    tutorialActive = false;
+    tutorialMsgOkCallback = null;
+    cancelTutorialSpotlight();
+    document.getElementById('tutorial-msg-overlay').classList.add('hidden');
+    document.getElementById('tutorial-complete-overlay').classList.add('hidden');
+}
+function startTutorial(){
+    document.getElementById('char-select-screen').classList.add('hidden');
+    tutorialActive = true;
+    startGameWithClass(0, 'easy', 'male'); // 戦士固定・常に解放済みの練習用構成
+    // わかりやすい2種類の条件（①マーク／②倍数）に固定して見せる
+    G.skills = [
+        finalizeSkill({type:'attack',  conds:['♥'],  base:4, level:1}),
+        finalizeSkill({type:'defense', conds:['*3'], base:6, level:1}),
+    ];
+    renderSkills();
+    startTutorialSpotlight(TUTORIAL_BATTLE_TOUR, ()=>{
+        showTutorialMessage(t('tutorial_msg_intro'));
+    });
+}
+function showTutorialComplete(){
+    document.getElementById('battle-screen').classList.add('hidden');
+    document.getElementById('tutorial-complete-overlay').classList.remove('hidden');
+}
+function closeTutorialComplete(){
+    document.getElementById('tutorial-complete-overlay').classList.add('hidden');
+    doReturnTitle();
 }
 
 // ============================================================
@@ -4564,6 +4769,23 @@ function csSelectCell(ci, dIdx){
 function renderCharGrid(){
     const grid=document.getElementById('class-grid');
     grid.innerHTML='';
+
+    // Tutorial row — always available regardless of unlock status
+    const tRow=document.createElement('div');
+    tRow.className='cs-row cs-tutorial-row';
+    tRow.onclick=startTutorial;
+    tRow.innerHTML=
+        `<div class="cs-gender-col"><div style="font-size:1.7rem;">🔰</div></div>
+         <div class="cs-class-info">
+           <div class="cs-img-wrap"><div class="cs-hero-em">🔰</div></div>
+           <div class="cs-class-stats">
+             <div class="cs-class-name">${t('tutorialRowLabel')}</div>
+             <div class="cs-stat-row">${t('tutorialRowDesc')}</div>
+           </div>
+         </div>
+         <div class="cs-cell cs-tutorial-start" style="width:342px;cursor:pointer;">▶</div>`;
+    grid.appendChild(tRow);
+
     CLASS_DEFS.forEach((def,ci)=>{
         const classVisible = ci===0 || isUnlocked(ci,'easy');
         const row=document.createElement('div');
