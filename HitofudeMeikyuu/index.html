@@ -2189,6 +2189,7 @@ function hasSave(){
 }
 function clearSave(){
     try { localStorage.removeItem(SAVE_KEY); } catch (e){}
+    currentSavePhase = null;
 }
 function refreshTitleButtons(){
     const has = hasSave();
@@ -2202,16 +2203,24 @@ function serializeGearItem(it){
 function rehydrateGearItem(saved){
     return makeGearItem(saved.defId, saved.category, saved.practice, saved.skills, saved.plusLevel);
 }
+// currentSavePhaseは「今何をしている最中か」を表し、行動のたびに再セーブする。
+// explore＝探索中／inventory＝ゴール到達後の道具の整理／battle＝戦闘マス探索中／
+// battle-result＝攻撃の応酬を見ている最中／battle-victory＝敵撃破後の報酬確認中
+let currentSavePhase = null;
+function setSavePhase(phase){
+    currentSavePhase = phase;
+    autoSaveGame();
+}
 function autoSaveGame(){
     if (tutorialActive) return;
-    if (currentMode !== 'explore' && currentMode !== 'battle') return;
-    // initFloor()/initBattleRound()がまだ走っていない一瞬（startGame()冒頭など）は状態が未生成なので保存しない
-    if (currentMode === 'explore' && (!visited || !start || !goal)) return;
-    if (currentMode === 'battle' && (!bVisited || !bStart || !bGoal)) return;
+    if (!currentSavePhase) return;
+    if (currentSavePhase === 'explore' && (!visited || !start || !goal)) return;
+    if ((currentSavePhase === 'battle' || currentSavePhase === 'battle-result' || currentSavePhase === 'battle-victory')
+        && (!bVisited || !bStart || !bGoal)) return;
     const data = {
-        version: 1,
+        version: 2,
         selectedJob, selectedGender, selectedDifficulty,
-        floor, currentMode,
+        floor, phase: currentSavePhase,
         player: {
             level: player.level, exp: player.exp, expToNext: player.expToNext,
             baseMaxHp: player.baseMaxHp, hp: player.hp, maxHp: player.maxHp,
@@ -2226,7 +2235,7 @@ function autoSaveGame(){
             job: player.job, gender: player.gender
         }
     };
-    if (currentMode === 'explore'){
+    if (currentSavePhase === 'explore'){
         data.explore = {
             start, goal, current,
             visited: Array.from(visited),
@@ -2235,7 +2244,7 @@ function autoSaveGame(){
             keyCounts: Object.assign({}, keyCounts),
             floorItemsObtained: floorItemsObtained.map(serializeGearItem)
         };
-    } else {
+    } else if (currentSavePhase === 'battle' || currentSavePhase === 'battle-result' || currentSavePhase === 'battle-victory'){
         data.battle = {
             bStart, bGoal, bCurrent,
             bVisited: Array.from(bVisited),
@@ -2247,6 +2256,46 @@ function autoSaveGame(){
         };
     }
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch (e){}
+}
+// battle/battle-result/battle-victoryの3フェーズ共通：内部変数と敵の表示DOMを復元する
+function restoreBattleStateFromSave(bt){
+    bStart = bt.bStart; bGoal = bt.bGoal; bCurrent = bt.bCurrent;
+    bVisited = new Set(bt.bVisited);
+    bMarks = bt.bMarks; bMarkTaken = bt.bMarkTaken;
+    bCombo = bt.bCombo; bLastMarkCategory = bt.bLastMarkCategory;
+    bTotal = bt.bTotal; bArmorCritGuard = bt.bArmorCritGuard;
+    enemyHp = bt.enemyHp; enemyMaxHp = bt.enemyMaxHp; battleRound = bt.battleRound;
+    const boss = isBossFloor(floor);
+    currentEnemySpecies = (boss ? BOSS_SPECIES : ENEMY_SPECIES).find(s => s.key === bt.enemySpeciesKey) || ENEMY_SPECIES[0];
+    bossRevivalsLeft = bt.bossRevivalsLeft;
+    battleEnded = false;
+    currentMode = 'battle';
+    document.getElementById('dungeon-screen').classList.add('hidden');
+    document.getElementById('battle-screen').classList.remove('hidden');
+    document.getElementById('bt-enemy-name').textContent = (boss ? '👑 ' : '') + currentEnemySpecies.name;
+    document.getElementById('bt-ally-name').textContent = getCurPlayerName();
+    document.getElementById('br-ally-label').textContent = getCurPlayerName();
+    document.getElementById('br-enemy-label').textContent = currentEnemySpecies.name;
+    document.getElementById('bt-floor-label').textContent = floor + 'F';
+    document.getElementById('bt-enemy-portrait').classList.toggle('bt-boss-frame', boss);
+    document.getElementById('br-enemy-illust').classList.toggle('bt-boss-frame', boss);
+    renderEnemyPortrait();
+}
+// 攻撃の応酬画面（battle-result-overlay）を、演出を再生せず最終状態のまま復元する
+function showBattleResultStatic(){
+    document.getElementById('br-title').textContent = `バトルステージ${battleRound}`;
+    const es = getEnemyStats(floor);
+    renderBattleCenterStats({
+        'atk-ally': bTotal.weapon, 'def-ally': bTotal.armor, 'mag-ally': bTotal.magic,
+        'atk-enemy': es.atk, 'def-enemy': es.def, 'mag-enemy': es.mag
+    });
+    setBattleCenterFrame([]);
+    document.getElementById('br-ally-dmg').classList.add('hidden');
+    document.getElementById('br-enemy-dmg').classList.add('hidden');
+    updateHpBar('ally', player.hp, player.maxHp);
+    updateHpBar('enemy', enemyHp, enemyMaxHp);
+    document.getElementById('battle-result-overlay').classList.remove('hidden');
+    finishBattleResult();
 }
 function continueGame(){
     let data;
@@ -2272,11 +2321,12 @@ function continueGame(){
     };
     document.getElementById('title-screen').classList.add('hidden');
     document.getElementById('dg-floor-disp').textContent = floor + 'F';
-    renderStatus();
     renderCharacterPortraits();
+    const phase = data.phase;
 
-    if (data.currentMode === 'explore'){
+    if (phase === 'explore'){
         currentMode = 'explore';
+        currentSavePhase = 'explore';
         const ex = data.explore;
         start = ex.start; goal = ex.goal; current = ex.current;
         visited = new Set(ex.visited);
@@ -2284,35 +2334,53 @@ function continueGame(){
         keyTaken = ex.keyTaken; chestOpened = ex.chestOpened; dotTaken = ex.dotTaken;
         keyCounts = ex.keyCounts;
         floorItemsObtained = ex.floorItemsObtained.map(rehydrateGearItem);
+        // 万一ゴール到達済みの状態で保存されていた場合の保険：そのままだと二度とゴールに入れず
+        // 詰んでしまうため、現在地をスタートまで巻き戻してこの階を最初からやり直せるようにする
+        if (current.r === goal.r && current.c === goal.c){
+            current = { r: start.r, c: start.c };
+            visited = new Set([key(current.r, current.c)]);
+        }
         document.getElementById('battle-screen').classList.add('hidden');
         document.getElementById('dungeon-screen').classList.remove('hidden');
         setMsg('');
+        renderStatus();
         renderMap();
-    } else {
-        currentMode = 'battle';
-        const bt = data.battle;
-        bStart = bt.bStart; bGoal = bt.bGoal; bCurrent = bt.bCurrent;
-        bVisited = new Set(bt.bVisited);
-        bMarks = bt.bMarks; bMarkTaken = bt.bMarkTaken;
-        bCombo = bt.bCombo; bLastMarkCategory = bt.bLastMarkCategory;
-        bTotal = bt.bTotal; bArmorCritGuard = bt.bArmorCritGuard;
-        enemyHp = bt.enemyHp; enemyMaxHp = bt.enemyMaxHp; battleRound = bt.battleRound;
-        const boss = isBossFloor(floor);
-        currentEnemySpecies = (boss ? BOSS_SPECIES : ENEMY_SPECIES).find(s => s.key === bt.enemySpeciesKey) || ENEMY_SPECIES[0];
-        bossRevivalsLeft = bt.bossRevivalsLeft;
-        battleEnded = false;
-        document.getElementById('dungeon-screen').classList.add('hidden');
-        document.getElementById('battle-screen').classList.remove('hidden');
-        document.getElementById('bt-enemy-name').textContent = (boss ? '👑 ' : '') + currentEnemySpecies.name;
-        document.getElementById('bt-ally-name').textContent = getCurPlayerName();
-        document.getElementById('br-ally-label').textContent = getCurPlayerName();
-        document.getElementById('br-enemy-label').textContent = currentEnemySpecies.name;
-        document.getElementById('bt-floor-label').textContent = floor + 'F';
-        document.getElementById('bt-enemy-portrait').classList.toggle('bt-boss-frame', boss);
-        document.getElementById('br-enemy-illust').classList.toggle('bt-boss-frame', boss);
-        renderEnemyPortrait();
+    } else if (phase === 'inventory'){
+        currentMode = 'explore';
+        currentSavePhase = 'inventory';
+        document.getElementById('battle-screen').classList.add('hidden');
+        document.getElementById('dungeon-screen').classList.remove('hidden');
+        renderStatus();
+        openInventory('floor-clear');
+    } else if (phase === 'battle'){
+        currentSavePhase = 'battle';
+        restoreBattleStateFromSave(data.battle);
+        // 万一ゴール到達済みの状態で保存されていた場合の保険：このラウンドをやり直させる
+        if (bCurrent.r === bGoal.r && bCurrent.c === bGoal.c){
+            initBattleRound();
+        }
+        renderStatus();
         renderBattleMap();
         renderBattleStatus();
+    } else if (phase === 'battle-result'){
+        currentSavePhase = 'battle-result';
+        restoreBattleStateFromSave(data.battle);
+        renderStatus();
+        renderBattleMap();
+        showBattleResultStatic();
+    } else if (phase === 'battle-victory'){
+        // 報酬確認画面はやり直せる操作がなく、報酬はすでに確定済みのため、再表示はせずその先まで進めて復元する
+        restoreBattleStateFromSave(data.battle);
+        renderStatus();
+        if (bossRevivalsLeft > 0){
+            reviveBossAndContinue();
+        } else if (floor >= LAST_STAGE){
+            showGameClear();
+        } else {
+            nextFloor();
+        }
+    } else {
+        goToJobSelect();
     }
 }
 function confirmNewGame(){
@@ -2641,6 +2709,7 @@ function initFloor(){
     floorItemsObtained = [];
     document.getElementById('dg-floor-disp').textContent = floor + 'F';
     setMsg('');
+    setSavePhase('explore');
     renderMap();
     maybeTriggerFloorEvent();
 }
@@ -2786,6 +2855,9 @@ function chooseDojoSkill(choiceIdx){
 // RENDER
 // ============================================================
 function renderMap(){
+    // 「道具の整理」フェーズから続きをロードした場合など、探索マスの情報を持たない状態で
+    // 呼ばれることがあるため、その場合は何もしない（背後に隠れているだけの盤面なので実害はない）
+    if (!visited || !start || !goal) return;
     const grid = document.getElementById('map-grid');
     grid.innerHTML = '';
     for (let r = 1; r <= 5; r++){
@@ -2944,6 +3016,9 @@ function onReachGoal(){
     const leveledUp = gainExp(expGained);
     renderFloorResult(expGained, leveledUp, levelBefore, player.level, isPerfect);
     document.getElementById('floor-result-overlay').classList.remove('hidden');
+    // 経験値はここで確定済みのため、ゴール到達直後の位置はもう保存対象にせず、
+    // その先（道具の整理フェーズ）まで進めた状態を保存する
+    setSavePhase('inventory');
 }
 
 // ============================================================
@@ -3130,6 +3205,7 @@ function initBattleRound(){
     bTotal = { weapon: 0, armor: 0, magic: 0 };
     bArmorCritGuard = false;
     hideComboPopup();
+    setSavePhase('battle');
     renderBattleMap();
     renderBattleStatus();
 }
@@ -3403,6 +3479,9 @@ function resolveBattleTurn(){
 
     enemyHp = curEnemyHp;
     player.hp = curPlayerHp;
+    // 攻撃の応酬はここで結果が確定するため、以後はこのラウンドの最終状態を保存対象にする
+    // （ここから先はポーション使用・つぎへの操作をやり直せないようにする）
+    setSavePhase('battle-result');
     renderStatus();
 
     showBattleResult({
@@ -3572,6 +3651,8 @@ function onEnemyDefeated(){
     document.getElementById('bv-title').textContent = bossRevivalsLeft > 0 ? ui('boss_revive_title') : ui('battle_victory_title');
     updatePotionButtons();
     document.getElementById('battle-victory-overlay').classList.remove('hidden');
+    // 経験値・報酬アイテムはここで確定済みのため、再抽選されないようここから先の状態を保存対象にする
+    setSavePhase('battle-victory');
 }
 
 // ボスを倒した直後、残り復活回数があればHP満タンで蘇らせ、新たなマップ探索は挟まずそのまま連戦を続ける
