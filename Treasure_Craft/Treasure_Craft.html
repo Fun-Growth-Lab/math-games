@@ -410,39 +410,69 @@ function drawText(text, x, y, size, color, align="left", weight="bold") {
     ctx.fillText(text, x, y);
 }
 
+function shadeColor(hex, percent) {
+    if (!hex.startsWith('#') || hex.length !== 7) return hex;
+    let num = parseInt(hex.slice(1), 16);
+    let r = Math.max(0, Math.min(255, (num >> 16) + Math.round(255 * percent)));
+    let g = Math.max(0, Math.min(255, ((num >> 8) & 0xFF) + Math.round(255 * percent)));
+    let b = Math.max(0, Math.min(255, (num & 0xFF) + Math.round(255 * percent)));
+    return '#' + (0x1000000 + r*0x10000 + g*0x100 + b).toString(16).slice(1);
+}
+
 function drawBtn(text, x, y, w, h, color, onClick, disabled=false) {
-    ctx.fillStyle = disabled ? '#95a5a6' : color;
+    let baseColor = disabled ? '#95a5a6' : color;
     if (disabled && text === "装備中" || text === "売切") {
-        ctx.fillStyle = text === "装備中" ? '#e74c3c' : '#7f8c8d';
+        baseColor = text === "装備中" ? '#e74c3c' : '#7f8c8d';
     }
-    ctx.beginPath(); ctx.roundRect(x, y, w, h, 10); ctx.fill();
-    ctx.strokeStyle = '#2c3e50'; ctx.lineWidth = 3; ctx.stroke();
+    const shadowColor = shadeColor(baseColor, -0.32);
+    const lightColor = shadeColor(baseColor, 0.16);
+
+    // 立体感のある影（下辺）
+    ctx.beginPath(); ctx.roundRect(x, y + 4, w, h, 10); ctx.fillStyle = shadowColor; ctx.fill();
+
+    // ボタン本体（グラデーション）
+    const grad = ctx.createLinearGradient(x, y, x, y + h);
+    grad.addColorStop(0, lightColor);
+    grad.addColorStop(1, baseColor);
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, 10); ctx.fillStyle = grad; ctx.fill();
+    ctx.strokeStyle = shadowColor; ctx.lineWidth = 2; ctx.stroke();
+
     let fSize = Math.min(22, Math.floor(h * 0.5));
-    drawText(text, x + w/2, y + h/2, fSize, '#fff', 'center');
+    drawText(text, x + w/2, y + h/2 - 1, fSize, '#fff', 'center');
     if (!disabled) addZone(x, y, w, h, onClick);
 }
 
 function drawPanel(x, y, w, h, title) {
     ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.3)';
+    ctx.shadowBlur = 18;
+    ctx.shadowOffsetY = 8;
     ctx.beginPath();
     ctx.roundRect(x, y, w, h, 15);
-    ctx.clip(); 
-
-    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
     ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, 15);
+    ctx.clip();
 
     if(title) {
-        ctx.fillStyle = '#34495e';
-        ctx.fillRect(x, y, w, 40); 
+        const grad = ctx.createLinearGradient(x, y, x, y + 40);
+        grad.addColorStop(0, shadeColor('#34495e', 0.12));
+        grad.addColorStop(1, '#2c3e50');
+        ctx.fillStyle = grad;
+        ctx.fillRect(x, y, w, 40);
         drawText(title, x + w/2, y + 20, 22, '#fff', 'center');
     }
 
     ctx.restore();
 
-    ctx.strokeStyle = '#34495e'; 
-    ctx.lineWidth = 4;
-    ctx.beginPath(); 
-    ctx.roundRect(x, y, w, h, 15); 
+    ctx.strokeStyle = '#2c3e50';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, 15);
     ctx.stroke();
 }
 
@@ -461,7 +491,11 @@ function renderTitle() {
     drawImageRect('title', 0, 0, 1280, 720);
     ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0,0,1280,720);
     
+    ctx.save();
+    ctx.shadowColor = 'rgba(241,196,15,0.7)';
+    ctx.shadowBlur = 25;
     drawText("トレジャー＆クラフト", 640, 120, 80, '#f1c40f', 'center', '900');
+    ctx.restore();
     drawText("～7つの秘境と幻の竜～", 640, 210, 40, '#ecf0f1', 'center');
 
     let startY = 320;
