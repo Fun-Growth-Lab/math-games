@@ -1374,8 +1374,13 @@ const Game = (function() {
             ctx.fillStyle = "rgba(0,0,0,0.6)";
             ctx.fillRect(0,0, BASE_WIDTH, BASE_HEIGHT);
 
+            ctx.save();
+            ctx.shadowColor = "rgba(0,0,0,0.4)";
+            ctx.shadowBlur = 25;
+            ctx.shadowOffsetY = 10;
             ctx.fillStyle = "#FFF";
             roundRect(ctx, BASE_WIDTH/2 - 200, BASE_HEIGHT/2 - 250, 400, 500, 20, true, false);
+            ctx.restore();
 
             ctx.fillStyle = "#5D4037";
             ctx.font = "bold 30px 'M PLUS Rounded 1c'";
@@ -1452,10 +1457,15 @@ const Game = (function() {
 
         const pw = 660, ph = 590;
         const px = BASE_WIDTH/2 - pw/2, py = BASE_HEIGHT/2 - ph/2;
+        ctx.save();
+        ctx.shadowColor = "rgba(0,0,0,0.35)";
+        ctx.shadowBlur = 25;
+        ctx.shadowOffsetY = 10;
         ctx.fillStyle = "#FFF8E1";
         roundRect(ctx, px, py, pw, ph, 20, true, false);
+        ctx.restore();
         ctx.strokeStyle = "#FF9800";
-        ctx.lineWidth = 4;
+        ctx.lineWidth = 3;
         roundRect(ctx, px, py, pw, ph, 20, false, true);
 
         ctx.fillStyle = "#5D4037";
@@ -1622,16 +1632,41 @@ const Game = (function() {
         drawButton(BASE_WIDTH/2, 650, 200, 50, "もどる", "#B0BEC5");
     }
     
+    function shadeColor(hex, percent) {
+        if (!hex.startsWith('#') || hex.length !== 7) return hex;
+        let num = parseInt(hex.slice(1), 16);
+        let r = Math.max(0, Math.min(255, (num >> 16) + Math.round(255 * percent)));
+        let g = Math.max(0, Math.min(255, ((num >> 8) & 0xFF) + Math.round(255 * percent)));
+        let b = Math.max(0, Math.min(255, (num & 0xFF) + Math.round(255 * percent)));
+        return '#' + (0x1000000 + r*0x10000 + g*0x100 + b).toString(16).slice(1);
+    }
+
     function drawButton(x, y, w, h, text, color, textColor="#fff") {
         ctx.save();
         ctx.translate(x - w/2, y - h/2);
-        ctx.fillStyle = color;
+
+        const shadowColor = shadeColor(color, -0.3);
+        const lightColor = shadeColor(color, 0.16);
+
+        // 立体感のある影（下辺）
+        ctx.fillStyle = shadowColor;
+        roundRect(ctx, 0, 4, w, h, 10, true, false);
+
+        // ボタン本体（グラデーション）
+        const grad = ctx.createLinearGradient(0, 0, 0, h);
+        grad.addColorStop(0, lightColor);
+        grad.addColorStop(1, color);
+        ctx.fillStyle = grad;
         roundRect(ctx, 0, 0, w, h, 10, true, false);
+        ctx.strokeStyle = shadowColor;
+        ctx.lineWidth = 2;
+        roundRect(ctx, 0, 0, w, h, 10, false, true);
+
         ctx.fillStyle = textColor;
         ctx.font = "bold 24px 'M PLUS Rounded 1c'";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(text, w/2, h/2);
+        ctx.fillText(text, w/2, h/2 - 1);
         ctx.restore();
     }
     
