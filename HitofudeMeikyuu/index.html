@@ -948,9 +948,6 @@
         <div class="screen-left">
             <div id="battle-grid" class="grid-5x5"></div>
             <div id="bt-combo-popup" class="combo-popup hidden"></div>
-            <div id="bt-start-gate" class="hidden" style="position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.55); border-radius:16px; display:flex; align-items:center; justify-content:center; z-index:65;">
-                <button class="btn btn-green" style="font-size:1.3rem; padding:18px 40px;" data-i18n="btn_fight" onclick="startBattleFirstStage()">たたかう ▶</button>
-            </div>
         </div>
         <div class="screen-right">
             <div class="panel-sec bt-compact">
@@ -1378,6 +1375,7 @@ const UI_TEXT = {
     inventory_title: { ja: '🎒 道具の整理', ja_easy: '🎒 どうぐの せいり', en: '🎒 Item Management' },
     inv_placeholder: { ja: '同じ道具（材質・種類が同じ）同士をタップすると合成できます', ja_easy: 'おなじ どうぐ（そざい・しゅるいが おなじ）どうしを タップすると あわせられます', en: 'Tap two of the same item (same material & type) to combine them' },
     btn_fight: { ja: 'たたかう ▶', ja_easy: 'たたかう ▶', en: 'Fight ▶' },
+    btn_battle_start: { ja: 'バトル開始 ▶', ja_easy: 'バトルかいし ▶', en: 'Start Battle ▶' },
     inv_sort_label: { ja: '並び替え', ja_easy: 'ならびかえ', en: 'Sort' },
     badge_equipped: { ja: '装備中', ja_easy: 'そうびちゅう', en: 'Equipped' },
     btn_equip: { ja: '装備 ▶', ja_easy: 'そうび ▶', en: 'Equip ▶' },
@@ -3118,7 +3116,8 @@ let bArmorCritGuard = false; // 防具のクリティカル（＝クリティカ
 let battleEnded = false;
 let enemyHp = 0, enemyMaxHp = 0; // 敵を倒すまでバトル全体で維持される（ラウンドをまたいで持続）
 let battleRound = 1; // バトルステージ番号（決着がつかず続くたびに+1）
-let battleAwaitingStart = false; // trueの間はマス移動を受け付けず、「たたかう」ボタンでポーションを使う猶予を作る
+// 迷路クリア直後（ステージ1の最初の攻防の前）は即座に計算せず、ポーションを使う猶予として確認画面を挟む
+let battleFirstStrikePending = false;
 
 function pickBattleStartGoal(){
     const i1 = Math.floor(Math.random() * VALID_CELLS.length);
@@ -3267,11 +3266,7 @@ function initBattleEncounter(isRetry){
     enemyMaxHp = getEnemyStats(floor).hp;
     enemyHp = enemyMaxHp;
     battleRound = 1;
-    if (tutorialActive){
-        initBattleRound();
-    } else {
-        beginBattleRound();
-    }
+    initBattleRound();
     // initBattleRound()がコンボポップアップを一旦隠すため、ボス出現の演出はその後に出す
     if (boss){
         showFadingPopup('bt-combo-popup', `<div class="combo-popup-num" style="color:#ff4d4d;">${ui('boss_appear_popup')}</div>`, 1500, 500);
@@ -3297,19 +3292,6 @@ function initBattleRound(){
     setSavePhase('battle');
     renderBattleMap();
     renderBattleStatus();
-}
-
-// 新しい敵との戦闘開始時（フロア突入・ボス復活）は、マス移動をすぐに受け付けず
-// 「たたかう」ボタンを押すまで待たせることで、先にポーションを使う余地を作る
-function beginBattleRound(){
-    initBattleRound();
-    battleAwaitingStart = true;
-    document.getElementById('bt-start-gate').classList.remove('hidden');
-}
-function startBattleFirstStage(){
-    if (isTutorialBlocking()) return;
-    battleAwaitingStart = false;
-    document.getElementById('bt-start-gate').classList.add('hidden');
 }
 
 const CATEGORY_ICON = { weapon: '⚔', armor: '🛡', magic: '🪄' };
@@ -3424,9 +3406,29 @@ function renderBattleMap(){
     }
 }
 
+// 迷路クリア直後、まだ何も攻防が起きていない状態のバトル結果画面を表示し、
+// 「バトル開始」を押すまで1回目の攻防（resolveBattleTurn）を計算しない
+function showBattleStartConfirm(){
+    battleFirstStrikePending = true;
+    document.getElementById('br-title').textContent = `バトルステージ${battleRound}`;
+    const es = getEnemyStats(floor);
+    renderBattleCenterStats({
+        'atk-ally': bTotal.weapon, 'def-ally': bTotal.armor, 'mag-ally': bTotal.magic,
+        'atk-enemy': es.atk, 'def-enemy': es.def, 'mag-enemy': es.mag
+    });
+    setBattleCenterFrame([]);
+    document.getElementById('br-ally-dmg').classList.add('hidden');
+    document.getElementById('br-enemy-dmg').classList.add('hidden');
+    updateHpBar('ally', player.hp, player.maxHp);
+    updateHpBar('enemy', enemyHp, enemyMaxHp);
+    document.getElementById('battle-result-overlay').classList.remove('hidden');
+    document.getElementById('br-next-btn').textContent = ui('btn_battle_start');
+    document.getElementById('br-next-btn').classList.remove('hidden');
+    document.getElementById('br-potion-btn').disabled = false;
+}
+
 function battleTryMoveTo(r,c){
     if (isTutorialBlocking()) return;
-    if (battleAwaitingStart) return;
     if (battleEnded) return;
     if (r < 1 || r > 5 || c < 1 || c > 5) return;
     if (!isAdjacent(bCurrent, r, c)) return;
@@ -3482,7 +3484,13 @@ function battleTryMoveTo(r,c){
 
     if (bCurrent.r === bGoal.r && bCurrent.c === bGoal.c){
         battleEnded = true;
-        resolveBattleTurn();
+        if (tutorialActive){
+            resolveBattleTurn();
+        } else {
+            // 迷路クリアでステータスが確定した直後：即座に攻防を計算せず、
+            // ポーションを使うか判断してから「バトル開始」を押させる
+            showBattleStartConfirm();
+        }
         return;
     }
     if (!bfsCanReach(bCurrent, bGoal, bVisited)){
@@ -3705,6 +3713,11 @@ function finishBattleResult(){
 // 攻撃・魔法攻撃の応酬を繰り返す（bTotalは維持したままresolveBattleTurnを再実行する）
 function continueAfterBattleResult(){
     document.getElementById('battle-result-overlay').classList.add('hidden');
+    if (battleFirstStrikePending){
+        battleFirstStrikePending = false;
+        resolveBattleTurn();
+        return;
+    }
     if (enemyHp <= 0){
         onEnemyDefeated();
     } else {
@@ -3771,7 +3784,7 @@ function reviveBossAndContinue(){
     enemyMaxHp = getEnemyStats(floor).hp;
     enemyHp = enemyMaxHp;
     battleRound = 1;
-    beginBattleRound();
+    initBattleRound();
 }
 
 // 倒した後の報酬確認を終えたら、道具の整理はスキップしてそのまま次の階（またはゲームクリア）へ進む
@@ -3837,11 +3850,6 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !document.getElementById('battle-victory-overlay').classList.contains('hidden')){
         e.preventDefault();
         confirmBattleVictory();
-        return;
-    }
-    if (e.key === 'Enter' && !document.getElementById('bt-start-gate').classList.contains('hidden')){
-        e.preventDefault();
-        startBattleFirstStage();
         return;
     }
     if (!document.getElementById('potion-overlay').classList.contains('hidden')) return;
