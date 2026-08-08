@@ -1034,7 +1034,7 @@
             </div>
             <div style="display:flex; gap:12px; justify-content:center; margin-top:10px;">
                 <button class="btn btn-gray btn-sm" id="br-potion-btn" onclick="openPotionMenu()">🧪 ポーションを使う（所持:0）</button>
-                <button class="btn btn-green btn-sm hidden" id="br-next-btn" data-i18n="btn_next" onclick="continueAfterBattleResult()">つぎへ ▶</button>
+                <button class="btn btn-green btn-sm hidden" id="br-next-btn" onclick="continueAfterBattleResult()">つぎへ ▶</button>
             </div>
         </div>
     </div>
@@ -1803,7 +1803,7 @@ const SKILL_DESC_L = {
     hp_pct:      { ja: () => '装備しているだけで最大HPが上がる', ja_easy: () => 'そうびしているだけで さいだいHPが あがる', en: () => 'Simply equipping this raises max HP' },
     combo_pct:   { ja: () => 'コンボの効果が大きくなる', ja_easy: () => 'コンボの こうかが おおきく なる', en: () => 'Makes combo effects bigger' },
     drain_pct:   { ja: () => '与えたダメージの分だけHPが回復する', ja_easy: () => 'あたえた ダメージの ぶんだけ HPが かいふくする', en: () => 'Heals HP based on the damage dealt' },
-    reflect_pct: { ja: () => '食らったダメージを相手に跳ね返す', ja_easy: () => 'くらった ダメージを あいてに はねかえす', en: () => 'Reflects damage taken back to the enemy' },
+    reflect_pct: { ja: () => '敵の攻撃を受けた後、防御力の一部を相手にダメージとして返す', ja_easy: () => 'てきの こうげきを うけた あと、ぼうぎょりょくの いちぶを あいてに ダメージとして かえす', en: () => "After taking the enemy's attack, deals damage back based on part of your defense" },
     heal_pct:    { ja: () => '魔法攻撃の数値の分だけHPが回復する', ja_easy: () => 'まほうこうげきの すうちの ぶんだけ HPが かいふくする', en: () => 'Heals HP based on the magic attack value' }
 };
 const SKILL_DEFS = {
@@ -1844,9 +1844,9 @@ const SKILL_DEFS = {
         desc: cat => TF(SKILL_DESC_L.drain_pct, cat)
     },
     reflect_pct: {
-        icon: '🪞',
+        icon: '🌵',
         categories: ['armor'],
-        name: () => currentLang === 'en' ? 'Reflect 25%' : '反射25%',
+        name: () => currentLang === 'en' ? 'Thorns' : 'トゲ',
         desc: cat => TF(SKILL_DESC_L.reflect_pct, cat)
     },
     heal_pct: {
@@ -3465,10 +3465,11 @@ function resolveBattleTurn(){
         curPlayerHp = Math.max(0, curPlayerHp - enemyWeaponNet);
         steps.push({ frame: ['atk-enemy', 'def-ally'], target: 'ally', dmg: enemyWeaponNet, hpAfter: curPlayerHp, hpMax: player.maxHp, guard: bArmorCritGuard });
 
-        // 反射25%（防具限定）：食らったダメージの25%×重複数を敵に跳ね返す。自分のHPが0になった場合は発動しない
+        // トゲ（防具限定）：敵の攻撃を受けた後、こちらの防御力の15%×重複数を敵に直接ダメージとして与える。
+        // 自分のHPが0になった場合は発動しない
         const reflectStacks = countSkill(player.gear.armor, 'reflect_pct');
-        if (reflectStacks > 0 && enemyWeaponNet > 0 && curPlayerHp > 0){
-            const reflectDmg = Math.round(enemyWeaponNet * 0.25 * reflectStacks);
+        if (reflectStacks > 0 && curPlayerHp > 0){
+            const reflectDmg = Math.round(bTotal.armor * 0.15 * reflectStacks);
             if (reflectDmg > 0){
                 curEnemyHp = Math.max(0, curEnemyHp - reflectDmg);
                 steps.push({ frame: ['def-ally'], target: 'enemy', dmg: reflectDmg, hpAfter: curEnemyHp, hpMax: enemyMaxHp });
@@ -3606,6 +3607,9 @@ function finishBattleResult(){
         }, 1000);
         return;
     }
+    // 敵がまだ倒れていない場合、この「つぎへ」は次のバトルステージを開始するボタンなので、
+    // ポーションを使ってから始められるとわかるよう「たたかう」表記にする
+    document.getElementById('br-next-btn').textContent = enemyHp > 0 ? ui('btn_fight') : ui('btn_next');
     document.getElementById('br-next-btn').classList.remove('hidden');
     document.getElementById('br-potion-btn').disabled = false;
     if (tutorialActive && !tutorialPotionPrompted && player.hp < player.maxHp){
