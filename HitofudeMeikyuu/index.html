@@ -1129,7 +1129,7 @@
     <div id="potion-overlay" class="overlay hidden" style="z-index:210;">
         <div class="ov-box" style="max-width:520px;">
             <div class="ov-title" data-i18n="potion_menu_title">🧪 ポーションを使う</div>
-            <div id="potion-list" style="display:flex; flex-direction:column; gap:10px; margin-bottom:18px;"></div>
+            <div id="potion-list" style="display:flex; flex-direction:column; gap:10px; margin-bottom:18px; max-height:420px; overflow-y:auto;"></div>
             <button class="btn btn-gray btn-sm" data-i18n="btn_close" onclick="closePotionMenu()">とじる</button>
         </div>
     </div>
@@ -1447,6 +1447,8 @@ const UI_TEXT = {
 
     potion_btn_label: { ja: n => `🧪 ポーションを使う（所持:${n}）`, ja_easy: n => `🧪 ポーションを つかう（もってる：${n}）`, en: n => `🧪 Use Potion (Owned: ${n})` },
     potion_row_desc: { ja: (amt, pct) => `HP+${amt}（最大HPの${pct}%）`, ja_easy: (amt, pct) => `HP+${amt}（さいだいHPの${pct}%）`, en: (amt, pct) => `HP +${amt} (${pct}% of Max HP)` },
+    buff_row_desc: { ja: stat => `次のバトルステージのみ、${stat}が2倍になる`, ja_easy: stat => `つぎの バトルステージだけ、${stat}が 2ばいに なる`, en: stat => `Doubles ${stat} for the next battle stage only` },
+    btn_active: { ja: '有効中', ja_easy: 'こうかちゅう', en: 'Active' },
     popup_key_get: { ja: n => `🔑 ${n}のカギを手に入れた！`, ja_easy: n => `🔑 ${n}の かぎを てにいれた！`, en: n => `🔑 Got the ${n} Key!` },
     popup_chest_get: { ja: n => `🎁 ${n}の宝箱をGET！`, ja_easy: n => `🎁 ${n}の たからばこを GET！`, en: n => `🎁 Got the ${n} Chest!` },
     popup_chest_locked: { ja: n => `🔒 ${n}の宝箱には${n}のカギが必要…`, ja_easy: n => `🔒 ${n}の たからばこには ${n}の かぎが ひつよう…`, en: n => `🔒 You need the ${n} Key for the ${n} Chest…` },
@@ -1630,6 +1632,30 @@ function rollPotionTier(){
 function findPotionTier(tierKey){
     return POTION_TIERS.find(t => t.key === tierKey) || POTION_TIERS[0];
 }
+// 強化ポーション：使うと次のバトルステージに限り、対応するステータス（攻撃力/防御力/魔力）が2倍になる（1回使い切り）
+const BUFF_POTION_NAME_L = {
+    b_atk: { ja: '攻撃強化ポーション', ja_easy: 'こうげきりょくが つよくなる ポーション', en: 'Attack Potion' },
+    b_def: { ja: '防御強化ポーション', ja_easy: 'ぼうぎょりょくが つよくなる ポーション', en: 'Defense Potion' },
+    b_mag: { ja: '魔力強化ポーション', ja_easy: 'まりょくが つよくなる ポーション',       en: 'Magic Potion' }
+};
+const BUFF_POTION_TIERS = [
+    { key: 'b_atk', category: 'weapon', icon: 'images/items/17_potion_red_square.png',    color: '#ff6b4a' },
+    { key: 'b_def', category: 'armor',  icon: 'images/items/18_potion_orange_square.png', color: '#f0a030' },
+    { key: 'b_mag', category: 'magic',  icon: 'images/items/19_potion_purple_square.png', color: '#af7ac5' }
+];
+BUFF_POTION_TIERS.forEach(t => Object.defineProperty(t, 'name', { get(){ return L(BUFF_POTION_NAME_L[this.key]); }, enumerable: true }));
+function findBuffTier(tierKey){
+    return BUFF_POTION_TIERS.find(t => t.key === tierKey);
+}
+function findAnyPotionTier(tierKey){
+    return POTION_TIERS.find(t => t.key === tierKey) || findBuffTier(tierKey) || POTION_TIERS[0];
+}
+// お店・マップとも回復ポーションと等確率（各3種の中は均等）で強化ポーションが出る
+function rollBuffTierEqual(){
+    return BUFF_POTION_TIERS[Math.floor(Math.random() * BUFF_POTION_TIERS.length)];
+}
+// 次のバトルステージのみ、対応ステータスを2倍にするフラグ（resolveBattleTurn実行時に消費される）
+let activeBattleBuffs = { weapon: false, armor: false, magic: false };
 
 let msgTimer = null;
 let currentMode = 'explore'; // 'explore' | 'battle'
@@ -2196,7 +2222,7 @@ function createPlayer(){
             magic:  makeGearItem('magic_staff_0',  'magic',  PRACTICE_START.common)
         },
         inventory: [], // 未装備の在庫（アイコンで管理する）
-        potions: { p30: 1, p50: 0, p100: 0 }, // HP回復ポーションのストック数（最初から小回復ポーションを1つ所持）
+        potions: { p30: 1, p50: 0, p100: 0, b_atk: 0, b_def: 0, b_mag: 0 }, // HP回復・強化ポーションのストック数（最初から小回復ポーションを1つ所持）
         score: 0, // 宝箱・パーフェクトなどで積み上がるランキング用スコア
         perfectCount: 0
     };
@@ -2483,7 +2509,8 @@ function renderStatus(){
 // 呼び出し元の画面を問わない共通のポーションメニューにしている
 // ============================================================
 function totalPotionCount(){
-    return POTION_TIERS.reduce((sum, t) => sum + (player.potions[t.key] || 0), 0);
+    return POTION_TIERS.reduce((sum, t) => sum + (player.potions[t.key] || 0), 0)
+        + BUFF_POTION_TIERS.reduce((sum, t) => sum + (player.potions[t.key] || 0), 0);
 }
 function updatePotionButtons(){
     const label = uif('potion_btn_label', totalPotionCount());
@@ -2515,11 +2542,33 @@ function renderPotionList(){
             <button class="btn btn-sm ${count > 0 ? 'btn-green' : 'btn-gray'}" ${count > 0 ? '' : 'disabled'} onclick="usePotion('${tier.key}')">${ui('btn_use')}</button>
         </div>`;
     }).join('');
-    document.getElementById('potion-list').innerHTML = hpLine + rows;
+    const buffRows = BUFF_POTION_TIERS.map(tier => {
+        const count = player.potions[tier.key] || 0;
+        const active = activeBattleBuffs[tier.category];
+        const canUse = count > 0 && !active;
+        return `<div class="potion-row">
+            <img src="${tier.icon}" alt="${tier.name}" class="potion-row-icon">
+            <div class="potion-row-info">
+                <div class="potion-row-name" style="color:${tier.color};">${tier.name}</div>
+                <div class="potion-row-desc">${uif('buff_row_desc', CATEGORY_STAT_LABEL[tier.category])}</div>
+            </div>
+            <span class="potion-row-count">×${count}</span>
+            <button class="btn btn-sm ${canUse ? 'btn-green' : 'btn-gray'}" ${canUse ? '' : 'disabled'} onclick="usePotion('${tier.key}')">${active ? ui('btn_active') : ui('btn_use')}</button>
+        </div>`;
+    }).join('');
+    document.getElementById('potion-list').innerHTML = hpLine + rows + buffRows;
 }
 function usePotion(tierKey){
     const count = player.potions[tierKey] || 0;
     if (count <= 0) return;
+    const buffTier = findBuffTier(tierKey);
+    if (buffTier){
+        if (activeBattleBuffs[buffTier.category]) return;
+        activeBattleBuffs[buffTier.category] = true;
+        player.potions[tierKey] = count - 1;
+        renderPotionList();
+        return;
+    }
     const tier = findPotionTier(tierKey);
     const healAmt = Math.round(player.maxHp * tier.ratio);
     player.hp = Math.min(player.maxHp, player.hp + healAmt);
@@ -2715,7 +2764,9 @@ function pickFloorObjects(){
             const category = GEAR_CATEGORIES[Math.floor(Math.random() * GEAR_CATEGORIES.length)];
             return { type: 'practice', category, amount: rollPracticeBonusAmount() };
         }
-        return { type: 'heal', tierKey: rollPotionTier().key };
+        // heal種別のうち50%は回復ポーション、50%は強化ポーション（各内部の比率は変えない）
+        const potionTier = Math.random() < 0.5 ? rollPotionTier() : rollBuffTierEqual();
+        return { type: 'heal', tierKey: potionTier.key };
     });
 }
 
@@ -2812,12 +2863,16 @@ function showEventSpring(){
 function rollPotionTierEqual(){
     return POTION_TIERS[Math.floor(Math.random() * POTION_TIERS.length)];
 }
+// 回復ポーション50%・強化ポーション50%で1本抽選する（お店・マップ共通の比率）
+function rollShopPotion(){
+    return Math.random() < 0.5 ? rollPotionTierEqual() : rollBuffTierEqual();
+}
 function showEventElfShop(){
-    const gotten = [rollPotionTierEqual()];
+    const gotten = [rollShopPotion()];
     if (Math.random() < 0.5){
-        gotten.push(rollPotionTierEqual());
+        gotten.push(rollShopPotion());
         if (Math.random() < 0.1){
-            gotten.push(rollPotionTierEqual());
+            gotten.push(rollShopPotion());
         }
     }
     gotten.forEach(tier => { player.potions[tier.key] = (player.potions[tier.key] || 0) + 1; });
@@ -2926,7 +2981,7 @@ function renderMap(){
                         const gear = player.gear[special.category];
                         cell.innerHTML = `<img class="cell-icon-img" src="${gear.icon}" alt="${gear.name}"><span class="dot-practice-badge">${ui('practice_badge_prefix')}+${special.amount}</span>`;
                     } else if (special && special.type === 'heal'){
-                        const potionTier = findPotionTier(special.tierKey);
+                        const potionTier = findAnyPotionTier(special.tierKey);
                         cell.innerHTML = `<img class="cell-icon-img" src="${potionTier.icon}" alt="${potionTier.name}">`;
                     } else {
                         cell.innerHTML = '<div class="pacman-dot"></div>';
@@ -2996,7 +3051,7 @@ function tryMoveTo(r,c){
             renderStatus();
             showDgPopup(uif('popup_practice_up', gearName, PRACTICE_NAME_TEXT(), special.amount), '#5dade2');
         } else if (special && special.type === 'heal'){
-            const potionTier = findPotionTier(special.tierKey);
+            const potionTier = findAnyPotionTier(special.tierKey);
             player.potions[potionTier.key] = (player.potions[potionTier.key] || 0) + 1;
             updatePotionButtons();
             showDgPopup(uif('popup_potion_get', potionTier.name), potionTier.color);
@@ -3439,8 +3494,14 @@ function resolveBattleTurn(){
     const bothAlive = () => curEnemyHp > 0 && curPlayerHp > 0;
     const steps = [];
 
+    // 強化ポーション：このステージ限定で対応ステータスを2倍にする（使い切りなので読んだ直後にリセット）
+    const effWeapon = activeBattleBuffs.weapon ? bTotal.weapon * 2 : bTotal.weapon;
+    const effArmor = activeBattleBuffs.armor ? bTotal.armor * 2 : bTotal.armor;
+    const effMagic = activeBattleBuffs.magic ? bTotal.magic * 2 : bTotal.magic;
+    activeBattleBuffs = { weapon: false, armor: false, magic: false };
+
     // ① 自分の武器攻撃：味方の攻撃力と敵の防御力を枠で囲んで見せる
-    const weaponDamage = calcAtkDefDamage(bTotal.weapon, enemyDef);
+    const weaponDamage = calcAtkDefDamage(effWeapon, enemyDef);
     const enemyHpBeforeWeapon = curEnemyHp;
     curEnemyHp = Math.max(0, curEnemyHp - weaponDamage);
     steps.push({ frame: ['atk-ally', 'def-enemy'], target: 'enemy', dmg: weaponDamage, hpAfter: curEnemyHp, hpMax: enemyMaxHp });
@@ -3460,7 +3521,7 @@ function resolveBattleTurn(){
     // ② 敵の武器攻撃：敵の攻撃力と味方の防御力を枠で囲む（敵が倒れていなければ）
     // 防具のクリティカル＝「クリティカルガード」が発動していれば、最終ダメージを半減する
     if (bothAlive()){
-        let enemyWeaponNet = calcAtkDefDamage(enemyWeaponAtk, bTotal.armor);
+        let enemyWeaponNet = calcAtkDefDamage(enemyWeaponAtk, effArmor);
         if (bArmorCritGuard) enemyWeaponNet = Math.floor(enemyWeaponNet / 2);
         curPlayerHp = Math.max(0, curPlayerHp - enemyWeaponNet);
         steps.push({ frame: ['atk-enemy', 'def-ally'], target: 'ally', dmg: enemyWeaponNet, hpAfter: curPlayerHp, hpMax: player.maxHp, guard: bArmorCritGuard });
@@ -3469,7 +3530,7 @@ function resolveBattleTurn(){
         // 自分のHPが0になった場合は発動しない
         const reflectStacks = countSkill(player.gear.armor, 'reflect_pct');
         if (reflectStacks > 0 && curPlayerHp > 0){
-            const reflectDmg = Math.round(bTotal.armor * 0.15 * reflectStacks);
+            const reflectDmg = Math.round(effArmor * 0.15 * reflectStacks);
             if (reflectDmg > 0){
                 curEnemyHp = Math.max(0, curEnemyHp - reflectDmg);
                 steps.push({ frame: ['def-ally'], target: 'enemy', dmg: reflectDmg, hpAfter: curEnemyHp, hpMax: enemyMaxHp });
@@ -3479,7 +3540,7 @@ function resolveBattleTurn(){
 
     // ③ 自分の魔法攻撃：味方の魔力だけを枠で囲む（防具を無視して直撃、両者とも倒れていなければ）
     if (bothAlive()){
-        const magicDamage = bTotal.magic;
+        const magicDamage = effMagic;
         curEnemyHp = Math.max(0, curEnemyHp - magicDamage);
         steps.push({ frame: ['mag-ally'], target: 'enemy', dmg: magicDamage, hpAfter: curEnemyHp, hpMax: enemyMaxHp });
 
@@ -3511,7 +3572,7 @@ function resolveBattleTurn(){
     showBattleResult({
         enemyHpStart, playerHpStart, steps,
         stats: {
-            'atk-ally': bTotal.weapon, 'def-ally': bTotal.armor, 'mag-ally': bTotal.magic,
+            'atk-ally': effWeapon, 'def-ally': effArmor, 'mag-ally': effMagic,
             'atk-enemy': enemyWeaponAtk, 'def-enemy': enemyDef, 'mag-enemy': enemyMagicAtk
         }
     });
