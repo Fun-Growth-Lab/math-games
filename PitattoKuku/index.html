@@ -1,0 +1,1356 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <script>if(screen.orientation&&screen.orientation.lock){screen.orientation.lock('landscape').catch(function(){});}</script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ピタッと九九 - Fun & Growth Lab</title>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-page:   #fff2da;
+            --bg-grad1:  #fffaf0;
+            --bg-grad2:  #ffe0a8;
+            --ink:       #3a2e55;
+            --ink-dim:   #8b7fa8;
+            --accent:    #ff7a45;
+            --accent-dk: #e2632f;
+            --teal:      #17b8a6;
+            --teal-dk:   #0f8f81;
+            --gold:      #ffc93d;
+            --card-bg:   #ffffff;
+            --card-bdr:  #ffd9a0;
+            --danger:    #ff5d5d;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            overflow: hidden;
+            background: var(--bg-page);
+            font-family: "M PLUS Rounded 1c", sans-serif;
+            user-select: none; -webkit-user-select: none;
+            touch-action: none;
+            display: flex; justify-content: center; align-items: center;
+            height: 100vh; width: 100vw;
+        }
+        #container {
+            width: 1280px; height: 720px;
+            flex-shrink: 0; position: relative;
+            background: radial-gradient(ellipse at 50% 0%, var(--bg-grad1) 0%, var(--bg-grad2) 100%);
+            box-shadow: 0 0 60px rgba(255,150,60,0.25), 0 20px 60px rgba(80,50,20,0.25);
+            border-radius: 24px; overflow: hidden;
+            border: 3px solid #ffffff;
+        }
+        #container.danger { animation: dangerFlash 1.8s ease-in-out infinite; }
+        @keyframes dangerFlash {
+            0%, 100% { border-color: #ffffff; box-shadow: 0 0 60px rgba(255,150,60,0.25), 0 20px 60px rgba(80,50,20,0.25); }
+            50% { border-color: #ff5d5d; box-shadow: 0 0 50px rgba(255,60,60,0.7), 0 20px 60px rgba(80,50,20,0.25); }
+        }
+        .hidden { display: none !important; }
+        .screen {
+            position: absolute; top:0; left:0; width:100%; height:100%;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 100;
+        }
+        .screen::before {
+            content:''; position:absolute; top:0; left:0; width:100%; height:100%;
+            background-image: radial-gradient(rgba(255,255,255,0.6) 2px, transparent 2px);
+            background-size: 34px 34px; opacity: 0.5; pointer-events: none;
+        }
+
+        /* ==================== TITLE / GENERIC BOX ==================== */
+        .title-box {
+            background: rgba(255,255,255,0.72); border: 3px solid #fff;
+            padding: 40px 68px; border-radius: 28px; position: relative; z-index: 1;
+            display: flex; flex-direction: column; align-items: center;
+            box-shadow: 0 18px 40px rgba(140,90,30,0.18), inset 0 0 0 2px rgba(255,201,61,0.35);
+        }
+        .title-h1 {
+            font-size: 3.8rem; font-weight: 800; letter-spacing: 6px; margin-bottom: 28px;
+            background: linear-gradient(180deg,#ffa363,var(--accent-dk));
+            -webkit-background-clip: text; background-clip: text; color: transparent;
+            filter: drop-shadow(0 3px 4px rgba(200,110,40,0.28));
+        }
+
+        /* ==================== BUTTONS ==================== */
+        .btn {
+            background: linear-gradient(to bottom,#ffffff,#fff3e0);
+            color: var(--ink); border: 2px solid var(--card-bdr);
+            padding: 13px 24px; border-radius: 50px;
+            cursor: pointer; font-size: 1.05rem; margin: 6px;
+            font-weight: 800; font-family: inherit;
+            box-shadow: 0 4px 0 #e8c789, 0 6px 14px rgba(140,90,30,0.15);
+            transition: transform 0.1s; width: 290px;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .btn:hover  { transform: translateY(2px); box-shadow: 0 2px 0 #e8c789; }
+        .btn:active { transform: translateY(4px); box-shadow: none; }
+        .btn-primary { background: linear-gradient(to bottom,#ffa15f,var(--accent)); color: #fff; border-color: #ffbb85; box-shadow: 0 4px 0 var(--accent-dk), 0 6px 14px rgba(140,60,20,0.25); font-size: 1.15rem; }
+        .btn-primary:hover { box-shadow: 0 2px 0 var(--accent-dk); }
+        .btn-teal { background: linear-gradient(to bottom,#3fd0bd,var(--teal)); color: #fff; border-color: #7ee3d4; box-shadow: 0 4px 0 var(--teal-dk), 0 6px 14px rgba(10,90,80,0.2); }
+        .btn-teal:hover { box-shadow: 0 2px 0 var(--teal-dk); }
+        .btn-danger { background: linear-gradient(to bottom,#ff8a8a,var(--danger)); color: #fff; border-color: #ffb0b0; box-shadow: 0 4px 0 #c94040; }
+        .btn-danger:hover { box-shadow: 0 2px 0 #c94040; }
+        .btn-sm { padding: 9px 18px; font-size: 0.92rem; width: auto; margin: 0; }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn:disabled:hover, .btn:disabled:active { transform: none; box-shadow: 0 4px 0 #e8c789, 0 6px 14px rgba(140,90,30,0.15); }
+
+        /* ==================== SETTINGS ==================== */
+        .settings-title { font-size: 1.9rem; color: var(--ink); font-weight: 800; letter-spacing: 2px; margin-bottom: 24px; }
+        .settings-section { margin-bottom: 26px; text-align: center; }
+        .settings-label { font-size: 0.95rem; color: var(--ink-dim); font-weight: 700; letter-spacing: 2px; margin-bottom: 12px; }
+        .settings-lang-options { display: flex; flex-direction: column; gap: 10px; }
+        .settings-lang-btn {
+            background: #ffffff; border: 2px solid var(--card-bdr); color: var(--ink);
+            font-family: inherit; font-size: 1.05rem; font-weight: 700; padding: 12px 40px; border-radius: 50px;
+            cursor: pointer; min-width: 260px;
+        }
+        .settings-lang-btn.active { background: linear-gradient(to bottom,#ffe27a,var(--gold)); border-color: #ffb300; color: #5a3d00; }
+        .settings-desc { color: var(--ink-dim); font-size: 0.88rem; margin-bottom: 10px; text-align: center; }
+
+        /* ==================== NAME REGISTER ==================== */
+        .name-reg-form { display: flex; gap: 8px; justify-content: center; margin-bottom: 14px; }
+        .name-reg-input {
+            padding: 10px 14px; font-size: 1.0rem; border-radius: 12px;
+            border: 2px solid var(--card-bdr); background: #fff;
+            color: var(--ink); font-family: inherit; width: 200px;
+        }
+        .name-reg-input::placeholder { color: var(--ink-dim); }
+        .pl-list { list-style: none; margin: 0 0 20px; padding: 0; display: flex; flex-direction: column; gap: 7px; max-height: 220px; overflow-y: auto; width: 380px; }
+        .pl-item {
+            background: #fff; padding: 10px 16px; border-radius: 14px;
+            display: flex; justify-content: space-between; align-items: center; gap: 10px;
+            border: 2px solid var(--card-bdr);
+            color: var(--ink); font-size: 1.0rem; font-weight: 700; transition: all 0.15s;
+        }
+        .pl-item.cur { border-color: var(--accent); background: rgba(255,122,69,0.1); color: var(--accent-dk); }
+        .pl-item-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .pl-item-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+        .pl-select-btn {
+            background: #fff; border: 2px solid var(--card-bdr);
+            color: var(--ink); font-family: inherit; font-weight: 700; font-size: 0.8rem;
+            padding: 5px 12px; border-radius: 50px; cursor: pointer; white-space: nowrap;
+        }
+        .pl-select-btn:hover { border-color: var(--accent); color: var(--accent-dk); }
+        .pl-selected-badge { color: var(--teal-dk); font-size: 0.85rem; font-weight: 800; white-space: nowrap; }
+        .del-btn {
+            background: var(--danger); color: #fff; border: none; width: 24px; height: 24px; border-radius: 50%;
+            cursor: pointer; font-weight: 800; font-size: 0.85rem; padding: 0; flex-shrink: 0;
+        }
+
+        /* ==================== RANKING ==================== */
+        .rank-box {
+            background: rgba(255,255,255,0.85); border: 3px solid #fff; border-radius: 24px;
+            padding: 26px 34px; width: 640px; max-height: 88vh; overflow-y: auto;
+            box-shadow: 0 18px 40px rgba(140,90,30,0.2); display: flex; flex-direction: column; align-items: center;
+        }
+        .rank-title { font-size: 1.5rem; font-weight: 800; color: var(--accent-dk); margin-bottom: 14px; }
+        .rank-toggle { display: flex; gap: 8px; justify-content: center; margin-bottom: 12px; flex-wrap: wrap; }
+        .rank-toggle-btn {
+            padding: 7px 18px; border-radius: 50px; border: 2px solid var(--card-bdr);
+            background: #fff; color: var(--ink-dim); font-size: 0.9rem;
+            font-weight: 800; cursor: pointer; font-family: inherit; transition: all 0.15s;
+        }
+        .rank-toggle-btn.active { background: linear-gradient(to bottom,#ffe27a,var(--gold)); color: #5a3d00; border-color: #ffb300; }
+        .rank-loading { text-align: center; color: var(--ink-dim); padding: 16px 0; }
+        .rank-list { list-style: none; margin: 6px 0 18px; padding: 0; width: 100%; }
+        .rank-row, .rank-row-empty {
+            display: flex; align-items: center; gap: 10px;
+            padding: 8px 6px; border-bottom: 1px solid var(--card-bdr);
+            color: var(--ink); font-size: 0.9rem;
+        }
+        .rank-num { color: var(--ink-dim); font-weight: 800; width: 26px; flex-shrink: 0; font-size: 0.85rem; }
+        .rank-num.top3 { color: var(--accent-dk); font-size: 1.05rem; }
+        .rank-pname { flex: 1; min-width: 0; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .rank-tag { font-size: 0.72rem; color: var(--teal-dk); font-weight: 800; white-space: nowrap; }
+        .rank-score { font-weight: 800; font-size: 0.95rem; color: var(--accent-dk); white-space: nowrap; }
+        .rank-turns { color: var(--teal-dk); font-size: 0.78rem; font-weight: 800; white-space: nowrap; }
+        .rank-date { color: var(--ink-dim); font-size: 0.75rem; white-space: nowrap; }
+        .rank-empty { text-align: center; color: var(--ink-dim); padding: 18px 0; font-size: 0.9rem; width: 100%; }
+
+        .score-submit-box { margin: 16px 0; text-align: center; }
+        .score-submit-label { font-size: 0.85rem; color: var(--ink-dim); font-weight: 700; margin-bottom: 4px; }
+        .score-submit-value { font-size: 1.8rem; font-weight: 800; color: var(--accent-dk); margin-bottom: 10px; }
+        .score-submit-msg { font-size: 0.8rem; margin-top: 6px; min-height: 1.2em; }
+
+        /* ==================== DAN SELECT ==================== */
+        #dan-select-screen { padding: 26px 30px; justify-content: center; }
+        .ds-title { font-size: 1.5rem; font-weight: 800; color: var(--accent-dk); letter-spacing: 3px; margin: 6px 0 4px; }
+        .ds-desc { font-size: 0.85rem; color: var(--ink-dim); margin-bottom: 10px; }
+        .ds-master-badge {
+            display: inline-block; align-self: center; margin-bottom: 10px; padding: 6px 18px;
+            border-radius: 50px; font-weight: 800; font-size: 0.88rem; color: #5a3d00;
+            background: linear-gradient(to bottom,#ffe27a,var(--gold)); border: 2px solid #ffb300;
+        }
+        .ds-perfect-badge {
+            color: #fff; background: linear-gradient(to bottom,#c9a4ff,#8a5cf0); border: 2px solid #a978ff;
+            box-shadow: 0 0 14px rgba(138,92,240,0.45);
+        }
+        .ds-wrap { width: 1180px; max-width: 100%; height: 372px; display: flex; gap: 22px; z-index: 1; }
+        .ds-list {
+            width: 260px; flex-shrink: 0; height: 100%; box-sizing: border-box;
+            display: flex; flex-direction: column; gap: 6px; overflow: hidden;
+            background: rgba(255,255,255,0.8); border: 2px solid var(--card-bdr); border-radius: 20px;
+            padding: 14px;
+        }
+        .ds-dan-row {
+            display: flex; align-items: center; gap: 10px; padding: 7px 14px; flex: 1; min-height: 0;
+            border-radius: 12px; border: 2px solid var(--card-bdr); background: #fff;
+            cursor: pointer; transition: all 0.12s;
+        }
+        .ds-dan-row:hover { border-color: var(--accent); background: #fff6ee; }
+        .ds-dan-row.active { border-color: var(--accent); background: linear-gradient(to right,#fff0e2,#ffe6d2); box-shadow: 0 4px 14px rgba(255,122,69,0.25); }
+        .ds-dan-num { font-size: 1.2rem; font-weight: 800; color: var(--accent-dk); width: 24px; text-align: center; flex-shrink: 0; }
+        .ds-dan-label { font-size: 0.9rem; font-weight: 800; color: var(--ink); white-space: nowrap; }
+        .ds-dan-medals {
+            margin-left: auto; flex-shrink: 0; font-size: 0.76rem; font-weight: 800; color: var(--ink-dim);
+            background: rgba(0,0,0,0.04); border-radius: 50px; padding: 3px 9px; white-space: nowrap;
+        }
+        .ds-dan-medals.full { color: #a87400; background: rgba(255,190,50,0.22); }
+        .ds-preview {
+            flex: 1; min-width: 0; height: 100%; box-sizing: border-box; display: flex; flex-direction: column;
+            background: rgba(255,255,255,0.8); border: 2px solid var(--card-bdr); border-radius: 20px;
+            padding: 18px 24px;
+        }
+        .ds-preview-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+        .ds-preview-title { font-size: 1.4rem; font-weight: 800; color: var(--ink); }
+        .ds-clear-count { font-size: 0.82rem; font-weight: 800; color: var(--teal-dk); white-space: nowrap; }
+        .ds-preview-sub { font-size: 0.85rem; color: var(--ink-dim); margin-bottom: 8px; }
+        .ds-achv-list {
+            display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-rows: 1fr;
+            gap: 8px; flex: 1; min-height: 0; overflow: hidden;
+        }
+        .ds-achv-row {
+            display: flex; align-items: center; gap: 8px; padding: 6px 12px; min-width: 0; min-height: 0;
+            border-radius: 12px; background: #f4f0ff; border: 2px solid #e8e0f7; opacity: 0.5;
+        }
+        .ds-achv-row.done { opacity: 1; background: linear-gradient(to right,#fff7db,#ffedb0); border-color: var(--gold); box-shadow: 0 2px 6px rgba(255,180,0,0.18); }
+        .ds-achv-icon { font-size: 1.3rem; width: 26px; text-align: center; flex-shrink: 0; }
+        .ds-achv-text { font-size: 0.8rem; font-weight: 700; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ds-footer { margin-top: 16px; display: flex; justify-content: center; gap: 10px; }
+
+        /* ==================== PLAY SCREEN ==================== */
+        #play-screen { padding: 20px; }
+        .play-layout { display: flex; align-items: center; justify-content: center; gap: 26px; z-index: 1; width: 100%; height: 100%; }
+        .play-side { width: 196px; flex-shrink: 0; display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
+        .play-side-left { align-items: stretch; justify-content: center; }
+        .play-side-right { justify-content: center; }
+        .hud-pill {
+            width: 100%; box-sizing: border-box; text-align: center;
+            background: #fff; border: 2px solid var(--card-bdr); border-radius: 16px;
+            padding: 10px 14px; font-weight: 800; color: var(--ink); font-size: 0.95rem;
+            box-shadow: 0 3px 0 var(--card-bdr);
+        }
+        .hud-pill b { color: var(--accent-dk); font-size: 1.3rem; display: block; margin-top: 2px; }
+        .hud-pill-best { border-color: var(--teal); background: #f2fdfb; }
+        .hud-pill-best b { color: var(--teal-dk); }
+        .play-side .btn { width: 100%; margin: 0; }
+        .eq-title { text-align: center; font-weight: 800; color: var(--ink-dim); font-size: 0.9rem; letter-spacing: 2px; margin-bottom: 2px; }
+        .eq-list { display: flex; flex-direction: column; gap: 8px; }
+        .eq-chip {
+            height: 54px; border-radius: 14px; display: flex; align-items: center; justify-content: center;
+            font-weight: 800; font-size: 1.2rem; background: #fff; color: var(--ink-dim);
+            border: 2px solid var(--card-bdr); transition: all 0.2s;
+        }
+        .eq-chip.done { background: linear-gradient(160deg,#ffe27a,var(--gold)); color: #5a3d00; border-color: #ffb300; transform: scale(1.04); }
+        .board-wrap { position: relative; z-index: 1; flex-shrink: 0; }
+        #board {
+            position: relative; width: 630px; height: 630px;
+            background: rgba(255,255,255,0.55); border-radius: 20px; border: 3px solid #fff;
+            box-shadow: inset 0 0 0 2px var(--card-bdr), 0 10px 30px rgba(140,90,30,0.15);
+        }
+        .cell-bg {
+            position: absolute; width: 118px; height: 118px; border-radius: 16px;
+            background: rgba(255,255,255,0.55); border: 2px dashed #ffe0b8;
+        }
+        .tile {
+            position: absolute; width: 118px; height: 118px; border-radius: 18px;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 800; color: #fff; text-shadow: 0 2px 3px rgba(0,0,0,0.15);
+            box-shadow: 0 5px 0 rgba(0,0,0,0.12), 0 8px 14px rgba(0,0,0,0.1);
+            transition: left 0.15s ease, top 0.15s ease, opacity 0.18s ease, transform 0.18s ease;
+            cursor: grab; touch-action: none; font-size: 2.8rem;
+        }
+        .tile:active { cursor: grabbing; }
+        .tile.len2 { font-size: 2.2rem; }
+        .tile.len3 { font-size: 1.7rem; }
+        .tile.selected { box-shadow: 0 0 0 4px var(--accent), 0 5px 0 rgba(0,0,0,0.12), 0 8px 14px rgba(0,0,0,0.1); }
+        .tile.pop-in { animation: tilePopIn 0.22s ease; }
+        .tile.fade-out { opacity: 0; transform: scale(1.35); }
+        .tile.pulse { animation: tilePulse 0.22s ease; }
+        .tile.shake { animation: tileShake 0.22s ease; }
+        @keyframes tilePopIn { from { transform: scale(0.2); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @keyframes tilePulse { 0% { transform: scale(1); } 45% { transform: scale(1.18); } 100% { transform: scale(1); } }
+        @keyframes tileShake { 0%,100% { transform: translateX(0); } 30% { transform: translateX(-6px); } 60% { transform: translateX(6px); } }
+        .score-float {
+            position: absolute; font-weight: 800; font-size: 1.5rem; color: var(--accent-dk);
+            text-shadow: 0 2px 0 #fff; pointer-events: none; animation: floatUp 0.8s ease forwards; z-index: 5;
+        }
+        @keyframes floatUp { 0% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(-46px); opacity: 0; } }
+
+        /* ==================== MODAL / RESULT ==================== */
+        .modal-backdrop {
+            position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(60,40,20,0.35);
+            display: flex; align-items: center; justify-content: center; z-index: 200;
+        }
+        .modal-backdrop.hidden { display: none; }
+        .modal-box {
+            background: #fff; border: 3px solid var(--card-bdr); border-radius: 24px;
+            padding: 30px 40px; text-align: center; min-width: 320px;
+            box-shadow: 0 18px 40px rgba(140,90,30,0.3);
+        }
+        .modal-msg { font-size: 1.05rem; font-weight: 800; color: var(--ink); margin-bottom: 20px; line-height: 1.7; }
+        .result-title { font-size: 2.0rem; font-weight: 800; margin-bottom: 14px; }
+        .result-title.clear { color: var(--teal-dk); }
+        .result-title.over { color: var(--danger); }
+        .result-title.timeup { color: var(--accent-dk); }
+    </style>
+</head>
+<body>
+<div id="container">
+
+    <!-- ==================== TITLE ==================== -->
+    <div id="title-screen" class="screen">
+        <div class="title-box">
+            <h1 class="title-h1">ピタッと九九</h1>
+            <button class="btn btn-primary" data-i18n="btn_game_start" onclick="goToDanSelect()">ゲームスタート</button>
+            <button id="btn-name-register" class="btn" onclick="openNameRegister()">👤 名前の登録</button>
+            <button class="btn" data-i18n="btn_ranking" onclick="openRanking()">🏆 ランキング</button>
+            <button class="btn" data-i18n="btn_settings" onclick="openSettings()">⚙️ 設定</button>
+            <button class="btn" data-i18n="btn_index" onclick="location.href='../index.html'">🏠 INDEXへ</button>
+        </div>
+    </div>
+
+    <!-- ==================== NAME REGISTER ==================== -->
+    <div id="name-register-screen" class="screen hidden">
+        <div class="title-box">
+            <h1 class="settings-title" data-i18n="name_register_title">👤 名前の登録</h1>
+            <p class="settings-desc" data-i18n="name_register_desc">お名前を登録してください（最大12文字）</p>
+            <p class="settings-desc"><span data-i18n="name_current_label">現在の名前：</span><span id="name-reg-current" style="color:var(--accent-dk); font-weight:800;"></span></p>
+            <div class="name-reg-form">
+                <input type="text" id="name-reg-input" class="name-reg-input" data-i18n-placeholder="name_input_placeholder" placeholder="なまえをにゅうりょく" maxlength="12">
+                <button class="btn btn-teal btn-sm" data-i18n="btn_add" onclick="addPlayerName()">追加</button>
+            </div>
+            <ul id="name-reg-list" class="pl-list"></ul>
+            <button class="btn" data-i18n="btn_back_title" onclick="closeNameRegister()">◀ タイトルへ戻る</button>
+        </div>
+    </div>
+
+    <!-- ==================== RANKING ==================== -->
+    <div id="ranking-screen" class="screen hidden">
+        <div class="rank-box">
+            <div class="rank-title" data-i18n="ranking_title">🏆 ランキング</div>
+            <div id="rank-dan-toggle" class="rank-toggle"></div>
+            <div class="rank-toggle">
+                <button id="rank-tab-local-btn" class="rank-toggle-btn active" data-i18n="rank_tab_local" onclick="switchRankTab('local')">ローカル</button>
+                <button id="rank-tab-world-btn" class="rank-toggle-btn" data-i18n="rank_tab_world" onclick="switchRankTab('world')">ワールド</button>
+            </div>
+            <div id="rank-loading" class="rank-loading" style="display:none;" data-i18n="rank_loading">読み込み中…</div>
+            <ul id="rank-list" class="rank-list"></ul>
+            <button class="btn" data-i18n="btn_back_title" onclick="closeRanking()">◀ タイトルへ戻る</button>
+        </div>
+    </div>
+
+    <!-- ==================== SETTINGS ==================== -->
+    <div id="settings-screen" class="screen hidden">
+        <div class="title-box">
+            <h1 class="settings-title" data-i18n="settings_title">⚙️ 設定</h1>
+            <div class="settings-section">
+                <div class="settings-label" data-i18n="settings_lang_label">言語</div>
+                <div id="settings-lang-options" class="settings-lang-options"></div>
+            </div>
+            <button class="btn" data-i18n="btn_back_title" onclick="closeSettings()">◀ タイトルへ戻る</button>
+        </div>
+    </div>
+
+    <!-- ==================== DAN SELECT ==================== -->
+    <div id="dan-select-screen" class="screen hidden">
+        <div class="ds-title" data-i18n="danselect_title">だんをえらぼう</div>
+        <div class="ds-desc" data-i18n="danselect_desc">2の段から9の段までえらべます</div>
+        <div id="ds-master-badge" class="ds-master-badge hidden" data-i18n="master_badge">🏆 全段マスター達成！</div>
+        <div id="ds-perfect-badge" class="ds-master-badge ds-perfect-badge hidden" data-i18n="perfect_badge">👑 パーフェクトマスター達成！</div>
+        <div class="ds-wrap">
+            <div id="ds-list" class="ds-list"></div>
+            <div class="ds-preview">
+                <div class="ds-preview-head">
+                    <div class="ds-preview-title" id="ds-preview-title">2の段</div>
+                    <div class="ds-clear-count" id="ds-clear-count">クリア回数：0回</div>
+                </div>
+                <div class="ds-preview-sub" data-i18n="danselect_achv_label">実績</div>
+                <div id="ds-achv-list" class="ds-achv-list"></div>
+            </div>
+        </div>
+        <div class="ds-footer">
+            <button class="btn" data-i18n="btn_back_title" onclick="goToTitle()">◀ タイトルへ戻る</button>
+            <button class="btn btn-primary" data-i18n="btn_dan_start" onclick="startGame()">この段ではじめる</button>
+        </div>
+    </div>
+
+    <!-- ==================== PLAY ==================== -->
+    <div id="play-screen" class="screen hidden">
+        <div class="play-layout">
+            <div class="play-side play-side-left">
+                <div class="hud-pill" id="hud-dan" data-i18n="hud_dan">2の段</div>
+                <div class="hud-pill"><span data-i18n="hud_turn">ターン</span><b id="hud-turn-val">0</b></div>
+                <div class="hud-pill"><span data-i18n="hud_score">スコア</span><b id="hud-score-val">0</b></div>
+                <div class="hud-pill hud-pill-best"><span data-i18n="hud_best">ハイスコア</span><b id="hud-best-val">0</b></div>
+                <button class="btn btn-sm" data-i18n="btn_howto" onclick="openHowTo()">📖 あそびかた</button>
+                <button class="btn btn-danger btn-sm" data-i18n="btn_retire" onclick="requestRetire()">やめる</button>
+            </div>
+            <div class="board-wrap">
+                <div id="board"></div>
+            </div>
+            <div class="play-side play-side-right">
+                <div class="eq-title" data-i18n="eq_list_title">つくる式</div>
+                <div id="chip-row" class="eq-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== HOW TO PLAY ==================== -->
+    <div id="howto-modal" class="modal-backdrop hidden">
+        <div class="modal-box" style="max-width:480px;">
+            <div class="settings-title" style="font-size:1.4rem; margin-bottom:16px;" data-i18n="howto_title">あそびかた</div>
+            <p class="modal-msg" style="text-align:left;" data-i18n="play_hint">数字をドラッグしてすべらせ、たしざんで九九の答えを作ろう！（クリックして選択＋矢印キーでも動かせます）</p>
+            <button class="btn btn-primary btn-sm" data-i18n="btn_close" onclick="closeHowTo()">とじる</button>
+        </div>
+    </div>
+
+    <!-- ==================== RETIRE CONFIRM ==================== -->
+    <div id="retire-modal" class="modal-backdrop hidden">
+        <div class="modal-box">
+            <p class="modal-msg" data-i18n="confirm_retire_msg">今のゲームをやめて、だん選択にもどりますか？</p>
+            <button class="btn btn-danger btn-sm" data-i18n="btn_yes" onclick="confirmRetire()">やめる</button>
+            <button class="btn btn-sm" data-i18n="btn_no" onclick="closeRetireModal()">いいえ</button>
+        </div>
+    </div>
+
+    <!-- ==================== RESULT ==================== -->
+    <div id="result-modal" class="modal-backdrop hidden">
+        <div class="modal-box" style="min-width:420px;">
+            <div id="result-title" class="result-title clear" data-i18n="result_clear_title">ステージクリア！</div>
+            <div class="score-submit-box">
+                <div class="score-submit-label" data-i18n="result_score_label">スコア</div>
+                <div class="score-submit-value" id="result-score-val">0</div>
+                <div class="score-submit-label"><span data-i18n="result_turns_label">ターン数</span>：<span id="result-turns-val">0</span></div>
+            </div>
+            <div class="score-submit-msg" id="result-world-submit-msg"></div>
+            <div style="margin-top:14px;">
+                <button class="btn btn-sm" data-i18n="btn_back_danselect" onclick="closeResultToDanSelect()">段をえらびなおす</button>
+                <button class="btn btn-primary btn-sm" data-i18n="btn_retry" onclick="closeResultAndRetry()">もう一度</button>
+            </div>
+        </div>
+    </div>
+
+</div><!-- #container -->
+
+<!-- Supabase (direct REST fetch)。HitofudeMeikyuu / Arithmeticaと同じプロジェクト・同じrankingsテーブルをgame列で書き分けて共有する -->
+<script>
+(function(){
+    const _base = 'https://rpxassndgiunoqkxqcco.supabase.co/rest/v1';
+    const _key  = 'sb_publishable_Wnge6OPvSf5l2YEgaPg4rw_nj4CyYAH';
+    const _hdr  = { 'apikey': _key, 'Authorization': 'Bearer ' + _key,
+                    'Content-Type': 'application/json', 'Prefer': 'return=minimal' };
+
+    window.saveOnlineScore = async (name, score, turns, difficulty, statusTag) => {
+        if ((score || 0) <= 0) return;
+        const res = await fetch(`${_base}/rankings`, {
+            method: 'POST',
+            headers: _hdr,
+            body: JSON.stringify({
+                game:        'pitatto_kuku',
+                difficulty:  difficulty  || 'dan2',
+                player_name: name        || 'ななしさん',
+                point_score: score       || 0,
+                stage_score: turns       || 0,
+                turns:       turns       || 0,
+                class_name:  statusTag   || ''
+            })
+        });
+        if (!res.ok) { const t = await res.text(); throw new Error(`HTTP ${res.status}: ${t}`); }
+    };
+
+    window.loadWorldRanking = async (difficulty) => {
+        try {
+            const q = new URLSearchParams({
+                select:      'player_name,class_name,point_score,turns,created_at',
+                game:        'eq.pitatto_kuku',
+                difficulty:  `eq.${difficulty || 'dan2'}`,
+                point_score: 'gt.0',
+                order:       'point_score.desc,turns.asc,created_at.desc',
+                limit:       '10'
+            });
+            const res = await fetch(`${_base}/rankings?${q}`, {
+                headers: { 'apikey': _key, 'Authorization': 'Bearer ' + _key }
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            return data.map(r => ({
+                name:  r.player_name,
+                tag:   r.class_name,
+                score: r.point_score,
+                turns: r.turns,
+                date:  r.created_at ? new Date(r.created_at).toLocaleDateString('ja-JP') : ''
+            }));
+        } catch (e) {
+            console.error('Ranking: 読み込みエラー', e);
+            return null;
+        }
+    };
+})();
+</script>
+
+<script>
+'use strict';
+
+// ============================================================
+// I18N
+// ============================================================
+const LANG_STORAGE_KEY = 'pitattoKukuLang';
+const LANGS = ['ja', 'ja_easy', 'en'];
+let currentLang = (function(){
+    try { const v = localStorage.getItem(LANG_STORAGE_KEY); return LANGS.includes(v) ? v : 'ja'; }
+    catch (e){ return 'ja'; }
+})();
+function L(dict){ if (!dict) return ''; return dict[currentLang] || dict.ja || ''; }
+function TF(dict, ...args){ if (!dict) return ''; const fn = dict[currentLang] || dict.ja; return fn ? fn(...args) : ''; }
+function ui(key){ return L(UI_TEXT[key]); }
+function uif(key, ...args){ return TF(UI_TEXT[key], ...args); }
+
+const UI_TEXT = {
+    btn_game_start: { ja: 'ゲームスタート', en: 'Start Game' },
+    player_name_btn: { ja: n => `👤 プレイヤー名：${n}`, ja_easy: n => `👤 プレイヤーめい：${n}`, en: n => `👤 Player: ${n}` },
+    btn_ranking: { ja: '🏆 ランキング', en: '🏆 Ranking' },
+    btn_settings: { ja: '⚙️ 設定', en: '⚙️ Settings' },
+    btn_index: { ja: '🏠 INDEXへ', en: '🏠 Back to INDEX' },
+    btn_back_title: { ja: '◀ タイトルへ戻る', ja_easy: '◀ タイトルへ もどる', en: '◀ Back to Title' },
+
+    name_register_title: { ja: '👤 名前の登録', en: '👤 Register Name' },
+    name_register_desc: { ja: 'お名前を登録してください（最大12文字）', en: 'Register your name (max 12 characters)' },
+    name_current_label: { ja: '現在の名前：', en: 'Current name: ' },
+    name_input_placeholder: { ja: 'なまえをにゅうりょく', en: 'Enter your name' },
+    btn_add: { ja: '追加', en: 'Add' },
+    name_too_long: { ja: '名前は12文字までです', en: 'Name must be 12 characters or fewer' },
+    name_duplicate: { ja: 'その名前はすでに登録されています', en: 'That name is already registered' },
+    label_name_selected: { ja: '✓ 選択中', en: '✓ Selected' },
+    btn_select_name: { ja: '選択する', en: 'Select' },
+    default_player_name: { ja: 'ななしさん', en: 'Guest' },
+
+    settings_title: { ja: '⚙️ 設定', en: '⚙️ Settings' },
+    settings_lang_label: { ja: '言語', en: 'Language' },
+
+    ranking_title: { ja: '🏆 ランキング', en: '🏆 Ranking' },
+    rank_tab_local: { ja: 'ローカル', en: 'Local' },
+    rank_tab_world: { ja: 'ワールド', en: 'World' },
+    rank_loading: { ja: '読み込み中…', en: 'Loading…' },
+    rank_empty: { ja: 'まだ記録がありません', en: 'No records yet' },
+    rank_turns_label: { ja: t => `${t}ターン`, en: t => `${t} turns` },
+    world_submit_sending: { ja: '送信中…', en: 'Sending…' },
+    world_submit_done: { ja: '送信しました！', en: 'Submitted!' },
+    world_submit_fail: { ja: '送信に失敗しました', en: 'Submission failed' },
+    tag_clear: { ja: 'クリア', en: 'Clear' },
+    tag_gameover: { ja: '道半ば', en: 'Retired' },
+    tag_timeup: { ja: 'タイムアップ', en: 'Time Up' },
+
+    danselect_title: { ja: 'だんをえらぼう', ja_easy: 'だんを えらぼう', en: 'Choose a Times Table' },
+    danselect_desc: { ja: '2の段から9の段までえらべます', en: 'Choose from the 2 to 9 times table' },
+    danselect_achv_label: { ja: '実績', en: 'Achievements' },
+    dan_row_label: { ja: n => `${n}の段`, en: n => `×${n} table` },
+    btn_dan_start: { ja: 'この段ではじめる', en: 'Start This Table' },
+    achv_turn: { ja: (t) => `${t}ターン以内にクリア`, en: (t) => `Clear within ${t} turns` },
+    achv_mag: { ja: (v) => `${v}を作った`, en: (v) => `Made ${v}` },
+    achv_score: { ja: (v) => `スコア${v}以上`, en: (v) => `Score ${v}+` },
+    achv_clear: { ja: (v) => `${v}回クリア`, en: (v) => `Clear ${v} times` },
+    clear_count_label: { ja: (v) => `クリア回数：${v}回`, en: (v) => `Cleared: ${v} times` },
+    master_badge: { ja: '🏆 全段マスター達成！', en: '🏆 All-Table Master!' },
+    perfect_badge: { ja: '👑 パーフェクトマスター達成！', en: '👑 Perfect Master!' },
+
+    hud_dan: { ja: n => `${n}の段`, en: n => `×${n} table` },
+    hud_turn: { ja: 'ターン ', en: 'Turn ' },
+    hud_score: { ja: 'スコア ', en: 'Score ' },
+    hud_best: { ja: 'ハイスコア ', en: 'High Score ' },
+    btn_retire: { ja: 'やめる', en: 'Quit' },
+    btn_howto: { ja: '📖 あそびかた', en: '📖 How to Play' },
+    howto_title: { ja: 'あそびかた', en: 'How to Play' },
+    btn_close: { ja: 'とじる', en: 'Close' },
+    eq_list_title: { ja: 'つくる式', ja_easy: 'つくる しき', en: 'Answers to Make' },
+    play_hint: { ja: '数字をドラッグしてすべらせ、たしざんで九九の答えを作ろう！（クリックして選択＋矢印キーでも動かせます）',
+                 ja_easy: 'すうじを ドラッグして すべらせ、たしざんで くくの こたえを つくろう！（クリックして えらんで、やじるしキーでも うごかせます）',
+                 en: 'Drag a number to slide it, and add numbers together to build times-table answers! (Or click to select and use arrow keys.)' },
+
+    confirm_retire_msg: { ja: '今のゲームをやめて、だん選択にもどりますか？', en: 'Quit this game and return to table selection?' },
+    btn_yes: { ja: 'やめる', en: 'Quit' },
+    btn_no: { ja: 'いいえ', en: 'No' },
+
+    result_clear_title: { ja: 'ステージクリア！', en: 'Stage Clear!' },
+    result_gameover_title: { ja: 'ゲームオーバー', en: 'Game Over' },
+    result_timeup_title: { ja: 'タイムアップ！', en: "Time's Up!" },
+    result_score_label: { ja: 'スコア', en: 'Score' },
+    result_turns_label: { ja: 'ターン数', en: 'Turns' },
+    btn_back_danselect: { ja: '段をえらびなおす', en: 'Choose Another Table' },
+    btn_retry: { ja: 'もう一度', en: 'Retry' },
+};
+
+function setLanguage(lang){
+    if (!LANGS.includes(lang)) return;
+    currentLang = lang;
+    try { localStorage.setItem(LANG_STORAGE_KEY, lang); } catch (e){}
+    applyI18n();
+    renderSettingsScreen();
+    updateNameRegisterBtn();
+    if (!document.getElementById('dan-select-screen').classList.contains('hidden')) renderDanList();
+}
+function applyI18n(){
+    document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = ui(el.getAttribute('data-i18n')); });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { el.setAttribute('placeholder', ui(el.getAttribute('data-i18n-placeholder'))); });
+    document.documentElement.lang = (currentLang === 'en') ? 'en' : 'ja';
+}
+
+const LANG_OPTION_LABELS = { ja: '日本語', ja_easy: 'かんたんなにほんご', en: 'English' };
+function openSettings(){ goTo('settings-screen'); renderSettingsScreen(); }
+function closeSettings(){ goTo('title-screen'); }
+function renderSettingsScreen(){
+    const wrap = document.getElementById('settings-lang-options');
+    wrap.innerHTML = LANGS.map(l => `<button class="settings-lang-btn${l===currentLang?' active':''}" onclick="setLanguage('${l}')">${LANG_OPTION_LABELS[l]}</button>`).join('');
+}
+
+// ============================================================
+// 画面切り替え
+// ============================================================
+function goTo(id){
+    document.querySelectorAll('.screen').forEach(el => el.classList.add('hidden'));
+    document.getElementById(id).classList.remove('hidden');
+    if (id !== 'play-screen') document.getElementById('container').classList.remove('danger');
+}
+function goToTitle(){ goTo('title-screen'); }
+
+// ============================================================
+// プレイヤー名登録
+// ============================================================
+function escapeHtml(str){
+    return String(str == null ? '' : str).replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]));
+}
+const PLAYERS_KEY = 'pitattoKukuPlayers';
+const CUR_PLAYER_KEY = 'pitattoKukuCurPlayer';
+function getPlayerNames(){ try { return JSON.parse(localStorage.getItem(PLAYERS_KEY) || '[]'); } catch (e){ return []; } }
+function savePlayerNames(list){ try { localStorage.setItem(PLAYERS_KEY, JSON.stringify(list)); } catch (e){} }
+function getCurPlayerName(){ try { return localStorage.getItem(CUR_PLAYER_KEY) || ui('default_player_name'); } catch (e){ return ui('default_player_name'); } }
+function setCurPlayerName(n){ try { localStorage.setItem(CUR_PLAYER_KEY, n); } catch (e){} }
+
+function openNameRegister(){ goTo('name-register-screen'); renderPlayerNameList(); }
+function closeNameRegister(){ goTo('title-screen'); updateNameRegisterBtn(); }
+function updateNameRegisterBtn(){
+    const btn = document.getElementById('btn-name-register');
+    if (btn) btn.textContent = uif('player_name_btn', getCurPlayerName());
+}
+function addPlayerName(){
+    const inp = document.getElementById('name-reg-input');
+    const name = inp.value.trim();
+    if (!name) return;
+    if (name.length > 12){ alert(ui('name_too_long')); return; }
+    const list = getPlayerNames();
+    if (list.includes(name)){ alert(ui('name_duplicate')); return; }
+    list.push(name);
+    savePlayerNames(list);
+    setCurPlayerName(name);
+    inp.value = '';
+    renderPlayerNameList();
+}
+function selectPlayerNameByIndex(idx){
+    const list = getPlayerNames();
+    if (list[idx] === undefined) return;
+    setCurPlayerName(list[idx]);
+    renderPlayerNameList();
+}
+function deletePlayerNameByIndex(idx){
+    const list = getPlayerNames();
+    const name = list[idx];
+    if (name === undefined) return;
+    list.splice(idx, 1);
+    savePlayerNames(list);
+    if (getCurPlayerName() === name) setCurPlayerName(list[0] || ui('default_player_name'));
+    renderPlayerNameList();
+}
+function renderPlayerNameList(){
+    const cur = getCurPlayerName();
+    const list = getPlayerNames();
+    document.getElementById('name-reg-current').textContent = cur;
+    document.getElementById('name-reg-list').innerHTML = list.map((n, idx) => {
+        const isCur = n === cur;
+        const actionHtml = isCur
+            ? `<span class="pl-selected-badge">${ui('label_name_selected')}</span>`
+            : `<button class="pl-select-btn" onclick="selectPlayerNameByIndex(${idx})">${ui('btn_select_name')}</button>`;
+        return `<li class="pl-item${isCur ? ' cur' : ''}">
+            <span class="pl-item-name">${escapeHtml(n)}</span>
+            <div class="pl-item-actions">
+                ${actionHtml}
+                <button class="del-btn" onclick="deletePlayerNameByIndex(${idx})">×</button>
+            </div>
+        </li>`;
+    }).join('');
+}
+
+// ============================================================
+// 段（2〜9）・実績データ
+// ============================================================
+const DANS = [2,3,4,5,6,7,8,9];
+// 実績「◯ターン以内にクリア」の目標値。最短目標(ゴールド)= 2n+10(2:14,3:16,...,9:28)を
+// 基準に、base, base+10, base+20の3段階にする(ゆるい順=ブロンズ/シルバー/ゴールドで大きい順に並べる)。
+function turnThresholds(dan){ const base = 2*dan + 10; return [base+20, base+10, base]; }
+// 実績「スコア◯以上」のブロンズ目標値。ユーザーが実際にハイスコア狙いで1回プレイした実測スコア
+// (2,6,7,9の段。5の段は「倍数が見分けやすく大きい数を消さずに育てやすい」段固有の特性で
+// 突出していたため近似の基準からは除外)にべき乗近似(score≈3203×n^3.245、決定係数がほぼ1の
+// 非常に良い当てはまり)を行い、全段(2〜9)をこの同じ式で計算する。
+const SCORE_FIT_A = 3203, SCORE_FIT_B = 3.245;
+function scoreTargets(dan){
+    const base = Math.round(SCORE_FIT_A * Math.pow(dan, SCORE_FIT_B));
+    return [base, Math.round(base*1.5), base*2];
+}
+const MAX_TURNS = 100; // ハイスコアの青天井防止のためのターン上限
+const DANGER_TURN = 90; // これを超えると画面枠が赤く点滅して警告
+const ACHV_KEY = 'pitattoKukuAchievements';
+function getAchvStore(){ try { return JSON.parse(localStorage.getItem(ACHV_KEY) || '{}'); } catch(e){ return {}; } }
+function saveAchvStore(store){ try { localStorage.setItem(ACHV_KEY, JSON.stringify(store)); } catch(e){} }
+const ACHV_DEFAULTS = {
+    turn1:false, turn2:false, turn3:false, mag10:false, mag20:false, mag30:false,
+    score1:false, score2:false, score3:false, clear1:false, clear2:false, clear3:false,
+    cleared:false, clearCount:0
+};
+function getDanAchv(dan){
+    const store = getAchvStore();
+    // 保存済みデータに新しいフィールド(clearCount等)が無い場合もデフォルト値で補う
+    return Object.assign({}, ACHV_DEFAULTS, store[dan] || {});
+}
+function setDanAchv(dan, achv){
+    const store = getAchvStore();
+    store[dan] = achv;
+    saveAchvStore(store);
+}
+// 全段(2〜9)を1回以上クリア済みなら「全段マスター」達成
+function isAllDansMastered(){
+    return DANS.every(dan => getDanAchv(dan).cleared);
+}
+// 全段(2〜9)で9項目の実績を全て達成していれば「パーフェクトマスター」達成
+function isAllDansPerfect(){
+    return DANS.every(dan => {
+        const achv = getDanAchv(dan);
+        return achvDefsForDan(dan).every(d => achv[d.key]);
+    });
+}
+const CLEAR_COUNT_TARGETS = [5, 10, 20];
+function achvDefsForDan(dan){
+    const [t1,t2,t3] = turnThresholds(dan);
+    const [s1,s2,s3] = scoreTargets(dan);
+    const [c1,c2,c3] = CLEAR_COUNT_TARGETS;
+    const iconTurn = '⏱️', iconMag = '🔢', iconScore = '💯', iconClear = '🔁';
+    return [
+        { key:'turn1', label: uif('achv_turn', t1), icon: iconTurn },
+        { key:'turn2', label: uif('achv_turn', t2), icon: iconTurn },
+        { key:'turn3', label: uif('achv_turn', t3), icon: iconTurn },
+        { key:'mag10', label: uif('achv_mag', dan*10), icon: iconMag },
+        { key:'mag20', label: uif('achv_mag', dan*20), icon: iconMag },
+        { key:'mag30', label: uif('achv_mag', dan*30), icon: iconMag },
+        { key:'score1', label: uif('achv_score', s1), icon: iconScore },
+        { key:'score2', label: uif('achv_score', s2), icon: iconScore },
+        { key:'score3', label: uif('achv_score', s3), icon: iconScore },
+        { key:'clear1', label: uif('achv_clear', c1), icon: iconClear },
+        { key:'clear2', label: uif('achv_clear', c2), icon: iconClear },
+        { key:'clear3', label: uif('achv_clear', c3), icon: iconClear },
+    ];
+}
+
+let selectedDan = 2;
+function goToDanSelect(){
+    goTo('dan-select-screen');
+    document.getElementById('ds-master-badge').classList.toggle('hidden', !isAllDansMastered());
+    document.getElementById('ds-perfect-badge').classList.toggle('hidden', !isAllDansPerfect());
+    renderDanList();
+}
+function renderDanList(){
+    const list = document.getElementById('ds-list');
+    list.innerHTML = DANS.map(n => {
+        const achv = getDanAchv(n);
+        const defs = achvDefsForDan(n);
+        const doneCount = defs.filter(d => achv[d.key]).length;
+        const full = doneCount >= defs.length;
+        return `<div class="ds-dan-row${n===selectedDan?' active':''}" onclick="selectDan(${n})">
+            <div class="ds-dan-num">${n}</div>
+            <div class="ds-dan-label">${uif('dan_row_label', n)}</div>
+            <div class="ds-dan-medals${full?' full':''}">⭐${doneCount}/${defs.length}</div>
+        </div>`;
+    }).join('');
+    renderDanPreview();
+}
+function selectDan(n){
+    selectedDan = n;
+    renderDanList();
+}
+function renderDanPreview(){
+    document.getElementById('ds-preview-title').textContent = uif('dan_row_label', selectedDan);
+    const achv = getDanAchv(selectedDan);
+    document.getElementById('ds-clear-count').textContent = uif('clear_count_label', achv.clearCount || 0);
+    const defs = achvDefsForDan(selectedDan);
+    document.getElementById('ds-achv-list').innerHTML = defs.map(d => {
+        const done = !!achv[d.key];
+        return `<div class="ds-achv-row${done?' done':''}">
+            <div class="ds-achv-icon">${d.icon}</div>
+            <div class="ds-achv-text">${d.label}</div>
+        </div>`;
+    }).join('');
+}
+
+// ============================================================
+// ゲーム本体
+// ============================================================
+const GRID = 5;
+const CELL = 118;
+const GAP = 10;
+let tiles = [];          // {id,row,col,value}
+let nextTileId = 1;
+let currentDan = 2;
+let spawnPool = [];
+let turnCount = 0;
+let score = 0;
+let achievedSet = new Set();  // 1..9 のうち作った倍数のインデックス
+let animating = false;
+let gameEnded = false;
+let selectedTileId = null;
+
+// 出現する数字は1〜10を均等に、加えてnの段では10,20,...,10(n-1)の10の倍数も出す。
+// また1・2・3は基本重み10に対してこの分だけ上乗せし、小さい数ほど出やすくする（1が最も出やすい）。
+const SMALL_NUM_BOOST = { 1: 12, 2: 8, 3: 4 };
+function baseSpawnWeight(v){ return 10 + (SMALL_NUM_BOOST[v] || 0); }
+
+// 10の倍数タイルvが「まだ足りていない式のうち、何個の完成に使える可能性があるか」を段の
+// ルールだけから機械的に数える。nの段の式はn,2n,...,9nの9個なので、vより大きい式の個数
+// = 9 - floor(v/n) が「使い道の広さ」になる（例:9の段で20はn×3=27以降の7個に使えるが、
+// 80はn×9=81の1個にしか使えない→使い道が狭いほど出現も少なくする）。
+function bonusUsefulness(v, dan){ return Math.max(0, 9 - Math.floor(v / dan)); }
+function buildSpawnPool(dan){
+    const pool = [];
+    for (let v=1; v<=10; v++) pool.push({ v, w: baseSpawnWeight(v) });
+    const bonusCount = dan - 2; // j=2..dan-1 の階層数
+    if (bonusCount > 0){
+        const values = [];
+        for (let j=2; j<=dan-1; j++) values.push(10*j);
+        const usefulness = values.map(v => bonusUsefulness(v, dan));
+        const maxU = Math.max(...usefulness);
+        // 一番使い道が広い10の倍数を、通常の数字1個ぶん(重み10)と同じ出現率になるよう
+        // スケールを合わせる。1〜9の数字を必ず主役に保ち、10の倍数だけが出すぎないようにするため。
+        const scale = 10 / maxU;
+        values.forEach((v, i) => pool.push({ v, w: scale * usefulness[i] }));
+    }
+    return pool;
+}
+function weightedSpawnValue(pool){
+    const total = pool.reduce((s,p) => s+p.w, 0);
+    let r = Math.random() * total;
+    for (const p of pool){ if (r < p.w) return p.v; r -= p.w; }
+    return pool[pool.length-1].v;
+}
+function emptyCells(){
+    const occupied = new Set(tiles.map(t => t.row*GRID+t.col));
+    const cells = [];
+    for (let r=0;r<GRID;r++) for (let c=0;c<GRID;c++){ if (!occupied.has(r*GRID+c)) cells.push({row:r,col:c}); }
+    return cells;
+}
+function tileAtExcept(row,col,exceptId){
+    return tiles.find(t => t.row===row && t.col===col && t.id!==exceptId);
+}
+
+function startGame(){
+    currentDan = selectedDan;
+    spawnPool = buildSpawnPool(currentDan);
+    tiles = [];
+    nextTileId = 1;
+    turnCount = 0;
+    score = 0;
+    achievedSet = new Set();
+    animating = false;
+    gameEnded = false;
+    selectedTileId = null;
+
+    const cells = emptyCells();
+    for (let i=cells.length-1; i>0; i--){ const j=Math.floor(Math.random()*(i+1)); [cells[i],cells[j]]=[cells[j],cells[i]]; }
+    const initCount = 10;
+    for (let i=0;i<initCount;i++){
+        const cell = cells[i];
+        tiles.push({ id: nextTileId++, row: cell.row, col: cell.col, value: weightedSpawnValue(spawnPool) });
+    }
+
+    goTo('play-screen');
+    setupBoardCells();
+    updateHud();
+    renderChips();
+    renderBoard();
+}
+
+function setupBoardCells(){
+    const board = document.getElementById('board');
+    board.querySelectorAll('.cell-bg').forEach(el => el.remove());
+    // 前回のゲームのタイルDOMが残っていると、IDがリセットされる新ゲームのタイルと
+    // id文字列が衝突して再利用されてしまい、fade-out等の古いクラス/スタイルを引き継いでしまうため
+    // 新しいゲームを始めるたびに盤面上のタイルを必ずすべて作り直す
+    board.querySelectorAll('.tile').forEach(el => el.remove());
+    for (let r=0;r<GRID;r++){
+        for (let c=0;c<GRID;c++){
+            const bg = document.createElement('div');
+            bg.className = 'cell-bg';
+            bg.style.left = (c*(CELL+GAP)) + 'px';
+            bg.style.top  = (r*(CELL+GAP)) + 'px';
+            board.appendChild(bg);
+        }
+    }
+}
+
+const TILE_COLORS = {
+    1: 'linear-gradient(160deg,#ff9a8b,#ff6b6b)',
+    2: 'linear-gradient(160deg,#ffb56b,#ff8c42)',
+    3: 'linear-gradient(160deg,#ffe066,#f4b400)',
+    4: 'linear-gradient(160deg,#c0f26b,#8bc926)',
+    5: 'linear-gradient(160deg,#6bf2c8,#22b8a0)',
+    6: 'linear-gradient(160deg,#6bdff2,#1fa8c9)',
+    7: 'linear-gradient(160deg,#7fb0ff,#4d7ff7)',
+    8: 'linear-gradient(160deg,#c2a4ff,#9160f7)',
+    9: 'linear-gradient(160deg,#ff9fd0,#ee5b9d)',
+    10: 'linear-gradient(160deg,#b8c4ff,#7b8cf7)',
+};
+const TILE_BIG = 'linear-gradient(160deg,#fff2b8,#ffc93d)';
+
+function tileColor(value){
+    if (value>=1 && value<=10 && TILE_COLORS[value]) return TILE_COLORS[value];
+    return TILE_BIG;
+}
+function tileTextClass(value){
+    const len = String(value).length;
+    if (len>=3) return 'len3';
+    if (len===2) return 'len2';
+    return '';
+}
+
+function renderBoard(){
+    const board = document.getElementById('board');
+    const existing = new Map();
+    board.querySelectorAll('.tile').forEach(el => existing.set(el.dataset.id, el));
+    const seen = new Set();
+    tiles.forEach(t => {
+        const idStr = String(t.id);
+        seen.add(idStr);
+        let el = existing.get(idStr);
+        const isNew = !el;
+        if (!el){
+            el = document.createElement('div');
+            el.className = 'tile pop-in';
+            el.dataset.id = idStr;
+            el.addEventListener('pointerdown', onTilePointerDown);
+            board.appendChild(el);
+        }
+        el.style.left = (t.col*(CELL+GAP)) + 'px';
+        el.style.top  = (t.row*(CELL+GAP)) + 'px';
+        el.textContent = t.value;
+        el.style.background = tileColor(t.value);
+        el.classList.remove('len2','len3');
+        const tc = tileTextClass(t.value);
+        if (tc) el.classList.add(tc);
+        el.classList.toggle('selected', t.id===selectedTileId);
+        if (isNew) setTimeout(() => el.classList.remove('pop-in'), 240);
+    });
+    existing.forEach((el, idStr) => {
+        if (!seen.has(idStr)){
+            el.classList.add('fade-out');
+            el.classList.remove('selected');
+            setTimeout(() => el.remove(), 210);
+        }
+    });
+}
+
+function renderChips(){
+    const row = document.getElementById('chip-row');
+    let html = '';
+    for (let k=1;k<=9;k++){
+        const done = achievedSet.has(k);
+        html += `<div class="eq-chip${done?' done':''}">${currentDan}×${k}</div>`;
+    }
+    row.innerHTML = html;
+}
+
+function updateHud(){
+    document.getElementById('hud-dan').textContent = uif('hud_dan', currentDan);
+    document.getElementById('hud-turn-val').textContent = turnCount;
+    document.getElementById('hud-score-val').textContent = score;
+    document.getElementById('hud-best-val').textContent = Math.max(getBestScore(currentDan), score);
+    document.getElementById('container').classList.toggle('danger', turnCount > DANGER_TURN && !gameEnded);
+}
+
+function pulseTile(id){
+    const el = document.querySelector(`.tile[data-id="${id}"]`);
+    if (!el) return;
+    el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse');
+}
+function shakeTile(id){
+    const el = document.querySelector(`.tile[data-id="${id}"]`);
+    if (!el) return;
+    el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake');
+}
+function spawnFloatingScore(text, row, col){
+    const board = document.getElementById('board');
+    const span = document.createElement('div');
+    span.className = 'score-float';
+    span.textContent = '+' + text;
+    span.style.left = (col*(CELL+GAP) + 14) + 'px';
+    span.style.top  = (row*(CELL+GAP) + 30) + 'px';
+    board.appendChild(span);
+    setTimeout(() => span.remove(), 820);
+}
+
+const DIRS = { up:[-1,0], down:[1,0], left:[0,-1], right:[0,1] };
+
+function selectTile(id){
+    selectedTileId = (selectedTileId===id) ? null : id;
+    renderBoard();
+}
+
+function performMove(id, dir){
+    if (animating || gameEnded) return;
+    const t = tiles.find(x => x.id === id);
+    if (!t) return;
+    const [dr,dc] = DIRS[dir];
+    let cur = { row:t.row, col:t.col };
+    let target = null;
+    while (true){
+        const nr = cur.row + dr, nc = cur.col + dc;
+        if (nr<0 || nr>=GRID || nc<0 || nc>=GRID) break;
+        const other = tileAtExcept(nr, nc, t.id);
+        if (other){ target = other; break; }
+        cur = { row:nr, col:nc };
+    }
+    if (!target && cur.row===t.row && cur.col===t.col){
+        shakeTile(id);
+        return;
+    }
+
+    animating = true;
+    selectedTileId = null;
+    const fromRow = t.row, fromCol = t.col;
+    if (target){ t.row = target.row; t.col = target.col; }
+    else { t.row = cur.row; t.col = cur.col; }
+    renderBoard();
+
+    setTimeout(() => {
+        if (gameEnded){ animating = false; return; }
+        if (target){
+            const sum = t.value + target.value;
+            const isMultiple = (sum % currentDan === 0);
+            if (isMultiple){
+                tiles = tiles.filter(x => x!==t && x!==target);
+                score += sum*sum*10;
+                const idx = sum / currentDan;
+                if (idx>=1 && idx<=9) achievedSet.add(idx);
+                checkMagnitudeAchievement(sum);
+                spawnFloatingScore(sum*sum*10, target.row, target.col);
+                renderBoard();
+                renderChips();
+            } else {
+                target.value = sum;
+                tiles = tiles.filter(x => x!==t);
+                renderBoard();
+                pulseTile(target.id);
+            }
+        }
+        updateHud();
+        afterMoveResolved();
+    }, 170);
+}
+
+function checkMagnitudeAchievement(sum){
+    const achv = getDanAchv(currentDan);
+    let changed = false;
+    if (sum === currentDan*10 && !achv.mag10){ achv.mag10 = true; changed = true; }
+    if (sum === currentDan*20 && !achv.mag20){ achv.mag20 = true; changed = true; }
+    if (sum === currentDan*30 && !achv.mag30){ achv.mag30 = true; changed = true; }
+    if (changed) setDanAchv(currentDan, achv);
+}
+function checkTurnAchievements(){
+    const achv = getDanAchv(currentDan);
+    const [t1,t2,t3] = turnThresholds(currentDan);
+    let changed = false;
+    if (turnCount <= t1 && !achv.turn1){ achv.turn1 = true; changed = true; }
+    if (turnCount <= t2 && !achv.turn2){ achv.turn2 = true; changed = true; }
+    if (turnCount <= t3 && !achv.turn3){ achv.turn3 = true; changed = true; }
+    if (!achv.cleared){ achv.cleared = true; changed = true; } // このダンをクリアした記録（全段マスター判定に使用）
+    achv.clearCount = (achv.clearCount || 0) + 1;
+    changed = true;
+    const [c1,c2,c3] = CLEAR_COUNT_TARGETS;
+    if (achv.clearCount >= c1 && !achv.clear1) achv.clear1 = true;
+    if (achv.clearCount >= c2 && !achv.clear2) achv.clear2 = true;
+    if (achv.clearCount >= c3 && !achv.clear3) achv.clear3 = true;
+    if (changed) setDanAchv(currentDan, achv);
+}
+function checkScoreAchievement(dan, finalScore){
+    const achv = getDanAchv(dan);
+    const [s1,s2,s3] = scoreTargets(dan);
+    let changed = false;
+    if (finalScore >= s1 && !achv.score1){ achv.score1 = true; changed = true; }
+    if (finalScore >= s2 && !achv.score2){ achv.score2 = true; changed = true; }
+    if (finalScore >= s3 && !achv.score3){ achv.score3 = true; changed = true; }
+    if (changed) setDanAchv(dan, achv);
+}
+
+function afterMoveResolved(){
+    turnCount++;
+    updateHud();
+
+    if (achievedSet.size >= 9){
+        checkTurnAchievements();
+        animating = false;
+        onStageClear();
+        return;
+    }
+
+    // ハイスコアの青天井（詰まないまま合体を続けてスコアを稼ぎ続ける）を防ぐためのターン上限
+    if (turnCount >= MAX_TURNS){
+        animating = false;
+        onTimeUp();
+        return;
+    }
+
+    // 毎ターン1つ補充する仕様。置く空きが1つもなければその時点でゲームオーバー
+    const empties = emptyCells();
+    if (empties.length < 1){
+        animating = false;
+        onGameOver();
+        return;
+    }
+    const cell = empties[Math.floor(Math.random()*empties.length)];
+    tiles.push({ id: nextTileId++, row: cell.row, col: cell.col, value: weightedSpawnValue(spawnPool) });
+    renderBoard();
+    animating = false;
+}
+
+// ---- 入力（ドラッグ／クリック＋矢印キー） ----
+let dragState = null;
+function onTilePointerDown(e){
+    if (animating || gameEnded) return;
+    const el = e.currentTarget;
+    const id = Number(el.dataset.id);
+    try { el.setPointerCapture(e.pointerId); } catch(err){}
+    dragState = { id, startX: e.clientX, startY: e.clientY };
+}
+window.addEventListener('pointerup', e => {
+    if (!dragState) return;
+    const { id, startX, startY } = dragState;
+    dragState = null;
+    const dx = e.clientX - startX, dy = e.clientY - startY;
+    const absX = Math.abs(dx), absY = Math.abs(dy);
+    const TH = 16;
+    if (Math.max(absX, absY) < TH){
+        selectTile(id);
+        return;
+    }
+    let dir;
+    if (absX > absY) dir = dx>0 ? 'right' : 'left';
+    else dir = dy>0 ? 'down' : 'up';
+    performMove(id, dir);
+});
+window.addEventListener('keydown', e => {
+    if (document.getElementById('play-screen').classList.contains('hidden')) return;
+    if (selectedTileId==null) return;
+    const map = { ArrowUp:'up', ArrowDown:'down', ArrowLeft:'left', ArrowRight:'right' };
+    if (map[e.key]){ e.preventDefault(); performMove(selectedTileId, map[e.key]); }
+});
+
+// ---- あそびかた ----
+function openHowTo(){ document.getElementById('howto-modal').classList.remove('hidden'); }
+function closeHowTo(){ document.getElementById('howto-modal').classList.add('hidden'); }
+
+// ---- リタイア ----
+function requestRetire(){ document.getElementById('retire-modal').classList.remove('hidden'); }
+function closeRetireModal(){ document.getElementById('retire-modal').classList.add('hidden'); }
+function confirmRetire(){
+    closeRetireModal();
+    gameEnded = true;
+    goToDanSelect();
+}
+
+// ---- クリア／ゲームオーバー／タイムアップ ----
+function onStageClear(){
+    gameEnded = true;
+    recordRunResult('clear');
+    showResult('clear');
+}
+function onGameOver(){
+    gameEnded = true;
+    recordRunResult('gameover');
+    showResult('gameover');
+}
+function onTimeUp(){
+    gameEnded = true;
+    recordRunResult('timeup');
+    showResult('timeup');
+}
+const RESULT_TITLE_KEY = { clear:'result_clear_title', gameover:'result_gameover_title', timeup:'result_timeup_title' };
+function showResult(mode){
+    document.getElementById('container').classList.remove('danger');
+    document.getElementById('result-title').textContent = ui(RESULT_TITLE_KEY[mode]);
+    const titleEl = document.getElementById('result-title');
+    titleEl.classList.toggle('clear', mode==='clear');
+    titleEl.classList.toggle('over', mode==='gameover');
+    titleEl.classList.toggle('timeup', mode==='timeup');
+    document.getElementById('result-score-val').textContent = score;
+    document.getElementById('result-turns-val').textContent = turnCount;
+    document.getElementById('result-world-submit-msg').textContent = '';
+    document.getElementById('result-modal').classList.remove('hidden');
+    if (score > 0) submitScoreToWorld();
+}
+function closeResultToDanSelect(){
+    document.getElementById('result-modal').classList.add('hidden');
+    goToDanSelect();
+}
+function closeResultAndRetry(){
+    document.getElementById('result-modal').classList.add('hidden');
+    startGame();
+}
+
+// ---- ランキング記録 ----
+const RANK_STORAGE_PREFIX = 'pitattoKukuRanking_';
+function getLocalRanking(dan){
+    try { return JSON.parse(localStorage.getItem(RANK_STORAGE_PREFIX + dan) || '[]'); } catch (e){ return []; }
+}
+function saveLocalScore(dan, entry){
+    const list = getLocalRanking(dan);
+    list.push(entry);
+    list.sort((a,b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        if (a.turns !== b.turns) return a.turns - b.turns;
+        return (b.dateIso || '').localeCompare(a.dateIso || '');
+    });
+    try { localStorage.setItem(RANK_STORAGE_PREFIX + dan, JSON.stringify(list.slice(0,10))); } catch(e){}
+}
+const RESULT_TAG_KEY = { clear:'tag_clear', gameover:'tag_gameover', timeup:'tag_timeup' };
+let lastFinalScore = 0;
+let lastFinalTurns = 0;
+let lastFinalTag = '';
+function recordRunResult(mode){
+    const now = new Date();
+    lastFinalScore = score;
+    lastFinalTurns = turnCount;
+    lastFinalTag = ui(RESULT_TAG_KEY[mode]);
+    saveBestScoreIfHigher(currentDan, score);
+    if (score > 0) checkScoreAchievement(currentDan, score);
+    if (score <= 0) return;
+    saveLocalScore(currentDan, {
+        name: getCurPlayerName(), score, turns: turnCount, tag: lastFinalTag,
+        dateIso: now.toISOString(), date: now.toLocaleDateString(currentLang==='en' ? 'en-US' : 'ja-JP')
+    });
+}
+async function submitScoreToWorld(){
+    const msg = document.getElementById('result-world-submit-msg');
+    if (lastFinalScore <= 0) return;
+    msg.style.color = 'var(--ink-dim)';
+    msg.textContent = ui('world_submit_sending');
+    try {
+        await window.saveOnlineScore(getCurPlayerName(), lastFinalScore, lastFinalTurns, `dan${currentDan}`, lastFinalTag);
+        msg.style.color = 'var(--teal-dk)';
+        msg.textContent = ui('world_submit_done');
+    } catch (e){
+        msg.style.color = 'var(--danger)';
+        msg.textContent = ui('world_submit_fail');
+        console.error('submitScoreToWorld error:', e);
+    }
+}
+
+// ---- 段ごとのハイスコア（今回のチャレンジ＝選択中の段のこれまでの最高スコア） ----
+const BEST_SCORE_PREFIX = 'pitattoKukuBest_';
+function getBestScore(dan){
+    try { return Number(localStorage.getItem(BEST_SCORE_PREFIX + dan) || 0); } catch (e){ return 0; }
+}
+function saveBestScoreIfHigher(dan, val){
+    if (val > getBestScore(dan)){
+        try { localStorage.setItem(BEST_SCORE_PREFIX + dan, String(val)); } catch (e){}
+    }
+}
+
+// ============================================================
+// ランキング画面
+// ============================================================
+let rankTab = 'local';
+let rankDan = 2;
+function openRanking(){
+    goTo('ranking-screen');
+    renderRankDanToggle();
+    switchRankTab('local');
+}
+function closeRanking(){ goTo('title-screen'); }
+function renderRankDanToggle(){
+    const wrap = document.getElementById('rank-dan-toggle');
+    wrap.innerHTML = DANS.map(n => `<button class="rank-toggle-btn${n===rankDan?' active':''}" onclick="switchRankDan(${n})">${n}</button>`).join('');
+}
+function switchRankDan(v){
+    rankDan = Number(v);
+    renderRankDanToggle();
+    loadAndRenderRanking();
+}
+function switchRankTab(tab){
+    rankTab = tab;
+    document.getElementById('rank-tab-local-btn').classList.toggle('active', tab==='local');
+    document.getElementById('rank-tab-world-btn').classList.toggle('active', tab==='world');
+    loadAndRenderRanking();
+}
+async function loadAndRenderRanking(){
+    const loading = document.getElementById('rank-loading');
+    const list = document.getElementById('rank-list');
+    if (rankTab === 'local'){
+        renderRankList(getLocalRanking(rankDan).map(e => ({ name:e.name, tag:e.tag, score:e.score, turns:e.turns, date:e.date })));
+        return;
+    }
+    loading.style.display = 'block';
+    list.innerHTML = '';
+    const rows = await (window.loadWorldRanking ? window.loadWorldRanking(`dan${rankDan}`) : Promise.resolve(null));
+    loading.style.display = 'none';
+    if (rows === null){
+        list.innerHTML = `<li class="rank-empty">${ui('rank_empty')}</li>`;
+        return;
+    }
+    renderRankList(rows);
+}
+function renderRankList(rows){
+    const list = document.getElementById('rank-list');
+    if (!rows || rows.length===0){
+        list.innerHTML = `<li class="rank-empty">${ui('rank_empty')}</li>`;
+        return;
+    }
+    list.innerHTML = rows.map((r, i) => `
+        <li class="rank-row">
+            <span class="rank-num${i<3?' top3':''}">${i+1}</span>
+            <span class="rank-pname">${escapeHtml(r.name)}</span>
+            <span class="rank-tag">${escapeHtml(r.tag || '')}</span>
+            <span class="rank-score">${r.score}</span>
+            <span class="rank-turns">${uif('rank_turns_label', r.turns ?? 0)}</span>
+            <span class="rank-date">${escapeHtml(r.date || '')}</span>
+        </li>
+    `).join('');
+}
+
+// ============================================================
+// 画面サイズが変わっても縦横比(1280×720)を保ったまま拡大縮小する
+// ============================================================
+function scaleContainer(){
+    const el = document.getElementById('container');
+    const w = window.innerWidth, h = window.innerHeight;
+    if (w <= 0 || h <= 0) return;
+    const s = Math.min(w / 1280, h / 720);
+    el.style.transform = `scale(${s})`;
+}
+window.addEventListener('resize', scaleContainer);
+window.addEventListener('load', scaleContainer);
+scaleContainer();
+requestAnimationFrame(scaleContainer);
+setTimeout(scaleContainer, 100);
+
+// ============================================================
+// 初期化
+// ============================================================
+applyI18n();
+updateNameRegisterBtn();
+</script>
+</body>
+</html>
