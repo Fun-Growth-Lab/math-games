@@ -308,6 +308,11 @@
             text-shadow: 0 0 12px rgba(93,173,226,0.8);
             opacity: 0; animation: comboGainIn 0.25s ease-out 0.3s forwards;
         }
+        .combo-popup-crit {
+            font-size: 1.4rem; font-weight: 800; color: #ff6b4a; margin-top: 6px;
+            text-shadow: 0 0 12px rgba(255,107,74,0.8);
+            opacity: 0; animation: comboGainIn 0.25s ease-out 0.3s forwards;
+        }
         @keyframes comboPop {
             0%   { transform: translate(-50%, -50%) scale(0.4); opacity: 0; }
             60%  { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
@@ -742,6 +747,10 @@
         .potion-row-name { font-weight: 800; font-size: 1.05rem; }
         .potion-row-desc { font-size: 0.8rem; color: var(--text-dim); }
         .potion-row-count { font-weight: 800; font-size: 1.1rem; color: var(--text-hi); flex-shrink: 0; }
+        /* 回復ポーション（左列）と強化ポーション（右列）を並べて縦スクロールなしで見せる */
+        .potion-columns { display: flex; gap: 22px; margin-bottom: 18px; }
+        .potion-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+        .potion-col:first-child { padding-right: 22px; border-right: 2px solid var(--bdr-dim); }
 
         /* ==================== SKILLS ==================== */
         .skill-chip {
@@ -1127,9 +1136,10 @@
     </div>
 
     <div id="potion-overlay" class="overlay hidden" style="z-index:210;">
-        <div class="ov-box" style="max-width:520px;">
+        <div class="ov-box" style="max-width:940px;">
             <div class="ov-title" data-i18n="potion_menu_title">🧪 ポーションを使う</div>
-            <div id="potion-list" style="display:flex; flex-direction:column; gap:10px; margin-bottom:18px; max-height:420px; overflow-y:auto;"></div>
+            <div id="potion-hp-line"></div>
+            <div id="potion-list" class="potion-columns"></div>
             <button class="btn btn-gray btn-sm" data-i18n="btn_close" onclick="closePotionMenu()">とじる</button>
         </div>
     </div>
@@ -1443,6 +1453,7 @@ const UI_TEXT = {
     current_hp_label: { ja: '現在HP：', ja_easy: 'いまの HP：', en: 'Current HP: ' },
     btn_use: { ja: '使う', ja_easy: 'つかう', en: 'Use' },
     critical_guard_popup: { ja: '🛡クリティカルガード発動！', ja_easy: '🛡クリティカルガード はつどう！', en: '🛡Critical Guard!' },
+    critical_hit_popup: { ja: '⚡クリティカルヒット発動！', ja_easy: '⚡クリティカルヒット はつどう！', en: '⚡Critical Hit!' },
     boss_revive_title: { ja: '👑 ボスが復活した！', ja_easy: '👑 ボスが ふっかつした！', en: '👑 The Boss Has Revived!' },
     boss_appear_popup: { ja: '⚠️ フロアのボスが現れた！', ja_easy: '⚠️ フロアの ボスが あらわれた！', en: '⚠️ The floor boss has appeared!' },
 
@@ -2345,6 +2356,9 @@ function showBattleResultStatic(){
     setBattleCenterFrame([]);
     document.getElementById('br-ally-dmg').classList.add('hidden');
     document.getElementById('br-enemy-dmg').classList.add('hidden');
+    // 前の階・前のラウンドの被弾演出（横揺れ）が残ったまま画面を開くと再生されてしまうため消しておく
+    document.getElementById('br-ally-illust').classList.remove('br-shake');
+    document.getElementById('br-enemy-illust').classList.remove('br-shake');
     updateHpBar('ally', player.hp, player.maxHp);
     updateHpBar('enemy', enemyHp, enemyMaxHp);
     document.getElementById('battle-result-overlay').classList.remove('hidden');
@@ -2529,7 +2543,7 @@ function closePotionMenu(){
     document.getElementById('potion-overlay').classList.add('hidden');
 }
 function renderPotionList(){
-    const hpLine = `<div class="potion-hp-line">${ui('current_hp_label')}<b>${player.hp} / ${player.maxHp}</b></div>`;
+    document.getElementById('potion-hp-line').innerHTML = `<div class="potion-hp-line">${ui('current_hp_label')}<b>${player.hp} / ${player.maxHp}</b></div>`;
     const rows = POTION_TIERS.map(tier => {
         const count = player.potions[tier.key] || 0;
         const healPreview = Math.round(player.maxHp * tier.ratio);
@@ -2557,7 +2571,7 @@ function renderPotionList(){
             <button class="btn btn-sm ${canUse ? 'btn-green' : 'btn-gray'}" ${canUse ? '' : 'disabled'} onclick="usePotion('${tier.key}')">${active ? ui('btn_active') : ui('btn_use')}</button>
         </div>`;
     }).join('');
-    document.getElementById('potion-list').innerHTML = hpLine + rows + buffRows;
+    document.getElementById('potion-list').innerHTML = `<div class="potion-col">${rows}</div><div class="potion-col">${buffRows}</div>`;
 }
 function usePotion(tierKey){
     const count = player.potions[tierKey] || 0;
@@ -3328,11 +3342,12 @@ function hideFadingPopup(elId){
 }
 
 // コンボが0（＝表示なし）でも、その一撃で加算された数値は必ず見せる
-function showComboPopup(n, category, gain, guardProc){
+function showComboPopup(n, category, gain, guardProc, critProc){
     const comboHtml = n >= 1 ? `<div class="combo-popup-num">${n}COMBO！</div>` : '';
     const gainHtml = `<div class="combo-popup-gain" style="color:${CATEGORY_COLOR[category]};">${CATEGORY_ICON[category]}+${gain}</div>`;
     const guardHtml = guardProc ? `<div class="combo-popup-guard">${ui('critical_guard_popup')}</div>` : '';
-    showFadingPopup('bt-combo-popup', comboHtml + gainHtml + guardHtml, 700, 400);
+    const critHtml = critProc ? `<div class="combo-popup-crit">${ui('critical_hit_popup')}</div>` : '';
+    showFadingPopup('bt-combo-popup', comboHtml + gainHtml + guardHtml + critHtml, 700, 400);
 }
 function hideComboPopup(){
     hideFadingPopup('bt-combo-popup');
@@ -3419,6 +3434,9 @@ function showBattleStartConfirm(){
     setBattleCenterFrame([]);
     document.getElementById('br-ally-dmg').classList.add('hidden');
     document.getElementById('br-enemy-dmg').classList.add('hidden');
+    // 前の階・前のラウンドの被弾演出（横揺れ）が残ったまま画面を開くと再生されてしまうため消しておく
+    document.getElementById('br-ally-illust').classList.remove('br-shake');
+    document.getElementById('br-enemy-illust').classList.remove('br-shake');
     updateHpBar('ally', player.hp, player.maxHp);
     updateHpBar('enemy', enemyHp, enemyMaxHp);
     document.getElementById('battle-result-overlay').classList.remove('hidden');
@@ -3461,6 +3479,7 @@ function battleTryMoveTo(r,c){
         let contribution = gearContribution(gearValue, bCombo, comboCoef);
         const critStacks = countSkill(gear, 'crit_chance');
         let guardProc = false;
+        let critProc = false;
         // クリティカルは武器・魔道具なら通常通りその一撃を1.5倍にするクリティカルヒット、
         // 防具なら「クリティカルガード」となり、この階での相手の攻撃の最終ダメージを半減する
         if (critStacks > 0 && Math.random() < 0.25 * critStacks){
@@ -3469,10 +3488,11 @@ function battleTryMoveTo(r,c){
                 guardProc = true;
             } else {
                 contribution = Math.round(contribution * 1.5);
+                critProc = true;
             }
         }
         bTotal[category] += contribution;
-        showComboPopup(bCombo, category, contribution, guardProc);
+        showComboPopup(bCombo, category, contribution, guardProc, critProc);
     } else {
         bCombo = 0;
         bLastMarkCategory = null;
@@ -3661,6 +3681,9 @@ function showBattleResult(d){
     setBattleCenterFrame([]);
     document.getElementById('br-ally-dmg').classList.add('hidden');
     document.getElementById('br-enemy-dmg').classList.add('hidden');
+    // 前の階・前のラウンドの被弾演出（横揺れ）が残ったまま画面を開くと再生されてしまうため消しておく
+    document.getElementById('br-ally-illust').classList.remove('br-shake');
+    document.getElementById('br-enemy-illust').classList.remove('br-shake');
     document.getElementById('battle-result-overlay').classList.remove('hidden');
     updateHpBar('ally', d.playerHpStart, player.maxHp);
     updateHpBar('enemy', d.enemyHpStart, enemyMaxHp);
