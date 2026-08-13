@@ -661,6 +661,9 @@
             position: absolute; top: 14px; right: 16px; z-index: 2;
             display: flex; align-items: center; gap: 4px;
         }
+        .inv-bulk-corner {
+            position: absolute; top: 14px; left: 16px; z-index: 2;
+        }
         .inv-sort-corner .inv-sort-label { font-size: 0.75rem; color: var(--text-dim); font-weight: 700; }
         .inv-sort-select {
             font-family: inherit; font-size: 0.8rem; font-weight: 700;
@@ -1196,6 +1199,9 @@
     <div id="inventory-overlay" class="overlay hidden">
         <div class="ov-box" style="max-width:1180px; max-height:660px; overflow-y:auto; text-align:left; position:relative;">
             <div id="inv-sort-tabs" class="inv-sort-corner"></div>
+            <div class="inv-bulk-corner">
+                <button class="btn btn-gray btn-sm" id="inv-bulk-disenchant-btn" onclick="promptBulkDisenchant()">🔧 一括分解</button>
+            </div>
             <div class="ov-title" style="text-align:center;" data-i18n="inventory_title">🎒 道具の整理</div>
             <div id="inv-tabs" style="display:flex; gap:8px; justify-content:center; margin-bottom:10px;"></div>
             <p class="panel-placeholder" style="text-align:center;" data-i18n="inv_placeholder">同じ道具（材質・種類が同じ）同士をタップすると合成できます</p>
@@ -1517,6 +1523,12 @@ const UI_TEXT = {
         ja: (src, tgt) => `${src}を分解して、装備中の${tgt}を強化しますか？<br>・練度：20%<br>・＋値：30%の確率<br>・スキル：40%の確率`,
         ja_easy: (src, tgt) => `${src}を ぶんかいして、そうびちゅうの ${tgt}を きょうかしますか？<br>・れんど：20%<br>・＋の あたい：30%の かくりつ<br>・スキル：40%の かくりつ`,
         en: (src, tgt) => `Break down ${src} to reinforce your equipped ${tgt}?<br>・Mastery: 20%<br>・+ Level: 30% chance<br>・Skills: 40% chance`
+    },
+    btn_bulk_disenchant: { ja: n => `🔧 一括分解（${n}）`, ja_easy: n => `🔧 まとめて ぶんかい（${n}）`, en: n => `🔧 Break Down All (${n})` },
+    bulk_disenchant_confirm_msg: {
+        ja: (n, tgt) => `在庫の${n}個をまとめて分解して、装備中の${tgt}を強化しますか？<br>・練度：20%<br>・＋値：30%の確率<br>・スキル：40%の確率<br>（1つずつ分解するのと同じ結果になります）`,
+        ja_easy: (n, tgt) => `ざいこの ${n}こを まとめて ぶんかいして、そうびちゅうの ${tgt}を きょうかしますか？<br>・れんど：20%<br>・＋の あたい：30%の かくりつ<br>・スキル：40%の かくりつ<br>（1つずつ ぶんかいするのと おなじ けっかに なります）`,
+        en: (n, tgt) => `Break down all ${n} items in your stock to reinforce your equipped ${tgt}?<br>・Mastery: 20%<br>・+ Level: 30% chance<br>・Skills: 40% chance<br>(Same result as breaking them down one at a time)`
     },
     event_spring_title: { ja: '⛲ 神秘の泉', ja_easy: '⛲ しんぴの いずみ', en: '⛲ Mystic Spring' },
     event_spring_desc: { ja: 'HPが全回復した！', ja_easy: 'HPが ぜんかいふくした！', en: 'Your HP has been fully restored!' },
@@ -4550,6 +4562,15 @@ function toolRowHtml(it, idx, isEquipped, isSelected, interactive){
 function renderInventory(){
     const list = invListForTab();
     document.getElementById('inv-grid').innerHTML = list.map((it, idx) => toolRowHtml(it, idx, idx === 0, idx === invSelectedIndex)).join('');
+    updateBulkDisenchantBtn(list.length - 1);
+}
+// 一括分解ボタン：チュートリアル中は個別に手順を踏ませたいので出さず、在庫が0個なら押せなくする
+function updateBulkDisenchantBtn(count){
+    const btn = document.getElementById('inv-bulk-disenchant-btn');
+    if (!btn) return;
+    btn.classList.toggle('hidden', tutorialActive);
+    btn.textContent = uif('btn_bulk_disenchant', count);
+    btn.disabled = count <= 0;
 }
 
 function selectInvItem(idx){
@@ -4583,18 +4604,69 @@ function promptDisenchant(idx){
         return;
     }
     pendingDisenchantIdx = idx;
+    pendingBulkDisenchant = false;
     document.getElementById('disenchant-confirm-msg').innerHTML = uif('disenchant_confirm_msg', source.name, target.name);
+    document.getElementById('disenchant-confirm-overlay').classList.remove('hidden');
+}
+// 一括分解：装備中以外の在庫すべてを、通常の分解（promptDisenchant→doDisenchantInInventory）と
+// 全く同じ確率・処理を1個ずつ順番に適用する（引き継ぎ効果が個別分解と変わらないようにするため）
+let pendingBulkDisenchant = false;
+let bulkDisenchantQueue = null;
+function promptBulkDisenchant(){
+    if (tutorialActive) return;
+    const list = invListForTab();
+    const sources = list.slice(1);
+    if (sources.length === 0) return;
+    pendingDisenchantIdx = null;
+    pendingBulkDisenchant = true;
+    document.getElementById('disenchant-confirm-msg').innerHTML = uif('bulk_disenchant_confirm_msg', sources.length, list[0].name);
     document.getElementById('disenchant-confirm-overlay').classList.remove('hidden');
 }
 function cancelDisenchant(){
     pendingDisenchantIdx = null;
+    pendingBulkDisenchant = false;
     document.getElementById('disenchant-confirm-overlay').classList.add('hidden');
 }
 function confirmDisenchant(){
     document.getElementById('disenchant-confirm-overlay').classList.add('hidden');
+    if (pendingBulkDisenchant){
+        pendingBulkDisenchant = false;
+        bulkDisenchantQueue = { cat: invActiveTab, items: invListForTab().slice(1) };
+        processBulkDisenchantNext();
+        return;
+    }
     const idx = pendingDisenchantIdx;
     pendingDisenchantIdx = null;
     if (idx !== null) doDisenchantInInventory(idx);
+}
+// キューから1個ずつ取り出し、doDisenchantInInventoryと同じ計算式で装備品に合成する。
+// スキル超過でトリム画面を挟む場合はfinalizeSynthesis側からこの続きが自動で呼ばれる
+function processBulkDisenchantNext(){
+    if (!bulkDisenchantQueue || bulkDisenchantQueue.items.length === 0){
+        bulkDisenchantQueue = null;
+        return;
+    }
+    const cat = bulkDisenchantQueue.cat;
+    const target = player.gear[cat];
+    const source = bulkDisenchantQueue.items.shift();
+    const practiceGain = Math.round(source.practice * DISENCHANT_PRACTICE_RATE);
+    let plusGain = 0;
+    for (let i = 0; i < (source.plusLevel || 0); i++){
+        if (Math.random() < DISENCHANT_PLUS_TRANSFER_RATE) plusGain++;
+    }
+    const inheritedSkills = source.skills.filter(() => Math.random() < DISENCHANT_SKILL_TRANSFER_RATE);
+    const newPractice = target.practice + practiceGain;
+    const newPlus = Math.min(MAX_PLUS_LEVEL, (target.plusLevel || 0) + plusGain);
+    const newSkills = target.skills.concat(inheritedSkills);
+    const merged = makeGearItem(target.defId, target.category, newPractice, newSkills, newPlus);
+    pendingSynthesis = { cat, itemA: target, itemB: source, idxA: 0, idxB: -1, merged };
+    invSelectedIndex = null;
+    renderInventory();
+    if (merged.skills.length > MAX_ITEM_SKILLS){
+        openSkillTrimOverlay();
+    } else {
+        finalizeSynthesis();
+    }
 }
 // 分解後の結果アイテムを作り、合成と同じ「装備中(idxA=0)＋在庫(idxB)」の枠組みに乗せて
 // finalizeSynthesis()をそのまま再利用する（スキルが4つを超えた場合のトリム画面も共通で使える）
@@ -4671,6 +4743,10 @@ function finalizeSynthesis(){
     pendingSynthesis = null;
     renderInventory();
     renderStatus();
+    // 一括分解の途中であれば、次の1個へ続ける（スキル超過でトリム画面を挟んだ場合もここから再開する）
+    if (bulkDisenchantQueue){
+        processBulkDisenchantNext();
+    }
 }
 
 let skillTrimKeep = []; // merged.skillsと同じ長さの真偽値配列。trueのものだけ残す
