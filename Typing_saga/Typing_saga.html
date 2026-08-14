@@ -109,6 +109,11 @@
         <button class="mc-btn" id="google-login-btn" style="display:none">Googleでログイン</button>
         <button class="mc-btn" style="font-size:16px; width:200px;" onclick="document.getElementById('login-overlay').style.display='none'">ログインせず遊ぶ</button>
     </div>
+
+    <input type="text" id="name-text-input" maxlength="12" autocomplete="off"
+        style="display:none; position:absolute; left:330px; top:100px; width:300px; height:50px;
+        font-size:24px; text-align:center; z-index:50; font-family:'DotGothic16', sans-serif;
+        background:#2a2a4a; color:#fff; border:3px solid #7986cb; border-radius:6px; box-sizing:border-box; outline:none;">
 </div>
 
 <script>
@@ -125,6 +130,23 @@ let auth = null;
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 ctx.imageSmoothingEnabled = false;
+
+// 冒険者名入力用のゲーム内テキストボックス(ブラウザのprompt()は使わない)
+const nameTextInput = document.getElementById('name-text-input');
+nameTextInput.addEventListener('input', () => {
+    gameState.regTemp.name = nameTextInput.value.substring(0, 12);
+});
+function syncNameInput() {
+    const show = (gameState.scene === SCENES.TITLE && gameState.titleState === 3);
+    if (show) {
+        nameTextInput.style.display = 'block';
+        if (document.activeElement !== nameTextInput) {
+            nameTextInput.value = gameState.regTemp.name;
+        }
+    } else {
+        nameTextInput.style.display = 'none';
+    }
+}
 
 // 画像読み込みヘルパー
 function createImage(src) {
@@ -349,8 +371,9 @@ class TypingEngine {
             if (w.length > 12) return false;
 
             if (diffLevel === 0) {
-                if (w.length > 4) return false;
-                if (/[ゃゅょっー]/.test(w)) return false;
+                // やさしい: 5文字以内・清音のみ(だくてん/はんだくてん/ようおん/そくおん/ちょうおんぷを含まない)
+                if (w.length > 5) return false;
+                if (/[がぎぐげござじずぜぞだぢづでどばびぶべぼぱぴぷぺぽゃゅょっー]/.test(w)) return false;
             } else if (diffLevel === 1) {
                 if (w.length > 7) return false;
             }
@@ -1162,6 +1185,7 @@ function draw() {
 }
 
 function drawTitle() {
+    syncNameInput();
     if (!titleBgImage.complete && !titleBgImage.error) {
         ctx.fillStyle = "#000";
         ctx.fillRect(0,0, canvas.width, canvas.height);
@@ -1267,8 +1291,9 @@ function drawTitle() {
         const titleText = (gameState.regTemp.slot !== undefined && adventurerList[gameState.regTemp.slot]) ? "冒険者を変更" : "新規登録";
         drawText(titleText, 480, 70, 30, "#fff", "center");
 
-        let nameDisp = gameState.regTemp.name || "（名前を入力してください）";
-        drawMcButton(330, 100, 300, 50, nameDisp, "#3f51b5", "#fff");
+        if (gameState.warningMsg) {
+            drawText(gameState.warningMsg, 480, 168, 16, "#ff5555", "center");
+        }
 
         drawText("姿を選ぶ", 480, 180, 20, "#aaa", "center");
         
@@ -1336,7 +1361,7 @@ function drawRanking() {
             
             // ★修正: d.score ではなく d.gold を表示
             const val = (d.gold !== undefined) ? d.gold : 0;
-            drawText(`${val}G`, 500, y, 20, "#ffeb3b");
+            drawText(`${val} G`, 500, y, 20, "#ffeb3b");
             
             drawText(`${d.floor}F`, 740, y, 20, "#fff", "center");
         });
@@ -1362,7 +1387,7 @@ function drawTyping() {
 
     drawMcButton(10, 10, 120, 40, "タイトルへ", "#546e7a", "#fff");
     drawText(`階層: ${gameState.currentFloor}F (${diffText})`, 140, 40, 20, "#fff"); 
-    drawText(`所持金: ${gameState.player.gold}G`, 940, 40, 24, "#ffeb3b", "right");
+    drawText(`所持金: ${gameState.player.gold} G`, 940, 40, 24, "#ffeb3b", "right");
 
     drawText(`時間: ${Math.ceil(gameState.typing.timeLeft)}`, 480, 50, 40, "#fff", "center");
     
@@ -1486,7 +1511,7 @@ function drawShop() {
     drawText(`階層: ${gameState.currentFloor}F (${diffText})`, 140, 40, 20, "#fff");
 
     drawText("ショップ", 480, 40, 40, "#fff", "center");
-    drawText(`所持金: ${gameState.player.gold}G`, 940, 40, 24, "#ffeb3b", "right");
+    drawText(`所持金: ${gameState.player.gold} G`, 940, 40, 24, "#ffeb3b", "right");
 
     drawText("=== 武器 (クリックで購入) ===", 50, 80, 20, "#aaa");
     gameState.shop.weapons.forEach((w, i) => {
@@ -1534,7 +1559,7 @@ function drawShop() {
         drawText(`${getHitStars(w.hit)}`, x+480, y+30, 16, subColor, "left", "DotGothic16", false);
 
         ctx.font = "20px 'DotGothic16'";
-        drawText(`${w.price}G`, x+560, y+30, 20, priceColor);
+        drawText(`${w.price} G`, x+560, y+30, 20, priceColor);
 
         // ★修正: 未所持ならNEW!を表示 (判定を厳密に、位置調整)
         // some(id => id == w.id) で数値と文字列の型違いを吸収
@@ -1591,7 +1616,7 @@ function drawShop() {
         drawText(`${getRateStars(a.guardFull)}`, x+480, y+30, 16, subColor, "left", "DotGothic16", false);
 
         ctx.font = "20px 'DotGothic16'";
-        drawText(`${a.price}G`, x+560, y+30, 20, priceColor);
+        drawText(`${a.price} G`, x+560, y+30, 20, priceColor);
 
         // ★修正: 未所持ならNEW!を表示
         const hasArmor = gameState.collection && gameState.collection.armors.some(id => id == a.id);
@@ -1631,7 +1656,7 @@ function drawShop() {
         ctx.textAlign = "left";
         drawText(f.name, x+10, y+28, 18, textColor);
         
-        let priceStr = f.price===0 ? "無料" : `${f.price}G`;
+        let priceStr = f.price===0 ? "無料" : `${f.price} G`;
         let priceColor = f.price===0 ? "#00ff00" : "#ffeb3b";
         if (!canBuy) priceColor = "#555";
         
@@ -1724,7 +1749,7 @@ function drawBattle() {
 
     drawMcButton(10, 10, 120, 40, "タイトルへ", "#546e7a", "#fff");
     drawText(`階層: ${gameState.currentFloor}F (${diffText})`, 140, 40, 20, "#fff");
-    drawText(`所持金: ${gameState.player.gold}G`, 940, 40, 24, "#ffeb3b", "right");
+    drawText(`所持金: ${gameState.player.gold} G`, 940, 40, 24, "#ffeb3b", "right");
 
     const px = 200; 
     const ex = 760; 
@@ -1874,7 +1899,7 @@ function drawEvent() {
 
     drawMcButton(10, 10, 120, 40, "タイトルへ", "#546e7a", "#fff");
     drawText(`階層: ${gameState.currentFloor}F (${diffText})`, 140, 40, 20, "#fff");
-    drawText(`所持金: ${gameState.player.gold}G`, 940, 40, 24, "#ffeb3b", "right");
+    drawText(`所持金: ${gameState.player.gold} G`, 940, 40, 24, "#ffeb3b", "right");
 
     const ex = 760, ey = 580; 
     const size = 300; 
@@ -2180,13 +2205,7 @@ canvas.addEventListener('mousedown', e => {
                 gameState.titleState = 0;
             }
         } else if (gameState.titleState === 3) {
-            // 新規登録・編集
-            if (x > 330 && x < 630 && y > 100 && y < 150) {
-                const input = prompt("名前を入力してください(12文字以内)", gameState.regTemp.name);
-                if (input) {
-                    gameState.regTemp.name = input.substring(0, 12);
-                }
-            }
+            // 新規登録・編集(名前欄はゲーム内テキストボックスnameTextInputが直接受け付ける)
             if (x > 280 && x < 340 && y > 310 && y < 390) {
                 gameState.regTemp.imgId--;
                 if (gameState.regTemp.imgId < 1) gameState.regTemp.imgId = 6;
@@ -2205,7 +2224,8 @@ canvas.addEventListener('mousedown', e => {
                     currentAdventurer = adventurerList[gameState.regTemp.slot];
                     gameState.titleState = 2; 
                 } else {
-                    alert("名前を入力してください");
+                    gameState.warningMsg = "なまえを にゅうりょくしてください";
+                    gameState.warningTimer = 120;
                 }
             }
             if (x > 330 && x < 630 && y > 560 && y < 600) {
@@ -2424,7 +2444,7 @@ function processEventChoice(id) {
         if (r < 0.8) {
             const money = gameState.currentFloor * 300;
             gameState.player.gold += money;
-            gameState.event.msg = `${money}G てにいれた！`;
+            gameState.event.msg = `${money} G てにいれた！`;
         } else {
             const dmg = Math.floor(gameState.player.maxHp / 2);
             gameState.player.hp -= dmg;
