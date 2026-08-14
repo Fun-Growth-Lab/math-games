@@ -1292,6 +1292,18 @@ const CHAR_SKILLS_ALL = CHAR_SKILLS_BASE.concat(CHAR_SKILLS_SPECIAL);
 function charSkill(id){ return CHAR_SKILLS_ALL.find(s => s.id === id); }
 // 倍率(×N)を「基準100%からの加算ぶん」の表記(+○○%)に変換する（×2なら+100%、×3なら+200%）
 function pctLabel(mult){ return `+${Math.round((mult - 1) * 100)}%`; }
+// ==== キャラクタースキルのレベル制 ====
+// 同じスキルを重ねて覚えると、新しいスロットを消費せずレベルが上がる（最大Lv5）。
+// レベルごとに、そのスキル自体の上乗せぶん(倍率-1)が20%ずつ強くなる（Lv5で基準の2倍＝+100%アップ）。
+const MAX_SKILL_LV = 5;
+function skillLevel(card, skillId){ return (card.skillLv && card.skillLv[skillId]) || 0; }
+function skillEffectiveMult(skill, lv){ return 1 + (skill.mult - 1) * (1 + 0.2 * lv); }
+function levelUpSkill(card, skillId){
+    card.skillLv = card.skillLv || {};
+    card.skillLv[skillId] = Math.min(MAX_SKILL_LV, skillLevel(card, skillId) + 1);
+}
+// レベルを考慮した「+○○%」表記
+function pctLabelLv(skill, lv){ return `+${Math.round((skillEffectiveMult(skill, lv) - 1) * 100)}%`; }
 // そのスキルをそのキャラクターカードに付けてよいか（特殊スキルはランクが一致する場合のみ）
 function skillAllowedForCard(skill, card){
     if (skill.id === 'triple7')   return card.rank === '7';
@@ -1430,7 +1442,7 @@ const PLAYER_MAX_HP_BASE = 100;
 let cardSeq = 0;
 // isChar: キャラクターカードかどうか。skillsは両方とも配列で持ち、最大2つまで。
 function makeCard(rank, suit, isChar){
-    return { uid: ++cardSeq, rank, suit, bj: bjValue(rank), color: SUIT_COLOR[suit], isChar: !!isChar, skills: [] };
+    return { uid: ++cardSeq, rank, suit, bj: bjValue(rank), color: SUIT_COLOR[suit], isChar: !!isChar, skills: [], skillLv: {} };
 }
 function shuffle(arr){
     const a = arr.slice();
@@ -1708,15 +1720,23 @@ function bigCardHtml(card, opts){
     let skillEntries = [];
     if (isChar){
         const activeIds = opts.activeSkillIds || [];
+        // previewExtraSkillIdが「すでに持っているスキル」と同じ場合は、新しい行を足すのではなく
+        // そのスキルの行自体を「レベルアップ予定」として光らせる（スロットを消費しないため）
+        const previewIsLevelUp = !!opts.previewExtraSkillId && (card.skills || []).includes(opts.previewExtraSkillId);
         skillEntries = (card.skills || []).map(id => {
             const s = charSkill(id);
             const cat = SKILL_CATEGORIES[s.cat];
-            return { emoji: cat.emoji, label: skillDisplayLabel(s, card), right: pctLabel(s.mult), glow: activeIds.includes(id), color: cat.color, desc: s.desc };
+            const lv = skillLevel(card, id);
+            const isPreviewTarget = previewIsLevelUp && id === opts.previewExtraSkillId;
+            const nextLv = Math.min(MAX_SKILL_LV, lv + 1);
+            const label = skillDisplayLabel(s, card) + (isPreviewTarget ? ` Lv.${lv}→${nextLv}` : (lv > 0 ? ` Lv.${lv}` : ''));
+            const right = pctLabelLv(s, isPreviewTarget ? nextLv : lv);
+            return { emoji: cat.emoji, label, right, glow: activeIds.includes(id), pending: isPreviewTarget, color: cat.color, desc: s.desc };
         });
-        if (opts.previewExtraSkillId){
+        if (opts.previewExtraSkillId && !previewIsLevelUp){
             const s = charSkill(opts.previewExtraSkillId);
             const cat = SKILL_CATEGORIES[s.cat];
-            skillEntries.push({ emoji: cat.emoji, label: skillDisplayLabel(s, card), right: pctLabel(s.mult), pending: true, color: cat.color, desc: s.desc });
+            skillEntries.push({ emoji: cat.emoji, label: skillDisplayLabel(s, card), right: pctLabelLv(s, 0), pending: true, color: cat.color, desc: s.desc });
         }
     } else {
         skillEntries = (card.skills || []).map(id => {
@@ -2353,7 +2373,7 @@ let mapEventSkillState = { skillId: null, candidates: [] };
 function openEventLearnSkill(){
     const pool = shuffle(CHAR_SKILLS_ALL);
     for (const skill of pool){
-        const eligible = game.charCollection.filter(c => !c.skills.includes(skill.id) && skillAllowedForCard(skill, c));
+        const eligible = game.charCollection.filter(c => skillAllowedForCard(skill, c) && (!c.skills.includes(skill.id) || skillLevel(c, skill.id) < MAX_SKILL_LV));
         if (eligible.length === 0) continue;
         const candidates = shuffle(eligible).slice(0, 3);
         mapEventSkillState = { skillId: skill.id, candidates };
@@ -2373,10 +2393,15 @@ function openEventLearnSkill(){
 }
 function pickEventSkillCard(i){
     const card = mapEventSkillState.candidates[i];
-    if (card.skills.length >= MAX_CARD_SKILLS){
-        showForgetScreen(card, mapEventSkillState.skillId, () => returnToMap());
+    const skillId = mapEventSkillState.skillId;
+    if (card.skills.includes(skillId)){
+        // すでに持っているスキル→スロットを使わずレベルアップ
+        levelUpSkill(card, skillId);
+        returnToMap();
+    } else if (card.skills.length >= MAX_CARD_SKILLS){
+        showForgetScreen(card, skillId, () => returnToMap());
     } else {
-        card.skills.push(mapEventSkillState.skillId);
+        card.skills.push(skillId);
         returnToMap();
     }
 }
@@ -2396,10 +2421,11 @@ function showForgetScreen(card, skillId, onDone){
         const s = charSkill(sid);
         const cat = SKILL_CATEGORIES[s.cat];
         const isNew = i === options.length - 1;
+        const lv = isNew ? 0 : skillLevel(card, sid);
         return `<div class="reward-pick" onclick="pickForgetSkill(${i})">
             <div class="bc-skill-row" style="--cat-color:${cat.color};border-color:${cat.color};background:${cat.color}22;">
-                <span class="bc-skill-label"><span class="bc-skill-text">${escapeHtml(skillDisplayLabel(s, card))}${isNew ? '（今回のスキル）' : ''}</span></span>
-                <span class="bc-skill-mult">${pctLabel(s.mult)}</span>
+                <span class="bc-skill-label"><span class="bc-skill-text">${escapeHtml(skillDisplayLabel(s, card))}${lv > 0 ? ` Lv.${lv}` : ''}${isNew ? '（今回のスキル）' : ''}</span></span>
+                <span class="bc-skill-mult">${pctLabelLv(s, lv)}</span>
             </div>
         </div>`;
     }).join('');
@@ -2410,8 +2436,9 @@ function pickForgetSkill(i){
     const options = card.skills.concat([skillId]);
     const discardId = options[i];
     if (discardId !== skillId){
-        // 既存スキルを1つ手放して、新しいスキルを覚える
+        // 既存スキルを1つ手放して、新しいスキルを覚える（手放したスキルのレベルはリセットする＝再習得したら0から）
         card.skills.splice(card.skills.indexOf(discardId), 1);
+        if (card.skillLv) delete card.skillLv[discardId];
         card.skills.push(skillId);
     }
     // 新しいスキルの方を選んだ場合は何もしない（今回の習得を見送り、今の2つのまま）
@@ -2600,7 +2627,8 @@ function currentMultInfo(){
     const breakdown = [];
     active.forEach(s => {
         const cat = SKILL_CATEGORIES[s.cat];
-        const pct = Math.round((s.mult - 1) * 100);
+        const lv = skillLevel(game.turn.base, s.id);
+        const pct = Math.round((skillEffectiveMult(s, lv) - 1) * 100);
         breakdown.push({ label: breakdownLabel(s, game.turn.base), pct, color: cat.color });
     });
     const suitGroups = suitMatchGroups(game.turn.hand);
@@ -2876,7 +2904,7 @@ function maybeSkillEpiphany(){
     if (Math.random() >= 0.20) return;
     const starter = game.charCollection.find(c => c.isStarter);
     if (!starter) return;
-    const pool = shuffle(CHAR_SKILLS_ALL).filter(s => !starter.skills.includes(s.id) && skillAllowedForCard(s, starter));
+    const pool = shuffle(CHAR_SKILLS_ALL).filter(s => skillAllowedForCard(s, starter) && (!starter.skills.includes(s.id) || skillLevel(starter, s.id) < MAX_SKILL_LV));
     if (pool.length === 0) return;
     pendingEpiphany = { card: starter, skillId: pool[0].id };
 }
@@ -2893,14 +2921,25 @@ function showEpiphanyAnnounce(card, skillId){
     epiphanyPending = { card, skillId };
     const skill = charSkill(skillId);
     document.getElementById('epiphany-card-area').innerHTML = bigCardHtml(card, { compact: true, previewExtraSkillId: skillId });
-    document.getElementById('epiphany-body').textContent =
-        `「${skillDisplayLabel(skill, card)}」（${pctLabel(skill.mult)}）をひらめいた！`;
+    if (card.skills.includes(skillId)){
+        const lv = skillLevel(card, skillId);
+        const nextLv = Math.min(MAX_SKILL_LV, lv + 1);
+        document.getElementById('epiphany-body').textContent =
+            `「${skillDisplayLabel(skill, card)}」がレベルアップ！ Lv.${lv}→Lv.${nextLv}（${pctLabelLv(skill, nextLv)}）`;
+    } else {
+        document.getElementById('epiphany-body').textContent =
+            `「${skillDisplayLabel(skill, card)}」（${pctLabelLv(skill, 0)}）をひらめいた！`;
+    }
     showScreen('epiphany-screen');
 }
 function closeEpiphany(){
     const { card, skillId } = epiphanyPending;
     epiphanyPending = null;
-    if (card.skills.length >= MAX_CARD_SKILLS){
+    if (card.skills.includes(skillId)){
+        // すでに持っているスキル→スロットを使わずレベルアップ
+        levelUpSkill(card, skillId);
+        showItemGetScreen();
+    } else if (card.skills.length >= MAX_CARD_SKILLS){
         showForgetScreen(card, skillId, () => showItemGetScreen());
     } else {
         card.skills.push(skillId);
