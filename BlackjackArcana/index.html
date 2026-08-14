@@ -1,0 +1,3048 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <script>if(screen.orientation&&screen.orientation.lock){screen.orientation.lock('landscape').catch(function(){});}</script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ブラックジャック・アルカナ - Fun & Growth Lab</title>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* 背景は黒に近い茶色から、落ち着いた深緑の card table 風に変更。
+               文字色（--text-dim）も、その上でも読みやすいよう明るめに調整した。 */
+            --bg-page:    #030503;
+            --felt-1:     #16281f;
+            --felt-2:     #050c07;
+            --gold:       #d4af37;
+            --gold-bright:#f4d872;
+            --gold-deep:  #6b5410;
+            --crimson:    #c0304a;
+            --arcane:     #9b6bf0;
+            --text-main:  #ece6d2;
+            --text-dim:   #b3ab93;
+            --text-hi:    #f5f0e0;
+            --card-bg:    #fffaf0;
+            --card-ink-b: #1c1c1c;
+            --card-ink-r: #b3273a;
+            --suit-h:     #c23a52;
+            --suit-s:     #1c1c1c;
+            --suit-d:     #c68a1e;
+            --suit-c:     #388e3c;
+            --panel-bg:   #10190f;
+            --panel-bg-2: #182219;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            overflow: hidden;
+            background: var(--bg-page);
+            font-family: "M PLUS Rounded 1c", sans-serif;
+            user-select: none; -webkit-user-select: none;
+            touch-action: none;
+            display: flex; justify-content: center; align-items: center;
+            height: 100vh; width: 100vw;
+        }
+        #container {
+            width: 1280px; height: 720px;
+            flex-shrink: 0; position: relative;
+            border: 5px solid transparent; border-radius: 16px;
+            background-image:
+                radial-gradient(ellipse at center, var(--felt-1) 0%, var(--felt-2) 100%),
+                linear-gradient(135deg, var(--gold-bright) 0%, var(--gold) 25%, var(--gold-deep) 50%, var(--gold) 75%, var(--gold-bright) 100%);
+            background-origin: border-box; background-clip: padding-box, border-box;
+            box-shadow: 0 0 0 2px #000, 0 0 90px rgba(212,175,55,0.2), inset 0 0 90px rgba(0,0,0,0.6), 0 0 140px rgba(0,0,0,0.9);
+            overflow: hidden;
+            transform-origin: center center;
+            color: var(--text-main);
+        }
+        .hidden { display: none !important; }
+        body.no-furigana rt { display: none; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-thumb { background: var(--gold); border-radius: 4px; }
+
+        /* ==================== COMMON ==================== */
+        .btn {
+            display: block; width: 100%; padding: 12px 18px; margin-top: 10px;
+            border: 2px solid transparent; border-radius: 10px;
+            background-image: linear-gradient(180deg, #2a2a2a 0%, #0a0a0a 100%), linear-gradient(180deg, var(--gold-bright), var(--gold-deep));
+            background-origin: border-box; background-clip: padding-box, border-box;
+            color: var(--text-main); font-size: 1rem; font-weight: 800;
+            font-family: inherit; cursor: pointer; text-align: center;
+            text-decoration: none; box-shadow: 0 4px 0 #000, 0 6px 16px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.06);
+            transition: transform .08s, filter .15s;
+        }
+        .btn:hover { filter: brightness(1.25); }
+        .btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #000, 0 2px 6px rgba(0,0,0,0.7); }
+        .btn-gold {
+            background-image: linear-gradient(180deg, #fff3c4 0%, var(--gold-bright) 35%, var(--gold) 100%), linear-gradient(180deg, #fff3c4, var(--gold));
+            color: #241c04; box-shadow: 0 4px 0 var(--gold-deep), 0 8px 20px rgba(212,175,55,0.35), inset 0 1px 0 rgba(255,255,255,0.5);
+        }
+        .btn-gray {
+            background-image: linear-gradient(180deg, #363636 0%, #131313 100%), linear-gradient(180deg, #7a7a7a, #2a2a2a);
+        }
+        .btn-crimson {
+            background-image: linear-gradient(180deg, #df5a72 0%, #a02338 100%), linear-gradient(180deg, #ffb0bd, #7a1826);
+            border-color: transparent;
+        }
+        .btn-sm { padding: 8px 12px; font-size: 0.85rem; }
+        .btn[disabled] { opacity: 0.4; cursor: not-allowed; filter: none !important; }
+        #title-screen .btn { max-width: 320px; margin-left: auto; margin-right: auto; }
+        /* タイトル画面いっぱいの背景イラスト（title.png）。その上に、UIの土台となる従来のfeltグラデーションも重ねておく */
+        .title-bg-img {
+            position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+            z-index: 0; opacity: 0.6; pointer-events: none;
+        }
+        /* タイトル画面の左右の空きスペースに、ランダムなキャラクターイラストを飾る（初代ポケモンのタイトル画面イメージ）。
+           イラストだけを浮かせて置くと不自然なので、カード風の枠で囲む（枠の縦横比は通常カードと違ってよい） */
+        .title-illust-frame {
+            position: absolute; top: 50%; transform: translateY(-50%); z-index: 1;
+            width: 210px; height: 300px; border-radius: 16px; overflow: hidden;
+            border: 5px solid transparent; background: var(--card-bg);
+            background-image:
+                linear-gradient(var(--card-bg), var(--card-bg)),
+                linear-gradient(135deg, #fff3c4 0%, var(--gold-bright) 30%, var(--gold) 60%, #fff3c4 100%);
+            background-origin: border-box; background-clip: padding-box, border-box;
+            box-shadow: 0 12px 30px rgba(0,0,0,0.75);
+        }
+        .title-illust-frame:not(:has(img[src])), .title-illust-frame:has(img[src=""]) { visibility: hidden; }
+        .title-illust-frame-left { left: 40px; }
+        .title-illust-frame-right { right: 40px; }
+        .title-illust { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .title-box, .rank-box, .overlay-box, .event-popup-box {
+            border: 3px solid transparent; border-radius: 18px;
+            background-image:
+                radial-gradient(ellipse at 50% 12%, #17251b 0%, #0a120b 55%, #030603 100%),
+                linear-gradient(135deg, var(--gold-bright), var(--gold) 45%, var(--gold-deep) 55%, var(--gold-bright));
+            background-origin: border-box; background-clip: padding-box, border-box;
+            box-shadow: 0 0 60px rgba(212,175,55,0.18), inset 0 0 40px rgba(212,175,55,0.05), 0 25px 70px rgba(0,0,0,0.85);
+        }
+        .title-box, .rank-box {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 480px; max-height: 660px; overflow-y: auto;
+            padding: 28px 32px; text-align: center;
+        }
+        .rank-box { width: 580px; }
+        /* イベント・ショップ画面用ポップアップ。中央に大きく表示し、スクロールが出ないようにする
+           （下の方に置いて背景を見せる案は操作性を損なったため撤回。背景演出は今後の課題） */
+        .event-popup-box {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 620px; max-height: 680px; overflow-y: auto;
+            padding: 18px 28px; text-align: center;
+        }
+        .settings-title, .rank-title { font-size: 1.4rem; font-weight: 800; color: var(--gold-bright); margin-bottom: 14px; }
+        .settings-desc { font-size: 0.85rem; color: var(--text-dim); margin-bottom: 8px; }
+        .settings-section { margin: 16px 0; text-align: left; }
+        .settings-label { font-size: 0.9rem; color: var(--gold-bright); font-weight: 700; margin-bottom: 8px; }
+        .settings-toggle-row { display: flex; gap: 10px; }
+        .settings-toggle-btn {
+            flex: 1; padding: 10px; border-radius: 8px; border: 2px solid #3a3226;
+            background: var(--panel-bg); color: var(--text-main); font-family: inherit; font-weight: 700;
+            cursor: pointer;
+        }
+        .settings-toggle-btn.active { border-color: var(--gold); background: #2a2410; color: var(--gold-bright); }
+
+        /* ==================== TITLE ==================== */
+        #title-screen .title-box { width: 620px; }
+        .title-h1 {
+            font-size: 2.1rem; font-weight: 800; color: var(--gold-bright);
+            letter-spacing: 2px; text-shadow: 0 0 18px rgba(244,216,114,0.5);
+            white-space: nowrap;
+        }
+        .title-sub { font-size: 0.95rem; color: var(--text-dim); margin: 10px 0 18px; letter-spacing: 4px; }
+
+        /* ==================== NAME REGISTER ==================== */
+        .name-reg-form { display: flex; gap: 8px; margin: 10px 0 4px; }
+        .name-reg-input {
+            flex: 1; padding: 10px; border-radius: 8px; border: 2px solid #3a3226;
+            background: var(--panel-bg); color: var(--text-main); font-family: inherit; font-size: 0.95rem;
+        }
+        .name-reg-error { color: #ff8a8a; font-size: 0.78rem; font-weight: 700; min-height: 1.1em; margin: 0 0 6px; text-align: left; }
+        .nr-section-label { font-size: 0.85rem; font-weight: 800; color: var(--gold-bright); text-align: left; margin: 4px 0 6px; }
+        .nr-table { width: 100%; border-collapse: collapse; text-align: left; margin-bottom: 4px; max-height: 190px; display: block; overflow-y: auto; }
+        .nr-table thead, .nr-table tbody, .nr-table tr { display: table; width: 100%; table-layout: fixed; }
+        .nr-table th { font-size: 0.72rem; color: var(--text-dim); font-weight: 700; padding: 4px 8px; border-bottom: 1px solid rgba(212,175,55,0.3); }
+        .nr-table th:first-child, .nr-table td:first-child { width: 60px; }
+        .nr-table th:nth-child(3), .nr-table td:nth-child(3) { width: 90px; }
+        .nr-table th:nth-child(4), .nr-table td:nth-child(4) { width: 76px; }
+        .nr-table th:nth-child(5), .nr-table td:nth-child(5) { width: 40px; }
+        .nr-table td { padding: 5px 8px; vertical-align: middle; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 0.85rem; }
+        .nr-table tr.cur td { background: rgba(212,175,55,0.12); }
+        .nr-table tr.editing td { background: rgba(155,107,240,0.16); }
+        .nr-row-avatar { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; border: 2px solid #4a4a4a; display: block; }
+        .nr-row-name { font-weight: 700; }
+        .pl-selected-badge { color: var(--gold-bright); font-size: 0.78rem; font-weight: 700; white-space: nowrap; }
+        .pl-select-btn, .del-btn {
+            border: 1px solid #3a3226; background: var(--panel-bg-2); color: var(--text-main);
+            border-radius: 6px; padding: 4px 8px; font-family: inherit; cursor: pointer; font-size: 0.78rem; white-space: nowrap;
+        }
+        .del-btn { color: #ff9aa8; }
+        .nr-avatar-header { display: flex; align-items: center; gap: 10px; justify-content: center; margin-top: 4px; flex-wrap: wrap; }
+        .nr-avatar-header > span:first-child { font-weight: 800; color: var(--text-main); font-size: 0.9rem; }
+        .nr-unlock-progress { font-size: 0.78rem; color: var(--text-dim); font-weight: 700; }
+        .nr-avatar-grid { display: grid; grid-template-columns: repeat(14, 1fr); gap: 4px; margin: 8px 0; }
+        .nr-avatar-cell { position: relative; cursor: pointer; border-radius: 8px; padding: 2px; border: 2px solid transparent; }
+        .nr-avatar-cell img { width: 100%; aspect-ratio: 1; border-radius: 6px; object-fit: cover; display: block; }
+        .nr-avatar-cell.selected { border-color: var(--gold-bright); box-shadow: 0 0 10px rgba(212,175,55,0.6); }
+        .nr-avatar-cell.locked { cursor: not-allowed; opacity: 0.32; filter: grayscale(1); }
+        .nr-avatar-cell.locked::after {
+            content:'🔒'; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:1rem;
+        }
+        .nr-avatar-hint { font-size: 0.7rem; color: var(--text-dim); margin: 2px 0 0; }
+
+        /* ==================== RANKING ==================== */
+        .rank-toggle { display: flex; gap: 8px; margin-bottom: 10px; }
+        .rank-toggle-btn {
+            flex: 1; padding: 8px; border-radius: 8px; border: 2px solid #3a3226;
+            background: var(--panel-bg); color: var(--text-main); font-family: inherit; font-weight: 700; cursor: pointer;
+        }
+        .rank-toggle-btn.active { border-color: var(--gold); background: #2a2410; color: var(--gold-bright); }
+        .rank-loading { padding: 20px; color: var(--text-dim); }
+        .rank-list { list-style: none; text-align: left; max-height: 340px; overflow-y: auto; }
+        .rank-row {
+            display: grid; grid-template-columns: 34px 1fr 60px 70px 56px; gap: 6px; align-items: center;
+            padding: 7px 8px; border-radius: 8px; margin-bottom: 5px; background: var(--panel-bg); font-size: 0.82rem;
+        }
+        .rank-row-empty { padding: 20px; text-align: center; color: var(--text-dim); }
+        .rank-num { font-weight: 800; color: var(--text-dim); }
+        .rank-num.top3 { font-size: 1.1rem; }
+        .rank-pname { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .rank-score { text-align: right; color: var(--gold-bright); font-weight: 700; }
+        .rank-date { text-align: right; color: var(--text-dim); font-size: 0.72rem; white-space: nowrap; }
+
+        /* ==================== STARTER CARD SELECT（52枚から1枚。クリア済みは実績としてはっきり表示） ==================== */
+        #starter-select-screen .title-box { width: 1080px; }
+        .starter-clear-pct { font-size: 1.6rem; font-weight: 900; color: var(--gold-bright); text-shadow: 0 0 14px rgba(244,216,114,0.5); margin: 4px 0; }
+        .starter-random-btns { display: flex; gap: 10px; justify-content: center; margin: 8px 0; }
+        .starter-random-btns .btn { margin-top: 0; padding: 8px 14px; font-size: 0.8rem; }
+        .starter-grid { display: grid; grid-template-columns: repeat(13, 1fr); gap: 6px; margin: 14px 0; }
+        .starter-cell {
+            aspect-ratio: 3/4; display: flex; flex-direction: column; align-items: center; justify-content: center;
+            background: rgba(0,0,0,0.4); border: 2px solid #3a3226; border-radius: 8px; cursor: pointer;
+            font-weight: 800; transition: all .15s; opacity: 0.4; filter: grayscale(0.8);
+        }
+        .starter-cell.cleared { opacity: 1; filter: none; border-color: var(--gold); }
+        .starter-cell:hover { border-color: var(--gold-bright); transform: translateY(-2px); }
+        .starter-cell.selected { border-color: var(--gold-bright); box-shadow: 0 0 14px rgba(212,175,55,0.7); background: rgba(212,175,55,0.18); }
+        .starter-cell-rank { font-size: 1rem; }
+        .starter-cell-suit { font-size: 1.1rem; }
+        .starter-cell.suit-S .starter-cell-suit, .starter-cell.suit-C .starter-cell-suit,
+        .starter-cell.suit-S .starter-cell-rank, .starter-cell.suit-C .starter-cell-rank { color: #eee; }
+        .starter-cell.suit-H .starter-cell-suit, .starter-cell.suit-D .starter-cell-suit,
+        .starter-cell.suit-H .starter-cell-rank, .starter-cell.suit-D .starter-cell-rank { color: #e5647a; }
+
+        /* ==================== BIG CARD (character / normal 共通、同じサイズ) ==================== */
+        /* カードの縦横比は「アルカナカードサイズ」(72:129)に統一。高さを外枠で固定し、
+           内側のイラスト欄・スキル欄はflexで自動配分することで、スキル数が変わってもカード全体の高さは常に一定になる */
+        .big-card {
+            width: 220px; height: 394px; flex-shrink: 0; border-radius: 16px; overflow: hidden;
+            background: var(--card-bg); border: 3px solid var(--gold);
+            box-shadow: 0 10px 24px rgba(0,0,0,0.65);
+            display: flex; flex-direction: column; position: relative;
+        }
+        /* キャラクターカードは通常カードより枠を太く、金を基調にした宝飾風グラデーションで豪華に見せる
+           （単色の紫だとのっぺり見えるため、金→紫→金と輝きが移り変わる縁取りにした） */
+        .big-card.character {
+            border: 6px solid transparent; border-radius: 16px;
+            background-image:
+                linear-gradient(var(--card-bg), var(--card-bg)),
+                linear-gradient(135deg, #fff3c4 0%, var(--gold-bright) 18%, #c9a4f5 38%, var(--arcane) 50%, #c9a4f5 62%, var(--gold-bright) 82%, #fff3c4 100%);
+            background-origin: border-box; background-clip: padding-box, border-box;
+            box-shadow: 0 0 0 2px rgba(10,8,4,0.6), 0 0 22px rgba(212,175,55,0.5), 0 10px 24px rgba(0,0,0,0.65);
+        }
+        /* 最初に選んだカード（デッキから外せない特別な1枚）は、白金の外枠＋左上のバッジでひと目でわかるようにする
+           （前は「最初の1枚」と文字で書いていたが、バッジだけの方がすっきりする） */
+        .big-card.starter { box-shadow: 0 0 0 3px #fff8dc, 0 0 24px rgba(244,216,114,0.7), 0 10px 24px rgba(0,0,0,0.65); }
+        .big-card.starter::before {
+            content: '★'; position: absolute; top: -9px; left: -9px; z-index: 6;
+            width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            background: radial-gradient(circle at 35% 30%, #fff3c4, var(--gold-bright) 55%, var(--gold-deep) 100%);
+            color: #241c04; font-size: 0.85rem; box-shadow: 0 2px 6px rgba(0,0,0,0.6), 0 0 0 2px #241c04;
+        }
+        .big-card .bc-illust {
+            height: 190px; flex-shrink: 0; background: #232323;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 3.4rem; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,0.6);
+        }
+        .big-card.character .bc-illust { background: #1e1826; font-size: 0; padding: 6px; }
+        .bc-illust-img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+        /* スートの色は全ての場所で4色統一：ハート=赤・スペード=黒・ダイヤ=黄・クローバー=緑（ゲーム全体の暗めのトーンは維持） */
+        .big-card.normal.suit-H .bc-illust { background: linear-gradient(160deg, #c0455f, #4a1420); }
+        .big-card.normal.suit-S .bc-illust { background: linear-gradient(160deg, #4a4a4a, #101010); }
+        .big-card.normal.suit-D .bc-illust { background: linear-gradient(160deg, #c9a02e, #5a4110); }
+        .big-card.normal.suit-C .bc-illust { background: linear-gradient(160deg, #4a9450, #123018); }
+        /* キャラクターカードの背景は、スート色をそのまま塗ると同系色のキャラ（例：スペード＝黒背景に黒っぽいドラゴン）が
+           見えにくくなるため、中央を明るく・端をスート色にしたグラデーションにして、色が沈んでも輪郭が見えるようにした */
+        .big-card.character.suit-H .bc-illust { background: radial-gradient(ellipse at center, #6b4048 0%, #3a1218 75%, #2a1014 100%); }
+        .big-card.character.suit-S .bc-illust { background: radial-gradient(ellipse at center, #5a5a62 0%, #201f24 75%, #16151a 100%); }
+        .big-card.character.suit-D .bc-illust { background: radial-gradient(ellipse at center, #6b5c40 0%, #3a2e12 75%, #281f0c 100%); }
+        .big-card.character.suit-C .bc-illust { background: radial-gradient(ellipse at center, #486b4c 0%, #12321a 75%, #0c2312 100%); }
+        .big-card .bc-info {
+            display: flex; justify-content: center; align-items: center; flex-shrink: 0;
+            padding: 8px 18px; font-weight: 900; font-size: 3.1rem; color: var(--card-ink-b);
+            border-top: 2px solid rgba(0,0,0,0.12); border-bottom: 2px solid rgba(0,0,0,0.12);
+        }
+        .big-card.suit-H .bc-info { color: var(--suit-h); }
+        .big-card.suit-S .bc-info { color: var(--suit-s); }
+        .big-card.suit-D .bc-info { color: var(--suit-d); }
+        .big-card.suit-C .bc-info { color: var(--suit-c); }
+        /* スキル欄はカード外枠の残り高さいっぱいに広がる（flex:1）。0～1個のときは中央に寄る。
+           以前はここを固定height:100pxにしていたが、カード自体(.big-card)の高さを固定する方式に変えたので、
+           スキル欄はflexで残りを自動的に埋めるだけでよく、スキル数が変わっても手札の高さは常に一定になる */
+        .big-card .bc-skills { padding: 8px 10px; display: flex; flex-direction: column; gap: 10px; justify-content: center; flex: 1; min-height: 0; overflow: hidden; }
+        .big-card .bc-skill-row {
+            position: relative; display: flex; justify-content: space-between; align-items: center; gap: 8px; cursor: pointer;
+            background: rgba(155,107,240,0.14); border: 1px solid var(--arcane); border-radius: 8px;
+            padding: 7px 12px; font-size: 0.92rem; font-weight: 700; color: #2a2a2a;
+            transition: box-shadow .2s, background .2s;
+        }
+        .big-card.normal .bc-skill-row { background: rgba(212,175,55,0.16); border-color: var(--gold); color: #6b5511; }
+        .big-card .bc-skill-label { display: flex; align-items: center; gap: 8px; text-align: left; min-width: 0; }
+        .big-card .bc-skill-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; }
+        .big-card .bc-skill-mult { color: var(--cat-color, var(--arcane)); font-weight: 800; font-size: 1.2rem; white-space: nowrap; }
+        .big-card.normal .bc-skill-mult { color: #9a7a10; }
+        .big-card .bc-skill-empty { text-align: center; color: #999; font-size: 0.85rem; padding: 6px 0; }
+        .big-card-caption { font-size: 0.78rem; color: var(--text-dim); text-align: center; margin-top: 6px; }
+
+        .bc-skill-row.active-glow {
+            box-shadow: 0 0 6px 2px rgba(155,107,240,0.55);
+            border-color: var(--gold-bright) !important;
+            background: rgba(155,107,240,0.36) !important;
+            animation: skillGlow 0.9s ease-in-out infinite alternate;
+        }
+        .big-card.normal .bc-skill-row.active-glow {
+            box-shadow: 0 0 6px 2px rgba(212,175,55,0.55);
+            background: rgba(212,175,55,0.4) !important;
+        }
+        @keyframes skillGlow {
+            from { box-shadow: 0 0 6px 1px rgba(155,107,240,0.4); }
+            to   { box-shadow: 0 0 16px 4px rgba(155,107,240,0.95); }
+        }
+        .bc-skill-row.pending-new {
+            border: 2px solid var(--gold-bright) !important;
+            box-shadow: 0 0 10px 3px rgba(244,216,114,0.6);
+            animation: skillGlow 0.9s ease-in-out infinite alternate;
+        }
+        .bc-skill-row.pending-new::before {
+            content: 'NEW!'; position: absolute; top: -9px; left: 8px;
+            background: var(--gold-bright); color: #241c04; font-size: 0.62rem; font-weight: 900;
+            padding: 1px 7px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.5); letter-spacing: 0.5px;
+        }
+
+        /* ==================== MINI CARD（通常カードのコレクション/手放し画面用） ==================== */
+        .card-grid { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; padding: 4px 2px; }
+        #col-normal-grid { max-width: 1180px; margin: 0 auto; }
+        .mini-card {
+            width: 108px; min-height: 152px; flex-shrink: 0; background: var(--card-bg);
+            border: 2px solid var(--gold); border-radius: 10px; display: flex; flex-direction: column;
+            overflow: hidden; cursor: default;
+        }
+        /* 通常のカード表示と同じく、上にスート（イラスト帯）・下に大きい数字 */
+        .mini-card .mc-illust {
+            height: 38px; display: flex; align-items: center; justify-content: center;
+            font-size: 1.3rem; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+        }
+        .mini-card.suit-H .mc-illust { background: linear-gradient(160deg, #c0455f, #4a1420); }
+        .mini-card.suit-S .mc-illust { background: linear-gradient(160deg, #4a4a4a, #101010); }
+        .mini-card.suit-D .mc-illust { background: linear-gradient(160deg, #c9a02e, #5a4110); }
+        .mini-card.suit-C .mc-illust { background: linear-gradient(160deg, #4a9450, #123018); }
+        .mini-card .mc-rank {
+            text-align: center; font-weight: 900; font-size: 1.75rem; padding: 4px 0;
+            border-top: 2px solid rgba(0,0,0,0.12); border-bottom: 2px solid rgba(0,0,0,0.12);
+        }
+        .mini-card.suit-H .mc-rank { color: var(--suit-h); }
+        .mini-card.suit-S .mc-rank { color: var(--suit-s); }
+        .mini-card.suit-D .mc-rank { color: var(--suit-d); }
+        .mini-card.suit-C .mc-rank { color: var(--suit-c); }
+        .mini-card .mc-skills { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 3px; padding: 4px 7px; }
+        .mini-card .mc-skill-line { display: flex; flex-direction: column; align-items: center; }
+        .mini-card .mc-skill-label {
+            display: block; font-weight: 800; color: #6b5511; text-align: center; line-height: 1.25; cursor: pointer;
+            font-size: 0.78rem; white-space: nowrap; overflow: hidden; max-width: 100%;
+        }
+        .mini-card .mc-skill-empty { text-align: center; color: #aaa; font-size: 0.78rem; }
+
+        /* ==================== キャラクターカード コレクション（最大10枚、5列×2段） ==================== */
+        .char-grid { max-width: 1160px; margin: 0 auto; gap: 14px 14px; }
+        .big-card.compact { width: 210px; height: 376px; }
+        .big-card.compact .bc-illust { height: 150px; }
+        .big-card.compact .bc-info { font-size: 2rem; padding: 4px 14px; }
+        .big-card.compact .bc-skills { padding: 6px 8px; gap: 6px; }
+        .big-card.compact .bc-skill-row { font-size: 0.8rem; padding: 5px 10px; }
+        .big-card.compact .bc-skill-mult { font-size: 1rem; }
+
+        /* ==================== デッキ構築（所持カードから、実際にデッキへ入れる分を選ぶ） ==================== */
+        #deckbuilder-screen .title-box { width: 1220px; max-height: 660px; }
+        .db-tabs { display: flex; gap: 10px; justify-content: center; margin-bottom: 16px; }
+        .db-tab {
+            background: rgba(0,0,0,0.35); border: 2px solid #3a3226; border-radius: 10px; padding: 9px 20px;
+            color: var(--text-dim); font-weight: 800; cursor: pointer; font-size: 0.88rem; font-family: inherit;
+            display: flex; align-items: center; gap: 8px; transition: all .15s;
+        }
+        .db-tab:hover { border-color: var(--gold); }
+        .db-tab.active { border-color: var(--gold); background: rgba(212,175,55,0.18); color: var(--gold-bright); }
+        .db-count { font-size: 0.72rem; color: var(--text-dim); font-weight: 700; }
+        .db-toolbar { display: flex; align-items: center; justify-content: center; gap: 18px; margin: -6px 0 14px; }
+        .db-toolbar .btn { margin-top: 0; padding: 7px 14px; font-size: 0.78rem; }
+        .db-hide-toggle { display: flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--text-dim); font-weight: 700; cursor: pointer; }
+        .db-hide-toggle input { accent-color: var(--gold-bright); width: 15px; height: 15px; cursor: pointer; }
+        .db-cell { position: relative; cursor: pointer; border-radius: 16px; padding: 2px; border: 2px solid transparent; opacity: 0.45; transition: all .15s; }
+        .db-cell:hover { opacity: 0.8; }
+        .db-cell.db-selected { opacity: 1; border-color: var(--gold); box-shadow: 0 0 12px rgba(212,175,55,0.5); }
+        .db-cell.db-locked { cursor: default; }
+        .db-cell.db-locked:hover { opacity: inherit; }
+        .db-check {
+            position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; border-radius: 50%;
+            background: var(--gold-bright); color: #1a1000; font-weight: 900; font-size: 0.85rem;
+            display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.6); z-index: 2;
+        }
+        /* デッキ構築のキャラクターカードは、コレクション画面などより一回り小さく表示する。
+           カード比率統一のため.big-card.compactに固定heightを入れたが、この文脈では合わないのでautoに戻す */
+        #db-char-grid .big-card.compact { width: 150px; height: auto; }
+        #db-char-grid .big-card.compact .bc-illust { height: 90px; }
+        #db-char-grid .big-card.compact .bc-info { font-size: 1.4rem; padding: 3px 10px; }
+        #db-char-grid .big-card.compact .bc-skills { min-height: 48px; padding: 4px 6px; gap: 4px; }
+        #db-char-grid .big-card.compact .bc-skill-row { font-size: 0.62rem; padding: 4px 8px; }
+        #db-char-grid .big-card.compact .bc-skill-mult { font-size: 0.75rem; }
+        /* 通常カードは横に10枚並ぶよう、少しだけ幅を詰める（.mini-cardを包む.db-cellのpadding/border分も考慮） */
+        #db-normal-grid .mini-card { width: 94px; }
+        /* スキル習得イベントの候補カードは、横に並べられるようさらに小さく表示する */
+        #eventskill-row.party-row { gap: 14px; margin: 14px 0; }
+        #eventskill-row .big-card.compact { width: 150px; height: auto; }
+        #eventskill-row .big-card.compact .bc-illust { height: 90px; }
+        #eventskill-row .big-card.compact .bc-info { font-size: 1.4rem; padding: 3px 10px; }
+        #eventskill-row .big-card.compact .bc-skills { min-height: 48px; padding: 4px 6px; gap: 4px; }
+        #eventskill-row .big-card.compact .bc-skill-row { font-size: 0.62rem; padding: 4px 8px; }
+        #eventskill-row .big-card.compact .bc-skill-mult { font-size: 0.75rem; }
+        /* スキルが埋まっているカードの「忘れるスキルを選ぶ」画面用：カードを1枚だけ大きめに見せる */
+        #eventforget-card-area .big-card.compact { width: 170px; height: auto; }
+        #eventforget-card-area .big-card.compact .bc-illust { height: 102px; }
+        #eventforget-card-area .big-card.compact .bc-info { font-size: 1.55rem; padding: 4px 10px; }
+        #eventforget-card-area .big-card.compact .bc-skills { min-height: 54px; padding: 5px 7px; gap: 5px; }
+        #eventforget-card-area .big-card.compact .bc-skill-row { font-size: 0.68rem; padding: 5px 9px; }
+        #eventforget-card-area .big-card.compact .bc-skill-mult { font-size: 0.85rem; }
+        .suit-tally {
+            display: inline-flex; gap: 12px; align-items: center; background: rgba(245,240,225,0.08);
+            border: 1px solid rgba(212,175,55,0.35); border-radius: 8px; padding: 3px 12px; font-weight: 800; font-size: 0.82rem;
+        }
+        .suit-tally .sc-H { color: #e0546c; }
+        .suit-tally .sc-S { color: #ddd; }
+        .suit-tally .sc-D { color: var(--gold-bright); }
+        .suit-tally .sc-C { color: #66bb6a; }
+
+        @keyframes pulse { 0%,100%{ transform:scale(1);} 50%{ transform:scale(1.08);} }
+        /* ==================== MAP（下から上に進むイメージ。今の2択の上に、その先2択ぶんのプレビュー） ==================== */
+        #map-screen { display: flex; flex-direction: row; height: 100%; position: relative; }
+        #map-left-panel { border-right: 2px solid rgba(212,175,55,0.5); }
+        #map-right-panel { border-left: 2px solid rgba(212,175,55,0.5); }
+        #map-center {
+            flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 18px 24px; gap: 14px;
+        }
+        .map-scene {
+            flex: 1; min-height: 0; border: 2px solid rgba(212,175,55,0.4); border-radius: 18px;
+            display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.2); overflow: hidden;
+        }
+        .map-scene-img { width: 100%; height: 100%; object-fit: cover; }
+        .map-scene-caption { color: var(--text-dim); font-size: 0.9rem; }
+        .map-fork { display: flex; justify-content: center; align-items: flex-end; gap: 70px; padding-bottom: 4px; }
+        .map-fork-col { display: flex; flex-direction: column; align-items: center; gap: 40px; position: relative; }
+        .map-node {
+            width: 160px; height: 160px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center;
+            font-size: 3rem; background: var(--panel-bg); border: 4px solid #3a3226; cursor: pointer; transition: all .15s;
+            animation: pulse 1.6s infinite; position: relative; z-index: 2;
+        }
+        .map-node:hover { border-color: var(--gold-bright); box-shadow: 0 0 20px rgba(212,175,55,0.6); transform: scale(1.05); }
+        .map-node-label { font-size: 0.85rem; font-weight: 800; color: var(--text-dim); margin-top: 2px; }
+        .map-node-normal { border-color: var(--crimson); }
+        .map-node-elite { border-color: #b23aef; box-shadow: 0 0 10px rgba(178,58,239,0.5); }
+        .map-node-shop { border-color: #29b6f6; }
+        .map-node-event { border-color: var(--gold); }
+        .map-node-boss { border-color: var(--arcane); box-shadow: 0 0 14px rgba(155,107,240,0.6); }
+        .map-preview-row { display: flex; gap: 14px; position: relative; z-index: 2; }
+        .map-node-preview {
+            width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-size: 1.8rem; background: var(--panel-bg); border: 3px solid #3a3226; opacity: 0.85; position: relative;
+        }
+        /* 通常・エリートマスに実際の敵イラストを丸く見せる。エリートは左上に⭐バッジ */
+        .map-node-monster-img { width: 96px; height: 96px; border-radius: 50%; object-fit: cover; display: block; }
+        .map-node-preview .map-node-monster-img { width: 54px; height: 54px; }
+        .map-node-elite-badge {
+            position: absolute; top: -4px; left: -4px; font-size: 1.3rem; z-index: 3;
+            filter: drop-shadow(0 2px 3px rgba(0,0,0,0.85));
+        }
+        .map-node-preview .map-node-elite-badge { font-size: 1rem; top: -2px; left: -2px; }
+        .map-node-preview.map-node-normal { border-color: var(--crimson); }
+        .map-node-preview.map-node-elite { border-color: #b23aef; }
+        .map-node-preview.map-node-shop { border-color: #29b6f6; }
+        .map-node-preview.map-node-event { border-color: var(--gold); }
+        .map-node-preview.map-node-boss { border-color: var(--arcane); }
+        /* プレビューと選択マスをつなぐ線（未知の道でつながっている感じ） */
+        .map-fork-lines { position: absolute; left: 50%; transform: translateX(-50%); top: 64px; width: 160px; height: 40px; overflow: visible; z-index: 1; }
+        .map-fork-lines line { stroke: rgba(212,175,55,0.55); stroke-width: 2; stroke-dasharray: 5 5; }
+
+        /* ==================== ボスまでの道のり（右パネル。下からSTART→〇×9→BOSS、現在地を光らせる） ==================== */
+        .boss-track { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: space-evenly; gap: 6px; width: 100%; }
+        .boss-track-node {
+            width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-size: 0.9rem; color: var(--text-dim); background: var(--panel-bg); border: 2px solid #3a3226; flex-shrink: 0;
+        }
+        .boss-track-node.boss-track-start, .boss-track-node.boss-track-boss {
+            width: auto; height: auto; border-radius: 8px; padding: 6px 10px; font-size: 0.68rem; font-weight: 800;
+        }
+        .boss-track-node.current {
+            border-color: var(--gold-bright); color: var(--gold-bright); background: rgba(212,175,55,0.22);
+            box-shadow: 0 0 14px rgba(212,175,55,0.7); animation: pulse 1.6s infinite;
+        }
+        .hp-bar-wrap { margin: 12px 0; }
+        .hp-bar-label { display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-dim); margin-bottom: 3px; }
+        .hp-bar { height: 16px; border-radius: 8px; background: var(--panel-bg); border: 1px solid rgba(212,175,55,0.3); overflow: hidden; }
+        .hp-bar-fill { height: 100%; background: linear-gradient(90deg, #7fd858, #3ea638); transition: width .3s; }
+        .hp-bar-fill.enemy { background: linear-gradient(90deg, #e0546c, var(--crimson)); }
+
+        /* ==================== BATTLE (3-column layout) ==================== */
+        #battle-screen { display: flex; flex-direction: row; height: 100%; position: relative; }
+        .bust-shake { animation: bustShake 0.4s ease-in-out; }
+        @keyframes bustShake {
+            0%, 100% { transform: translate(0, 0); }
+            20% { transform: translate(-10px, 5px); }
+            40% { transform: translate(9px, -5px); }
+            60% { transform: translate(-7px, 3px); }
+            80% { transform: translate(7px, -3px); }
+        }
+        .bust-flash {
+            position: absolute; inset: 0; background: rgba(220,30,30,0.35);
+            pointer-events: none; z-index: 400; animation: bustFlashFade 0.5s ease-out forwards;
+        }
+        @keyframes bustFlashFade { 0% { opacity: 1; } 100% { opacity: 0; } }
+        /* プレイヤーがダメージを受けたときの軽い演出（バーストより控えめ、アバター周りだけ） */
+        .player-hit-shake { animation: playerHitShake 0.35s ease-in-out; }
+        @keyframes playerHitShake {
+            0%, 100% { transform: translate(0, 0); }
+            25% { transform: translate(-6px, 0); }
+            50% { transform: translate(6px, 0); }
+            75% { transform: translate(-4px, 0); }
+        }
+        .player-hit-flash {
+            position: absolute; inset: -6px; border-radius: 16px; background: rgba(220,30,30,0.45);
+            pointer-events: none; z-index: 40; animation: bustFlashFade 0.4s ease-out forwards;
+        }
+        .battle-panel {
+            width: 232px; flex-shrink: 0;
+            background: linear-gradient(180deg, #17251b 0%, #050a06 100%);
+            padding: 14px 14px; display: flex; flex-direction: column; align-items: center; gap: 4px;
+            overflow-y: auto;
+        }
+        #battle-left-panel { border-right: 2px solid rgba(212,175,55,0.5); }
+        #battle-right-panel { border-left: 2px solid rgba(212,175,55,0.5); }
+        .bp-title { color: var(--gold); font-weight: 800; letter-spacing: 3px; font-size: 0.9rem; }
+        .bp-avatar-wrap { position: relative; display: flex; align-items: center; justify-content: center; }
+        .bp-avatar-illust {
+            width: 200px; height: 200px; border-radius: 14px; margin: 6px 0;
+            background: #242424; border: 3px solid #4a4a4a; object-fit: cover;
+        }
+        .bp-name { font-weight: 800; font-size: 0.95rem; color: var(--text-hi); margin-bottom: 4px; text-align: center; }
+        .bp-atk { font-size: 0.8rem; color: #e0546c; font-weight: 700; margin-bottom: 4px; }
+        .bp-hp-label { align-self: flex-start; font-size: 0.8rem; color: var(--text-dim); font-weight: 700; }
+        .bp-hp-text { align-self: flex-end; font-size: 0.88rem; color: var(--text-dim); margin-bottom: 4px; font-weight: 700; }
+        .battle-panel .hp-bar { width: 100%; }
+        .info-box {
+            width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(212,175,55,0.3); border-radius: 8px;
+            padding: 7px 9px; font-size: 0.7rem; color: var(--text-dim); margin-top: 6px; min-height: 36px;
+        }
+        .info-box .ea-name { color: #d98a5a; font-weight: 800; margin-bottom: 3px; font-size: 0.74rem; }
+        .bp-stats {
+            width: 100%; background: rgba(0,0,0,0.35); border: 1px solid rgba(212,175,55,0.3); border-radius: 8px;
+            padding: 7px 9px; margin-top: auto; padding-top: 8px; display: flex; flex-direction: column; gap: 3px;
+        }
+        .bp-stat-row { display: flex; justify-content: space-between; gap: 6px; font-size: 0.74rem; color: var(--text-dim); }
+        .bp-stat-row span:last-child { color: var(--text-main); font-weight: 700; text-align: right; }
+        /* マップ画面：HPのすぐ下に、チップの所持数を大きく目立たせて表示する */
+        .bp-chip-big {
+            width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;
+            background: rgba(212,175,55,0.14); border: 2px solid var(--gold); border-radius: 12px;
+            padding: 8px 0; margin: 8px 0 4px; font-size: 1.7rem; font-weight: 900; color: var(--gold-bright);
+        }
+        /* ポーションはアイテムが3種類だけなので、一覧を開かせず直接使えるボタンにする。
+           コインパネルとそろえた見た目にして、マップ・バトル両画面で統一感を出す */
+        .bp-potion-row { width: 100%; display: flex; gap: 6px; margin-bottom: 4px; }
+        .potion-btn {
+            flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
+            background: rgba(212,175,55,0.1); border: 2px solid #3a3226; border-radius: 10px;
+            padding: 6px 0; cursor: pointer; font-family: inherit; color: var(--text-main);
+        }
+        .potion-btn:hover:not(:disabled) { border-color: var(--gold-bright); filter: brightness(1.15); }
+        .potion-btn:disabled { opacity: 0.35; cursor: not-allowed; filter: grayscale(0.6); }
+        .potion-btn .potion-img { width: 30px; height: 30px; object-fit: contain; }
+        .potion-btn .potion-count { font-size: 0.78rem; font-weight: 800; color: var(--text-main); }
+        .bp-bottom-btns { width: 100%; display: flex; flex-direction: column; gap: 6px; padding-top: 8px; margin-top: auto; }
+        .bp-bottom-btns .btn { margin-top: 0; }
+
+        #battle-center {
+            flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center;
+            justify-content: center; gap: 6px; padding: 6px 18px; position: relative;
+        }
+        .cards-row {
+            /* カード実寸は394px固定（.big-cardのheightを参照）。カードサイズをアルカナ比率(72:129)に
+               統一した際に高さが増えたため、他の行のpadding/gapを詰めて縦の予算を確保している */
+            position: relative; height: 402px; width: 100%; max-width: 860px;
+            display: flex; align-items: center; justify-content: center; overflow: hidden;
+        }
+        .cards-inner { display: flex; flex-wrap: nowrap; gap: 16px; transform-origin: center center; }
+        .badges-row { display: flex; gap: 14px; align-items: stretch; justify-content: center; width: 520px; }
+        .total-badge {
+            width: 150px; text-align: center; box-sizing: border-box;
+            font-size: 2.1rem; font-weight: 800; color: var(--gold-bright);
+            background: rgba(0,0,0,0.4); border: 2px solid var(--gold); border-radius: 14px; padding: 4px 0;
+        }
+        .total-badge.ace-option { cursor: pointer; transition: opacity .15s, transform .15s; user-select: none; }
+        .total-badge.ace-option:hover { transform: translateY(-2px); }
+        .total-badge.ace-option.dim { opacity: 0.4; }
+        .total-badge.ace-option .ace-sub { display: block; font-size: 0.6rem; color: var(--text-dim); font-weight: 700; margin-top: 2px; }
+        .mult-value-badge { color: var(--arcane); border-color: var(--arcane); background: rgba(155,107,240,0.18); }
+        .battle-actions { display: flex; gap: 14px; width: 520px; justify-content: center; }
+        .battle-actions .btn { width: 230px; margin-top: 0; padding: 10px 24px; font-size: 1.3rem; }
+        .battle-actions .btn:disabled { opacity: 0.35; cursor: not-allowed; filter: grayscale(0.6); }
+        /* そのターンに倍率へ乗っているものを、加算されるたびに1つずつ増やして表示する内訳リスト。
+           何も乗っていないときも1行ぶんのスペースをあらかじめ確保し、表示されてもカードなどの位置がずれないようにする
+           （多くなって2行目に折り返すこともあるが、そこまでは常時予約しない＝縦の予算を圧迫しすぎない）。
+           分かりやすさ重視で他のピル（スキル欄など）よりひとまわり大きく表示する。 */
+        .mult-breakdown-row {
+            display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; width: 680px; min-height: 40px; align-content: flex-start;
+        }
+        .mult-chip {
+            display: inline-flex; align-items: center; gap: 6px; font-size: 0.92rem; font-weight: 800;
+            padding: 7px 14px; border-radius: 999px; white-space: nowrap;
+            border: 1px solid var(--cat-color); background: color-mix(in srgb, var(--cat-color) 18%, transparent);
+            color: var(--text-hi);
+        }
+        .mult-chip .mult-chip-pct { color: var(--cat-color); font-size: 1rem; }
+
+        /* キャラクタースキル・アイテムと同じ「色つき角丸ピル」の見た目で統一。コインは金色系。
+           badges-row と同じ幅(520px)にして、上下で見た目をそろえる。 */
+        .chip-bet-row {
+            display: flex; align-items: stretch; justify-content: center; gap: 24px;
+            background: rgba(212,175,55,0.14); border: 2px solid var(--gold); border-radius: 14px;
+            padding: 4px 20px; width: 520px; transition: opacity .2s, filter .2s;
+        }
+        .chip-bet-row.disabled { opacity: 0.4; filter: grayscale(0.7); }
+        .chip-section { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; flex: 1; }
+        .chip-divider { width: 2px; background: rgba(212,175,55,0.4); margin: 4px 4px; flex-shrink: 0; }
+        .chip-section-label { font-size: 0.76rem; color: var(--text-dim); font-weight: 800; letter-spacing: 1px; }
+        .chip-section-value { font-size: 1.6rem; font-weight: 900; color: var(--gold-bright); line-height: 1.1; }
+        .chip-pct-value { color: var(--arcane); }
+        .chip-bet-controls { display: flex; align-items: center; gap: 10px; }
+        .chip-btn {
+            width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--gold); background: var(--panel-bg);
+            color: var(--text-main); font-weight: 900; font-size: 1.2rem; cursor: pointer; font-family: inherit;
+            flex-shrink: 0; display: flex; align-items: center; justify-content: center; line-height: 1;
+        }
+        .chip-btn:hover:not(:disabled) { filter: brightness(1.3); }
+        .chip-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        /* ポップアップ表示（絶対配置）。表示/非表示してもまわりのレイアウトが動かないようにする */
+        .defeat-banner {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            font-size: 2.3rem; font-weight: 900; color: var(--gold-bright); text-align: center; white-space: nowrap;
+            text-shadow: 0 0 20px rgba(244,216,114,0.9), 0 4px 10px rgba(0,0,0,0.7);
+            background: rgba(8,6,3,0.92); border: 3px solid var(--gold-bright); border-radius: 20px;
+            padding: 22px 46px; z-index: 250; pointer-events: none;
+            animation: defeatPop 0.4s ease-out;
+        }
+        /* translate(-50%,-50%)による中央寄せは、アニメーション中もscaleと同時に効かせないと
+           （transformは1プロパティなので、scaleだけのキーフレームだと中央寄せが上書きされて、
+           一瞬だけ右下寄りの位置に表示されてから中央へワープするバグになる） */
+        @keyframes defeatPop {
+            from { transform: translate(-50%, -50%) scale(0.7); opacity: 0; }
+            to   { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        }
+        /* 同じスートがそろったときの演出（自動でしばらくすると消える）。位置は敵撃破ポップアップと同じ中央 */
+        .suitmatch-banner {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            font-size: 1.7rem; font-weight: 900; color: var(--arcane); text-align: center; white-space: nowrap;
+            text-shadow: 0 0 16px rgba(155,107,240,0.9), 0 4px 10px rgba(0,0,0,0.7);
+            background: rgba(8,6,3,0.92); border: 3px solid var(--arcane); border-radius: 20px;
+            padding: 16px 34px; z-index: 245; pointer-events: none;
+            animation: defeatPop 0.35s ease-out;
+        }
+
+        /* ダメージ／回復のフロート表示 */
+        .dmg-float {
+            position: absolute; left: 50%; top: 40%; transform: translate(-50%, 0);
+            font-size: 1.9rem; font-weight: 800; color: #ff5566;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.8); pointer-events: none; z-index: 30;
+            animation: dmgRise 1.1s ease-out forwards; white-space: nowrap;
+        }
+        .dmg-float.heal { color: #7fd858; font-size: 1.5rem; }
+        .dmg-float.coin { color: var(--gold-bright); font-size: 1.5rem; }
+        .dmg-float.bust { color: #ffcc55; font-size: 1.8rem; }
+        .dmg-float.enemy-hit { font-size: 2.8rem; color: #ff3344; text-shadow: 0 0 12px rgba(255,50,50,0.85), 0 3px 10px rgba(0,0,0,0.9); }
+        @keyframes dmgRise {
+            0%   { opacity: 0; transform: translate(-50%, 10px) scale(0.8); }
+            15%  { opacity: 1; transform: translate(-50%, -6px) scale(1.1); }
+            100% { opacity: 0; transform: translate(-50%, -46px) scale(1); }
+        }
+
+        /* スキルをタップ/クリックすると効果説明が出るポップアップ */
+        .skill-desc-popup {
+            position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%);
+            max-width: 640px; background: rgba(10,8,4,0.97); border: 2px solid var(--gold-bright);
+            border-radius: 12px; padding: 10px 22px; font-size: 0.85rem; font-weight: 700; color: var(--text-hi);
+            text-align: center; z-index: 300; box-shadow: 0 8px 24px rgba(0,0,0,0.7);
+            animation: descPopIn 0.15s ease-out; pointer-events: none;
+        }
+        @keyframes descPopIn { from { opacity: 0; transform: translateX(-50%) translateY(10px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+
+        /* ==================== OVERLAY（画面共通。#container直下に置く） ==================== */
+        .overlay {
+            position: absolute; inset: 0; background: rgba(0,0,0,0.8);
+            display: flex; align-items: center; justify-content: center; z-index: 100;
+        }
+        .overlay-box { width: 560px; max-height: 640px; overflow-y: auto; padding: 26px 30px; text-align: center; }
+        .overlay-box.wide { width: 1220px; max-height: 716px; padding: 10px 30px; }
+        .overlay-box.wide .settings-title { margin-bottom: 6px; }
+        .overlay-box.wide .settings-label { margin-bottom: 4px; }
+        .howto-body { text-align: left; font-size: 0.84rem; line-height: 1.9; color: var(--text-main); margin: 12px 0 18px; }
+        .howto-body h3 { color: var(--gold-bright); font-size: 0.92rem; margin: 12px 0 3px; }
+        /* ==================== REWARD / EVENTS ==================== */
+        #itemget-screen .title-box { width: 480px; }
+        #reveal-screen .title-box { width: 920px; }
+        .pack-closed {
+            width: 280px; height: 360px; margin: 20px auto; cursor: pointer;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+            background: linear-gradient(160deg, #2a2410, #0a0806); border: 3px solid var(--gold-bright); border-radius: 20px;
+            box-shadow: 0 0 30px rgba(212,175,55,0.4); transition: transform .15s; animation: pulse 1.6s infinite;
+        }
+        .pack-closed:hover { transform: scale(1.05); box-shadow: 0 0 40px rgba(212,175,55,0.7); }
+        .pack-closed-img { width: 230px; height: 230px; object-fit: contain; }
+        .pack-closed-label { font-weight: 800; color: var(--gold-bright); font-size: 0.95rem; }
+        .reward-row { display: flex; gap: 24px; justify-content: center; margin: 18px 0; flex-wrap: wrap; }
+        .party-row { display: flex; gap: 24px; justify-content: center; margin: 20px 0; flex-wrap: wrap; }
+        .reward-pick { cursor: pointer; border-radius: 18px; padding: 6px; border: 2px solid transparent; }
+        .reward-pick:hover { border-color: var(--gold); background: rgba(212,175,55,0.1); }
+        .big-announce {
+            font-size: 1.7rem; font-weight: 900; color: var(--gold-bright);
+            text-shadow: 0 0 16px rgba(244,216,114,0.5); margin-bottom: 8px; line-height: 1.4;
+        }
+        .eventskill-sub { font-size: 1.05rem; color: var(--text-main); font-weight: 700; margin-bottom: 8px; }
+        .eventskill-desc { font-size: 0.85rem; color: var(--text-dim); font-weight: 600; margin: -4px 0 10px; }
+        /* 見知らぬ魔法使いイベント：前置きは控えめに、効果の行は大きく色分けして目立たせる */
+        .eh-intro { font-size: 1rem; color: var(--text-dim); font-weight: 700; margin-bottom: 10px; }
+        .eh-line { font-size: 1.7rem; font-weight: 900; margin: 8px 0; text-shadow: 0 0 14px rgba(0,0,0,0.5); }
+        .eh-maxhp { color: var(--gold-bright); text-shadow: 0 0 16px rgba(244,216,114,0.6); }
+        .eh-heal { color: #7fd858; text-shadow: 0 0 16px rgba(127,216,88,0.6); }
+
+        /* ==================== SHOP（横2×縦2グリッドで、縦スクロールが出ないようにする） ==================== */
+        #shop-screen .event-popup-box { width: 560px; }
+        .shop-list { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
+        .shop-row {
+            display: flex; flex-direction: column; align-items: center; gap: 3px; border: 1px solid var(--gold);
+            border-radius: 10px; padding: 10px 10px; text-align: center;
+        }
+        .shop-icon { font-size: 1.7rem; }
+        .shop-info { display: flex; flex-direction: column; align-items: center; }
+        .shop-name { font-weight: 800; font-size: 0.9rem; color: var(--text-hi); }
+        .shop-desc { font-size: 0.68rem; color: var(--text-dim); }
+        .shop-price { font-weight: 900; color: var(--gold-bright); }
+        .shop-buy-btn { width: auto; margin: 0; padding: 6px 20px; }
+
+        /* ==================== RESULT ==================== */
+        #clear-screen .title-box, #over-screen .title-box { width: 460px; }
+        .result-emoji { font-size: 3rem; }
+        .result-score { font-size: 1.6rem; color: var(--gold-bright); font-weight: 800; margin: 10px 0; }
+        .world-submit-msg { font-size: 0.8rem; margin-top: 6px; min-height: 1em; }
+    </style>
+</head>
+<body>
+<div id="container">
+
+    <!-- ==================== TITLE ==================== -->
+    <div id="title-screen">
+        <img class="title-bg-img" src="images/title.png" alt="">
+        <div class="title-illust-frame title-illust-frame-left">
+            <img id="title-illust-left" class="title-illust" alt="" onerror="this.parentElement.style.visibility='hidden';">
+        </div>
+        <div class="title-illust-frame title-illust-frame-right">
+            <img id="title-illust-right" class="title-illust" alt="" onerror="this.parentElement.style.visibility='hidden';">
+        </div>
+        <div class="title-box">
+            <h1 class="title-h1">ブラックジャック・アルカナ</h1>
+            <p class="title-sub">BLACKJACK ARCANA</p>
+            <button id="btn-continue" class="btn btn-gold hidden" onclick="continueGame()">▶ つづきから</button>
+            <button class="btn btn-gold" onclick="goToStarterSelect()">はじめから</button>
+            <button id="btn-name-register" class="btn btn-gray" onclick="openNameRegister()">👤 名前の登録</button>
+            <button class="btn btn-gray" onclick="openRanking()">🏆 ランキング</button>
+            <button class="btn btn-gray" onclick="openSettings()">⚙️ 設定</button>
+            <button class="btn btn-gray" onclick="location.href='../index.html'">🏠 INDEXへ</button>
+        </div>
+    </div>
+
+    <!-- ==================== NAME REGISTER ==================== -->
+    <div id="name-register-screen" class="hidden">
+        <div class="title-box" style="width:920px; max-height:680px;">
+            <h1 class="settings-title">👤 名前の登録</h1>
+
+            <div class="nr-section-label">登録ずみのなまえ</div>
+            <table class="nr-table">
+                <thead><tr><th>見た目</th><th>なまえ</th><th></th><th></th><th></th></tr></thead>
+                <tbody id="name-reg-list"></tbody>
+            </table>
+
+            <div class="nr-section-label" style="margin-top:16px;">あたらしく登録する</div>
+            <div class="name-reg-form">
+                <input type="text" id="name-reg-input" class="name-reg-input" placeholder="なまえをにゅうりょく（さいだい12文字）" maxlength="12">
+            </div>
+            <p id="name-reg-error" class="name-reg-error"></p>
+
+            <div class="nr-avatar-header">
+                <span id="nr-avatar-picker-title">見た目をえらぶ</span>
+                <span id="nr-unlock-progress" class="nr-unlock-progress"></span>
+                <button class="btn btn-gray btn-sm" style="width:auto; margin:0;" onclick="pickRandomAvatar()">🎲 ランダムに決める</button>
+                <button id="nr-avatar-cancel-btn" class="btn btn-gray btn-sm hidden" style="width:auto; margin:0;" onclick="cancelEditAvatar()">編集をやめる</button>
+            </div>
+            <div id="nr-avatar-grid" class="nr-avatar-grid"></div>
+            <p class="nr-avatar-hint">クリアするカードが増えるほど、えらべる見た目が増えていきます。</p>
+
+            <button id="nr-add-btn" class="btn btn-gold" style="margin-top:14px;" onclick="addPlayerName()">この見た目で追加する</button>
+            <button class="btn btn-gray" onclick="closeNameRegister()">◀ タイトルへ戻る</button>
+        </div>
+    </div>
+
+    <!-- ==================== RANKING ==================== -->
+    <div id="ranking-screen" class="hidden">
+        <div class="rank-box">
+            <div class="rank-title">🏆 ランキング</div>
+            <div class="rank-toggle">
+                <button id="rank-tab-local-btn" class="rank-toggle-btn active" onclick="switchRankTab('local')">ローカル</button>
+                <button id="rank-tab-world-btn" class="rank-toggle-btn" onclick="switchRankTab('world')">ワールド</button>
+            </div>
+            <div id="rank-loading" class="rank-loading" style="display:none;">読み込み中…</div>
+            <ul id="rank-list" class="rank-list"></ul>
+            <button class="btn btn-gray" onclick="closeRanking()">◀ タイトルへ戻る</button>
+        </div>
+    </div>
+
+    <!-- ==================== SETTINGS ==================== -->
+    <div id="settings-screen" class="hidden">
+        <div class="title-box">
+            <h1 class="settings-title">⚙️ 設定</h1>
+            <div class="settings-section">
+                <div class="settings-label">ふりがな表示</div>
+                <div class="settings-toggle-row">
+                    <button id="furigana-on-btn" class="settings-toggle-btn active" onclick="setFurigana(true)">表示する</button>
+                    <button id="furigana-off-btn" class="settings-toggle-btn" onclick="setFurigana(false)">表示しない</button>
+                </div>
+            </div>
+            <p class="settings-desc" style="margin-top:14px;">🌐「かんたんな日本語」「English」は、ゲームが完成に近づいたタイミングで追加予定です。</p>
+            <button class="btn btn-gray" onclick="closeSettings()">◀ タイトルへ戻る</button>
+        </div>
+    </div>
+
+    <!-- ==================== DIFFICULTY SELECT ==================== -->
+    <!-- ==================== STARTER CARD SELECT（52枚から最初の1枚を選ぶ。クリア済みカードは実績としてはっきり表示） ==================== -->
+    <div id="starter-select-screen" class="hidden">
+        <div class="title-box">
+            <h1 class="settings-title">🃏 <ruby>最初<rt>さいしょ</rt></ruby>の1<ruby>枚<rt>まい</rt></ruby>を<ruby>選<rt>えら</rt></ruby>ぼう</h1>
+            <div class="starter-clear-pct">クリア<ruby>率<rt>りつ</rt></ruby> <span id="starter-clear-pct-value">0%</span></div>
+            <div class="starter-random-btns">
+                <button class="btn btn-gray btn-sm" style="width:auto;" onclick="pickRandomStarter(true)">🎲 クリアしていないカードからランダム</button>
+                <button class="btn btn-gray btn-sm" style="width:auto;" onclick="pickRandomStarter(false)">🎲 すべてのカードからランダム</button>
+            </div>
+            <div class="starter-grid" id="starter-grid"></div>
+            <button class="btn btn-gray" onclick="backToTitleFromStarter()">◀ タイトルへ戻る</button>
+        </div>
+    </div>
+
+    <!-- ==================== STARTER CARD CONFIRM（選んだカードを大きく見せて確認する） ==================== -->
+    <div id="starter-confirm-screen" class="hidden">
+        <div class="title-box">
+            <h1 class="settings-title">このカードでいいですか？</h1>
+            <div id="starter-confirm-card-area" style="display:flex; justify-content:center; margin:16px 0;"></div>
+            <button class="btn btn-gold" onclick="confirmStarterSelect()">🃏 このカードではじめる</button>
+            <button class="btn btn-gray" onclick="backToStarterGrid()">◀ えらびなおす</button>
+        </div>
+    </div>
+
+    <!-- ==================== MAP（分岐する道。2択の先、さらに2択ぶんまで見える） ==================== -->
+    <div id="map-screen" class="hidden">
+        <!-- LEFT: 自分にまつわる情報とボタンだけ（デッキの枚数やステージ表示は右のボスまでの道のりに統合） -->
+        <div id="map-left-panel" class="battle-panel">
+            <div class="bp-avatar-wrap"><img id="map-player-avatar" class="bp-avatar-illust" alt="" onerror="this.style.visibility='hidden';" onload="this.style.visibility='visible';"></div>
+            <div class="bp-name" id="map-player-name"></div>
+            <div class="bp-hp-label">HP</div>
+            <div class="hp-bar"><div id="map-hp-fill" class="hp-bar-fill"></div></div>
+            <div class="bp-hp-text" id="map-hp-text"></div>
+            <div class="bp-chip-big">🪙 <span id="map-stat-chips"></span></div>
+            <div class="bp-potion-row">
+                <button class="potion-btn" data-item="potionS" onclick="confirmUsePotion('potionS')"><img class="potion-img" src="images/14_potion_green.png" alt=""><span class="potion-count"></span></button>
+                <button class="potion-btn" data-item="potionM" onclick="confirmUsePotion('potionM')"><img class="potion-img" src="images/13_potion_blue.png" alt=""><span class="potion-count"></span></button>
+                <button class="potion-btn" data-item="potionL" onclick="confirmUsePotion('potionL')"><img class="potion-img" src="images/15_potion_yellow.png" alt=""><span class="potion-count"></span></button>
+            </div>
+            <div class="bp-bottom-btns">
+                <button class="btn btn-gold" style="padding:16px 18px; font-size:1.05rem;" onclick="goToDeckBuilder()">🧩 デッキ構築</button>
+            </div>
+        </div>
+
+        <!-- CENTER: 絵のスペース（上）＋下から上に進む2択（下） -->
+        <div id="map-center">
+            <div class="map-scene"><img id="map-scene-img" class="map-scene-img" src="" alt=""></div>
+            <div id="map-fork" class="map-fork"></div>
+        </div>
+
+        <!-- RIGHT: 選択マスではなく、ボスまでの現在の進行度が一目でわかる道のり表示 -->
+        <div id="map-right-panel" class="battle-panel">
+            <div class="bp-title" id="map-stage-title"></div>
+            <div id="map-boss-track" class="boss-track"></div>
+            <div class="bp-bottom-btns">
+                <button class="btn btn-gray btn-sm" onclick="openBattleHowTo()">📖 あそびかた</button>
+                <button class="btn btn-gray btn-sm" onclick="giveUpRun()">🏳️ タイトルへ</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== SHOP ==================== -->
+    <div id="shop-screen" class="hidden">
+        <div class="event-popup-box">
+            <div class="big-announce">🛒 ショップ</div>
+            <p class="settings-desc">🪙 しょじ：<span id="shop-chips"></span></p>
+            <div id="shop-list" class="shop-list"></div>
+            <p id="shop-log" class="settings-desc" style="color:var(--gold-bright); min-height:1.2em;"></p>
+            <button class="btn btn-gray" onclick="closeShop()">▶ マップへもどる</button>
+        </div>
+    </div>
+
+    <!-- ==================== マップイベント①: 最大HPアップ ==================== -->
+    <div id="eventhp-screen" class="hidden">
+        <div class="event-popup-box">
+            <div class="big-announce">🧙 見知らぬ魔法使い</div>
+            <div id="eventhp-body" style="font-size:1.15rem; font-weight:800; color:var(--text-hi); margin:14px 0; line-height:1.7;"></div>
+            <button class="btn btn-gold" onclick="closeEventMaxHp()">▶ マップへもどる</button>
+        </div>
+    </div>
+
+    <!-- ==================== マップイベント②: スキル習得（付与先を選ぶ） ==================== -->
+    <div id="eventskill-screen" class="hidden">
+        <div class="event-popup-box" style="width:900px;">
+            <div class="big-announce">🌟 新しいスキルを覚えさせることができる！</div>
+            <p class="eventskill-sub"><span id="eventskill-name"></span>を付けるカードを1つ選んでください</p>
+            <p class="eventskill-desc" id="eventskill-desc"></p>
+            <div id="eventskill-row" class="party-row"></div>
+            <button class="btn btn-gray" onclick="skipEventLearnSkill()">スキルを覚えさせない</button>
+        </div>
+    </div>
+
+    <!-- ==================== マップイベント②': スキル習得（すでに上限のカードは、忘れるスキルを選ぶ） ==================== -->
+    <div id="eventforget-screen" class="hidden">
+        <div class="event-popup-box" style="width:680px;">
+            <div class="big-announce">🤔 スキルがいっぱい！</div>
+            <div id="eventforget-card-area" style="display:flex; justify-content:center; margin:8px 0;"></div>
+            <p class="eventskill-sub" id="eventforget-desc"></p>
+            <div id="eventforget-row" class="party-row"></div>
+        </div>
+    </div>
+
+    <!-- ==================== マップイベント③: 宝箱 ==================== -->
+    <div id="eventtreasure-screen" class="hidden">
+        <div class="event-popup-box">
+            <div class="big-announce">📦 宝箱発見！</div>
+            <div id="eventtreasure-body" style="font-size:1.15rem; font-weight:800; color:var(--text-hi); margin:14px 0; line-height:1.7;"></div>
+            <button class="btn btn-gold" onclick="closeEventTreasure()">▶ マップへもどる</button>
+        </div>
+    </div>
+
+    <!-- ==================== DECK BUILDER（所持カードから、実際にデッキへ入れる分を選ぶ。戦闘中は開けない） ==================== -->
+    <div id="deckbuilder-screen" class="hidden">
+        <div class="title-box">
+            <h1 class="settings-title">🧩 デッキ構築</h1>
+            <div class="db-tabs">
+                <button class="db-tab active" id="db-tab-char" onclick="switchDeckBuilderTab('char')">🎴 キャラクターカード <span id="db-char-count" class="db-count"></span></button>
+                <button class="db-tab" id="db-tab-normal" onclick="switchDeckBuilderTab('normal')">🃏 通常カード <span id="db-normal-count" class="db-count"></span></button>
+            </div>
+            <div class="db-toolbar">
+                <button class="btn btn-gray btn-sm" id="db-clear-btn" style="width:auto;" onclick="clearDeckSelection()">🗑️ すべてデッキから外す</button>
+                <label class="db-hide-toggle"><input type="checkbox" id="db-hide-bench" onchange="toggleHideBench()"> デッキ外のカードを隠す</label>
+            </div>
+            <div id="db-char-grid" class="card-grid char-grid"></div>
+            <div id="db-normal-grid" class="card-grid hidden"></div>
+            <button class="btn btn-gold" id="db-confirm-btn" onclick="confirmDeckBuilder()">これでいい！</button>
+            <button class="btn btn-gray" onclick="cancelDeckBuilder()">◀ もどる</button>
+        </div>
+    </div>
+
+    <!-- ==================== BATTLE ==================== -->
+    <div id="battle-screen" class="hidden">
+        <!-- LEFT: 味方 -->
+        <div id="battle-left-panel" class="battle-panel">
+            <div class="bp-avatar-wrap" id="battle-player-avatar-wrap">
+                <img id="battle-player-avatar" class="bp-avatar-illust" alt="" onerror="this.style.visibility='hidden';" onload="this.style.visibility='visible';">
+            </div>
+            <div class="bp-name" id="battle-player-name"></div>
+            <div class="bp-hp-label">HP</div>
+            <div class="hp-bar"><div id="battle-player-hp-fill" class="hp-bar-fill"></div></div>
+            <div class="bp-hp-text" id="battle-player-hp-text"></div>
+            <div class="bp-chip-big">🪙 <span id="battle-stat-chips"></span></div>
+            <div class="bp-potion-row">
+                <button class="potion-btn" data-item="potionS" onclick="confirmUsePotion('potionS')"><img class="potion-img" src="images/14_potion_green.png" alt=""><span class="potion-count"></span></button>
+                <button class="potion-btn" data-item="potionM" onclick="confirmUsePotion('potionM')"><img class="potion-img" src="images/13_potion_blue.png" alt=""><span class="potion-count"></span></button>
+                <button class="potion-btn" data-item="potionL" onclick="confirmUsePotion('potionL')"><img class="potion-img" src="images/15_potion_yellow.png" alt=""><span class="potion-count"></span></button>
+            </div>
+            <div class="bp-stats">
+                <div class="bp-stat-row"><span>キャラカード</span><span id="stat-char-deck"></span></div>
+                <div class="bp-stat-row"><span>通常カード</span><span id="stat-normal-deck"></span></div>
+                <div class="bp-stat-row"><span>ステージ</span><span id="stat-stage"></span></div>
+                <div class="bp-stat-row"><span>ターン</span><span id="stat-turn"></span></div>
+                <div class="bp-stat-row"><span>スコア</span><span id="stat-score"></span></div>
+            </div>
+        </div>
+
+        <!-- CENTER: 対戦エリア -->
+        <div id="battle-center">
+            <div id="battle-cards-row" class="cards-row">
+                <div id="battle-cards-inner" class="cards-inner"></div>
+            </div>
+            <div class="chip-bet-row" id="chip-bet-row">
+                <div class="chip-section">
+                    <span class="chip-section-label">しょじ</span>
+                    <span class="chip-section-value">🪙<span id="chip-pool">0</span></span>
+                </div>
+                <div class="chip-divider"></div>
+                <div class="chip-section">
+                    <span class="chip-section-label">かける</span>
+                    <div class="chip-bet-controls">
+                        <button class="chip-btn" id="chip-minus-btn" onclick="adjustChipBet(-1)">−</button>
+                        <span class="chip-section-value" id="chip-bet-count">0</span>
+                        <button class="chip-btn" id="chip-plus-btn" onclick="adjustChipBet(1)">＋</button>
+                    </div>
+                </div>
+            </div>
+            <div class="badges-row" id="badges-row"></div>
+            <div class="mult-breakdown-row" id="mult-breakdown-row"></div>
+            <div class="battle-actions" id="battle-hit-stand-row">
+                <button class="btn btn-gold" onclick="doHit()">カードを引く</button>
+                <button class="btn btn-crimson" id="battle-attack-btn" onclick="doStand()">攻撃する</button>
+            </div>
+            <button id="battle-next-turn-btn" class="btn btn-gold hidden js-enter-next" style="width:220px;" onclick="proceedAfterTurn()">つぎへ ▶</button>
+        </div>
+        <div id="defeat-banner" class="defeat-banner hidden">🎉 敵を倒した！</div>
+        <div id="suitmatch-banner" class="suitmatch-banner hidden"></div>
+
+        <!-- RIGHT: てき -->
+        <div id="battle-right-panel" class="battle-panel">
+            <div class="bp-title">てき</div>
+            <div class="bp-avatar-wrap" id="battle-enemy-avatar-wrap">
+                <img id="battle-enemy-avatar" class="bp-avatar-illust" alt="" onerror="this.style.visibility='hidden';" onload="this.style.visibility='visible';">
+            </div>
+            <div class="bp-name" id="battle-enemy-name"></div>
+            <div class="bp-atk">こうげき力：<span id="battle-enemy-atk"></span></div>
+            <div class="bp-hp-label">HP</div>
+            <div class="hp-bar"><div id="battle-enemy-hp-fill" class="hp-bar-fill enemy"></div></div>
+            <div class="bp-hp-text" id="battle-enemy-hp-text"></div>
+            <div id="battle-enemy-ability-box" class="info-box"></div>
+            <div class="bp-bottom-btns">
+                <button class="btn btn-gray btn-sm" onclick="openBattleHowTo()">📖 あそびかた</button>
+                <button class="btn btn-gray btn-sm" onclick="openCharCollection()">🎴 キャラクターカード</button>
+                <button class="btn btn-gray btn-sm" onclick="openNormalCollection()">🃏 通常カード</button>
+                <button class="btn btn-gray btn-sm" onclick="battleBackToTitle()">🏠 タイトルへ</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== 撃破ボーナス：カードパックを開ける（タップするまで閉じたまま） ==================== -->
+    <div id="reveal-screen" class="hidden">
+        <div class="title-box">
+            <div class="big-announce" id="reveal-title">🎁 カードパック</div>
+            <div id="reveal-pack-closed" class="pack-closed" onclick="openPackAnimation()">
+                <img id="reveal-pack-img" class="pack-closed-img" src="" alt="">
+                <div class="pack-closed-label">タップして開ける</div>
+            </div>
+            <div id="reveal-card-area" class="reward-row hidden"></div>
+            <button class="btn btn-gold hidden js-enter-next" id="reveal-next-btn" onclick="closeReveal()">つぎへ ▶</button>
+        </div>
+    </div>
+
+    <!-- ==================== 撃破ボーナス：スキルのひらめき（20%） ==================== -->
+    <div id="epiphany-screen" class="hidden">
+        <div class="title-box">
+            <div class="big-announce">💡 ひらめいた！</div>
+            <div id="epiphany-card-area" style="display:flex; justify-content:center; margin:10px 0;"></div>
+            <div id="epiphany-body" style="font-size:1.15rem; font-weight:800; color:var(--text-hi); margin:14px 0; line-height:1.7;"></div>
+            <button class="btn btn-gold js-enter-next" onclick="closeEpiphany()">▶ つぎへ</button>
+        </div>
+    </div>
+
+    <!-- ==================== 撃破ボーナス：コイン・アイテム獲得 ==================== -->
+    <div id="itemget-screen" class="hidden">
+        <div class="title-box">
+            <div class="big-announce">🎁 GET！</div>
+            <div id="itemget-body" style="font-size:1.3rem; font-weight:800; color:var(--text-hi); margin:14px 0; line-height:1.9;"></div>
+            <button class="btn btn-gold js-enter-next" onclick="closeItemGet()">つぎへ ▶</button>
+        </div>
+    </div>
+
+    <!-- ==================== CLEAR ==================== -->
+    <div id="clear-screen" class="hidden">
+        <div class="title-box">
+            <div class="result-emoji">🎉</div>
+            <h1 class="settings-title">ステージクリア！</h1>
+            <div class="result-score" id="clear-score"></div>
+            <button id="clear-world-submit-btn" class="btn btn-gold" onclick="submitScoreToWorld('clear')">🌐 ワールドランキングに送信</button>
+            <div id="clear-world-submit-msg" class="world-submit-msg"></div>
+            <button class="btn btn-gray" onclick="goToStarterSelect()">🔄 もう一度あそぶ</button>
+            <button class="btn btn-gray" onclick="backToTitleFromResult()">🏠 タイトルへ</button>
+        </div>
+    </div>
+
+    <!-- ==================== GAME OVER ==================== -->
+    <div id="over-screen" class="hidden">
+        <div class="title-box">
+            <div class="result-emoji">💀</div>
+            <h1 class="settings-title">ゲームオーバー</h1>
+            <div class="result-score" id="over-score"></div>
+            <button id="over-world-submit-btn" class="btn btn-gold" onclick="submitScoreToWorld('over')">🌐 ワールドランキングに送信</button>
+            <div id="over-world-submit-msg" class="world-submit-msg"></div>
+            <button class="btn btn-gray" onclick="goToStarterSelect()">🔄 もう一度あそぶ</button>
+            <button class="btn btn-gray" onclick="backToTitleFromResult()">🏠 タイトルへ</button>
+        </div>
+    </div>
+
+    <!-- ==================== 汎用のはい／いいえ確認ダイアログ（ブラウザのconfirm()は使わない方針） ==================== -->
+    <div id="confirm-overlay" class="overlay hidden">
+        <div class="overlay-box" style="width:360px; padding:26px 28px;">
+            <p id="confirm-message" style="font-size:1rem; font-weight:700; color:var(--text-hi); margin:6px 0 20px; line-height:1.6;"></p>
+            <div style="display:flex; gap:10px;">
+                <button id="confirm-yes-btn" class="btn btn-gold" style="margin-top:0;" onclick="resolveConfirmDialog(true)">はい</button>
+                <button id="confirm-no-btn" class="btn btn-gray" style="margin-top:0;" onclick="resolveConfirmDialog(false)">いいえ</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== オーバーレイ（あそびかた／コレクション／アイテム）。
+         どの画面からでも開けるよう #container 直下に置く（過去、battle-screen配下に置いていたせいで
+         撃破ボーナス画面などから開けないバグがあったため、この位置に修正） ==================== -->
+    <div id="howto-overlay" class="overlay hidden">
+        <div class="overlay-box">
+            <h1 class="settings-title">📖 あそびかた</h1>
+            <div class="howto-body">
+                <h3>◆ きほん</h3>
+                <ruby>手札<rt>てふだ</rt></ruby>の<ruby>合計<rt>ごうけい</rt></ruby>が21を<ruby>超<rt>こ</rt></ruby>えないように「カードを<ruby>引<rt>ひ</rt></ruby>く」でカードを<ruby>足<rt>た</rt></ruby>し、いいところで「<ruby>攻撃<rt>こうげき</rt></ruby>する」で<ruby>確定<rt>かくてい</rt></ruby>させよう。21を<ruby>超<rt>こ</rt></ruby>えると「バースト」でダメージ0になる。Ａがあるときは、2つの<ruby>合計<rt>ごうけい</rt></ruby>候補<rt>こうほ</rt>から<ruby>選<rt>えら</rt></ruby>べる。
+                <h3>◆ スキルと<ruby>倍率<rt>ばいすう</rt></ruby></h3>
+                キャラクターカードが<ruby>持<rt>も</rt></ruby>つスキルの<ruby>条件<rt>じょうけん</rt></ruby>を<ruby>満<rt>み</rt></ruby>たすと、<ruby>合計<rt>ごうけい</rt></ruby>に<ruby>倍率<rt>ばいすう</rt></ruby>がかけ<ruby>算<rt>ざん</rt></ruby>される。カード<ruby>内<rt>ない</rt></ruby>のスキルらんは、<ruby>条件<rt>じょうけん</rt></ruby>が<ruby>満<rt>み</rt></ruby>たされているあいだ<ruby>光<rt>ひか</rt></ruby>る。
+                <h3>◆ アイテムとコイン</h3>
+                <ruby>敵<rt>てき</rt></ruby>を<ruby>倒<rt>たお</rt></ruby>すとアイテムとコインが<ruby>手<rt>て</rt></ruby>に<ruby>入<rt>はい</rt></ruby>る。コインは「カードを<ruby>引<rt>ひ</rt></ruby>く」<ruby>前<rt>まえ</rt></ruby>だけ、1〜10<ruby>枚<rt>まい</rt></ruby>かけて<ruby>倍率<rt>ばいすう</rt></ruby>を<ruby>上<rt>あ</rt></ruby>げられる（1<ruby>枚<rt>まい</rt></ruby>で+20%）。
+                <h3>◆ 敵<rt></rt>のとくせい</h3>
+                <ruby>敵<rt>てき</rt></ruby>によっては「10%の<ruby>確率<rt>かくりつ</rt></ruby>で<ruby>回避<rt>かいひ</rt></ruby>」「HPを<ruby>毎<rt>まい</rt></ruby>ターン<ruby>回復<rt>かいふく</rt></ruby>」「15<ruby>以下<rt>いか</rt></ruby>のダメージを<ruby>受<rt>う</rt></ruby>けない」「クリティカルヒット」「<ruby>攻撃力<rt>こうげきりょく</rt></ruby>が<ruby>上昇<rt>じょうしょう</rt></ruby>」「ブレスを<ruby>吐<rt>は</rt></ruby>く」などのとくせいを<ruby>持<rt>も</rt></ruby>つ。<ruby>右<rt>みぎ</rt></ruby>のとくせいらんで<ruby>確認<rt>かくにん</rt></ruby>しよう。
+                <h3>◆ 撃破<rt>げきは</rt>ボーナス</h3>
+                <ruby>敵<rt>てき</rt></ruby>を<ruby>倒<rt>たお</rt></ruby>すとコイン+5（エリートなら+10）と、カードパック1つ（エリートを<ruby>倒<rt>たお</rt></ruby>すとレアパック）がもらえる。さらに20%の<ruby>確率<rt>かくりつ</rt></ruby>でポーションも<ruby>手<rt>て</rt></ruby>に<ruby>入<rt>はい</rt></ruby>る。ボスを<ruby>倒<rt>たお</rt></ruby>すとコイン+50とレアパック・<ruby>通常<rt>つうじょう</rt></ruby>パックが1つずつもらえ、HPも<ruby>全回復<rt>ぜんかいふく</rt></ruby>する（<ruby>最終<rt>さいしゅう</rt></ruby>ボスをのぞく）。
+                <h3>◆ <ruby>冒険<rt>ぼうけん</rt></ruby>の<ruby>道<rt>みち</rt></ruby></h3>
+                マップは2つの<ruby>分<rt>わ</rt></ruby>かれ<ruby>道<rt>みち</rt></ruby>から1つを<ruby>選<rt>えら</rt></ruby>んで<ruby>進<rt>すす</rt></ruby>む。10<ruby>マス<rt>ます</rt></ruby><ruby>進<rt>すす</rt></ruby>むと<ruby>必<rt>かなら</rt></ruby>ずボスが<ruby>待<rt>ま</rt></ruby>っている。ボスをたおすと<ruby>次<rt>つぎ</rt></ruby>のステージへ。3ステージ<ruby>目<rt>め</rt></ruby>のボスをたおせばクリア！
+                <h3>◆ マップのマスの<ruby>種類<rt>しゅるい</rt></ruby></h3>
+                ⚔️<ruby>通常<rt>つうじょう</rt></ruby>の<ruby>敵<rt>てき</rt></ruby>：ふつうの<ruby>戦闘<rt>せんとう</rt></ruby>マス。⭐バッジつきはエリートで、<ruby>強<rt>つよ</rt></ruby>いぶん<ruby>報酬<rt>ほうしゅう</rt></ruby>もいい（レアパックがもらえる）。🛒ショップ：コインでポーションやパックを<ruby>買<rt>か</rt></ruby>える。❓イベント：<ruby>魔法使<rt>まほうつか</rt></ruby>い・スキル<ruby>習得<rt>しゅうとく</rt></ruby>・<ruby>宝箱<rt>たからばこ</rt></ruby>のどれかが<ruby>起<rt>お</rt></ruby>こる。👑BOSS：10マス<ruby>進<rt>すす</rt></ruby>んだ<ruby>先<rt>さき</rt></ruby>に<ruby>必<rt>かなら</rt></ruby>ずいる、そのステージいちばんの<ruby>強敵<rt>きょうてき</rt></ruby>。
+            </div>
+            <button class="btn btn-gold" onclick="closeBattleHowTo()">とじる</button>
+        </div>
+    </div>
+
+    <div id="char-collection-overlay" class="overlay hidden">
+        <div class="overlay-box wide">
+            <h1 class="settings-title">🎴 キャラクターカード（<span id="col-char-total"></span>枚）</h1>
+            <div id="col-char-grid" class="card-grid char-grid"></div>
+            <button class="btn btn-gold" onclick="closeCharCollection()">とじる</button>
+        </div>
+    </div>
+
+    <div id="normal-collection-overlay" class="overlay hidden">
+        <div class="overlay-box wide">
+            <h1 class="settings-title" style="display:flex; align-items:center; justify-content:center; gap:12px;">
+                🃏 通常カード（<span id="col-normal-total"></span>枚） <span id="col-normal-tally"></span>
+            </h1>
+            <div id="col-normal-grid" class="card-grid"></div>
+            <button class="btn btn-gold" onclick="closeNormalCollection()">とじる</button>
+        </div>
+    </div>
+
+
+    <div id="skill-desc-popup" class="skill-desc-popup hidden"></div>
+
+</div><!-- #container -->
+
+<!-- Supabase (direct REST fetch)。HitofudeMeikyuu/Arithmetica/PitattoKukuと同じプロジェクト・rankingsテーブルを
+     game列で書き分けて共有する（本ゲーム専用のバックエンドを新たに用意する必要がない） -->
+<script>
+(function(){
+    const _base = 'https://rpxassndgiunoqkxqcco.supabase.co/rest/v1';
+    const _key  = 'sb_publishable_Wnge6OPvSf5l2YEgaPg4rw_nj4CyYAH';
+    const _hdr  = { 'apikey': _key, 'Authorization': 'Bearer ' + _key,
+                    'Content-Type': 'application/json', 'Prefer': 'return=minimal' };
+
+    window.saveOnlineScore = async (name, score, defeatedCount, turns, difficulty) => {
+        if ((score || 0) <= 0) return;
+        const res = await fetch(`${_base}/rankings`, {
+            method: 'POST',
+            headers: _hdr,
+            body: JSON.stringify({
+                game:        'blackjack_arcana',
+                difficulty:  difficulty    || 'normal',
+                player_name: name          || 'ななしさん',
+                point_score: score         || 0,
+                stage_score: defeatedCount || 0,
+                turns:       turns         || 0,
+                class_name:  ''
+            })
+        });
+        if (!res.ok) { const t = await res.text(); throw new Error(`HTTP ${res.status}: ${t}`); }
+    };
+
+    window.loadWorldRanking = async () => {
+        try {
+            const q = new URLSearchParams({
+                select:      'player_name,point_score,stage_score,turns,created_at',
+                game:        'eq.blackjack_arcana',
+                point_score: 'gt.0',
+                order:       'point_score.desc,stage_score.desc,created_at.desc',
+                limit:       '10'
+            });
+            const res = await fetch(`${_base}/rankings?${q}`, {
+                headers: { 'apikey': _key, 'Authorization': 'Bearer ' + _key }
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            return data.map(r => ({
+                name:  r.player_name,
+                score: r.point_score,
+                defeated: r.stage_score,
+                turns: r.turns,
+                date:  r.created_at ? new Date(r.created_at).toLocaleDateString('ja-JP') : ''
+            }));
+        } catch (e) {
+            console.error('Ranking: 読み込みエラー', e);
+            return null;
+        }
+    };
+})();
+</script>
+
+<script>
+'use strict';
+
+// ============================================================
+// 定数データ
+// ============================================================
+const SUITS = ['S', 'H', 'D', 'C'];
+const SUIT_SYMBOL = { S: '♠', H: '♥', D: '♦', C: '♣' };
+const SUIT_COLOR  = { S: 'black', H: 'red', D: 'red', C: 'black' };
+const RANKS = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+function bjValue(rank){ if (rank === 'A') return 11; if (rank === 'J' || rank === 'Q' || rank === 'K') return 10; return Number(rank); }
+
+// スキルのジャンル分け（絵文字・色でカード上のスキル欄を見分けやすくする）
+const SKILL_CATEGORIES = {
+    count:     { emoji:'🔢', color:'#29b6f6' },
+    parity:    { emoji:'⚖️', color:'#66bb6a' },
+    prime:     { emoji:'💎', color:'#42a5f5' },
+    multiple:  { emoji:'✖️', color:'#ffa726' },
+    pair:      { emoji:'👯', color:'#ec407a' },
+    range:     { emoji:'🛡️', color:'#7e57c2' },
+    suitcolor: { emoji:'🎴', color:'#26a69a' },
+    special:   { emoji:'👑', color:'#ffca28' },
+};
+const MAX_CARD_SKILLS = 2; // キャラクターカード・通常カードとも、付けられるスキルは最大2つまで
+const PRIME_SET = new Set([2,3,5,7,11,13,17,19]);
+
+// キャラクターカードのスキル一覧（倍率は乗算で重複適用される）。
+// CHAR_SKILLS_BASE = 最初のキャラ作成（リセマラ）で出現するスキル。
+// CHAR_SKILLS_SPECIAL = 撃破ボーナスでのみ、対応するランクのカードに限って手に入る特殊スキル。
+const CHAR_SKILLS_BASE = [
+    { id:'cnt2',      label:'2カード',        cat:'count',     mult:2,    desc:'手札がちょうど2枚のとき発動',        check:h => h.hand.length === 2 },
+    { id:'cnt3',      label:'3カード',        cat:'count',     mult:3,    desc:'手札がちょうど3枚のとき発動',        check:h => h.hand.length === 3 },
+    { id:'even',      label:'偶数',           cat:'parity',    mult:2,    desc:'合計が偶数のとき発動',              check:h => h.total % 2 === 0 },
+    { id:'odd',       label:'奇数',           cat:'parity',    mult:2,    desc:'合計が奇数のとき発動',              check:h => h.total % 2 === 1 },
+    { id:'prime',     label:'素数',           cat:'prime',     mult:2.5,  desc:'合計が素数のとき発動',              check:h => PRIME_SET.has(h.total) },
+    { id:'mul3',      label:'3の倍数',        cat:'multiple',  mult:3,    desc:'合計が3の倍数のとき発動',            check:h => h.total % 3 === 0 },
+    { id:'mul5',      label:'5の倍数',        cat:'multiple',  mult:3.5,  desc:'合計が5の倍数のとき発動',            check:h => h.total % 5 === 0 },
+    { id:'mul7',      label:'7の倍数',        cat:'multiple',  mult:4,    desc:'合計が7の倍数のとき発動',            check:h => h.total % 7 === 0 },
+    { id:'pair',      label:'数字統一',       cat:'pair',      mult:4,    desc:'使ったカードが全部同じ数字のとき発動', check:h => h.hand.every(c => c.rank === h.base.rank) },
+    { id:'le15',      label:'15リミット',     cat:'range',     mult:3.5,  desc:'合計が15以下のとき発動',             check:h => h.total <= 15 },
+    { id:'over15',    label:'15オーバー',     cat:'range',     mult:3,    desc:'合計が15より大きいとき発動',          check:h => h.total > 15 },
+    { id:'suitOnly',  label:'スート統一',     cat:'suitcolor', mult:2.5,  desc:'使ったカードが全部同じスートのとき発動', check:h => h.hand.every(c => c.suit === h.base.suit) },
+];
+const CHAR_SKILLS_SPECIAL = [
+    { id:'kingQueen', label:'King and Queen', cat:'special', mult:3.5,  desc:'手札にKとQの両方が使われているときのみ発動', check:h => h.hand.some(c => c.rank === 'K') && h.hand.some(c => c.rank === 'Q') },
+    { id:'jackAce',   label:'Jack and Ace',   cat:'special', mult:3.5,  desc:'手札にJとAの両方が使われているときのみ発動', check:h => h.hand.some(c => c.rank === 'J') && h.hand.some(c => c.rank === 'A') },
+    { id:'triple7',   label:'777',            cat:'special', mult:21, desc:'手札に7が3枚使われているときのみ発動',   check:h => h.hand.filter(c => c.rank === '7').length >= 3 },
+];
+const CHAR_SKILLS_ALL = CHAR_SKILLS_BASE.concat(CHAR_SKILLS_SPECIAL);
+function charSkill(id){ return CHAR_SKILLS_ALL.find(s => s.id === id); }
+// 倍率(×N)を「基準100%からの加算ぶん」の表記(+○○%)に変換する（×2なら+100%、×3なら+200%）
+function pctLabel(mult){ return `+${Math.round((mult - 1) * 100)}%`; }
+// そのスキルをそのキャラクターカードに付けてよいか（特殊スキルはランクが一致する場合のみ）
+function skillAllowedForCard(skill, card){
+    if (skill.id === 'triple7')   return card.rank === '7';
+    if (skill.id === 'kingQueen') return card.rank === 'K' || card.rank === 'Q';
+    if (skill.id === 'jackAce')   return card.rank === 'J' || card.rank === 'A';
+    return true;
+}
+// スート限定スキルは、実際のスートに応じて表示名を変える（例：♦統一）
+function skillDisplayLabel(skill, card){
+    if (skill.id === 'suitOnly') return `${SUIT_SYMBOL[card.suit]}統一`;
+    if (skill.id === 'pair') return `${card.rank}統一`;
+    return skill.label;
+}
+// 倍率内訳のピルは横幅が限られるので、カード上の表示名より短い名前を使う（カード自体の表示名は変えない）
+function breakdownLabel(skill, card){
+    if (skill.id === 'kingQueen') return 'K&Q';
+    if (skill.id === 'jackAce') return 'J&A';
+    return skillDisplayLabel(skill, card);
+}
+
+// 通常カードに付与できるスキル（撃破ボーナスで獲得）。重複発動＝加算方式。
+const NORMAL_SKILLS = {
+    atk5:      { label:'攻撃5ダメージ', kind:'extraDmg', value:5,  desc:'カードでの攻撃のあと、倍率の影響を受けない5ダメージを追加で与える' },
+    healPct10: { label:'HP回復10%',    kind:'healPct',  value:10, desc:'このカードを引いた瞬間、最大HPの10%ぶんHPが回復する' },
+    mult10:    { label:'倍率+10%',      kind:'mult',     value:10, desc:'倍率を10%増やす' },
+    coin2:     { label:'コイン+2',      kind:'coin',     value:2,  desc:'このカードを引いた瞬間、コインを2枚手に入れる' },
+};
+const NORMAL_SKILL_IDS = Object.keys(NORMAL_SKILLS);
+// 通常カードのスキルは全部同じ色だと見分けにくいので、種類ごとに色を分ける
+const NORMAL_SKILL_COLORS = { extraDmg:'#e0546c', healPct:'#66bb6a', mult:'#d4af37', coin:'#42a5f5' };
+// 所持カード（コレクション）の上限は撤廃済み。何枚でも持てる。
+// デッキ構築で実際にデッキへ入れられる上限（所持数がこれ以下なら全部強制的にデッキ入り）
+const CHAR_DECK_CAP = 5;
+const NORMAL_DECK_CAP = 20;
+
+// アイテム（撃破ごとに1つランダムで手に入る）。回復ポーションのみ。valueは最大HPに対する％。
+const ITEM_DEFS = {
+    potionL: { label:'回復ポーション(大)', emoji:'🧪', effect:'heal', value:100 },
+    potionM: { label:'回復ポーション(中)', emoji:'🧴', effect:'heal', value:50 },
+    potionS: { label:'回復ポーション(小)', emoji:'💊', effect:'heal', value:25 },
+};
+const ITEM_IDS = Object.keys(ITEM_DEFS);
+function itemHealAmount(def){ return Math.round(game.playerMaxHp * def.value / 100); }
+
+// 難易度設定は廃止し、常にかんたん相当（敵HP倍率×1）で固定。ランキング送信用に文字列としてのみ残す。
+const DIFFICULTY_HP_MULT = { easy:1 };
+
+// 敵一覧（7種類の通常敵＋7種類のボス、計14種類）。imgKeyはimages/内の画像ファイル名（拡張子なし）に対応する。
+// ボスは対応する通常敵と同じ絵柄・同じとくせいを持つ強化版（例：ゴブリン→ゴブリンロード、どちらもevade10）。
+// HP・攻撃力は「基本値 × その敵の％」で決まる。基本値はステージ(n)と進行度(m)から計算する：
+//   HP基本値  = 50n + 3(m-1)
+//   攻撃力基本値 = 10n + (m-1)
+// とくせいは1体につき最大1つ。エリートは全ステータス×1.2（とくせいの発動確率などは変わらない）。
+const ENEMY_TYPES = [
+    { name:'スライム',     imgKey:'slime',   hpPct:1.00, atkPct:0.60, ability:null },
+    { name:'ゴブリン',     imgKey:'goblin',  hpPct:0.80, atkPct:0.90, ability:'evade10' },
+    { name:'ワイト',       imgKey:'wite',    hpPct:0.70, atkPct:1.10, ability:'regenMaxHp10' },
+    { name:'ゴーレム',     imgKey:'gorem',   hpPct:1.60, atkPct:0.60, ability:'blockLowDamage15' },
+    { name:'ダークエルフ', imgKey:'darkelf', hpPct:0.90, atkPct:1.20, ability:'crit10x2' },
+    { name:'デーモン',     imgKey:'demon',   hpPct:1.15, atkPct:1.10, ability:'rampAtk10pct' },
+    { name:'ドラゴン',     imgKey:'dragon',  hpPct:1.30, atkPct:1.30, ability:'breath30' },
+];
+const BOSS_TYPES = [
+    { name:'アビス・ゼリー',   imgKey:'slime',   hpPct:2.00, atkPct:0.70, ability:null },
+    { name:'ゴブリンロード',   imgKey:'goblin',  hpPct:1.60, atkPct:1.10, ability:'evade10' },
+    { name:'リッチ',           imgKey:'wite',    hpPct:1.40, atkPct:1.20, ability:'regenMaxHp10' },
+    { name:'ギガントゴーレム', imgKey:'gorem',   hpPct:3.20, atkPct:0.70, ability:'blockLowDamage15' },
+    { name:'シャドウマスター', imgKey:'darkelf', hpPct:1.80, atkPct:1.30, ability:'crit10x2' },
+    { name:'アークデーモン',   imgKey:'demon',   hpPct:2.00, atkPct:1.20, ability:'rampAtk10pct' },
+    { name:'エルダードラゴン', imgKey:'dragon',  hpPct:2.60, atkPct:1.40, ability:'breath30' },
+];
+const ELITE_MULT = 1.2;
+function enemyHpBase(n, m){ return 50 * n + 3 * (m - 1); }
+function enemyAtkBase(n, m){ return 10 * n + (m - 1); }
+// とくせいの説明文（右パネルのとくせいらん表示用）
+const ENEMY_ABILITY_TEXT = {
+    evade10: '10%の確率で攻撃を回避する',
+    regenMaxHp10: '毎ターン、HPを最大HPの10%回復する',
+    blockLowDamage15: '15以下のダメージは受けない',
+    crit10x2: '10%の確率で2倍ダメージのクリティカルヒットで攻撃する',
+    rampAtk10pct: '攻撃力が毎ターン10%ずつ上昇する',
+    breath30: '30%の確率で攻撃力の120〜200%のダメージのブレスを吐く',
+};
+function abilityText(enemy){
+    return ENEMY_ABILITY_TEXT[enemy.ability] || 'とくせいなし';
+}
+function enemyImageSrc(enemy){ return `images/${enemy.imgKey}${enemy.boss ? '_boss' : ''}.png`; }
+// n=ステージ(1〜3)、m=マップ上の進行度（最初のマスが0、ボスのマスはm=10）。
+// opts.boss=trueならボス専用プールから選ぶ。opts.elite=trueなら全ステータス×1.2。
+function buildRandomEnemy(n, m, opts){
+    opts = opts || {};
+    const pool = opts.boss ? BOSS_TYPES : ENEMY_TYPES;
+    const type = opts.forceType || pool[Math.floor(Math.random() * pool.length)];
+    const eliteMult = opts.elite ? ELITE_MULT : 1;
+    const hp = Math.round(enemyHpBase(n, m) * type.hpPct * eliteMult);
+    const atk = Math.round(enemyAtkBase(n, m) * type.atkPct * eliteMult);
+    return { name: type.name, imgKey: type.imgKey, maxHp: hp, hp, atk, baseAtk: atk, ability: type.ability, rampCount: 0, boss: !!opts.boss, elite: !!opts.elite };
+}
+// ============================================================
+// マップ（分岐する道）
+// 1ステージ＝10マス（m=1〜9は2択のランダムマス、m=10は確定ボス）。3ステージで冒険終了。
+// 「今の2択」だけでなく、それぞれの先の2択（＝2マス先）まで見えるように、選んだマスの子も
+// あらかじめ作っておく（木構造をステージ開始時にまとめて生成する）。
+// ============================================================
+// ①ノーマル敵40%／②エリート10%／③SHOP10%／④イベント40%（m=10は必ずボス）
+function rollNodeType(m){
+    if (m >= 10) return 'boss';
+    const r = Math.random();
+    if (r < 0.40) return 'normal';
+    if (r < 0.50) return 'elite';
+    if (r < 0.60) return 'shop';
+    return 'event';
+}
+function makeMapNode(m){
+    const node = { m, type: rollNodeType(m) };
+    // 通常・エリートマスは、どの敵が出るかをこの時点で決めておく（マップ上に実際の敵のイラストを出すため）
+    if (node.type === 'normal' || node.type === 'elite'){
+        node.monsterType = ENEMY_TYPES[Math.floor(Math.random() * ENEMY_TYPES.length)];
+    }
+    // m=9→10（ボス）は、どちらから進んでも同じボスなので選択肢を1つに集約する
+    node.children = m < 10 ? (m === 9 ? [makeMapNode(10)] : [makeMapNode(m + 1), makeMapNode(m + 1)]) : null;
+    return node;
+}
+// 現在地（m=0、まだ何も選んでいない状態）から、最初の2択とその先2択ぶんまで生成する
+function buildStageMap(){
+    return { m: 0, type: 'start', children: [makeMapNode(1), makeMapNode(1)] };
+}
+
+// 最大HPは魔法使いイベントで増えることがあるので、ゲームごとに変わる値として game.playerMaxHp に持つ。
+// これは開始時の基準値。
+const PLAYER_MAX_HP_BASE = 100;
+
+// ============================================================
+// カード生成・デッキ操作
+// ============================================================
+let cardSeq = 0;
+// isChar: キャラクターカードかどうか。skillsは両方とも配列で持ち、最大2つまで。
+function makeCard(rank, suit, isChar){
+    return { uid: ++cardSeq, rank, suit, bj: bjValue(rank), color: SUIT_COLOR[suit], isChar: !!isChar, skills: [] };
+}
+function shuffle(arr){
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--){
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+}
+function randomSuit(){ return SUITS[Math.floor(Math.random() * SUITS.length)]; }
+function randomRank(){ return RANKS[Math.floor(Math.random() * RANKS.length)]; }
+// 最初持っている通常カードは13枚（A〜K、1枚ずつ）。スートはランダム・スキルなし。
+function buildStartingNormalDeck(){
+    return shuffle(RANKS.map(r => makeCard(r, randomSuit(), false)));
+}
+function pickDistinctSkillIds(pool, n){
+    return shuffle(pool).slice(0, Math.min(n, pool.length)).map(s => s.id);
+}
+// 既存のキャラクターカードと同じランク・スートにならないように選ぶ（キャラクターカードは重複しない）
+function uniqueRankSuit(existing){
+    let rank, suit, tries = 0;
+    do {
+        rank = randomRank(); suit = randomSuit(); tries++;
+    } while (existing.some(c => c.rank === rank && c.suit === suit) && tries < 200);
+    return { rank, suit };
+}
+// ---- カードパック：2枚入り。通常パック／レアパックの2種類（どちらもスキル1つ持ちが確定） ----
+const PACK_SIZE = 2;
+const PACK_CHAR_CHANCE = 0.10;       // 通常パック：キャラ10%／通常90%
+const RARE_PACK_CHAR_CHANCE = 0.50;  // レアパック：キャラ50%／通常50%
+// avoid には「今開けているパックの中で、既に確定した他のカード」を渡し、同じパック内でのキャラ重複を避ける
+// パックで手に入るカードは、キャラクターカードも通常カードも必ずスキルを1つ以上持った状態で出てくる。
+// countを指定すると複数スキルを付ける（キャラクターカードは重複なし、通常カードは重複してもよい）。
+const RARE_PACK_DOUBLE_SKILL_CHANCE = 0.20; // レアパックのみ：20%の確率でスキル2つ持ちになる
+function assignRandomCharSkill(card, count){
+    const pool = CHAR_SKILLS_ALL.filter(s => skillAllowedForCard(s, card));
+    card.skills = pickDistinctSkillIds(pool, count || 1);
+}
+function assignRandomNormalSkill(card, count){
+    const n = count || 1;
+    const skills = [];
+    for (let i = 0; i < n; i++) skills.push(NORMAL_SKILL_IDS[Math.floor(Math.random() * NORMAL_SKILL_IDS.length)]);
+    card.skills = skills;
+}
+function drawPackCard(avoid){
+    if (Math.random() < PACK_CHAR_CHANCE){
+        const { rank, suit } = uniqueRankSuit([...game.charCollection, ...avoid]);
+        const card = makeCard(rank, suit, true);
+        assignRandomCharSkill(card);
+        return card;
+    }
+    const card = makeCard(randomRank(), randomSuit(), false);
+    assignRandomNormalSkill(card);
+    return card;
+}
+function drawRarePackCard(avoid){
+    const skillCount = Math.random() < RARE_PACK_DOUBLE_SKILL_CHANCE ? 2 : 1;
+    if (Math.random() < RARE_PACK_CHAR_CHANCE){
+        const { rank, suit } = uniqueRankSuit([...game.charCollection, ...avoid]);
+        const card = makeCard(rank, suit, true);
+        assignRandomCharSkill(card, skillCount);
+        return card;
+    }
+    const card = makeCard(randomRank(), randomSuit(), false);
+    assignRandomNormalSkill(card, skillCount);
+    return card;
+}
+function generateNormalPack(){
+    const drafted = [];
+    for (let i = 0; i < PACK_SIZE; i++) drafted.push(drawPackCard(drafted));
+    return drafted;
+}
+// レアパック：2枚とも「キャラ50%／通常50%」で独立抽選（キャラ確定枠は廃止）
+function generateRarePack(){
+    const drafted = [];
+    for (let i = 0; i < PACK_SIZE; i++) drafted.push(drawRarePackCard(drafted));
+    return drafted;
+}
+// パックの中身を実際に所持カードへ加える。デッキ上限未満ならそのままデッキ入り、上限に達していたらベンチへ。
+function applyPackCards(cards){
+    cards.forEach(card => {
+        if (card.isChar){
+            game.charCollection.push(card);
+            if (game.charSelectedIds.length < CHAR_DECK_CAP){
+                game.charSelectedIds.push(card.uid);
+                game.charDeck.push(card);
+                game.charDeck = shuffle(game.charDeck);
+            }
+        } else {
+            game.normalCollection.push(card);
+            if (game.normalSelectedIds.length < NORMAL_DECK_CAP){
+                game.normalSelectedIds.push(card.uid);
+                game.normalDeck.push(card);
+                game.normalDeck = shuffle(game.normalDeck);
+            }
+        }
+    });
+}
+// Aは1/11のどちらかをプレイヤーが選ぶ。cardBjValueで実際に使う値を取得する。
+function cardBjValue(c){ return c.rank === 'A' ? (c.aceValue || 11) : c.bj; }
+function computeTotal(hand){ return hand.reduce((s, c) => s + cardBjValue(c), 0); }
+
+// ============================================================
+// ゲーム状態
+// ============================================================
+let game = null;
+// 最初持っているキャラカードは、選んだ1枚のみ（スキルなし）。デッキから外せないよう isStarter を立てておく。
+// 所持カード（charCollection/normalCollection）と、実際にデッキへ入っているカード（charDeck+charDiscard など）を分けて持つ。
+// 所持数がデッキ上限以下のうちは、全部が強制的にデッキ入りする。
+// ============================================================
+// セーブ／ロード（一筆迷宮と同じ方式：マップに戻る・ターン開始のたびに自動保存し、
+// タイトル画面の「つづきから」で中断した場所からそのまま再開できる）
+// ============================================================
+const SAVE_KEY = 'blackjackArcanaSave';
+function hasSave(){ try { return !!localStorage.getItem(SAVE_KEY); } catch (e){ return false; } }
+function clearSave(){ try { localStorage.removeItem(SAVE_KEY); } catch (e){} }
+function refreshTitleButtons(){
+    document.getElementById('btn-continue').classList.toggle('hidden', !hasSave());
+}
+function autoSaveGame(){
+    if (!game) return;
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(game)); } catch (e){}
+}
+function continueGame(){
+    let saved;
+    try { saved = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e){ saved = null; }
+    if (!saved){ goToStarterSelect(); return; }
+    game = saved;
+    if (game.enemy && game.turn && !game.turn.ended && game.player.hp > 0 && game.enemy.hp > 0){
+        renderBattleHeader();
+        showScreen('battle-screen');
+        renderBattleTurn();
+    } else {
+        goToMap();
+    }
+}
+function newGame(starterRank, starterSuit){
+    clearSave();
+    const starterCard = makeCard(starterRank, starterSuit, true);
+    starterCard.isStarter = true;
+    const startingNormals = buildStartingNormalDeck();
+    game = {
+        charCollection: [starterCard],
+        charDeck: [],
+        charDiscard: [],
+        charSelectedIds: [starterCard.uid],
+        normalCollection: startingNormals,
+        normalDeck: [],
+        normalDiscard: [],
+        normalSelectedIds: startingNormals.map(c => c.uid),
+        enemy: null,
+        mapStage: { n: 1, current: buildStageMap() },
+        playerMaxHp: PLAYER_MAX_HP_BASE,
+        player: { hp: PLAYER_MAX_HP_BASE },
+        stats: { totalDamage: 0, turnsTaken: 0, defeatedCount: 0 },
+        turn: null,
+        items: {},
+        chips: 10,
+        difficulty: 'easy', // 難易度設定は廃止。常にかんたん相当（敵HP倍率×1）
+        starterRank, starterSuit,
+    };
+    ITEM_IDS.forEach(id => { game.items[id] = 0; });
+    rebuildCharDeck();
+    rebuildNormalDeck();
+}
+// 選択中のIDにもとづいて山札・捨札を作り直す（入れ替えるたびにシャッフルし直す）
+function rebuildCharDeck(){
+    const selected = game.charCollection.filter(c => game.charSelectedIds.includes(c.uid));
+    game.charDeck = shuffle(selected);
+    game.charDiscard = [];
+}
+function rebuildNormalDeck(){
+    const selected = game.normalCollection.filter(c => game.normalSelectedIds.includes(c.uid));
+    game.normalDeck = shuffle(selected);
+    game.normalDiscard = [];
+}
+function drawCharCard(){
+    if (game.charDeck.length === 0){
+        game.charDeck = shuffle(game.charDiscard);
+        game.charDiscard = [];
+    }
+    const idx = Math.floor(Math.random() * game.charDeck.length);
+    return game.charDeck.splice(idx, 1)[0];
+}
+function drawNormalCard(){
+    if (game.normalDeck.length === 0){
+        game.normalDeck = shuffle(game.normalDiscard);
+        game.normalDiscard = [];
+    }
+    return game.normalDeck.pop();
+}
+// 現在の推定スコア（クリアボーナスを除く。ランキング用の最終スコアと同じ式を共有する）
+function liveScore(){ return game.stats.totalDamage + game.stats.defeatedCount * 40 + Math.max(0, game.player.hp) * 2; }
+
+// ============================================================
+// カード描画ヘルパー
+// ============================================================
+function escapeHtml(str){
+    return String(str == null ? '' : str).replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]));
+}
+// キャラクターカードのイラスト画像パス（images/Card_{ランク}_{スート}.png、52種類）
+function charIllustSrc(card){ return `images/Card_${card.rank}_${card.suit.toLowerCase()}.png`; }
+
+// 主人公（プレイヤー）のイラスト。ファイル名のtypo（maie/mail/femaieなど）はそのまま。
+// 14職業×男女のペア。最初は「けんし」だけ選べて、52枚のうちクリアした枚数が増えるほど
+// 職業が1つずつ解放されていく（男女は必ず同時解放）。47枚（約9割）クリアで全解放。
+const CHAR_JOBS = [
+    { key:'Swordsman',   label:'けんし',           male:'male_Swordsman',   female:'female_Swordsman' },
+    { key:'Guardian',    label:'ガーディアン',     male:'male_Guardian',    female:'female_Guardian' },
+    { key:'archer',      label:'ゆみつかい',       male:'male_archer',      female:'female_archer' },
+    { key:'berserker',   label:'バーサーカー',     male:'male_berserker',   female:'female_berserker' },
+    { key:'crestknight', label:'クレストナイト',   male:'male_crestknight', female:'female_crestknight' },
+    { key:'gambler',     label:'ギャンブラー',     male:'male_gambler',     female:'female_gambler' },
+    { key:'highpriest',  label:'こうい神官',       male:'male_highpriest',  female:'female_highpriest' },
+    { key:'jewelmaster', label:'ジュエルマスター', male:'male_jewelmaster', female:'female_jewelmaster' },
+    { key:'mage',        label:'まほうつかい',     male:'male_mage',        female:'female_mage' },
+    { key:'runemaster',  label:'ルーンマスター',   male:'male_runemaster',  female:'female_runemaster' },
+    { key:'villager',    label:'むらびと',         male:'male_villager',    female:'female_villager' },
+    { key:'armorknight', label:'アーマーナイト',   male:'maie_armorknight', female:'femaie_armorknight' },
+    { key:'knight',      label:'ナイト',           male:'mail_knight',      female:'femail_knight' },
+    { key:'swordmaster', label:'けんごう',         male:'mail_swordmaster', female:'femail_swordmaster' },
+];
+const AVATAR_FULL_UNLOCK_CLEARS = 47; // 52枚中これだけクリアすると全職業解放（約9割）
+function clearedCardCount(){ return Object.keys(getCardClears()).length; }
+// 今クリアした枚数で、何番目の職業まで解放されているか（0=けんしのみ）
+function unlockedJobCount(){
+    const n = 1 + Math.floor(clearedCardCount() * (CHAR_JOBS.length - 1) / AVATAR_FULL_UNLOCK_CLEARS);
+    return Math.min(CHAR_JOBS.length, n);
+}
+function unlockedAvatarKeys(){
+    const n = unlockedJobCount();
+    const keys = [];
+    CHAR_JOBS.slice(0, n).forEach(j => { keys.push(j.male, j.female); });
+    return keys;
+}
+function avatarSrc(key){ return `images/${key}.png`; }
+
+// スキルをタップ/クリックすると効果説明を表示する（他の場所をタップすると閉じる）
+function showSkillDescPopup(text){
+    if (!text) return;
+    const el = document.getElementById('skill-desc-popup');
+    el.textContent = text;
+    el.classList.remove('hidden');
+}
+function hideSkillDescPopup(){ document.getElementById('skill-desc-popup').classList.add('hidden'); }
+
+// スキル名が改行しそうな場合は、1行に収まるまでフォントサイズを少しずつ小さくする
+function fitSkillLabelText(el){
+    el.style.fontSize = '';
+    const baseSize = parseFloat(getComputedStyle(el).fontSize);
+    let size = baseSize;
+    const minSize = baseSize * 0.6;
+    let guard = 0;
+    while (el.scrollWidth > el.clientWidth + 1 && size > minSize && guard < 20){
+        size -= 1;
+        el.style.fontSize = size + 'px';
+        guard++;
+    }
+}
+function fitAllSkillLabels(){
+    document.querySelectorAll('.bc-skill-text, .mini-card .mc-skill-label').forEach(fitSkillLabelText);
+}
+// カード表示は毎回innerHTMLで作り直すので、DOM変化を監視して自動でフィットさせる
+new MutationObserver(() => requestAnimationFrame(fitAllSkillLabels))
+    .observe(document.getElementById('container'), { childList: true, subtree: true });
+// キャラクターカード／通常カードとも同じ大きさの「大きいカード」で表示する。
+// 上：イラスト（キャラは画像未実装のためグレー/黒。通常カードはスートの装飾アイコン）
+// 中：スート（左）と数値（右） / 下：スキル（倍率つき、ジャンルの絵文字・色つき）
+// opts.activeSkillIds: 現在発動中のキャラクタースキルidの配列（スキル欄を光らせる）
+// opts.previewSkillId: まだ確定していない通常カードのスキル（撃破ボーナスの候補表示用。NEW!表示になる）
+// opts.previewExtraSkillId: キャラクターカードに追加予定の新スキル（撃破ボーナス③の候補表示用。NEW!表示になる）
+function bigCardHtml(card, opts){
+    opts = opts || {};
+    const isChar = card.isChar;
+    let skillEntries = [];
+    if (isChar){
+        const activeIds = opts.activeSkillIds || [];
+        skillEntries = (card.skills || []).map(id => {
+            const s = charSkill(id);
+            const cat = SKILL_CATEGORIES[s.cat];
+            return { emoji: cat.emoji, label: skillDisplayLabel(s, card), right: pctLabel(s.mult), glow: activeIds.includes(id), color: cat.color, desc: s.desc };
+        });
+        if (opts.previewExtraSkillId){
+            const s = charSkill(opts.previewExtraSkillId);
+            const cat = SKILL_CATEGORIES[s.cat];
+            skillEntries.push({ emoji: cat.emoji, label: skillDisplayLabel(s, card), right: pctLabel(s.mult), pending: true, color: cat.color, desc: s.desc });
+        }
+    } else {
+        skillEntries = (card.skills || []).map(id => {
+            const s = NORMAL_SKILLS[id];
+            return { label: s.label, right: '', glow: !!card._triggered, desc: s.desc, color: NORMAL_SKILL_COLORS[s.kind] };
+        });
+        if (opts.previewSkillId){
+            const s = NORMAL_SKILLS[opts.previewSkillId];
+            skillEntries.push({ label: s.label, right: '', pending: true, desc: s.desc, color: NORMAL_SKILL_COLORS[s.kind] });
+        }
+    }
+    const cls = ['big-card'];
+    cls.push(isChar ? 'character' : 'normal');
+    cls.push(`suit-${card.suit}`);
+    if (opts.compact) cls.push('compact');
+    if (card.isStarter) cls.push('starter');
+    const skillsHtml = skillEntries.length
+        ? skillEntries.map(s => `<div class="bc-skill-row${s.glow ? ' active-glow' : ''}${s.pending ? ' pending-new' : ''}"${s.color ? ` style="--cat-color:${s.color};border-color:${s.color};background:${s.color}22;"` : ''} data-desc="${escapeHtml(s.desc || '')}" onclick="event.stopPropagation(); showSkillDescPopup(this.dataset.desc)"><span class="bc-skill-label"><span class="bc-skill-text">${escapeHtml(s.label)}</span></span>${s.right ? `<span class="bc-skill-mult">${escapeHtml(s.right)}</span>` : ''}</div>`).join('')
+        : `<div class="bc-skill-empty">スキルなし</div>`;
+    const illustContent = isChar
+        ? `<img class="bc-illust-img" src="${charIllustSrc(card)}" alt="${card.rank}${SUIT_SYMBOL[card.suit]}" onerror="this.remove();">`
+        : SUIT_SYMBOL[card.suit];
+    return `<div class="${cls.join(' ')}">
+        <div class="bc-illust">${illustContent}</div>
+        <div class="bc-info">
+            <span class="bc-rank">${card.rank}</span>
+        </div>
+        <div class="bc-skills">${skillsHtml}</div>
+    </div>`;
+}
+// 通常カード専用の小さいカードタイル（キャラクターカードは10枚までなのでbigCardHtmlのcompact表示を使う）。
+// 通常のカード表示と同じく、上にスート・下に大きい数字。
+function miniCardHtml(card){
+    const cls = ['mini-card', 'normal', `suit-${card.suit}`];
+    const lines = (card.skills || []).map(id => {
+        const s = NORMAL_SKILLS[id];
+        const color = NORMAL_SKILL_COLORS[s.kind];
+        return `<div class="mc-skill-line"><span class="mc-skill-label" style="color:${color};" data-desc="${escapeHtml(s.desc)}" onclick="event.stopPropagation(); showSkillDescPopup(this.dataset.desc)">${escapeHtml(s.label)}</span></div>`;
+    });
+    const skillsHtml = lines.length ? lines.join('') : `<div class="mc-skill-empty">-</div>`;
+    return `<div class="${cls.join(' ')}">
+        <div class="mc-illust">${SUIT_SYMBOL[card.suit]}</div>
+        <div class="mc-rank">${card.rank}</div>
+        <div class="mc-skills">${skillsHtml}</div>
+    </div>`;
+}
+function suitCountHtml(cards){
+    const cnt = { S:0, H:0, D:0, C:0 };
+    cards.forEach(c => { cnt[c.suit] = (cnt[c.suit] || 0) + 1; });
+    const inner = SUITS.map(s => `<span class="sc-${s}">${SUIT_SYMBOL[s]}×${cnt[s]}</span>`).join(' ');
+    return `<span class="suit-tally">${inner}</span>`;
+}
+
+// ============================================================
+// 画面遷移共通
+// ============================================================
+function showScreen(id){
+    ['title-screen','name-register-screen','ranking-screen','settings-screen','starter-select-screen','starter-confirm-screen',
+     'map-screen','shop-screen','eventhp-screen','eventskill-screen','eventforget-screen','eventtreasure-screen',
+     'deckbuilder-screen','battle-screen','reveal-screen','epiphany-screen','itemget-screen',
+     'clear-screen','over-screen'
+    ].forEach(s => document.getElementById(s).classList.toggle('hidden', s !== id));
+    if (id === 'title-screen'){ renderTitleIllusts(); refreshTitleButtons(); }
+}
+// タイトル画面の左右に、ランダムなキャラクターのイラストを飾る（見るたびに抽選し直す）
+function renderTitleIllusts(){
+    document.getElementById('title-illust-left').src = charIllustSrc({ rank: randomRank(), suit: randomSuit() });
+    document.getElementById('title-illust-right').src = charIllustSrc({ rank: randomRank(), suit: randomSuit() });
+}
+
+// ============================================================
+// プレイヤー名の登録・管理（ローカル保存）
+// ============================================================
+const PLAYERS_KEY = 'blackjackArcanaPlayers';
+const CUR_PLAYER_KEY = 'blackjackArcanaCurPlayer';
+// 各プレイヤー名は { name, avatarKey } の形で保持する。avatarKeyはimages/内の1枚に一意にひもづく
+// （ランダムで決めた場合もその場で確定し、以後はその名前で固定表示になる）。
+// 以前のバージョン（文字列のみの配列 / {name,pref}）はここで新形式に変換する。
+function getPlayerNames(){
+    try {
+        const raw = JSON.parse(localStorage.getItem(PLAYERS_KEY) || '[]');
+        let migrated = false;
+        const list = raw.map(e => {
+            if (typeof e === 'string'){ migrated = true; return { name: e, avatarKey: randomUnlockedAvatarKey() }; }
+            if (!e.avatarKey){ migrated = true; return { name: e.name, avatarKey: randomUnlockedAvatarKey() }; }
+            return e;
+        });
+        if (migrated) savePlayerNames(list);
+        return list;
+    } catch (e){ return []; }
+}
+function savePlayerNames(list){ try { localStorage.setItem(PLAYERS_KEY, JSON.stringify(list)); } catch (e){} }
+function getCurPlayerName(){ try { return localStorage.getItem(CUR_PLAYER_KEY) || 'ななしさん'; } catch (e){ return 'ななしさん'; } }
+function setCurPlayerName(n){ try { localStorage.setItem(CUR_PLAYER_KEY, n); } catch (e){} }
+function randomUnlockedAvatarKey(){
+    const keys = unlockedAvatarKeys();
+    return keys[Math.floor(Math.random() * keys.length)];
+}
+// 未登録のデフォルト名（ななしさん）は、けんし(男)で固定表示する
+function getCurPlayerAvatarKey(){
+    const found = getPlayerNames().find(p => p.name === getCurPlayerName());
+    return found ? found.avatarKey : CHAR_JOBS[0].male;
+}
+
+let pendingAvatarKey = null;
+let editingPlayerIndex = null; // null=あたらしく登録する見た目を選択中／数値=その登録済み名前の見た目を編集中
+function openNameRegister(){
+    pendingAvatarKey = null;
+    editingPlayerIndex = null;
+    document.getElementById('name-reg-error').textContent = '';
+    document.getElementById('name-reg-input').value = '';
+    showScreen('name-register-screen');
+    renderPlayerNameList();
+    renderAvatarPicker();
+}
+function closeNameRegister(){ showScreen('title-screen'); updateNameRegisterBtn(); }
+function updateNameRegisterBtn(){
+    const btn = document.getElementById('btn-name-register');
+    if (btn) btn.textContent = `👤 名前：${getCurPlayerName()}`;
+}
+function renderAvatarPicker(){
+    const n = unlockedJobCount();
+    const list = getPlayerNames();
+    const editingEntry = editingPlayerIndex !== null ? list[editingPlayerIndex] : null;
+    document.getElementById('nr-avatar-picker-title').textContent = editingEntry ? `「${editingEntry.name}」の見た目を変える` : '見た目をえらぶ';
+    document.getElementById('nr-avatar-cancel-btn').classList.toggle('hidden', !editingEntry);
+    document.getElementById('nr-add-btn').classList.toggle('hidden', !!editingEntry);
+    document.getElementById('nr-unlock-progress').textContent = `解放ずみ ${n}／${CHAR_JOBS.length}職業（クリア${clearedCardCount()}／52枚）`;
+    const rows = [CHAR_JOBS.map(j => j.male), CHAR_JOBS.map(j => j.female)];
+    document.getElementById('nr-avatar-grid').innerHTML = rows.map(row => row.map((key, i) => {
+        const locked = i >= n;
+        const selected = !locked && pendingAvatarKey === key;
+        const cls = ['nr-avatar-cell'];
+        if (locked) cls.push('locked'); else if (selected) cls.push('selected');
+        return `<div class="${cls.join(' ')}" ${locked ? '' : `onclick="pickAvatarCell('${key}')"`} title="${escapeHtml(CHAR_JOBS[i].label)}">
+            ${locked ? '' : `<img src="${avatarSrc(key)}" alt="">`}
+        </div>`;
+    }).join('')).join('');
+}
+function pickAvatarCell(key){
+    pendingAvatarKey = key;
+    if (editingPlayerIndex !== null){
+        const list = getPlayerNames();
+        if (list[editingPlayerIndex]){
+            list[editingPlayerIndex].avatarKey = key;
+            savePlayerNames(list);
+            renderPlayerNameList();
+        }
+    }
+    renderAvatarPicker();
+}
+function pickRandomAvatar(){
+    pickAvatarCell(randomUnlockedAvatarKey());
+}
+function startEditAvatar(idx){
+    const list = getPlayerNames();
+    if (!list[idx]) return;
+    editingPlayerIndex = idx;
+    pendingAvatarKey = list[idx].avatarKey;
+    renderAvatarPicker();
+    renderPlayerNameList();
+}
+function cancelEditAvatar(){
+    editingPlayerIndex = null;
+    pendingAvatarKey = null;
+    renderAvatarPicker();
+    renderPlayerNameList();
+}
+function addPlayerName(){
+    const inp = document.getElementById('name-reg-input');
+    const errEl = document.getElementById('name-reg-error');
+    const name = inp.value.trim();
+    errEl.textContent = '';
+    if (!name) return;
+    if (name.length > 12){ errEl.textContent = '12文字以内で入力してください'; return; }
+    const list = getPlayerNames();
+    if (list.some(p => p.name === name)){ errEl.textContent = 'その名前はすでに登録されています'; return; }
+    const avatarKey = pendingAvatarKey || randomUnlockedAvatarKey();
+    list.push({ name, avatarKey });
+    savePlayerNames(list);
+    setCurPlayerName(name);
+    inp.value = '';
+    pendingAvatarKey = null;
+    renderPlayerNameList();
+    renderAvatarPicker();
+}
+function selectPlayerNameByIndex(idx){
+    const list = getPlayerNames();
+    if (list[idx] === undefined) return;
+    setCurPlayerName(list[idx].name);
+    renderPlayerNameList();
+}
+function deletePlayerNameByIndex(idx){
+    const list = getPlayerNames();
+    const entry = list[idx];
+    if (entry === undefined) return;
+    list.splice(idx, 1);
+    savePlayerNames(list);
+    if (getCurPlayerName() === entry.name) setCurPlayerName(list[0] ? list[0].name : 'ななしさん');
+    if (editingPlayerIndex === idx) cancelEditAvatar(); else renderPlayerNameList();
+}
+function renderPlayerNameList(){
+    const cur = getCurPlayerName();
+    const list = getPlayerNames();
+    document.getElementById('name-reg-list').innerHTML = list.map((p, idx) => {
+        const isCur = p.name === cur;
+        const actionHtml = isCur
+            ? `<span class="pl-selected-badge">✓ 選択中</span>`
+            : `<button class="pl-select-btn" onclick="selectPlayerNameByIndex(${idx})">選択する</button>`;
+        return `<tr class="${isCur ? 'cur' : ''}${editingPlayerIndex === idx ? ' editing' : ''}">
+            <td><img class="nr-row-avatar" src="${avatarSrc(p.avatarKey)}" alt=""></td>
+            <td class="nr-row-name">${escapeHtml(p.name)}</td>
+            <td>${actionHtml}</td>
+            <td><button class="pl-select-btn" onclick="startEditAvatar(${idx})">見た目</button></td>
+            <td><button class="del-btn" onclick="deletePlayerNameByIndex(${idx})">×</button></td>
+        </tr>`;
+    }).join('');
+}
+
+// ============================================================
+// ランキング
+// ============================================================
+const RANK_STORAGE_KEY = 'blackjackArcanaRanking';
+function getLocalRanking(){ try { return JSON.parse(localStorage.getItem(RANK_STORAGE_KEY) || '[]'); } catch (e){ return []; } }
+function saveLocalScore(entry){
+    const list = getLocalRanking();
+    list.push(entry);
+    list.sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return (b.dateIso || '').localeCompare(a.dateIso || '');
+    });
+    try { localStorage.setItem(RANK_STORAGE_KEY, JSON.stringify(list.slice(0, 10))); } catch (e){}
+}
+function computeFinalScore(cleared){ return liveScore() + (cleared ? 250 : 0); }
+let lastFinalScore = 0;
+function recordRunResult(cleared){
+    const now = new Date();
+    lastFinalScore = computeFinalScore(cleared);
+    const stage = cleared ? 'クリア' : `${game.mapStage.n}-${game.mapStage.current.m}`;
+    saveLocalScore({
+        name: getCurPlayerName(), score: lastFinalScore, stage,
+        turns: game.stats.turnsTaken, difficulty: game.difficulty,
+        dateIso: now.toISOString(), date: now.toLocaleDateString('ja-JP')
+    });
+}
+async function submitScoreToWorld(which){
+    const btn = document.getElementById(`${which}-world-submit-btn`);
+    const msg = document.getElementById(`${which}-world-submit-msg`);
+    if (lastFinalScore <= 0) return;
+    btn.disabled = true;
+    msg.style.color = 'var(--text-dim)';
+    msg.textContent = '送信中…';
+    try {
+        await window.saveOnlineScore(getCurPlayerName(), lastFinalScore, game.stats.defeatedCount, game.stats.turnsTaken, game.difficulty);
+        msg.style.color = 'var(--gold-bright)';
+        msg.textContent = '送信しました！';
+    } catch (e){
+        btn.disabled = false;
+        msg.style.color = '#ff9aa8';
+        msg.textContent = '送信に失敗しました';
+        console.error('submitScoreToWorld error:', e);
+    }
+}
+let rankTab = 'local';
+function openRanking(){ rankTab = 'local'; renderRankTabs(); loadAndRenderRanking(); showScreen('ranking-screen'); }
+function closeRanking(){ showScreen('title-screen'); }
+function switchRankTab(tab){ rankTab = tab; renderRankTabs(); loadAndRenderRanking(); }
+function renderRankTabs(){
+    document.getElementById('rank-tab-local-btn').classList.toggle('active', rankTab === 'local');
+    document.getElementById('rank-tab-world-btn').classList.toggle('active', rankTab === 'world');
+}
+function renderRankList(rows){
+    const listEl = document.getElementById('rank-list');
+    if (!rows || !rows.length){
+        listEl.innerHTML = `<li class="rank-row-empty">まだ記録がありません</li>`;
+        return;
+    }
+    const medals = ['🥇','🥈','🥉'];
+    listEl.innerHTML = rows.map((r, i) => {
+        const numTxt = i < 3 ? medals[i] : `${i + 1}.`;
+        const numCls = i < 3 ? 'rank-num top3' : 'rank-num';
+        // ワールドランキング側がまだ古い形式（stageではなくdefeated）を返す場合のフォールバックも残す
+        const stageTxt = r.stage ? r.stage : (r.defeated !== undefined ? `撃破${r.defeated}` : '-');
+        const dateTxt = r.dateIso ? new Date(r.dateIso).toLocaleDateString('ja-JP', { month:'numeric', day:'numeric' }) : (r.date || '');
+        return `<li class="rank-row">
+            <span class="${numCls}">${numTxt}</span>
+            <span class="rank-pname">${escapeHtml(r.name)}</span>
+            <span class="rank-score">${escapeHtml(stageTxt)}</span>
+            <span class="rank-score">${r.score}pt</span>
+            <span class="rank-date">${escapeHtml(dateTxt)}</span>
+        </li>`;
+    }).join('');
+}
+async function loadAndRenderRanking(){
+    const loadingEl = document.getElementById('rank-loading');
+    const listEl = document.getElementById('rank-list');
+    listEl.innerHTML = '';
+    if (rankTab === 'local'){
+        loadingEl.style.display = 'none';
+        renderRankList(getLocalRanking());
+    } else {
+        loadingEl.style.display = 'block';
+        const rows = await (window.loadWorldRanking ? window.loadWorldRanking() : Promise.resolve(null));
+        loadingEl.style.display = 'none';
+        renderRankList(rows);
+    }
+}
+
+// ============================================================
+// 設定（ふりがな表示）
+// ============================================================
+const FURIGANA_KEY = 'blackjackArcanaFurigana';
+function getFuriganaOn(){ try { return localStorage.getItem(FURIGANA_KEY) !== 'off'; } catch (e){ return true; } }
+function setFurigana(on){
+    try { localStorage.setItem(FURIGANA_KEY, on ? 'on' : 'off'); } catch (e){}
+    document.body.classList.toggle('no-furigana', !on);
+    document.getElementById('furigana-on-btn').classList.toggle('active', on);
+    document.getElementById('furigana-off-btn').classList.toggle('active', !on);
+}
+function openSettings(){ showScreen('settings-screen'); }
+function closeSettings(){ showScreen('title-screen'); }
+
+// ============================================================
+// 最初の1枚選択（52枚から1枚。クリアしたことのあるカードは実績としてはっきり表示される）
+// ============================================================
+const CARD_CLEAR_KEY = 'blackjackArcanaCardClears';
+function getCardClears(){ try { return JSON.parse(localStorage.getItem(CARD_CLEAR_KEY) || '{}'); } catch (e){ return {}; } }
+function hasCardClear(rank, suit){ return !!getCardClears()[`${rank}_${suit}`]; }
+function recordCardClear(rank, suit){
+    const clears = getCardClears();
+    clears[`${rank}_${suit}`] = true;
+    try { localStorage.setItem(CARD_CLEAR_KEY, JSON.stringify(clears)); } catch (e){}
+}
+let selectedStarter = null; // { rank, suit }
+function goToStarterSelect(){
+    selectedStarter = null;
+    renderStarterGrid();
+    showScreen('starter-select-screen');
+}
+function renderStarterGrid(){
+    const cells = [];
+    let clearedCount = 0;
+    SUITS.forEach(suit => {
+        RANKS.forEach(rank => {
+            const cleared = hasCardClear(rank, suit);
+            if (cleared) clearedCount++;
+            const sel = !!selectedStarter && selectedStarter.rank === rank && selectedStarter.suit === suit;
+            cells.push(`<div class="starter-cell suit-${suit}${cleared ? ' cleared' : ''}${sel ? ' selected' : ''}" onclick="selectStarterCard('${rank}','${suit}')">
+                <div class="starter-cell-rank">${rank}</div>
+                <div class="starter-cell-suit">${SUIT_SYMBOL[suit]}</div>
+            </div>`);
+        });
+    });
+    document.getElementById('starter-grid').innerHTML = cells.join('');
+    document.getElementById('starter-clear-pct-value').textContent = `${Math.round(clearedCount / (RANKS.length * SUITS.length) * 100)}%（${clearedCount}／${RANKS.length * SUITS.length}）`;
+}
+// クリアしていないカード／すべてのカードから、それぞれランダムに1枚選ぶ
+function pickRandomStarter(onlyUncleared){
+    const all = [];
+    SUITS.forEach(suit => RANKS.forEach(rank => all.push({ rank, suit })));
+    let pool = onlyUncleared ? all.filter(c => !hasCardClear(c.rank, c.suit)) : all;
+    if (pool.length === 0) pool = all; // 全部クリア済みのときはすべてから選ぶ
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    selectStarterCard(pick.rank, pick.suit);
+}
+function selectStarterCard(rank, suit){
+    selectedStarter = { rank, suit };
+    const previewCard = { rank, suit, color: SUIT_COLOR[suit], isChar: true, skills: [] };
+    document.getElementById('starter-confirm-card-area').innerHTML = bigCardHtml(previewCard);
+    showScreen('starter-confirm-screen');
+}
+function backToStarterGrid(){
+    renderStarterGrid();
+    showScreen('starter-select-screen');
+}
+function confirmStarterSelect(){
+    if (!selectedStarter) return;
+    newGame(selectedStarter.rank, selectedStarter.suit);
+    goToMap();
+}
+function backToTitleFromStarter(){ showScreen('title-screen'); }
+
+// ============================================================
+// コレクション（キャラクター/通常カード一覧）オーバーレイ
+// ============================================================
+// 表示専用の並び順：スート（♠♥♦♣）ごとに、数値の小さい順。Aは一番大きい数値として最後に並べる。
+const RANK_DISPLAY_ORDER = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
+function sortForDisplay(cards){
+    return [...cards].sort((a, b) => {
+        if (a.suit !== b.suit) return SUITS.indexOf(a.suit) - SUITS.indexOf(b.suit);
+        return RANK_DISPLAY_ORDER.indexOf(a.rank) - RANK_DISPLAY_ORDER.indexOf(b.rank);
+    });
+}
+// イラストつきの通常表示（bigCardHtml）で見せる。
+// デッキ構築で外されている（ベンチの）カードも含めて、所持カード全部を表示する。
+function openCharCollection(){
+    if (!game) return;
+    const chars = sortForDisplay(game.charCollection);
+    document.getElementById('col-char-total').textContent = chars.length;
+    document.getElementById('col-char-grid').innerHTML = chars.map(c => bigCardHtml(c, { compact: true })).join('');
+    document.getElementById('char-collection-overlay').classList.remove('hidden');
+}
+function closeCharCollection(){ document.getElementById('char-collection-overlay').classList.add('hidden'); }
+function openNormalCollection(){
+    if (!game) return;
+    const normals = sortForDisplay(game.normalCollection);
+    document.getElementById('col-normal-total').textContent = normals.length;
+    document.getElementById('col-normal-tally').innerHTML = suitCountHtml(normals);
+    document.getElementById('col-normal-grid').innerHTML = normals.map(c => miniCardHtml(c)).join('');
+    document.getElementById('normal-collection-overlay').classList.remove('hidden');
+}
+function closeNormalCollection(){ document.getElementById('normal-collection-overlay').classList.add('hidden'); }
+
+// ============================================================
+// アイテム
+// ============================================================
+function grantRandomItem(){
+    const id = ITEM_IDS[Math.floor(Math.random() * ITEM_IDS.length)];
+    game.items[id] = (game.items[id] || 0) + 1;
+    return id;
+}
+// ポーションはアイテムが3種類だけなので、一覧オーバーレイを開かせず、
+// 左パネルに直接3つのボタンとして常時表示する（マップ画面・バトル画面共通）
+function renderPotionButtons(){
+    if (!game) return;
+    document.querySelectorAll('.potion-btn').forEach(btn => {
+        const id = btn.dataset.item;
+        const count = game.items[id] || 0;
+        btn.querySelector('.potion-count').textContent = count;
+        btn.disabled = count <= 0;
+    });
+}
+// 汎用のはい／いいえ確認ダイアログ（ブラウザのconfirm()の代わり）
+let confirmDialogCallback = null;
+function showConfirmDialog(message, onYes){
+    confirmDialogCallback = onYes;
+    document.getElementById('confirm-message').textContent = message;
+    document.getElementById('confirm-yes-btn').textContent = 'はい';
+    document.getElementById('confirm-no-btn').classList.remove('hidden');
+    document.getElementById('confirm-overlay').classList.remove('hidden');
+}
+// ボタン1つだけのお知らせ表示（ブラウザのalert()の代わり）
+function showNoticeDialog(message){
+    confirmDialogCallback = null;
+    document.getElementById('confirm-message').textContent = message;
+    document.getElementById('confirm-yes-btn').textContent = 'OK';
+    document.getElementById('confirm-no-btn').classList.add('hidden');
+    document.getElementById('confirm-overlay').classList.remove('hidden');
+}
+function resolveConfirmDialog(yes){
+    document.getElementById('confirm-overlay').classList.add('hidden');
+    const cb = confirmDialogCallback;
+    confirmDialogCallback = null;
+    if (yes && cb) cb();
+}
+function confirmUsePotion(id){
+    if ((game.items[id] || 0) <= 0) return;
+    const def = ITEM_DEFS[id];
+    showConfirmDialog(`${def.label}を使いますか？（HP+${def.value}%回復）`, () => useItem(id));
+}
+function useItem(id){
+    const def = ITEM_DEFS[id];
+    if ((game.items[id] || 0) <= 0) return;
+    game.items[id]--;
+    const heal = itemHealAmount(def);
+    game.player.hp = Math.min(game.playerMaxHp, game.player.hp + heal);
+    if (game.turn && !game.turn.ended){
+        floatText('battle-player-avatar-wrap', `+${heal}`, 'heal');
+        renderBattleTurn();
+    } else if (!document.getElementById('map-screen').classList.contains('hidden')){
+        renderMap();
+    }
+    renderPotionButtons();
+}
+
+// ============================================================
+// ステージマップ
+// ============================================================
+function returnToMap(){ goToMap(); }
+function goToMap(){
+    document.getElementById('map-player-avatar').src = avatarSrc(getCurPlayerAvatarKey());
+    renderMap();
+    showScreen('map-screen');
+    autoSaveGame();
+}
+const MAP_NODE_ICON = { normal:'⚔️', elite:'💀', shop:'🛒', event:'❓', boss:'👑' };
+const MAP_NODE_LABEL = { normal:'てき', elite:'エリート', shop:'ショップ', event:'イベント', boss:'ボス' };
+// 通常・エリートマスは実際に出る敵のイラストを見せる（どんな敵か分かった方が楽しいので）。
+// エリートは左上に⭐バッジをつけて見分けられるようにする。
+function mapNodeIconHtml(node){
+    if (node.type === 'normal' || node.type === 'elite'){
+        const badge = node.type === 'elite' ? '<span class="map-node-elite-badge">⭐</span>' : '';
+        return `${badge}<img class="map-node-monster-img" src="${enemyImageSrc({ imgKey: node.monsterType.imgKey, boss:false })}" alt="">`;
+    }
+    return `<span>${MAP_NODE_ICON[node.type]}</span>`;
+}
+const MAP_STAGE_BG = { 1:'images/haikei_1_1.png', 2:'images/haikei_1_2.png', 3:'images/haikei_1_3.png' };
+function renderMap(){
+    const cur = game.mapStage.current;
+    document.getElementById('map-player-name').textContent = getCurPlayerName();
+    document.getElementById('map-hp-text').textContent = `${Math.max(0, game.player.hp)} / ${game.playerMaxHp}`;
+    document.getElementById('map-hp-fill').style.width = `${Math.max(0, game.player.hp) / game.playerMaxHp * 100}%`;
+    document.getElementById('map-stat-chips').textContent = game.chips;
+    document.getElementById('map-stage-title').textContent = `STAGE.${game.mapStage.n}`;
+    document.getElementById('map-scene-img').src = MAP_STAGE_BG[game.mapStage.n] || MAP_STAGE_BG[1];
+    renderPotionButtons();
+    renderBossTrack(cur.m);
+    // 下から上に進むイメージ：先のプレビューを上、今えらべる大きなマスを下に並べる。線で親子をつなぐ
+    document.getElementById('map-fork').innerHTML = cur.children.map((node, i) => {
+        const kids = node.children || [];
+        // ボス直前（1つ先がボスのみ）は選択肢が1本道なので、線も1本にする
+        const linesHtml = kids.length === 1
+            ? `<line x1="80" y1="40" x2="80" y2="0"></line>`
+            : `<line x1="80" y1="40" x2="41" y2="0"></line><line x1="80" y1="40" x2="119" y2="0"></line>`;
+        const previewHtml = kids.length ? `
+            <div class="map-preview-row">
+                ${kids.map(c => `<div class="map-node-preview map-node-${c.type}">${mapNodeIconHtml(c)}</div>`).join('')}
+            </div>
+            <svg class="map-fork-lines" viewBox="0 0 160 40" preserveAspectRatio="none">
+                ${linesHtml}
+            </svg>` : '';
+        return `
+        <div class="map-fork-col">
+            ${previewHtml}
+            <div class="map-node map-node-${node.type}" onclick="chooseMapNode(${i})">
+                ${mapNodeIconHtml(node)}
+                <span class="map-node-label">${MAP_NODE_LABEL[node.type]}</span>
+            </div>
+        </div>`;
+    }).join('');
+}
+// 右パネル：ボスまでの道のり（下からSTART→〇×9→BOSS。今いる場所を光らせる）
+function renderBossTrack(m){
+    const rows = [];
+    rows.push(`<div class="boss-track-node boss-track-boss${m === 10 ? ' current' : ''}">BOSS</div>`);
+    for (let i = 9; i >= 1; i--){
+        rows.push(`<div class="boss-track-node${m === i ? ' current' : ''}">〇</div>`);
+    }
+    rows.push(`<div class="boss-track-node boss-track-start${m === 0 ? ' current' : ''}">START</div>`);
+    document.getElementById('map-boss-track').innerHTML = rows.join('');
+}
+function chooseMapNode(i){
+    const node = game.mapStage.current.children[i];
+    game.mapStage.current = node;
+    enterMapNode(node);
+}
+function enterMapNode(node){
+    if (node.type === 'normal' || node.type === 'elite'){
+        game.enemy = buildRandomEnemy(game.mapStage.n, node.m, { elite: node.type === 'elite', forceType: node.monsterType });
+        startBattle();
+    } else if (node.type === 'boss'){
+        game.enemy = buildRandomEnemy(game.mapStage.n, node.m, { boss: true });
+        startBattle();
+    } else if (node.type === 'shop'){
+        openShop();
+    } else if (node.type === 'event'){
+        openMapEvent();
+    }
+}
+// ============================================================
+// SHOP（カードパックやポーションをチップで買える。何度でも買い物できる）
+// ============================================================
+const SHOP_OFFERS = [
+    { id:'pack',    label:'カードパック',       desc:'カードが2枚（通常90%／キャラ10%）', price:30, emoji:'🎁' },
+    { id:'potionL', label:'回復ポーション(大)', desc:'最大HPの100%回復', price:30, emoji:'🧪' },
+    { id:'potionM', label:'回復ポーション(中)', desc:'最大HPの50%回復',  price:20, emoji:'🧴' },
+    { id:'potionS', label:'回復ポーション(小)', desc:'最大HPの25%回復',  price:10, emoji:'💊' },
+];
+function openShop(){
+    document.getElementById('shop-log').textContent = '';
+    renderShop();
+    showScreen('shop-screen');
+}
+function renderShop(){
+    document.getElementById('shop-chips').textContent = game.chips;
+    document.getElementById('shop-list').innerHTML = SHOP_OFFERS.map(o => `
+        <div class="shop-row">
+            <span class="shop-icon">${o.emoji}</span>
+            <span class="shop-info"><span class="shop-name">${escapeHtml(o.label)}</span><span class="shop-desc">${escapeHtml(o.desc)}</span></span>
+            <span class="shop-price">🪙${o.price}</span>
+            <button class="btn btn-gold btn-sm shop-buy-btn" ${game.chips < o.price ? 'disabled' : ''} onclick="buyShopItem('${o.id}')">かう</button>
+        </div>
+    `).join('');
+}
+function buyShopItem(id){
+    const offer = SHOP_OFFERS.find(o => o.id === id);
+    if (!offer || game.chips < offer.price) return;
+    game.chips -= offer.price;
+    if (offer.id === 'pack'){
+        // 敵撃破時のパックと同じ、タップして開ける演出を使う。閉じたらショップへ戻る
+        lastOpenedPackCards = generateNormalPack();
+        showPackReveal('🎁 カードパック', 'normal', () => { renderShop(); showScreen('shop-screen'); });
+        return;
+    }
+    game.items[offer.id] = (game.items[offer.id] || 0) + 1;
+    document.getElementById('shop-log').textContent = `${offer.emoji} ${offer.label} を手に入れた！`;
+    renderShop();
+}
+function closeShop(){ returnToMap(); }
+
+// ============================================================
+// マップイベント（①最大HPアップ ②スキル習得 ③宝箱、のどれか1つがランダムで起こる）
+// ============================================================
+function openMapEvent(){
+    const roll = Math.floor(Math.random() * 3);
+    if (roll === 0) openEventMaxHp();
+    else if (roll === 1) openEventLearnSkill();
+    else openEventTreasure();
+}
+
+// ---- ①見知らぬ魔法使い：最大HP+20、ついでに全回復 ----
+function openEventMaxHp(){
+    game.playerMaxHp += 20;
+    game.player.hp = game.playerMaxHp;
+    document.getElementById('eventhp-body').innerHTML =
+        `<div class="eh-intro">特別な魔法をかけてもらった！</div>
+         <div class="eh-line eh-maxhp">最大HP＋20</div>
+         <div class="eh-line eh-heal">HP完全回復！</div>`;
+    showScreen('eventhp-screen');
+}
+function closeEventMaxHp(){ returnToMap(); }
+
+// ---- ②スキル習得：所持キャラカードから1枚選ぶ。すでに上限までスキルを持つカードは、
+//      忘れるスキルを1つ選んでから新しいスキルを覚える。「覚えさせない」も選べる。 ----
+let mapEventSkillState = { skillId: null, candidates: [] };
+// ランクが限定されるスキル（777など）が、まだ所持していないランクのカードにしか合わないことがあるため、
+// 1つのスキルだけ抽選して外れたら（誰にも付けられなければ）何も起きずに終わってしまうバグがあった
+// （1歩目、キャラクターカードが最初の1枚しかないときに特に起きやすい）。付けられるスキルが見つかるまで探す。
+function openEventLearnSkill(){
+    const pool = shuffle(CHAR_SKILLS_ALL);
+    for (const skill of pool){
+        const eligible = game.charCollection.filter(c => !c.skills.includes(skill.id) && skillAllowedForCard(skill, c));
+        if (eligible.length === 0) continue;
+        const candidates = shuffle(eligible).slice(0, 3);
+        mapEventSkillState = { skillId: skill.id, candidates };
+        const cat = SKILL_CATEGORIES[skill.cat];
+        document.getElementById('eventskill-name').textContent = `${cat.emoji} ${skill.label}（${pctLabel(skill.mult)}）`;
+        document.getElementById('eventskill-desc').textContent = skill.desc;
+        document.getElementById('eventskill-row').innerHTML = candidates.map((c, i) => `
+            <div class="reward-pick" onclick="pickEventSkillCard(${i})">
+                ${bigCardHtml(c, { compact: true, previewExtraSkillId: skill.id })}
+            </div>
+        `).join('');
+        showScreen('eventskill-screen');
+        return;
+    }
+    // どのスキルもどのカードにも付けられない（万一のケース）は、無反応にならないよう宝箱にフォールバックする
+    openEventTreasure();
+}
+function pickEventSkillCard(i){
+    const card = mapEventSkillState.candidates[i];
+    if (card.skills.length >= MAX_CARD_SKILLS){
+        showForgetScreen(card, mapEventSkillState.skillId, () => returnToMap());
+    } else {
+        card.skills.push(mapEventSkillState.skillId);
+        returnToMap();
+    }
+}
+function skipEventLearnSkill(){ returnToMap(); }
+// ---- スキルが2つで埋まっているカードに新しいスキルを覚えさせるとき、忘れるスキルを選ばせる共通フロー
+//      （マップイベント②・撃破時のひらめき、どちらからも使う） ----
+let forgetFlow = null;
+// カードを実際に表示しつつ、「今持っている2つ」＋「新しく覚えようとしているスキル」の3つから
+// 忘れる（＝手放す）ものを1つ選ばせる。新しいスキルを選んだ場合は、今回の習得を見送ったことになる。
+function showForgetScreen(card, skillId, onDone){
+    forgetFlow = { card, skillId, onDone };
+    document.getElementById('eventforget-desc').textContent =
+        `${card.rank}${SUIT_SYMBOL[card.suit]} はもうスキルがいっぱいです。手放すスキルを1つ選んでください。`;
+    document.getElementById('eventforget-card-area').innerHTML = bigCardHtml(card, { compact: true, previewExtraSkillId: skillId });
+    const options = card.skills.concat([skillId]);
+    document.getElementById('eventforget-row').innerHTML = options.map((sid, i) => {
+        const s = charSkill(sid);
+        const cat = SKILL_CATEGORIES[s.cat];
+        const isNew = i === options.length - 1;
+        return `<div class="reward-pick" onclick="pickForgetSkill(${i})">
+            <div class="bc-skill-row" style="--cat-color:${cat.color};border-color:${cat.color};background:${cat.color}22;">
+                <span class="bc-skill-label"><span class="bc-skill-text">${escapeHtml(skillDisplayLabel(s, card))}${isNew ? '（今回のスキル）' : ''}</span></span>
+                <span class="bc-skill-mult">${pctLabel(s.mult)}</span>
+            </div>
+        </div>`;
+    }).join('');
+    showScreen('eventforget-screen');
+}
+function pickForgetSkill(i){
+    const { card, skillId, onDone } = forgetFlow;
+    const options = card.skills.concat([skillId]);
+    const discardId = options[i];
+    if (discardId !== skillId){
+        // 既存スキルを1つ手放して、新しいスキルを覚える
+        card.skills.splice(card.skills.indexOf(discardId), 1);
+        card.skills.push(skillId);
+    }
+    // 新しいスキルの方を選んだ場合は何もしない（今回の習得を見送り、今の2つのまま）
+    forgetFlow = null;
+    onDone();
+}
+
+// ---- ③宝箱発見：チップ10・20・30・40のいずれかを獲得 ----
+function openEventTreasure(){
+    const amounts = [10, 20, 30, 40];
+    const amt = amounts[Math.floor(Math.random() * amounts.length)];
+    game.chips += amt;
+    document.getElementById('eventtreasure-body').textContent = `宝箱を見つけた！ 🪙 コイン +${amt} を手に入れた！`;
+    showScreen('eventtreasure-screen');
+}
+function closeEventTreasure(){ returnToMap(); }
+// 自動セーブしているので「あきらめる」と記録が消えるわけではない。確認なしでそのままタイトルへ戻る
+function giveUpRun(){ showScreen('title-screen'); }
+
+// ============================================================
+// バトル（BJロジック）
+// ============================================================
+function startBattle(){
+    game.turn = null;
+    renderBattleHeader();
+    showScreen('battle-screen');
+    startTurn();
+}
+function renderBattleHeader(){
+    document.getElementById('battle-player-name').textContent = getCurPlayerName();
+    document.getElementById('battle-player-avatar').src = avatarSrc(getCurPlayerAvatarKey());
+    document.getElementById('battle-enemy-name').textContent = `${game.enemy.name}${game.enemy.boss ? '（ボス）' : game.enemy.elite ? '（エリート）' : ''}`;
+    document.getElementById('battle-enemy-avatar').src = enemyImageSrc(game.enemy);
+    document.getElementById('battle-enemy-atk').textContent = game.enemy.atk;
+    renderEnemyAbilityBox();
+    updateBattleBars();
+}
+function renderEnemyAbilityBox(){
+    const box = document.getElementById('battle-enemy-ability-box');
+    box.innerHTML = `<div class="ea-name">🔮 とくせい</div><div>${escapeHtml(abilityText(game.enemy))}</div>`;
+}
+function updateBattleBars(){
+    document.getElementById('battle-player-hp-text').textContent = `${Math.max(0, game.player.hp)}/${game.playerMaxHp}`;
+    document.getElementById('battle-player-hp-fill').style.width = `${Math.max(0, game.player.hp) / game.playerMaxHp * 100}%`;
+    document.getElementById('battle-stat-chips').textContent = game.chips;
+    renderPotionButtons();
+    document.getElementById('battle-enemy-hp-text').textContent = `${Math.max(0, game.enemy.hp)}/${game.enemy.maxHp}`;
+    document.getElementById('battle-enemy-hp-fill').style.width = `${Math.max(0, game.enemy.hp) / game.enemy.maxHp * 100}%`;
+    document.getElementById('stat-char-deck').textContent = `山札${game.charDeck.length}／捨札${game.charDiscard.length}`;
+    document.getElementById('stat-normal-deck').textContent = `山札${game.normalDeck.length}／捨札${game.normalDiscard.length}`;
+    document.getElementById('stat-stage').textContent = `${game.mapStage.n}-${game.mapStage.current.m}`;
+    document.getElementById('stat-turn').textContent = game.stats.turnsTaken;
+    document.getElementById('stat-score').textContent = `${liveScore()}pt`;
+}
+function addToHand(card){ game.turn.hand.push(card); }
+// A(エース)が1枚以上あるときの「最小合計」「最大合計（バーストしない範囲でなるべく11を使う）」を計算する
+function aceChoiceValues(hand){
+    const aces = hand.filter(c => c.rank === 'A');
+    if (aces.length === 0) return null;
+    const nonAceSum = hand.reduce((s, c) => c.rank === 'A' ? s : s + c.bj, 0);
+    const totalMin = nonAceSum + aces.length * 1;
+    let totalMax = nonAceSum + aces.length * 11;
+    let acesAt11 = aces.length;
+    while (totalMax > 21 && acesAt11 > 0){ totalMax -= 10; acesAt11--; }
+    return { totalMin, totalMax };
+}
+function applyAceChoice(hand, choice){
+    const aces = hand.filter(c => c.rank === 'A');
+    if (aces.length === 0) return;
+    if (choice === 'min'){ aces.forEach(c => { c.aceValue = 1; }); return; }
+    aces.forEach(c => { c.aceValue = 11; });
+    let total = computeTotal(hand);
+    let i = 0;
+    while (total > 21 && i < aces.length){ aces[i].aceValue = 1; total = computeTotal(hand); i++; }
+}
+function chooseAceTotal(choice){
+    if (!game.turn || game.turn.ended) return;
+    game.turn.aceChoice = choice;
+    applyAceChoice(game.turn.hand, choice);
+    renderBattleTurn();
+}
+function startTurn(){
+    const base = drawCharCard();
+    game.turn = { base, hand: [], extraDmg: 0, multSources: [], chipsBet: 0, aceChoice: 'max', ended: false };
+    addToHand(base);
+    applyAceChoice(game.turn.hand, game.turn.aceChoice);
+    applyOnDrawSkill(base);
+    document.getElementById('suitmatch-banner').classList.add('hidden');
+    renderBattleTurn();
+    autoSaveGame();
+}
+// 同じスートや同じ数字が2枚以上そろった瞬間に演出を出す（+100%ずつ積み上がる。一定時間で自動的に消える）
+let suitMatchBannerTimer = null;
+function matchEffectText(count, label){
+    return count === 2 ? `${label}がそろった！+100%` : `${label}が${count}つそろった！+100%`;
+}
+function showSuitMatchBanner(text){
+    const el = document.getElementById('suitmatch-banner');
+    el.textContent = text;
+    el.classList.remove('hidden');
+    if (suitMatchBannerTimer) clearTimeout(suitMatchBannerTimer);
+    suitMatchBannerTimer = setTimeout(() => { el.classList.add('hidden'); }, 1300);
+}
+function floatText(containerId, text, cls, duration){
+    const parent = document.getElementById(containerId);
+    if (!parent) return;
+    const el = document.createElement('div');
+    el.className = 'dmg-float' + (cls ? ' ' + cls : '');
+    el.textContent = text;
+    if (duration) el.style.animationDuration = `${duration}ms`;
+    parent.appendChild(el);
+    setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, duration || 1100);
+}
+// バースト時、画面を一瞬赤くしつつ揺らす
+function triggerBustEffect(){
+    const screen = document.getElementById('battle-screen');
+    screen.classList.remove('bust-shake');
+    void screen.offsetWidth; // アニメーションを毎回リスタートさせる
+    screen.classList.add('bust-shake');
+    setTimeout(() => screen.classList.remove('bust-shake'), 400);
+    const flash = document.createElement('div');
+    flash.className = 'bust-flash';
+    screen.appendChild(flash);
+    setTimeout(() => { if (flash.parentNode) flash.parentNode.removeChild(flash); }, 500);
+}
+// プレイヤーが敵の攻撃でダメージを受けたとき、アバター周りだけ軽く揺らして赤く光らせる
+function triggerPlayerHitEffect(){
+    const wrap = document.getElementById('battle-player-avatar-wrap');
+    wrap.classList.remove('player-hit-shake');
+    void wrap.offsetWidth;
+    wrap.classList.add('player-hit-shake');
+    setTimeout(() => wrap.classList.remove('player-hit-shake'), 350);
+    const flash = document.createElement('div');
+    flash.className = 'player-hit-flash';
+    wrap.appendChild(flash);
+    setTimeout(() => { if (flash.parentNode) flash.parentNode.removeChild(flash); }, 400);
+}
+function applyOnDrawSkill(card){
+    if (!card.skills || !card.skills.length) return;
+    card._triggered = true;
+    card.skills.forEach(sid => {
+        const s = NORMAL_SKILLS[sid];
+        if (!s) return; // キャラクターカードのスキルID（通常カードスキルではない）は対象外
+        if (s.kind === 'healPct'){
+            const heal = Math.round(game.playerMaxHp * s.value / 100);
+            game.player.hp = Math.min(game.playerMaxHp, game.player.hp + heal);
+            floatText('battle-player-avatar-wrap', `+${heal}`, 'heal');
+        } else if (s.kind === 'extraDmg'){
+            game.turn.extraDmg += s.value;
+        } else if (s.kind === 'mult'){
+            game.turn.multSources.push({ label: '通常カード：倍率', pct: s.value, color: 'var(--gold)' });
+        } else if (s.kind === 'coin'){
+            game.chips += s.value;
+            floatText('battle-player-avatar-wrap', `🪙+${s.value}`, 'coin');
+        }
+    });
+}
+// 手札にあるスートごとに枚数を数え、2枚以上そろっているスートがあればそれぞれ+100%ぶん加算する
+// （2枚で+100%、3枚で+200%、4枚で+300%…）。ハート2枚＋スペード2枚のように複数スートがそろっている
+// 場合は、それぞれのグループぶんが独立に加算される（+100%+100%=+200%）。
+// キャラクタースキルの「スート統一」（+100%＝×2）を持っている場合は、その分もこのボーナスに加算される。
+function suitMatchGroups(hand){
+    const counts = {};
+    hand.forEach(c => { counts[c.suit] = (counts[c.suit] || 0) + 1; });
+    return Object.entries(counts)
+        .filter(([, c]) => c >= 2)
+        .map(([suit, c]) => ({ suit, count: c, pct: (c - 1) * 100 }));
+}
+// 同じ数字（A・J・Q・Kも含む）が2枚以上そろったときも、スートそろいと同じ計算式でボーナスを加算する
+function rankMatchGroups(hand){
+    const counts = {};
+    hand.forEach(c => { counts[c.rank] = (counts[c.rank] || 0) + 1; });
+    return Object.entries(counts)
+        .filter(([, c]) => c >= 2)
+        .map(([rank, c]) => ({ rank, count: c, pct: (c - 1) * 100 }));
+}
+// 倍率はすべて「加算(%)」でまとめる（乗算にすると組み合わせで爆発的にインフレするため）。
+// 基準は100%（通常）。キャラクタースキル・同じスートボーナス・通常カードスキル・アイテム・チップは、
+// それぞれ「倍率－1（＝加算する%ぶん）」を同じ1つの加算プールに足し込み、最後に 1 + 合計 で最終倍率にする。
+// 例：+100%のスキルと+300%のスキルが同時発動 → 100%+300%=400%ぶん加算 → 最終倍率は100%+400%=500%＝×5
+// breakdown配列は、そのターン中に倍率へ乗っている内訳を1つずつ並べたもの（画面表示用）。
+function currentMultInfo(){
+    const total = computeTotal(game.turn.hand);
+    const ctx = { total, hand: game.turn.hand, base: game.turn.base };
+    const active = game.turn.base.skills.map(id => charSkill(id)).filter(s => s.check(ctx));
+    const breakdown = [];
+    active.forEach(s => {
+        const cat = SKILL_CATEGORIES[s.cat];
+        const pct = Math.round((s.mult - 1) * 100);
+        breakdown.push({ label: breakdownLabel(s, game.turn.base), pct, color: cat.color });
+    });
+    const suitGroups = suitMatchGroups(game.turn.hand);
+    suitGroups.forEach(g => {
+        breakdown.push({ label: `${SUIT_SYMBOL[g.suit]}${g.count}枚`, pct: g.pct, color: SKILL_CATEGORIES.suitcolor.color });
+    });
+    const rankGroups = rankMatchGroups(game.turn.hand);
+    rankGroups.forEach(g => {
+        breakdown.push({ label: `${g.rank}×${g.count}枚`, pct: g.pct, color: SKILL_CATEGORIES.suitcolor.color });
+    });
+    if (total === 21) breakdown.push({ label: '21！', pct: 200, color: 'var(--gold-bright)' });
+    (game.turn.multSources || []).forEach(src => breakdown.push(src));
+    if (game.turn.chipsBet) breakdown.push({ label: `コイン${game.turn.chipsBet}枚`, pct: game.turn.chipsBet * 20, color: 'var(--gold)' });
+    const bonusSum = breakdown.reduce((sum, b) => sum + b.pct, 0) / 100;
+    const mult = 1 + bonusSum;
+    return { total, active, mult, breakdown };
+}
+// 手札の枚数が増えても中央エリアが同じ幅からはみ出さないよう、自動で縮小する
+function fitCardsRow(){
+    const outer = document.getElementById('battle-cards-row');
+    const inner = document.getElementById('battle-cards-inner');
+    inner.style.transform = 'scale(1)';
+    const outerW = outer.clientWidth;
+    const innerW = inner.scrollWidth;
+    const scale = innerW > outerW ? outerW / innerW : 1;
+    inner.style.transform = `scale(${scale})`;
+}
+function renderBadges(){
+    const wrap = document.getElementById('badges-row');
+    const aceVals = game.turn.ended ? null : aceChoiceValues(game.turn.hand);
+    const { mult } = currentMultInfo();
+    const multBadge = `<div class="total-badge mult-value-badge">×${mult.toFixed(2)}</div>`;
+    if (aceVals && aceVals.totalMin !== aceVals.totalMax){
+        const sel = game.turn.aceChoice === 'min' ? 'min' : 'max';
+        wrap.innerHTML = `
+            <div class="total-badge ace-option${sel === 'min' ? '' : ' dim'}" onclick="chooseAceTotal('min')">${aceVals.totalMin}<span class="ace-sub">A=1</span></div>
+            <div class="total-badge ace-option${sel === 'max' ? '' : ' dim'}" onclick="chooseAceTotal('max')">${aceVals.totalMax}<span class="ace-sub">A=11</span></div>
+            ${multBadge}`;
+    } else {
+        const total = computeTotal(game.turn.hand);
+        wrap.innerHTML = `<div class="total-badge">${total}</div>${multBadge}`;
+    }
+}
+// 倍率の内訳を、加算されているものだけ小さいピルで並べて表示する（攻撃前でも、加算されるたびに増えていく）
+function renderMultBreakdown(){
+    const { breakdown } = currentMultInfo();
+    const wrap = document.getElementById('mult-breakdown-row');
+    wrap.innerHTML = breakdown.map(b => `<span class="mult-chip" style="--cat-color:${b.color || 'var(--gold)'}">${escapeHtml(b.label)} <span class="mult-chip-pct">+${b.pct}%</span></span>`).join('');
+}
+function renderChipRow(){
+    const row = document.getElementById('chip-bet-row');
+    const canBet = !!(game.turn && !game.turn.ended && game.turn.hand.length === 1);
+    row.classList.toggle('disabled', !canBet);
+    document.getElementById('chip-pool').textContent = game.chips;
+    document.getElementById('chip-bet-count').textContent = game.turn ? (game.turn.chipsBet || 0) : 0;
+    document.getElementById('chip-minus-btn').disabled = !canBet || !(game.turn && game.turn.chipsBet > 0);
+    document.getElementById('chip-plus-btn').disabled = !canBet || game.chips <= 0 || !(game.turn && game.turn.chipsBet < 10);
+}
+function adjustChipBet(delta){
+    if (!game.turn || game.turn.ended || game.turn.hand.length !== 1) return;
+    const bet = game.turn.chipsBet || 0;
+    const next = bet + delta;
+    if (next < 0 || next > 10) return;
+    if (delta > 0 && game.chips <= 0) return;
+    game.chips -= delta;
+    game.turn.chipsBet = next;
+    renderBattleTurn();
+}
+function renderBattleTurn(){
+    const { total, active } = currentMultInfo();
+    const activeIds = active.map(s => s.id);
+    const cardsHtml = game.turn.hand.map((c, i) => bigCardHtml(c, i === 0 ? { activeSkillIds: activeIds } : {}));
+    document.getElementById('battle-cards-inner').innerHTML = cardsHtml.join('');
+    fitCardsRow();
+    renderBadges();
+    renderMultBreakdown();
+    renderChipRow();
+    updateBattleBars();
+    const busted = total > 21;
+    document.getElementById('battle-hit-stand-row').classList.toggle('hidden', busted || game.turn.ended);
+    document.getElementById('battle-attack-btn').disabled = game.turn.hand.length < 2;
+    document.getElementById('battle-next-turn-btn').classList.add('hidden');
+    document.getElementById('defeat-banner').classList.add('hidden');
+    if (busted && !game.turn.ended) resolveTurn(true);
+}
+function doHit(){
+    if (!game.turn || game.turn.ended) return;
+    const card = drawNormalCard();
+    addToHand(card);
+    applyAceChoice(game.turn.hand, game.turn.aceChoice);
+    applyOnDrawSkill(card);
+    // バーストする手では「そろった」演出は出さない（バースト演出だけにする）
+    if (computeTotal(game.turn.hand) <= 21){
+        const sameSuitCount = game.turn.hand.filter(c => c.suit === card.suit).length;
+        const sameRankCount = game.turn.hand.filter(c => c.rank === card.rank).length;
+        if (sameSuitCount >= 2) showSuitMatchBanner(matchEffectText(sameSuitCount, 'マーク'));
+        else if (sameRankCount >= 2) showSuitMatchBanner(matchEffectText(sameRankCount, '数字'));
+    }
+    renderBattleTurn();
+}
+function doStand(){
+    if (!game.turn || game.turn.ended || game.turn.hand.length < 2) return;
+    resolveTurn(false);
+}
+// extraDmg（通常カードの「攻撃5ダメージ」スキル）は、倍率をかけたあとに足す＝倍率の影響を受けない
+function computeDamage(total, mult, hand, enemy, extraDmg){
+    let dmg = Math.round(total * mult) + (extraDmg || 0);
+    if (enemy.ability === 'blockLowDamage15' && dmg <= 15) dmg = 0;
+    return dmg;
+}
+// ワイトなど、敵の反撃前に発動するとくせい（HP回復）
+function applyEnemyPreAttackAbilities(){
+    const enemy = game.enemy;
+    if (enemy.ability === 'regenMaxHp10' && enemy.hp > 0 && enemy.hp < enemy.maxHp){
+        const healed = Math.min(enemy.maxHp, enemy.hp + Math.round(enemy.maxHp * 0.10)) - enemy.hp;
+        enemy.hp += healed;
+        floatText('battle-enemy-avatar-wrap', `+${healed}`, 'heal');
+    }
+}
+function resolveTurn(busted){
+    game.turn.ended = true;
+    game.stats.turnsTaken++;
+    let enemyDefeated = false;
+    if (busted){
+        floatText('battle-cards-row', 'バースト！', 'bust');
+        triggerBustEffect();
+    } else {
+        const { total, mult } = currentMultInfo();
+        const dmg = computeDamage(total, mult, game.turn.hand, game.enemy, game.turn.extraDmg);
+        game.enemy.hp -= dmg;
+        game.stats.totalDamage += dmg;
+        floatText('battle-enemy-avatar-wrap', `-${dmg}`, 'enemy-hit', 1800);
+        if (game.enemy.hp <= 0) enemyDefeated = true;
+    }
+    game.charDiscard.push(game.turn.base);
+    game.turn.hand.slice(1).forEach(c => game.normalDiscard.push(c));
+    updateBattleBars();
+    renderBattleTurn();
+    if (enemyDefeated){
+        // 中央のダメージ表示のあとに「敵を倒した！」が続いて見えるよう、一拍おいてから出す
+        setTimeout(() => {
+            document.getElementById('defeat-banner').classList.remove('hidden');
+            document.getElementById('battle-next-turn-btn').classList.remove('hidden');
+        }, 550);
+    } else {
+        setTimeout(() => { if (game.turn && game.turn.ended) proceedAfterTurn(); }, 1000);
+    }
+}
+function proceedAfterTurn(){
+    if (game.enemy.hp <= 0){
+        game.stats.defeatedCount++;
+        if (game.enemy.boss){
+            if (game.mapStage.n >= 3){ finishRun(true); return; }
+            game.player.hp = game.playerMaxHp;
+            game.mapStage.n++;
+            game.mapStage.current = buildStageMap();
+        }
+        afterEnemyDefeated(game.enemy);
+        return;
+    }
+    // 敵の反撃（とくせいで内容が変わる：回避／クリティカル／攻撃力上昇／ブレス）
+    applyEnemyPreAttackAbilities();
+    const enemy = game.enemy;
+    let incoming = enemy.atk;
+    let evaded = false, crit = false, breathed = false;
+    if (enemy.ability === 'evade10' && Math.random() < 0.10){
+        evaded = true;
+    } else if (enemy.ability === 'rampAtk10pct'){
+        incoming = Math.round(enemy.baseAtk * (1 + 0.10 * enemy.rampCount));
+        enemy.atk = incoming;
+        enemy.rampCount++;
+        document.getElementById('battle-enemy-atk').textContent = enemy.atk;
+    } else if (enemy.ability === 'crit10x2' && Math.random() < 0.10){
+        incoming *= 2;
+        crit = true;
+    } else if (enemy.ability === 'breath30' && Math.random() < 0.30){
+        incoming = Math.round(enemy.atk * (1.2 + Math.random() * 0.8));
+        breathed = true;
+    }
+    if (evaded){
+        floatText('battle-player-avatar-wrap', 'かわした！', 'heal');
+    } else {
+        floatText('battle-player-avatar-wrap', breathed ? `🔥ブレス！ -${incoming}` : `-${incoming}`, crit ? 'bust' : '');
+        game.player.hp -= incoming;
+        triggerPlayerHitEffect();
+    }
+    updateBattleBars();
+    if (game.player.hp <= 0){ finishRun(false); return; }
+    startTurn();
+}
+function openBattleHowTo(){ document.getElementById('howto-overlay').classList.remove('hidden'); }
+function closeBattleHowTo(){ document.getElementById('howto-overlay').classList.add('hidden'); }
+function battleBackToTitle(){ showScreen('title-screen'); }
+
+// ============================================================
+// 撃破ボーナス：
+//  ・ふつうの敵：チップ+5／エリート：チップ+10、どちらも20%でポーション、パック1つ（エリートはレアパック）
+//  ・ボス（最終ボスをのぞく）：チップ+50、レアパック1つ＋通常パック1つ（ポーションの抽選なし）。
+//    倒すとHPが全回復してから次のステージへ進む（proceedAfterTurn側で処理）
+//  ・どの敵でも共通で、20%の確率でキャラクターカードがスキルを1つひらめく
+//  ・最終ボスをたおしたときは冒険クリアがそのまま確定するので、この関数自体が呼ばれない（報酬なし）
+// ============================================================
+let lastGrantedItemId = null;
+let pendingPacks = [];
+function afterEnemyDefeated(enemy){
+    if (enemy.boss){
+        game.chips += 50;
+        lastGrantedItemId = null;
+        pendingPacks = ['rare', 'normal'];
+    } else {
+        game.chips += enemy.elite ? 10 : 5;
+        lastGrantedItemId = Math.random() < 0.20 ? grantRandomItem() : null;
+        pendingPacks = [enemy.elite ? 'rare' : 'normal'];
+    }
+    maybeSkillEpiphany();
+    openNextPendingPack();
+}
+// 所持カードの上限は撤廃済みなので、手放し画面をはさまずそのままマップへ戻る
+function afterRewardEvent(){ returnToMap(); }
+
+// ---- カードパックを開ける（真ん中に閉じたパックを表示し、タップすると開いて中身が見える） ----
+// revealDoneCallback が指定されているときは、閉じたあとに撃破ボーナスの流れ（ひらめき等）へ進まず、
+// 呼び出し元（ショップでの購入など）が指定した画面へ戻る。
+let lastOpenedPackCards = [];
+let revealDoneCallback = null;
+function openNextPendingPack(){
+    if (pendingPacks.length === 0){ openEpiphanyIfAny(); return; }
+    const kind = pendingPacks.shift();
+    if (kind === 'rare') openRarePack(); else openNormalPack();
+}
+function openNormalPack(){
+    lastOpenedPackCards = generateNormalPack();
+    showPackReveal('🎁 カードパック', 'normal');
+}
+function openRarePack(){
+    lastOpenedPackCards = generateRarePack();
+    showPackReveal('✨ レアパック', 'rare');
+}
+function showPackReveal(title, kind, onDone){
+    revealDoneCallback = onDone || null;
+    document.getElementById('reveal-title').textContent = title;
+    document.getElementById('reveal-pack-img').src = kind === 'rare' ? 'images/cardpack_2.png' : 'images/cardpack_1.png';
+    document.getElementById('reveal-pack-closed').classList.remove('hidden');
+    document.getElementById('reveal-card-area').innerHTML = '';
+    document.getElementById('reveal-card-area').classList.add('hidden');
+    document.getElementById('reveal-next-btn').classList.add('hidden');
+    showScreen('reveal-screen');
+}
+function openPackAnimation(){
+    applyPackCards(lastOpenedPackCards);
+    document.getElementById('reveal-pack-closed').classList.add('hidden');
+    document.getElementById('reveal-card-area').innerHTML = lastOpenedPackCards.map(c => bigCardHtml(c, { compact: true })).join('');
+    document.getElementById('reveal-card-area').classList.remove('hidden');
+    document.getElementById('reveal-next-btn').classList.remove('hidden');
+}
+function closeReveal(){
+    if (revealDoneCallback){
+        const cb = revealDoneCallback;
+        revealDoneCallback = null;
+        cb();
+    } else {
+        openNextPendingPack();
+    }
+}
+
+// ---- 敵撃破時、20%の確率で「最初に選んだ1枚」だけがスキルを1つひらめく（エリート・ボスも対象） ----
+// 最初に選んだカードはデッキから外せない特別なカードなので、理想のビルドを狙えるようひらめきの対象もこのカードだけに絞る。
+// すでに覚えているスキルは対象外。JA/QK/777などランク条件のあるスキルも、条件を満たすカードなら対象になる
+// （777をひらめけるのはランク7のカードのみ、など）。スキルが2つ埋まっているときは、忘れるスキルを選んでから覚える。
+let pendingEpiphany = null;
+function maybeSkillEpiphany(){
+    pendingEpiphany = null;
+    if (Math.random() >= 0.20) return;
+    const starter = game.charCollection.find(c => c.isStarter);
+    if (!starter) return;
+    const pool = shuffle(CHAR_SKILLS_ALL).filter(s => !starter.skills.includes(s.id) && skillAllowedForCard(s, starter));
+    if (pool.length === 0) return;
+    pendingEpiphany = { card: starter, skillId: pool[0].id };
+}
+// ひらめいた瞬間は、まだスキル欄が埋まっているかどうかにかかわらず先に「ひらめいた！」を見せる。
+// 欄が埋まっていた場合の「忘れるスキルを選ぶ」は、そのあとで出す（先に埋まっている通知が出るのは変な順番だったため）。
+let epiphanyPending = null;
+function openEpiphanyIfAny(){
+    if (!pendingEpiphany){ showItemGetScreen(); return; }
+    const { card, skillId } = pendingEpiphany;
+    pendingEpiphany = null;
+    showEpiphanyAnnounce(card, skillId);
+}
+function showEpiphanyAnnounce(card, skillId){
+    epiphanyPending = { card, skillId };
+    const skill = charSkill(skillId);
+    document.getElementById('epiphany-card-area').innerHTML = bigCardHtml(card, { compact: true, previewExtraSkillId: skillId });
+    document.getElementById('epiphany-body').textContent =
+        `「${skillDisplayLabel(skill, card)}」（${pctLabel(skill.mult)}）をひらめいた！`;
+    showScreen('epiphany-screen');
+}
+function closeEpiphany(){
+    const { card, skillId } = epiphanyPending;
+    epiphanyPending = null;
+    if (card.skills.length >= MAX_CARD_SKILLS){
+        showForgetScreen(card, skillId, () => showItemGetScreen());
+    } else {
+        card.skills.push(skillId);
+        showItemGetScreen();
+    }
+}
+
+// ---- コイン・アイテム獲得の表示 ----
+function showItemGetScreen(){
+    const itemDef = lastGrantedItemId ? ITEM_DEFS[lastGrantedItemId] : null;
+    const coinGain = game.enemy.boss ? 50 : (game.enemy.elite ? 10 : 5);
+    document.getElementById('itemget-body').innerHTML = `🪙 コイン +${coinGain}` + (itemDef ? `<br>${itemDef.emoji} ${escapeHtml(itemDef.label)} ×1` : '');
+    showScreen('itemget-screen');
+}
+function closeItemGet(){ afterRewardEvent(); }
+
+// ============================================================
+// デッキ構築（所持カードから、実際にデッキへ入れる分を選ぶ。マップ画面から開ける・戦闘中は不可）
+// ============================================================
+// 所持数がデッキ上限以下なら全部強制的にデッキ入りになる（例：3枚しか持っていないのに1枚だけセット、は不可）。
+// 上限を超えて持っている場合だけ、選択を入れ替えられる。最初に選んだカードは常にデッキ入り（外せない）。
+let deckBuilderSelection = { char: [], normal: [] };
+function deckBuilderCap(kind){ return kind === 'char' ? CHAR_DECK_CAP : NORMAL_DECK_CAP; }
+function deckBuilderCollection(kind){ return kind === 'char' ? game.charCollection : game.normalCollection; }
+let deckBuilderTab = 'char';
+let deckBuilderHideBench = false;
+function goToDeckBuilder(){
+    deckBuilderSelection = {
+        char: game.charCollection.length <= CHAR_DECK_CAP ? game.charCollection.map(c => c.uid) : game.charSelectedIds.slice(),
+        normal: game.normalCollection.length <= NORMAL_DECK_CAP ? game.normalCollection.map(c => c.uid) : game.normalSelectedIds.slice(),
+    };
+    deckBuilderTab = 'char';
+    deckBuilderHideBench = false;
+    document.getElementById('db-hide-bench').checked = false;
+    renderDeckBuilder();
+    showScreen('deckbuilder-screen');
+}
+// キャラクターカード／通常カードをタブで切り替える（両方いっぺんに表示すると縦に長くなりすぎるため）
+function switchDeckBuilderTab(kind){
+    deckBuilderTab = kind;
+    document.getElementById('db-tab-char').classList.toggle('active', kind === 'char');
+    document.getElementById('db-tab-normal').classList.toggle('active', kind === 'normal');
+    document.getElementById('db-char-grid').classList.toggle('hidden', kind !== 'char');
+    document.getElementById('db-normal-grid').classList.toggle('hidden', kind !== 'normal');
+    // タブを切り替えたときも、そのタブの規定枚数に応じて「すべてデッキから外す」ボタンの有効/無効を更新する
+    // （以前はrenderDeckBuilder内でしか更新しておらず、タブ切り替えだけでは反映されないバグがあった）
+    document.getElementById('db-clear-btn').disabled = deckBuilderCollection(kind).length <= deckBuilderCap(kind);
+}
+function renderDeckBuilder(){
+    renderDeckBuilderSection('char');
+    renderDeckBuilderSection('normal');
+    switchDeckBuilderTab(deckBuilderTab);
+    const ready = deckBuilderSelection.char.length === Math.min(game.charCollection.length, CHAR_DECK_CAP)
+        && deckBuilderSelection.normal.length === Math.min(game.normalCollection.length, NORMAL_DECK_CAP);
+    document.getElementById('db-confirm-btn').disabled = !ready;
+}
+// 規定枚数（デッキ上限）を超えて所持しているときだけ使える。最初に選んだカードだけは外せないので残る
+function clearDeckSelection(){
+    const kind = deckBuilderTab;
+    const collection = deckBuilderCollection(kind);
+    if (collection.length <= deckBuilderCap(kind)) return;
+    deckBuilderSelection[kind] = collection.filter(c => c.isStarter).map(c => c.uid);
+    renderDeckBuilder();
+}
+function toggleHideBench(){
+    deckBuilderHideBench = document.getElementById('db-hide-bench').checked;
+    renderDeckBuilder();
+}
+function renderDeckBuilderSection(kind){
+    const collection = deckBuilderCollection(kind);
+    const cap = deckBuilderCap(kind);
+    const selected = deckBuilderSelection[kind];
+    const forced = collection.length <= cap;
+    let sorted = sortForDisplay(collection);
+    if (deckBuilderHideBench) sorted = sorted.filter(c => selected.includes(c.uid));
+    const gridId = kind === 'char' ? 'db-char-grid' : 'db-normal-grid';
+    const countId = kind === 'char' ? 'db-char-count' : 'db-normal-count';
+    document.getElementById(countId).textContent = forced
+        ? `全${collection.length}枚、すべて使用中`
+        : `選択中 ${selected.length}／${cap}（所持${collection.length}枚）`;
+    document.getElementById(gridId).innerHTML = sorted.map(c => {
+        const sel = selected.includes(c.uid);
+        const locked = forced || c.isStarter;
+        const cls = ['db-cell'];
+        if (sel) cls.push('db-selected');
+        if (locked) cls.push('db-locked');
+        const inner = kind === 'char' ? bigCardHtml(c, { compact: true }) : miniCardHtml(c);
+        // 強制選出中（全部使用中）ではなく、このカードが最初の1枚だから外せない場合だけ、その旨を伝える
+        const onclickAttr = !locked ? `onclick="toggleDeckCard('${kind}', ${c.uid})"`
+            : (c.isStarter && !forced ? `onclick="showStarterLockedMessage()"` : '');
+        return `<div class="${cls.join(' ')}" ${onclickAttr}>${inner}${sel ? '<div class="db-check">✓</div>' : ''}</div>`;
+    }).join('');
+}
+function showStarterLockedMessage(){ showNoticeDialog('最初に選んだカードははずせない！'); }
+function toggleDeckCard(kind, uid){
+    const collection = deckBuilderCollection(kind);
+    const cap = deckBuilderCap(kind);
+    if (collection.length <= cap) return; // 強制選出中は変更できない
+    const card = collection.find(c => c.uid === uid);
+    if (card && card.isStarter) return; // 最初に選んだカードは外せない
+    const selected = deckBuilderSelection[kind];
+    const idx = selected.indexOf(uid);
+    if (idx >= 0){
+        selected.splice(idx, 1);
+    } else {
+        if (selected.length >= cap) return; // 上限に達している
+        selected.push(uid);
+    }
+    renderDeckBuilder();
+}
+function confirmDeckBuilder(){
+    if (document.getElementById('db-confirm-btn').disabled) return;
+    game.charSelectedIds = deckBuilderSelection.char.slice();
+    game.normalSelectedIds = deckBuilderSelection.normal.slice();
+    rebuildCharDeck();
+    rebuildNormalDeck();
+    returnToMap();
+}
+function cancelDeckBuilder(){ returnToMap(); }
+
+// ============================================================
+// 決着
+// ============================================================
+function finishRun(cleared){
+    clearSave();
+    recordRunResult(cleared);
+    if (cleared) recordCardClear(game.starterRank, game.starterSuit);
+    const label = `撃破数 ${game.stats.defeatedCount}　スコア ${lastFinalScore}pt`;
+    if (cleared){
+        document.getElementById('clear-score').textContent = label;
+        document.getElementById('clear-world-submit-btn').disabled = false;
+        document.getElementById('clear-world-submit-msg').textContent = '';
+        showScreen('clear-screen');
+        submitScoreToWorld('clear');
+    } else {
+        document.getElementById('over-score').textContent = label;
+        document.getElementById('over-world-submit-btn').disabled = false;
+        document.getElementById('over-world-submit-msg').textContent = '';
+        showScreen('over-screen');
+        submitScoreToWorld('over');
+    }
+}
+function backToTitleFromResult(){ showScreen('title-screen'); }
+
+// ============================================================
+// SCALE
+// ============================================================
+function scaleContainer(){
+    const el = document.getElementById('container');
+    const w = window.innerWidth, h = window.innerHeight;
+    if (w <= 0 || h <= 0) return;
+    const s = Math.min(w / 1280, h / 720);
+    el.style.transform = `scale(${s})`;
+}
+window.addEventListener('resize', scaleContainer);
+window.addEventListener('load', scaleContainer);
+scaleContainer();
+// 「つぎへ」系のボタン（.js-enter-next）は、表示されているときEnterキーでも押せるようにする
+document.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    const btn = Array.from(document.querySelectorAll('.js-enter-next')).find(b => b.offsetParent !== null && !b.disabled);
+    if (btn){ e.preventDefault(); btn.click(); }
+});
+requestAnimationFrame(scaleContainer);
+setTimeout(scaleContainer, 100);
+updateNameRegisterBtn();
+setFurigana(getFuriganaOn());
+document.getElementById('container').addEventListener('click', hideSkillDescPopup);
+renderTitleIllusts();
+refreshTitleButtons();
+</script>
+</body>
+</html>
