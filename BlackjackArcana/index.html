@@ -89,7 +89,7 @@
         /* タイトル画面いっぱいの背景イラスト（title.png）。その上に、UIの土台となる従来のfeltグラデーションも重ねておく */
         .title-bg-img {
             position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
-            z-index: 0; opacity: 0.6; pointer-events: none;
+            z-index: 0; opacity: 0.9; pointer-events: none;
         }
         /* タイトル画面の左右の空きスペースに、ランダムなキャラクターイラストを飾る（初代ポケモンのタイトル画面イメージ）。
            イラストだけを浮かせて置くと不自然なので、カード風の枠で囲む（枠の縦横比は通常カードと違ってよい） */
@@ -145,8 +145,9 @@
         #title-screen .title-box {
             width: 620px;
             background-image:
-                radial-gradient(ellipse at 50% 12%, rgba(23,37,27,0.7) 0%, rgba(10,18,11,0.7) 55%, rgba(3,6,3,0.7) 100%),
+                radial-gradient(ellipse at 50% 12%, rgba(23,37,27,0.4) 0%, rgba(10,18,11,0.4) 55%, rgba(3,6,3,0.4) 100%),
                 linear-gradient(135deg, var(--gold-bright), var(--gold) 45%, var(--gold-deep) 55%, var(--gold-bright));
+            backdrop-filter: blur(2px);
         }
         .title-h1 {
             font-size: 2.1rem; font-weight: 800; color: var(--gold-bright);
@@ -390,6 +391,13 @@
         .db-toolbar .btn { margin-top: 0; padding: 7px 14px; font-size: 0.78rem; }
         .db-hide-toggle { display: flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--text-dim); font-weight: 700; cursor: pointer; }
         .db-hide-toggle input { accent-color: var(--gold-bright); width: 15px; height: 15px; cursor: pointer; }
+        .db-sort-toggle { display: flex; align-items: center; gap: 6px; }
+        .db-sort-label { font-size: 0.82rem; color: var(--text-dim); font-weight: 700; }
+        .db-sort-btn {
+            background: rgba(0,0,0,0.35); border: 2px solid #3a3226; border-radius: 8px; padding: 5px 12px;
+            color: var(--text-dim); font-weight: 800; cursor: pointer; font-size: 0.78rem; font-family: inherit;
+        }
+        .db-sort-btn.active { border-color: var(--gold); background: rgba(212,175,55,0.18); color: var(--gold-bright); }
         .db-cell { position: relative; cursor: pointer; border-radius: 16px; padding: 2px; border: 2px solid transparent; opacity: 0.45; transition: all .15s; }
         .db-cell:hover { opacity: 0.8; }
         .db-cell.db-selected { opacity: 1; border-color: var(--gold); box-shadow: 0 0 12px rgba(212,175,55,0.5); }
@@ -708,6 +716,7 @@
         .howto-body h3 { color: var(--gold-bright); font-size: 0.92rem; margin: 12px 0 3px; }
         /* ==================== REWARD / EVENTS ==================== */
         #itemget-screen .title-box { width: 480px; }
+        .itemget-icon { width: 28px; height: 28px; object-fit: contain; vertical-align: middle; }
         #reveal-screen .title-box { width: 920px; }
         .pack-closed {
             width: 280px; height: 360px; margin: 20px auto; cursor: pointer;
@@ -741,7 +750,7 @@
             display: flex; flex-direction: column; align-items: center; gap: 3px; border: 1px solid var(--gold);
             border-radius: 10px; padding: 10px 10px; text-align: center;
         }
-        .shop-icon { font-size: 1.7rem; }
+        .shop-icon { width: 40px; height: 40px; object-fit: contain; }
         .shop-info { display: flex; flex-direction: column; align-items: center; }
         .shop-name { font-weight: 800; font-size: 0.9rem; color: var(--text-hi); }
         .shop-desc { font-size: 0.68rem; color: var(--text-dim); }
@@ -963,6 +972,11 @@
             <div class="db-toolbar">
                 <button class="btn btn-gray btn-sm" id="db-clear-btn" style="width:auto;" onclick="clearDeckSelection()">🗑️ すべてデッキから外す</button>
                 <label class="db-hide-toggle"><input type="checkbox" id="db-hide-bench" onchange="toggleHideBench()"> デッキ外のカードを隠す</label>
+                <div class="db-sort-toggle">
+                    <span class="db-sort-label">ならびかえ</span>
+                    <button class="db-sort-btn active" id="db-sort-suit" onclick="setDeckBuilderSort('suit')">スート</button>
+                    <button class="db-sort-btn" id="db-sort-rank" onclick="setDeckBuilderSort('rank')">数字</button>
+                </div>
             </div>
             <div id="db-char-grid" class="card-grid char-grid"></div>
             <div id="db-normal-grid" class="card-grid hidden"></div>
@@ -1312,9 +1326,9 @@ const NORMAL_DECK_CAP = 20;
 
 // アイテム（撃破ごとに1つランダムで手に入る）。回復ポーションのみ。valueは最大HPに対する％。
 const ITEM_DEFS = {
-    potionL: { label:'回復ポーション(大)', emoji:'🧪', effect:'heal', value:100 },
-    potionM: { label:'回復ポーション(中)', emoji:'🧴', effect:'heal', value:50 },
-    potionS: { label:'回復ポーション(小)', emoji:'💊', effect:'heal', value:25 },
+    potionL: { label:'回復ポーション(大)', img:'images/15_potion_yellow.png', effect:'heal', value:100 },
+    potionM: { label:'回復ポーション(中)', img:'images/13_potion_blue.png',   effect:'heal', value:50 },
+    potionS: { label:'回復ポーション(小)', img:'images/14_potion_green.png', effect:'heal', value:25 },
 };
 const ITEM_IDS = Object.keys(ITEM_DEFS);
 function itemHealAmount(def){ return Math.round(game.playerMaxHp * def.value / 100); }
@@ -1348,7 +1362,7 @@ const BOSS_TYPES = [
 ];
 const ELITE_MULT = 1.2;
 function enemyHpBase(n, m){ return 50 * n + 3 * (m - 1); }
-function enemyAtkBase(n, m){ return 10 * n + (m - 1); }
+function enemyAtkBase(n, m){ return 10 * n + 2 * (m - 1); }
 // とくせいの説明文（右パネルのとくせいらん表示用）
 const ENEMY_ABILITY_TEXT = {
     evade10: '10%の確率で攻撃を回避する',
@@ -2086,9 +2100,14 @@ function backToTitleFromStarter(){ showScreen('title-screen'); }
 // コレクション（キャラクター/通常カード一覧）オーバーレイ
 // ============================================================
 // 表示専用の並び順：スート（♠♥♦♣）ごとに、数値の小さい順。Aは一番大きい数値として最後に並べる。
+// mode==='rank'のときは数字を優先し、同じ数字の中でスート順に並べる（デッキ構築のソート切り替え用）。
 const RANK_DISPLAY_ORDER = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
-function sortForDisplay(cards){
+function sortForDisplay(cards, mode){
     return [...cards].sort((a, b) => {
+        if (mode === 'rank'){
+            if (a.rank !== b.rank) return RANK_DISPLAY_ORDER.indexOf(a.rank) - RANK_DISPLAY_ORDER.indexOf(b.rank);
+            return SUITS.indexOf(a.suit) - SUITS.indexOf(b.suit);
+        }
         if (a.suit !== b.suit) return SUITS.indexOf(a.suit) - SUITS.indexOf(b.suit);
         return RANK_DISPLAY_ORDER.indexOf(a.rank) - RANK_DISPLAY_ORDER.indexOf(b.rank);
     });
@@ -2263,10 +2282,10 @@ function enterMapNode(node){
 // SHOP（カードパックやポーションをチップで買える。何度でも買い物できる）
 // ============================================================
 const SHOP_OFFERS = [
-    { id:'pack',    label:'カードパック',       desc:'カードが2枚（通常90%／キャラ10%）', price:30, emoji:'🎁' },
-    { id:'potionL', label:'回復ポーション(大)', desc:'最大HPの100%回復', price:30, emoji:'🧪' },
-    { id:'potionM', label:'回復ポーション(中)', desc:'最大HPの50%回復',  price:20, emoji:'🧴' },
-    { id:'potionS', label:'回復ポーション(小)', desc:'最大HPの25%回復',  price:10, emoji:'💊' },
+    { id:'pack',    label:'カードパック',       desc:'カードが2枚（通常90%／キャラ10%）', price:30, img:'images/cardpack_1.png' },
+    { id:'potionL', label:'回復ポーション(大)', desc:'最大HPの100%回復', price:30, img:'images/15_potion_yellow.png' },
+    { id:'potionM', label:'回復ポーション(中)', desc:'最大HPの50%回復',  price:20, img:'images/13_potion_blue.png' },
+    { id:'potionS', label:'回復ポーション(小)', desc:'最大HPの25%回復',  price:10, img:'images/14_potion_green.png' },
 ];
 function openShop(){
     document.getElementById('shop-log').textContent = '';
@@ -2277,7 +2296,7 @@ function renderShop(){
     document.getElementById('shop-chips').textContent = game.chips;
     document.getElementById('shop-list').innerHTML = SHOP_OFFERS.map(o => `
         <div class="shop-row">
-            <span class="shop-icon">${o.emoji}</span>
+            <img class="shop-icon" src="${o.img}" alt="">
             <span class="shop-info"><span class="shop-name">${escapeHtml(o.label)}</span><span class="shop-desc">${escapeHtml(o.desc)}</span></span>
             <span class="shop-price">🪙${o.price}</span>
             <button class="btn btn-gold btn-sm shop-buy-btn" ${game.chips < o.price ? 'disabled' : ''} onclick="buyShopItem('${o.id}')">かう</button>
@@ -2295,7 +2314,7 @@ function buyShopItem(id){
         return;
     }
     game.items[offer.id] = (game.items[offer.id] || 0) + 1;
-    document.getElementById('shop-log').textContent = `${offer.emoji} ${offer.label} を手に入れた！`;
+    document.getElementById('shop-log').textContent = `${offer.label} を手に入れた！`;
     renderShop();
 }
 function closeShop(){ returnToMap(); }
@@ -2397,9 +2416,9 @@ function pickForgetSkill(i){
     onDone();
 }
 
-// ---- ③宝箱発見：チップ10・20・30・40のいずれかを獲得 ----
+// ---- ③宝箱発見：コイン5・10・15のいずれかを獲得 ----
 function openEventTreasure(){
-    const amounts = [10, 20, 30, 40];
+    const amounts = [5, 10, 15];
     const amt = amounts[Math.floor(Math.random() * amounts.length)];
     game.chips += amt;
     document.getElementById('eventtreasure-body').textContent = `宝箱を見つけた！ 🪙 コイン +${amt} を手に入れた！`;
@@ -2890,7 +2909,7 @@ function closeEpiphany(){
 function showItemGetScreen(){
     const itemDef = lastGrantedItemId ? ITEM_DEFS[lastGrantedItemId] : null;
     const coinGain = game.enemy.boss ? 50 : (game.enemy.elite ? 10 : 5);
-    document.getElementById('itemget-body').innerHTML = `🪙 コイン +${coinGain}` + (itemDef ? `<br>${itemDef.emoji} ${escapeHtml(itemDef.label)} ×1` : '');
+    document.getElementById('itemget-body').innerHTML = `🪙 コイン +${coinGain}` + (itemDef ? `<br><img class="itemget-icon" src="${itemDef.img}" alt=""> ${escapeHtml(itemDef.label)} ×1` : '');
     showScreen('itemget-screen');
 }
 function closeItemGet(){ afterRewardEvent(); }
@@ -2905,6 +2924,7 @@ function deckBuilderCap(kind){ return kind === 'char' ? CHAR_DECK_CAP : NORMAL_D
 function deckBuilderCollection(kind){ return kind === 'char' ? game.charCollection : game.normalCollection; }
 let deckBuilderTab = 'char';
 let deckBuilderHideBench = false;
+let deckBuilderSortMode = 'suit';
 function goToDeckBuilder(){
     deckBuilderSelection = {
         char: game.charCollection.length <= CHAR_DECK_CAP ? game.charCollection.map(c => c.uid) : game.charSelectedIds.slice(),
@@ -2912,9 +2932,20 @@ function goToDeckBuilder(){
     };
     deckBuilderTab = 'char';
     deckBuilderHideBench = false;
+    deckBuilderSortMode = 'suit';
     document.getElementById('db-hide-bench').checked = false;
+    setDeckBuilderSortButtons();
     renderDeckBuilder();
     showScreen('deckbuilder-screen');
+}
+function setDeckBuilderSort(mode){
+    deckBuilderSortMode = mode;
+    setDeckBuilderSortButtons();
+    renderDeckBuilder();
+}
+function setDeckBuilderSortButtons(){
+    document.getElementById('db-sort-suit').classList.toggle('active', deckBuilderSortMode === 'suit');
+    document.getElementById('db-sort-rank').classList.toggle('active', deckBuilderSortMode === 'rank');
 }
 // キャラクターカード／通常カードをタブで切り替える（両方いっぺんに表示すると縦に長くなりすぎるため）
 function switchDeckBuilderTab(kind){
@@ -2952,7 +2983,7 @@ function renderDeckBuilderSection(kind){
     const cap = deckBuilderCap(kind);
     const selected = deckBuilderSelection[kind];
     const forced = collection.length <= cap;
-    let sorted = sortForDisplay(collection);
+    let sorted = sortForDisplay(collection, deckBuilderSortMode);
     if (deckBuilderHideBench) sorted = sorted.filter(c => selected.includes(c.uid));
     const gridId = kind === 'char' ? 'db-char-grid' : 'db-normal-grid';
     const countId = kind === 'char' ? 'db-char-count' : 'db-normal-count';
