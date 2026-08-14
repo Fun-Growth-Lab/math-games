@@ -143,13 +143,16 @@
 
         /* ==================== TITLE ==================== */
         /* タイトル画面だけ、背景のtitle.pngが透けて見えるようボタンのコンテナを半透明にする（他画面のtitle-boxは不透明のまま）。
-           Math_Braves_additionのtitle-content-boxと同じ考え方：塗りはごく薄く(0.12)して、backdrop-filterのぼかしで
-           「すりガラス」として質感を出す。塗りを濃くする方式では透け感が弱かったため、これに変更した。 */
+           原因判明：共有の.title-box基本ルールは「不透明な塗り(layer1、padding-boxでクリップ)が内側を覆い隠すことで、
+           下に敷いた金グラデーション(layer2、border-boxでクリップ＝実は箱全体に描画される)が縁だけ細く見える」という
+           2枚重ねのトリックだった。layer1を単純に薄くすると、覆い隠す役目を果たせなくなり、下の不透明な金グラデーションが
+           内側全体に見えてしまい、逆に「完全に不透明な金色の箱」に見えていた（透過率をいくら調整しても直らなかった理由）。
+           このトリックとは別物にする：背景レイヤーは半透明の塗り1枚だけにし、縁取りは単色の枠線(border)でまかなう。 */
         #title-screen .title-box {
             width: 620px;
-            background-image:
-                radial-gradient(ellipse at 50% 12%, rgba(23,37,27,0.12) 0%, rgba(10,18,11,0.12) 55%, rgba(3,6,3,0.12) 100%),
-                linear-gradient(135deg, var(--gold-bright), var(--gold) 45%, var(--gold-deep) 55%, var(--gold-bright));
+            border: 3px solid var(--gold);
+            background-image: none;
+            background-color: rgba(10,18,11,0.14);
             backdrop-filter: blur(8px);
         }
         .title-h1 {
@@ -1729,7 +1732,7 @@ function bigCardHtml(card, opts){
             const lv = skillLevel(card, id);
             const isPreviewTarget = previewIsLevelUp && id === opts.previewExtraSkillId;
             const nextLv = Math.min(MAX_SKILL_LV, lv + 1);
-            const label = skillDisplayLabel(s, card) + (isPreviewTarget ? ` Lv.${lv}→${nextLv}` : (lv > 0 ? ` Lv.${lv}` : ''));
+            const label = skillDisplayLabel(s, card) + (isPreviewTarget ? ` Lv.${lv}→${nextLv}` : ` Lv.${lv}`);
             const right = pctLabelLv(s, isPreviewTarget ? nextLv : lv);
             return { emoji: cat.emoji, label, right, glow: activeIds.includes(id), pending: isPreviewTarget, color: cat.color, desc: s.desc };
         });
@@ -2424,7 +2427,7 @@ function showForgetScreen(card, skillId, onDone){
         const lv = isNew ? 0 : skillLevel(card, sid);
         return `<div class="reward-pick" onclick="pickForgetSkill(${i})">
             <div class="bc-skill-row" style="--cat-color:${cat.color};border-color:${cat.color};background:${cat.color}22;">
-                <span class="bc-skill-label"><span class="bc-skill-text">${escapeHtml(skillDisplayLabel(s, card))}${lv > 0 ? ` Lv.${lv}` : ''}${isNew ? '（今回のスキル）' : ''}</span></span>
+                <span class="bc-skill-label"><span class="bc-skill-text">${escapeHtml(skillDisplayLabel(s, card))} Lv.${lv}${isNew ? '（今回のスキル）' : ''}</span></span>
                 <span class="bc-skill-mult">${pctLabelLv(s, lv)}</span>
             </div>
         </div>`;
