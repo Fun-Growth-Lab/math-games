@@ -385,6 +385,17 @@
         /* ==================== デッキ構築（所持カードから、実際にデッキへ入れる分を選ぶ） ==================== */
         #deckbuilder-screen .title-box { width: 1220px; max-height: 660px; }
         .db-tabs { display: flex; gap: 10px; justify-content: center; margin-bottom: 16px; }
+        /* ==================== 恒久強化（アルカナのかけら） ==================== */
+        .meta-row {
+            display: flex; align-items: center; gap: 12px; border: 1px solid #3a3226; border-radius: 10px;
+            padding: 10px 14px; margin-bottom: 8px; text-align: left;
+        }
+        .meta-row-info { flex: 1; min-width: 0; }
+        .meta-row-name { font-weight: 800; color: var(--text-hi); font-size: 0.92rem; }
+        .meta-row-desc { font-size: 0.76rem; color: var(--text-dim); margin-top: 2px; }
+        .meta-row-count { font-size: 0.78rem; color: var(--gold-bright); white-space: nowrap; }
+        .meta-row-cost { font-weight: 900; color: var(--gold-bright); white-space: nowrap; }
+        .meta-row .btn { width: 100px; flex-shrink: 0; margin-top: 0; padding: 8px 10px; font-size: 0.8rem; }
         .db-tab {
             background: rgba(0,0,0,0.35); border: 2px solid #3a3226; border-radius: 10px; padding: 9px 20px;
             color: var(--text-dim); font-weight: 800; cursor: pointer; font-size: 0.88rem; font-family: inherit;
@@ -787,6 +798,7 @@
             <p class="title-sub">BLACKJACK ARCANA</p>
             <button id="btn-continue" class="btn btn-gold hidden" onclick="continueGame()">▶ つづきから</button>
             <button class="btn btn-gold" onclick="goToStarterSelect()">はじめから</button>
+            <button class="btn btn-gray" onclick="openMetaHub()">🌟 恒久強化</button>
             <button id="btn-name-register" class="btn btn-gray" onclick="openNameRegister()">👤 名前の登録</button>
             <button class="btn btn-gray" onclick="openRanking()">🏆 ランキング</button>
             <button class="btn btn-gray" onclick="openSettings()">⚙️ 設定</button>
@@ -967,6 +979,90 @@
         </div>
     </div>
 
+    <!-- ==================== マップイベント：汎用の結果表示（盗賊・毒沼・疲労・女神の祝福・呪われた宝箱など） ==================== -->
+    <div id="eventgeneric-screen" class="hidden">
+        <div class="event-popup-box">
+            <div class="big-announce" id="eventgeneric-title"></div>
+            <div id="eventgeneric-body" style="font-size:1.15rem; font-weight:800; color:var(--text-hi); margin:14px 0; line-height:1.7;"></div>
+            <button class="btn btn-gold" onclick="closeEventGeneric()">▶ マップへもどる</button>
+        </div>
+    </div>
+
+    <!-- ==================== マップイベント：賢者の書（通常カード1枚にランダムスキルを付与） ==================== -->
+    <div id="eventsage-screen" class="hidden">
+        <div class="event-popup-box">
+            <div class="big-announce">📖 賢者の書</div>
+            <div id="eventsage-body" style="font-size:1.05rem; font-weight:800; color:var(--text-hi); margin:10px 0;"></div>
+            <div id="eventsage-card-area" style="display:flex; justify-content:center; margin:8px 0;"></div>
+            <button class="btn btn-gold" onclick="closeEventSage()">▶ マップへもどる</button>
+        </div>
+    </div>
+
+    <!-- ==================== マップイベント：修行の祠（好きなキャラスキルのレベルを確定+1） ==================== -->
+    <div id="eventshrine-screen" class="hidden">
+        <div class="event-popup-box" style="width:900px;">
+            <div class="big-announce">⛩️ 修行の祠</div>
+            <p class="eventskill-sub">レベルを上げたいスキルを1つ選んでください</p>
+            <div id="eventshrine-row" class="party-row"></div>
+            <button class="btn btn-gray" onclick="skipEventShrine()">やめておく</button>
+        </div>
+    </div>
+
+    <!-- ==================== マップイベント：謎のマシン（コインを賭ける運試し） ==================== -->
+    <div id="eventmachine-screen" class="hidden">
+        <div class="event-popup-box">
+            <div class="big-announce">🎰 謎のマシン</div>
+            <p class="settings-desc">コインを賭けて回す。0倍／0.5倍／1.5倍／2.0倍／3.0倍がそれぞれ20%で出る！</p>
+            <p class="settings-desc">🪙 しょじ：<span id="eventmachine-chips"></span></p>
+            <div style="display:flex; align-items:center; justify-content:center; gap:10px; margin:14px 0;">
+                <button class="btn btn-gray btn-sm" style="width:auto;" onclick="adjustMachineBet(-5)">－5</button>
+                <span id="eventmachine-bet" style="font-size:1.4rem; font-weight:900; color:var(--gold-bright); min-width:80px; text-align:center;">0</span>
+                <button class="btn btn-gray btn-sm" style="width:auto;" onclick="adjustMachineBet(5)">＋5</button>
+            </div>
+            <div id="eventmachine-result" style="font-size:1.2rem; font-weight:800; color:var(--text-hi); min-height:1.6em; margin-bottom:10px;"></div>
+            <button class="btn btn-gold" id="eventmachine-spin-btn" onclick="spinMachine()">レバーを引く</button>
+            <button class="btn btn-gray" onclick="closeEventMachine()">▶ マップへもどる</button>
+        </div>
+    </div>
+
+    <!-- ==================== 恒久強化（アルカナのかけら：パッシブ購入・スキルガチャ・誓い） ==================== -->
+    <div id="meta-hub-screen" class="hidden">
+        <div class="title-box" style="width:1000px; max-height:680px;">
+            <h1 class="settings-title">🌟 恒久強化</h1>
+            <p class="settings-desc">💎 アルカナのかけら：<span id="meta-shards"></span></p>
+            <div class="db-tabs">
+                <button class="db-tab active" id="meta-tab-passive" onclick="switchMetaTab('passive')">🛡️ パッシブ</button>
+                <button class="db-tab" id="meta-tab-gacha" onclick="switchMetaTab('gacha')">🎴 スキルガチャ</button>
+                <button class="db-tab" id="meta-tab-vow" onclick="switchMetaTab('vow')">🕯️ 誓い</button>
+            </div>
+            <div id="meta-passive-list"></div>
+            <div id="meta-gacha-panel" class="hidden">
+                <p class="settings-desc">ガチャの結果は直接カードには付かず「スキルコレクション」に加わります（重複すればレベルアップ）。実際に使うスキルは、ラン開始時にコレクションから1つ選んで装備します。</p>
+                <button class="btn btn-gold" id="meta-gacha-btn" style="max-width:280px; margin:10px auto;" onclick="doGachaPull()">🎴 ガチャを引く</button>
+                <p id="meta-gacha-result" style="font-weight:800; color:var(--gold-bright); min-height:1.6em;"></p>
+                <div id="meta-gacha-collection"></div>
+            </div>
+            <div id="meta-vow-list" class="hidden"></div>
+            <button class="btn btn-gray" onclick="showScreen('title-screen')">◀ タイトルへもどる</button>
+        </div>
+    </div>
+
+    <!-- ==================== ラン開始前：スキルコレクションから1つ装備し、誓いのレベルを選ぶ（デッキ構築からの付け替えにも流用） ==================== -->
+    <div id="runstart-equip-screen" class="hidden">
+        <div class="title-box" style="width:1000px; max-height:680px;">
+            <h1 class="settings-title">🎴 スキルを装備する</h1>
+            <p class="settings-desc">スキルコレクションから、このカードに付けるスキルを1つ選べます（つけなくてもOK）</p>
+            <div id="runstart-skill-list"></div>
+            <div id="runstart-vow-section">
+                <h1 class="settings-title" style="margin-top:18px;">🕯️ 誓い</h1>
+                <p class="settings-desc">このランで使う誓いのレベルを選べます（購入済みレベルまで、0でOFF）</p>
+                <div id="runstart-vow-list"></div>
+            </div>
+            <button class="btn btn-gold" id="runstart-confirm-btn" onclick="confirmRunStartEquip()">▶ 冒険にでる</button>
+            <button class="btn btn-gray" onclick="cancelRunStartEquip()">◀ もどる</button>
+        </div>
+    </div>
+
     <!-- ==================== DECK BUILDER（所持カードから、実際にデッキへ入れる分を選ぶ。戦闘中は開けない） ==================== -->
     <div id="deckbuilder-screen" class="hidden">
         <div class="title-box">
@@ -977,6 +1073,7 @@
             </div>
             <div class="db-toolbar">
                 <button class="btn btn-gray btn-sm" id="db-clear-btn" style="width:auto;" onclick="clearDeckSelection()">🗑️ すべてデッキから外す</button>
+                <button class="btn btn-gray btn-sm" style="width:auto;" onclick="openDeckBuilderSkillSwap()">🎴 スキル付け替え</button>
                 <label class="db-hide-toggle"><input type="checkbox" id="db-hide-bench" onchange="toggleHideBench()"> デッキ外のカードを隠す</label>
                 <div class="db-sort-toggle">
                     <span class="db-sort-label">ならびかえ</span>
@@ -1152,7 +1249,7 @@
                 <h3>◆ アイテムとコイン</h3>
                 <ruby>敵<rt>てき</rt></ruby>を<ruby>倒<rt>たお</rt></ruby>すとアイテムとコインが<ruby>手<rt>て</rt></ruby>に<ruby>入<rt>はい</rt></ruby>る。コインは「カードを<ruby>引<rt>ひ</rt></ruby>く」<ruby>前<rt>まえ</rt></ruby>だけ、1〜10<ruby>枚<rt>まい</rt></ruby>かけて<ruby>倍率<rt>ばいすう</rt></ruby>を<ruby>上<rt>あ</rt></ruby>げられる（1<ruby>枚<rt>まい</rt></ruby>で+20%）。
                 <h3>◆ 敵<rt></rt>のとくせい</h3>
-                <ruby>敵<rt>てき</rt></ruby>によっては「10%の<ruby>確率<rt>かくりつ</rt></ruby>で<ruby>回避<rt>かいひ</rt></ruby>」「HPを<ruby>毎<rt>まい</rt></ruby>ターン<ruby>回復<rt>かいふく</rt></ruby>」「15<ruby>以下<rt>いか</rt></ruby>のダメージを<ruby>受<rt>う</rt></ruby>けない」「クリティカルヒット」「<ruby>攻撃力<rt>こうげきりょく</rt></ruby>が<ruby>上昇<rt>じょうしょう</rt></ruby>」「ブレスを<ruby>吐<rt>は</rt></ruby>く」などのとくせいを<ruby>持<rt>も</rt></ruby>つ。<ruby>右<rt>みぎ</rt></ruby>のとくせいらんで<ruby>確認<rt>かくにん</rt></ruby>しよう。
+                <ruby>敵<rt>てき</rt></ruby>は<ruby>出現<rt>しゅつげん</rt></ruby>するたびに、<ruby>回避<rt>かいひ</rt></ruby>・<ruby>自動<rt>じどう</rt></ruby><ruby>回復<rt>かいふく</rt></ruby>・クリティカル・どく・<ruby>硬化<rt>こうか</rt></ruby>など<ruby>数多<rt>かずおお</rt></ruby>くのとくせい<ruby>候補<rt>こうほ</rt></ruby>の<ruby>中<rt>なか</rt></ruby>から1つだけを<ruby>抽選<rt>ちゅうせん</rt></ruby>で<ruby>持<rt>も</rt></ruby>つ。<ruby>同<rt>おな</rt></ruby>じ<ruby>敵<rt>てき</rt></ruby>の<ruby>種類<rt>しゅるい</rt></ruby>でも、そのときどきでとくせいが<ruby>変<rt>か</rt></ruby>わる。<ruby>右<rt>みぎ</rt></ruby>のとくせいらんで<ruby>確認<rt>かくにん</rt></ruby>しよう。
                 <h3>◆ 撃破<rt>げきは</rt>ボーナス</h3>
                 <ruby>敵<rt>てき</rt></ruby>を<ruby>倒<rt>たお</rt></ruby>すとコイン+5（エリートなら+10）と、カードパック1つ（エリートを<ruby>倒<rt>たお</rt></ruby>すとレアパック）がもらえる。さらに20%の<ruby>確率<rt>かくりつ</rt></ruby>でポーションも<ruby>手<rt>て</rt></ruby>に<ruby>入<rt>はい</rt></ruby>る。ボスを<ruby>倒<rt>たお</rt></ruby>すとコイン+50とレアパック・<ruby>通常<rt>つうじょう</rt></ruby>パックが1つずつもらえ、HPも<ruby>全回復<rt>ぜんかいふく</rt></ruby>する（<ruby>最終<rt>さいしゅう</rt></ruby>ボスをのぞく）。
                 <h3>◆ <ruby>冒険<rt>ぼうけん</rt></ruby>の<ruby>道<rt>みち</rt></ruby></h3>
@@ -1349,7 +1446,11 @@ const ITEM_DEFS = {
     potionS: { label:'回復ポーション(小)', img:'images/14_potion_green.png', effect:'heal', value:25 },
 };
 const ITEM_IDS = Object.keys(ITEM_DEFS);
-function itemHealAmount(def){ return Math.round(game.playerMaxHp * def.value / 100); }
+// 一心の誓い：回復量を下げる代わりにスコアが上がる
+function itemHealAmount(def){
+    const isshinMult = 1 - 0.10 * activeVowLevel('isshin');
+    return Math.round(game.playerMaxHp * def.value / 100 * isshinMult);
+}
 
 // 難易度設定は廃止し、常にかんたん相当（敵HP倍率×1）で固定。ランキング送信用に文字列としてのみ残す。
 const DIFFICULTY_HP_MULT = { easy:1 };
@@ -1361,34 +1462,71 @@ const DIFFICULTY_HP_MULT = { easy:1 };
 //   攻撃力基本値 = 10n + (m-1)
 // とくせいは1体につき最大1つ。エリートは全ステータス×1.2（とくせいの発動確率などは変わらない）。
 const ENEMY_TYPES = [
-    { name:'スライム',     imgKey:'slime',   hpPct:1.00, atkPct:0.60, ability:null },
-    { name:'ゴブリン',     imgKey:'goblin',  hpPct:0.80, atkPct:0.90, ability:'evade10' },
-    { name:'ワイト',       imgKey:'wite',    hpPct:0.70, atkPct:1.10, ability:'regenMaxHp10' },
-    { name:'ゴーレム',     imgKey:'gorem',   hpPct:1.60, atkPct:0.60, ability:'blockLowDamage15' },
-    { name:'ダークエルフ', imgKey:'darkelf', hpPct:0.90, atkPct:1.20, ability:'crit10x2' },
-    { name:'デーモン',     imgKey:'demon',   hpPct:1.15, atkPct:1.10, ability:'rampAtk10pct' },
-    { name:'ドラゴン',     imgKey:'dragon',  hpPct:1.30, atkPct:1.30, ability:'breath30' },
+    { name:'スライム',     imgKey:'slime',   hpPct:1.00, atkPct:0.60 },
+    { name:'ゴブリン',     imgKey:'goblin',  hpPct:0.80, atkPct:0.90 },
+    { name:'ワイト',       imgKey:'wite',    hpPct:0.70, atkPct:1.10 },
+    { name:'ゴーレム',     imgKey:'gorem',   hpPct:1.60, atkPct:0.60 },
+    { name:'ダークエルフ', imgKey:'darkelf', hpPct:0.90, atkPct:1.20 },
+    { name:'デーモン',     imgKey:'demon',   hpPct:1.15, atkPct:1.10 },
+    { name:'ドラゴン',     imgKey:'dragon',  hpPct:1.30, atkPct:1.30 },
 ];
 const BOSS_TYPES = [
-    { name:'アビス・ゼリー',   imgKey:'slime',   hpPct:2.00, atkPct:0.70, ability:null },
-    { name:'ゴブリンロード',   imgKey:'goblin',  hpPct:1.60, atkPct:1.10, ability:'evade10' },
-    { name:'リッチ',           imgKey:'wite',    hpPct:1.40, atkPct:1.20, ability:'regenMaxHp10' },
-    { name:'ギガントゴーレム', imgKey:'gorem',   hpPct:3.20, atkPct:0.70, ability:'blockLowDamage15' },
-    { name:'シャドウマスター', imgKey:'darkelf', hpPct:1.80, atkPct:1.30, ability:'crit10x2' },
-    { name:'アークデーモン',   imgKey:'demon',   hpPct:2.00, atkPct:1.20, ability:'rampAtk10pct' },
-    { name:'エルダードラゴン', imgKey:'dragon',  hpPct:2.60, atkPct:1.40, ability:'breath30' },
+    { name:'アビス・ゼリー',   imgKey:'slime',   hpPct:2.00, atkPct:0.70 },
+    { name:'ゴブリンロード',   imgKey:'goblin',  hpPct:1.60, atkPct:1.10 },
+    { name:'リッチ',           imgKey:'wite',    hpPct:1.40, atkPct:1.20 },
+    { name:'ギガントゴーレム', imgKey:'gorem',   hpPct:3.20, atkPct:0.70 },
+    { name:'シャドウマスター', imgKey:'darkelf', hpPct:1.80, atkPct:1.30 },
+    { name:'アークデーモン',   imgKey:'demon',   hpPct:2.00, atkPct:1.20 },
+    { name:'エルダードラゴン', imgKey:'dragon',  hpPct:2.60, atkPct:1.40 },
 ];
 const ELITE_MULT = 1.2;
 function enemyHpBase(n, m){ return 50 * n + 3 * (m - 1); }
 function enemyAtkBase(n, m){ return 10 * n + 2 * (m - 1); }
+// とくせいは「固有スキル→共通ランダムプール」の順で、それぞれの確率で1つずつ抽選し、
+// 最初に当たったものだけをそのモンスターのとくせいとする（％の記載がないものは、順番が回ってくれば無条件で確定）。
+// 一度当選したとくせいは、以後の戦闘中は必ず（100%）発動する（発動確率は「当選するかどうか」だけに使う）。
+const ENEMY_SIGNATURE_ABILITY = {
+    goblin:  { id:'evade',    pct:0.10 },
+    wite:    { id:'regen',    pct:null },
+    gorem:   { id:'blockLow', pct:null },
+    darkelf: { id:'crit',     pct:0.20 },
+    demon:   { id:'ramp',     pct:null },
+    dragon:  { id:'breath',   pct:0.30 },
+};
+const ENEMY_SHARED_ABILITY_POOL = [
+    { id:'followUp',  pct:0.50 },
+    { id:'flurry',    pct:0.30 },
+    { id:'chargeAtk', pct:0.30 },
+    { id:'poison',    pct:null },
+    { id:'lifesteal', pct:null },
+    { id:'harden',    pct:null },
+    { id:'lastStand', pct:null },
+];
+function rollEnemyAbility(imgKey){
+    const candidates = [];
+    const sig = ENEMY_SIGNATURE_ABILITY[imgKey];
+    if (sig) candidates.push(sig);
+    candidates.push(...ENEMY_SHARED_ABILITY_POOL);
+    for (const c of candidates){
+        if (c.pct === null || Math.random() < c.pct) return c.id;
+    }
+    return null;
+}
 // とくせいの説明文（右パネルのとくせいらん表示用）
 const ENEMY_ABILITY_TEXT = {
-    evade10: '10%の確率で攻撃を回避する',
-    regenMaxHp10: '毎ターン、HPを最大HPの10%回復する',
-    blockLowDamage15: '15以下のダメージは受けない',
-    crit10x2: '10%の確率で2倍ダメージのクリティカルヒットで攻撃する',
-    rampAtk10pct: '攻撃力が毎ターン10%ずつ上昇する',
-    breath30: '30%の確率で攻撃力の120〜200%のダメージのブレスを吐く',
+    evade:     'すばやい動き：攻撃を回避する',
+    regen:     '自動回復：毎ターン、HPを最大HPの10%回復する',
+    blockLow:  '硬い身体：15以下のダメージを受けない',
+    crit:      'ねらいうち：2倍ダメージのクリティカルヒットで攻撃する',
+    ramp:      'マッスルパワー：攻撃力が毎ターン、最初の攻撃力の10%ずつ上昇する',
+    breath:    'ヘルファイア：攻撃力の120〜200%のブレスを吐く',
+    followUp:  'ついげき：通常攻撃のあと、攻撃力50%の追撃を繰り出す',
+    flurry:    'みだれうち：0.5倍の攻撃を連続でくり出す（当たるたび50%で継続）',
+    chargeAtk: 'ためこみ：1ターン攻撃を溜め、次のターンに2.5倍の攻撃をくり出す',
+    poison:    'どく攻撃：攻撃を受けるたび毒が蓄積し、毎ターン毒スタックぶんダメージを受ける（撃破で治る）',
+    lifesteal: 'すいとる：与えたダメージの20%で自分のHPを回復する',
+    harden:    '硬化：毎ターン身を硬くし、蓄積したぶんだけ被ダメージを軽減する',
+    lastStand: '意地：戦闘中1回だけ、HPが0になっても1残って耐える',
 };
 function abilityText(enemy){
     return ENEMY_ABILITY_TEXT[enemy.ability] || 'とくせいなし';
@@ -1401,9 +1539,13 @@ function buildRandomEnemy(n, m, opts){
     const pool = opts.boss ? BOSS_TYPES : ENEMY_TYPES;
     const type = opts.forceType || pool[Math.floor(Math.random() * pool.length)];
     const eliteMult = opts.elite ? ELITE_MULT : 1;
-    const hp = Math.round(enemyHpBase(n, m) * type.hpPct * eliteMult);
-    const atk = Math.round(enemyAtkBase(n, m) * type.atkPct * eliteMult);
-    return { name: type.name, imgKey: type.imgKey, maxHp: hp, hp, atk, baseAtk: atk, ability: type.ability, rampCount: 0, boss: !!opts.boss, elite: !!opts.elite };
+    const moshaMult = 1 + 0.10 * activeVowLevel('mosha'); // 猛者の誓い：敵HP・攻撃力を底上げする代わりにスコアが上がる
+    const curseMult = (game && game.enemyBuffActive) ? 1.2 : 1; // 呪われた宝箱：次の1戦だけ敵を強化（この個体だけで消費）
+    if (game && game.enemyBuffActive) game.enemyBuffActive = false;
+    const hp = Math.round(enemyHpBase(n, m) * type.hpPct * eliteMult * moshaMult * curseMult);
+    const atk = Math.round(enemyAtkBase(n, m) * type.atkPct * eliteMult * moshaMult * curseMult);
+    const ability = rollEnemyAbility(type.imgKey);
+    return { name: type.name, imgKey: type.imgKey, maxHp: hp, hp, atk, baseAtk: atk, ability, rampCount: 0, poisonStack: 0, hardenStack: 0, charging: false, lastStandUsed: false, boss: !!opts.boss, elite: !!opts.elite };
 }
 // ============================================================
 // マップ（分岐する道）
@@ -1414,10 +1556,13 @@ function buildRandomEnemy(n, m, opts){
 // ①ノーマル敵40%／②エリート10%／③SHOP10%／④イベント40%（m=10は必ずボス）
 function rollNodeType(m){
     if (m >= 10) return 'boss';
+    // 無欲の誓い：ショップの出現率を下げ、下げたぶんはイベントに回す（代わりにスコアが上がる）
+    const shopReduce = Math.min(0.10, 0.02 * activeVowLevel('muyoku'));
+    const shopWeight = 0.10 - shopReduce;
     const r = Math.random();
     if (r < 0.40) return 'normal';
     if (r < 0.50) return 'elite';
-    if (r < 0.60) return 'shop';
+    if (r < 0.50 + shopWeight) return 'shop';
     return 'event';
 }
 function makeMapNode(m){
@@ -1559,6 +1704,312 @@ let game = null;
 // セーブ／ロード（一筆迷宮と同じ方式：マップに戻る・ターン開始のたびに自動保存し、
 // タイトル画面の「つづきから」で中断した場所からそのまま再開できる）
 // ============================================================
+// ============================================================
+// 恒久進行（アルカナのかけら・スキルコレクション・誓い）
+// game（1回のランの状態、SAVE_KEYに保存）とは別の、端末に永続保存されランをまたいで引き継がれるデータ。
+// ============================================================
+const META_KEY = 'blackjackArcanaMeta';
+const VOW_IDS = ['mosha', 'muyoku', 'isshin', 'konnan'];
+const MAX_VOW_LV = 5;
+const GACHA_COST = 10;
+const SHARDS_PER_CLEAR = 10;
+let meta = null;
+function loadMeta(){
+    let m;
+    try { m = JSON.parse(localStorage.getItem(META_KEY)); } catch (e){ m = null; }
+    if (!m || typeof m !== 'object') m = {};
+    m.shards = m.shards || 0;
+    m.skillCollection = m.skillCollection || {}; // skillId -> レベル(0〜5)。キーがあれば所持している
+    m.passiveCoin = m.passiveCoin || 0;       // 購入個数(0〜20)。1個で初期コイン+2
+    m.passiveHp = m.passiveHp || 0;           // 購入個数(0〜20)。1個で初期HP+2
+    m.passiveShopRare = m.passiveShopRare || 0; // 購入個数(0〜10)。ランにつき所持個数までレアパック抽選(10%)ができる
+    m.potionS = !!m.potionS;
+    m.potionM = !!m.potionM;
+    m.potionL = !!m.potionL;
+    m.vows = m.vows || {};
+    VOW_IDS.forEach(id => { m.vows[id] = m.vows[id] || 0; });
+    meta = m;
+    return meta;
+}
+function saveMeta(){ if (meta) try { localStorage.setItem(META_KEY, JSON.stringify(meta)); } catch (e){} }
+function getVowLevel(id){ return (meta && meta.vows && meta.vows[id]) || 0; }
+// 誓いを1段上げるのに必要なかけら（そのの誓い自身の現在レベルにつき+10%ずつ増えていく）
+function vowNextCost(id){
+    const lv = getVowLevel(id);
+    return Math.round(15 * Math.pow(1.1, lv));
+}
+function buyVowLevel(id){
+    const lv = getVowLevel(id);
+    if (lv >= MAX_VOW_LV) return false;
+    const cost = vowNextCost(id);
+    if (meta.shards < cost) return false;
+    meta.shards -= cost;
+    meta.vows[id] = lv + 1;
+    saveMeta();
+    return true;
+}
+// キャラクタースキルガチャ：スロットには直接付かず、アカウント共通の「スキルコレクション」に加わる／レベルが上がる
+function pullSkillGacha(){
+    if (meta.shards < GACHA_COST) return null;
+    const pool = CHAR_SKILLS_ALL.filter(s => (meta.skillCollection[s.id] === undefined) || meta.skillCollection[s.id] < MAX_SKILL_LV);
+    if (pool.length === 0) return null; // 全スキルLv5達成、ガチャ打ち止め
+    meta.shards -= GACHA_COST;
+    const s = pool[Math.floor(Math.random() * pool.length)];
+    meta.skillCollection[s.id] = meta.skillCollection[s.id] === undefined ? 0 : Math.min(MAX_SKILL_LV, meta.skillCollection[s.id] + 1);
+    saveMeta();
+    return s.id;
+}
+// 恒久パッシブ（キャラクタースキル以外）：アルカナのかけらで直接購入する
+const META_PASSIVES = [
+    { id:'coin',      label:'初期コイン+2',         desc:'ラン開始時の所持コインが+2される',            cost:5,  countKey:'passiveCoin', maxCount:20 },
+    { id:'hp',        label:'初期HP+2',            desc:'ラン開始時の最大HPが+2される',                cost:5,  countKey:'passiveHp',   maxCount:20 },
+    { id:'shopRare',  label:'ショップの品ぞろえ',    desc:'ショップのカードパックが10%の確率でレアパックになる（1ランにつき所持個数まで）', cost:5, countKey:'passiveShopRare', maxCount:10 },
+    { id:'potionS',   label:'初期所持ポーション(小)', desc:'ラン開始時にポーション(小)を1つ持って始まる', cost:30, countKey:'potionS', maxCount:1, flag:true },
+    { id:'potionM',   label:'初期所持ポーション(中)', desc:'ラン開始時にポーション(中)を1つ持って始まる', cost:40, countKey:'potionM', maxCount:1, flag:true },
+    { id:'potionL',   label:'初期所持ポーション(大)', desc:'ラン開始時にポーション(大)を1つ持って始まる', cost:50, countKey:'potionL', maxCount:1, flag:true },
+];
+function buyPassive(id){
+    const p = META_PASSIVES.find(x => x.id === id);
+    if (!p || meta.shards < p.cost) return false;
+    if (p.flag){
+        if (meta[p.countKey]) return false;
+        meta.shards -= p.cost;
+        meta[p.countKey] = true;
+    } else {
+        if (meta[p.countKey] >= p.maxCount) return false;
+        meta.shards -= p.cost;
+        meta[p.countKey]++;
+    }
+    saveMeta();
+    return true;
+}
+// 誓い：段階購入制（Lv0〜5）。使うランでLv0〜自分の購入上限の好きなレベルを選べる（強さはgame.vowLevelsに保存）。
+// 効果はすべて「レベル×1段あたりの増分」。無欲/困難はマップの抽選ロジック側、猛者は敵ステータス計算、
+// 一心はポーション回復量計算、スコアボーナスはliveScore側でそれぞれ参照する。
+const VOWS = [
+    { id:'mosha',  label:'猛者の誓い', effectText:lv => `敵HP・攻撃力+${lv*10}%`, scoreText:lv => `スコア+${lv*20}%` },
+    { id:'muyoku', label:'無欲の誓い', effectText:lv => `ショップが出にくくなる`, scoreText:lv => `スコア+${lv*10}%` },
+    { id:'isshin', label:'一心の誓い', effectText:lv => `ポーションの効果-${lv*10}%`, scoreText:lv => `スコア+${lv*10}%` },
+    { id:'konnan', label:'困難の誓い', effectText:lv => `悪いイベントが出やすくなる(+${lv*10}%)`, scoreText:lv => `スコア+${lv*10}%` },
+];
+// そのランで実際に使う誓いレベル（0〜購入上限）。ラン開始前の選択画面でgame.vowLevelsにセットする。
+function vowScoreBonusPct(){
+    if (!game || !game.vowLevels) return 0;
+    let pct = 0;
+    VOW_IDS.forEach(id => {
+        const lv = game.vowLevels[id] || 0;
+        pct += lv * (id === 'mosha' ? 20 : 10);
+    });
+    return pct;
+}
+function activeVowLevel(id){ return (game && game.vowLevels && game.vowLevels[id]) || 0; }
+
+// ============================================================
+// 恒久強化 画面（タイトルから入る：パッシブ購入・スキルガチャ・誓いの購入）
+// ============================================================
+let metaTab = 'passive';
+function openMetaHub(){
+    if (!meta) loadMeta();
+    metaTab = 'passive';
+    renderMetaHub();
+    showScreen('meta-hub-screen');
+}
+function switchMetaTab(tab){
+    metaTab = tab;
+    renderMetaHub();
+}
+function renderMetaHub(){
+    document.getElementById('meta-shards').textContent = meta.shards;
+    document.getElementById('meta-tab-passive').classList.toggle('active', metaTab === 'passive');
+    document.getElementById('meta-tab-gacha').classList.toggle('active', metaTab === 'gacha');
+    document.getElementById('meta-tab-vow').classList.toggle('active', metaTab === 'vow');
+    document.getElementById('meta-passive-list').classList.toggle('hidden', metaTab !== 'passive');
+    document.getElementById('meta-gacha-panel').classList.toggle('hidden', metaTab !== 'gacha');
+    document.getElementById('meta-vow-list').classList.toggle('hidden', metaTab !== 'vow');
+    if (metaTab === 'passive') renderMetaPassives();
+    else if (metaTab === 'gacha') renderMetaGacha();
+    else renderMetaVows();
+}
+function renderMetaPassives(){
+    document.getElementById('meta-passive-list').innerHTML = META_PASSIVES.map(p => {
+        const owned = p.flag ? !!meta[p.countKey] : meta[p.countKey];
+        const maxed = p.flag ? owned : owned >= p.maxCount;
+        const disabled = maxed || meta.shards < p.cost;
+        const countText = p.flag ? (owned ? '購入済み' : '未購入') : `${owned}／${p.maxCount}個`;
+        return `<div class="meta-row">
+            <div class="meta-row-info">
+                <div class="meta-row-name">${escapeHtml(p.label)}</div>
+                <div class="meta-row-desc">${escapeHtml(p.desc)}</div>
+            </div>
+            <span class="meta-row-count">${countText}</span>
+            <span class="meta-row-cost">${maxed ? '' : `💎${p.cost}`}</span>
+            <button class="btn btn-gold" ${disabled ? 'disabled' : ''} onclick="doBuyPassive('${p.id}')">${maxed ? '上限' : 'かう'}</button>
+        </div>`;
+    }).join('');
+}
+function doBuyPassive(id){
+    if (buyPassive(id)) renderMetaHub();
+}
+function renderMetaGacha(){
+    document.getElementById('meta-gacha-result').textContent = '';
+    const canPull = meta.shards >= GACHA_COST && CHAR_SKILLS_ALL.some(s => meta.skillCollection[s.id] === undefined || meta.skillCollection[s.id] < MAX_SKILL_LV);
+    const btn = document.getElementById('meta-gacha-btn');
+    btn.disabled = !canPull;
+    btn.textContent = meta.shards < GACHA_COST && CHAR_SKILLS_ALL.some(s => meta.skillCollection[s.id] === undefined || meta.skillCollection[s.id] < MAX_SKILL_LV)
+        ? 'かけらが足りない' : (canPull ? `🎴 ガチャを引く（${GACHA_COST}かけら）` : 'すべてLv.5！ガチャ終了');
+    renderMetaGachaCollection();
+}
+function renderMetaGachaCollection(){
+    const owned = Object.keys(meta.skillCollection);
+    if (owned.length === 0){
+        document.getElementById('meta-gacha-collection').innerHTML = '<p class="settings-desc">まだ何も持っていません</p>';
+        return;
+    }
+    document.getElementById('meta-gacha-collection').innerHTML = owned.map(id => {
+        const s = charSkill(id);
+        const lv = meta.skillCollection[id];
+        const cat = SKILL_CATEGORIES[s.cat];
+        return `<div class="bc-skill-row" style="--cat-color:${cat.color};border-color:${cat.color};background:${cat.color}22; margin-bottom:6px;">
+            <span class="bc-skill-label"><span class="bc-skill-text">${escapeHtml(s.label)} Lv.${lv}</span></span>
+            <span class="bc-skill-mult">${pctLabelLv(s, lv)}</span>
+        </div>`;
+    }).join('');
+}
+function doGachaPull(){
+    const id = pullSkillGacha();
+    if (id){
+        const s = charSkill(id);
+        const lv = meta.skillCollection[id];
+        document.getElementById('meta-gacha-result').textContent = lv > 0 ? `「${s.label}」がLv.${lv}になった！` : `「${s.label}」を手に入れた！`;
+    }
+    document.getElementById('meta-shards').textContent = meta.shards;
+    renderMetaGacha();
+}
+function renderMetaVows(){
+    document.getElementById('meta-vow-list').innerHTML = VOWS.map(v => {
+        const lv = getVowLevel(v.id);
+        const maxed = lv >= MAX_VOW_LV;
+        const cost = maxed ? 0 : vowNextCost(v.id);
+        const disabled = maxed || meta.shards < cost;
+        return `<div class="meta-row">
+            <div class="meta-row-info">
+                <div class="meta-row-name">${escapeHtml(v.label)}　Lv.${lv}／${MAX_VOW_LV}</div>
+                <div class="meta-row-desc">次のLv：${escapeHtml(v.effectText(lv + 1))} ／ ${escapeHtml(v.scoreText(lv + 1))}</div>
+            </div>
+            <span class="meta-row-cost">${maxed ? '' : `💎${cost}`}</span>
+            <button class="btn btn-gold" ${disabled ? 'disabled' : ''} onclick="doBuyVow('${v.id}')">${maxed ? '最大' : 'レベルアップ'}</button>
+        </div>`;
+    }).join('');
+}
+function doBuyVow(id){
+    if (buyVowLevel(id)) renderMetaHub();
+}
+
+// ============================================================
+// ラン開始前：コレクションからスキルを1つ装備し、誓いのレベルを選ぶ
+// ============================================================
+let runStartCard = null; // { rank, suit }
+let runStartSkillId = null;
+let runStartVowLevels = { mosha:0, muyoku:0, isshin:0, konnan:0 };
+let runStartMode = 'newgame'; // 'newgame'：ラン開始時／'swap'：デッキ構築からのスキル付け替え
+function openRunStartEquip(rank, suit){
+    if (!meta) loadMeta();
+    runStartMode = 'newgame';
+    runStartCard = { rank, suit };
+    runStartSkillId = null;
+    runStartVowLevels = { mosha:0, muyoku:0, isshin:0, konnan:0 };
+    document.getElementById('runstart-vow-section').classList.remove('hidden');
+    document.getElementById('runstart-confirm-btn').textContent = '▶ 冒険にでる';
+    renderRunStartEquip();
+    showScreen('runstart-equip-screen');
+}
+// デッキ構築中に、スターターに付けるコレクションスキルをいつでも付け替えられるようにする
+function openDeckBuilderSkillSwap(){
+    if (!meta) loadMeta();
+    const starter = game.charCollection.find(c => c.isStarter);
+    runStartMode = 'swap';
+    runStartCard = { rank: starter.rank, suit: starter.suit };
+    runStartSkillId = null;
+    document.getElementById('runstart-vow-section').classList.add('hidden');
+    document.getElementById('runstart-confirm-btn').textContent = '▶ 付け替える';
+    renderRunStartEquip();
+    showScreen('runstart-equip-screen');
+}
+function renderRunStartEquip(){
+    const tmpCard = { rank: runStartCard.rank, suit: runStartCard.suit, isChar: true };
+    const eligible = Object.keys(meta.skillCollection).filter(id => skillAllowedForCard(charSkill(id), tmpCard));
+    if (eligible.length === 0){
+        document.getElementById('runstart-skill-list').innerHTML = '<p class="settings-desc">まだ装備できるスキルを持っていません（スキルガチャで手に入ります）</p>';
+    } else {
+        document.getElementById('runstart-skill-list').innerHTML = eligible.map(id => {
+            const s = charSkill(id);
+            const lv = meta.skillCollection[id];
+            const cat = SKILL_CATEGORIES[s.cat];
+            const sel = runStartSkillId === id;
+            return `<div class="meta-row" style="cursor:pointer; ${sel ? 'border-color:var(--gold-bright); border-width:2px;' : ''}" onclick="pickRunStartSkill('${id}')">
+                <div class="meta-row-info">
+                    <div class="meta-row-name" style="color:${cat.color};">${escapeHtml(s.label)} Lv.${lv}</div>
+                    <div class="meta-row-desc">${pctLabelLv(s, lv)}</div>
+                </div>
+                <span class="meta-row-count">${sel ? '✓ 選択中' : ''}</span>
+            </div>`;
+        }).join('') + `<button class="btn btn-gray" style="max-width:200px;" onclick="pickRunStartSkill(null)">つけない</button>`;
+    }
+    document.getElementById('runstart-vow-list').innerHTML = VOWS.map(v => {
+        const maxLv = getVowLevel(v.id);
+        const cur = runStartVowLevels[v.id];
+        const opts = [];
+        for (let lv = 0; lv <= maxLv; lv++) opts.push(lv);
+        return `<div class="meta-row">
+            <div class="meta-row-info">
+                <div class="meta-row-name">${escapeHtml(v.label)}</div>
+                <div class="meta-row-desc">${cur === 0 ? 'OFF' : `${escapeHtml(v.effectText(cur))} ／ ${escapeHtml(v.scoreText(cur))}`}</div>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+                <button class="btn btn-gray btn-sm" style="width:auto; margin-top:0;" onclick="adjustRunStartVow('${v.id}', -1, ${maxLv})">－</button>
+                <span style="font-weight:900; color:var(--gold-bright); min-width:28px; text-align:center;">${cur}</span>
+                <button class="btn btn-gray btn-sm" style="width:auto; margin-top:0;" onclick="adjustRunStartVow('${v.id}', 1, ${maxLv})">＋</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+function pickRunStartSkill(id){
+    runStartSkillId = id;
+    renderRunStartEquip();
+}
+function adjustRunStartVow(id, delta, maxLv){
+    runStartVowLevels[id] = Math.max(0, Math.min(maxLv, runStartVowLevels[id] + delta));
+    renderRunStartEquip();
+}
+function confirmRunStartEquip(){
+    if (runStartMode === 'swap'){
+        const starter = game.charCollection.find(c => c.isStarter);
+        if (runStartSkillId){
+            const lv = meta.skillCollection[runStartSkillId] || 0;
+            if (starter.skills.includes(runStartSkillId)){
+                starter.skillLv[runStartSkillId] = lv;
+            } else if (starter.skills.length >= MAX_CARD_SKILLS){
+                showForgetScreen(starter, runStartSkillId, () => {
+                    starter.skillLv[runStartSkillId] = lv;
+                    goToDeckBuilder();
+                });
+                return;
+            } else {
+                starter.skills.push(runStartSkillId);
+                starter.skillLv[runStartSkillId] = lv;
+            }
+        }
+        goToDeckBuilder();
+        return;
+    }
+    newGame(runStartCard.rank, runStartCard.suit, runStartSkillId, runStartVowLevels);
+    goToMap();
+}
+function cancelRunStartEquip(){
+    if (runStartMode === 'swap') goToDeckBuilder();
+    else showScreen('starter-confirm-screen');
+}
+
 const SAVE_KEY = 'blackjackArcanaSave';
 function hasSave(){ try { return !!localStorage.getItem(SAVE_KEY); } catch (e){ return false; } }
 function clearSave(){ try { localStorage.removeItem(SAVE_KEY); } catch (e){} }
@@ -1582,10 +2033,17 @@ function continueGame(){
         goToMap();
     }
 }
-function newGame(starterRank, starterSuit){
+// collectionSkillId：スキルコレクションから今回つけて始めるスキル（未選択ならnull）
+// vowLevels：{mosha,muyoku,isshin,konnan} 今回のランで実際に使う誓いのレベル（未指定ならすべて0）
+function newGame(starterRank, starterSuit, collectionSkillId, vowLevels){
     clearSave();
+    if (!meta) loadMeta();
     const starterCard = makeCard(starterRank, starterSuit, true);
     starterCard.isStarter = true;
+    if (collectionSkillId && skillAllowedForCard(charSkill(collectionSkillId), starterCard)){
+        starterCard.skills.push(collectionSkillId);
+        starterCard.skillLv[collectionSkillId] = meta.skillCollection[collectionSkillId] || 0;
+    }
     const startingNormals = buildStartingNormalDeck();
     game = {
         charCollection: [starterCard],
@@ -1597,17 +2055,27 @@ function newGame(starterRank, starterSuit){
         normalDiscard: [],
         normalSelectedIds: startingNormals.map(c => c.uid),
         enemy: null,
-        mapStage: { n: 1, current: buildStageMap() },
-        playerMaxHp: PLAYER_MAX_HP_BASE,
-        player: { hp: PLAYER_MAX_HP_BASE },
+        mapStage: { n: 1, current: null },
+        playerMaxHp: PLAYER_MAX_HP_BASE + meta.passiveHp * 2,
+        player: { hp: PLAYER_MAX_HP_BASE + meta.passiveHp * 2 },
         stats: { totalDamage: 0, turnsTaken: 0, defeatedCount: 0 },
         turn: null,
         items: {},
-        chips: 10,
+        chips: 10 + meta.passiveCoin * 2,
         difficulty: 'easy', // 難易度設定は廃止。常にかんたん相当（敵HP倍率×1）
         starterRank, starterSuit,
+        shopRareChargesLeft: meta.passiveShopRare, // ショップの品ぞろえパッシブ：ランにつき使える回数
+        vowLevels: vowLevels || { mosha:0, muyoku:0, isshin:0, konnan:0 },
+        blessingActive: false, // 女神の祝福：次の1戦だけダメージ1.5倍
+        enemyBuffActive: false, // 呪われた宝箱：次の1戦だけ敵ステータス×1.2
+        fatigueStack: 0, // 疲労：撃破報酬コインの減少（20%ずつ、最大100%）
     };
+    // game.vowLevelsが必要なrollNodeType()（無欲の誓い）が動くよう、game代入が終わったあとにマップを作る
+    game.mapStage.current = buildStageMap();
     ITEM_IDS.forEach(id => { game.items[id] = 0; });
+    if (meta.potionS) game.items.potionS = 1;
+    if (meta.potionM) game.items.potionM = 1;
+    if (meta.potionL) game.items.potionL = 1;
     rebuildCharDeck();
     rebuildNormalDeck();
 }
@@ -1638,7 +2106,10 @@ function drawNormalCard(){
     return game.normalDeck.pop();
 }
 // 現在の推定スコア（クリアボーナスを除く。ランキング用の最終スコアと同じ式を共有する）
-function liveScore(){ return game.stats.totalDamage + game.stats.defeatedCount * 40 + Math.max(0, game.player.hp) * 2; }
+function liveScore(){
+    const base = game.stats.totalDamage + game.stats.defeatedCount * 40 + Math.max(0, game.player.hp) * 2;
+    return Math.round(base * (1 + vowScoreBonusPct() / 100));
+}
 
 // ============================================================
 // カード描画ヘルパー
@@ -1739,7 +2210,7 @@ function bigCardHtml(card, opts){
         if (opts.previewExtraSkillId && !previewIsLevelUp){
             const s = charSkill(opts.previewExtraSkillId);
             const cat = SKILL_CATEGORIES[s.cat];
-            skillEntries.push({ emoji: cat.emoji, label: skillDisplayLabel(s, card), right: pctLabelLv(s, 0), pending: true, color: cat.color, desc: s.desc });
+            skillEntries.push({ emoji: cat.emoji, label: skillDisplayLabel(s, card) + ' Lv.0', right: pctLabelLv(s, 0), pending: true, color: cat.color, desc: s.desc });
         }
     } else {
         skillEntries = (card.skills || []).map(id => {
@@ -1799,8 +2270,9 @@ function suitCountHtml(cards){
 function showScreen(id){
     ['title-screen','name-register-screen','ranking-screen','settings-screen','starter-select-screen','starter-confirm-screen',
      'map-screen','shop-screen','eventhp-screen','eventskill-screen','eventforget-screen','eventtreasure-screen',
+     'eventgeneric-screen','eventsage-screen','eventshrine-screen','eventmachine-screen',
      'deckbuilder-screen','battle-screen','reveal-screen','epiphany-screen','itemget-screen',
-     'clear-screen','over-screen'
+     'clear-screen','over-screen','meta-hub-screen','runstart-equip-screen'
     ].forEach(s => document.getElementById(s).classList.toggle('hidden', s !== id));
     if (id === 'title-screen'){ renderTitleIllusts(); refreshTitleButtons(); }
 }
@@ -2117,8 +2589,7 @@ function backToStarterGrid(){
 }
 function confirmStarterSelect(){
     if (!selectedStarter) return;
-    newGame(selectedStarter.rank, selectedStarter.suit);
-    goToMap();
+    openRunStartEquip(selectedStarter.rank, selectedStarter.suit);
 }
 function backToTitleFromStarter(){ showScreen('title-screen'); }
 
@@ -2314,54 +2785,106 @@ const SHOP_OFFERS = [
     { id:'potionS', label:'回復ポーション(小)', desc:'最大HPの25%回復',  price:10, img:'images/14_potion_green.png' },
 ];
 function openShop(){
+    game.shopDiscountActive = false;
     document.getElementById('shop-log').textContent = '';
     renderShop();
     showScreen('shop-screen');
 }
+// 商人イベント：ショップ画面をそのまま開き、いる間はずっと割引価格（25%OFF）にする
+function openEventMerchant(){
+    game.shopDiscountActive = true;
+    document.getElementById('shop-log').textContent = '商人が現れた！ここでは25%引きで買える！';
+    renderShop();
+    showScreen('shop-screen');
+}
+function shopPriceFor(o){
+    return game.shopDiscountActive ? Math.round(o.price * 0.75) : o.price;
+}
 function renderShop(){
     document.getElementById('shop-chips').textContent = game.chips;
-    document.getElementById('shop-list').innerHTML = SHOP_OFFERS.map(o => `
+    document.getElementById('shop-list').innerHTML = SHOP_OFFERS.map(o => {
+        const price = shopPriceFor(o);
+        return `
         <div class="shop-row">
             <img class="shop-icon" src="${o.img}" alt="">
             <span class="shop-info"><span class="shop-name">${escapeHtml(o.label)}</span><span class="shop-desc">${escapeHtml(o.desc)}</span></span>
-            <span class="shop-price">🪙${o.price}</span>
-            <button class="btn btn-gold btn-sm shop-buy-btn" ${game.chips < o.price ? 'disabled' : ''} onclick="buyShopItem('${o.id}')">かう</button>
+            <span class="shop-price">🪙${price}</span>
+            <button class="btn btn-gold btn-sm shop-buy-btn" ${game.chips < price ? 'disabled' : ''} onclick="buyShopItem('${o.id}')">かう</button>
         </div>
-    `).join('');
+    `;
+    }).join('');
 }
 function buyShopItem(id){
     const offer = SHOP_OFFERS.find(o => o.id === id);
-    if (!offer || game.chips < offer.price) return;
-    game.chips -= offer.price;
+    const price = offer ? shopPriceFor(offer) : 0;
+    if (!offer || game.chips < price) return;
+    game.chips -= price;
     if (offer.id === 'pack'){
+        // ショップの品ぞろえパッシブ：ランにつき所持個数までの回数、10%の確率で通常パックがレアパックになる
+        let rare = false;
+        if (game.shopRareChargesLeft > 0 && Math.random() < 0.10){
+            game.shopRareChargesLeft--;
+            rare = true;
+        }
         // 敵撃破時のパックと同じ、タップして開ける演出を使う。閉じたらショップへ戻る
-        lastOpenedPackCards = generateNormalPack();
-        showPackReveal('🎁 カードパック', 'normal', () => { renderShop(); showScreen('shop-screen'); });
+        lastOpenedPackCards = rare ? generateRarePack() : generateNormalPack();
+        showPackReveal(rare ? '✨ レアパック' : '🎁 カードパック', rare ? 'rare' : 'normal', () => { renderShop(); showScreen('shop-screen'); });
         return;
     }
     game.items[offer.id] = (game.items[offer.id] || 0) + 1;
     document.getElementById('shop-log').textContent = `${offer.label} を手に入れた！`;
     renderShop();
 }
-function closeShop(){ returnToMap(); }
+function closeShop(){ game.shopDiscountActive = false; returnToMap(); }
 
 // ============================================================
-// マップイベント（①最大HPアップ ②スキル習得 ③宝箱、のどれか1つがランダムで起こる）
+// マップイベント：ポジティブ7種・ネガティブ3種・運試し2種、計12種類からランダムに1つ選ばれる。
+// 困難の誓いのレベルぶん、ポジティブの取り分を削ってネガティブに回す（代わりにスコアが上がる）。
 // ============================================================
+const MAP_EVENTS = [
+    { kind:'pos',    fn: () => openEventFountain() },
+    { kind:'pos',    fn: () => openEventTreasure() },
+    { kind:'pos',    fn: () => openEventMerchant() },
+    { kind:'pos',    fn: () => openEventSage() },
+    { kind:'pos',    fn: () => openEventShrine() },
+    { kind:'pos',    fn: () => openEventBlessing() },
+    { kind:'pos',    fn: () => openEventLearnSkill() },
+    { kind:'neg',    fn: () => openEventThief() },
+    { kind:'neg',    fn: () => openEventPoisonSwamp() },
+    { kind:'neg',    fn: () => openEventFatigue() },
+    { kind:'gamble', fn: () => openEventMachine() },
+    { kind:'gamble', fn: () => openEventCursedChest() },
+];
 function openMapEvent(){
-    const roll = Math.floor(Math.random() * 3);
-    if (roll === 0) openEventMaxHp();
-    else if (roll === 1) openEventLearnSkill();
-    else openEventTreasure();
+    const posList = MAP_EVENTS.filter(e => e.kind === 'pos');
+    const negList = MAP_EVENTS.filter(e => e.kind === 'neg');
+    const gambleList = MAP_EVENTS.filter(e => e.kind === 'gamble');
+    const n = MAP_EVENTS.length;
+    let posWeight = posList.length / n;
+    let negWeight = negList.length / n;
+    const shift = Math.min(posWeight, 0.10 * activeVowLevel('konnan'));
+    posWeight -= shift;
+    negWeight += shift;
+    const r = Math.random();
+    let pool;
+    if (r < posWeight) pool = posList;
+    else if (r < posWeight + negWeight) pool = negList;
+    else pool = gambleList;
+    pool[Math.floor(Math.random() * pool.length)].fn();
 }
+// 汎用の結果表示（アイコン・タイトル・本文だけのシンプルなイベント用）
+function openEventGeneric(title, bodyHtml){
+    document.getElementById('eventgeneric-title').textContent = title;
+    document.getElementById('eventgeneric-body').innerHTML = bodyHtml;
+    showScreen('eventgeneric-screen');
+}
+function closeEventGeneric(){ returnToMap(); }
 
-// ---- ①見知らぬ魔法使い：最大HP+20、ついでに全回復 ----
-function openEventMaxHp(){
-    game.playerMaxHp += 20;
+// ---- ①祝福の泉：HP全回復のみ ----
+function openEventFountain(){
     game.player.hp = game.playerMaxHp;
     document.getElementById('eventhp-body').innerHTML =
-        `<div class="eh-intro">特別な魔法をかけてもらった！</div>
-         <div class="eh-line eh-maxhp">最大HP＋20</div>
+        `<div class="eh-intro">泉の水に癒やされた！</div>
          <div class="eh-line eh-heal">HP完全回復！</div>`;
     showScreen('eventhp-screen');
 }
@@ -2451,13 +2974,126 @@ function pickForgetSkill(i){
 
 // ---- ③宝箱発見：コイン5・10・15のいずれかを獲得 ----
 function openEventTreasure(){
-    const amounts = [5, 10, 15];
-    const amt = amounts[Math.floor(Math.random() * amounts.length)];
-    game.chips += amt;
-    document.getElementById('eventtreasure-body').textContent = `宝箱を見つけた！ 🪙 コイン +${amt} を手に入れた！`;
+    if (Math.random() < 0.5){
+        const amounts = [5, 10, 15];
+        const amt = amounts[Math.floor(Math.random() * amounts.length)];
+        game.chips += amt;
+        document.getElementById('eventtreasure-body').textContent = `宝箱を見つけた！ 🪙 コイン +${amt} を手に入れた！`;
+    } else {
+        const potionIds = ['potionS', 'potionM', 'potionL'];
+        const id = potionIds[Math.floor(Math.random() * potionIds.length)];
+        game.items[id] = (game.items[id] || 0) + 1;
+        document.getElementById('eventtreasure-body').textContent = `宝箱を見つけた！ ${ITEM_DEFS[id].label} ×1 を手に入れた！`;
+    }
     showScreen('eventtreasure-screen');
 }
 function closeEventTreasure(){ returnToMap(); }
+
+// ---- 商人：ショップ画面をそのまま開き、いる間はずっと25%引き（openShop近くのopenEventMerchantで定義済み） ----
+
+// ---- 賢者の書：所持している通常カードから1枚選び、ランダムなスキルを付与する ----
+function openEventSage(){
+    const pool = game.normalCollection;
+    if (pool.length === 0){ openEventTreasure(); return; }
+    const card = pool[Math.floor(Math.random() * pool.length)];
+    const skillId = NORMAL_SKILL_IDS[Math.floor(Math.random() * NORMAL_SKILL_IDS.length)];
+    card.skills = (card.skills || []).concat([skillId]);
+    document.getElementById('eventsage-body').textContent = `${card.rank}${SUIT_SYMBOL[card.suit]} に「${NORMAL_SKILLS[skillId].label}」を付けた！`;
+    document.getElementById('eventsage-card-area').innerHTML = miniCardHtml(card);
+    showScreen('eventsage-screen');
+}
+function closeEventSage(){ returnToMap(); }
+
+// ---- 修行の祠：所持キャラカードが持つスキル（Lv5未満）から1つ選び、確定でレベル+1 ----
+let eventShrineCandidates = [];
+function openEventShrine(){
+    const options = [];
+    game.charCollection.forEach(c => {
+        (c.skills || []).forEach(skillId => {
+            if (skillLevel(c, skillId) < MAX_SKILL_LV) options.push({ card: c, skillId });
+        });
+    });
+    if (options.length === 0){ openEventTreasure(); return; }
+    eventShrineCandidates = shuffle(options).slice(0, 3);
+    document.getElementById('eventshrine-row').innerHTML = eventShrineCandidates.map((o, i) => `
+        <div class="reward-pick" onclick="pickEventShrine(${i})">
+            ${bigCardHtml(o.card, { compact: true, previewExtraSkillId: o.skillId })}
+        </div>
+    `).join('');
+    showScreen('eventshrine-screen');
+}
+function pickEventShrine(i){
+    const { card, skillId } = eventShrineCandidates[i];
+    levelUpSkill(card, skillId);
+    returnToMap();
+}
+function skipEventShrine(){ returnToMap(); }
+
+// ---- 女神の祝福：次の1戦だけダメージ1.5倍（resolveTurnで参照、afterEnemyDefeatedで消費） ----
+function openEventBlessing(){
+    game.blessingActive = true;
+    openEventGeneric('✨ 女神の祝福', '女神の祝福を受けた！<br>次の戦闘だけダメージが1.5倍になる！');
+}
+
+// ---- 盗賊：所持コインの25/50/75/100%のいずれかを奪われる ----
+function openEventThief(){
+    const pct = [0.25, 0.5, 0.75, 1.0][Math.floor(Math.random() * 4)];
+    const lost = Math.round(game.chips * pct);
+    game.chips -= lost;
+    openEventGeneric('🥷 盗賊', `盗賊に襲われた！<br>🪙 コイン -${lost} を奪われた…`);
+}
+
+// ---- 毒沼：最大HPの30%減少（HPが0以下になる場合は1で耐える） ----
+function openEventPoisonSwamp(){
+    const lost = Math.round(game.playerMaxHp * 0.30);
+    game.player.hp = Math.max(1, game.player.hp - lost);
+    openEventGeneric('☠️ 毒沼', `毒沼に足を取られた！<br>HP -${lost}！`);
+}
+
+// ---- 疲労：このステージ終了まで撃破報酬のコインが-20%×スタック数（最大100%）。afterEnemyDefeatedで参照 ----
+function openEventFatigue(){
+    game.fatigueStack = Math.min(5, (game.fatigueStack || 0) + 1);
+    openEventGeneric('😩 疲労', `体が重い…<br>このステージの間、撃破報酬のコインが-${game.fatigueStack * 20}%になる。`);
+}
+
+// ---- 謎のマシン：コインを好きなだけ賭け、0/0.5/1.5/2.0/3.0倍がそれぞれ20%で出る（賭けなくてもよい） ----
+let machineBet = 0;
+function openEventMachine(){
+    machineBet = 0;
+    document.getElementById('eventmachine-chips').textContent = game.chips;
+    document.getElementById('eventmachine-bet').textContent = machineBet;
+    document.getElementById('eventmachine-result').textContent = '';
+    document.getElementById('eventmachine-spin-btn').disabled = false;
+    showScreen('eventmachine-screen');
+}
+function adjustMachineBet(delta){
+    machineBet = Math.max(0, Math.min(game.chips, machineBet + delta));
+    document.getElementById('eventmachine-bet').textContent = machineBet;
+}
+function spinMachine(){
+    if (machineBet <= 0) return;
+    const mults = [0, 0.5, 1.5, 2.0, 3.0];
+    const mult = mults[Math.floor(Math.random() * mults.length)];
+    game.chips -= machineBet;
+    const won = Math.round(machineBet * mult);
+    game.chips += won;
+    document.getElementById('eventmachine-chips').textContent = game.chips;
+    document.getElementById('eventmachine-result').textContent = `${mult}倍！ ${won}枚もどってきた（差し引き${won - machineBet >= 0 ? '+' : ''}${won - machineBet}）`;
+    document.getElementById('eventmachine-spin-btn').disabled = true;
+}
+function closeEventMachine(){ returnToMap(); }
+
+// ---- 呪われた宝箱：70%でコイン+30、30%で次の戦闘だけ敵が強化（HP・攻撃力×1.2） ----
+function openEventCursedChest(){
+    if (Math.random() < 0.70){
+        game.chips += 30;
+        openEventGeneric('📦 呪われた宝箱', '開けると… 🪙 コイン +30 が転がり出た！');
+    } else {
+        game.enemyBuffActive = true;
+        openEventGeneric('📦 呪われた宝箱', '開けると…呪いだ！<br>次の戦闘だけ敵が強化される（HP・攻撃力×1.2）！');
+    }
+}
+
 // 自動セーブしているので「あきらめる」と記録が消えるわけではない。確認なしでそのままタイトルへ戻る
 function giveUpRun(){ showScreen('title-screen'); }
 
@@ -2737,18 +3373,31 @@ function doStand(){
     resolveTurn(false);
 }
 // extraDmg（通常カードの「攻撃5ダメージ」スキル）は、倍率をかけたあとに足す＝倍率の影響を受けない
+// 硬化：蓄積した軽減スタックぶんだけ被ダメージ（＝敵が受けるダメージ）を軽減し、使ったぶんは消える
 function computeDamage(total, mult, hand, enemy, extraDmg){
     let dmg = Math.round(total * mult) + (extraDmg || 0);
-    if (enemy.ability === 'blockLowDamage15' && dmg <= 15) dmg = 0;
+    if (enemy.ability === 'blockLow' && dmg <= 15) dmg = 0;
+    if (enemy.ability === 'harden' && enemy.hardenStack > 0){
+        const reduced = Math.min(dmg, enemy.hardenStack);
+        dmg -= reduced;
+        enemy.hardenStack -= reduced;
+    }
     return dmg;
 }
-// ワイトなど、敵の反撃前に発動するとくせい（HP回復）
+// 敵の反撃より前に発動するとくせい（自動回復・硬化の蓄積・どくのダメージ）
 function applyEnemyPreAttackAbilities(){
     const enemy = game.enemy;
-    if (enemy.ability === 'regenMaxHp10' && enemy.hp > 0 && enemy.hp < enemy.maxHp){
+    if (enemy.ability === 'regen' && enemy.hp > 0 && enemy.hp < enemy.maxHp){
         const healed = Math.min(enemy.maxHp, enemy.hp + Math.round(enemy.maxHp * 0.10)) - enemy.hp;
         enemy.hp += healed;
         floatText('battle-enemy-avatar-wrap', `+${healed}`, 'heal');
+    }
+    if (enemy.ability === 'harden'){
+        enemy.hardenStack = (enemy.hardenStack || 0) + 5;
+    }
+    if (enemy.ability === 'poison' && enemy.poisonStack > 0){
+        game.player.hp -= enemy.poisonStack;
+        floatText('battle-player-avatar-wrap', `どく -${enemy.poisonStack}`, 'bust');
     }
 }
 function resolveTurn(busted){
@@ -2760,11 +3409,21 @@ function resolveTurn(busted){
         triggerBustEffect();
     } else {
         const { total, mult } = currentMultInfo();
-        const dmg = computeDamage(total, mult, game.turn.hand, game.enemy, game.turn.extraDmg);
+        let dmg = computeDamage(total, mult, game.turn.hand, game.enemy, game.turn.extraDmg);
+        if (game.blessingActive) dmg = Math.round(dmg * 1.5); // 女神の祝福：この戦闘中はダメージ1.5倍
         game.enemy.hp -= dmg;
         game.stats.totalDamage += dmg;
         floatText('battle-enemy-avatar-wrap', `-${dmg}`, 'enemy-hit', 1800);
-        if (game.enemy.hp <= 0) enemyDefeated = true;
+        if (game.enemy.hp <= 0){
+            // 意地：戦闘中1回だけ、致命傷をHP1で耐える
+            if (game.enemy.ability === 'lastStand' && !game.enemy.lastStandUsed){
+                game.enemy.hp = 1;
+                game.enemy.lastStandUsed = true;
+                floatText('battle-enemy-avatar-wrap', '踏みとどまった！', 'heal');
+            } else {
+                enemyDefeated = true;
+            }
+        }
     }
     game.charDiscard.push(game.turn.base);
     game.turn.hand.slice(1).forEach(c => game.normalDiscard.push(c));
@@ -2788,36 +3447,82 @@ function proceedAfterTurn(){
             game.player.hp = game.playerMaxHp;
             game.mapStage.n++;
             game.mapStage.current = buildStageMap();
+            game.fatigueStack = 0; // 疲労はステージ終了でリセット
         }
         afterEnemyDefeated(game.enemy);
         return;
     }
-    // 敵の反撃（とくせいで内容が変わる：回避／クリティカル／攻撃力上昇／ブレス）
     applyEnemyPreAttackAbilities();
+    updateBattleBars();
+    if (game.player.hp <= 0){ finishRun(false); return; }
+
     const enemy = game.enemy;
+    const ability = enemy.ability;
+
+    // ためこみ：溜め中は攻撃せず次のターンへ、溜め終わった次のターンで確定2.5倍攻撃（連続チャージはしない）
+    if (ability === 'chargeAtk'){
+        if (!enemy.charging){
+            enemy.charging = true;
+            floatText('battle-enemy-avatar-wrap', 'ちからを溜めている…', 'heal');
+            updateBattleBars();
+            startTurn();
+            return;
+        }
+        enemy.charging = false;
+        const incoming = Math.round(enemy.atk * 2.5);
+        floatText('battle-player-avatar-wrap', `🔥渾身の一撃！ -${incoming}`, 'bust');
+        game.player.hp -= incoming;
+        triggerPlayerHitEffect();
+        updateBattleBars();
+        if (game.player.hp <= 0){ finishRun(false); return; }
+        startTurn();
+        return;
+    }
+
+    // すばやい動き：当選した時点で確定効果なので、この個体は攻撃をまったく当てられない
+    if (ability === 'evade'){
+        floatText('battle-player-avatar-wrap', 'かわした！', 'heal');
+        startTurn();
+        return;
+    }
+
     let incoming = enemy.atk;
-    let evaded = false, crit = false, breathed = false;
-    if (enemy.ability === 'evade10' && Math.random() < 0.10){
-        evaded = true;
-    } else if (enemy.ability === 'rampAtk10pct'){
+    let label = '';
+    let cls = '';
+    if (ability === 'ramp'){
         incoming = Math.round(enemy.baseAtk * (1 + 0.10 * enemy.rampCount));
         enemy.atk = incoming;
         enemy.rampCount++;
         document.getElementById('battle-enemy-atk').textContent = enemy.atk;
-    } else if (enemy.ability === 'crit10x2' && Math.random() < 0.10){
+    } else if (ability === 'crit'){
         incoming *= 2;
-        crit = true;
-    } else if (enemy.ability === 'breath30' && Math.random() < 0.30){
+        cls = 'bust';
+    } else if (ability === 'breath'){
         incoming = Math.round(enemy.atk * (1.2 + Math.random() * 0.8));
-        breathed = true;
+        label = `🔥ブレス！ -${incoming}`;
+    } else if (ability === 'flurry'){
+        // 0.5倍の攻撃を、1発目は確定・以後は50%で継続する連続攻撃
+        let hits = 0, hitTotal = 0;
+        do { hits++; hitTotal += Math.round(enemy.atk * 0.5); } while (Math.random() < 0.5 && hits < 10);
+        incoming = hitTotal;
+        label = `連続攻撃×${hits}！ -${incoming}`;
     }
-    if (evaded){
-        floatText('battle-player-avatar-wrap', 'かわした！', 'heal');
-    } else {
-        floatText('battle-player-avatar-wrap', breathed ? `🔥ブレス！ -${incoming}` : `-${incoming}`, crit ? 'bust' : '');
-        game.player.hp -= incoming;
-        triggerPlayerHitEffect();
+
+    floatText('battle-player-avatar-wrap', label || `-${incoming}`, cls);
+    game.player.hp -= incoming;
+    triggerPlayerHitEffect();
+
+    if (ability === 'poison') enemy.poisonStack = (enemy.poisonStack || 0) + 1;
+    if (ability === 'followUp'){
+        const followDmg = Math.round(enemy.atk * 0.5);
+        game.player.hp -= followDmg;
+        setTimeout(() => floatText('battle-player-avatar-wrap', `追撃！ -${followDmg}`, ''), 400);
     }
+    if (ability === 'lifesteal'){
+        const healed = Math.min(enemy.maxHp, enemy.hp + Math.round(incoming * 0.20)) - enemy.hp;
+        if (healed > 0){ enemy.hp += healed; floatText('battle-enemy-avatar-wrap', `+${healed}`, 'heal'); }
+    }
+
     updateBattleBars();
     if (game.player.hp <= 0){ finishRun(false); return; }
     startTurn();
@@ -2837,12 +3542,14 @@ function battleBackToTitle(){ showScreen('title-screen'); }
 let lastGrantedItemId = null;
 let pendingPacks = [];
 function afterEnemyDefeated(enemy){
+    game.blessingActive = false; // 女神の祝福：この戦闘で使い切り
+    const fatigueMult = 1 - Math.min(1, (game.fatigueStack || 0) * 0.20); // 疲労：撃破報酬コインの減少
     if (enemy.boss){
-        game.chips += 50;
+        game.chips += Math.round(50 * fatigueMult);
         lastGrantedItemId = null;
         pendingPacks = ['rare', 'normal'];
     } else {
-        game.chips += enemy.elite ? 10 : 5;
+        game.chips += Math.round((enemy.elite ? 10 : 5) * fatigueMult);
         lastGrantedItemId = Math.random() < 0.20 ? grantRandomItem() : null;
         pendingPacks = [enemy.elite ? 'rare' : 'normal'];
     }
@@ -3081,7 +3788,12 @@ function cancelDeckBuilder(){ returnToMap(); }
 function finishRun(cleared){
     clearSave();
     recordRunResult(cleared);
-    if (cleared) recordCardClear(game.starterRank, game.starterSuit);
+    if (cleared){
+        recordCardClear(game.starterRank, game.starterSuit);
+        if (!meta) loadMeta();
+        meta.shards += SHARDS_PER_CLEAR;
+        saveMeta();
+    }
     const label = `撃破数 ${game.stats.defeatedCount}　スコア ${lastFinalScore}pt`;
     if (cleared){
         document.getElementById('clear-score').textContent = label;
@@ -3125,6 +3837,7 @@ setFurigana(getFuriganaOn());
 document.getElementById('container').addEventListener('click', hideSkillDescPopup);
 renderTitleIllusts();
 refreshTitleButtons();
+loadMeta();
 </script>
 </body>
 </html>
