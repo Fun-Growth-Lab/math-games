@@ -1037,7 +1037,7 @@
             </div>
             <div id="meta-passive-list"></div>
             <div id="meta-gacha-panel" class="hidden">
-                <p class="settings-desc">ガチャの結果は直接カードには付かず「スキルコレクション」に加わります（重複すればレベルアップ）。実際に使うスキルは、ラン開始時にコレクションから1つ選んで装備します。</p>
+                <p class="settings-desc">最初に選んだキャラクターカードにスキルをつけられるようになります。</p>
                 <button class="btn btn-gold" id="meta-gacha-btn" style="max-width:280px; margin:10px auto;" onclick="doGachaPull()">🎴 ガチャを引く</button>
                 <p id="meta-gacha-result" style="font-weight:800; color:var(--gold-bright); min-height:1.6em;"></p>
                 <div id="meta-gacha-collection"></div>
@@ -1047,17 +1047,18 @@
         </div>
     </div>
 
-    <!-- ==================== ラン開始前：スキルコレクションから1つ装備し、誓いのレベルを選ぶ（デッキ構築からの付け替えにも流用） ==================== -->
+    <!-- ==================== ラン開始前：スキルコレクションから1つ装備し、パッシブ・誓いのレベルを選ぶ ==================== -->
     <div id="runstart-equip-screen" class="hidden">
         <div class="title-box" style="width:1000px; max-height:680px;">
             <h1 class="settings-title">🎴 スキルを装備する</h1>
             <p class="settings-desc">スキルコレクションから、このカードに付けるスキルを1つ選べます（つけなくてもOK）</p>
             <div id="runstart-skill-list"></div>
-            <div id="runstart-vow-section">
-                <h1 class="settings-title" style="margin-top:18px;">🕯️ 誓い</h1>
-                <p class="settings-desc">このランで使う誓いのレベルを選べます（購入済みレベルまで、0でOFF）</p>
-                <div id="runstart-vow-list"></div>
-            </div>
+            <h1 class="settings-title" style="margin-top:18px;">🛡️ パッシブ</h1>
+            <p class="settings-desc">持っているパッシブを、このランでどれだけ使うか選べます</p>
+            <div id="runstart-passive-list"></div>
+            <h1 class="settings-title" style="margin-top:18px;">🕯️ 誓い</h1>
+            <p class="settings-desc">このランで使う誓いのレベルを選べます（購入済みレベルまで、0でOFF）</p>
+            <div id="runstart-vow-list"></div>
             <button class="btn btn-gold" id="runstart-confirm-btn" onclick="confirmRunStartEquip()">▶ 冒険にでる</button>
             <button class="btn btn-gray" onclick="cancelRunStartEquip()">◀ もどる</button>
         </div>
@@ -1073,7 +1074,6 @@
             </div>
             <div class="db-toolbar">
                 <button class="btn btn-gray btn-sm" id="db-clear-btn" style="width:auto;" onclick="clearDeckSelection()">🗑️ すべてデッキから外す</button>
-                <button class="btn btn-gray btn-sm" style="width:auto;" onclick="openDeckBuilderSkillSwap()">🎴 スキル付け替え</button>
                 <label class="db-hide-toggle"><input type="checkbox" id="db-hide-bench" onchange="toggleHideBench()"> デッキ外のカードを隠す</label>
                 <div class="db-sort-toggle">
                     <span class="db-sort-label">ならびかえ</span>
@@ -1734,10 +1734,8 @@ function loadMeta(){
 function saveMeta(){ if (meta) try { localStorage.setItem(META_KEY, JSON.stringify(meta)); } catch (e){} }
 function getVowLevel(id){ return (meta && meta.vows && meta.vows[id]) || 0; }
 // 誓いを1段上げるのに必要なかけら（そのの誓い自身の現在レベルにつき+10%ずつ増えていく）
-function vowNextCost(id){
-    const lv = getVowLevel(id);
-    return Math.round(15 * Math.pow(1.1, lv));
-}
+const VOW_LV_COST = 15; // 誓いを1段上げるのに必要なかけら（レベルによらず定額）
+function vowNextCost(id){ return VOW_LV_COST; }
 function buyVowLevel(id){
     const lv = getVowLevel(id);
     if (lv >= MAX_VOW_LV) return false;
@@ -1763,7 +1761,7 @@ function pullSkillGacha(){
 const META_PASSIVES = [
     { id:'coin',      label:'初期コイン+2',         desc:'ラン開始時の所持コインが+2される',            cost:5,  countKey:'passiveCoin', maxCount:20 },
     { id:'hp',        label:'初期HP+2',            desc:'ラン開始時の最大HPが+2される',                cost:5,  countKey:'passiveHp',   maxCount:20 },
-    { id:'shopRare',  label:'ショップの品ぞろえ',    desc:'ショップのカードパックが10%の確率でレアパックになる（1ランにつき所持個数まで）', cost:5, countKey:'passiveShopRare', maxCount:10 },
+    { id:'shopRare',  label:'ショップの品ぞろえ',    desc:'お店に入るたび、1個につき10%の確率でレアパック(🪙60・何個でも買える)が品ぞろえに並ぶ', cost:5, countKey:'passiveShopRare', maxCount:10 },
     { id:'potionS',   label:'初期所持ポーション(小)', desc:'ラン開始時にポーション(小)を1つ持って始まる', cost:30, countKey:'potionS', maxCount:1, flag:true },
     { id:'potionM',   label:'初期所持ポーション(中)', desc:'ラン開始時にポーション(中)を1つ持って始まる', cost:40, countKey:'potionM', maxCount:1, flag:true },
     { id:'potionL',   label:'初期所持ポーション(大)', desc:'ラン開始時にポーション(大)を1つ持って始まる', cost:50, countKey:'potionL', maxCount:1, flag:true },
@@ -1792,6 +1790,8 @@ const VOWS = [
     { id:'isshin', label:'一心の誓い', effectText:lv => `ポーションの効果-${lv*10}%`, scoreText:lv => `スコア+${lv*10}%` },
     { id:'konnan', label:'困難の誓い', effectText:lv => `悪いイベントが出やすくなる(+${lv*10}%)`, scoreText:lv => `スコア+${lv*10}%` },
 ];
+// 誓い共通：全ての誓いは「アルカナのかけら+10%（レベルごと）」を持つ（スコアの伸び方は誓いごとに異なる）
+function vowShardText(lv){ return `アルカナのかけら+${lv*10}%`; }
 // そのランで実際に使う誓いレベル（0〜購入上限）。ラン開始前の選択画面でgame.vowLevelsにセットする。
 function vowScoreBonusPct(){
     if (!game || !game.vowLevels) return 0;
@@ -1800,6 +1800,13 @@ function vowScoreBonusPct(){
         const lv = game.vowLevels[id] || 0;
         pct += lv * (id === 'mosha' ? 20 : 10);
     });
+    return pct;
+}
+// クリア時に得るアルカナのかけらへのボーナス（誓いレベル×10%、全誓い共通・合算）
+function vowShardBonusPct(){
+    if (!game || !game.vowLevels) return 0;
+    let pct = 0;
+    VOW_IDS.forEach(id => { pct += (game.vowLevels[id] || 0) * 10; });
     return pct;
 }
 function activeVowLevel(id){ return (game && game.vowLevels && game.vowLevels[id]) || 0; }
@@ -1886,7 +1893,9 @@ function doGachaPull(){
     renderMetaGacha();
 }
 function renderMetaVows(){
-    document.getElementById('meta-vow-list').innerHTML = VOWS.map(v => {
+    document.getElementById('meta-vow-list').innerHTML =
+        `<p class="settings-desc">敵が強くなる代わりに、スコアが高くなり、アルカナのかけらも多く手に入るようになります。</p>` +
+        VOWS.map(v => {
         const lv = getVowLevel(v.id);
         const maxed = lv >= MAX_VOW_LV;
         const cost = maxed ? 0 : vowNextCost(v.id);
@@ -1894,7 +1903,7 @@ function renderMetaVows(){
         return `<div class="meta-row">
             <div class="meta-row-info">
                 <div class="meta-row-name">${escapeHtml(v.label)}　Lv.${lv}／${MAX_VOW_LV}</div>
-                <div class="meta-row-desc">次のLv：${escapeHtml(v.effectText(lv + 1))} ／ ${escapeHtml(v.scoreText(lv + 1))}</div>
+                <div class="meta-row-desc">${escapeHtml(v.effectText(lv + 1))} ／ ${escapeHtml(v.scoreText(lv + 1))} ／ ${escapeHtml(vowShardText(lv + 1))}</div>
             </div>
             <span class="meta-row-cost">${maxed ? '' : `💎${cost}`}</span>
             <button class="btn btn-gold" ${disabled ? 'disabled' : ''} onclick="doBuyVow('${v.id}')">${maxed ? '最大' : 'レベルアップ'}</button>
@@ -1911,27 +1920,17 @@ function doBuyVow(id){
 let runStartCard = null; // { rank, suit }
 let runStartSkillId = null;
 let runStartVowLevels = { mosha:0, muyoku:0, isshin:0, konnan:0 };
-let runStartMode = 'newgame'; // 'newgame'：ラン開始時／'swap'：デッキ構築からのスキル付け替え
+let runStartPassiveLevels = { coin:0, hp:0, shopRare:0, potionS:false, potionM:false, potionL:false };
 function openRunStartEquip(rank, suit){
     if (!meta) loadMeta();
-    runStartMode = 'newgame';
     runStartCard = { rank, suit };
     runStartSkillId = null;
     runStartVowLevels = { mosha:0, muyoku:0, isshin:0, konnan:0 };
-    document.getElementById('runstart-vow-section').classList.remove('hidden');
-    document.getElementById('runstart-confirm-btn').textContent = '▶ 冒険にでる';
-    renderRunStartEquip();
-    showScreen('runstart-equip-screen');
-}
-// デッキ構築中に、スターターに付けるコレクションスキルをいつでも付け替えられるようにする
-function openDeckBuilderSkillSwap(){
-    if (!meta) loadMeta();
-    const starter = game.charCollection.find(c => c.isStarter);
-    runStartMode = 'swap';
-    runStartCard = { rank: starter.rank, suit: starter.suit };
-    runStartSkillId = null;
-    document.getElementById('runstart-vow-section').classList.add('hidden');
-    document.getElementById('runstart-confirm-btn').textContent = '▶ 付け替える';
+    // パッシブは、持っている数ぶんデフォルトで全部使う状態から始める（減らしたければここで調整できる）
+    runStartPassiveLevels = {
+        coin: meta.passiveCoin, hp: meta.passiveHp, shopRare: meta.passiveShopRare,
+        potionS: meta.potionS, potionM: meta.potionM, potionL: meta.potionL,
+    };
     renderRunStartEquip();
     showScreen('runstart-equip-screen');
 }
@@ -1958,12 +1957,10 @@ function renderRunStartEquip(){
     document.getElementById('runstart-vow-list').innerHTML = VOWS.map(v => {
         const maxLv = getVowLevel(v.id);
         const cur = runStartVowLevels[v.id];
-        const opts = [];
-        for (let lv = 0; lv <= maxLv; lv++) opts.push(lv);
         return `<div class="meta-row">
             <div class="meta-row-info">
                 <div class="meta-row-name">${escapeHtml(v.label)}</div>
-                <div class="meta-row-desc">${cur === 0 ? 'OFF' : `${escapeHtml(v.effectText(cur))} ／ ${escapeHtml(v.scoreText(cur))}`}</div>
+                <div class="meta-row-desc">${cur === 0 ? 'OFF' : `${escapeHtml(v.effectText(cur))} ／ ${escapeHtml(v.scoreText(cur))} ／ ${escapeHtml(vowShardText(cur))}`}</div>
             </div>
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn btn-gray btn-sm" style="width:auto; margin-top:0;" onclick="adjustRunStartVow('${v.id}', -1, ${maxLv})">－</button>
@@ -1972,6 +1969,28 @@ function renderRunStartEquip(){
             </div>
         </div>`;
     }).join('');
+    const passiveRows = META_PASSIVES.map(p => {
+        if (p.flag){
+            if (!meta[p.countKey]) return '';
+            const on = runStartPassiveLevels[p.id];
+            return `<div class="meta-row">
+                <div class="meta-row-info"><div class="meta-row-name">${escapeHtml(p.label)}</div></div>
+                <button class="btn ${on ? 'btn-gold' : 'btn-gray'}" style="width:100px;" onclick="toggleRunStartPassive('${p.id}')">${on ? 'ON' : 'OFF'}</button>
+            </div>`;
+        }
+        const owned = meta[p.countKey];
+        if (owned <= 0) return '';
+        const cur = runStartPassiveLevels[p.id];
+        return `<div class="meta-row">
+            <div class="meta-row-info"><div class="meta-row-name">${escapeHtml(p.label)}</div><div class="meta-row-desc">所持${owned}個</div></div>
+            <div style="display:flex; align-items:center; gap:8px;">
+                <button class="btn btn-gray btn-sm" style="width:auto; margin-top:0;" onclick="adjustRunStartPassive('${p.id}', -1, ${owned})">－</button>
+                <span style="font-weight:900; color:var(--gold-bright); min-width:24px; text-align:center;">${cur}</span>
+                <button class="btn btn-gray btn-sm" style="width:auto; margin-top:0;" onclick="adjustRunStartPassive('${p.id}', 1, ${owned})">＋</button>
+            </div>
+        </div>`;
+    }).join('');
+    document.getElementById('runstart-passive-list').innerHTML = passiveRows || '<p class="settings-desc">まだパッシブを持っていません</p>';
 }
 function pickRunStartSkill(id){
     runStartSkillId = id;
@@ -1981,34 +2000,19 @@ function adjustRunStartVow(id, delta, maxLv){
     runStartVowLevels[id] = Math.max(0, Math.min(maxLv, runStartVowLevels[id] + delta));
     renderRunStartEquip();
 }
+function toggleRunStartPassive(id){
+    runStartPassiveLevels[id] = !runStartPassiveLevels[id];
+    renderRunStartEquip();
+}
+function adjustRunStartPassive(id, delta, max){
+    runStartPassiveLevels[id] = Math.max(0, Math.min(max, runStartPassiveLevels[id] + delta));
+    renderRunStartEquip();
+}
 function confirmRunStartEquip(){
-    if (runStartMode === 'swap'){
-        const starter = game.charCollection.find(c => c.isStarter);
-        if (runStartSkillId){
-            const lv = meta.skillCollection[runStartSkillId] || 0;
-            if (starter.skills.includes(runStartSkillId)){
-                starter.skillLv[runStartSkillId] = lv;
-            } else if (starter.skills.length >= MAX_CARD_SKILLS){
-                showForgetScreen(starter, runStartSkillId, () => {
-                    starter.skillLv[runStartSkillId] = lv;
-                    goToDeckBuilder();
-                });
-                return;
-            } else {
-                starter.skills.push(runStartSkillId);
-                starter.skillLv[runStartSkillId] = lv;
-            }
-        }
-        goToDeckBuilder();
-        return;
-    }
-    newGame(runStartCard.rank, runStartCard.suit, runStartSkillId, runStartVowLevels);
+    newGame(runStartCard.rank, runStartCard.suit, runStartSkillId, runStartVowLevels, runStartPassiveLevels);
     goToMap();
 }
-function cancelRunStartEquip(){
-    if (runStartMode === 'swap') goToDeckBuilder();
-    else showScreen('starter-confirm-screen');
-}
+function cancelRunStartEquip(){ showScreen('starter-confirm-screen'); }
 
 const SAVE_KEY = 'blackjackArcanaSave';
 function hasSave(){ try { return !!localStorage.getItem(SAVE_KEY); } catch (e){ return false; } }
@@ -2035,9 +2039,11 @@ function continueGame(){
 }
 // collectionSkillId：スキルコレクションから今回つけて始めるスキル（未選択ならnull）
 // vowLevels：{mosha,muyoku,isshin,konnan} 今回のランで実際に使う誓いのレベル（未指定ならすべて0）
-function newGame(starterRank, starterSuit, collectionSkillId, vowLevels){
+// passiveLevels：{coin,hp,shopRare,potionS,potionM,potionL} 今回のランで実際に使うパッシブの量（未指定なら所持ぶん全部）
+function newGame(starterRank, starterSuit, collectionSkillId, vowLevels, passiveLevels){
     clearSave();
     if (!meta) loadMeta();
+    const pl = passiveLevels || { coin: meta.passiveCoin, hp: meta.passiveHp, shopRare: meta.passiveShopRare, potionS: meta.potionS, potionM: meta.potionM, potionL: meta.potionL };
     const starterCard = makeCard(starterRank, starterSuit, true);
     starterCard.isStarter = true;
     if (collectionSkillId && skillAllowedForCard(charSkill(collectionSkillId), starterCard)){
@@ -2056,29 +2062,31 @@ function newGame(starterRank, starterSuit, collectionSkillId, vowLevels){
         normalSelectedIds: startingNormals.map(c => c.uid),
         enemy: null,
         mapStage: { n: 1, current: null },
-        playerMaxHp: PLAYER_MAX_HP_BASE + meta.passiveHp * 2,
-        player: { hp: PLAYER_MAX_HP_BASE + meta.passiveHp * 2 },
+        playerMaxHp: PLAYER_MAX_HP_BASE + pl.hp * 2,
+        player: { hp: PLAYER_MAX_HP_BASE + pl.hp * 2 },
         stats: { totalDamage: 0, turnsTaken: 0, defeatedCount: 0 },
         turn: null,
         items: {},
-        chips: 10 + meta.passiveCoin * 2,
+        chips: 10 + pl.coin * 2,
         difficulty: 'easy', // 難易度設定は廃止。常にかんたん相当（敵HP倍率×1）
         starterRank, starterSuit,
-        shopRareChargesLeft: meta.passiveShopRare, // ショップの品ぞろえパッシブ：ランにつき使える回数
+        passiveLevels: pl,
         vowLevels: vowLevels || { mosha:0, muyoku:0, isshin:0, konnan:0 },
         blessingActive: false, // 女神の祝福：次の1戦だけダメージ1.5倍
         enemyBuffActive: false, // 呪われた宝箱：次の1戦だけ敵ステータス×1.2
         fatigueStack: 0, // 疲労：撃破報酬コインの減少（20%ずつ、最大100%）
+        shopHasRarePack: false, // ショップの品ぞろえパッシブ：お店に入るたび抽選しなおす
     };
     // game.vowLevelsが必要なrollNodeType()（無欲の誓い）が動くよう、game代入が終わったあとにマップを作る
     game.mapStage.current = buildStageMap();
     ITEM_IDS.forEach(id => { game.items[id] = 0; });
-    if (meta.potionS) game.items.potionS = 1;
-    if (meta.potionM) game.items.potionM = 1;
-    if (meta.potionL) game.items.potionL = 1;
+    if (pl.potionS) game.items.potionS = 1;
+    if (pl.potionM) game.items.potionM = 1;
+    if (pl.potionL) game.items.potionL = 1;
     rebuildCharDeck();
     rebuildNormalDeck();
 }
+function activePassiveLevel(key){ return (game && game.passiveLevels && game.passiveLevels[key]) || 0; }
 // 選択中のIDにもとづいて山札・捨札を作り直す（入れ替えるたびにシャッフルし直す）
 function rebuildCharDeck(){
     const selected = game.charCollection.filter(c => game.charSelectedIds.includes(c.uid));
@@ -2784,15 +2792,27 @@ const SHOP_OFFERS = [
     { id:'potionM', label:'回復ポーション(中)', desc:'最大HPの50%回復',  price:20, img:'images/13_potion_blue.png' },
     { id:'potionS', label:'回復ポーション(小)', desc:'最大HPの25%回復',  price:10, img:'images/14_potion_green.png' },
 ];
+// ショップの品ぞろえパッシブ：お店マスに入るたび、パッシブのレベル×10%の確率でレアパックが品ぞろえに並ぶ
+// （1つ60コインで何個でも買える）。別のお店マスに入ると再抽選される。
+function rollShopRarePack(){
+    return Math.random() < Math.min(1, activePassiveLevel('shopRare') * 0.10);
+}
+function getShopOffers(){
+    const offers = SHOP_OFFERS.slice();
+    if (game.shopHasRarePack) offers.push({ id:'rarepack', label:'レアパック', desc:'カードが2枚（20%の確率で2スキル持ちに）', price:60, img:'images/cardpack_2.png' });
+    return offers;
+}
 function openShop(){
     game.shopDiscountActive = false;
+    game.shopHasRarePack = rollShopRarePack();
     document.getElementById('shop-log').textContent = '';
     renderShop();
     showScreen('shop-screen');
 }
-// 商人イベント：ショップ画面をそのまま開き、いる間はずっと割引価格（25%OFF）にする
+// 商人イベント：ショップ画面をそのまま開き、いる間はずっと割引価格（25%OFF）にする。品ぞろえパッシブの対象外。
 function openEventMerchant(){
     game.shopDiscountActive = true;
+    game.shopHasRarePack = false;
     document.getElementById('shop-log').textContent = '商人が現れた！ここでは25%引きで買える！';
     renderShop();
     showScreen('shop-screen');
@@ -2802,7 +2822,7 @@ function shopPriceFor(o){
 }
 function renderShop(){
     document.getElementById('shop-chips').textContent = game.chips;
-    document.getElementById('shop-list').innerHTML = SHOP_OFFERS.map(o => {
+    document.getElementById('shop-list').innerHTML = getShopOffers().map(o => {
         const price = shopPriceFor(o);
         return `
         <div class="shop-row">
@@ -2815,17 +2835,12 @@ function renderShop(){
     }).join('');
 }
 function buyShopItem(id){
-    const offer = SHOP_OFFERS.find(o => o.id === id);
+    const offer = getShopOffers().find(o => o.id === id);
     const price = offer ? shopPriceFor(offer) : 0;
     if (!offer || game.chips < price) return;
     game.chips -= price;
-    if (offer.id === 'pack'){
-        // ショップの品ぞろえパッシブ：ランにつき所持個数までの回数、10%の確率で通常パックがレアパックになる
-        let rare = false;
-        if (game.shopRareChargesLeft > 0 && Math.random() < 0.10){
-            game.shopRareChargesLeft--;
-            rare = true;
-        }
+    if (offer.id === 'pack' || offer.id === 'rarepack'){
+        const rare = offer.id === 'rarepack';
         // 敵撃破時のパックと同じ、タップして開ける演出を使う。閉じたらショップへ戻る
         lastOpenedPackCards = rare ? generateRarePack() : generateNormalPack();
         showPackReveal(rare ? '✨ レアパック' : '🎁 カードパック', rare ? 'rare' : 'normal', () => { renderShop(); showScreen('shop-screen'); });
@@ -3791,7 +3806,7 @@ function finishRun(cleared){
     if (cleared){
         recordCardClear(game.starterRank, game.starterSuit);
         if (!meta) loadMeta();
-        meta.shards += SHARDS_PER_CLEAR;
+        meta.shards += Math.round(SHARDS_PER_CLEAR * (1 + vowShardBonusPct() / 100));
         saveMeta();
     }
     const label = `撃破数 ${game.stats.defeatedCount}　スコア ${lastFinalScore}pt`;
