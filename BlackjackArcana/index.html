@@ -416,21 +416,21 @@
         .meta-row-cost { font-weight: 900; color: var(--gold-bright); white-space: nowrap; }
         .meta-row .btn { width: 100px; flex-shrink: 0; margin-top: 0; padding: 8px 10px; font-size: 0.8rem; }
         /* スキル図鑑：通し番号つきのカード風パネル。未GETは？で伏せる（スキルガチャ・ラン開始前の装備選択で共用） */
-        .skill-dex-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin: 10px 0; }
+        .skill-dex-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 7px; margin: 10px 0; }
         .skill-dex-card {
             position: relative; border-radius: 10px; border: 2px solid var(--cat-color, #3a3226);
             background: linear-gradient(160deg, color-mix(in srgb, var(--cat-color, #3a3226) 24%, #14120c), #0c0a06);
-            padding: 10px 6px 8px; text-align: center; min-height: 96px;
-            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+            padding: 12px 6px 7px; text-align: center; min-height: 92px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
         }
         .skill-dex-card.selectable { cursor: pointer; }
         .skill-dex-card.selected { border-color: var(--gold-bright); box-shadow: 0 0 12px rgba(212,175,55,0.7); }
         .skill-dex-card.locked { border-color: #3a3226; background: #161616; opacity: 0.5; filter: grayscale(0.7); }
-        .skill-dex-num { position: absolute; top: 4px; left: 6px; font-size: 0.6rem; color: var(--text-dim); font-weight: 800; }
-        .skill-dex-icon { font-size: 1.5rem; }
-        .skill-dex-name { font-size: 0.68rem; font-weight: 800; color: var(--text-hi); line-height: 1.25; }
-        .skill-dex-lv { font-size: 0.62rem; color: var(--gold-bright); font-weight: 800; }
-        .skill-dex-pct { font-size: 0.7rem; font-weight: 800; color: var(--cat-color, var(--gold)); }
+        .skill-dex-num { position: absolute; top: 4px; left: 6px; font-size: 0.58rem; color: var(--text-dim); font-weight: 800; }
+        .skill-dex-name { font-size: 0.66rem; font-weight: 800; color: var(--text-hi); line-height: 1.2; }
+        .skill-dex-desc { font-size: 0.56rem; color: var(--text-dim); line-height: 1.25; }
+        .skill-dex-lv { font-size: 0.6rem; color: var(--gold-bright); font-weight: 800; }
+        .skill-dex-pct { font-size: 0.68rem; font-weight: 800; color: var(--cat-color, var(--gold)); }
         /* ラン開始前の装備画面：ボタンを上に固定し、下に獲得ずみの項目だけを並べる */
         .runstart-top-btns { display: flex; gap: 14px; justify-content: center; margin-bottom: 18px; }
         .runstart-top-btns .btn { width: 220px; margin-top: 0; }
@@ -1462,38 +1462,47 @@ const RANKS = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
 function bjValue(rank){ if (rank === 'A') return 11; if (rank === 'J' || rank === 'Q' || rank === 'K') return 10; return Number(rank); }
 
 // スキルのジャンル分け（絵文字・色でカード上のスキル欄を見分けやすくする）
+// スキルごとの絵文字は運用コストが高いため廃止。色だけで系統を区別する。
 const SKILL_CATEGORIES = {
-    count:     { emoji:'🔢', color:'#29b6f6' },
-    parity:    { emoji:'⚖️', color:'#66bb6a' },
-    prime:     { emoji:'💎', color:'#42a5f5' },
-    multiple:  { emoji:'✖️', color:'#ffa726' },
-    range:     { emoji:'🛡️', color:'#7e57c2' },
-    suitcolor: { emoji:'🎴', color:'#26a69a' },
-    special:   { emoji:'👑', color:'#ffca28' },
+    count:      { color:'#29b6f6' },
+    parity:     { color:'#66bb6a' },
+    prime:      { color:'#42a5f5' },
+    multiple:   { color:'#ffa726' },
+    range:      { color:'#7e57c2' },
+    suitcolor:  { color:'#26a69a' },
+    suitspread: { color:'#8d6e63' },
+    rankonly:   { color:'#ec407a' },
+    special:    { color:'#ffca28' },
 };
 const MAX_CARD_SKILLS = 2; // キャラクターカード・通常カードとも、付けられるスキルは最大2つまで
 const PRIME_SET = new Set([2,3,5,7,11,13,17,19]);
 
-// キャラクターカードのスキル一覧（倍率は乗算で重複適用される）。
+// キャラクターカードのスキル一覧（倍率は乗算で重複適用される）。全17種＋特殊3種＝20種。
 // CHAR_SKILLS_BASE = 最初のキャラ作成（リセマラ）で出現するスキル。
 // CHAR_SKILLS_SPECIAL = 撃破ボーナスでのみ、対応するランクのカードに限って手に入る特殊スキル。
 const CHAR_SKILLS_BASE = [
-    { id:'cnt2',      label:'2カード',        cat:'count',     mult:3,    desc:'手札がちょうど2枚のとき発動',        check:h => h.hand.length === 2 },
-    { id:'cnt3',      label:'3カード',        cat:'count',     mult:4,    desc:'手札がちょうど3枚のとき発動',        check:h => h.hand.length === 3 },
-    { id:'even',      label:'偶数',           cat:'parity',    mult:2,    desc:'合計が偶数のとき発動',              check:h => h.total % 2 === 0 },
-    { id:'odd',       label:'奇数',           cat:'parity',    mult:2,    desc:'合計が奇数のとき発動',              check:h => h.total % 2 === 1 },
-    { id:'prime',     label:'素数',           cat:'prime',     mult:2.5,  desc:'合計が素数のとき発動',              check:h => PRIME_SET.has(h.total) },
-    { id:'mul3',      label:'3の倍数',        cat:'multiple',  mult:3,    desc:'合計が3の倍数のとき発動',            check:h => h.total % 3 === 0 },
-    { id:'mul5',      label:'5の倍数',        cat:'multiple',  mult:3.5,  desc:'合計が5の倍数のとき発動',            check:h => h.total % 5 === 0 },
-    { id:'mul7',      label:'7の倍数',        cat:'multiple',  mult:4,    desc:'合計が7の倍数のとき発動',            check:h => h.total % 7 === 0 },
-    { id:'le15',      label:'15リミット',     cat:'range',     mult:4,    desc:'合計が15以下のとき発動',             check:h => h.total <= 15 },
-    { id:'over15',    label:'15オーバー',     cat:'range',     mult:3,    desc:'合計が15より大きいとき発動',          check:h => h.total > 15 },
-    { id:'suitOnly',  label:'スート統一',     cat:'suitcolor', mult:2.5,  desc:'使ったカードが全部同じスートのとき発動', check:h => h.hand.every(c => c.suit === h.base.suit) },
+    { id:'cnt2',      label:'2カード',        cat:'count',      mult:3,    desc:'手札がちょうど2枚のとき発動',        check:h => h.hand.length === 2 },
+    { id:'cnt3',      label:'3カード',        cat:'count',      mult:4,    desc:'手札がちょうど3枚のとき発動',        check:h => h.hand.length === 3 },
+    { id:'even',      label:'偶数',           cat:'parity',     mult:2,    desc:'合計が偶数のとき発動',              check:h => h.total % 2 === 0 },
+    { id:'odd',       label:'奇数',           cat:'parity',     mult:2,    desc:'合計が奇数のとき発動',              check:h => h.total % 2 === 1 },
+    { id:'prime',     label:'素数',           cat:'prime',      mult:2.5,  desc:'合計が素数のとき発動',              check:h => PRIME_SET.has(h.total) },
+    { id:'mul3',      label:'3の倍数',        cat:'multiple',   mult:3,    desc:'合計が3の倍数のとき発動',            check:h => h.total % 3 === 0 },
+    { id:'mul4',      label:'4の倍数',        cat:'multiple',   mult:3,    desc:'合計が4の倍数のとき発動',            check:h => h.total % 4 === 0 },
+    { id:'mul5',      label:'5の倍数',        cat:'multiple',   mult:3.5,  desc:'合計が5の倍数のとき発動',            check:h => h.total % 5 === 0 },
+    { id:'mul6',      label:'6の倍数',        cat:'multiple',   mult:3.5,  desc:'合計が6の倍数のとき発動',            check:h => h.total % 6 === 0 },
+    { id:'mul7',      label:'7の倍数',        cat:'multiple',   mult:4,    desc:'合計が7の倍数のとき発動',            check:h => h.total % 7 === 0 },
+    { id:'mul8',      label:'8の倍数',        cat:'multiple',   mult:4,    desc:'合計が8の倍数のとき発動',            check:h => h.total % 8 === 0 },
+    { id:'mul9',      label:'9の倍数',        cat:'multiple',   mult:5,    desc:'合計が9の倍数のとき発動',            check:h => h.total % 9 === 0 },
+    { id:'le15',      label:'15リミット',     cat:'range',      mult:4,    desc:'合計が15以下のとき発動',             check:h => h.total <= 15 },
+    { id:'over15',    label:'15オーバー',     cat:'range',      mult:3,    desc:'合計が15より大きいとき発動',          check:h => h.total > 15 },
+    { id:'suitOnly',  label:'スート統一',     cat:'suitcolor',  mult:3.5,  desc:'使ったカードが全部同じスートのとき発動', check:h => h.hand.every(c => c.suit === h.base.suit) },
+    { id:'suitSpread',label:'スート分散',     cat:'suitspread', mult:2.5,  desc:'使ったカードに同じスートが1つもないとき発動', check:h => new Set(h.hand.map(c => c.suit)).size === h.hand.length },
+    { id:'rankOnly',  label:'数統一',         cat:'rankonly',   mult:5,    desc:'使ったカードが全部同じ数字のとき発動', check:h => h.hand.every(c => c.rank === h.hand[0].rank) },
 ];
 const CHAR_SKILLS_SPECIAL = [
-    { id:'kingQueen', label:'King and Queen', cat:'special', mult:11,   desc:'手札にKとQの両方が使われているときのみ発動', check:h => h.hand.some(c => c.rank === 'K') && h.hand.some(c => c.rank === 'Q') },
-    { id:'jackAce',   label:'Jack and Ace',   cat:'special', mult:6,    desc:'手札にJとAの両方が使われているときのみ発動', check:h => h.hand.some(c => c.rank === 'J') && h.hand.some(c => c.rank === 'A') },
-    { id:'triple7',   label:'777',            cat:'special', mult:21, desc:'手札に7が3枚使われているときのみ発動',   check:h => h.hand.filter(c => c.rank === '7').length >= 3 },
+    { id:'kingQueen', label:'King and Queen', cat:'special', mult:11,    desc:'手札にKとQの両方が使われているときのみ発動', check:h => h.hand.some(c => c.rank === 'K') && h.hand.some(c => c.rank === 'Q') },
+    { id:'jackAce',   label:'Jack and Ace',   cat:'special', mult:6,     desc:'手札にJとAの両方が使われているときのみ発動', check:h => h.hand.some(c => c.rank === 'J') && h.hand.some(c => c.rank === 'A') },
+    { id:'triple7',   label:'777',            cat:'special', mult:78.77, desc:'手札に7が3枚使われているときのみ発動',   check:h => h.hand.filter(c => c.rank === '7').length >= 3 },
 ];
 const CHAR_SKILLS_ALL = CHAR_SKILLS_BASE.concat(CHAR_SKILLS_SPECIAL);
 function charSkill(id){ return CHAR_SKILLS_ALL.find(s => s.id === id); }
@@ -2011,8 +2020,8 @@ function skillDexCardHtml(skill, num, ownedLv, opts){
     const clickAttr = opts.onclick ? ` onclick="${opts.onclick}"` : '';
     return `<div class="${cls.join(' ')}" style="--cat-color:${cat.color};"${clickAttr}>
         <div class="skill-dex-num">No.${num}</div>
-        <div class="skill-dex-icon">${owned ? cat.emoji : '？'}</div>
         <div class="skill-dex-name">${owned ? escapeHtml(skill.label) : '？？？'}</div>
+        <div class="skill-dex-desc">${owned ? escapeHtml(skill.desc) : 'まだ手に入れていない'}</div>
         ${owned ? `<div class="skill-dex-lv">Lv.${ownedLv}</div><div class="skill-dex-pct">${pctLabelLv(skill, ownedLv)}</div>` : ''}
     </div>`;
 }
@@ -2381,9 +2390,18 @@ function fitSkillLabelText(el){
 function fitAllSkillLabels(){
     document.querySelectorAll('.bc-skill-text, .mini-card .mc-skill-label').forEach(fitSkillLabelText);
 }
-// カード表示は毎回innerHTMLで作り直すので、DOM変化を監視して自動でフィットさせる
-new MutationObserver(() => requestAnimationFrame(fitAllSkillLabels))
-    .observe(document.getElementById('container'), { childList: true, subtree: true });
+// カード表示は毎回innerHTMLで作り直すので、DOM変化を監視して自動でフィットさせる。
+// ただし監視範囲が#container全体（subtree）のため、HPバーの数値更新やポーション所持数の表示更新など、
+// スキルラベルと無関係な変化でも毎回このコールバックが発火していた。fitAllSkillLabelsは対象要素ぶん
+// scrollWidth/clientWidthを強制同期レイアウトしながら回すため軽くなく、無関係な更新のたびに実行されると
+// 描画のカクつき（HPバー更新時に一瞬おかしく見える不具合の原因）につながっていた。
+// 実際にスキルラベルを含む要素が追加された変化のときだけ実行するよう絞り込む。
+new MutationObserver(muts => {
+    const hasNewSkillLabel = muts.some(m => Array.from(m.addedNodes).some(n =>
+        n.nodeType === 1 && (n.matches?.('.bc-skill-text, .mini-card .mc-skill-label') || n.querySelector?.('.bc-skill-text, .mc-skill-label'))
+    ));
+    if (hasNewSkillLabel) requestAnimationFrame(fitAllSkillLabels);
+}).observe(document.getElementById('container'), { childList: true, subtree: true });
 // キャラクターカード／通常カードとも同じ大きさの「大きいカード」で表示する。
 // 上：イラスト（キャラは画像未実装のためグレー/黒。通常カードはスートの装飾アイコン）
 // 中：スート（左）と数値（右） / 下：スキル（倍率つき、ジャンルの絵文字・色つき）
@@ -2408,12 +2426,12 @@ function bigCardHtml(card, opts){
             const suffix = isPreviewTarget ? ` Lv.${lv}→${nextLv}` : ` Lv.${lv}`;
             const labelHtml = skillLabelHtml(s, card, suffix);
             const right = pctLabelLv(s, isPreviewTarget ? nextLv : lv);
-            return { emoji: cat.emoji, labelHtml, right, glow: activeIds.includes(id), pending: isPreviewTarget, color: cat.color, desc: s.desc };
+            return { labelHtml, right, glow: activeIds.includes(id), pending: isPreviewTarget, color: cat.color, desc: s.desc };
         });
         if (opts.previewExtraSkillId && !previewIsLevelUp){
             const s = charSkill(opts.previewExtraSkillId);
             const cat = SKILL_CATEGORIES[s.cat];
-            skillEntries.push({ emoji: cat.emoji, labelHtml: skillLabelHtml(s, card, ' Lv.0'), right: pctLabelLv(s, 0), pending: true, color: cat.color, desc: s.desc });
+            skillEntries.push({ labelHtml: skillLabelHtml(s, card, ' Lv.0'), right: pctLabelLv(s, 0), pending: true, color: cat.color, desc: s.desc });
         }
     } else {
         skillEntries = (card.skills || []).map(id => {
@@ -3192,8 +3210,7 @@ function openEventLearnSkill(){
         if (eligible.length === 0) continue;
         const candidates = shuffle(eligible).slice(0, 3);
         mapEventSkillState = { skillId: skill.id, candidates };
-        const cat = SKILL_CATEGORIES[skill.cat];
-        document.getElementById('eventskill-name').textContent = `${cat.emoji} ${skill.label}（${pctLabel(skill.mult)}）`;
+        document.getElementById('eventskill-name').textContent = `${skill.label}（${pctLabel(skill.mult)}）`;
         document.getElementById('eventskill-desc').textContent = skill.desc;
         document.getElementById('eventskill-row').innerHTML = candidates.map((c, i) => `
             <div class="reward-pick" onclick="pickEventSkillCard(${i})">
