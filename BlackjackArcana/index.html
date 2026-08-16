@@ -1416,7 +1416,6 @@ const SKILL_CATEGORIES = {
     parity:    { emoji:'⚖️', color:'#66bb6a' },
     prime:     { emoji:'💎', color:'#42a5f5' },
     multiple:  { emoji:'✖️', color:'#ffa726' },
-    pair:      { emoji:'👯', color:'#ec407a' },
     range:     { emoji:'🛡️', color:'#7e57c2' },
     suitcolor: { emoji:'🎴', color:'#26a69a' },
     special:   { emoji:'👑', color:'#ffca28' },
@@ -1436,7 +1435,6 @@ const CHAR_SKILLS_BASE = [
     { id:'mul3',      label:'3の倍数',        cat:'multiple',  mult:3,    desc:'合計が3の倍数のとき発動',            check:h => h.total % 3 === 0 },
     { id:'mul5',      label:'5の倍数',        cat:'multiple',  mult:3.5,  desc:'合計が5の倍数のとき発動',            check:h => h.total % 5 === 0 },
     { id:'mul7',      label:'7の倍数',        cat:'multiple',  mult:4,    desc:'合計が7の倍数のとき発動',            check:h => h.total % 7 === 0 },
-    { id:'pair',      label:'数字統一',       cat:'pair',      mult:4,    desc:'使ったカードが全部同じ数字のとき発動', check:h => h.hand.every(c => c.rank === h.base.rank) },
     { id:'le15',      label:'15リミット',     cat:'range',     mult:3.5,  desc:'合計が15以下のとき発動',             check:h => h.total <= 15 },
     { id:'over15',    label:'15オーバー',     cat:'range',     mult:3,    desc:'合計が15より大きいとき発動',          check:h => h.total > 15 },
     { id:'suitOnly',  label:'スート統一',     cat:'suitcolor', mult:2.5,  desc:'使ったカードが全部同じスートのとき発動', check:h => h.hand.every(c => c.suit === h.base.suit) },
@@ -1471,9 +1469,18 @@ function skillAllowedForCard(skill, card){
 }
 // スート限定スキルは、実際のスートに応じて表示名を変える（例：♦統一）
 function skillDisplayLabel(skill, card){
-    if (skill.id === 'suitOnly') return `${SUIT_SYMBOL[card.suit]}統一`;
-    if (skill.id === 'pair') return `${card.rank}統一`;
+    if (skill.id === 'suitOnly') return `【${SUIT_SYMBOL[card.suit]}】統一`;
     return skill.label;
+}
+// スート限定スキルのスート記号だけ、そのスートの色で表示するHTML断片（カード表示など、innerHTMLで使う場面専用）。
+// textContentやescapeHtmlの文脈ではHTMLが表示されてしまうので使わないこと（そちらはskillDisplayLabel()の平文を使う）。
+const SUIT_CSS_VAR = { S: 'var(--suit-s)', H: 'var(--suit-h)', D: 'var(--suit-d)', C: 'var(--suit-c)' };
+function skillLabelHtml(skill, card, suffix){
+    const suffixHtml = suffix ? escapeHtml(suffix) : '';
+    if (skill.id === 'suitOnly'){
+        return `<span style="color:${SUIT_CSS_VAR[card.suit]}">【${SUIT_SYMBOL[card.suit]}】</span>統一${suffixHtml}`;
+    }
+    return escapeHtml(skill.label) + suffixHtml;
 }
 // 倍率内訳のピルは横幅が限られるので、カード上の表示名より短い名前を使う（カード自体の表示名は変えない）
 function breakdownLabel(skill, card){
@@ -1798,6 +1805,7 @@ function loadMeta(){
     if (!m || typeof m !== 'object') m = {};
     m.shards = m.shards || 0;
     m.skillCollection = m.skillCollection || {}; // skillId -> レベル(0〜5)。キーがあれば所持している
+    if (typeof REMOVED_SKILL_IDS !== 'undefined') REMOVED_SKILL_IDS.forEach(id => { delete m.skillCollection[id]; }); // 廃止済みスキルの残骸を除去
     m.passiveCoin = m.passiveCoin || 0;       // 購入個数(0〜20)。1個で初期コイン+2
     m.passiveHp = m.passiveHp || 0;           // 購入個数(0〜20)。1個で初期HP+2
     m.passiveShopRare = m.passiveShopRare || 0; // 購入個数(0〜10)。ランにつき所持個数までレアパック抽選(10%)ができる
@@ -2132,11 +2140,25 @@ function autoSaveGame(){
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(game)); } catch (e){}
     saveCardSeq();
 }
+// 廃止済みのスキルidが、以前のセーブ/コレクションに残っていても壊れないよう取り除く
+// （charSkill()がundefinedを返すようになったスキルidを持ったままだと、カード表示などが軒並み落ちてしまうため）
+const REMOVED_SKILL_IDS = ['pair'];
+function stripRemovedSkills(card){
+    if (!card || !card.skills) return;
+    REMOVED_SKILL_IDS.forEach(id => {
+        const idx = card.skills.indexOf(id);
+        if (idx !== -1){
+            card.skills.splice(idx, 1);
+            if (card.skillLv) delete card.skillLv[id];
+        }
+    });
+}
 function continueGame(){
     let saved;
     try { saved = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e){ saved = null; }
     if (!saved){ goToStarterSelect(); return; }
     game = saved;
+    (game.charCollection || []).forEach(stripRemovedSkills);
     if (game.enemy && game.turn && !game.turn.ended && game.player.hp > 0 && game.enemy.hp > 0){
         renderBattleHeader();
         showScreen('battle-screen');
@@ -2329,14 +2351,15 @@ function bigCardHtml(card, opts){
             const lv = skillLevel(card, id);
             const isPreviewTarget = previewIsLevelUp && id === opts.previewExtraSkillId;
             const nextLv = Math.min(MAX_SKILL_LV, lv + 1);
-            const label = skillDisplayLabel(s, card) + (isPreviewTarget ? ` Lv.${lv}→${nextLv}` : ` Lv.${lv}`);
+            const suffix = isPreviewTarget ? ` Lv.${lv}→${nextLv}` : ` Lv.${lv}`;
+            const labelHtml = skillLabelHtml(s, card, suffix);
             const right = pctLabelLv(s, isPreviewTarget ? nextLv : lv);
-            return { emoji: cat.emoji, label, right, glow: activeIds.includes(id), pending: isPreviewTarget, color: cat.color, desc: s.desc };
+            return { emoji: cat.emoji, labelHtml, right, glow: activeIds.includes(id), pending: isPreviewTarget, color: cat.color, desc: s.desc };
         });
         if (opts.previewExtraSkillId && !previewIsLevelUp){
             const s = charSkill(opts.previewExtraSkillId);
             const cat = SKILL_CATEGORIES[s.cat];
-            skillEntries.push({ emoji: cat.emoji, label: skillDisplayLabel(s, card) + ' Lv.0', right: pctLabelLv(s, 0), pending: true, color: cat.color, desc: s.desc });
+            skillEntries.push({ emoji: cat.emoji, labelHtml: skillLabelHtml(s, card, ' Lv.0'), right: pctLabelLv(s, 0), pending: true, color: cat.color, desc: s.desc });
         }
     } else {
         skillEntries = (card.skills || []).map(id => {
@@ -2354,7 +2377,7 @@ function bigCardHtml(card, opts){
     if (opts.compact) cls.push('compact');
     if (card.isStarter) cls.push('starter');
     const skillsHtml = skillEntries.length
-        ? skillEntries.map(s => `<div class="bc-skill-row${s.glow ? ' active-glow' : ''}${s.pending ? ' pending-new' : ''}"${s.color ? ` style="--cat-color:${s.color};border-color:${s.color};background:${s.color}22;"` : ''} data-desc="${escapeHtml(s.desc || '')}" onclick="event.stopPropagation(); showSkillDescPopup(this.dataset.desc)"><span class="bc-skill-label"><span class="bc-skill-text">${escapeHtml(s.label)}</span></span>${s.right ? `<span class="bc-skill-mult">${escapeHtml(s.right)}</span>` : ''}</div>`).join('')
+        ? skillEntries.map(s => `<div class="bc-skill-row${s.glow ? ' active-glow' : ''}${s.pending ? ' pending-new' : ''}"${s.color ? ` style="--cat-color:${s.color};border-color:${s.color};background:${s.color}22;"` : ''} data-desc="${escapeHtml(s.desc || '')}" onclick="event.stopPropagation(); showSkillDescPopup(this.dataset.desc)"><span class="bc-skill-label"><span class="bc-skill-text">${s.labelHtml !== undefined ? s.labelHtml : escapeHtml(s.label)}</span></span>${s.right ? `<span class="bc-skill-mult">${escapeHtml(s.right)}</span>` : ''}</div>`).join('')
         : `<div class="bc-skill-empty">スキルなし</div>`;
     const illustContent = isChar
         ? `<img class="bc-illust-img" src="${charIllustSrc(card)}" alt="${card.rank}${SUIT_SYMBOL[card.suit]}" onerror="this.remove();">`
@@ -3118,9 +3141,10 @@ function showForgetScreen(card, skillId, onDone){
         const cat = SKILL_CATEGORIES[s.cat];
         const isNew = i === options.length - 1;
         const lv = isNew ? 0 : skillLevel(card, sid);
+        const suffix = ` Lv.${lv}${isNew ? '（今回のスキル）' : ''}`;
         return `<div class="reward-pick" onclick="pickForgetSkill(${i})">
             <div class="bc-skill-row" style="--cat-color:${cat.color};border-color:${cat.color};background:${cat.color}22;">
-                <span class="bc-skill-label"><span class="bc-skill-text">${escapeHtml(skillDisplayLabel(s, card))} Lv.${lv}${isNew ? '（今回のスキル）' : ''}</span></span>
+                <span class="bc-skill-label"><span class="bc-skill-text">${skillLabelHtml(s, card, suffix)}</span></span>
                 <span class="bc-skill-mult">${pctLabelLv(s, lv)}</span>
             </div>
         </div>`;
