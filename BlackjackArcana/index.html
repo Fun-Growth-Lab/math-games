@@ -129,6 +129,11 @@
             width: 620px; max-height: 680px; overflow-y: auto;
             padding: 18px 28px; text-align: center;
         }
+        /* 星の祭壇・ラン開始前の装備画面：タブや獲得済み項目でコンテンツの縦幅が変わるため、
+           上下中央寄せ(top:50%)のままだと見出しの位置が毎回動いてしまう。上端を固定し、下方向にだけ伸縮させる。 */
+        #meta-hub-screen .title-box, #runstart-equip-screen .title-box {
+            top: 40px; transform: translateX(-50%);
+        }
         .settings-title, .rank-title { font-size: 1.4rem; font-weight: 800; color: var(--gold-bright); margin-bottom: 14px; }
         .settings-desc { font-size: 0.85rem; color: var(--text-dim); margin-bottom: 8px; }
         .settings-section { margin: 16px 0; text-align: left; }
@@ -589,9 +594,17 @@
             background: #242424; border: 3px solid #4a4a4a; object-fit: cover;
         }
         .bp-name { font-weight: 800; font-size: 0.95rem; color: var(--text-hi); margin-bottom: 4px; text-align: center; }
+        .bp-level { font-size: 0.78rem; color: var(--gold-bright); font-weight: 800; margin-bottom: 4px; text-align: center; }
         .bp-atk { font-size: 0.8rem; color: #e0546c; font-weight: 700; margin-bottom: 4px; }
         .bp-hp-label { align-self: flex-start; font-size: 0.8rem; color: var(--text-dim); font-weight: 700; }
         .bp-hp-text { align-self: flex-end; font-size: 0.88rem; color: var(--text-dim); margin-bottom: 4px; font-weight: 700; }
+        /* 女神の祝福・どくなど、戦闘中の主人公の状態異常/バフを表示する */
+        .bp-status-row { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; width: 100%; margin-bottom: 6px; min-height: 0; }
+        .bp-status-chip {
+            font-size: 0.68rem; font-weight: 800; padding: 3px 8px; border-radius: 999px;
+            border: 1px solid var(--cat-color, var(--gold)); background: color-mix(in srgb, var(--cat-color, var(--gold)) 20%, transparent);
+            color: var(--text-hi); white-space: nowrap;
+        }
         .battle-panel .hp-bar { width: 100%; }
         .info-box {
             width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(212,175,55,0.3); border-radius: 8px;
@@ -923,6 +936,7 @@
         <div id="map-left-panel" class="battle-panel">
             <div class="bp-avatar-wrap"><img id="map-player-avatar" class="bp-avatar-illust" alt="" onerror="this.style.visibility='hidden';" onload="this.style.visibility='visible';"></div>
             <div class="bp-name" id="map-player-name"></div>
+            <div class="bp-level" id="map-player-level"></div>
             <div class="bp-hp-label">HP</div>
             <div class="hp-bar"><div id="map-hp-fill" class="hp-bar-fill"></div></div>
             <div class="bp-hp-text" id="map-hp-text"></div>
@@ -1138,9 +1152,11 @@
                 <img id="battle-player-avatar" class="bp-avatar-illust" alt="" onerror="this.style.visibility='hidden';" onload="this.style.visibility='visible';">
             </div>
             <div class="bp-name" id="battle-player-name"></div>
+            <div class="bp-level" id="battle-player-level"></div>
             <div class="bp-hp-label">HP</div>
             <div class="hp-bar"><div id="battle-player-hp-fill" class="hp-bar-fill"></div></div>
             <div class="bp-hp-text" id="battle-player-hp-text"></div>
+            <div class="bp-status-row" id="battle-player-status"></div>
             <div class="bp-chip-big">🪙 <span id="battle-stat-chips"></span></div>
             <div class="bp-potion-row">
                 <button class="potion-btn" data-item="potionS" onclick="confirmUsePotion('potionS')"><img class="potion-img" src="images/14_potion_green.png" alt=""><span class="potion-count"></span></button>
@@ -1526,8 +1542,23 @@ function enemyHpBase(n, m){ return 50 * n + 3 * (m - 1); }
 function enemyAtkBase(n, m){ return 10 * n + (m - 1); }
 // スコア計算用：敵の種類ごとの撃破スコアの重み（ボスはさらに×3される）
 const ENEMY_KILL_WEIGHT = { slime:1.0, goblin:1.1, wite:1.2, gorem:1.4, darkelf:1.6, demon:1.8, dragon:2.0 };
-// とくせいは「固有スキル→共通ランダムプール」の順で、それぞれの確率で1つずつ抽選し、
-// 最初に当たったものだけをそのモンスターのとくせいとする（％の記載がないものは、順番が回ってくれば無条件で確定）。
+// 主人公のレベル：経験値は撃破スコアと同じ重み（ENEMY_KILL_WEIGHT×ボス/エリート倍率）で貯まり、
+// 重み1（スライム）3体ぶんでLv+1。レベルアップで最大HPが+20、現在HPも増えたぶんだけ回復する（全回復はしない）。
+const XP_PER_LEVEL = ENEMY_KILL_WEIGHT.slime * 3;
+const LEVEL_UP_HP_BONUS = 20;
+function grantPlayerXp(amount){
+    game.player.xp += amount;
+    while (game.player.xp >= XP_PER_LEVEL){
+        game.player.xp -= XP_PER_LEVEL;
+        game.player.level++;
+        game.playerMaxHp += LEVEL_UP_HP_BONUS;
+        game.player.hp += LEVEL_UP_HP_BONUS;
+        floatText('battle-player-avatar-wrap', `LEVEL UP! Lv.${game.player.level}`, 'heal', 1800);
+    }
+}
+// 固有スキルを持つモンスター種は、その固有スキルを確定で持ち、さらに共通ランダムプールから抽選した
+// もう1つのとくせいを加えて、合計2つのとくせい持ちになる。固有スキルを持たない（スライム）場合は、
+// 共通ランダムプールから1つだけ抽選する（％の記載がないものは、順番が回ってくれば無条件で確定）。
 // 一度当選したとくせいは、以後の戦闘中は必ず（100%）発動する（発動確率は「当選するかどうか」だけに使う）。
 const ENEMY_SIGNATURE_ABILITY = {
     goblin:  { id:'evade',    pct:0.10 },
@@ -1546,15 +1577,16 @@ const ENEMY_SHARED_ABILITY_POOL = [
     { id:'harden',    pct:null },
     { id:'lastStand', pct:null },
 ];
+// 戻り値は常に配列（固有スキル持ちの敵は2つ、スライムは1つ、まれに0はない＝プール末尾が無条件発動のため）
 function rollEnemyAbility(imgKey){
-    const candidates = [];
+    const abilities = [];
     const sig = ENEMY_SIGNATURE_ABILITY[imgKey];
-    if (sig) candidates.push(sig);
-    candidates.push(...ENEMY_SHARED_ABILITY_POOL);
-    for (const c of candidates){
-        if (c.pct === null || Math.random() < c.pct) return c.id;
+    if (sig) abilities.push(sig.id); // 固有スキルは確定で持つ
+    const pool = ENEMY_SHARED_ABILITY_POOL.filter(c => c.id !== (sig && sig.id));
+    for (const c of pool){
+        if (c.pct === null || Math.random() < c.pct){ abilities.push(c.id); break; }
     }
-    return null;
+    return abilities;
 }
 // とくせいの説明文（右パネルのとくせいらん表示用）
 const ENEMY_ABILITY_TEXT = {
@@ -1572,8 +1604,10 @@ const ENEMY_ABILITY_TEXT = {
     harden:    '硬化：毎ターン身を硬くし、蓄積したぶんだけ被ダメージを軽減する',
     lastStand: '意地：戦闘中1回だけ、HPが0になっても1残って耐える',
 };
+function hasAbility(enemy, id){ return !!(enemy.abilities && enemy.abilities.includes(id)); }
 function abilityText(enemy){
-    return ENEMY_ABILITY_TEXT[enemy.ability] || 'とくせいなし';
+    if (!enemy.abilities || enemy.abilities.length === 0) return 'とくせいなし';
+    return enemy.abilities.map(id => ENEMY_ABILITY_TEXT[id] || id).join('<br>');
 }
 function enemyImageSrc(enemy){ return `images/${enemy.imgKey}${enemy.boss ? '_boss' : ''}.png`; }
 // n=ステージ(1〜3)、m=マップ上の進行度（最初のマスが0、ボスのマスはm=10）。
@@ -1588,8 +1622,8 @@ function buildRandomEnemy(n, m, opts){
     if (game && game.enemyBuffActive) game.enemyBuffActive = false;
     const hp = Math.round(enemyHpBase(n, m) * type.hpPct * eliteMult * moshaMult * curseMult);
     const atk = Math.round(enemyAtkBase(n, m) * type.atkPct * eliteMult * moshaMult * curseMult);
-    const ability = rollEnemyAbility(type.imgKey);
-    return { name: type.name, imgKey: type.imgKey, maxHp: hp, hp, atk, baseAtk: atk, ability, rampCount: 0, poisonStack: 0, hardenStack: 0, charging: false, lastStandUsed: false, boss: !!opts.boss, elite: !!opts.elite };
+    const abilities = rollEnemyAbility(type.imgKey);
+    return { name: type.name, imgKey: type.imgKey, maxHp: hp, hp, atk, baseAtk: atk, abilities, rampCount: 0, poisonStack: 0, hardenStack: 0, charging: false, lastStandUsed: false, boss: !!opts.boss, elite: !!opts.elite };
 }
 // ============================================================
 // マップ（分岐する道）
@@ -1808,12 +1842,12 @@ function pullSkillGacha(){
 }
 // 恒久パッシブ（キャラクタースキル以外）：アルカナのかけらで直接購入する
 const META_PASSIVES = [
-    { id:'coin',      label:'初期コイン+2',         desc:'ラン開始時の所持コインが+2される',            cost:5,  countKey:'passiveCoin', maxCount:50 },
-    { id:'hp',        label:'初期HP+2',            desc:'ラン開始時の最大HPが+2される',                cost:5,  countKey:'passiveHp',   maxCount:50 },
-    { id:'shopRare',  label:'ショップの品ぞろえ',    desc:'お店に入るたび、1個につき10%の確率でレアパック(🪙60・何個でも買える)が品ぞろえに並ぶ', cost:5, countKey:'passiveShopRare', maxCount:10 },
-    { id:'potionS',   label:'初期所持ポーション(小)', desc:'ラン開始時にポーション(小)を1つ持って始まる', cost:30, countKey:'potionS', maxCount:1, flag:true },
-    { id:'potionM',   label:'初期所持ポーション(中)', desc:'ラン開始時にポーション(中)を1つ持って始まる', cost:40, countKey:'potionM', maxCount:1, flag:true },
-    { id:'potionL',   label:'初期所持ポーション(大)', desc:'ラン開始時にポーション(大)を1つ持って始まる', cost:50, countKey:'potionL', maxCount:1, flag:true },
+    { id:'coin',      label:'🪙 初期コイン+2',         desc:'ラン開始時の所持コインが+2される',            cost:5,  countKey:'passiveCoin', maxCount:50 },
+    { id:'hp',        label:'❤️ 初期HP+2',            desc:'ラン開始時の最大HPが+2される',                cost:5,  countKey:'passiveHp',   maxCount:50 },
+    { id:'shopRare',  label:'🛒 ショップの品ぞろえ',    desc:'お店に入るたび、1個につき10%の確率でレアパック(🪙60・何個でも買える)が品ぞろえに並ぶ', cost:5, countKey:'passiveShopRare', maxCount:10 },
+    { id:'potionS',   label:'💊 初期所持ポーション(小)', desc:'ラン開始時にポーション(小)を1つ持って始まる', cost:30, countKey:'potionS', maxCount:1, flag:true },
+    { id:'potionM',   label:'🧴 初期所持ポーション(中)', desc:'ラン開始時にポーション(中)を1つ持って始まる', cost:40, countKey:'potionM', maxCount:1, flag:true },
+    { id:'potionL',   label:'🧪 初期所持ポーション(大)', desc:'ラン開始時にポーション(大)を1つ持って始まる', cost:50, countKey:'potionL', maxCount:1, flag:true },
 ];
 function buyPassive(id){
     const p = META_PASSIVES.find(x => x.id === id);
@@ -1834,10 +1868,10 @@ function buyPassive(id){
 // 効果はすべて「レベル×1段あたりの増分」。無欲/困難はマップの抽選ロジック側、猛者は敵ステータス計算、
 // 一心はポーション回復量計算、スコアボーナスはliveScore側でそれぞれ参照する。
 const VOWS = [
-    { id:'mosha',  label:'猛者の誓い', effectText:lv => `敵HP・攻撃力+${lv*10}%`, scoreText:lv => `スコア+${lv*20}%` },
-    { id:'muyoku', label:'無欲の誓い', effectText:lv => `ショップが出にくくなる`, scoreText:lv => `スコア+${lv*10}%` },
-    { id:'isshin', label:'一心の誓い', effectText:lv => `ポーションの効果-${lv*10}%`, scoreText:lv => `スコア+${lv*10}%` },
-    { id:'konnan', label:'困難の誓い', effectText:lv => `悪いイベントが出やすくなる(+${lv*10}%)`, scoreText:lv => `スコア+${lv*10}%` },
+    { id:'mosha',  label:'⚔️ 猛者の誓い', effectText:lv => `敵HP・攻撃力+${lv*10}%`, scoreText:lv => `スコア+${lv*20}%` },
+    { id:'muyoku', label:'🙏 無欲の誓い', effectText:lv => `ショップが出にくくなる`, scoreText:lv => `スコア+${lv*10}%` },
+    { id:'isshin', label:'💧 一心の誓い', effectText:lv => `ポーションの効果-${lv*10}%`, scoreText:lv => `スコア+${lv*10}%` },
+    { id:'konnan', label:'⛈️ 困難の誓い', effectText:lv => `悪いイベントが出やすくなる(+${lv*10}%)`, scoreText:lv => `スコア+${lv*10}%` },
 ];
 // 誓い共通：全ての誓いは「アルカナのかけら+10%（レベルごと）」を持つ（スコアの伸び方は誓いごとに異なる）
 function vowShardText(lv){ return `アルカナのかけら+${lv*10}%`; }
@@ -1908,11 +1942,12 @@ function doBuyPassive(id){
 }
 function renderMetaGacha(){
     document.getElementById('meta-gacha-result').textContent = '';
-    const canPull = meta.shards >= GACHA_COST && CHAR_SKILLS_ALL.some(s => meta.skillCollection[s.id] === undefined || meta.skillCollection[s.id] < MAX_SKILL_LV);
+    const complete = !CHAR_SKILLS_ALL.some(s => meta.skillCollection[s.id] === undefined || meta.skillCollection[s.id] < MAX_SKILL_LV);
+    const canPull = !complete && meta.shards >= GACHA_COST;
     const btn = document.getElementById('meta-gacha-btn');
     btn.disabled = !canPull;
-    btn.textContent = meta.shards < GACHA_COST && CHAR_SKILLS_ALL.some(s => meta.skillCollection[s.id] === undefined || meta.skillCollection[s.id] < MAX_SKILL_LV)
-        ? 'かけらが足りない' : (canPull ? `🎴 ガチャを引く（${GACHA_COST}かけら）` : 'すべてLv.5！ガチャ終了');
+    // かけらが足りないときも「いくらで引けるか」が一目でわかるよう、金額だけをボタンに出して非アクティブにする
+    btn.textContent = complete ? 'すべてLv.5！ガチャ終了' : `🎴 ガチャを引く（💎${GACHA_COST}）`;
     renderMetaGachaCollection();
 }
 function renderMetaGachaCollection(){
@@ -2136,7 +2171,7 @@ function newGame(starterRank, starterSuit, collectionSkillId, vowLevels, passive
         enemy: null,
         mapStage: { n: 1, current: null },
         playerMaxHp: PLAYER_MAX_HP_BASE + pl.hp * 2,
-        player: { hp: PLAYER_MAX_HP_BASE + pl.hp * 2 },
+        player: { hp: PLAYER_MAX_HP_BASE + pl.hp * 2, level: 0, xp: 0 },
         stats: { totalDamage: 0, turnsTaken: 0, defeatedCount: 0, weightedKillScore: 0 },
         turn: null,
         items: {},
@@ -2822,6 +2857,7 @@ const MAP_STAGE_BG = { 1:'images/haikei_1_1.png', 2:'images/haikei_1_2.png', 3:'
 function renderMap(){
     const cur = game.mapStage.current;
     document.getElementById('map-player-name').textContent = getCurPlayerName();
+    document.getElementById('map-player-level').textContent = `Lv.${game.player.level}`;
     document.getElementById('map-hp-text').textContent = `${Math.max(0, game.player.hp)} / ${game.playerMaxHp}`;
     document.getElementById('map-hp-fill').style.width = `${Math.max(0, game.player.hp) / game.playerMaxHp * 100}%`;
     document.getElementById('map-stat-chips').textContent = game.chips;
@@ -3251,11 +3287,25 @@ function renderBattleHeader(){
 }
 function renderEnemyAbilityBox(){
     const box = document.getElementById('battle-enemy-ability-box');
-    box.innerHTML = `<div class="ea-name">🔮 とくせい</div><div>${escapeHtml(abilityText(game.enemy))}</div>`;
+    // abilityText()は<br>区切りのHTML断片を返す（各行は固定の説明文なのでエスケープ済み扱い）
+    box.innerHTML = `<div class="ea-name">🔮 とくせい</div><div>${abilityText(game.enemy)}</div>`;
+}
+// 主人公にかかっている状態（女神の祝福・どく等）を左パネルにピルで表示する
+function renderPlayerStatusRow(){
+    const chips = [];
+    if (game.blessingActive) chips.push({ label: '✨ 祝福中(ダメ1.5倍)', color: 'var(--gold-bright)' });
+    if (game.enemy && hasAbility(game.enemy, 'poison') && game.enemy.poisonStack > 0){
+        chips.push({ label: `🐍 どく×${game.enemy.poisonStack}`, color: '#7fd858' });
+    }
+    document.getElementById('battle-player-status').innerHTML = chips.map(c =>
+        `<span class="bp-status-chip" style="--cat-color:${c.color};">${escapeHtml(c.label)}</span>`
+    ).join('');
 }
 function updateBattleBars(){
     document.getElementById('battle-player-hp-text').textContent = `${Math.max(0, game.player.hp)}/${game.playerMaxHp}`;
     document.getElementById('battle-player-hp-fill').style.width = `${Math.max(0, game.player.hp) / game.playerMaxHp * 100}%`;
+    document.getElementById('battle-player-level').textContent = `Lv.${game.player.level}`;
+    renderPlayerStatusRow();
     document.getElementById('battle-stat-chips').textContent = game.chips;
     renderPotionButtons();
     document.getElementById('battle-enemy-hp-text').textContent = `${Math.max(0, game.enemy.hp)}/${game.enemy.maxHp}`;
@@ -3510,26 +3560,26 @@ function doStand(){
 // 硬化：蓄積した軽減スタックぶんだけ被ダメージ（＝敵が受けるダメージ）を軽減し、使ったぶんは消える
 function computeDamage(total, mult, hand, enemy, extraDmg){
     let dmg = Math.round(total * mult) + (extraDmg || 0);
-    if (enemy.ability === 'blockLow' && dmg <= 15) dmg = 0;
-    if (enemy.ability === 'harden' && enemy.hardenStack > 0){
+    if (hasAbility(enemy, 'blockLow') && dmg <= 15) dmg = 0;
+    if (hasAbility(enemy, 'harden') && enemy.hardenStack > 0){
         const reduced = Math.min(dmg, enemy.hardenStack);
         dmg -= reduced;
         enemy.hardenStack -= reduced;
     }
     return dmg;
 }
-// 敵の反撃より前に発動するとくせい（自動回復・硬化の蓄積・どくのダメージ）
+// 敵の反撃より前に発動するとくせい（自動回復・硬化の蓄積・どくのダメージ）。2つとも持つ場合はどちらも発動する。
 function applyEnemyPreAttackAbilities(){
     const enemy = game.enemy;
-    if (enemy.ability === 'regen' && enemy.hp > 0 && enemy.hp < enemy.maxHp){
+    if (hasAbility(enemy, 'regen') && enemy.hp > 0 && enemy.hp < enemy.maxHp){
         const healed = Math.min(enemy.maxHp, enemy.hp + Math.round(enemy.maxHp * 0.10)) - enemy.hp;
         enemy.hp += healed;
         floatText('battle-enemy-avatar-wrap', `+${healed}`, 'heal');
     }
-    if (enemy.ability === 'harden'){
+    if (hasAbility(enemy, 'harden')){
         enemy.hardenStack = (enemy.hardenStack || 0) + 5;
     }
-    if (enemy.ability === 'poison' && enemy.poisonStack > 0){
+    if (hasAbility(enemy, 'poison') && enemy.poisonStack > 0){
         game.player.hp -= enemy.poisonStack;
         floatText('battle-player-avatar-wrap', `どく -${enemy.poisonStack}`, 'bust');
     }
@@ -3550,7 +3600,7 @@ function resolveTurn(busted){
         floatText('battle-enemy-avatar-wrap', `-${dmg}`, 'enemy-hit', 1800);
         if (game.enemy.hp <= 0){
             // 意地：戦闘中1回だけ、致命傷をHP1で耐える
-            if (game.enemy.ability === 'lastStand' && !game.enemy.lastStandUsed){
+            if (hasAbility(game.enemy, 'lastStand') && !game.enemy.lastStandUsed){
                 game.enemy.hp = 1;
                 game.enemy.lastStandUsed = true;
                 floatText('battle-enemy-avatar-wrap', '踏みとどまった！', 'heal');
@@ -3580,6 +3630,7 @@ function proceedAfterTurn(){
         const killWeight = ENEMY_KILL_WEIGHT[game.enemy.imgKey] || 1;
         const killMult = game.enemy.boss ? 3 : (game.enemy.elite ? 1.5 : 1);
         game.stats.weightedKillScore = (game.stats.weightedKillScore || 0) + killWeight * killMult;
+        grantPlayerXp(killWeight * killMult);
         if (game.enemy.boss){
             if (game.mapStage.n >= 3){ finishRun(true); return; }
             game.player.hp = game.playerMaxHp;
@@ -3595,10 +3646,13 @@ function proceedAfterTurn(){
     if (game.player.hp <= 0){ finishRun(false); return; }
 
     const enemy = game.enemy;
-    const ability = enemy.ability;
+
+    // 「その攻撃ターンに何をするか」を決めるとくせいは、1ターンにつき1つだけ発動する
+    // （固有＋ランダムの2つとも攻撃系だった場合は、この優先順：ためこみ＞すばやい動き＞ラン＞クリ＞ブレス＞連続攻撃）。
+    // どく／すいとる／ついげき／自動回復／硬化／意地のような「付随効果」系は、これとは別に両方とも発動する。
 
     // ためこみ：溜め中は攻撃せず次のターンへ、溜め終わった次のターンで確定2.5倍攻撃（連続チャージはしない）
-    if (ability === 'chargeAtk'){
+    if (hasAbility(enemy, 'chargeAtk')){
         if (!enemy.charging){
             enemy.charging = true;
             floatText('battle-enemy-avatar-wrap', 'ちからを溜めている…', 'heal');
@@ -3618,7 +3672,7 @@ function proceedAfterTurn(){
     }
 
     // すばやい動き：当選した時点で確定効果なので、この個体は攻撃をまったく当てられない
-    if (ability === 'evade'){
+    if (hasAbility(enemy, 'evade')){
         floatText('battle-player-avatar-wrap', 'かわした！', 'heal');
         startTurn();
         return;
@@ -3627,18 +3681,18 @@ function proceedAfterTurn(){
     let incoming = enemy.atk;
     let label = '';
     let cls = '';
-    if (ability === 'ramp'){
+    if (hasAbility(enemy, 'ramp')){
         incoming = Math.round(enemy.baseAtk * (1 + 0.10 * enemy.rampCount));
         enemy.atk = incoming;
         enemy.rampCount++;
         document.getElementById('battle-enemy-atk').textContent = enemy.atk;
-    } else if (ability === 'crit'){
+    } else if (hasAbility(enemy, 'crit')){
         incoming *= 2;
         cls = 'bust';
-    } else if (ability === 'breath'){
+    } else if (hasAbility(enemy, 'breath')){
         incoming = Math.round(enemy.atk * (1.2 + Math.random() * 0.8));
         label = `🔥ブレス！ -${incoming}`;
-    } else if (ability === 'flurry'){
+    } else if (hasAbility(enemy, 'flurry')){
         // 0.5倍の攻撃を、1発目は確定・以後は50%で継続する連続攻撃
         let hits = 0, hitTotal = 0;
         do { hits++; hitTotal += Math.round(enemy.atk * 0.5); } while (Math.random() < 0.5 && hits < 10);
@@ -3650,13 +3704,13 @@ function proceedAfterTurn(){
     game.player.hp -= incoming;
     triggerPlayerHitEffect();
 
-    if (ability === 'poison') enemy.poisonStack = (enemy.poisonStack || 0) + 1;
-    if (ability === 'followUp'){
+    if (hasAbility(enemy, 'poison')) enemy.poisonStack = (enemy.poisonStack || 0) + 1;
+    if (hasAbility(enemy, 'followUp')){
         const followDmg = Math.round(enemy.atk * 0.5);
         game.player.hp -= followDmg;
         setTimeout(() => floatText('battle-player-avatar-wrap', `追撃！ -${followDmg}`, ''), 400);
     }
-    if (ability === 'lifesteal'){
+    if (hasAbility(enemy, 'lifesteal')){
         const healed = Math.min(enemy.maxHp, enemy.hp + Math.round(incoming * 0.20)) - enemy.hp;
         if (healed > 0){ enemy.hp += healed; floatText('battle-enemy-avatar-wrap', `+${healed}`, 'heal'); }
     }
