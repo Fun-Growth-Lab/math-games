@@ -571,8 +571,12 @@
         }
         .hp-bar-wrap { margin: 12px 0; }
         .hp-bar-label { display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-dim); margin-bottom: 3px; }
-        .hp-bar { height: 16px; border-radius: 8px; background: var(--panel-bg); border: 1px solid rgba(212,175,55,0.3); overflow: hidden; }
-        .hp-bar-fill { height: 100%; background: linear-gradient(90deg, #7fd858, #3ea638); }
+        /* flex-shrink:0が無いと、overflow:hiddenを持つflexアイテムはflexboxの仕様上「中身に応じた最小サイズ」の
+           保護を失い、親(.battle-panel)の中身が少しでも縦にあふれただけでこのバーだけ極端に押しつぶされてしまう
+           （実測で高さ16px→1.3pxまで潰れ、「HPバーが空っぽに見える」不具合の直接の原因だった）。押しつぶされず、
+           必要なら.battle-panel側のoverflow-y:autoでスクロールする方に倒す。 */
+        .hp-bar { height: 16px; border-radius: 8px; background: var(--panel-bg); border: 1px solid rgba(212,175,55,0.3); overflow: hidden; flex-shrink: 0; }
+        .hp-bar-fill { height: 100%; background: linear-gradient(90deg, #7fd858, #3ea638); transition: width .3s; }
         .hp-bar-fill.enemy { background: linear-gradient(90deg, #e0546c, var(--crimson)); }
         .hp-bar-fill.xp { background: linear-gradient(90deg, #6ab7ff, #2f6fd6); }
 
@@ -614,7 +618,7 @@
         .bp-title { color: var(--gold); font-weight: 800; letter-spacing: 3px; font-size: 0.9rem; }
         .bp-avatar-wrap { position: relative; display: flex; align-items: center; justify-content: center; }
         .bp-avatar-illust {
-            width: 200px; height: 200px; border-radius: 14px; margin: 6px 0;
+            width: 188px; height: 188px; border-radius: 14px; margin: 4px 0;
             background: #242424; border: 3px solid #4a4a4a; object-fit: cover;
         }
         .bp-name { font-weight: 800; font-size: 0.95rem; color: var(--text-hi); margin-bottom: 4px; text-align: center; }
@@ -632,10 +636,10 @@
         .battle-panel .hp-bar { width: 100%; }
         .info-box {
             width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(212,175,55,0.3); border-radius: 8px;
-            padding: 7px 9px; font-size: 0.7rem; color: var(--text-dim); margin-top: 6px; min-height: 36px;
+            padding: 5px 8px; font-size: 0.68rem; color: var(--text-dim); margin-top: 5px; min-height: 28px;
         }
-        .info-box .ea-name { color: #d98a5a; font-weight: 800; margin-bottom: 3px; font-size: 0.74rem; }
-        .ea-wrap { width: 100%; display: flex; flex-direction: column; gap: 5px; margin-top: 6px; }
+        .info-box .ea-name { color: #d98a5a; font-weight: 800; margin-bottom: 2px; font-size: 0.72rem; }
+        .ea-wrap { width: 100%; display: flex; flex-direction: column; gap: 4px; margin-top: 5px; }
         .ea-wrap .info-box { margin-top: 0; }
         .bp-stats {
             width: 100%; background: rgba(0,0,0,0.35); border: 1px solid rgba(212,175,55,0.3); border-radius: 8px;
@@ -3031,7 +3035,8 @@ function rollShopRarePack(){
     return Math.random() < Math.min(1, activePassiveLevel('shopRare') * 0.10);
 }
 function getShopOffers(){
-    const offers = SHOP_OFFERS.slice();
+    // 露天商（商人イベント）ではカードパックは売らない。かわりにスキルの巻物が並ぶ。
+    const offers = game.shopDiscountActive ? SHOP_OFFERS.filter(o => o.id !== 'pack') : SHOP_OFFERS.slice();
     if (game.shopHasRarePack) offers.push({ id:'rarepack', label:'レアパック', desc:'カードが2枚（20%の確率で2スキル持ちに）', price:60, img:'images/cardpack_2.png' });
     if (game.shopDiscountActive) offers.push(SKILL_SCROLL_OFFER);
     return offers;
@@ -3056,6 +3061,8 @@ function openEventMerchant(){
     showScreen('shop-screen');
 }
 function shopPriceFor(o){
+    // スキルの巻物は割引の対象外（常に定価）
+    if (o.id === 'skillScroll') return o.price;
     return game.shopDiscountActive ? Math.round(o.price * 0.5) : o.price;
 }
 function renderShop(){
