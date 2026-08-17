@@ -572,13 +572,13 @@
         .map-fork-lines line { stroke: rgba(212,175,55,0.55); stroke-width: 2; stroke-dasharray: 5 5; }
 
         /* ==================== ボスまでの道のり（右パネル。下からSTART→〇×9→BOSS、現在地を光らせる） ==================== */
-        .boss-track { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: space-evenly; gap: 5px; width: 100%; }
+        .boss-track { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: space-evenly; gap: 4px; width: 100%; }
         .boss-track-node {
-            width: 25px; height: 25px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-            font-size: 0.78rem; color: var(--text-dim); background: var(--panel-bg); border: 2px solid #3a3226; flex-shrink: 0;
+            width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-size: 0.72rem; color: var(--text-dim); background: var(--panel-bg); border: 2px solid #3a3226; flex-shrink: 0;
         }
         .boss-track-node.boss-track-start, .boss-track-node.boss-track-boss {
-            width: auto; height: auto; border-radius: 8px; padding: 5px 9px; font-size: 0.62rem; font-weight: 800;
+            width: auto; height: auto; border-radius: 8px; padding: 4px 8px; font-size: 0.58rem; font-weight: 800;
         }
         .boss-track-node.current {
             border-color: var(--gold-bright); color: var(--gold-bright); background: rgba(212,175,55,0.22);
@@ -1014,7 +1014,7 @@
             <div id="map-boss-track" class="boss-track"></div>
             <div class="bp-bottom-btns">
                 <button class="btn btn-gold" style="padding:16px 18px; font-size:1.05rem;" onclick="goToDeckBuilder()">🧩 デッキ構築</button>
-                <button class="btn btn-gray btn-sm" id="fusion-btn" onclick="goToCardFusion()">🔮 カードの合成</button>
+                <button class="btn btn-gray" style="padding:16px 18px; font-size:1.05rem;" id="fusion-btn" onclick="goToCardFusion()">🔮 カードの合成</button>
                 <button class="btn btn-gray btn-sm" onclick="openBattleHowTo()">📖 あそびかた</button>
                 <button class="btn btn-gray btn-sm" onclick="giveUpRun()">🏳️ タイトルへ</button>
             </div>
@@ -1222,7 +1222,7 @@
     <div id="cardfusion-screen" class="hidden">
         <div class="title-box" style="width:1000px; max-height:680px;">
             <h1 class="settings-title">🔮 カードの合成</h1>
-            <p class="settings-desc">元となるカードを選んでください（合成後、スキルの移し先になります）</p>
+            <p class="settings-desc">元となるカードを選んで下さい</p>
             <div id="cardfusion-base-row"></div>
             <button class="btn btn-gray" onclick="showScreen('map-screen')">◀ もどる</button>
         </div>
@@ -1232,7 +1232,7 @@
     <div id="cardfusionmaterial-screen" class="hidden">
         <div class="title-box" style="width:1000px; max-height:680px;">
             <h1 class="settings-title">🔮 カードの合成</h1>
-            <p class="settings-desc">合成するカードを選んでください（このカードは合成後、消滅します）</p>
+            <p class="settings-desc">合成するカードを選んでください。※このカードは失われます</p>
             <div id="cardfusion-base-preview" style="display:flex; justify-content:center; margin:8px 0;"></div>
             <div id="cardfusion-material-row"></div>
             <button class="btn btn-gray" onclick="backToCardFusionBase()">◀ 元となるカードを選びなおす</button>
@@ -1371,6 +1371,17 @@
     </div>
 
     <!-- ==================== 撃破ボーナス：コイン・アイテム獲得 ==================== -->
+    <!-- ==================== レベルアップ結果 ==================== -->
+    <div id="levelup-screen" class="hidden">
+        <div class="title-box">
+            <div class="result-emoji">⭐</div>
+            <h1 class="settings-title">レベルが上がった！</h1>
+            <div class="result-score" id="levelup-lv-line"></div>
+            <div class="result-score" id="levelup-hp-line"></div>
+            <button class="btn btn-gold js-enter-next" onclick="closeLevelUpScreen()">つぎへ ▶</button>
+        </div>
+    </div>
+
     <div id="itemget-screen" class="hidden">
         <div class="title-box">
             <div class="big-announce">🎁 GET！</div>
@@ -1685,7 +1696,11 @@ const ENEMY_KILL_WEIGHT = { slime:1.0, goblin:1.1, wite:1.2, gorem:1.4, darkelf:
 // 重み1（スライム）3体ぶんでLv+1。レベルアップで最大HPが+20、現在HPも増えたぶんだけ回復する（全回復はしない）。
 const XP_PER_LEVEL = ENEMY_KILL_WEIGHT.slime * 3;
 const LEVEL_UP_HP_BONUS = 20;
+// レベルアップが発生した場合、その内容をpendingLevelUpに記録しておき、撃破後にポップアップで見せる
+let pendingLevelUp = null;
 function grantPlayerXp(amount){
+    const fromLv = game.player.level;
+    const fromMaxHp = game.playerMaxHp;
     game.player.xp += amount;
     while (game.player.xp >= XP_PER_LEVEL){
         game.player.xp -= XP_PER_LEVEL;
@@ -1694,7 +1709,18 @@ function grantPlayerXp(amount){
         game.player.hp += LEVEL_UP_HP_BONUS;
         floatText('battle-player-avatar-wrap', `LEVEL UP! Lv.${game.player.level}`, 'heal', 1800);
     }
+    if (game.player.level > fromLv){
+        pendingLevelUp = { fromLv, toLv: game.player.level, fromMaxHp, toMaxHp: game.playerMaxHp };
+    }
 }
+function showLevelUpScreen(){
+    const { fromLv, toLv, fromMaxHp, toMaxHp } = pendingLevelUp;
+    document.getElementById('levelup-lv-line').textContent = `Lv.${fromLv} ➡ Lv.${toLv}`;
+    document.getElementById('levelup-hp-line').textContent = `最大HP ${fromMaxHp} ➡ ${toMaxHp}`;
+    pendingLevelUp = null;
+    showScreen('levelup-screen');
+}
+function closeLevelUpScreen(){ afterEnemyDefeated(game.enemy); }
 function renderXpBar(prefix){
     document.getElementById(`${prefix}-xp-fill`).style.width = `${game.player.xp / XP_PER_LEVEL * 100}%`;
     document.getElementById(`${prefix}-xp-text`).textContent = `${Math.floor(game.player.xp * 100)} / ${Math.floor(XP_PER_LEVEL * 100)}`;
@@ -1729,7 +1755,7 @@ const ENEMY_ABILITY_TEXT = {
     evade:     { name:'すばやい動き', desc:'10%の確率で攻撃を回避する' },
     regen:     { name:'自動回復',     desc:'毎ターンHPが10%回復' },
     blockLow:  { name:'硬い身体',     desc:'15以下のダメージを無効化' },
-    crit:      { name:'ねらいうち',   desc:'2倍ダメージで攻撃' },
+    crit:      { name:'ねらいうち',   desc:'10%の確率で2倍攻撃' },
     ramp:      { name:'マッスルパワー', desc:'攻撃力が毎ターン10%ずつ上昇' },
     breath:    { name:'ヘルファイア', desc:'120〜200%のブレス攻撃' },
     followUp:  { name:'ついげき',     desc:'攻撃のあと50%の追撃' },
@@ -2558,7 +2584,7 @@ function showScreen(id){
     ['title-screen','name-register-screen','ranking-screen','settings-screen','starter-select-screen','starter-confirm-screen',
      'map-screen','shop-screen','shopscroll-screen','eventhp-screen','eventskill-screen','eventforget-screen','eventtreasure-screen',
      'eventgeneric-screen','eventsage-screen','eventshrine-screen','eventshrineskill-screen','eventmachine-screen',
-     'deckbuilder-screen','battle-screen','reveal-screen','epiphany-screen','itemget-screen',
+     'deckbuilder-screen','battle-screen','reveal-screen','epiphany-screen','itemget-screen','levelup-screen',
      'clear-screen','over-screen','meta-hub-screen','runstart-equip-screen',
      'cardfusion-screen','cardfusionmaterial-screen','cardfusionconfirm-screen','fusiondiscard-screen'
     ].forEach(s => document.getElementById(s).classList.toggle('hidden', s !== id));
@@ -3841,13 +3867,20 @@ function applyEnemyPreAttackAbilities(){
     }
 }
 // どく攻撃：蓄積した毒スタックぶんのダメージを、敵の攻撃とは別枠で与える（敵の攻撃の直後に発動）
-function applyPoisonTick(){
+// 敵自身の攻撃の演出が終わってから、少し間を置いて別枠で表示する（同時に出ると分かりづらいため）
+function applyPoisonTick(callback){
     const enemy = game.enemy;
     if (hasAbility(enemy, 'poison') && enemy.poisonStack > 0){
-        floatText('battle-player-avatar-wrap', `どく -${enemy.poisonStack}`, 'bust');
-        game.player.hp -= enemy.poisonStack;
-        triggerPlayerHitEffect();
-        updateBattleBars();
+        setTimeout(() => {
+            floatText('battle-player-avatar-wrap', `どく -${enemy.poisonStack}`, 'bust');
+            game.player.hp -= enemy.poisonStack;
+            triggerPlayerHitEffect();
+            updateBattleBars();
+            if (game.player.hp <= 0){ finishRun(false); return; }
+            callback();
+        }, 700);
+    } else {
+        callback();
     }
 }
 function resolveTurn(busted){
@@ -3911,6 +3944,7 @@ function proceedAfterTurn(){
             game.fatigueActive = false;
             game.fatigueUsedThisStage = false;
         }
+        if (pendingLevelUp){ showLevelUpScreen(); return; }
         afterEnemyDefeated(game.enemy);
         return;
     }
@@ -3941,9 +3975,7 @@ function proceedAfterTurn(){
         triggerPlayerHitEffect();
         updateBattleBars();
         if (game.player.hp <= 0){ finishRun(false); return; }
-        applyPoisonTick();
-        if (game.player.hp <= 0){ finishRun(false); return; }
-        startTurn();
+        applyPoisonTick(startTurn);
         return;
     }
 
@@ -3955,8 +3987,9 @@ function proceedAfterTurn(){
         enemy.atk = incoming;
         enemy.rampCount++;
         document.getElementById('battle-enemy-atk').textContent = enemy.atk;
-    } else if (hasAbility(enemy, 'crit')){
+    } else if (hasAbility(enemy, 'crit') && Math.random() < 0.10){
         incoming *= 2;
+        label = `会心の一撃！ -${incoming}`;
         cls = 'bust';
     } else if (hasAbility(enemy, 'breath')){
         incoming = Math.round(enemy.atk * (1.2 + Math.random() * 0.8));
@@ -3986,9 +4019,7 @@ function proceedAfterTurn(){
 
     updateBattleBars();
     if (game.player.hp <= 0){ finishRun(false); return; }
-    applyPoisonTick();
-    if (game.player.hp <= 0){ finishRun(false); return; }
-    startTurn();
+    applyPoisonTick(startTurn);
 }
 function openBattleHowTo(){ document.getElementById('howto-overlay').classList.remove('hidden'); }
 function closeBattleHowTo(){ document.getElementById('howto-overlay').classList.add('hidden'); }
@@ -4265,7 +4296,7 @@ function goToCardFusion(){
 function renderCardFusionBaseGrid(){
     const sorted = sortForDisplay(game.charCollection, 'suit');
     document.getElementById('cardfusion-base-row').innerHTML = sorted.map(c => `
-        <div class="reward-pick" onclick="pickCardFusionBase('${c.uid}')">
+        <div class="reward-pick" onclick="pickCardFusionBase(${c.uid})">
             ${bigCardHtml(c, { compact: true, equipped: game.charSelectedIds.includes(c.uid) })}
         </div>
     `).join('');
@@ -4286,7 +4317,7 @@ function renderCardFusionMaterialGrid(){
     const candidates = game.charCollection.filter(c => c.uid !== fusionBaseCard.uid && !c.isStarter);
     const sorted = sortForDisplay(candidates, 'suit');
     document.getElementById('cardfusion-material-row').innerHTML = sorted.length ? sorted.map(c => `
-        <div class="reward-pick" onclick="pickCardFusionMaterial('${c.uid}')">
+        <div class="reward-pick" onclick="pickCardFusionMaterial(${c.uid})">
             ${bigCardHtml(c, { compact: true, equipped: game.charSelectedIds.includes(c.uid) })}
         </div>
     `).join('') : '<p class="settings-desc">合成できるカードがありません</p>';
