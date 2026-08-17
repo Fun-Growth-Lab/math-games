@@ -195,16 +195,17 @@
         .del-btn { color: #ff9aa8; }
         .nr-avatar-header { display: flex; align-items: center; gap: 10px; justify-content: center; margin-top: 4px; flex-wrap: wrap; }
         .nr-avatar-header > span:first-child { font-weight: 800; color: var(--text-main); font-size: 0.9rem; }
-        .nr-unlock-progress { font-size: 0.78rem; color: var(--text-dim); font-weight: 700; }
-        .nr-avatar-grid { display: grid; grid-template-columns: repeat(14, 1fr); gap: 4px; margin: 8px 0; }
-        .nr-avatar-cell { position: relative; cursor: pointer; border-radius: 8px; padding: 2px; border: 2px solid transparent; }
-        .nr-avatar-cell img { width: 100%; aspect-ratio: 1; border-radius: 6px; object-fit: cover; display: block; }
-        .nr-avatar-cell.selected { border-color: var(--gold-bright); box-shadow: 0 0 10px rgba(212,175,55,0.6); }
-        .nr-avatar-cell.locked { cursor: not-allowed; opacity: 0.32; filter: grayscale(1); }
-        .nr-avatar-cell.locked::after {
-            content:'🔒'; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:1rem;
+        /* 見た目は8種固定（段階解放なし）。画像を大きく見やすくし、ラベルを添えて選びやすくする */
+        .nr-avatar-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 10px 0; }
+        .nr-avatar-cell {
+            position: relative; cursor: pointer; border-radius: 12px; padding: 6px;
+            border: 3px solid transparent; background: rgba(0,0,0,0.25); transition: all .15s;
         }
-        .nr-avatar-hint { font-size: 0.7rem; color: var(--text-dim); margin: 2px 0 0; }
+        .nr-avatar-cell:hover { border-color: rgba(212,175,55,0.45); transform: translateY(-2px); }
+        .nr-avatar-cell img { width: 100%; aspect-ratio: 1; border-radius: 8px; object-fit: cover; display: block; }
+        .nr-avatar-cell-label { font-size: 0.76rem; font-weight: 700; color: var(--text-dim); margin-top: 4px; }
+        .nr-avatar-cell.selected { border-color: var(--gold-bright); box-shadow: 0 0 14px rgba(212,175,55,0.7); background: rgba(212,175,55,0.15); }
+        .nr-avatar-cell.selected .nr-avatar-cell-label { color: var(--gold-bright); }
 
         /* ==================== RANKING ==================== */
         .rank-toggle { display: flex; gap: 8px; margin-bottom: 10px; }
@@ -432,6 +433,8 @@
         .meta-row-count { font-size: 0.78rem; color: var(--gold-bright); white-space: nowrap; }
         .meta-row-cost { font-weight: 900; color: var(--gold-bright); white-space: nowrap; }
         .meta-row .btn { width: 100px; flex-shrink: 0; margin-top: 0; padding: 8px 10px; font-size: 0.8rem; }
+        /* ガチャ結果表示：GET直後だけ中身が入る想定。空のときは:emptyで余白ごと詰める */
+        #meta-gacha-result:not(:empty) { min-height: 104px; display: flex; justify-content: center; align-items: center; margin: 10px 0; }
         /* スキル図鑑：通し番号つきのカード風パネル。未GETは？で伏せる（スキルガチャ・ラン開始前の装備選択で共用） */
         .skill-dex-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 7px; margin: 10px 0; }
         .skill-dex-card {
@@ -880,6 +883,11 @@
         #clear-screen .result-score, #clear-screen .itemget-coin {
             font-size: 2rem; white-space: nowrap; margin: 8px 0;
         }
+        /* スート/ランクを初めて全クリアしたときのボーナス表示（かけら獲得の下に追加で並べる） */
+        .combo-bonus-line {
+            font-size: 1.15rem; font-weight: 800; color: var(--gold-bright);
+            text-shadow: 0 0 10px rgba(244,216,114,0.5); margin: 4px 0;
+        }
         .world-submit-msg { font-size: 0.8rem; margin-top: 6px; min-height: 1em; }
     </style>
 </head>
@@ -900,8 +908,8 @@
             <p class="title-sub">BLACKJACK ARCANA</p>
             <button id="btn-continue" class="btn btn-gold hidden" onclick="continueGame()">▶ つづきから</button>
             <button class="btn btn-gold" onclick="goToStarterSelect()">はじめから</button>
-            <button class="btn btn-gray" onclick="openMetaHub()">🌟 星の祭壇</button>
             <button id="btn-name-register" class="btn btn-gray" onclick="openNameRegister()">👤 名前の登録</button>
+            <button class="btn btn-gray" onclick="openMetaHub()">🌟 星の祭壇</button>
             <button class="btn btn-gray" onclick="openRanking()">🏆 ランキング</button>
             <button class="btn btn-gray" onclick="openSettings()">⚙️ 設定</button>
             <button class="btn btn-gray" onclick="location.href='../index.html'">🏠 INDEXへ</button>
@@ -927,12 +935,9 @@
 
             <div class="nr-avatar-header">
                 <span id="nr-avatar-picker-title">見た目をえらぶ</span>
-                <span id="nr-unlock-progress" class="nr-unlock-progress"></span>
-                <button class="btn btn-gray btn-sm" style="width:auto; margin:0;" onclick="pickRandomAvatar()">🎲 ランダムに決める</button>
                 <button id="nr-avatar-cancel-btn" class="btn btn-gray btn-sm hidden" style="width:auto; margin:0;" onclick="cancelEditAvatar()">編集をやめる</button>
             </div>
             <div id="nr-avatar-grid" class="nr-avatar-grid"></div>
-            <p class="nr-avatar-hint">クリアするカードが増えるほど、えらべる見た目が増えていきます。</p>
 
             <button id="nr-add-btn" class="btn btn-gold" style="margin-top:14px;" onclick="addPlayerName()">この見た目で追加する</button>
             <button class="btn btn-gray" onclick="closeNameRegister()">◀ タイトルへ戻る</button>
@@ -1187,7 +1192,7 @@
             <div id="meta-gacha-panel" class="hidden">
                 <p class="settings-desc">最初に選んだキャラクターカードにスキルをつけられるようになります。</p>
                 <button class="btn btn-gold" id="meta-gacha-btn" style="max-width:280px; margin:10px auto;" onclick="doGachaPull()">🎴 ガチャを引く</button>
-                <div id="meta-gacha-result" style="min-height:104px; display:flex; justify-content:center; align-items:center;"></div>
+                <div id="meta-gacha-result"></div>
                 <div id="meta-gacha-collection"></div>
             </div>
             <div id="meta-vow-list" class="hidden"></div>
@@ -1420,6 +1425,7 @@
             <h1 class="settings-title">ステージクリア！</h1>
             <div class="result-score" id="clear-score"></div>
             <div class="itemget-coin" id="clear-shard-gain"></div>
+            <div id="clear-combo-bonus"></div>
             <button id="clear-world-submit-btn" class="btn btn-gold" onclick="submitScoreToWorld('clear')">🌐 ワールドランキングに送信</button>
             <div id="clear-world-submit-msg" class="world-submit-msg"></div>
             <button class="btn btn-gray" onclick="backToTitleFromResult()">🏠 タイトルへ</button>
@@ -1980,6 +1986,8 @@ const VOW_IDS = ['mosha', 'muyoku', 'isshin', 'konnan'];
 const MAX_VOW_LV = 5;
 const GACHA_COST = 10;
 const SHARDS_PER_CLEAR = 10;
+const SUIT_COMPLETE_BONUS_SHARDS = 100; // 1スート(13枚)を初めて全クリアしたときのボーナス
+const RANK_COMPLETE_BONUS_SHARDS = 20; // 1つの数字(4スート)を初めて全クリアしたときのボーナス
 let meta = null;
 function loadMeta(){
     let m;
@@ -2154,6 +2162,8 @@ function renderMetaGacha(){
     btn.disabled = !canPull;
     // かけらが足りないときも「いくらで引けるか」が一目でわかるよう、金額だけをボタンに出して非アクティブにする
     btn.textContent = complete ? 'すべてLv.6！ガチャ終了' : `🎴 ガチャを引く（💎${GACHA_COST}）`;
+    // GET演出は「今引いた直後」だけのものなので、画面を開き直すたびに毎回クリアする（前回引いた結果を持ち越さない）
+    document.getElementById('meta-gacha-result').innerHTML = '';
     renderMetaGachaCollection();
 }
 // 図鑑形式：CHAR_SKILLS_ALLの並び順を通し番号にして、未GETのスキルは「？」で伏せて表示する
@@ -2455,36 +2465,17 @@ function charIllustSrc(card){ return `images/Card_${card.rank}_${card.suit.toLow
 
 // 主人公（プレイヤー）のイラスト。ファイル名のtypo（maie/mail/femaieなど）はそのまま。
 // 14職業×男女のペア。最初は「けんし」だけ選べて、52枚のうちクリアした枚数が増えるほど
-// 職業が1つずつ解放されていく（男女は必ず同時解放）。47枚（約9割）クリアで全解放。
-const CHAR_JOBS = [
-    { key:'Swordsman',   label:'けんし',           male:'male_Swordsman',   female:'female_Swordsman' },
-    { key:'Guardian',    label:'ガーディアン',     male:'male_Guardian',    female:'female_Guardian' },
-    { key:'archer',      label:'ゆみつかい',       male:'male_archer',      female:'female_archer' },
-    { key:'berserker',   label:'バーサーカー',     male:'male_berserker',   female:'female_berserker' },
-    { key:'crestknight', label:'クレストナイト',   male:'male_crestknight', female:'female_crestknight' },
-    { key:'gambler',     label:'ギャンブラー',     male:'male_gambler',     female:'female_gambler' },
-    { key:'highpriest',  label:'こうい神官',       male:'male_highpriest',  female:'female_highpriest' },
-    { key:'jewelmaster', label:'ジュエルマスター', male:'male_jewelmaster', female:'female_jewelmaster' },
-    { key:'mage',        label:'まほうつかい',     male:'male_mage',        female:'female_mage' },
-    { key:'runemaster',  label:'ルーンマスター',   male:'male_runemaster',  female:'female_runemaster' },
-    { key:'villager',    label:'むらびと',         male:'male_villager',    female:'female_villager' },
-    { key:'armorknight', label:'アーマーナイト',   male:'maie_armorknight', female:'femaie_armorknight' },
-    { key:'knight',      label:'ナイト',           male:'mail_knight',      female:'femail_knight' },
-    { key:'swordmaster', label:'けんごう',         male:'mail_swordmaster', female:'femail_swordmaster' },
+// 見た目は8種類固定（段階解放なし・誰でも最初から全部選べる）
+const AVATAR_CHOICES = [
+    { key:'male_Swordsman',   label:'けんし（男）' },
+    { key:'female_Swordsman', label:'けんし（女）' },
+    { key:'male_mage',        label:'まほうつかい（男）' },
+    { key:'female_mage',      label:'まほうつかい（女）' },
+    { key:'male_Guardian',    label:'ガーディアン（男）' },
+    { key:'female_Guardian',  label:'ガーディアン（女）' },
+    { key:'male_archer',      label:'ゆみつかい（男）' },
+    { key:'female_archer',    label:'ゆみつかい（女）' },
 ];
-const AVATAR_FULL_UNLOCK_CLEARS = 47; // 52枚中これだけクリアすると全職業解放（約9割）
-function clearedCardCount(){ return Object.keys(getCardClears()).length; }
-// 今クリアした枚数で、何番目の職業まで解放されているか（0=けんしのみ）
-function unlockedJobCount(){
-    const n = 1 + Math.floor(clearedCardCount() * (CHAR_JOBS.length - 1) / AVATAR_FULL_UNLOCK_CLEARS);
-    return Math.min(CHAR_JOBS.length, n);
-}
-function unlockedAvatarKeys(){
-    const n = unlockedJobCount();
-    const keys = [];
-    CHAR_JOBS.slice(0, n).forEach(j => { keys.push(j.male, j.female); });
-    return keys;
-}
 function avatarSrc(key){ return `images/${key}.png`; }
 
 // スキルをタップ/クリックすると効果説明を表示する（他の場所をタップすると閉じる）
@@ -2640,8 +2631,8 @@ function getPlayerNames(){
         const raw = JSON.parse(localStorage.getItem(PLAYERS_KEY) || '[]');
         let migrated = false;
         const list = raw.map(e => {
-            if (typeof e === 'string'){ migrated = true; return { name: e, avatarKey: randomUnlockedAvatarKey() }; }
-            if (!e.avatarKey){ migrated = true; return { name: e.name, avatarKey: randomUnlockedAvatarKey() }; }
+            if (typeof e === 'string'){ migrated = true; return { name: e, avatarKey: randomAvatarKey() }; }
+            if (!e.avatarKey){ migrated = true; return { name: e.name, avatarKey: randomAvatarKey() }; }
             return e;
         });
         if (migrated) savePlayerNames(list);
@@ -2651,14 +2642,13 @@ function getPlayerNames(){
 function savePlayerNames(list){ try { localStorage.setItem(PLAYERS_KEY, JSON.stringify(list)); } catch (e){} }
 function getCurPlayerName(){ try { return localStorage.getItem(CUR_PLAYER_KEY) || 'ななしさん'; } catch (e){ return 'ななしさん'; } }
 function setCurPlayerName(n){ try { localStorage.setItem(CUR_PLAYER_KEY, n); } catch (e){} }
-function randomUnlockedAvatarKey(){
-    const keys = unlockedAvatarKeys();
-    return keys[Math.floor(Math.random() * keys.length)];
+function randomAvatarKey(){
+    return AVATAR_CHOICES[Math.floor(Math.random() * AVATAR_CHOICES.length)].key;
 }
 // 未登録のデフォルト名（ななしさん）は、けんし(男)で固定表示する
 function getCurPlayerAvatarKey(){
     const found = getPlayerNames().find(p => p.name === getCurPlayerName());
-    return found ? found.avatarKey : CHAR_JOBS[0].male;
+    return found ? found.avatarKey : AVATAR_CHOICES[0].key;
 }
 
 let pendingAvatarKey = null;
@@ -2678,23 +2668,18 @@ function updateNameRegisterBtn(){
     if (btn) btn.textContent = `👤 名前：${getCurPlayerName()}`;
 }
 function renderAvatarPicker(){
-    const n = unlockedJobCount();
     const list = getPlayerNames();
     const editingEntry = editingPlayerIndex !== null ? list[editingPlayerIndex] : null;
     document.getElementById('nr-avatar-picker-title').textContent = editingEntry ? `「${editingEntry.name}」の見た目を変える` : '見た目をえらぶ';
     document.getElementById('nr-avatar-cancel-btn').classList.toggle('hidden', !editingEntry);
     document.getElementById('nr-add-btn').classList.toggle('hidden', !!editingEntry);
-    document.getElementById('nr-unlock-progress').textContent = `解放ずみ ${n}／${CHAR_JOBS.length}職業（クリア${clearedCardCount()}／52枚）`;
-    const rows = [CHAR_JOBS.map(j => j.male), CHAR_JOBS.map(j => j.female)];
-    document.getElementById('nr-avatar-grid').innerHTML = rows.map(row => row.map((key, i) => {
-        const locked = i >= n;
-        const selected = !locked && pendingAvatarKey === key;
-        const cls = ['nr-avatar-cell'];
-        if (locked) cls.push('locked'); else if (selected) cls.push('selected');
-        return `<div class="${cls.join(' ')}" ${locked ? '' : `onclick="pickAvatarCell('${key}')"`} title="${escapeHtml(CHAR_JOBS[i].label)}">
-            ${locked ? '' : `<img src="${avatarSrc(key)}" alt="">`}
+    document.getElementById('nr-avatar-grid').innerHTML = AVATAR_CHOICES.map(({ key, label }) => {
+        const selected = pendingAvatarKey === key;
+        return `<div class="nr-avatar-cell${selected ? ' selected' : ''}" onclick="pickAvatarCell('${key}')">
+            <img src="${avatarSrc(key)}" alt="">
+            <div class="nr-avatar-cell-label">${escapeHtml(label)}</div>
         </div>`;
-    }).join('')).join('');
+    }).join('');
 }
 function pickAvatarCell(key){
     pendingAvatarKey = key;
@@ -2707,9 +2692,6 @@ function pickAvatarCell(key){
         }
     }
     renderAvatarPicker();
-}
-function pickRandomAvatar(){
-    pickAvatarCell(randomUnlockedAvatarKey());
 }
 function startEditAvatar(idx){
     const list = getPlayerNames();
@@ -2734,7 +2716,7 @@ function addPlayerName(){
     if (name.length > 12){ errEl.textContent = '12文字以内で入力してください'; return; }
     const list = getPlayerNames();
     if (list.some(p => p.name === name)){ errEl.textContent = 'その名前はすでに登録されています'; return; }
-    const avatarKey = pendingAvatarKey || randomUnlockedAvatarKey();
+    const avatarKey = pendingAvatarKey || randomAvatarKey();
     list.push({ name, avatarKey });
     savePlayerNames(list);
     setCurPlayerName(name);
@@ -2889,6 +2871,23 @@ function recordCardClear(rank, suit){
     const clears = getCardClears();
     clears[`${rank}_${suit}`] = true;
     try { localStorage.setItem(CARD_CLEAR_KEY, JSON.stringify(clears)); } catch (e){}
+}
+// このカードのクリアを記録したうえで、「スート1列(13枚)」または「数字1つ(4スート)」がちょうど今そろったかを判定する。
+// 記録前の状態で判定してから記録するので、既にそろっていたものが再度クリアされてもボーナスは重複しない（初回のみ）。
+function checkComboBonuses(rank, suit){
+    const before = getCardClears();
+    const suitWasComplete = RANKS.every(r => before[`${r}_${suit}`]);
+    const rankWasComplete = SUITS.every(s => before[`${rank}_${s}`]);
+    recordCardClear(rank, suit);
+    const after = getCardClears();
+    const bonuses = [];
+    if (!suitWasComplete && RANKS.every(r => after[`${r}_${suit}`])){
+        bonuses.push({ text: `${SUIT_SYMBOL[suit]} 全クリア！`, shards: SUIT_COMPLETE_BONUS_SHARDS });
+    }
+    if (!rankWasComplete && SUITS.every(s => after[`${rank}_${s}`])){
+        bonuses.push({ text: `${rank} 全クリア！`, shards: RANK_COMPLETE_BONUS_SHARDS });
+    }
+    return bonuses;
 }
 let selectedStarter = null; // { rank, suit }
 function goToStarterSelect(){
@@ -4474,11 +4473,13 @@ function finishRun(cleared){
     clearSave();
     recordRunResult(cleared);
     let shardGain = 0;
+    let comboBonuses = [];
     if (cleared){
-        recordCardClear(game.starterRank, game.starterSuit);
+        comboBonuses = checkComboBonuses(game.starterRank, game.starterSuit);
         if (!meta) loadMeta();
         shardGain = Math.round(SHARDS_PER_CLEAR * (1 + vowShardBonusPct() / 100));
-        meta.shards += shardGain;
+        const bonusShardGain = comboBonuses.reduce((sum, b) => sum + b.shards, 0);
+        meta.shards += shardGain + bonusShardGain;
         saveMeta();
     } else {
         // ゲームオーバーでも、到達したステージのボスを倒していればかけらがもらえる（加算ではなく高い方のみ）。
@@ -4495,6 +4496,7 @@ function finishRun(cleared){
     if (cleared){
         document.getElementById('clear-score').textContent = `スコア ${lastFinalScore}pt`;
         document.getElementById('clear-shard-gain').textContent = `💎 アルカナのかけら +${shardGain}`;
+        document.getElementById('clear-combo-bonus').innerHTML = comboBonuses.map(b => `<div class="combo-bonus-line">🎊 ${escapeHtml(b.text)} 💎+${b.shards}</div>`).join('');
         document.getElementById('clear-world-submit-btn').disabled = false;
         document.getElementById('clear-world-submit-msg').textContent = '';
         showScreen('clear-screen');
