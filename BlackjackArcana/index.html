@@ -277,7 +277,7 @@
         }
         /* 装備中（charSelectedIdsに入っている）カードは右上にバッジを出す。修行の祠などの候補一覧で使う */
         .big-card.equipped::after {
-            content: '🛡️'; position: absolute; top: 6px; right: 6px; z-index: 6;
+            content: '⚔️'; position: absolute; top: 6px; right: 6px; z-index: 6;
             width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
             background: radial-gradient(circle at 35% 30%, #bfe9ff, #3ea8e0 55%, #1a5f8a 100%);
             font-size: 0.8rem; box-shadow: 0 2px 6px rgba(0,0,0,0.6), 0 0 0 2px #06202e;
@@ -774,9 +774,9 @@
         /* ダメージ／回復のフロート表示 */
         .dmg-float {
             position: absolute; left: 50%; top: 40%; transform: translate(-50%, 0);
-            font-size: 1.9rem; font-weight: 800; color: #ff5566;
+            font-size: 1.9rem; font-weight: 800; color: #ff5566; width: 180px; text-align: center;
             text-shadow: 0 2px 8px rgba(0,0,0,0.8); pointer-events: none; z-index: 30;
-            animation: dmgRise 1.1s ease-out forwards; white-space: nowrap;
+            animation: dmgRise 1.1s ease-out forwards; white-space: normal; line-height: 1.2;
         }
         .dmg-float.heal { color: #7fd858; font-size: 1.5rem; }
         .dmg-float.coin { color: var(--gold-bright); font-size: 1.5rem; }
@@ -1232,7 +1232,7 @@
     <div id="cardfusionmaterial-screen" class="hidden">
         <div class="title-box" style="width:1000px; max-height:680px;">
             <h1 class="settings-title">🔮 カードの合成</h1>
-            <p class="settings-desc">合成するカードを選んでください。※このカードは失われます</p>
+            <p class="settings-desc">合成するカードを選んで下さい。※合成に使用したカードは失われます</p>
             <div id="cardfusion-base-preview" style="display:flex; justify-content:center; margin:8px 0;"></div>
             <div id="cardfusion-material-row"></div>
             <button class="btn btn-gray" onclick="backToCardFusionBase()">◀ 元となるカードを選びなおす</button>
@@ -1611,18 +1611,13 @@ function skillAllowedForCard(skill, card){
     return true;
 }
 // スート限定スキルは、実際のスートに応じて表示名を変える（例：♦統一）
+// 以前はsuitOnly（スート統一）だけカードの実際のスートを埋め込んだ表示（例：【♡】統一）にしていたが、
+// カードの合成画面などで分かりづらくなるため、常に固定のスキル名をそのまま表示する。
 function skillDisplayLabel(skill, card){
-    if (skill.id === 'suitOnly') return `【${SUIT_SYMBOL[card.suit]}】統一`;
     return skill.label;
 }
-// スート限定スキルのスート記号だけ、そのスートの色で表示するHTML断片（カード表示など、innerHTMLで使う場面専用）。
-// textContentやescapeHtmlの文脈ではHTMLが表示されてしまうので使わないこと（そちらはskillDisplayLabel()の平文を使う）。
-const SUIT_CSS_VAR = { S: 'var(--suit-s)', H: 'var(--suit-h)', D: 'var(--suit-d)', C: 'var(--suit-c)' };
 function skillLabelHtml(skill, card, suffix){
     const suffixHtml = suffix ? escapeHtml(suffix) : '';
-    if (skill.id === 'suitOnly'){
-        return `<span style="color:${SUIT_CSS_VAR[card.suit]}">【${SUIT_SYMBOL[card.suit]}】</span>統一${suffixHtml}`;
-    }
     return escapeHtml(skill.label) + suffixHtml;
 }
 // 倍率内訳のピルは横幅が限られるので、カード上の表示名より短い名前を使う（カード自体の表示名は変えない）
@@ -1692,9 +1687,10 @@ function enemyHpBase(n, m){ return 50 * n + 3 * (m - 1); }
 function enemyAtkBase(n, m){ return 10 * n + (m - 1); }
 // スコア計算用：敵の種類ごとの撃破スコアの重み（ボスはさらに×3される）
 const ENEMY_KILL_WEIGHT = { slime:1.0, goblin:1.1, wite:1.2, gorem:1.4, darkelf:1.6, demon:1.8, dragon:2.0 };
-// 主人公のレベル：経験値は撃破スコアと同じ重み（ENEMY_KILL_WEIGHT×ボス/エリート倍率）で貯まり、
-// 重み1（スライム）3体ぶんでLv+1。レベルアップで最大HPが+20、現在HPも増えたぶんだけ回復する（全回復はしない）。
-const XP_PER_LEVEL = ENEMY_KILL_WEIGHT.slime * 3;
+// 主人公のレベル：経験値は撃破スコアと同じ重み（ENEMY_KILL_WEIGHT×ボス/エリート倍率）で貯まる。
+// 表示は×100されるため（renderXpBar）、この値×100が実際に画面で見えるレベルアップ必要経験値になる（＝500）。
+// レベルアップで最大HPが+20、現在HPも増えたぶんだけ回復する（全回復はしない）。
+const XP_PER_LEVEL = ENEMY_KILL_WEIGHT.slime * 5;
 const LEVEL_UP_HP_BONUS = 20;
 // レベルアップが発生した場合、その内容をpendingLevelUpに記録しておき、撃破後にポップアップで見せる
 let pendingLevelUp = null;
@@ -1707,7 +1703,7 @@ function grantPlayerXp(amount){
         game.player.level++;
         game.playerMaxHp += LEVEL_UP_HP_BONUS;
         game.player.hp += LEVEL_UP_HP_BONUS;
-        floatText('battle-player-avatar-wrap', `LEVEL UP! Lv.${game.player.level}`, 'heal', 1800);
+        floatText('battle-player-avatar-wrap', `LEVEL UP! Lv.${game.player.level}`, 'heal', 2400);
     }
     if (game.player.level > fromLv){
         pendingLevelUp = { fromLv, toLv: game.player.level, fromMaxHp, toMaxHp: game.playerMaxHp };
@@ -3090,6 +3086,13 @@ function renderBossTrack(m){
     document.getElementById('map-boss-track').innerHTML = rows.join('');
 }
 function chooseMapNode(i){
+    // カードの合成でデッキ入りしていたカードが消滅すると、所持数は足りているのに装備中のキャラカードが
+    // 5枚未満になってしまうことがある。この状態のまま冒険を続けさせず、デッキ構築へ差し戻す。
+    if (game.charCollection.length >= CHAR_DECK_CAP && game.charSelectedIds.length < CHAR_DECK_CAP){
+        showNoticeDialog(`キャラカードを${CHAR_DECK_CAP}枚選択して下さい。`);
+        goToDeckBuilder();
+        return;
+    }
     const node = game.mapStage.current.children[i];
     game.mapStage.current = node;
     enterMapNode(node);
@@ -3654,7 +3657,7 @@ function floatText(containerId, text, cls, duration){
     el.className = 'dmg-float' + (cls ? ' ' + cls : '');
     el.textContent = text;
     // 既定は1.6秒（以前は1.1秒）。「かわした」「連続攻撃」等の説明テキストが早く消えすぎて読めない対策
-    const dur = duration || 1600;
+    const dur = duration || 2400;
     el.style.animationDuration = `${dur}ms`;
     parent.appendChild(el);
     setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, dur);
@@ -3899,7 +3902,7 @@ function resolveTurn(busted){
         if (game.blessingActive) dmg = Math.round(dmg * 1.25); // 女神の祝福：このステージ中はダメージ1.25倍
         game.enemy.hp -= dmg;
         game.stats.totalDamage += dmg;
-        floatText('battle-enemy-avatar-wrap', `-${dmg}`, 'enemy-hit', 1800);
+        floatText('battle-enemy-avatar-wrap', `-${dmg}`, 'enemy-hit', 2400);
         if (game.enemy.hp <= 0){
             // 意地：戦闘中1回だけ、致命傷をHP1で耐える
             if (hasAbility(game.enemy, 'lastStand') && !game.enemy.lastStandUsed){
