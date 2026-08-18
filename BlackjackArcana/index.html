@@ -1118,7 +1118,7 @@
             <div class="big-announce" id="eventgeneric-title"></div>
             <img class="event-illust" id="eventgeneric-illust" alt="" style="display:none;" onerror="this.style.display='none';">
             <div id="eventgeneric-body" style="font-size:1.15rem; font-weight:800; color:var(--text-hi); margin:14px 0; line-height:1.7;"></div>
-            <button class="btn btn-gold js-enter-next" onclick="closeEventGeneric()">▶ マップへもどる</button>
+            <button id="eventgeneric-close-btn" class="btn btn-gold js-enter-next" onclick="closeEventGeneric()">▶ マップへもどる</button>
         </div>
     </div>
 
@@ -3318,6 +3318,8 @@ function openEventGeneric(title, bodyHtml, eventId){
     document.getElementById('eventgeneric-title').textContent = title;
     setEventIllustImg(document.getElementById('eventgeneric-illust'), eventId);
     document.getElementById('eventgeneric-body').innerHTML = bodyHtml;
+    // 毒沼で致命傷のときだけこのボタンを隠すので、それ以外は毎回表示状態にリセットしておく
+    document.getElementById('eventgeneric-close-btn').classList.remove('hidden');
     showScreen('eventgeneric-screen');
 }
 function closeEventGeneric(){ returnToMap(); }
@@ -3532,8 +3534,13 @@ function openEventPoisonSwamp(){
     const pct = 0.10 + Math.random() * 0.20;
     const lost = Math.round(game.playerMaxHp * pct);
     game.player.hp -= lost;
-    if (game.player.hp <= 0){ finishRun(false); return; }
+    // 致命傷でも、何が起きたか分からないまま即ゲームオーバーにはしない。
+    // 必ずイベント内容を表示してから、致命傷のときだけ「マップへもどる」を隠して自動でゲームオーバーへ進む。
     openEventGeneric('☠️ 毒沼', `毒沼に足を取られた！<br>HP -${lost}！`, 'poisonSwamp');
+    if (game.player.hp <= 0){
+        document.getElementById('eventgeneric-close-btn').classList.add('hidden');
+        setTimeout(() => finishRun(false), 1500);
+    }
 }
 
 // ---- 疲労：このステージ終了まで撃破報酬のコインが-20%。afterEnemyDefeatedで参照。重複しない ----
