@@ -86,6 +86,12 @@
         .btn-sm { padding: 8px 12px; font-size: 0.85rem; }
         .btn[disabled] { opacity: 0.4; cursor: not-allowed; filter: none !important; }
         #title-screen .btn { max-width: 320px; margin-left: auto; margin-right: auto; }
+        /* 「つづきから」がある場合、「はじめから」と横並びにする。2つ合わせた幅は他のボタンと揃える（＝320px幅のまま） */
+        .title-start-row { display: flex; gap: 8px; max-width: 320px; margin: 10px auto 0; }
+        .title-start-row .btn {
+            flex: 1; min-width: 0; margin-top: 0; max-width: none;
+            padding-left: 6px; padding-right: 6px; font-size: 0.82rem; white-space: nowrap;
+        }
         /* タイトル画面いっぱいの背景イラスト（title.png）。Math_Braves_additionと同じく等倍の濃さで表示し、
            透け感はボックス側のbackground-color薄め＋backdrop-filterで作る（画像側を薄くする方式だと効果が弱かった） */
         .title-bg-img {
@@ -906,8 +912,10 @@
         <div class="title-box">
             <h1 class="title-h1">ブラックジャック・アルカナ</h1>
             <p class="title-sub">BLACKJACK ARCANA</p>
-            <button id="btn-continue" class="btn btn-gold hidden" onclick="continueGame()">▶ つづきから</button>
-            <button class="btn btn-gold" onclick="goToStarterSelect()">はじめから</button>
+            <div class="title-start-row">
+                <button id="btn-continue" class="btn btn-gold hidden" onclick="continueGame()">▶ つづきから</button>
+                <button class="btn btn-gold" onclick="goToStarterSelect()">はじめから</button>
+            </div>
             <button id="btn-name-register" class="btn btn-gray" onclick="openNameRegister()">👤 名前の登録</button>
             <button class="btn btn-gray" onclick="openMetaHub()">🌟 星の祭壇</button>
             <button class="btn btn-gray" onclick="openRanking()">🏆 ランキング</button>
@@ -1998,7 +2006,7 @@ function loadMeta(){
     if (typeof REMOVED_SKILL_IDS !== 'undefined') REMOVED_SKILL_IDS.forEach(id => { delete m.skillCollection[id]; }); // 廃止済みスキルの残骸を除去
     m.passiveCoin = m.passiveCoin || 0;       // 購入個数(0〜20)。1個で初期コイン+2
     m.passiveHp = m.passiveHp || 0;           // 購入個数(0〜20)。1個で初期HP+2
-    m.passiveShopRare = m.passiveShopRare || 0; // 購入個数(0〜10)。ランにつき所持個数までレアパック抽選(10%)ができる
+    m.passiveAutoheal = m.passiveAutoheal || 0; // 購入個数(0〜20)。1個でマスを1つ進むごとにHPが1回復
     m.potionS = !!m.potionS;
     m.potionM = !!m.potionM;
     m.potionL = !!m.potionL;
@@ -2042,7 +2050,7 @@ function pullSkillGacha(){
 const META_PASSIVES = [
     { id:'coin',      label:'🪙 初期コイン+2',         desc:'ラン開始時の所持コインが+2される',            cost:5,  countKey:'passiveCoin', maxCount:50 },
     { id:'hp',        label:'❤️ 初期HP+2',            desc:'ラン開始時の最大HPが+2される',                cost:5,  countKey:'passiveHp',   maxCount:50 },
-    { id:'shopRare',  label:'🛒 ショップの品ぞろえ',    desc:'お店に入るたび、1個につき10%の確率でレアパック(🪙60・何個でも買える)が品ぞろえに並ぶ', cost:5, countKey:'passiveShopRare', maxCount:10 },
+    { id:'autoheal',  label:'🚶 自動回復',             desc:'マスを1つ進むごとにHPが1回復する',            cost:10, countKey:'passiveAutoheal', maxCount:20 },
     { id:'potionS',   label:'💊 初期所持ポーション(小)', desc:'ラン開始時にポーション(小)を1つ持って始まる', cost:30, countKey:'potionS', maxCount:1, flag:true },
     { id:'potionM',   label:'🧴 初期所持ポーション(中)', desc:'ラン開始時にポーション(中)を1つ持って始まる', cost:40, countKey:'potionM', maxCount:1, flag:true },
     { id:'potionL',   label:'🧪 初期所持ポーション(大)', desc:'ラン開始時にポーション(大)を1つ持って始まる', cost:50, countKey:'potionL', maxCount:1, flag:true },
@@ -2208,7 +2216,7 @@ function doUnlockVow(id){
 let runStartCard = null; // { rank, suit }
 let runStartSkillId = null;
 let runStartVowLevels = { mosha:0, muyoku:0, isshin:0, konnan:0 };
-let runStartPassiveLevels = { coin:0, hp:0, shopRare:0, potionS:false, potionM:false, potionL:false };
+let runStartPassiveLevels = { coin:0, hp:0, autoheal:0, potionS:false, potionM:false, potionL:false };
 function openRunStartEquip(rank, suit){
     if (!meta) loadMeta();
     runStartCard = { rank, suit };
@@ -2217,7 +2225,7 @@ function openRunStartEquip(rank, suit){
     runStartVowLevels = { mosha: getVowLevel('mosha'), muyoku: getVowLevel('muyoku'), isshin: getVowLevel('isshin'), konnan: getVowLevel('konnan') };
     // パッシブは、持っている数ぶんデフォルトで全部使う状態から始める（減らしたければここで調整できる）
     runStartPassiveLevels = {
-        coin: meta.passiveCoin, hp: meta.passiveHp, shopRare: meta.passiveShopRare,
+        coin: meta.passiveCoin, hp: meta.passiveHp, autoheal: meta.passiveAutoheal,
         potionS: meta.potionS, potionM: meta.potionM, potionL: meta.potionL,
     };
     renderRunStartEquip();
@@ -2226,7 +2234,7 @@ function openRunStartEquip(rank, suit){
 function renderRunStartEquip(){
     // 星の祭壇で獲得していないジャンルは、そもそもセクションごと出さない（はじめてのプレイヤーへの情報過多を避ける）
     const hasSkillCollection = Object.keys(meta.skillCollection).length > 0;
-    const hasAnyPassive = meta.passiveCoin > 0 || meta.passiveHp > 0 || meta.passiveShopRare > 0 || meta.potionS || meta.potionM || meta.potionL;
+    const hasAnyPassive = meta.passiveCoin > 0 || meta.passiveHp > 0 || meta.passiveAutoheal > 0 || meta.potionS || meta.potionM || meta.potionL;
     const hasAnyVow = VOW_IDS.some(id => isVowUnlocked(id));
     document.getElementById('runstart-skill-section').classList.toggle('hidden', !hasSkillCollection);
     document.getElementById('runstart-passive-section').classList.toggle('hidden', !hasAnyPassive);
@@ -2362,11 +2370,11 @@ function continueGame(){
 }
 // collectionSkillId：スキルコレクションから今回つけて始めるスキル（未選択ならnull）
 // vowLevels：{mosha,muyoku,isshin,konnan} 今回のランで実際に使う誓いのレベル（未指定ならすべて0）
-// passiveLevels：{coin,hp,shopRare,potionS,potionM,potionL} 今回のランで実際に使うパッシブの量（未指定なら所持ぶん全部）
+// passiveLevels：{coin,hp,autoheal,potionS,potionM,potionL} 今回のランで実際に使うパッシブの量（未指定なら所持ぶん全部）
 function newGame(starterRank, starterSuit, collectionSkillId, vowLevels, passiveLevels){
     clearSave();
     if (!meta) loadMeta();
-    const pl = passiveLevels || { coin: meta.passiveCoin, hp: meta.passiveHp, shopRare: meta.passiveShopRare, potionS: meta.potionS, potionM: meta.potionM, potionL: meta.potionL };
+    const pl = passiveLevels || { coin: meta.passiveCoin, hp: meta.passiveHp, autoheal: meta.passiveAutoheal, potionS: meta.potionS, potionM: meta.potionM, potionL: meta.potionL };
     const starterCard = makeCard(starterRank, starterSuit, true);
     starterCard.isStarter = true;
     if (collectionSkillId && skillAllowedForCard(charSkill(collectionSkillId), starterCard)){
@@ -2395,12 +2403,10 @@ function newGame(starterRank, starterSuit, collectionSkillId, vowLevels, passive
         starterRank, starterSuit,
         passiveLevels: pl,
         vowLevels: vowLevels || { mosha:0, muyoku:0, isshin:0, konnan:0 },
-        blessingActive: false, // 女神の祝福：このステージの間ずっとダメージ1.25倍
-        blessingUsedThisStage: false, // 女神の祝福：このステージで既に発生済みなら再抽選対象から除く
+        blessingCount: 0, // 女神の祝福：このステージでの発生回数（重複可、倍率は1+0.25×回数）
         enemyBuffActive: false, // 呪われた宝箱：次の1戦だけ敵ステータス×1.2
         fatigueActive: false, // 疲労：このステージの間ずっと撃破報酬コインが-20%
         fatigueUsedThisStage: false, // 疲労：このステージで既に発生済みなら再抽選対象から除く
-        shopHasRarePack: false, // ショップの品ぞろえパッシブ：お店に入るたび抽選しなおす
         lastEventId: null, // 直前に発生したマップイベント
     };
     // game.vowLevelsが必要なrollNodeType()（無欲の誓い）が動くよう、game代入が終わったあとにマップを作る
@@ -2936,7 +2942,7 @@ function backToStarterGrid(){
 function hasAnyMetaProgress(){
     if (!meta) loadMeta();
     if (Object.keys(meta.skillCollection).length > 0) return true;
-    if (meta.passiveCoin > 0 || meta.passiveHp > 0 || meta.passiveShopRare > 0) return true;
+    if (meta.passiveCoin > 0 || meta.passiveHp > 0 || meta.passiveAutoheal > 0) return true;
     if (meta.potionS || meta.potionM || meta.potionL) return true;
     if (VOW_IDS.some(id => isVowUnlocked(id))) return true;
     return false;
@@ -3129,6 +3135,9 @@ function chooseMapNode(i){
     }
     const node = game.mapStage.current.children[i];
     game.mapStage.current = node;
+    // 自動回復パッシブ：マスを1つ進むごとに、所持個数ぶんHPが回復する
+    const autohealAmount = activePassiveLevel('autoheal');
+    if (autohealAmount > 0) game.player.hp = Math.min(game.playerMaxHp, game.player.hp + autohealAmount);
     enterMapNode(node);
 }
 function enterMapNode(node){
@@ -3155,31 +3164,23 @@ const SHOP_OFFERS = [
 ];
 // スキルの巻物は露天商（game.shopDiscountActive）限定の品ぞろえ。通常のショップには並ばない。
 const SKILL_SCROLL_OFFER = { id:'skillScroll', label:'スキルの巻物', desc:'カードのスキルを1つ選んでレベルアップ', price:30, img:'images/events/event_4.png' };
-// ショップの品ぞろえパッシブ：お店マスに入るたび、パッシブのレベル×10%の確率でレアパックが品ぞろえに並ぶ
-// （1つ60コインで何個でも買える）。別のお店マスに入ると再抽選される。
-function rollShopRarePack(){
-    return Math.random() < Math.min(1, activePassiveLevel('shopRare') * 0.10);
-}
 function getShopOffers(){
     // 露天商（商人イベント）ではカードパックは売らない。かわりにスキルの巻物が並ぶ。
     const offers = game.shopDiscountActive ? SHOP_OFFERS.filter(o => o.id !== 'pack') : SHOP_OFFERS.slice();
-    if (game.shopHasRarePack) offers.push({ id:'rarepack', label:'レアパック', desc:'カードが2枚（20%の確率で2スキル持ちに）', price:60, img:'images/cardpack_2.png' });
     if (game.shopDiscountActive) offers.unshift(SKILL_SCROLL_OFFER); // 一番左に表示
     return offers;
 }
 function openShop(){
     game.shopDiscountActive = false;
-    game.shopHasRarePack = rollShopRarePack();
     document.getElementById('shop-title').textContent = '🛒 ショップ';
     document.getElementById('shop-illust').style.display = 'none'; // 露天商イベント以外ではイラストなし
     document.getElementById('shop-log').textContent = '';
     renderShop();
     showScreen('shop-screen');
 }
-// 商人イベント：ショップ画面をそのまま開き、いる間はずっと割引価格（50%OFF）にする。品ぞろえパッシブの対象外。
+// 商人イベント：ショップ画面をそのまま開き、いる間はずっと割引価格（50%OFF）にする。
 function openEventMerchant(){
     game.shopDiscountActive = true;
-    game.shopHasRarePack = false;
     document.getElementById('shop-title').textContent = '🛒 露天商';
     setEventIllustImg(document.getElementById('shop-illust'), 'merchant');
     document.getElementById('shop-log').textContent = '露天商だ！割引価格で品物を買える！';
@@ -3210,11 +3211,10 @@ function buyShopItem(id){
     const price = offer ? shopPriceFor(offer) : 0;
     if (!offer || game.chips < price) return;
     game.chips -= price;
-    if (offer.id === 'pack' || offer.id === 'rarepack'){
-        const rare = offer.id === 'rarepack';
+    if (offer.id === 'pack'){
         // 敵撃破時のパックと同じ、タップして開ける演出を使う。閉じたらショップへ戻る
-        lastOpenedPackCards = rare ? generateRarePack() : generateNormalPack();
-        showPackReveal(rare ? '✨ レアパック' : '🎁 カードパック', rare ? 'rare' : 'normal', () => { renderShop(); showScreen('shop-screen'); });
+        lastOpenedPackCards = generateNormalPack();
+        showPackReveal('🎁 カードパック', 'normal', () => { renderShop(); showScreen('shop-screen'); });
         return;
     }
     if (offer.id === 'skillScroll'){
@@ -3289,9 +3289,9 @@ function setEventIllustImg(imgEl, id){
     imgEl.style.display = '';
 }
 function openMapEvent(){
-    // 女神の祝福・疲労は、このステージ中に一度発生したら以後の抽選対象から除く（重複しない）
+    // 疲労は、このステージ中に一度発生したら以後の抽選対象から除く（重複しない）。
+    // 女神の祝福は重複OK（発生するたびに加算で重ねがけされる。openEventBlessing参照）
     let events = MAP_EVENTS;
-    if (game.blessingUsedThisStage) events = events.filter(e => e.id !== 'blessing');
     if (game.fatigueUsedThisStage) events = events.filter(e => e.id !== 'fatigue');
     const posList = events.filter(e => e.kind === 'pos');
     const negList = events.filter(e => e.kind === 'neg');
@@ -3509,11 +3509,12 @@ function showShrineResult(card, skillId, beforeLv, afterLv){
 }
 function closeShrineResult(){ returnToMap(); }
 
-// ---- 女神の祝福：このステージの間ずっとダメージ1.25倍（computeDamageで参照、ステージ進行でリセット）。重複しない ----
+// ---- 女神の祝福：このステージの間ダメージ倍率+25%（computeDamageで参照、ステージ進行でリセット）。
+//      重複可能で、加算で重ねがけされる（2回出たら1+0.25+0.25=1.5倍） ----
+function blessingMult(){ return 1 + 0.25 * (game.blessingCount || 0); }
 function openEventBlessing(){
-    game.blessingActive = true;
-    game.blessingUsedThisStage = true;
-    openEventGeneric('✨ 女神の祝福', '女神の祝福を受けた！<br>このステージの間、ダメージが1.25倍になる！', 'blessing');
+    game.blessingCount = (game.blessingCount || 0) + 1;
+    openEventGeneric('✨ 女神の祝福', `女神の祝福を受けた！<br>このステージの間、ダメージが${blessingMult()}倍になる！`, 'blessing');
 }
 
 // ---- 盗賊：所持コインの25/50/75/100%のいずれかを奪われる ----
@@ -3623,7 +3624,7 @@ function renderStatusLine(elId, parts){
 }
 function renderPlayerStatusLine(){
     const parts = [];
-    if (game.blessingActive) parts.push('攻撃力×1.25');
+    if (game.blessingCount > 0) parts.push(`攻撃力×${blessingMult()}`);
     if (game.enemy && hasAbility(game.enemy, 'poison') && game.enemy.poisonStack > 0) parts.push('毒');
     renderStatusLine('battle-player-status', parts);
 }
@@ -3652,6 +3653,13 @@ function updateBattleBars(){
     document.getElementById('stat-stage').textContent = `${game.mapStage.n}-${game.mapStage.current.m}`;
     document.getElementById('stat-turn').textContent = game.stats.turnsTaken;
     document.getElementById('stat-score').textContent = `${liveScore()}pt`;
+}
+// HPが0になったときは、updateBattleBars()で0%まで縮むHPバーのtransition(0.3s)が見えるのを待ってから、
+// さらに0.5秒おいてゲームオーバー画面を出す（即座に切り替わるとHPが0になる瞬間を見届けられないため）
+function checkBattleGameOver(){
+    if (game.player.hp > 0) return false;
+    setTimeout(() => finishRun(false), 800);
+    return true;
 }
 function addToHand(card){ game.turn.hand.push(card); }
 // A(エース)が1枚以上あるときの「最小合計」「最大合計（バーストしない範囲でなるべく11を使う）」を計算する
@@ -3931,7 +3939,7 @@ function applyPoisonTick(callback){
             game.player.hp -= enemy.poisonStack;
             triggerPlayerHitEffect();
             updateBattleBars();
-            if (game.player.hp <= 0){ finishRun(false); return; }
+            if (checkBattleGameOver()) return;
             callback();
         }, 700);
     } else {
@@ -3951,7 +3959,7 @@ function resolveTurn(busted){
     } else {
         const { total, mult } = currentMultInfo();
         let dmg = computeDamage(total, mult, game.turn.hand, game.enemy, game.turn.extraDmg);
-        if (game.blessingActive) dmg = Math.round(dmg * 1.25); // 女神の祝福：このステージ中はダメージ1.25倍
+        if (game.blessingCount > 0) dmg = Math.round(dmg * blessingMult()); // 女神の祝福：重複可（加算で重ねがけ）
         game.enemy.hp -= dmg;
         game.stats.totalDamage += dmg;
         floatText('battle-enemy-avatar-wrap', `-${dmg}`, 'enemy-hit', 2400);
@@ -3994,8 +4002,7 @@ function proceedAfterTurn(){
             game.mapStage.n++;
             game.mapStage.current = buildStageMap();
             // 女神の祝福・疲労は新しいステージに入るタイミングでリセット（次のステージでまた出現しうる）
-            game.blessingActive = false;
-            game.blessingUsedThisStage = false;
+            game.blessingCount = 0;
             game.fatigueActive = false;
             game.fatigueUsedThisStage = false;
         }
@@ -4005,7 +4012,7 @@ function proceedAfterTurn(){
     }
     applyEnemyPreAttackAbilities();
     updateBattleBars();
-    if (game.player.hp <= 0){ finishRun(false); return; }
+    if (checkBattleGameOver()) return;
 
     const enemy = game.enemy;
 
@@ -4029,7 +4036,7 @@ function proceedAfterTurn(){
         game.player.hp -= incoming;
         triggerPlayerHitEffect();
         updateBattleBars();
-        if (game.player.hp <= 0){ finishRun(false); return; }
+        if (checkBattleGameOver()) return;
         applyPoisonTick(startTurn);
         return;
     }
@@ -4073,7 +4080,7 @@ function proceedAfterTurn(){
     }
 
     updateBattleBars();
-    if (game.player.hp <= 0){ finishRun(false); return; }
+    if (checkBattleGameOver()) return;
     applyPoisonTick(startTurn);
 }
 function openBattleHowTo(){ document.getElementById('howto-overlay').classList.remove('hidden'); }
