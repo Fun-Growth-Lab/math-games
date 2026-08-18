@@ -87,12 +87,12 @@
         .btn-sm { padding: 8px 12px; font-size: 0.85rem; }
         .btn[disabled] { opacity: 0.4; cursor: not-allowed; filter: none !important; }
         #title-screen .btn { max-width: 320px; margin-left: auto; margin-right: auto; }
-        /* 「つづきから」がある場合、「はじめから」と横並びにする。2つ合わせた幅は他のボタンと揃える（＝320px幅のまま） */
-        .title-start-row { display: flex; gap: 8px; max-width: 320px; margin: 10px auto 0; }
-        .title-start-row .btn {
-            flex: 1; min-width: 0; margin-top: 0; max-width: none;
-            padding-left: 6px; padding-right: 6px; font-size: 0.82rem; white-space: nowrap;
-        }
+        /* 「つづきから」がある場合、「はじめから」と横並びにする。行の器（title-box）自体の幅は変えず、
+           2つ並ぶときだけ他の単独ボタン(320px)より少し広い460pxまで使ってよいので、フォントは縮めなくてよい。
+           「つづきから」が無いとき（.hiddenが付いているとき）は、はじめからを単独ボタンと同じ320px幅に戻す。 */
+        .title-start-row { display: flex; gap: 10px; max-width: 460px; margin: 10px auto 0; }
+        .title-start-row .btn { flex: 1; min-width: 0; margin-top: 0; max-width: none; white-space: nowrap; }
+        .title-start-row:has(#btn-continue.hidden) { max-width: 320px; }
         /* タイトル画面いっぱいの背景イラスト（title.png）。Math_Braves_additionと同じく等倍の濃さで表示し、
            透け感はボックス側のbackground-color薄め＋backdrop-filterで作る（画像側を薄くする方式だと効果が弱かった） */
         .title-bg-img {
@@ -914,8 +914,8 @@
             <h1 class="title-h1">ブラックジャック・アルカナ</h1>
             <p class="title-sub">BLACKJACK ARCANA</p>
             <div class="title-start-row">
-                <button id="btn-continue" class="btn btn-gold hidden" onclick="continueGame()">▶ つづきから</button>
                 <button class="btn btn-gold" onclick="goToStarterSelect()">はじめから</button>
+                <button id="btn-continue" class="btn btn-gold hidden" onclick="continueGame()">▶ つづきから</button>
             </div>
             <button id="btn-name-register" class="btn btn-gray" onclick="openNameRegister()">👤 名前の登録</button>
             <button class="btn btn-gray" onclick="openMetaHub()">🌟 星の祭壇</button>
@@ -2076,27 +2076,24 @@ function buyPassive(id){
 // 一心はポーション回復量計算、スコアボーナスはliveScore側でそれぞれ参照する。
 const VOWS = [
     { id:'mosha',  label:'⚔️ 猛者の誓い', effectText:lv => `敵HP・攻撃力+${lv*10}%`, scoreText:lv => `スコア+${lv*20}%` },
-    { id:'muyoku', label:'🙏 無欲の誓い', effectText:lv => `ショップが出にくくなる`, scoreText:lv => `スコア+${lv*10}%` },
-    { id:'isshin', label:'💧 一心の誓い', effectText:lv => `ポーションの効果-${lv*10}%`, scoreText:lv => `スコア+${lv*10}%` },
-    { id:'konnan', label:'⛈️ 困難の誓い', effectText:lv => `悪いイベントが出やすくなる(+${lv*10}%)`, scoreText:lv => `スコア+${lv*10}%` },
+    { id:'muyoku', label:'🙏 無欲の誓い', effectText:lv => `ショップが出にくくなる`, scoreText:lv => `スコア+${lv*20}%` },
+    { id:'isshin', label:'💧 一心の誓い', effectText:lv => `ポーションの効果-${lv*10}%`, scoreText:lv => `スコア+${lv*20}%` },
+    { id:'konnan', label:'⛈️ 困難の誓い', effectText:lv => `悪いイベントが出やすくなる(+${lv*10}%)`, scoreText:lv => `スコア+${lv*20}%` },
 ];
-// 誓い共通：全ての誓いは「アルカナのかけら+10%（レベルごと）」を持つ（スコアの伸び方は誓いごとに異なる）
-function vowShardText(lv){ return `アルカナのかけら+${lv*10}%`; }
+// 誓い共通：全ての誓いは「スコア+20%」「アルカナのかけら+20%」（レベルごと）を持つ（effectTextの実際の効果だけが誓いごとに異なる）
+function vowShardText(lv){ return `アルカナのかけら+${lv*20}%`; }
 // そのランで実際に使う誓いレベル（0〜購入上限）。ラン開始前の選択画面でgame.vowLevelsにセットする。
 function vowScoreBonusPct(){
     if (!game || !game.vowLevels) return 0;
     let pct = 0;
-    VOW_IDS.forEach(id => {
-        const lv = game.vowLevels[id] || 0;
-        pct += lv * (id === 'mosha' ? 20 : 10);
-    });
+    VOW_IDS.forEach(id => { pct += (game.vowLevels[id] || 0) * 20; });
     return pct;
 }
-// クリア時に得るアルカナのかけらへのボーナス（誓いレベル×10%、全誓い共通・合算）
+// クリア時に得るアルカナのかけらへのボーナス（誓いレベル×20%、全誓い共通・合算）
 function vowShardBonusPct(){
     if (!game || !game.vowLevels) return 0;
     let pct = 0;
-    VOW_IDS.forEach(id => { pct += (game.vowLevels[id] || 0) * 10; });
+    VOW_IDS.forEach(id => { pct += (game.vowLevels[id] || 0) * 20; });
     return pct;
 }
 function activeVowLevel(id){ return (game && game.vowLevels && game.vowLevels[id]) || 0; }
@@ -3575,14 +3572,14 @@ function spinMachine(){
 }
 function closeEventMachine(){ returnToMap(); }
 
-// ---- 呪われた宝箱：70%でコイン+30、30%で次の戦闘だけ敵が強化（HP・攻撃力×1.2） ----
+// ---- あやしい宝箱：70%でコイン+30（幸運）、30%で次の戦闘だけ敵が強化（不運、HP・攻撃力×1.2） ----
 function openEventCursedChest(){
     if (Math.random() < 0.70){
         game.chips += 30;
-        openEventGeneric('📦 呪われた宝箱', '開けると… 🪙 コイン +30 が転がり出た！', 'cursedChest');
+        openEventGeneric('📦 あやしい宝箱', '開けると…<br>幸運にも 🪙 コイン +30 が転がり出た！', 'cursedChest');
     } else {
         game.enemyBuffActive = true;
-        openEventGeneric('📦 呪われた宝箱', '開けると…呪いだ！<br>次の戦闘だけ敵が強化される（HP・攻撃力×1.2）！', 'cursedChest');
+        openEventGeneric('📦 あやしい宝箱', '開けると…<br>不運にも、次の戦闘だけ敵が強化されてしまった（HP・攻撃力×1.2）！', 'cursedChest');
     }
 }
 
