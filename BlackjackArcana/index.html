@@ -864,8 +864,8 @@
         /* 画面の実物の要素そのものを光らせる「スポットライト」演出。ダイアログで隠さず、実際の場所を指させる */
         .tutorial-spotlight {
             position: relative; z-index: 150; border-radius: 12px;
-            outline: 4px solid var(--gold-bright); outline-offset: 4px;
-            box-shadow: 0 0 0 4px var(--gold-bright), 0 0 26px 8px rgba(244,216,114,0.8);
+            outline: 4px solid #2de1ff; outline-offset: 4px;
+            box-shadow: 0 0 0 4px #2de1ff, 0 0 26px 8px rgba(45,225,255,0.85);
         }
         #tutorial-spotlight-caption {
             position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
@@ -876,7 +876,18 @@
         #tutorial-spotlight-caption p { font-size: 1.05rem; font-weight: 700; color: var(--text-hi); margin-bottom: 12px; line-height: 1.6; }
         /* メッセージ吹き出しは既存の.overlay/.overlay-boxを流用し、スポットライトより前面に出す */
         #tutorial-msg-overlay { z-index: 300; }
+        /* 特定の説明だけ、隠したくないボタン等を避けて表示位置をずらすための修飾クラス */
+        #tutorial-msg-overlay.pos-top { align-items: flex-start; padding-top: 30px; }
+        #tutorial-msg-overlay.pos-bottom { align-items: flex-end; padding-bottom: 24px; }
         #tutorial-entry-btn { position: absolute; top: 14px; left: 14px; width: auto; margin: 0; padding: 8px 16px; font-size: 0.82rem; }
+        /* チュートリアル中は台本にないボタンを押せないようにする（タイトルへ戻るボタンだけは例外） */
+        #container.tutorial-lock #map-right-panel .bp-bottom-btns button:not(.tutorial-keep-enabled),
+        #container.tutorial-lock #battle-right-panel .bp-bottom-btns button:not(.tutorial-keep-enabled),
+        #container.tutorial-lock #chip-bet-row,
+        #container.tutorial-lock .potion-btn[data-item="potionM"],
+        #container.tutorial-lock .potion-btn[data-item="potionL"] {
+            pointer-events: none; opacity: 0.4; filter: grayscale(0.6);
+        }
         /* ==================== REWARD / EVENTS ==================== */
         #itemget-screen .title-box { width: 480px; }
         .itemget-icon { width: 28px; height: 28px; object-fit: contain; vertical-align: middle; }
@@ -1038,7 +1049,7 @@
     <!-- ==================== STARTER CARD SELECT（52枚から最初の1枚を選ぶ。クリア済みカードは実績としてはっきり表示） ==================== -->
     <div id="starter-select-screen" class="hidden">
         <div class="title-box">
-            <button id="tutorial-entry-btn" class="btn btn-gray" onclick="startTutorial()">📘 チュートリアル</button>
+            <button id="tutorial-entry-btn" class="btn btn-gray" onclick="startTutorial()">🔰 チュートリアル</button>
             <h1 class="settings-title">🃏 <ruby>最初<rt>さいしょ</rt></ruby>の1<ruby>枚<rt>まい</rt></ruby>を<ruby>選<rt>えら</rt></ruby>ぼう</h1>
             <div class="starter-clear-pct">クリア<ruby>率<rt>りつ</rt></ruby> <span id="starter-clear-pct-value">0%</span></div>
             <div class="starter-random-btns">
@@ -1095,7 +1106,7 @@
                 <button class="btn btn-gold" style="padding:16px 18px; font-size:1.05rem;" onclick="goToDeckBuilder()">🧩 デッキ構築</button>
                 <button class="btn btn-gray" style="padding:16px 18px; font-size:1.05rem;" id="fusion-btn" onclick="goToCardFusion()">🔮 カードの合成</button>
                 <button class="btn btn-gray btn-sm" onclick="openBattleHowTo()">📖 あそびかた</button>
-                <button class="btn btn-gray btn-sm" onclick="giveUpRun()">🏳️ タイトルへ</button>
+                <button class="btn btn-gray btn-sm tutorial-keep-enabled" onclick="giveUpRun()">🏳️ タイトルへ</button>
             </div>
         </div>
     </div>
@@ -1432,7 +1443,7 @@
                 <button class="btn btn-gray btn-sm" onclick="openBattleHowTo()">📖 あそびかた</button>
                 <button class="btn btn-gray btn-sm" onclick="openCharCollection()">🎴 キャラクターカード</button>
                 <button class="btn btn-gray btn-sm" onclick="openNormalCollection()">🃏 通常カード</button>
-                <button class="btn btn-gray btn-sm" onclick="battleBackToTitle()">🏠 タイトルへ</button>
+                <button class="btn btn-gray btn-sm tutorial-keep-enabled" onclick="battleBackToTitle()">🏠 タイトルへ</button>
             </div>
         </div>
     </div>
@@ -1537,13 +1548,13 @@
     <div id="tutorial-msg-overlay" class="overlay hidden">
         <div class="overlay-box" style="width:520px; padding:28px 30px;">
             <p id="tutorial-msg-text" style="font-size:1.1rem; font-weight:700; color:var(--text-hi); margin:6px 0 22px; line-height:1.7;"></p>
-            <button class="btn btn-gold" style="margin-top:0;" onclick="closeTutorialMessage()">OK</button>
+            <button id="tutorial-msg-ok-btn" class="btn btn-gold" style="margin-top:0;" onclick="closeTutorialMessage()">OK</button>
         </div>
     </div>
     <!-- ==================== チュートリアル：画面の各部分を光らせて説明するキャプション ==================== -->
     <div id="tutorial-spotlight-caption" class="hidden">
         <p id="tutorial-spotlight-text"></p>
-        <button class="btn btn-gold btn-sm" style="width:auto; margin:0;" onclick="advanceTutorialSpotlight()">OK</button>
+        <button id="tutorial-spotlight-ok-btn" class="btn btn-gold btn-sm" style="width:auto; margin:0; display:inline-block;" onclick="advanceTutorialSpotlight()">OK</button>
     </div>
     <!-- ==================== チュートリアル：完了画面 ==================== -->
     <div id="tutorial-complete-overlay" class="overlay hidden" style="z-index:300;">
@@ -3217,9 +3228,8 @@ function useItem(id){
     renderPotionButtons();
     if (tutorialActive && tutorialTurnNum === 2 && id === 'potionS' && !tutorialFlags.potionUsedTurn2){
         tutorialFlags.potionUsedTurn2 = true;
-        showTutorialMessage('HPが回復しました！では戦闘を続けましょう。「カードを引く」を押してみましょう。', () => {
-            startTurn();
-        });
+        // 2枚目のキャラクターカードはtutorialSetupTurn2側で既にターン開始済みなので、ここではstartTurn()を呼び直さない
+        showTutorialMessage('HPが回復しました！では戦闘を続けましょう。「カードを引く」を押してみましょう。');
     }
 }
 
@@ -3442,7 +3452,7 @@ function closeShop(){
             showTutorialMessage('回復ポーション(小)を買ってから、マップへ戻りましょう。');
             return;
         }
-        showTutorialMessage('買い物ができました。最後は⚔️のマスで、実際に敵と戦ってみましょう。', () => { returnToMap(); });
+        showTutorialMessage('買い物ができました。最後はスライムの絵が描いてあるマスで、実際に敵と戦ってみましょう。', () => { returnToMap(); });
         return;
     }
     returnToMap();
@@ -4123,6 +4133,10 @@ function doStand(){
         showTutorialMessage('まずはカードをもう1枚引いてみましょう。');
         return;
     }
+    if (tutorialActive && tutorialTurnNum === 2 && game.turn.aceChoice === 'min'){
+        showTutorialMessage('Aは11として数えたほうが「7の倍数」ボーナスが発動します。合計21（A=11）を選んでから攻撃しましょう。');
+        return;
+    }
     resolveTurn(false);
 }
 // extraDmg（通常カードの「攻撃5ダメージ」スキル）は、倍率をかけたあとに足す＝倍率の影響を受けない
@@ -4315,7 +4329,7 @@ function proceedAfterTurn(){
 }
 function openBattleHowTo(){ document.getElementById('howto-overlay').classList.remove('hidden'); }
 function closeBattleHowTo(){ document.getElementById('howto-overlay').classList.add('hidden'); }
-function battleBackToTitle(){ showScreen('title-screen'); }
+function battleBackToTitle(){ if (tutorialActive) resetTutorialState(); showScreen('title-screen'); }
 
 // ============================================================
 // 撃破ボーナス：
@@ -4823,18 +4837,31 @@ let tutorialSpotlightIndex = 0;
 let tutorialSpotlightDoneCallback = null;
 let tutorialHitsThisTurn = 0;
 let tutorialTurnNum = 0; // 0=戦闘前、1=1ターン目、2=2ターン目
+let tutorialMsgPending = false; // 演出を見せるため遅延表示している間、trueにして操作を受け付けない
 
-// チュートリアル中、説明ポップアップやスポットライトが出ている間は他の操作を受け付けない
+// チュートリアル中、説明ポップアップやスポットライトが出ている間（表示待ちの遅延中も含む）は他の操作を受け付けない
 function isTutorialBlocking(){
     if (!tutorialActive) return false;
+    if (tutorialMsgPending) return true;
     if (!document.getElementById('tutorial-msg-overlay').classList.contains('hidden')) return true;
     if (!document.getElementById('tutorial-spotlight-caption').classList.contains('hidden')) return true;
     return false;
 }
-function showTutorialMessage(text, onOk){
+function showTutorialMessage(text, onOk, pos){
     document.getElementById('tutorial-msg-text').textContent = text;
     tutorialMsgOkCallback = onOk || null;
-    document.getElementById('tutorial-msg-overlay').classList.remove('hidden');
+    const overlay = document.getElementById('tutorial-msg-overlay');
+    overlay.classList.remove('pos-top', 'pos-bottom');
+    if (pos) overlay.classList.add('pos-' + pos);
+    overlay.classList.remove('hidden');
+}
+// 演出（カードやバナー）を先に見せてから、少し遅れてポップアップを出したいときに使う
+function showTutorialMessageDelayed(delayMs, text, onOk, pos){
+    tutorialMsgPending = true;
+    setTimeout(() => {
+        tutorialMsgPending = false;
+        showTutorialMessage(text, onOk, pos);
+    }, delayMs);
 }
 function closeTutorialMessage(){
     document.getElementById('tutorial-msg-overlay').classList.add('hidden');
@@ -4871,8 +4898,9 @@ function advanceTutorialSpotlight(){
 }
 const TUTORIAL_MAP_TOUR = [
     { selector: '#map-left-panel', text: 'ここは主人公の情報です。HP・経験値・所持コインと、回復ポーションのボタンが並びます。' },
-    { selector: '#map-center', text: 'ここがマップです。2つの分かれ道から1つを選んで進みます。マークで何のマスか分かります（❓イベント／🛒ショップ／⚔️敵）。' },
-    { selector: '#map-right-panel', text: 'ここは目的地までの道のりです。BOSSを倒すとステージクリアになります。' },
+    { selector: '#map-center', text: 'ここがマップです。2つの分かれ道から1つを選んで進みます。マークで何のマスか分かります（❓イベント／🛒ショップ）。敵のマスにはその敵のイラストが描かれ、エリート（強敵）には⭐マークがつきます。' },
+    { selector: '#map-boss-track', text: '現在のステージとBOSSまでの道のりがわかります。' },
+    { selector: '#map-right-panel .bp-bottom-btns', text: '持っているカードのうち使うカードを選んでセットすることができます。' },
 ];
 const TUTORIAL_BATTLE_TOUR = [
     { selector: '#battle-left-panel', text: 'ここは自分の情報です。HPが0になるとゲームオーバーです。回復ポーションもここから使えます。' },
@@ -4895,13 +4923,15 @@ function startTutorial(){
     tutorialTurnNum = 0;
     // 誓い・パッシブ・スキルコレクションの影響を受けない、まっさらな状態で強制的に始める
     newGame('5', 'H', null, { mosha:0, muyoku:0, isshin:0, konnan:0 }, { coin:0, hp:0, autoheal:0, potionS:false, potionM:false, potionL:false });
+    game.chips = 5; // イベントの+10とあわせて15枚に固定し、回復ポーション(小)しか買えない状態にする
     const starter = game.charCollection[0];
     starter.skills = ['odd'];
     starter.skillLv = { odd: 1 };
     game.mapStage.current = buildTutorialStageMap();
+    document.getElementById('container').classList.add('tutorial-lock');
     goToMap();
     startTutorialSpotlight(TUTORIAL_MAP_TOUR, () => {
-        showTutorialMessage('チュートリアルを始めましょう。まずは❓のマスに進んで、イベントを体験してみましょう。');
+        showTutorialMessage('チュートリアルを始めましょう。まずは❓のマスに進んで、イベントを体験してみましょう。イベントでは様々なことが起こります。良いことだけでなく、よくないことも起こります。');
     });
 }
 // ---- ①イベント（宝箱）：コイン+10と回復ポーション(中)を確定で入手 ----
@@ -4929,14 +4959,14 @@ function enterTutorialBattle(){
     game.normalDiscard = [];
     startBattle();
     startTutorialSpotlight(TUTORIAL_BATTLE_TOUR, () => {
-        showTutorialMessage('では「カードを引く」を押して、手札を増やしてみましょう。');
+        showTutorialMessage('では「カードを引く」を押して、手札を増やしてみましょう。', null, 'top');
     });
 }
 // 手札にカードを引くたびに呼ばれ、そのときどきの教える内容を出す
 function tutorialAfterHit(){
     if (tutorialTurnNum === 1){
         if (tutorialHitsThisTurn === 1){
-            showTutorialMessage('スペードの5が出ました。最初のカード（ハートの5）と同じ数字なので「数字がそろった」ボーナスが発動しています。もう1枚引いてみましょう。');
+            showTutorialMessageDelayed(1000, 'スペードの5が出ました。最初のカード（ハートの5）と同じ数字なので「数字がそろった」ボーナスが発動しています。もう1枚引いてみましょう。', null, 'bottom');
         } else if (tutorialHitsThisTurn === 2){
             showTutorialMessage('ハートの9が出ました。ハートの5と同じマークなので「マークがそろった」ボーナスも発動！ さらに合計が19（奇数）になったので、キャラクターカードのスキル「奇数」も発動しています。「攻撃する」を押してみましょう。');
         }
@@ -4963,6 +4993,8 @@ function tutorialSetupTurn2(){
     game.normalDiscard = [];
     tutorialTurnNum = 2;
     tutorialHitsThisTurn = 0;
+    // カードが画面に出た状態で説明を出すため、先にターンを開始してから案内を出す
+    startTurn();
     showTutorialMessage('2枚目のキャラクターカード「クローバーのA」が使えるようになりました。スキルは「3カード」（手札がちょうど3枚で発動）と「7の倍数」（合計が7の倍数で発動）です。まずは回復ポーション(小)を使ってHPを回復してみましょう。');
 }
 function tutorialFinish(){
@@ -4985,6 +5017,8 @@ function resetTutorialState(){
     tutorialFlags = { potionBought: false, potionUsedTurn2: false };
     tutorialHitsThisTurn = 0;
     tutorialTurnNum = 0;
+    tutorialMsgPending = false;
+    document.getElementById('container').classList.remove('tutorial-lock');
     document.getElementById('tutorial-msg-overlay').classList.add('hidden');
     document.getElementById('tutorial-spotlight-caption').classList.add('hidden');
     document.querySelectorAll('.tutorial-spotlight').forEach(el => el.classList.remove('tutorial-spotlight'));
@@ -5006,6 +5040,14 @@ scaleContainer();
 // 「つぎへ」系のボタン（.js-enter-next）は、表示されているときEnterキーでも押せるようにする
 document.addEventListener('keydown', e => {
     if (e.key !== 'Enter') return;
+    // チュートリアルの説明ポップアップ／スポットライトが出ている間は、そちらのOKを優先する
+    if (isTutorialBlocking()){
+        const tbtn = document.getElementById('tutorial-msg-overlay').classList.contains('hidden')
+            ? document.getElementById('tutorial-spotlight-ok-btn')
+            : document.getElementById('tutorial-msg-ok-btn');
+        if (tbtn && tbtn.offsetParent !== null){ e.preventDefault(); tbtn.click(); }
+        return;
+    }
     const btn = Array.from(document.querySelectorAll('.js-enter-next')).find(b => b.offsetParent !== null && !b.disabled);
     if (btn){ e.preventDefault(); btn.click(); }
 });
