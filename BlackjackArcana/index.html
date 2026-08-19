@@ -223,14 +223,22 @@
         .rank-toggle-btn.active { border-color: var(--gold); background: #2a2410; color: var(--gold-bright); }
         .rank-loading { padding: 20px; color: var(--text-dim); }
         .rank-list { list-style: none; text-align: left; max-height: 340px; overflow-y: auto; }
-        .rank-row {
-            display: grid; grid-template-columns: 34px 1fr 60px 70px 56px; gap: 6px; align-items: center;
-            padding: 7px 8px; border-radius: 8px; margin-bottom: 5px; background: var(--panel-bg); font-size: 0.82rem;
+        .rank-row, .rank-header {
+            display: grid; grid-template-columns: 34px 1fr 52px 56px 70px 56px; gap: 6px; align-items: center;
+            padding: 7px 8px; font-size: 0.82rem;
         }
+        .rank-row { border-radius: 8px; margin-bottom: 5px; background: var(--panel-bg); }
+        .rank-header {
+            color: var(--text-dim); font-size: 0.68rem; font-weight: 700; padding-bottom: 4px;
+            border-bottom: 1px solid rgba(212,175,55,0.25);
+        }
+        .rank-header span:nth-child(n+3) { text-align: right; }
         .rank-row-empty { padding: 20px; text-align: center; color: var(--text-dim); }
         .rank-num { font-weight: 800; color: var(--text-dim); }
         .rank-num.top3 { font-size: 1.1rem; }
         .rank-pname { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .rank-cleared { text-align: center; color: var(--gold-bright); font-weight: 800; font-size: 0.72rem; white-space: nowrap; }
+        .rank-stage { text-align: right; color: var(--text-main); font-weight: 700; font-size: 0.76rem; white-space: nowrap; }
         .rank-score { text-align: right; color: var(--gold-bright); font-weight: 700; }
         .rank-date { text-align: right; color: var(--text-dim); font-size: 0.72rem; white-space: nowrap; }
 
@@ -972,6 +980,7 @@
                 <button id="rank-tab-world-btn" class="rank-toggle-btn" onclick="switchRankTab('world')">ワールド</button>
             </div>
             <div id="rank-loading" class="rank-loading" style="display:none;">読み込み中…</div>
+            <div class="rank-header"><span></span><span>名前</span><span>クリア</span><span>到達</span><span>スコア</span><span>日付</span></div>
             <ul id="rank-list" class="rank-list"></ul>
             <button class="btn btn-gray" onclick="closeRanking()">◀ タイトルへ戻る</button>
         </div>
@@ -2891,13 +2900,25 @@ function renderRankList(rows){
     listEl.innerHTML = rows.map((r, i) => {
         const numTxt = i < 3 ? medals[i] : `${i + 1}.`;
         const numCls = i < 3 ? 'rank-num top3' : 'rank-num';
-        // ワールドランキング側がまだ古い形式（stageではなくdefeated）を返す場合のフォールバックも残す
-        const stageTxt = r.stage ? r.stage : (r.defeated !== undefined ? `撃破${r.defeated}` : '-');
+        // stageは「クリア n-m」または「n-m」の結合文字列（recordRunResult参照）なので、
+        // 「クリアしたか」と「到達ステージ」の2列に分けて表示する。
+        // 古い形式のデータ（数字のないstage:'クリア'のみ、stageが無くdefeatedだけのワールド旧データ）も
+        // 見苦しくならない範囲でフォールバックする。
+        let clearedTxt = '', stageTxt = '-';
+        if (r.stage){
+            const isCleared = r.stage.startsWith('クリア');
+            const pos = r.stage.replace(/^クリア\s*/, '');
+            clearedTxt = isCleared ? '🏆クリア' : '';
+            stageTxt = pos || '-';
+        } else if (r.defeated !== undefined){
+            stageTxt = `撃破${r.defeated}`;
+        }
         const dateTxt = r.dateIso ? new Date(r.dateIso).toLocaleDateString('ja-JP', { month:'numeric', day:'numeric' }) : (r.date || '');
         return `<li class="rank-row">
             <span class="${numCls}">${numTxt}</span>
             <span class="rank-pname">${escapeHtml(r.name)}</span>
-            <span class="rank-score">${escapeHtml(stageTxt)}</span>
+            <span class="rank-cleared">${escapeHtml(clearedTxt)}</span>
+            <span class="rank-stage">${escapeHtml(stageTxt)}</span>
             <span class="rank-score">${r.score}pt</span>
             <span class="rank-date">${escapeHtml(dateTxt)}</span>
         </li>`;
