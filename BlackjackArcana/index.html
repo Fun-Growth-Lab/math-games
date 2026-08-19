@@ -1549,7 +1549,10 @@
     const _hdr  = { 'apikey': _key, 'Authorization': 'Bearer ' + _key,
                     'Content-Type': 'application/json', 'Prefer': 'return=minimal' };
 
-    window.saveOnlineScore = async (name, score, defeatedCount, turns, difficulty) => {
+    // stage_scoreは「到達ステージ(n-m)＋クリア済みか」を1つの整数に符号化して入れる
+    // （n*1000+m*10+クリアビット。encodeStageValue()と同じ式。テーブル自体は他ゲームと共有だが、
+    //   game列で絞り込むので他ゲームのstage_scoreの意味には影響しない）。
+    window.saveOnlineScore = async (name, score, stageValue, turns, difficulty) => {
         if ((score || 0) <= 0) return;
         const res = await fetch(`${_base}/rankings`, {
             method: 'POST',
@@ -1559,7 +1562,7 @@
                 difficulty:  difficulty    || 'normal',
                 player_name: name          || 'ななしさん',
                 point_score: score         || 0,
-                stage_score: defeatedCount || 0,
+                stage_score: stageValue    || 0,
                 turns:       turns         || 0,
                 class_name:  ''
             })
@@ -1581,13 +1584,24 @@
             });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
-            return data.map(r => ({
-                name:  r.player_name,
-                score: r.point_score,
-                defeated: r.stage_score,
-                turns: r.turns,
-                date:  r.created_at ? new Date(r.created_at).toLocaleDateString('ja-JP') : ''
-            }));
+            return data.map(r => {
+                // stage_scoreをn*1000+m*10+クリアビットとしてデコードする。
+                // この変更より前に送信された古い行はstage_scoreがそのまま「撃破数」なので、
+                // n=0（=1000未満）になったときは新形式ではないとみなし、従来通り撃破数として見せる。
+                const sv = r.stage_score || 0;
+                const n = Math.floor(sv / 1000);
+                const m = Math.floor(sv / 10) % 100;
+                const cleared = sv % 10 === 1;
+                const isNewFormat = n > 0;
+                return {
+                    name:  r.player_name,
+                    score: r.point_score,
+                    stage: isNewFormat ? (cleared ? 'クリア ' : '') + `${n}-${m}` : undefined,
+                    defeated: isNewFormat ? undefined : sv,
+                    turns: r.turns,
+                    date:  r.created_at ? new Date(r.created_at).toLocaleDateString('ja-JP') : ''
+                };
+            });
         } catch (e) {
             console.error('Ranking: 読み込みエラー', e);
             return null;
@@ -2818,18 +2832,25 @@ function saveLocalScore(entry){
     list.push(entry);
     list.sort((a, b) => {
         if (b.score !== a.score) return b.score - a.score;
+        if ((b.stageValue || 0) !== (a.stageValue || 0)) return (b.stageValue || 0) - (a.stageValue || 0);
         return (b.dateIso || '').localeCompare(a.dateIso || '');
     });
     try { localStorage.setItem(RANK_STORAGE_KEY, JSON.stringify(list.slice(0, 10))); } catch (e){}
 }
 function computeFinalScore(cleared){ return Math.round(rawScore(cleared) * (1 + vowScoreBonusPct() / 100)); }
 let lastFinalScore = 0;
+// 到達ステージ(n-m)とクリア済みかどうかを、1つの数値に符号化する（ランキングの並べ替え・ワールド送信の両方で使う）。
+// n*1000+m*10+クリアビット：nが最優先、同じnならm、さらに同じ位置なら「その場でクリアしたか」がタイブレークになる。
+function encodeStageValue(n, m, cleared){ return n * 1000 + m * 10 + (cleared ? 1 : 0); }
+let lastStageValue = 0;
 function recordRunResult(cleared){
     const now = new Date();
     lastFinalScore = computeFinalScore(cleared);
-    const stage = cleared ? 'クリア' : `${game.mapStage.n}-${game.mapStage.current.m}`;
+    const n = game.mapStage.n, m = game.mapStage.current.m;
+    lastStageValue = encodeStageValue(n, m, cleared);
+    const stage = (cleared ? 'クリア ' : '') + `${n}-${m}`;
     saveLocalScore({
-        name: getCurPlayerName(), score: lastFinalScore, stage,
+        name: getCurPlayerName(), score: lastFinalScore, stage, stageValue: lastStageValue,
         turns: game.stats.turnsTaken, difficulty: game.difficulty,
         dateIso: now.toISOString(), date: now.toLocaleDateString('ja-JP')
     });
@@ -2842,7 +2863,7 @@ async function submitScoreToWorld(which){
     msg.style.color = 'var(--text-dim)';
     msg.textContent = '送信中…';
     try {
-        await window.saveOnlineScore(getCurPlayerName(), lastFinalScore, game.stats.defeatedCount, game.stats.turnsTaken, game.difficulty);
+        await window.saveOnlineScore(getCurPlayerName(), lastFinalScore, lastStageValue, game.stats.turnsTaken, game.difficulty);
         msg.style.color = 'var(--gold-bright)';
         msg.textContent = '送信しました！';
     } catch (e){
