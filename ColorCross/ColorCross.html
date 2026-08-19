@@ -171,8 +171,8 @@ canvas{position:absolute;top:0;left:0;touch-action:none;}
         <button id="btn-rank-kind-turnMax" class="rank-toggle-btn"        onclick="switchRankKind('turnMax')" data-i18n="rank.kind.turnmax">ターンMAX</button>
       </div>
       <div class="rank-toggle">
-        <button id="btn-rank-local" class="rank-toggle-btn active" onclick="switchRankTab('local')" data-i18n="rank.tab.local">ローカル</button>
-        <button id="btn-rank-world" class="rank-toggle-btn"        onclick="switchRankTab('world')" data-i18n="rank.tab.world">ワールド</button>
+        <button id="btn-rank-world" class="rank-toggle-btn active" onclick="switchRankTab('world')" data-i18n="rank.tab.world">ワールド</button>
+        <button id="btn-rank-local" class="rank-toggle-btn"        onclick="switchRankTab('local')" data-i18n="rank.tab.local">ローカル</button>
       </div>
       <div id="rank-loading" style="text-align:center;color:var(--text-dim);padding:14px 0;display:none;" data-i18n="rank.loading">読み込み中…</div>
       <ul id="rank-list" class="rank-list"></ul>
@@ -197,6 +197,7 @@ canvas{position:absolute;top:0;left:0;touch-action:none;}
     const res = await fetch(`${_base}/rankings`, {
       method: 'POST',
       headers: _hdr,
+      keepalive: true,
       body: JSON.stringify({
         game:        'colorcross',
         difficulty:  difficulty  || 'normal',
@@ -1839,7 +1840,7 @@ function showTitle(){
 const RANK_KEYS={sum:'colorcross_ranking_easy', turnMax:'colorcross_ranking_easy_turnmax'};
 const RANK_WORLD_DIFF={sum:'easy', turnMax:'easy_turnmax'};
 const RANK_KINDS=['sum','turnMax'];
-let rankTab='local', rankKind='sum';
+let rankTab='world', rankKind='sum';
 function getLocalRanking(kind){
   try{return JSON.parse(localStorage.getItem(RANK_KEYS[kind])||'[]');}catch{return [];}
 }
@@ -1866,11 +1867,13 @@ function renderRankList(rows,myName){
     const numCls=i<3?'rank-num top3':'rank-num';
     const nameCls=isMe?'rank-pname me':'rank-pname';
     const turns=r.turns!=null?r.turns:0;
-    li.innerHTML=`<span class="${numCls}">${numTxt}</span>
-                  <span class="${nameCls}">${r.name||'ゲスト'}</span>
-                  <span class="rank-sub">${turns}${T('unit.turns')}</span>
-                  <span class="rank-score">${(r.score||0).toLocaleString()}pt</span>
-                  ${r.date?`<span class="rank-date">${r.date}</span>`:''}`;
+
+    const numSpan=document.createElement('span'); numSpan.className=numCls; numSpan.textContent=numTxt;
+    const nameSpan=document.createElement('span'); nameSpan.className=nameCls; nameSpan.textContent=r.name||'ゲスト';
+    const subSpan=document.createElement('span'); subSpan.className='rank-sub'; subSpan.textContent=`${turns}${T('unit.turns')}`;
+    const scoreSpan=document.createElement('span'); scoreSpan.className='rank-score'; scoreSpan.textContent=`${(r.score||0).toLocaleString()}pt`;
+    li.appendChild(numSpan); li.appendChild(nameSpan); li.appendChild(subSpan); li.appendChild(scoreSpan);
+    if(r.date){ const dateSpan=document.createElement('span'); dateSpan.className='rank-date'; dateSpan.textContent=r.date; li.appendChild(dateSpan); }
     ul.appendChild(li);
   });
 }
@@ -1905,9 +1908,9 @@ async function loadAndRender(){
   }
 }
 function showRanking(){
-  rankTab='local'; rankKind='sum';
-  document.getElementById('btn-rank-local').classList.add('active');
-  document.getElementById('btn-rank-world').classList.remove('active');
+  rankTab='world'; rankKind='sum';
+  document.getElementById('btn-rank-world').classList.add('active');
+  document.getElementById('btn-rank-local').classList.remove('active');
   RANK_KINDS.forEach(k=>{
     document.getElementById(`btn-rank-kind-${k}`).classList.toggle('active',k==='sum');
   });
