@@ -342,16 +342,18 @@
         /* スキル欄はスキル2個ぶんの高さで固定し、それ以上は増やさない（0〜1個のときは中央に寄る）。
            余った高さはすべて.bc-info（数字欄）に回して、数字をできるだけ大きく表示する */
         .big-card .bc-skills { padding: 6px 10px; display: flex; flex-direction: column; gap: 6px; justify-content: center; height: 100px; flex-shrink: 0; overflow: hidden; }
-        .big-card .bc-skill-row {
+        /* .big-card内のスキル欄だけでなく、修行の祠・忘れるスキル選択・合成の整理画面など、
+           カードの外で単独のスキルパネルとして使う箇所も同じ見た目にする（.big-cardスコープを外している） */
+        .bc-skill-row {
             position: relative; display: flex; justify-content: space-between; align-items: center; gap: 8px; cursor: pointer;
             background: rgba(155,107,240,0.14); border: 1px solid var(--arcane); border-radius: 8px;
             padding: 5px 12px; font-size: 0.92rem; font-weight: 700; color: #2a2a2a;
             transition: box-shadow .2s, background .2s;
         }
         .big-card.normal .bc-skill-row { background: rgba(212,175,55,0.16); border-color: var(--gold); color: #6b5511; }
-        .big-card .bc-skill-label { display: flex; align-items: center; gap: 8px; text-align: left; min-width: 0; }
-        .big-card .bc-skill-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; }
-        .big-card .bc-skill-mult { color: var(--cat-color, var(--arcane)); font-weight: 800; font-size: 1.2rem; white-space: nowrap; }
+        .bc-skill-label { display: flex; align-items: center; gap: 8px; text-align: left; min-width: 0; }
+        .bc-skill-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; }
+        .bc-skill-mult { color: var(--cat-color, var(--arcane)); font-weight: 800; font-size: 1.2rem; white-space: nowrap; }
         .big-card.normal .bc-skill-mult { color: #9a7a10; }
         .big-card .bc-skill-empty { text-align: center; color: #999; font-size: 0.85rem; padding: 6px 0; }
         .big-card-caption { font-size: 0.78rem; color: var(--text-dim); text-align: center; margin-top: 6px; }
@@ -908,6 +910,11 @@
         #clear-screen .result-score, #clear-screen .itemget-coin {
             font-size: 2rem; white-space: nowrap; margin: 8px 0;
         }
+        /* ステージ3クリア時の続ける/やめる選択画面も、かけら獲得表示が折り返さないよう同じ幅・サイズにする */
+        #stage3clear-screen .title-box { width: 560px; }
+        #stage3clear-screen .result-score, #stage3clear-screen .itemget-coin {
+            font-size: 2rem; white-space: nowrap; margin: 8px 0;
+        }
         /* スート/ランクを初めて全クリアしたときのボーナス表示（かけら獲得の下に追加で並べる） */
         .combo-bonus-line {
             font-size: 1.15rem; font-weight: 800; color: var(--gold-bright);
@@ -1455,7 +1462,7 @@
             <div class="result-score" id="stage3clear-score"></div>
             <div class="itemget-coin" id="stage3clear-shard-gain"></div>
             <div id="stage3clear-combo-bonus"></div>
-            <p class="settings-desc">さらに先のステージ（最大999）に挑み続けますか？<br>「続ける」を選ぶと、ここまでのスコアはランキングに送信されず、この先の結果とあわせて最後に送信されます。</p>
+            <p class="settings-desc">さらに先のステージに挑み続けますか？<br>「続ける」を選ぶと、ここまでのスコアはランキングに送信されず、この先の結果とあわせて最後に送信されます。</p>
             <button class="btn btn-gold" onclick="continueAfterStageThree()">▶ 続ける（ステージ4へ）</button>
             <button class="btn btn-gray" onclick="stopAfterStageThree()">■ ここでやめる</button>
         </div>
@@ -2063,8 +2070,12 @@ function loadMeta(){
     try { m = JSON.parse(localStorage.getItem(META_KEY)); } catch (e){ m = null; }
     if (!m || typeof m !== 'object') m = {};
     m.shards = m.shards || 0;
-    m.skillCollection = m.skillCollection || {}; // skillId -> レベル(0〜5)。キーがあれば所持している
+    m.skillCollection = m.skillCollection || {}; // skillId -> レベル(1〜6)。キーがあれば所持している
     if (typeof REMOVED_SKILL_IDS !== 'undefined') REMOVED_SKILL_IDS.forEach(id => { delete m.skillCollection[id]; }); // 廃止済みスキルの残骸を除去
+    // レベル体系を0〜5から1〜6制に変更した際の名残で、1未満（旧仕様の0）の値が保存されたままのセーブがある。
+    // 表示・実際の効果の両方に使われる値なので、読み込み時に一律で1未満を1へ底上げしておく
+    // （既に1以上の値はそのまま。何度読み込んでも安全＝冪等な処理）。
+    Object.keys(m.skillCollection).forEach(id => { if (m.skillCollection[id] < 1) m.skillCollection[id] = 1; });
     m.passiveCoin = m.passiveCoin || 0;       // 購入個数(0〜20)。1個で初期コイン+2
     m.passiveHp = m.passiveHp || 0;           // 購入個数(0〜20)。1個で初期HP+2
     m.passiveAutoheal = m.passiveAutoheal || 0; // 購入個数(0〜20)。1個でマスを1つ進むごとにHPが1回復
@@ -2622,7 +2633,10 @@ function bigCardHtml(card, opts){
         if (opts.previewExtraSkillId && !previewIsLevelUp){
             const s = charSkill(opts.previewExtraSkillId);
             const cat = SKILL_CATEGORIES[s.cat];
-            skillEntries.push({ labelHtml: skillLabelHtml(s, card, ' Lv.1'), right: pctLabelLv(s, 1), pending: true, color: cat.color, desc: s.desc });
+            // 新しく覚える予定のスキルの初期レベルは加重抽選（Lv.1〜3）なので、呼び出し側から実際の値を渡してもらう。
+            // 省略時のみLv.1固定でよい呼び出し元（マップイベント②のスキル習得候補など）向けにデフォルトを残す。
+            const previewLv = opts.previewExtraSkillLv || 1;
+            skillEntries.push({ labelHtml: skillLabelHtml(s, card, ` Lv.${previewLv}`), right: pctLabelLv(s, previewLv), pending: true, color: cat.color, desc: s.desc });
         }
     } else {
         skillEntries = (card.skills || []).map(id => {
@@ -3476,7 +3490,7 @@ function showForgetScreen(card, skillId, onDone, level){
     forgetFlow = { card, skillId, onDone, level: level || 1 };
     document.getElementById('eventforget-desc').textContent =
         `${card.rank}${SUIT_SYMBOL[card.suit]} はもうスキルがいっぱいです。手放すスキルを1つ選んでください。`;
-    document.getElementById('eventforget-card-area').innerHTML = bigCardHtml(card, { compact: true, previewExtraSkillId: skillId });
+    document.getElementById('eventforget-card-area').innerHTML = bigCardHtml(card, { compact: true, previewExtraSkillId: skillId, previewExtraSkillLv: level || 1 });
     const options = card.skills.concat([skillId]);
     document.getElementById('eventforget-row').innerHTML = options.map((sid, i) => {
         const s = charSkill(sid);
@@ -4295,7 +4309,7 @@ function showEpiphanyAnnounce(card, skillId){
     const newLv = isNewSkill ? rollInitialSkillLevel() : null;
     epiphanyPending = { card, skillId, newLv };
     const skill = charSkill(skillId);
-    document.getElementById('epiphany-card-area').innerHTML = bigCardHtml(card, { compact: true, previewExtraSkillId: skillId });
+    document.getElementById('epiphany-card-area').innerHTML = bigCardHtml(card, { compact: true, previewExtraSkillId: skillId, previewExtraSkillLv: newLv || 1 });
     if (!isNewSkill){
         const lv = skillLevel(card, skillId);
         const nextLv = Math.min(MAX_SKILL_LV, lv + 1);
