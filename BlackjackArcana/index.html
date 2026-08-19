@@ -860,6 +860,23 @@
         .overlay-box.wide .settings-label { margin-bottom: 4px; }
         .howto-body { text-align: left; font-size: 0.84rem; line-height: 1.9; color: var(--text-main); margin: 12px 0 18px; }
         .howto-body h3 { color: var(--gold-bright); font-size: 0.92rem; margin: 12px 0 3px; }
+        /* ==================== チュートリアル（一筆迷宮のチュートリアル方式を踏襲） ==================== */
+        /* 画面の実物の要素そのものを光らせる「スポットライト」演出。ダイアログで隠さず、実際の場所を指させる */
+        .tutorial-spotlight {
+            position: relative; z-index: 150; border-radius: 12px;
+            outline: 4px solid var(--gold-bright); outline-offset: 4px;
+            box-shadow: 0 0 0 4px var(--gold-bright), 0 0 26px 8px rgba(244,216,114,0.8);
+        }
+        #tutorial-spotlight-caption {
+            position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+            z-index: 160; width: 700px; max-width: 92%;
+            background: rgba(20,16,10,0.95); border: 2px solid var(--gold-bright); border-radius: 14px;
+            padding: 14px 26px; text-align: center; box-shadow: 0 4px 18px rgba(0,0,0,0.6);
+        }
+        #tutorial-spotlight-caption p { font-size: 1.05rem; font-weight: 700; color: var(--text-hi); margin-bottom: 12px; line-height: 1.6; }
+        /* メッセージ吹き出しは既存の.overlay/.overlay-boxを流用し、スポットライトより前面に出す */
+        #tutorial-msg-overlay { z-index: 300; }
+        #tutorial-entry-btn { position: absolute; top: 14px; left: 14px; width: auto; margin: 0; padding: 8px 16px; font-size: 0.82rem; }
         /* ==================== REWARD / EVENTS ==================== */
         #itemget-screen .title-box { width: 480px; }
         .itemget-icon { width: 28px; height: 28px; object-fit: contain; vertical-align: middle; }
@@ -1021,6 +1038,7 @@
     <!-- ==================== STARTER CARD SELECT（52枚から最初の1枚を選ぶ。クリア済みカードは実績としてはっきり表示） ==================== -->
     <div id="starter-select-screen" class="hidden">
         <div class="title-box">
+            <button id="tutorial-entry-btn" class="btn btn-gray" onclick="startTutorial()">📘 チュートリアル</button>
             <h1 class="settings-title">🃏 <ruby>最初<rt>さいしょ</rt></ruby>の1<ruby>枚<rt>まい</rt></ruby>を<ruby>選<rt>えら</rt></ruby>ぼう</h1>
             <div class="starter-clear-pct">クリア<ruby>率<rt>りつ</rt></ruby> <span id="starter-clear-pct-value">0%</span></div>
             <div class="starter-random-btns">
@@ -1512,6 +1530,30 @@
                 <button id="confirm-yes-btn" class="btn btn-gold" style="margin-top:0;" onclick="resolveConfirmDialog(true)">はい</button>
                 <button id="confirm-no-btn" class="btn btn-gray" style="margin-top:0;" onclick="resolveConfirmDialog(false)">いいえ</button>
             </div>
+        </div>
+    </div>
+
+    <!-- ==================== チュートリアル：説明メッセージ（既存の.overlay/.overlay-boxを流用） ==================== -->
+    <div id="tutorial-msg-overlay" class="overlay hidden">
+        <div class="overlay-box" style="width:520px; padding:28px 30px;">
+            <p id="tutorial-msg-text" style="font-size:1.1rem; font-weight:700; color:var(--text-hi); margin:6px 0 22px; line-height:1.7;"></p>
+            <button class="btn btn-gold" style="margin-top:0;" onclick="closeTutorialMessage()">OK</button>
+        </div>
+    </div>
+    <!-- ==================== チュートリアル：画面の各部分を光らせて説明するキャプション ==================== -->
+    <div id="tutorial-spotlight-caption" class="hidden">
+        <p id="tutorial-spotlight-text"></p>
+        <button class="btn btn-gold btn-sm" style="width:auto; margin:0;" onclick="advanceTutorialSpotlight()">OK</button>
+    </div>
+    <!-- ==================== チュートリアル：完了画面 ==================== -->
+    <div id="tutorial-complete-overlay" class="overlay hidden" style="z-index:300;">
+        <div class="overlay-box" style="width:520px; padding:28px 30px;">
+            <div class="result-emoji">🎉</div>
+            <h1 class="settings-title">チュートリアル完了！</h1>
+            <p style="font-size:1rem; font-weight:700; color:var(--text-hi); margin:10px 0 22px; line-height:1.7;">
+                ステージ3のボスを倒すことを目指して、本番のランに挑戦してみましょう！
+            </p>
+            <button class="btn btn-gold" onclick="closeTutorialComplete()">🏠 タイトルへ戻る</button>
         </div>
     </div>
 
@@ -2423,6 +2465,7 @@ function refreshTitleButtons(){
 }
 function autoSaveGame(){
     if (!game) return;
+    if (tutorialActive) return; // チュートリアル中は保存しない（本番のセーブを上書きしないため）
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(game)); } catch (e){}
     saveCardSeq();
 }
@@ -3150,6 +3193,7 @@ function resolveConfirmDialog(yes){
     if (yes && cb) cb();
 }
 function confirmUsePotion(id){
+    if (isTutorialBlocking()) return;
     if ((game.items[id] || 0) <= 0) return;
     const def = ITEM_DEFS[id];
     showConfirmDialog(`${def.label}を使いますか？（HP+${def.value}%回復）`, () => useItem(id));
@@ -3163,10 +3207,20 @@ function useItem(id){
     if (game.turn && !game.turn.ended){
         floatText('battle-player-avatar-wrap', `+${heal}`, 'heal');
         renderBattleTurn();
+    } else if (!document.getElementById('battle-screen').classList.contains('hidden')){
+        // ターンとターンの間（次のカードを引く前）でも、戦闘画面が見えていれば同じように回復を見せる
+        floatText('battle-player-avatar-wrap', `+${heal}`, 'heal');
+        updateBattleBars();
     } else if (!document.getElementById('map-screen').classList.contains('hidden')){
         renderMap();
     }
     renderPotionButtons();
+    if (tutorialActive && tutorialTurnNum === 2 && id === 'potionS' && !tutorialFlags.potionUsedTurn2){
+        tutorialFlags.potionUsedTurn2 = true;
+        showTutorialMessage('HPが回復しました！では戦闘を続けましょう。「カードを引く」を押してみましょう。', () => {
+            startTurn();
+        });
+    }
 }
 
 // ============================================================
@@ -3241,6 +3295,7 @@ function renderBossTrack(m){
     document.getElementById('map-boss-track').innerHTML = rows.join('');
 }
 function chooseMapNode(i){
+    if (isTutorialBlocking()) return;
     // カードの合成でデッキ入りしていたカードが消滅すると、所持数は足りているのに装備中のキャラカードが
     // 5枚未満になってしまうことがある。この状態のまま冒険を続けさせず、デッキ構築へ差し戻す。
     if (game.charCollection.length >= CHAR_DECK_CAP && game.charSelectedIds.length < CHAR_DECK_CAP){
@@ -3256,6 +3311,11 @@ function chooseMapNode(i){
     enterMapNode(node);
 }
 function enterMapNode(node){
+    if (tutorialActive){
+        if (node.type === 'normal'){ enterTutorialBattle(); return; }
+        if (node.type === 'shop'){ openShop(); return; }
+        if (node.type === 'event'){ openTutorialTreasure(); return; }
+    }
     if (node.type === 'normal' || node.type === 'elite'){
         game.enemy = buildRandomEnemy(game.mapStage.n, node.m, { elite: node.type === 'elite', forceType: node.monsterType });
         startBattle();
@@ -3322,6 +3382,7 @@ function renderShop(){
     }).join('');
 }
 function buyShopItem(id){
+    if (isTutorialBlocking()) return;
     const offer = getShopOffers().find(o => o.id === id);
     const price = offer ? shopPriceFor(offer) : 0;
     if (!offer || game.chips < price) return;
@@ -3339,6 +3400,7 @@ function buyShopItem(id){
     game.items[offer.id] = (game.items[offer.id] || 0) + 1;
     document.getElementById('shop-log').textContent = `${offer.label} を手に入れた！`;
     renderShop();
+    if (tutorialActive && offer.id === 'potionS') tutorialFlags.potionBought = true;
 }
 // ---- スキルの巻物：購入後にどのカードのどのスキルへ使うか選ぶ。キャンセルすると返金してショップへ戻る ----
 let shopScrollCandidates = [];
@@ -3372,7 +3434,19 @@ function cancelShopScroll(){
     renderShop();
     showScreen('shop-screen');
 }
-function closeShop(){ game.shopDiscountActive = false; returnToMap(); }
+function closeShop(){
+    game.shopDiscountActive = false;
+    if (isTutorialBlocking()) return;
+    if (tutorialActive){
+        if (!tutorialFlags.potionBought){
+            showTutorialMessage('回復ポーション(小)を買ってから、マップへ戻りましょう。');
+            return;
+        }
+        showTutorialMessage('買い物ができました。最後は⚔️のマスで、実際に敵と戦ってみましょう。', () => { returnToMap(); });
+        return;
+    }
+    returnToMap();
+}
 
 // ============================================================
 // マップイベント：ポジティブ7種・ネガティブ3種・運試し2種、計12種類からランダムに1つ選ばれる。
@@ -3547,7 +3621,14 @@ function openEventTreasure(){
          <div class="eh-intro">を手に入れた！</div>`;
     showScreen('eventtreasure-screen');
 }
-function closeEventTreasure(){ returnToMap(); }
+function closeEventTreasure(){
+    if (isTutorialBlocking()) return;
+    if (tutorialActive){
+        showTutorialMessage('イベントではコインやアイテムが手に入ることがあります。次は🛒のマスでショップを体験してみましょう。回復ポーション(小)を買ってみて下さい。', () => { returnToMap(); });
+        return;
+    }
+    returnToMap();
+}
 
 // ---- 商人：ショップ画面をそのまま開き、いる間はずっと50%引き（openShop近くのopenEventMerchantで定義済み） ----
 
@@ -3704,7 +3785,10 @@ function openEventCursedChest(){
 }
 
 // 自動セーブしているので「あきらめる」と記録が消えるわけではない。確認なしでそのままタイトルへ戻る
-function giveUpRun(){ showScreen('title-screen'); }
+function giveUpRun(){
+    if (tutorialActive) resetTutorialState();
+    showScreen('title-screen');
+}
 
 // ============================================================
 // バトル（BJロジック）
@@ -4010,6 +4094,11 @@ function renderBattleTurn(){
 }
 function doHit(){
     if (!game.turn || game.turn.ended) return;
+    if (isTutorialBlocking()) return;
+    if (tutorialActive && tutorialHitsThisTurn >= 2){
+        showTutorialMessage('もう十分にカードが集まりました。「攻撃する」を押してみましょう！');
+        return;
+    }
     const card = drawNormalCard();
     addToHand(card);
     applyAceChoice(game.turn.hand, game.turn.aceChoice);
@@ -4022,9 +4111,18 @@ function doHit(){
         else if (sameRankCount >= 2) showSuitMatchBanner(matchEffectText(sameRankCount, '数字'));
     }
     renderBattleTurn();
+    if (tutorialActive){
+        tutorialHitsThisTurn++;
+        tutorialAfterHit();
+    }
 }
 function doStand(){
     if (!game.turn || game.turn.ended || game.turn.hand.length < 2) return;
+    if (isTutorialBlocking()) return;
+    if (tutorialActive && tutorialHitsThisTurn < 2){
+        showTutorialMessage('まずはカードをもう1枚引いてみましょう。');
+        return;
+    }
     resolveTurn(false);
 }
 // extraDmg（通常カードの「攻撃5ダメージ」スキル）は、倍率をかけたあとに足す＝倍率の影響を受けない
@@ -4207,6 +4305,12 @@ function proceedAfterTurn(){
 
     updateBattleBars();
     if (checkBattleGameOver()) return;
+    if (tutorialActive && tutorialTurnNum === 1){
+        showTutorialMessage('攻撃しましたが敵はまだ倒れませんでした。そして敵から反撃を受け、HPが大きく減りました。こうして削り合いながら戦います。2枚目のキャラクターカードを使ってみましょう。', () => {
+            tutorialSetupTurn2();
+        });
+        return;
+    }
     applyPoisonTick(startTurn);
 }
 function openBattleHowTo(){ document.getElementById('howto-overlay').classList.remove('hidden'); }
@@ -4241,7 +4345,10 @@ function afterEnemyDefeated(enemy){
     openNextPendingPack();
 }
 // 所持カードの上限は撤廃済みなので、手放し画面をはさまずそのままマップへ戻る
-function afterRewardEvent(){ returnToMap(); }
+function afterRewardEvent(){
+    if (tutorialActive){ tutorialFinish(); return; }
+    returnToMap();
+}
 
 // ---- カードパックを開ける（真ん中に閉じたパックを表示し、タップすると開いて中身が見える） ----
 // revealDoneCallback が指定されているときは、閉じたあとに撃破ボーナスの流れ（ひらめき等）へ進まず、
@@ -4295,6 +4402,7 @@ function closeReveal(){
 let pendingEpiphany = null;
 function maybeSkillEpiphany(){
     pendingEpiphany = null;
+    if (tutorialActive) return; // チュートリアル中は展開を固定するため、ひらめきは発生させない
     if (Math.random() >= 0.20) return;
     const starter = game.charCollection.find(c => c.isStarter);
     if (!starter) return;
@@ -4701,6 +4809,186 @@ function finishRun(cleared){
     }
 }
 function backToTitleFromResult(){ showScreen('title-screen'); }
+
+// ============================================================
+// チュートリアル（一筆迷宮のチュートリアルと同じ方式：専用画面は作らず、通常のマップ／戦闘画面の上に
+// スクリプトされた進行を重ねる。tutorialActiveフラグ＋各所への分岐で構成し、乱数が絡む部分は
+// 「値を差し替える」形で決定的にする（Math.random自体には手を入れない））
+// ============================================================
+let tutorialActive = false;
+let tutorialFlags = { potionBought: false, potionUsedTurn2: false };
+let tutorialMsgOkCallback = null;
+let tutorialSpotlightSteps = [];
+let tutorialSpotlightIndex = 0;
+let tutorialSpotlightDoneCallback = null;
+let tutorialHitsThisTurn = 0;
+let tutorialTurnNum = 0; // 0=戦闘前、1=1ターン目、2=2ターン目
+
+// チュートリアル中、説明ポップアップやスポットライトが出ている間は他の操作を受け付けない
+function isTutorialBlocking(){
+    if (!tutorialActive) return false;
+    if (!document.getElementById('tutorial-msg-overlay').classList.contains('hidden')) return true;
+    if (!document.getElementById('tutorial-spotlight-caption').classList.contains('hidden')) return true;
+    return false;
+}
+function showTutorialMessage(text, onOk){
+    document.getElementById('tutorial-msg-text').textContent = text;
+    tutorialMsgOkCallback = onOk || null;
+    document.getElementById('tutorial-msg-overlay').classList.remove('hidden');
+}
+function closeTutorialMessage(){
+    document.getElementById('tutorial-msg-overlay').classList.add('hidden');
+    const cb = tutorialMsgOkCallback;
+    tutorialMsgOkCallback = null;
+    if (cb) cb();
+}
+function startTutorialSpotlight(steps, onDone){
+    tutorialSpotlightSteps = steps;
+    tutorialSpotlightIndex = 0;
+    tutorialSpotlightDoneCallback = onDone || null;
+    showTutorialSpotlightStep();
+}
+function showTutorialSpotlightStep(){
+    const step = tutorialSpotlightSteps[tutorialSpotlightIndex];
+    const el = document.querySelector(step.selector);
+    if (el) el.classList.add('tutorial-spotlight');
+    document.getElementById('tutorial-spotlight-text').textContent = step.text;
+    document.getElementById('tutorial-spotlight-caption').classList.remove('hidden');
+}
+function advanceTutorialSpotlight(){
+    const step = tutorialSpotlightSteps[tutorialSpotlightIndex];
+    const el = document.querySelector(step.selector);
+    if (el) el.classList.remove('tutorial-spotlight');
+    tutorialSpotlightIndex++;
+    if (tutorialSpotlightIndex >= tutorialSpotlightSteps.length){
+        document.getElementById('tutorial-spotlight-caption').classList.add('hidden');
+        const cb = tutorialSpotlightDoneCallback;
+        tutorialSpotlightDoneCallback = null;
+        if (cb) cb();
+        return;
+    }
+    showTutorialSpotlightStep();
+}
+const TUTORIAL_MAP_TOUR = [
+    { selector: '#map-left-panel', text: 'ここは主人公の情報です。HP・経験値・所持コインと、回復ポーションのボタンが並びます。' },
+    { selector: '#map-center', text: 'ここがマップです。2つの分かれ道から1つを選んで進みます。マークで何のマスか分かります（❓イベント／🛒ショップ／⚔️敵）。' },
+    { selector: '#map-right-panel', text: 'ここは目的地までの道のりです。BOSSを倒すとステージクリアになります。' },
+];
+const TUTORIAL_BATTLE_TOUR = [
+    { selector: '#battle-left-panel', text: 'ここは自分の情報です。HPが0になるとゲームオーバーです。回復ポーションもここから使えます。' },
+    { selector: '#battle-cards-row', text: 'ここに今の手札が表示されます。1枚目はキャラクターカード、2枚目以降は通常カードです。' },
+    { selector: '#battle-hit-stand-row', text: '「カードを引く」で手札を増やし、「攻撃する」でその手札の合計値ぶん攻撃します（21を超えるとバーストで攻撃失敗になるので注意）。' },
+    { selector: '#battle-right-panel', text: 'ここは敵の情報です。HPを0にすれば勝利です。' },
+];
+// 2択とも同じ種類のマスにしておくことで、自由に選ばせても必ず同じ体験になるようにする
+const TUTORIAL_SLIME_TYPE = ENEMY_TYPES.find(t => t.imgKey === 'slime');
+function buildTutorialStageMap(){
+    const enemyNode = () => ({ m: 3, type: 'normal', monsterType: TUTORIAL_SLIME_TYPE, children: [] });
+    const shopNode = () => ({ m: 2, type: 'shop', children: [enemyNode(), enemyNode()] });
+    const eventNode = () => ({ m: 1, type: 'event', children: [shopNode(), shopNode()] });
+    return { m: 0, type: 'start', children: [eventNode(), eventNode()] };
+}
+function startTutorial(){
+    tutorialActive = true;
+    tutorialFlags = { potionBought: false, potionUsedTurn2: false };
+    tutorialHitsThisTurn = 0;
+    tutorialTurnNum = 0;
+    // 誓い・パッシブ・スキルコレクションの影響を受けない、まっさらな状態で強制的に始める
+    newGame('5', 'H', null, { mosha:0, muyoku:0, isshin:0, konnan:0 }, { coin:0, hp:0, autoheal:0, potionS:false, potionM:false, potionL:false });
+    const starter = game.charCollection[0];
+    starter.skills = ['odd'];
+    starter.skillLv = { odd: 1 };
+    game.mapStage.current = buildTutorialStageMap();
+    goToMap();
+    startTutorialSpotlight(TUTORIAL_MAP_TOUR, () => {
+        showTutorialMessage('チュートリアルを始めましょう。まずは❓のマスに進んで、イベントを体験してみましょう。');
+    });
+}
+// ---- ①イベント（宝箱）：コイン+10と回復ポーション(中)を確定で入手 ----
+function openTutorialTreasure(){
+    game.chips += 10;
+    game.items.potionM = (game.items.potionM || 0) + 1;
+    document.getElementById('eventtreasure-body').innerHTML =
+        `<div class="eh-intro">宝箱を見つけた！</div>
+         <div class="eh-line eh-maxhp">🪙 コイン +10</div>
+         <div class="eh-line eh-heal">${escapeHtml(ITEM_DEFS.potionM.label)}</div>
+         <div class="eh-intro">を手に入れた！</div>`;
+    showScreen('eventtreasure-screen');
+}
+// ---- ②戦闘：スライム（HP150・攻撃力40・とくせいなし）を固定で用意し、カードもすべて指定の順で引かせる ----
+function enterTutorialBattle(){
+    game.enemy = {
+        name: 'スライム', imgKey: 'slime', maxHp: 150, hp: 150, atk: 40, baseAtk: 40,
+        abilities: [], rampCount: 0, poisonStack: 0, hardenStack: 0, charging: false, lastStandUsed: false,
+        boss: false, elite: false,
+    };
+    tutorialTurnNum = 1;
+    tutorialHitsThisTurn = 0;
+    // 引く順はpop()で末尾から取り出すので、配列の末尾が最初に引くカードになる（スペードの5→ハートの9の順）
+    game.normalDeck = [makeCard('9', 'H', false), makeCard('5', 'S', false)];
+    game.normalDiscard = [];
+    startBattle();
+    startTutorialSpotlight(TUTORIAL_BATTLE_TOUR, () => {
+        showTutorialMessage('では「カードを引く」を押して、手札を増やしてみましょう。');
+    });
+}
+// 手札にカードを引くたびに呼ばれ、そのときどきの教える内容を出す
+function tutorialAfterHit(){
+    if (tutorialTurnNum === 1){
+        if (tutorialHitsThisTurn === 1){
+            showTutorialMessage('スペードの5が出ました。最初のカード（ハートの5）と同じ数字なので「数字がそろった」ボーナスが発動しています。もう1枚引いてみましょう。');
+        } else if (tutorialHitsThisTurn === 2){
+            showTutorialMessage('ハートの9が出ました。ハートの5と同じマークなので「マークがそろった」ボーナスも発動！ さらに合計が19（奇数）になったので、キャラクターカードのスキル「奇数」も発動しています。「攻撃する」を押してみましょう。');
+        }
+    } else if (tutorialTurnNum === 2){
+        if (tutorialHitsThisTurn === 1){
+            showTutorialMessage('ダイヤの8が出ました。もう1枚引いてみましょう。');
+        } else if (tutorialHitsThisTurn === 2){
+            showTutorialMessage('クローバーの2が出ました。手札がちょうど3枚になったので「3カード」、合計が21になり7の倍数なので「7の倍数」、キャラクターカードのスキルが2つとも発動しています！ 「攻撃する」を押して、とどめを刺しましょう！');
+        }
+    }
+}
+// 1ターン目の攻撃のあと（敵は倒れず、反撃を受ける）：2枚目のキャラクターカードを渡して2ターン目へつなぐ
+function tutorialSetupTurn2(){
+    const caCard = makeCard('A', 'C', true);
+    caCard.skills = ['cnt3', 'mul7'];
+    caCard.skillLv = { cnt3: 1, mul7: 1 };
+    game.charCollection.push(caCard);
+    game.charSelectedIds.push(caCard.uid);
+    // 次に引くキャラクターカードが必ずこの1枚になるよう、山札をこのカードだけにしておく
+    game.charDiscard = game.charCollection.filter(c => c.uid !== caCard.uid);
+    game.charDeck = [caCard];
+    // 通常カードの山札も、次に引く順（ダイヤの8→クローバーの2）を固定しておく
+    game.normalDeck = [makeCard('2', 'C', false), makeCard('8', 'D', false)];
+    game.normalDiscard = [];
+    tutorialTurnNum = 2;
+    tutorialHitsThisTurn = 0;
+    showTutorialMessage('2枚目のキャラクターカード「クローバーのA」が使えるようになりました。スキルは「3カード」（手札がちょうど3枚で発動）と「7の倍数」（合計が7の倍数で発動）です。まずは回復ポーション(小)を使ってHPを回復してみましょう。');
+}
+function tutorialFinish(){
+    goToMap();
+    showTutorialMessage('お疲れさまでした！本番のランでは、ステージ3のボスを倒すことが目的です。実際のランに挑戦してみましょう！', () => {
+        showTutorialComplete();
+    });
+}
+function showTutorialComplete(){
+    document.getElementById('map-screen').classList.add('hidden');
+    document.getElementById('tutorial-complete-overlay').classList.remove('hidden');
+}
+function closeTutorialComplete(){
+    document.getElementById('tutorial-complete-overlay').classList.add('hidden');
+    resetTutorialState();
+    showScreen('title-screen');
+}
+function resetTutorialState(){
+    tutorialActive = false;
+    tutorialFlags = { potionBought: false, potionUsedTurn2: false };
+    tutorialHitsThisTurn = 0;
+    tutorialTurnNum = 0;
+    document.getElementById('tutorial-msg-overlay').classList.add('hidden');
+    document.getElementById('tutorial-spotlight-caption').classList.add('hidden');
+    document.querySelectorAll('.tutorial-spotlight').forEach(el => el.classList.remove('tutorial-spotlight'));
+}
 
 // ============================================================
 // SCALE
