@@ -864,8 +864,9 @@
         /* 画面の実物の要素そのものを光らせる「スポットライト」演出。ダイアログで隠さず、実際の場所を指させる */
         .tutorial-spotlight {
             position: relative; z-index: 150; border-radius: 12px;
-            outline: 4px solid #2de1ff; outline-offset: 4px;
-            box-shadow: 0 0 0 4px #2de1ff, 0 0 26px 8px rgba(45,225,255,0.85);
+            /* 画面端の要素だと外側に光らせると画面外にはみ出て見えなくなるため、内側に収まるようにする */
+            outline: 4px solid #2de1ff; outline-offset: -4px;
+            box-shadow: inset 0 0 0 4px #2de1ff, inset 0 0 22px 6px rgba(45,225,255,0.75);
         }
         #tutorial-spotlight-caption {
             position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
@@ -873,6 +874,7 @@
             background: rgba(20,16,10,0.95); border: 2px solid var(--gold-bright); border-radius: 14px;
             padding: 14px 26px; text-align: center; box-shadow: 0 4px 18px rgba(0,0,0,0.6);
         }
+        #tutorial-spotlight-caption.pos-top { bottom: auto; top: 16px; }
         #tutorial-spotlight-caption p { font-size: 1.05rem; font-weight: 700; color: var(--text-hi); margin-bottom: 12px; line-height: 1.6; }
         /* メッセージ吹き出しは既存の.overlay/.overlay-boxを流用し、スポットライトより前面に出す */
         #tutorial-msg-overlay { z-index: 300; }
@@ -880,12 +882,26 @@
         #tutorial-msg-overlay.pos-top { align-items: flex-start; padding-top: 30px; }
         #tutorial-msg-overlay.pos-bottom { align-items: flex-end; padding-bottom: 24px; }
         #tutorial-entry-btn { position: absolute; top: 14px; left: 14px; width: auto; margin: 0; padding: 8px 16px; font-size: 0.82rem; }
-        /* チュートリアル中は台本にないボタンを押せないようにする（タイトルへ戻るボタンだけは例外） */
+        /* チュートリアル中は台本にないボタンを押せないようにする（タイトルへ戻るボタンだけは例外）。
+           ポーションとチップかけは既定では常に禁止し、専用のステップ中だけ個別に解禁する（下のtutorial-bet-step/tutorial-potion-step参照） */
         #container.tutorial-lock #map-right-panel .bp-bottom-btns button:not(.tutorial-keep-enabled),
         #container.tutorial-lock #battle-right-panel .bp-bottom-btns button:not(.tutorial-keep-enabled),
         #container.tutorial-lock #chip-bet-row,
-        #container.tutorial-lock .potion-btn[data-item="potionM"],
-        #container.tutorial-lock .potion-btn[data-item="potionL"] {
+        #container.tutorial-lock .potion-btn {
+            pointer-events: none; opacity: 0.4; filter: grayscale(0.6);
+        }
+        /* チップを5枚かけるステップ：チップ操作だけ解禁し、他の操作（カードを引く等）はロックする */
+        #container.tutorial-lock.tutorial-bet-step #chip-bet-row {
+            pointer-events: auto; opacity: 1; filter: none;
+        }
+        #container.tutorial-lock.tutorial-bet-step #battle-hit-stand-row {
+            pointer-events: none; opacity: 0.4; filter: grayscale(0.6);
+        }
+        /* 回復ポーション(小)を使うステップ：小ポーションだけ解禁し、他の操作はロックする */
+        #container.tutorial-lock.tutorial-potion-step .potion-btn[data-item="potionS"] {
+            pointer-events: auto; opacity: 1; filter: none;
+        }
+        #container.tutorial-lock.tutorial-potion-step #battle-hit-stand-row {
             pointer-events: none; opacity: 0.4; filter: grayscale(0.6);
         }
         /* ==================== REWARD / EVENTS ==================== */
@@ -1100,13 +1116,15 @@
 
         <!-- RIGHT: 選択マスではなく、ボスまでの現在の進行度が一目でわかる道のり表示 -->
         <div id="map-right-panel" class="battle-panel">
-            <div class="bp-title" id="map-stage-title"></div>
-            <div id="map-boss-track" class="boss-track"></div>
+            <div id="map-progress-wrap">
+                <div class="bp-title" id="map-stage-title"></div>
+                <div id="map-boss-track" class="boss-track"></div>
+            </div>
             <div class="bp-bottom-btns">
-                <button class="btn btn-gold" style="padding:16px 18px; font-size:1.05rem;" onclick="goToDeckBuilder()">🧩 デッキ構築</button>
+                <button id="map-deckbuilder-btn" class="btn btn-gold" style="padding:16px 18px; font-size:1.05rem;" onclick="goToDeckBuilder()">🧩 デッキ構築</button>
                 <button class="btn btn-gray" style="padding:16px 18px; font-size:1.05rem;" id="fusion-btn" onclick="goToCardFusion()">🔮 カードの合成</button>
-                <button class="btn btn-gray btn-sm" onclick="openBattleHowTo()">📖 あそびかた</button>
-                <button class="btn btn-gray btn-sm tutorial-keep-enabled" onclick="giveUpRun()">🏳️ タイトルへ</button>
+                <button id="map-howto-btn" class="btn btn-gray btn-sm" onclick="openBattleHowTo()">📖 あそびかた</button>
+                <button id="map-title-btn" class="btn btn-gray btn-sm tutorial-keep-enabled" onclick="giveUpRun()">🏳️ タイトルへ</button>
             </div>
         </div>
     </div>
@@ -3205,6 +3223,7 @@ function resolveConfirmDialog(yes){
 }
 function confirmUsePotion(id){
     if (isTutorialBlocking()) return;
+    if (tutorialActive && !(tutorialAwaitingPotion && id === 'potionS')) return; // ポーションは専用ステップでのみ使える
     if ((game.items[id] || 0) <= 0) return;
     const def = ITEM_DEFS[id];
     showConfirmDialog(`${def.label}を使いますか？（HP+${def.value}%回復）`, () => useItem(id));
@@ -3228,6 +3247,8 @@ function useItem(id){
     renderPotionButtons();
     if (tutorialActive && tutorialTurnNum === 2 && id === 'potionS' && !tutorialFlags.potionUsedTurn2){
         tutorialFlags.potionUsedTurn2 = true;
+        tutorialAwaitingPotion = false;
+        document.getElementById('container').classList.remove('tutorial-potion-step');
         // 2枚目のキャラクターカードはtutorialSetupTurn2側で既にターン開始済みなので、ここではstartTurn()を呼び直さない
         showTutorialMessage('HPが回復しました！では戦闘を続けましょう。「カードを引く」を押してみましょう。');
     }
@@ -4077,13 +4098,23 @@ function renderChipRow(){
 }
 function adjustChipBet(delta){
     if (!game.turn || game.turn.ended || game.turn.hand.length !== 1) return;
+    if (isTutorialBlocking()) return;
+    if (tutorialActive && !tutorialAwaitingBet) return; // チップをかける専用ステップ以外では操作させない
     const bet = game.turn.chipsBet || 0;
+    if (tutorialActive && delta > 0 && bet >= 5) return; // 5枚でストップ
     const next = bet + delta;
     if (next < 0 || next > 10) return;
     if (delta > 0 && game.chips <= 0) return;
     game.chips -= delta;
     game.turn.chipsBet = next;
     renderBattleTurn();
+    if (tutorialActive && tutorialAwaitingBet && game.turn.chipsBet === 5){
+        tutorialAwaitingBet = false;
+        document.getElementById('container').classList.remove('tutorial-bet-step');
+        tutorialAwaitingPotion = true;
+        document.getElementById('container').classList.add('tutorial-potion-step');
+        showTutorialMessage('チップを5枚かけました！攻撃の倍率が上がります。次は回復ポーション(小)を使ってHPを回復してみましょう。');
+    }
 }
 function renderBattleTurn(){
     const { total, active } = currentMultInfo();
@@ -4105,6 +4136,14 @@ function renderBattleTurn(){
 function doHit(){
     if (!game.turn || game.turn.ended) return;
     if (isTutorialBlocking()) return;
+    if (tutorialActive && tutorialAwaitingBet){
+        showTutorialMessage('先にチップを5枚かけてみましょう。');
+        return;
+    }
+    if (tutorialActive && tutorialAwaitingPotion){
+        showTutorialMessage('先に回復ポーション(小)を使ってみましょう。');
+        return;
+    }
     if (tutorialActive && tutorialHitsThisTurn >= 2){
         showTutorialMessage('もう十分にカードが集まりました。「攻撃する」を押してみましょう！');
         return;
@@ -4838,6 +4877,8 @@ let tutorialSpotlightDoneCallback = null;
 let tutorialHitsThisTurn = 0;
 let tutorialTurnNum = 0; // 0=戦闘前、1=1ターン目、2=2ターン目
 let tutorialMsgPending = false; // 演出を見せるため遅延表示している間、trueにして操作を受け付けない
+let tutorialAwaitingBet = false; // 2ターン目：チップを5枚かけるまで他の操作を禁止する
+let tutorialAwaitingPotion = false; // 2ターン目：回復ポーション(小)を使うまで他の操作を禁止する
 
 // チュートリアル中、説明ポップアップやスポットライトが出ている間（表示待ちの遅延中も含む）は他の操作を受け付けない
 function isTutorialBlocking(){
@@ -4880,7 +4921,9 @@ function showTutorialSpotlightStep(){
     const el = document.querySelector(step.selector);
     if (el) el.classList.add('tutorial-spotlight');
     document.getElementById('tutorial-spotlight-text').textContent = step.text;
-    document.getElementById('tutorial-spotlight-caption').classList.remove('hidden');
+    const cap = document.getElementById('tutorial-spotlight-caption');
+    cap.classList.toggle('pos-top', step.pos === 'top');
+    cap.classList.remove('hidden');
 }
 function advanceTutorialSpotlight(){
     const step = tutorialSpotlightSteps[tutorialSpotlightIndex];
@@ -4899,13 +4942,16 @@ function advanceTutorialSpotlight(){
 const TUTORIAL_MAP_TOUR = [
     { selector: '#map-left-panel', text: 'ここは主人公の情報です。HP・経験値・所持コインと、回復ポーションのボタンが並びます。' },
     { selector: '#map-center', text: 'ここがマップです。2つの分かれ道から1つを選んで進みます。マークで何のマスか分かります（❓イベント／🛒ショップ）。敵のマスにはその敵のイラストが描かれ、エリート（強敵）には⭐マークがつきます。' },
-    { selector: '#map-boss-track', text: '現在のステージとBOSSまでの道のりがわかります。' },
-    { selector: '#map-right-panel .bp-bottom-btns', text: '持っているカードのうち使うカードを選んでセットすることができます。' },
+    { selector: '#map-progress-wrap', text: '現在のステージとBOSSまでの道のりがわかります。' },
+    { selector: '#map-deckbuilder-btn', text: '持っているカードのうち使うカードを選んでセットすることができます。' },
+    { selector: '#fusion-btn', text: '余ったカードを合成することができます。' },
+    { selector: '#map-howto-btn', text: 'あそびかたを確認できます。' },
+    { selector: '#map-title-btn', text: 'セーブしてタイトルへ戻ります。' },
 ];
 const TUTORIAL_BATTLE_TOUR = [
     { selector: '#battle-left-panel', text: 'ここは自分の情報です。HPが0になるとゲームオーバーです。回復ポーションもここから使えます。' },
     { selector: '#battle-cards-row', text: 'ここに今の手札が表示されます。1枚目はキャラクターカード、2枚目以降は通常カードです。' },
-    { selector: '#battle-hit-stand-row', text: '「カードを引く」で手札を増やし、「攻撃する」でその手札の合計値ぶん攻撃します（21を超えるとバーストで攻撃失敗になるので注意）。' },
+    { selector: '#battle-hit-stand-row', text: '「カードを引く」で手札を増やし、「攻撃する」でその手札の合計値ぶん攻撃します（21を超えるとバーストで攻撃失敗になるので注意）。', pos: 'top' },
     { selector: '#battle-right-panel', text: 'ここは敵の情報です。HPを0にすれば勝利です。' },
 ];
 // 2択とも同じ種類のマスにしておくことで、自由に選ばせても必ず同じ体験になるようにする
@@ -4921,6 +4967,8 @@ function startTutorial(){
     tutorialFlags = { potionBought: false, potionUsedTurn2: false };
     tutorialHitsThisTurn = 0;
     tutorialTurnNum = 0;
+    tutorialAwaitingBet = false;
+    tutorialAwaitingPotion = false;
     // 誓い・パッシブ・スキルコレクションの影響を受けない、まっさらな状態で強制的に始める
     newGame('5', 'H', null, { mosha:0, muyoku:0, isshin:0, konnan:0 }, { coin:0, hp:0, autoheal:0, potionS:false, potionM:false, potionL:false });
     game.chips = 5; // イベントの+10とあわせて15枚に固定し、回復ポーション(小)しか買えない状態にする
@@ -4959,7 +5007,7 @@ function enterTutorialBattle(){
     game.normalDiscard = [];
     startBattle();
     startTutorialSpotlight(TUTORIAL_BATTLE_TOUR, () => {
-        showTutorialMessage('では「カードを引く」を押して、手札を増やしてみましょう。', null, 'top');
+        showTutorialMessage('では「カードを引く」を押して、手札を増やしてみましょう。', null, 'bottom');
     });
 }
 // 手札にカードを引くたびに呼ばれ、そのときどきの教える内容を出す
@@ -4993,9 +5041,12 @@ function tutorialSetupTurn2(){
     game.normalDiscard = [];
     tutorialTurnNum = 2;
     tutorialHitsThisTurn = 0;
-    // カードが画面に出た状態で説明を出すため、先にターンを開始してから案内を出す
+    // カードが画面に出た状態で説明を出すため、先にターンを開始してから、少し間を置いて案内を出す
     startTurn();
-    showTutorialMessage('2枚目のキャラクターカード「クローバーのA」が使えるようになりました。スキルは「3カード」（手札がちょうど3枚で発動）と「7の倍数」（合計が7の倍数で発動）です。まずは回復ポーション(小)を使ってHPを回復してみましょう。');
+    showTutorialMessageDelayed(1000, '2枚目のキャラクターカード「クローバーのA」が使えるようになりました。スキルは「3カード」（手札がちょうど3枚で発動）と「7の倍数」（合計が7の倍数で発動）です。まずはチップを5枚かけてみましょう。', () => {
+        tutorialAwaitingBet = true;
+        document.getElementById('container').classList.add('tutorial-bet-step');
+    });
 }
 function tutorialFinish(){
     goToMap();
@@ -5018,7 +5069,9 @@ function resetTutorialState(){
     tutorialHitsThisTurn = 0;
     tutorialTurnNum = 0;
     tutorialMsgPending = false;
-    document.getElementById('container').classList.remove('tutorial-lock');
+    tutorialAwaitingBet = false;
+    tutorialAwaitingPotion = false;
+    document.getElementById('container').classList.remove('tutorial-lock', 'tutorial-bet-step', 'tutorial-potion-step');
     document.getElementById('tutorial-msg-overlay').classList.add('hidden');
     document.getElementById('tutorial-spotlight-caption').classList.add('hidden');
     document.querySelectorAll('.tutorial-spotlight').forEach(el => el.classList.remove('tutorial-spotlight'));
