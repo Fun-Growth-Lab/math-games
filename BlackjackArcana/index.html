@@ -2057,6 +2057,16 @@ const I18N = {
     'result.shardGain': { ja:'💎 アルカナのかけら +{n}', easy:'💎 アルカナのかけら +{n}', en:'💎 Arcana Shards +{n}' },
     'result.defeatedScoreLabel': { ja:'撃破数 {n}　スコア {score}pt', easy:'たおしたかず {n}　スコア {score}pt', en:'Defeated {n}　Score {score}pt' },
     'result.toTitle': { ja:'🏠 タイトルへ', easy:'🏠 タイトルへ', en:'🏠 To Title' },
+    'combat.charging': { ja:'ちからを溜めている…', easy:'ちからをためている…', en:'Charging power…' },
+    'combat.fullPowerHit': { ja:'🔥渾身の一撃！ -{n}', easy:'🔥ぜんりょくのいちげき！ -{n}', en:'🔥 All-out attack! -{n}' },
+    'combat.critHit': { ja:'会心の一撃！ -{n}', easy:'かいしんのいちげき！ -{n}', en:'Critical hit! -{n}' },
+    'combat.breath': { ja:'🔥ブレス！ -{n}', easy:'🔥ブレス！ -{n}', en:'🔥 Breath attack! -{n}' },
+    'combat.flurry': { ja:'連続攻撃×{hits}！ -{n}', easy:'れんぞくこうげき×{hits}！ -{n}', en:'{hits}-hit combo! -{n}' },
+    'combat.bust': { ja:'バースト！', easy:'バースト！', en:'Bust!' },
+    'combat.evaded': { ja:'かわした！', easy:'かわした！', en:'Dodged!' },
+    'combat.lastStand': { ja:'踏みとどまった！', easy:'ふんばった！', en:'Held on!' },
+    'combat.poisonTick': { ja:'どく -{n}', easy:'どく -{n}', en:'Poison -{n}' },
+    'combat.followUp': { ja:'追撃！ -{n}', easy:'ついげき！ -{n}', en:'Follow-up! -{n}' },
     'common.close': { ja:'とじる', easy:'とじる', en:'Close' },
     'common.countParen': { ja:'（{n}枚）', easy:'（{n}まい）', en:'({n})' },
     'howto.body': {
@@ -4605,7 +4615,7 @@ function applyPoisonTick(callback){
     const enemy = game.enemy;
     if (hasAbility(enemy, 'poison') && enemy.poisonStack > 0){
         setTimeout(() => {
-            floatText('battle-player-avatar-wrap', `どく -${enemy.poisonStack}`, 'bust');
+            floatText('battle-player-avatar-wrap', t('combat.poisonTick', { n: enemy.poisonStack }), 'bust');
             game.player.hp -= enemy.poisonStack;
             triggerPlayerHitEffect();
             updateBattleBars();
@@ -4621,11 +4631,11 @@ function resolveTurn(busted){
     game.stats.turnsTaken++;
     let enemyDefeated = false;
     if (busted){
-        floatText('battle-cards-row', 'バースト！', 'bust');
+        floatText('battle-cards-row', t('combat.bust'), 'bust');
         triggerBustEffect();
     } else if (hasAbility(game.enemy, 'evade') && Math.random() < 0.10){
         // すばやい動き：10%でプレイヤーの攻撃そのものを回避する（敵側の効果なので敵のイラスト上に表示）
-        floatText('battle-enemy-avatar-wrap', 'かわした！', 'heal');
+        floatText('battle-enemy-avatar-wrap', t('combat.evaded'), 'heal');
     } else {
         const { total, mult } = currentMultInfo();
         let dmg = computeDamage(total, mult, game.turn.hand, game.enemy, game.turn.extraDmg);
@@ -4638,7 +4648,7 @@ function resolveTurn(busted){
             if (hasAbility(game.enemy, 'lastStand') && !game.enemy.lastStandUsed){
                 game.enemy.hp = 1;
                 game.enemy.lastStandUsed = true;
-                floatText('battle-enemy-avatar-wrap', '踏みとどまった！', 'heal');
+                floatText('battle-enemy-avatar-wrap', t('combat.lastStand'), 'heal');
             } else {
                 enemyDefeated = true;
             }
@@ -4699,14 +4709,14 @@ function proceedAfterTurn(){
     if (hasAbility(enemy, 'chargeAtk')){
         if (!enemy.charging){
             enemy.charging = true;
-            floatText('battle-enemy-avatar-wrap', 'ちからを溜めている…', 'heal');
+            floatText('battle-enemy-avatar-wrap', t('combat.charging'), 'heal');
             updateBattleBars();
             startTurn();
             return;
         }
         enemy.charging = false;
         const incoming = Math.round(enemy.atk * 2.5);
-        floatText('battle-player-avatar-wrap', `🔥渾身の一撃！ -${incoming}`, 'bust');
+        floatText('battle-player-avatar-wrap', t('combat.fullPowerHit', { n: incoming }), 'bust');
         game.player.hp -= incoming;
         triggerPlayerHitEffect();
         updateBattleBars();
@@ -4725,17 +4735,17 @@ function proceedAfterTurn(){
         document.getElementById('battle-enemy-atk').textContent = enemy.atk;
     } else if (hasAbility(enemy, 'crit') && Math.random() < 0.10){
         incoming *= 2;
-        label = `会心の一撃！ -${incoming}`;
+        label = t('combat.critHit', { n: incoming });
         cls = 'bust';
     } else if (hasAbility(enemy, 'breath')){
         incoming = Math.round(enemy.atk * (1.2 + Math.random() * 0.8));
-        label = `🔥ブレス！ -${incoming}`;
+        label = t('combat.breath', { n: incoming });
     } else if (hasAbility(enemy, 'flurry')){
         // 0.5倍の攻撃を、1発目は確定・以後は50%で継続する連続攻撃
         let hits = 0, hitTotal = 0;
         do { hits++; hitTotal += Math.round(enemy.atk * 0.5); } while (Math.random() < 0.5 && hits < 10);
         incoming = hitTotal;
-        label = `連続攻撃×${hits}！ -${incoming}`;
+        label = t('combat.flurry', { hits, n: incoming });
     }
 
     floatText('battle-player-avatar-wrap', label || `-${incoming}`, cls);
@@ -4746,7 +4756,7 @@ function proceedAfterTurn(){
     if (hasAbility(enemy, 'followUp')){
         const followDmg = Math.round(enemy.atk * 0.5);
         game.player.hp -= followDmg;
-        setTimeout(() => floatText('battle-player-avatar-wrap', `追撃！ -${followDmg}`, ''), 400);
+        setTimeout(() => floatText('battle-player-avatar-wrap', t('combat.followUp', { n: followDmg }), ''), 400);
     }
     if (hasAbility(enemy, 'lifesteal')){
         const healed = Math.min(enemy.maxHp, enemy.hp + Math.round(incoming * 0.20)) - enemy.hp;
