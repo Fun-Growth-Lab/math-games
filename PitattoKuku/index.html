@@ -335,14 +335,22 @@
         </div>
     </div>
 
+    <!-- ==================== CUSTOM ALERT (ブラウザ標準alertの代替) ==================== -->
+    <div id="custom-alert-modal" class="modal-backdrop hidden" style="z-index:9999;">
+        <div class="modal-box">
+            <p class="modal-msg" id="custom-alert-msg"></p>
+            <button class="btn btn-primary btn-sm" data-i18n="btn_ok" onclick="closeCustomAlert()">OK</button>
+        </div>
+    </div>
+
     <!-- ==================== RANKING ==================== -->
     <div id="ranking-screen" class="screen hidden">
         <div class="rank-box">
             <div class="rank-title" data-i18n="ranking_title">🏆 ランキング</div>
             <div id="rank-dan-toggle" class="rank-toggle"></div>
             <div class="rank-toggle">
-                <button id="rank-tab-local-btn" class="rank-toggle-btn active" data-i18n="rank_tab_local" onclick="switchRankTab('local')">ローカル</button>
-                <button id="rank-tab-world-btn" class="rank-toggle-btn" data-i18n="rank_tab_world" onclick="switchRankTab('world')">ワールド</button>
+                <button id="rank-tab-world-btn" class="rank-toggle-btn active" data-i18n="rank_tab_world" onclick="switchRankTab('world')">ワールド</button>
+                <button id="rank-tab-local-btn" class="rank-toggle-btn" data-i18n="rank_tab_local" onclick="switchRankTab('local')">ローカル</button>
             </div>
             <div id="rank-loading" class="rank-loading" style="display:none;" data-i18n="rank_loading">読み込み中…</div>
             <ul id="rank-list" class="rank-list"></ul>
@@ -456,6 +464,7 @@
         const res = await fetch(`${_base}/rankings`, {
             method: 'POST',
             headers: _hdr,
+            keepalive: true,
             body: JSON.stringify({
                 game:        'pitatto_kuku',
                 difficulty:  difficulty  || 'dan2',
@@ -531,6 +540,7 @@ const UI_TEXT = {
     btn_add: { ja: '追加', ja_easy: 'ついか', en: 'Add' },
     name_too_long: { ja: '名前は12文字までです', ja_easy: 'なまえは 12もじまでだよ', en: 'Name must be 12 characters or fewer' },
     name_duplicate: { ja: 'その名前はすでに登録されています', ja_easy: 'そのなまえは もう とうろくされているよ', en: 'That name is already registered' },
+    btn_ok: { ja: 'OK', ja_easy: 'OK', en: 'OK' },
     label_name_selected: { ja: '✓ 選択中', ja_easy: '✓ えらんでいる', en: '✓ Selected' },
     btn_select_name: { ja: '選択する', ja_easy: 'えらぶ', en: 'Select' },
     default_player_name: { ja: 'ななしさん', en: 'Guest' },
@@ -599,6 +609,14 @@ function setLanguage(lang){
     updateNameRegisterBtn();
     if (!document.getElementById('dan-select-screen').classList.contains('hidden')) renderDanList();
 }
+// ブラウザ標準のalert()の代わりに使うゲーム内ポップアップ
+function showCustomAlert(msg){
+    document.getElementById('custom-alert-msg').textContent = msg;
+    document.getElementById('custom-alert-modal').classList.remove('hidden');
+}
+function closeCustomAlert(){
+    document.getElementById('custom-alert-modal').classList.add('hidden');
+}
 function applyI18n(){
     document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = ui(el.getAttribute('data-i18n')); });
     document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { el.setAttribute('placeholder', ui(el.getAttribute('data-i18n-placeholder'))); });
@@ -646,9 +664,9 @@ function addPlayerName(){
     const inp = document.getElementById('name-reg-input');
     const name = inp.value.trim();
     if (!name) return;
-    if (name.length > 12){ alert(ui('name_too_long')); return; }
+    if (name.length > 12){ showCustomAlert(ui('name_too_long')); return; }
     const list = getPlayerNames();
-    if (list.includes(name)){ alert(ui('name_duplicate')); return; }
+    if (list.includes(name)){ showCustomAlert(ui('name_duplicate')); return; }
     list.push(name);
     savePlayerNames(list);
     setCurPlayerName(name);
@@ -1239,7 +1257,7 @@ function recordRunResult(mode){
     if (score <= 0) return;
     saveLocalScore(currentDan, {
         name: getCurPlayerName(), score, turns: turnCount, tag: lastFinalTag,
-        dateIso: now.toISOString(), date: now.toLocaleDateString(currentLang==='en' ? 'en-US' : 'ja-JP')
+        dateIso: now.toISOString(), date: `${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()}`
     });
 }
 async function submitScoreToWorld(){
@@ -1272,12 +1290,12 @@ function saveBestScoreIfHigher(dan, val){
 // ============================================================
 // ランキング画面
 // ============================================================
-let rankTab = 'local';
+let rankTab = 'world';
 let rankDan = 2;
 function openRanking(){
     goTo('ranking-screen');
     renderRankDanToggle();
-    switchRankTab('local');
+    switchRankTab('world');
 }
 function closeRanking(){ goTo('title-screen'); }
 function renderRankDanToggle(){
