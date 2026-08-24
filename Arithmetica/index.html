@@ -1217,6 +1217,7 @@
         const res = await fetch(`${_base}/rankings`, {
             method: 'POST',
             headers: _hdr,
+            keepalive: true,
             body: JSON.stringify({
                 game:        'arithmetica',
                 difficulty:  difficulty  || 'easy',
@@ -1399,6 +1400,12 @@ const STRINGS = {
     rankClear:'👑 CLEAR',
     rankStage:'ステージ',
     rankSubmitDone:'✅ 送信完了！TOP10に入ればランキングに載ります！',
+    rankSubmitting:'送信中…',
+    rankSubmitFail:'❌ 登録に失敗しました',
+    rankLoadFail:'取得に失敗しました',
+    nameTooLong:'12文字以内で入力してね',
+    nameNgWord:'その名前は使えません',
+    nameDuplicate:'同じ名前がすでにあります',
     // Misc
     noSkill:'スキルなし',
     stageLabel:'ステージ',
@@ -1608,6 +1615,12 @@ const STRINGS = {
     rankClear:'👑 CLEAR',
     rankStage:'ステージ',
     rankSubmitDone:'✅ そうしんかんりょう！TOP10にはいればランキングにのります！',
+    rankSubmitting:'そうしんちゅう…',
+    rankSubmitFail:'❌ とうろくに しっぱいしました',
+    rankLoadFail:'しゅとくに しっぱいしました',
+    nameTooLong:'12もじいないで にゅうりょくしてね',
+    nameNgWord:'そのなまえは つかえません',
+    nameDuplicate:'おなじなまえが もうあります',
     noSkill:'スキルなし',
     stageLabel:'ステージ',
     turnLabel:'ターン',
@@ -1806,6 +1819,12 @@ const STRINGS = {
     rankClear:'👑 CLEAR',
     rankStage:'Stage',
     rankSubmitDone:'✅ Submitted! You\'ll appear in the ranking if you make the Top 10!',
+    rankSubmitting:'Submitting…',
+    rankSubmitFail:'❌ Failed to submit',
+    rankLoadFail:'Failed to load',
+    nameTooLong:'Please enter within 12 characters',
+    nameNgWord:'That name cannot be used',
+    nameDuplicate:'That name is already registered',
     noSkill:'No Skills',
     stageLabel:'Stage',
     turnLabel:'Turn',
@@ -2388,10 +2407,10 @@ function addPlayer() {
     const inp = document.getElementById('name-inp');
     const name = inp.value.trim();
     if (!name) return;
-    if (name.length>12) { alert('12文字以内で入力してね'); return; }
-    if (NG.some(w=>name.includes(w))) { alert('その名前は使えません'); return; }
+    if (name.length>12) { showInfoPopup(t('nameTooLong')); return; }
+    if (NG.some(w=>name.includes(w))) { showInfoPopup(t('nameNgWord')); return; }
     const pl = getPlayers();
-    if (pl.includes(name)) { alert('同じ名前がすでにあります'); return; }
+    if (pl.includes(name)) { showInfoPopup(t('nameDuplicate')); return; }
     pl.push(name); savePlayers(pl); setCurP(name);
     inp.value=''; renderPList(); refreshPDisp();
 }
@@ -4996,12 +5015,12 @@ async function submitToWorld(which){
     const className  = CLASS_DEFS[G.classIdx||0]?.name || '戦士';
 
     if(pointScore <= 0) return;
-    if(msg){ msg.style.color='var(--text-dim)'; msg.textContent='送信中…'; }
+    if(msg){ msg.style.color='var(--text-dim)'; msg.textContent=t('rankSubmitting'); }
     try {
         await window.saveOnlineScore(name, pointScore, stageScore, turns, diff, className);
         if(msg){ msg.style.color='var(--gold)'; msg.style.fontSize='0.85rem'; msg.textContent=t('rankSubmitDone'); }
     } catch(e) {
-        if(msg){ msg.style.color='#cc4444'; msg.textContent='❌ 登録に失敗しました'; }
+        if(msg){ msg.style.color='#cc4444'; msg.textContent=t('rankSubmitFail'); }
         console.error('submitToWorld error:', e);
     }
 }
@@ -5022,14 +5041,16 @@ function renderRankList(rows, myName){
         const numTxt = i<3 ? medals[i] : `${i+1}.`;
         const numCls = i<3 ? 'rank-num top3' : 'rank-num';
         const nameCls = isMe ? 'rank-pname me' : 'rank-pname';
-        const classLbl = r.className ? `<span class="rank-date">${r.className}</span>` : '';
         const ptScore = r.pointScore != null ? r.pointScore : 0;
-        li.innerHTML = `<span class="${numCls}">${numTxt}</span>
-                        <span class="${nameCls}">${r.name||'ななしさん'}</span>
-                        ${classLbl}
-                        <span class="rank-score">${scoreLabel(r.score)}</span>
-                        <span class="rank-score" style="color:#c4a04a;">${ptScore}pt</span>
-                        ${r.date?`<span class="rank-date">${r.date}</span>`:''}`;
+
+        const numSpan = document.createElement('span'); numSpan.className = numCls; numSpan.textContent = numTxt;
+        const nameSpan = document.createElement('span'); nameSpan.className = nameCls; nameSpan.textContent = r.name || 'ななしさん';
+        const scoreSpan = document.createElement('span'); scoreSpan.className = 'rank-score'; scoreSpan.textContent = scoreLabel(r.score);
+        const ptSpan = document.createElement('span'); ptSpan.className = 'rank-score'; ptSpan.style.color = '#c4a04a'; ptSpan.textContent = `${ptScore}pt`;
+        li.appendChild(numSpan); li.appendChild(nameSpan);
+        if (r.className) { const clsSpan = document.createElement('span'); clsSpan.className = 'rank-date'; clsSpan.textContent = r.className; li.appendChild(clsSpan); }
+        li.appendChild(scoreSpan); li.appendChild(ptSpan);
+        if (r.date) { const dateSpan = document.createElement('span'); dateSpan.className = 'rank-date'; dateSpan.textContent = r.date; li.appendChild(dateSpan); }
         ul.appendChild(li);
     });
 }
@@ -5061,7 +5082,7 @@ async function loadAndRender(){
         loading.style.display='none';
         if(!rows){
             document.getElementById('rank-list').innerHTML=
-                `<li><span class="rank-empty" style="width:100%;">取得に失敗しました</span></li>`;
+                `<li><span class="rank-empty" style="width:100%;">${t('rankLoadFail')}</span></li>`;
             return;
         }
         renderRankList(rows, getCurP());
