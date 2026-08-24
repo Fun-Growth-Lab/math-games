@@ -581,8 +581,8 @@
       </div>
       <!-- local/world tabs -->
       <div id="rank-mode-tabs" style="display:flex;gap:6px;justify-content:center;margin-bottom:14px">
-        <button class="rank-tab-btn active" onclick="switchRankTab('local')" data-i18n="rank.tab.local">ローカル</button>
-        <button class="rank-tab-btn"        onclick="switchRankTab('world')" data-i18n="rank.tab.world">ワールド</button>
+        <button class="rank-tab-btn active" onclick="switchRankTab('world')" data-i18n="rank.tab.world">ワールド</button>
+        <button class="rank-tab-btn"        onclick="switchRankTab('local')" data-i18n="rank.tab.local">ローカル</button>
       </div>
       <!-- world: player name area -->
       <div id="rank-login-area" class="hidden" style="margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:8px">
@@ -1723,6 +1723,14 @@ const STRINGS = {
     'rank.name.placeholder': 'ななしさん',
     'rank.name.save': '保存',
     'rank.loading': '読み込み中…',
+    'rank.col.num': '#',
+    'rank.col.name': 'なまえ',
+    'rank.col.floor': '階層',
+    'rank.col.score': 'スコア',
+    'rank.col.date': '日付',
+    'rank.empty': 'まだ記録がありません',
+    'rank.fail': '取得に失敗しました',
+    'rank.floorunit': '階',
     'btn.close': 'とじる',
     'coll.title': '📖 コレクション',
     'zoom.close': 'クリックで閉じる',
@@ -1889,6 +1897,14 @@ const STRINGS = {
     'rank.name.placeholder': 'ななしさん',
     'rank.name.save': 'ほぞん',
     'rank.loading': 'よみこみちゅう…',
+    'rank.col.num': '#',
+    'rank.col.name': 'なまえ',
+    'rank.col.floor': 'かいそう',
+    'rank.col.score': 'スコア',
+    'rank.col.date': 'ひづけ',
+    'rank.empty': 'まだ きろくが ありません',
+    'rank.fail': 'しゅとくに しっぱいしました',
+    'rank.floorunit': 'かい',
     'btn.close': 'とじる',
     'coll.title': '📖 コレクション',
     'zoom.close': 'クリックでとじる',
@@ -2055,6 +2071,14 @@ const STRINGS = {
     'rank.name.placeholder': 'Anonymous',
     'rank.name.save': 'Save',
     'rank.loading': 'Loading…',
+    'rank.col.num': '#',
+    'rank.col.name': 'Name',
+    'rank.col.floor': 'Floor',
+    'rank.col.score': 'Score',
+    'rank.col.date': 'Date',
+    'rank.empty': 'No records yet',
+    'rank.fail': 'Failed to load',
+    'rank.floorunit': 'F',
     'btn.close': 'Close',
     'coll.title': '📖 Collection',
     'zoom.close': 'Click to close',
@@ -2916,7 +2940,7 @@ function saveRankEntry(floor, score, diff) {
 }
 function openRanking() {
   _rankDiff = (typeof battle !== 'undefined' && battle.difficulty) ? battle.difficulty : 'normal';
-  _rankTab  = 'local';
+  _rankTab  = 'world';
   // プレイヤー名をinputに反映
   const nameInput = document.getElementById('rank-player-name');
   if (nameInput) nameInput.value = getPlayerName();
@@ -2932,8 +2956,8 @@ function _updateRankTabs() {
   ['easy','normal','hard','endless'].forEach((d, i) =>
     diffBtns[i].classList.toggle('active', d === _rankDiff));
   const modeBtns = document.querySelectorAll('#rank-mode-tabs .rank-tab-btn');
-  modeBtns[0].classList.toggle('active', _rankTab === 'local');
-  modeBtns[1].classList.toggle('active', _rankTab === 'world');
+  modeBtns[0].classList.toggle('active', _rankTab === 'world');
+  modeBtns[1].classList.toggle('active', _rankTab === 'local');
   document.getElementById('rank-login-area').classList.toggle('hidden', _rankTab !== 'world');
 }
 async function _loadAndRender() {
@@ -2951,10 +2975,13 @@ async function _loadAndRender() {
     : Promise.resolve(null));
   loading.style.display = 'none';
   if (!rows) {
-    tbl.innerHTML = `<tr><td colspan="5" style="color:#bbb;padding:16px 0">取得に失敗しました</td></tr>`;
+    tbl.innerHTML = `<tr><td colspan="5" style="color:#bbb;padding:16px 0">${t('rank.fail')}</td></tr>`;
     return;
   }
   _renderRankRows(rows);
+}
+function _escHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 function _renderRankRows(rows) {
   const tbl = document.getElementById('rank-table');
@@ -2963,20 +2990,20 @@ function _renderRankRows(rows) {
   // ローカルは name 列なし（4列）、ワールドは name 列あり（5列）
   const isWorld = _rankTab === 'world';
   let html = isWorld
-    ? `<tr><th>#</th><th>なまえ</th><th>階層</th><th>スコア</th><th>日付</th></tr>`
-    : `<tr><th>#</th><th>階層</th><th>スコア</th><th>日付</th></tr>`;
+    ? `<tr><th>${t('rank.col.num')}</th><th>${t('rank.col.name')}</th><th>${t('rank.col.floor')}</th><th>${t('rank.col.score')}</th><th>${t('rank.col.date')}</th></tr>`
+    : `<tr><th>${t('rank.col.num')}</th><th>${t('rank.col.floor')}</th><th>${t('rank.col.score')}</th><th>${t('rank.col.date')}</th></tr>`;
   if (!rows || rows.length === 0) {
     const cols = isWorld ? 5 : 4;
-    html += `<tr><td colspan="${cols}" style="color:#bbb;padding:16px 0">まだ記録がありません</td></tr>`;
+    html += `<tr><td colspan="${cols}" style="color:#bbb;padding:16px 0">${t('rank.empty')}</td></tr>`;
   } else {
     rows.forEach((r, i) => {
       const medal = MEDALS[i] || (i + 1);
       const isMine = isWorld && r.name === myName;
       const style  = isMine ? 'background:#fffbe8;font-weight:800' : '';
       if (isWorld) {
-        html += `<tr style="${style}"><td>${medal}</td><td>${r.name||'ゲスト'}</td><td>${r.floor}階</td><td>${(r.score||0).toLocaleString()}</td><td>${r.date||''}</td></tr>`;
+        html += `<tr style="${style}"><td>${medal}</td><td>${_escHtml(r.name||'ゲスト')}</td><td>${r.floor}${t('rank.floorunit')}</td><td>${(r.score||0).toLocaleString()}</td><td>${_escHtml(r.date||'')}</td></tr>`;
       } else {
-        html += `<tr><td>${medal}</td><td>${r.floor}階</td><td>${(r.score||0).toLocaleString()}</td><td>${r.date||''}</td></tr>`;
+        html += `<tr><td>${medal}</td><td>${r.floor}${t('rank.floorunit')}</td><td>${(r.score||0).toLocaleString()}</td><td>${_escHtml(r.date||'')}</td></tr>`;
       }
     });
   }
@@ -6921,6 +6948,7 @@ function buildDiceFace(face, num) {
     const res = await fetch(`${_base}/rankings`, {
       method: 'POST',
       headers: _hdr,
+      keepalive: true,
       body: JSON.stringify({
         game:        'iriscraft',
         difficulty:  difficulty   || 'normal',
