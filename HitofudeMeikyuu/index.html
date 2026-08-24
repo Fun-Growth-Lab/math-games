@@ -850,6 +850,14 @@
         </div>
     </div>
 
+    <!-- ==================== CUSTOM ALERT (ブラウザ標準alertの代替) ==================== -->
+    <div id="custom-alert-overlay" class="overlay hidden" style="z-index:9999;">
+        <div class="ov-box" style="text-align:center;">
+            <p class="ov-desc center" id="custom-alert-msg"></p>
+            <button class="btn btn-green btn-sm" data-i18n="btn_ok" onclick="closeCustomAlert()">OK</button>
+        </div>
+    </div>
+
     <!-- ==================== RANKING ==================== -->
     <div id="ranking-screen" class="hidden">
         <div class="rank-box">
@@ -860,8 +868,8 @@
                 <button id="rank-diff-btn-hard" class="rank-toggle-btn" data-i18n="diff_hard" onclick="switchRankDiff('hard')">むずかしい</button>
             </div>
             <div class="rank-toggle">
-                <button id="rank-tab-local-btn" class="rank-toggle-btn active" data-i18n="rank_tab_local" onclick="switchRankTab('local')">ローカル</button>
-                <button id="rank-tab-world-btn" class="rank-toggle-btn" data-i18n="rank_tab_world" onclick="switchRankTab('world')">ワールド</button>
+                <button id="rank-tab-world-btn" class="rank-toggle-btn active" data-i18n="rank_tab_world" onclick="switchRankTab('world')">ワールド</button>
+                <button id="rank-tab-local-btn" class="rank-toggle-btn" data-i18n="rank_tab_local" onclick="switchRankTab('local')">ローカル</button>
             </div>
             <div id="rank-loading" class="rank-loading" style="display:none;" data-i18n="rank_loading">読み込み中…</div>
             <ul id="rank-list" class="rank-list"></ul>
@@ -1241,6 +1249,7 @@
         const res = await fetch(`${_base}/rankings`, {
             method: 'POST',
             headers: _hdr,
+            keepalive: true,
             body: JSON.stringify({
                 game:        'hitofude_meikyuu',
                 difficulty:  difficulty  || 'normal',
@@ -1323,6 +1332,14 @@ function setLanguage(lang){
 }
 // data-i18n="key"（textContent）／data-i18n-html="key"（innerHTML）／data-i18n-alt="key"（alt属性）を持つ
 // 静的HTML要素を、現在の言語のテキストに一括で置き換える
+// ブラウザ標準のalert()の代わりに使うゲーム内ポップアップ
+function showCustomAlert(msg){
+    document.getElementById('custom-alert-msg').textContent = msg;
+    document.getElementById('custom-alert-overlay').classList.remove('hidden');
+}
+function closeCustomAlert(){
+    document.getElementById('custom-alert-overlay').classList.add('hidden');
+}
 function applyI18n(){
     document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = ui(el.getAttribute('data-i18n')); });
     document.querySelectorAll('[data-i18n-html]').forEach(el => { el.innerHTML = ui(el.getAttribute('data-i18n-html')); });
@@ -1511,6 +1528,7 @@ const UI_TEXT = {
     label_name_selected: { ja: '✓ 選択中', ja_easy: '✓ せんたくちゅう', en: '✓ Selected' },
     name_too_long: { ja: '12文字以内で入力してください', ja_easy: '12もじいないで にゅうりょくしてください', en: 'Please enter within 12 characters' },
     name_duplicate: { ja: '同じ名前がすでにあります', ja_easy: 'おなじ なまえが もう あります', en: 'That name is already registered' },
+    btn_ok: { ja: 'OK', ja_easy: 'OK', en: 'OK' },
     default_player_name: { ja: 'ななしさん', ja_easy: 'ななしさん', en: 'Guest' },
 
     ranking_title: { ja: '🏆 ランキング', ja_easy: '🏆 ランキング', en: '🏆 Ranking' },
@@ -3950,9 +3968,9 @@ function addPlayerName(){
     const inp = document.getElementById('name-reg-input');
     const name = inp.value.trim();
     if (!name) return;
-    if (name.length > 12){ alert(ui('name_too_long')); return; }
+    if (name.length > 12){ showCustomAlert(ui('name_too_long')); return; }
     const list = getPlayerNames();
-    if (list.includes(name)){ alert(ui('name_duplicate')); return; }
+    if (list.includes(name)){ showCustomAlert(ui('name_duplicate')); return; }
     list.push(name);
     savePlayerNames(list);
     setCurPlayerName(name);
@@ -4024,7 +4042,7 @@ function recordRunResult(cleared){
     const jobName = JOBS[player.job] ? JOBS[player.job].name : '';
     saveLocalScore(selectedDifficulty, {
         name: getCurPlayerName(), score: lastFinalScore, floor, job: jobName,
-        dateIso: now.toISOString(), date: now.toLocaleDateString(currentLang === 'en' ? 'en-US' : 'ja-JP')
+        dateIso: now.toISOString(), date: `${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()}`
     });
 }
 
@@ -4050,11 +4068,11 @@ async function submitScoreToWorld(which){
 }
 
 // ---- ランキング画面 ----
-let rankTab = 'local';
+let rankTab = 'world';
 let rankDiff = 'normal';
 function openRanking(){
     document.getElementById('title-screen').classList.add('hidden');
-    rankTab = 'local';
+    rankTab = 'world';
     rankDiff = 'normal';
     renderRankTabs();
     loadAndRenderRanking();
