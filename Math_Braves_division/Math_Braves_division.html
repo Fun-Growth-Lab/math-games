@@ -21,7 +21,7 @@
     window.saveOnlineScore = async (uid, name, score, difficulty) => {
         if((score||0)<=0) return;
         try {
-            const res = await fetch(`${_b}/rankings`,{method:'POST',headers:_h,
+            const res = await fetch(`${_b}/rankings`,{method:'POST',headers:_h,keepalive:true,
                 body:JSON.stringify({game:'math_braves_division',difficulty:difficulty||'normal',player_name:name||'ゲスト',point_score:Math.round(score)||0})});
             if(!res.ok){const t=await res.text();throw new Error(`HTTP ${res.status}: ${t}`);}
         } catch(e){console.error('Ranking save error:',e);}
@@ -32,7 +32,7 @@
             const res = await fetch(`${_b}/rankings?${q}`,{headers:_rh});
             if(!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
-            return data.map(r=>({uid:'',name:r.player_name,score:r.point_score,date:r.created_at?new Date(r.created_at).toLocaleDateString('ja-JP'):''}));
+            return data.map(r=>{let d='';if(r.created_at){const dt=new Date(r.created_at);d=`${dt.getFullYear()}/${dt.getMonth()+1}/${dt.getDate()}`;}return {uid:'',name:r.player_name,score:r.point_score,date:d};});
         } catch(e){console.error('Ranking load error:',e);return [];}
     };
 })();
@@ -158,7 +158,7 @@
             background-color: #aed581; color: #33691e; pointer-events: none; font-weight: bold; box-shadow: 0 2px 0 #558b2f;
         }
 
-        #overlay, #ranking-overlay, #player-manager-overlay, #round-clear-overlay, #difficulty-select-overlay, #howto-overlay {
+        #overlay, #ranking-overlay, #player-manager-overlay, #round-clear-overlay, #difficulty-select-overlay, #howto-overlay, #settings-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.6);
             display: flex; justify-content: center; align-items: center;
@@ -175,6 +175,9 @@
         }
         
         .hidden { display: none !important; }
+        .lang-btn { opacity: 0.55; }
+        .lang-btn.active { opacity: 1; outline: 3px solid #fbc02d; }
+        .rank-date { font-size: 0.72rem; color: #a1887f; }
         
         .difficulty-container {
             display: flex; justify-content: center; gap: 15px; margin-bottom: 20px; align-items: flex-end;
@@ -271,37 +274,37 @@
     <div id="game-area">
         <canvas id="gameCanvas"></canvas>
         
-        <button id="btn-show-howto" class="btn btn-spla-yellow" style="position: absolute; top: 20px; left: 20px; z-index: 20; width: 150px; font-size: 1.1rem; box-shadow: 0 4px 0 #f57f17;">あそびかた</button>
-        <button id="btn-back-to-title-ingame" class="btn btn-spla-pink hidden" style="position: absolute; top: 20px; right: 20px; z-index: 10; width: 150px; font-size: 1.1rem;">タイトルへ</button>
+        <button id="btn-show-howto" class="btn btn-spla-yellow" style="position: absolute; top: 20px; left: 20px; z-index: 20; width: 150px; font-size: 1.1rem; box-shadow: 0 4px 0 #f57f17;" data-i18n="btn_howto">あそびかた</button>
+        <button id="btn-back-to-title-ingame" class="btn btn-spla-pink hidden" style="position: absolute; top: 20px; right: 20px; z-index: 10; width: 150px; font-size: 1.1rem;" data-i18n="btn_to_title">タイトルへ</button>
 
         <div id="info-bottom-left" class="hidden" style="position: absolute; bottom: 20px; left: 20px; background: rgba(255, 248, 225, 0.95); padding: 15px 25px; border-radius: 15px; border: 4px solid #a1887f; z-index: 5; box-shadow: 0 4px 10px rgba(0,0,0,0.1); color: #5d4037; font-size: 1.2rem; display: flex; flex-direction: column; gap: 8px;">
-            <div><span style="color:#8d6e63; font-size:1rem; margin-right: 5px;">プレーヤー</span> <span id="disp-player-name" style="font-weight:bold; color:#33691e; font-size: 1.4rem;"></span></div>
-            <div><span style="color:#8d6e63; font-size:1rem; margin-right: 5px;">難易度</span> <span id="disp-difficulty-label" style="font-weight:bold; color:#f57f17; font-size: 1.4rem;"></span></div>
-            <div><span style="color:#8d6e63; font-size:1rem; margin-right: 5px;">ラウンド</span> <span id="disp-round" style="font-weight:bold; color:#33691e; font-size: 1.4rem;"></span></div>
+            <div><span style="color:#8d6e63; font-size:1rem; margin-right: 5px;" data-i18n="label_player">プレーヤー</span> <span id="disp-player-name" style="font-weight:bold; color:#33691e; font-size: 1.4rem;"></span></div>
+            <div><span style="color:#8d6e63; font-size:1rem; margin-right: 5px;" data-i18n="label_difficulty">難易度</span> <span id="disp-difficulty-label" style="font-weight:bold; color:#f57f17; font-size: 1.4rem;"></span></div>
+            <div><span style="color:#8d6e63; font-size:1rem; margin-right: 5px;" data-i18n="label_round">ラウンド</span> <span id="disp-round" style="font-weight:bold; color:#33691e; font-size: 1.4rem;"></span></div>
         </div>
 
         <div id="info-bottom-right" class="hidden" style="position: absolute; bottom: 20px; right: 20px; background: rgba(255, 248, 225, 0.95); padding: 15px 30px; border-radius: 15px; border: 4px solid #a1887f; z-index: 5; box-shadow: 0 4px 10px rgba(0,0,0,0.1); color: #5d4037; font-size: 1.2rem; display: flex; flex-direction: column; gap: 8px; text-align: right;">
             <div><span style="color:#8d6e63; font-size:1rem; margin-right: 5px;">HIT</span> <span id="disp-hit-progress" style="font-weight:bold; color:#d84315; font-size:2rem; text-shadow: 1px 1px 0 #fff;">0 / 10</span></div>
-            <div><span style="color:#8d6e63; font-size:1rem; margin-right: 5px;">スコア</span> <span id="disp-total-score" style="font-weight:bold; color:#f57f17; font-size:2rem; text-shadow: 1px 1px 0 #fff;">0</span></div>
+            <div><span style="color:#8d6e63; font-size:1rem; margin-right: 5px;" data-i18n="label_score">スコア</span> <span id="disp-total-score" style="font-weight:bold; color:#f57f17; font-size:2rem; text-shadow: 1px 1px 0 #fff;">0</span></div>
         </div>
 
         <div id="ap-display-container" class="hidden">
-            <div id="ap-label">のこりAP</div>
+            <div id="ap-label" data-i18n="label_ap">のこりAP</div>
             <div id="ap-value">10</div>
             <div id="quota-remaining">あと 10 こ</div>
         </div>
-        
+
         <div id="title-screen" style="position:absolute; top:0; left:0; width:100%; height:100%; display:flex; flex-direction:column; justify-content:center; align-items:center; z-index:10;">
             <div class="title-container">
                 <div style="text-align: center; margin-bottom: 30px; transform: scale(1.1) rotate(-2deg);">
                     <h1 style="font-size:4rem; margin:0; color:#33691e; text-shadow: 3px 3px 0 #fff, 6px 6px 0 rgba(0,0,0,0.1); letter-spacing: 2px;">MATH BRAVES</h1>
-                    <p style="font-size:1.8rem; margin-top:5px; margin-bottom:10px; font-weight:bold; color:#e64a19; text-shadow: 2px 2px 0 #fff; letter-spacing: 5px;">- わりざん パネル -</p>
+                    <p style="font-size:1.8rem; margin-top:5px; margin-bottom:10px; font-weight:bold; color:#e64a19; text-shadow: 2px 2px 0 #fff; letter-spacing: 5px;" data-i18n="title_sub">- わりざん パネル -</p>
                 </div>
-                
-                <button id="btn-start-game" class="btn btn-spla-green title-menu-btn">はじめる</button>
-                
+
+                <button id="btn-start-game" class="btn btn-spla-green title-menu-btn" data-i18n="btn_start">はじめる</button>
+
                 <button id="player-select-btn" class="btn btn-spla-pink title-menu-btn" title="プレーヤーをへんこうする">
-                    <span>👤 <span id="current-player-name-display">ゲスト</span> <span style="font-size: 0.8rem;">(へんこう)</span></span>
+                    <span>👤 <span id="current-player-name-display">ゲスト</span> <span style="font-size: 0.8rem;" data-i18n="player_change_suffix">(へんこう)</span></span>
                 </button>
 
                 <div style="width: 100%; display: flex; flex-direction: column; align-items: center; background: rgba(0,0,0,0.05); border-radius: 15px; margin-bottom: 15px; padding-top: 10px; display:none">
@@ -310,32 +313,46 @@
                     <button id="btn-logout" class="btn btn-danger hidden title-menu-btn" style="margin-top:0; display:none">ログアウト</button>
                 </div>
 
-                <button id="btn-view-ranking" class="btn btn-spla-yellow title-menu-btn">🏆 ランキング</button>
-                <button id="btn-index" class="btn btn-spla-blue title-menu-btn">🏠 INDEXへ</button>
+                <button id="btn-view-ranking" class="btn btn-spla-yellow title-menu-btn" data-i18n="btn_ranking">🏆 ランキング</button>
+                <button id="btn-open-settings" class="btn btn-spla-pink title-menu-btn" data-i18n="btn_settings">⚙ 設定</button>
+                <button id="btn-index" class="btn btn-spla-blue title-menu-btn" data-i18n="btn_index">🏠 INDEXへ</button>
+            </div>
+        </div>
+
+        <div id="settings-screen" class="hidden">
+            <div class="overlay-content" style="border-color: #f48fb1; width: 380px;">
+                <h2 style="color: #d84315; margin-top: 0;" data-i18n="settings_title">⚙ 設定</h2>
+                <p style="font-size:0.9rem; color:#8d6e63; margin-bottom:16px;" data-i18n="settings_sub">言語 / Language</p>
+                <div style="display:flex; flex-direction:column; gap:10px;">
+                    <button id="lang-btn-simple" class="btn btn-spla-blue lang-btn" onclick="selectLanguage('simple')" data-i18n="lang_simple">かんたんなにほんご</button>
+                    <button id="lang-btn-ja"     class="btn btn-spla-blue lang-btn" onclick="selectLanguage('ja')"     data-i18n="lang_ja">日本語</button>
+                    <button id="lang-btn-en"     class="btn btn-spla-blue lang-btn" onclick="selectLanguage('en')"     data-i18n="lang_en">English</button>
+                </div>
+                <button id="btn-close-settings" class="btn btn-spla-pink" style="width: 200px; font-size: 1.2rem; margin-top:20px;" data-i18n="btn_close">とじる</button>
             </div>
         </div>
 
         <div id="difficulty-select-overlay" class="hidden">
             <div class="overlay-content" style="border-color: #8bc34a; box-shadow: 0 0 20px rgba(139,195,74,0.3);">
-                <h2 style="color: #33691e; font-size: 2.2rem; border-bottom: none; margin-bottom: 30px; text-shadow: 2px 2px 0 #fff;">難易度をえらぶ</h2>
+                <h2 style="color: #33691e; font-size: 2.2rem; border-bottom: none; margin-bottom: 30px; text-shadow: 2px 2px 0 #fff;" data-i18n="diff_prompt">難易度をえらぶ</h2>
                 <div class="difficulty-container" style="margin-bottom: 40px;">
                     <div class="diff-wrapper">
                         <div id="crown-easy" class="crown-icon">👑</div>
-                        <button id="btn-easy" class="btn btn-spla-green">やさしい</button>
+                        <button id="btn-easy" class="btn btn-spla-green" data-i18n="diff_easy">やさしい</button>
                         <div id="clear-easy" class="clear-count-text">0回クリア</div>
                     </div>
                     <div class="diff-wrapper">
                         <div id="crown-normal" class="crown-icon">👑</div>
-                        <button id="btn-normal" class="btn btn-spla-yellow">ふつう</button>
+                        <button id="btn-normal" class="btn btn-spla-yellow" data-i18n="diff_normal">ふつう</button>
                         <div id="clear-normal" class="clear-count-text">0回クリア</div>
                     </div>
                     <div class="diff-wrapper">
                         <div id="crown-hard" class="crown-icon">👑</div>
-                        <button id="btn-hard" class="btn btn-spla-pink">むずかしい</button>
+                        <button id="btn-hard" class="btn btn-spla-pink" data-i18n="diff_hard">むずかしい</button>
                         <div id="clear-hard" class="clear-count-text">0回クリア</div>
                     </div>
                 </div>
-                <button id="btn-close-difficulty" class="btn btn-spla-blue" style="width: 200px; font-size: 1.2rem;">もどる</button>
+                <button id="btn-close-difficulty" class="btn btn-spla-blue" style="width: 200px; font-size: 1.2rem;" data-i18n="btn_back">もどる</button>
             </div>
         </div>
 
@@ -351,55 +368,55 @@
         <div id="ranking-screen" class="hidden">
             <div id="ranking-overlay">
                 <div class="overlay-content" style="width: 95%; max-width: 900px; border-color: #ffb300;">
-                    <h2 id="ranking-header-title" style="color: #f57f17; font-size: 2rem; margin-top: 0; text-shadow: 2px 2px 0 #fff; border: none;">ベストスコア 10</h2>
+                    <h2 id="ranking-header-title" data-i18n="rank_header" style="color: #f57f17; font-size: 2rem; margin-top: 0; text-shadow: 2px 2px 0 #fff; border: none;">ベストスコア 10</h2>
                     <div style="margin-bottom: 20px;">
-                        <button id="btn-rank-local" class="btn btn-toggle active">ローカル</button>
-                        <button id="btn-rank-world" class="btn btn-toggle">ワールド</button>
+                        <button id="btn-rank-world" class="btn btn-toggle active" data-i18n="rank_tab_world">ワールド</button>
+                        <button id="btn-rank-local" class="btn btn-toggle" data-i18n="rank_tab_local">ローカル</button>
                     </div>
                     <div class="ranking-container">
                         <div class="ranking-box" id="box-easy">
-                            <div class="ranking-title" style="color: #33691e;">やさしい</div>
+                            <div class="ranking-title" style="color: #33691e;" data-i18n="diff_easy">やさしい</div>
                             <ul id="rank-list-easy" class="ranking-list"></ul>
                         </div>
                         <div class="ranking-box" id="box-normal">
-                            <div class="ranking-title" style="color: #f57f17;">ふつう</div>
+                            <div class="ranking-title" style="color: #f57f17;" data-i18n="diff_normal">ふつう</div>
                             <ul id="rank-list-normal" class="ranking-list"></ul>
                         </div>
                         <div class="ranking-box" id="box-hard">
-                            <div class="ranking-title" style="color: #d84315;">むずかしい</div>
+                            <div class="ranking-title" style="color: #d84315;" data-i18n="diff_hard">むずかしい</div>
                             <ul id="rank-list-hard" class="ranking-list"></ul>
                         </div>
                     </div>
-                    <button id="btn-close-ranking" class="btn btn-spla-pink" style="width: 200px; font-size: 1.2rem;">とじる</button>
+                    <button id="btn-close-ranking" class="btn btn-spla-pink" style="width: 200px; font-size: 1.2rem;" data-i18n="btn_close">とじる</button>
                 </div>
             </div>
         </div>
 
         <div id="player-manager-overlay" class="hidden">
             <div class="overlay-content" style="width: 450px; border-color: #ffab91;">
-                <h2 style="color: #d84315; font-size: 1.8rem; margin-top: 0; border: none; text-shadow: 2px 2px 0 #fff;">プレーヤーをえらぶ</h2>
+                <h2 style="color: #d84315; font-size: 1.8rem; margin-top: 0; border: none; text-shadow: 2px 2px 0 #fff;" data-i18n="pm_title">プレーヤーをえらぶ</h2>
                 <div class="add-player-form">
-                    <input type="text" id="input-new-player" class="input-name" placeholder="なまえ (ひらがな 12もじ)" maxlength="12">
-                    <button id="btn-add-player" class="btn btn-spla-green" style="font-size: 1.1rem;">ついか</button>
+                    <input type="text" id="input-new-player" class="input-name" placeholder="なまえ (ひらがな 12もじ)" maxlength="12" data-i18n-placeholder="pm_placeholder">
+                    <button id="btn-add-player" class="btn btn-spla-green" style="font-size: 1.1rem;" data-i18n="btn_add">ついか</button>
                 </div>
                 <ul id="player-list-ul" class="player-list"></ul>
-                <button id="btn-close-player-manager" class="btn btn-spla-pink" style="width: 200px; font-size: 1.2rem; margin-top: 15px;">とじる</button>
+                <button id="btn-close-player-manager" class="btn btn-spla-pink" style="width: 200px; font-size: 1.2rem; margin-top: 15px;" data-i18n="btn_close">とじる</button>
             </div>
         </div>
 
         <div id="howto-overlay" class="hidden" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; z-index: 1000; flex-direction: column;">
             <div class="overlay-content" style="border: 5px solid #8bc34a; box-shadow: 0 0 25px rgba(139, 195, 74, 0.4); width: 80%; max-width: 600px; padding: 40px 30px; text-align: left;">
-                <h2 style="color: #33691e; font-size: 2rem; border-bottom: 4px solid #8bc34a; padding-bottom: 10px; margin-top: 0; text-align: center;">あそびかた</h2>
+                <h2 style="color: #33691e; font-size: 2rem; border-bottom: 4px solid #8bc34a; padding-bottom: 10px; margin-top: 0; text-align: center;" data-i18n="btn_howto">あそびかた</h2>
                 <div style="font-size: 1.1rem; line-height: 1.6; color: #5d4037;">
-                    <p>1. <strong>てふだ(2〜10)</strong> を <strong>ば の カード</strong> にかさねて わりざん をしよう！</p>
-                    <p>2. <strong>商（しょう）</strong> と <strong>余り（あまり）</strong> の パネルをうめよう！HITしたら灰色になるよ。</p>
-                    <p>3. <strong>ターゲット</strong><br>商と余りのパネルには、それぞれ1つずつ<span style="color:#e64a19; font-weight:bold;">「ターゲット（枠が光っているパネル）」</span>が設定されています。</p>
-                    <p>4. <strong>スコア</strong><br>パネルをHITさせると得点が入ります！<br>・商と余り片方HIT：100pt<br>・商と余り両方HIT：300pt<br><span style="color:#e64a19; font-weight:bold;">★ターゲットをふくむと倍率UP!</span><br>★９マス全部HITすると２０００ｐｔのボーナス！</p>
-                    <p>5. <strong>クリア</strong><br>きめられた かず のパネルを HITさせたら ラウンドクリア！<br>APが 0 になると まけだよ。</p>
-                    <p>6. <strong>ビンゴボーナス</strong><br>商や余りのパネルが 縦・横・ななめ のどれか1列に 3つ そろうと BINGO！<br>1列そろうごとに <strong style="color:#e64a19;">500pt</strong> のボーナスがもらえるよ！</p>
+                    <p data-i18n-html="howto_1">1. <strong>てふだ(2〜10)</strong> を <strong>ば の カード</strong> にかさねて わりざん をしよう！</p>
+                    <p data-i18n-html="howto_2">2. <strong>商（しょう）</strong> と <strong>余り（あまり）</strong> の パネルをうめよう！HITしたら灰色になるよ。</p>
+                    <p data-i18n-html="howto_3">3. <strong>ターゲット</strong><br>商と余りのパネルには、それぞれ1つずつ<span style="color:#e64a19; font-weight:bold;">「ターゲット（枠が光っているパネル）」</span>が設定されています。</p>
+                    <p data-i18n-html="howto_4">4. <strong>スコア</strong><br>パネルをHITさせると得点が入ります！<br>・商と余り片方HIT：100pt<br>・商と余り両方HIT：300pt<br><span style="color:#e64a19; font-weight:bold;">★ターゲットをふくむと倍率UP!</span><br>★９マス全部HITすると２０００ｐｔのボーナス！</p>
+                    <p data-i18n-html="howto_5">5. <strong>クリア</strong><br>きめられた かず のパネルを HITさせたら ラウンドクリア！<br>APが 0 になると まけだよ。</p>
+                    <p data-i18n-html="howto_6">6. <strong>ビンゴボーナス</strong><br>商や余りのパネルが 縦・横・ななめ のどれか1列に 3つ そろうと BINGO！<br>1列そろうごとに <strong style="color:#e64a19;">500pt</strong> のボーナスがもらえるよ！</p>
                 </div>
                 <div style="text-align: center; margin-top: 20px;">
-                    <button id="btn-close-howto" class="btn btn-spla-green" style="font-size: 1.2rem; width: 150px;">とじる</button>
+                    <button id="btn-close-howto" class="btn btn-spla-green" style="font-size: 1.2rem; width: 150px;" data-i18n="btn_close">とじる</button>
                 </div>
             </div>
         </div>
@@ -410,7 +427,7 @@
             <div id="custom-dialog-msg" style="font-size: 1.3rem; font-weight: bold; margin-bottom: 30px; line-height: 1.5; color: #5d4037;"></div>
             <div style="display: flex; justify-content: center; gap: 20px;">
                 <button id="btn-dialog-ok" class="btn btn-spla-pink" style="width: 140px; font-size: 1.2rem;">OK</button>
-                <button id="btn-dialog-cancel" class="btn btn-spla-blue hidden" style="width: 140px; font-size: 1.2rem;">キャンセル</button>
+                <button id="btn-dialog-cancel" class="btn btn-spla-blue hidden" style="width: 140px; font-size: 1.2rem;" data-i18n="btn_cancel">キャンセル</button>
             </div>
         </div>
     </div>
@@ -421,6 +438,126 @@
     window.handleLogout = function() {};
 </script>
 <script>
+// ============================================================
+//  I18N（かんたんなにほんご／日本語／English）
+// ============================================================
+const STRINGS = {
+    ja: {
+        btn_howto: 'あそびかた', btn_to_title: 'タイトルへ',
+        label_player: 'プレーヤー', label_difficulty: '難易度', label_round: 'ラウンド', label_score: 'スコア', label_ap: 'のこりAP',
+        title_sub: '- わりざん パネル -', btn_start: 'はじめる', player_change_suffix: '(へんこう)',
+        btn_ranking: '🏆 ランキング', btn_settings: '⚙ 設定', btn_index: '🏠 INDEXへ',
+        settings_title: '⚙ 設定', settings_sub: '言語 / Language', lang_simple: 'かんたんなにほんご', lang_ja: '日本語', lang_en: 'English',
+        diff_prompt: '難易度をえらぶ', diff_easy: 'やさしい', diff_normal: 'ふつう', diff_hard: 'むずかしい', btn_back: 'もどる',
+        rank_header: 'ベストスコア 10', rank_tab_world: 'ワールド', rank_tab_local: 'ローカル', rank_loading: 'よみこみ中...', rank_empty: 'データなし',
+        pm_title: 'プレーヤーをえらぶ', pm_placeholder: 'なまえ (ひらがな 12もじ)', btn_add: 'ついか', btn_close: 'とじる', btn_cancel: 'キャンセル',
+        howto_1: '1. <strong>てふだ(2〜10)</strong> を <strong>ば の カード</strong> にかさねて わりざん をしよう！',
+        howto_2: '2. <strong>商（しょう）</strong> と <strong>余り（あまり）</strong> の パネルをうめよう！HITしたら灰色になるよ。',
+        howto_3: '3. <strong>ターゲット</strong><br>商と余りのパネルには、それぞれ1つずつ<span style="color:#e64a19; font-weight:bold;">「ターゲット（枠が光っているパネル）」</span>が設定されています。',
+        howto_4: '4. <strong>スコア</strong><br>パネルをHITさせると得点が入ります！<br>・商と余り片方HIT：100pt<br>・商と余り両方HIT：300pt<br><span style="color:#e64a19; font-weight:bold;">★ターゲットをふくむと倍率UP!</span><br>★９マス全部HITすると２０００ｐｔのボーナス！',
+        howto_5: '5. <strong>クリア</strong><br>きめられた かず のパネルを HITさせたら ラウンドクリア！<br>APが 0 になると まけだよ。',
+        howto_6: '6. <strong>ビンゴボーナス</strong><br>商や余りのパネルが 縦・横・ななめ のどれか1列に 3つ そろうと BINGO！<br>1列そろうごとに <strong style="color:#e64a19;">500pt</strong> のボーナスがもらえるよ！',
+        clear_count: '{n}回クリア',
+        alert_hiragana_only: 'ひらがな と ー (のばすぼう) だけで 入力してください',
+        alert_name_too_long: 'なまえは12もじまでです', alert_ng_word: 'そのなまえはつかえません',
+        alert_max_players: '登録できるのは 5人 までです', alert_duplicate_name: 'すでにあるなまえです',
+        delete_confirm: '{name} をさくじょしますか？', confirm_to_title: 'タイトルへもどりますか？<br>（スコアはきろくされません）',
+        quota_remaining: 'あと {n} こ', equation_placeholder: 'ここに けいさんしき が ひょうじ されるよ', equation_remainder_word: 'あまり',
+        canvas_quotient: 'しょう', canvas_quotient_kanji: '商', canvas_remainder: 'あまり', canvas_remainder_kanji: '余り',
+        target_get: 'ターゲットGET!', hit_text: 'HIT!', perfect_text: 'パーフェクト!',
+        round_clear_title: 'ラウンド {n} クリア！', ap_bonus_label: 'APボーナス：', round_score_label: 'ラウンドスコア：',
+        bingo_label: 'ビンゴ：', perfect_label: 'パーフェクト：', times_suffix: ' 回', total_score_label: '合計スコア：',
+        btn_see_result: '結果を見る', btn_next: 'つぎへ', round_n_score: 'ラウンド{n}スコア：',
+        total_bingo_label: '合計ビンゴ：', total_perfect_label: '合計パーフェクト：', overall_score_label: '総合スコア：',
+        btn_to_title2: 'タイトルへ', ap_zero_title: 'AP切れ！', ap_zero_body: '目標を達成できませんでした...',
+        overall_score_colon: '総合スコア: ',
+    },
+    simple: {
+        btn_howto: 'あそびかた', btn_to_title: 'タイトルへ',
+        label_player: 'プレーヤー', label_difficulty: 'なんいど', label_round: 'ラウンド', label_score: 'スコア', label_ap: 'のこりAP',
+        title_sub: '- わりざん パネル -', btn_start: 'はじめる', player_change_suffix: '(へんこう)',
+        btn_ranking: '🏆 ランキング', btn_settings: '⚙ せってい', btn_index: '🏠 INDEXへ',
+        settings_title: '⚙ せってい', settings_sub: '言語 / Language', lang_simple: 'かんたんなにほんご', lang_ja: '日本語', lang_en: 'English',
+        diff_prompt: 'なんいどを えらぶ', diff_easy: 'やさしい', diff_normal: 'ふつう', diff_hard: 'むずかしい', btn_back: 'もどる',
+        rank_header: 'ベストスコア 10', rank_tab_world: 'ワールド', rank_tab_local: 'ローカル', rank_loading: 'よみこみちゅう...', rank_empty: 'データなし',
+        pm_title: 'プレーヤーを えらぶ', pm_placeholder: 'なまえ (ひらがな 12もじ)', btn_add: 'ついか', btn_close: 'とじる', btn_cancel: 'キャンセル',
+        howto_1: '1. <strong>てふだ(2〜10)</strong> を <strong>ばの カード</strong> に かさねて わりざん を しよう！',
+        howto_2: '2. <strong>しょう</strong> と <strong>あまり</strong> の パネルを うめよう！HITしたら はいいろに なるよ。',
+        howto_3: '3. <strong>ターゲット</strong><br>しょうと あまりの パネルには、それぞれ1つずつ<span style="color:#e64a19; font-weight:bold;">「ターゲット（わくが ひかっている パネル）」</span>が きまっています。',
+        howto_4: '4. <strong>スコア</strong><br>パネルを HITさせると とくてんが はいります！<br>・しょうと あまり かたほうHIT：100pt<br>・しょうと あまり りょうほうHIT：300pt<br><span style="color:#e64a19; font-weight:bold;">★ターゲットを ふくむと ばいりつUP!</span><br>★９マス ぜんぶHITすると ２０００ｐｔの ボーナス！',
+        howto_5: '5. <strong>クリア</strong><br>きめられた かずの パネルを HITさせたら ラウンドクリア！<br>APが 0に なると まけだよ。',
+        howto_6: '6. <strong>ビンゴボーナス</strong><br>しょうや あまりの パネルが たて・よこ・ななめ の どれか1れつに 3つ そろうと BINGO！<br>1れつ そろうごとに <strong style="color:#e64a19;">500pt</strong> の ボーナスが もらえるよ！',
+        clear_count: '{n}かい クリア',
+        alert_hiragana_only: 'ひらがな と ー (のばすぼう) だけで にゅうりょくしてください',
+        alert_name_too_long: 'なまえは12もじまでです', alert_ng_word: 'そのなまえは つかえません',
+        alert_max_players: 'とうろくできるのは 5にん までです', alert_duplicate_name: 'すでに あるなまえです',
+        delete_confirm: '{name} を さくじょしますか？', confirm_to_title: 'タイトルへ もどりますか？<br>（スコアは きろくされません）',
+        quota_remaining: 'あと {n} こ', equation_placeholder: 'ここに けいさんしき が ひょうじ されるよ', equation_remainder_word: 'あまり',
+        canvas_quotient: 'しょう', canvas_quotient_kanji: 'しょう', canvas_remainder: 'あまり', canvas_remainder_kanji: 'あまり',
+        target_get: 'ターゲットGET!', hit_text: 'HIT!', perfect_text: 'パーフェクト!',
+        round_clear_title: 'ラウンド {n} クリア！', ap_bonus_label: 'APボーナス：', round_score_label: 'ラウンドスコア：',
+        bingo_label: 'ビンゴ：', perfect_label: 'パーフェクト：', times_suffix: ' かい', total_score_label: 'ごうけいスコア：',
+        btn_see_result: 'けっかを みる', btn_next: 'つぎへ', round_n_score: 'ラウンド{n}スコア：',
+        total_bingo_label: 'ごうけいビンゴ：', total_perfect_label: 'ごうけいパーフェクト：', overall_score_label: 'そうごうスコア：',
+        btn_to_title2: 'タイトルへ', ap_zero_title: 'APきれ！', ap_zero_body: 'もくひょうを たっせいできませんでした...',
+        overall_score_colon: 'そうごうスコア: ',
+    },
+    en: {
+        btn_howto: 'How to Play', btn_to_title: 'To Title',
+        label_player: 'Player', label_difficulty: 'Difficulty', label_round: 'Round', label_score: 'Score', label_ap: 'AP Left',
+        title_sub: ' - Division Panels - ', btn_start: 'Start', player_change_suffix: '(change)',
+        btn_ranking: '🏆 Ranking', btn_settings: '⚙ Settings', btn_index: '🏠 To INDEX',
+        settings_title: '⚙ Settings', settings_sub: '言語 / Language', lang_simple: 'かんたんなにほんご', lang_ja: '日本語', lang_en: 'English',
+        diff_prompt: 'Choose a Difficulty', diff_easy: 'Easy', diff_normal: 'Normal', diff_hard: 'Hard', btn_back: 'Back',
+        rank_header: 'Best Score Top 10', rank_tab_world: 'World', rank_tab_local: 'Local', rank_loading: 'Loading...', rank_empty: 'No data',
+        pm_title: 'Choose Player', pm_placeholder: 'Name (Hiragana, up to 12)', btn_add: 'Add', btn_close: 'Close', btn_cancel: 'Cancel',
+        howto_1: '1. Stack a <strong>hand card (2-10)</strong> onto a <strong>field card</strong> to divide!',
+        howto_2: '2. Fill in the <strong>Quotient</strong> and <strong>Remainder</strong> panels! A hit turns the panel gray.',
+        howto_3: '3. <strong>Target</strong><br>Each of the Quotient and Remainder panels has one <span style="color:#e64a19; font-weight:bold;">"Target" (a panel with a glowing frame)</span>.',
+        howto_4: '4. <strong>Score</strong><br>Hitting a panel earns points!<br>・One of Quotient/Remainder hit: 100pt<br>・Both hit: 300pt<br><span style="color:#e64a19; font-weight:bold;">★Including the target raises the multiplier!</span><br>★Hitting all 9 panels gives a 2000pt bonus!',
+        howto_5: '5. <strong>Clear</strong><br>Hit the required number of panels to clear the round!<br>You lose if AP reaches 0.',
+        howto_6: '6. <strong>Bingo Bonus</strong><br>Getting 3 Quotient or Remainder panels in a row, column, or diagonal is a BINGO!<br>Each completed line earns a <strong style="color:#e64a19;">500pt</strong> bonus!',
+        clear_count: '{n} clears',
+        alert_hiragana_only: 'Please use Hiragana and ー (long vowel mark) only',
+        alert_name_too_long: 'Name must be 12 characters or fewer', alert_ng_word: 'That name cannot be used',
+        alert_max_players: 'You can register up to 5 players', alert_duplicate_name: 'That name is already registered',
+        delete_confirm: 'Delete {name}?', confirm_to_title: 'Return to title?<br>(Your score will not be recorded)',
+        quota_remaining: '{n} left', equation_placeholder: 'The equation will be shown here', equation_remainder_word: 'r',
+        canvas_quotient: 'Quotient', canvas_quotient_kanji: 'Quotient', canvas_remainder: 'Remainder', canvas_remainder_kanji: 'Remainder',
+        target_get: 'TARGET GET!', hit_text: 'HIT!', perfect_text: 'PERFECT!',
+        round_clear_title: 'Round {n} Clear!', ap_bonus_label: 'AP Bonus:', round_score_label: 'Round Score:',
+        bingo_label: 'Bingo:', perfect_label: 'Perfect:', times_suffix: '', total_score_label: 'Total Score:',
+        btn_see_result: 'See Result', btn_next: 'Next', round_n_score: 'Round {n} Score:',
+        total_bingo_label: 'Total Bingo:', total_perfect_label: 'Total Perfect:', overall_score_label: 'Overall Score:',
+        btn_to_title2: 'To Title', ap_zero_title: 'Out of AP!', ap_zero_body: 'You did not reach the goal...',
+        overall_score_colon: 'Overall Score: ',
+    },
+};
+let currentLang = localStorage.getItem('mb_div_lang') || 'ja';
+function T(key, params) {
+    const dict = STRINGS[currentLang] || STRINGS.ja;
+    let str = dict[key] !== undefined ? dict[key] : (STRINGS.ja[key] || key);
+    if (params) { Object.keys(params).forEach(k => { str = str.split(`{${k}}`).join(params[k]); }); }
+    return str;
+}
+function applyLanguage() {
+    document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = T(el.getAttribute('data-i18n')); });
+    document.querySelectorAll('[data-i18n-html]').forEach(el => { el.innerHTML = T(el.getAttribute('data-i18n-html')); });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { el.setAttribute('placeholder', T(el.getAttribute('data-i18n-placeholder'))); });
+    ['simple', 'ja', 'en'].forEach(l => {
+        const btn = document.getElementById('lang-btn-' + l);
+        if (btn) btn.classList.toggle('active', l === currentLang);
+    });
+    if (typeof refreshClearCountLabels === 'function') refreshClearCountLabels();
+}
+function selectLanguage(lang) {
+    currentLang = lang;
+    localStorage.setItem('mb_div_lang', lang);
+    applyLanguage();
+}
+function openSettings() { document.getElementById('settings-screen').classList.remove('hidden'); }
+function closeSettings() { document.getElementById('settings-screen').classList.add('hidden'); }
+
 // Game Config
 const SETTINGS = {
     EASY: { label: "やさしい", baseQuota: 10, ap: 10, maxRound: 3 },
@@ -442,7 +579,7 @@ let state = {
     roundScoreHistory: [],
     roundHits: 0,
     quota: 10,
-    equationText: "ここに けいさんしき が ひょうじ されるよ",
+    equationText: T('equation_placeholder'),
     
     // Arrays
     cards: [null, null, null, null, null], // 手札 (2-10)
@@ -464,7 +601,7 @@ let state = {
     
     width: 0, height: 0, dragInfo: null,
     isProcessing: false, inputLocked: false,
-    rankingMode: 'LOCAL',
+    rankingMode: 'WORLD',
     playerName: "ゲスト",
     particles: [],
     flash: 0
@@ -532,6 +669,8 @@ const ui = {
     btnIndex: document.getElementById('btn-index'),
     btnRankLocal: document.getElementById('btn-rank-local'),
     btnRankWorld: document.getElementById('btn-rank-world'),
+    btnOpenSettings: document.getElementById('btn-open-settings'),
+    btnCloseSettings: document.getElementById('btn-close-settings'),
     playerSelectBtn: document.getElementById('player-select-btn'),
     currentPlayerDisplay: document.getElementById('current-player-name-display'),
     playerManagerOverlay: document.getElementById('player-manager-overlay'),
@@ -719,9 +858,9 @@ function drawPanels(ctx) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
     ctx.font = 'bold 20px "Arial Black", sans-serif';
-    ctx.fillText("しょう", centerX_Q, lay.startY - 70);
+    ctx.fillText(T('canvas_quotient'), centerX_Q, lay.startY - 70);
     ctx.font = 'bold 50px "Arial Black", sans-serif';
-    ctx.fillText("商", centerX_Q, lay.startY - 20);
+    ctx.fillText(T('canvas_quotient_kanji'), centerX_Q, lay.startY - 20);
     ctx.shadowBlur = 0;
 
     for(let i=0; i<9; i++) {
@@ -772,9 +911,9 @@ function drawPanels(ctx) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
     ctx.font = 'bold 20px "Arial Black", sans-serif';
-    ctx.fillText("あまり", centerX_R, lay.startY - 70);
+    ctx.fillText(T('canvas_remainder'), centerX_R, lay.startY - 70);
     ctx.font = 'bold 50px "Arial Black", sans-serif';
-    ctx.fillText("余り", centerX_R, lay.startY - 20);
+    ctx.fillText(T('canvas_remainder_kanji'), centerX_R, lay.startY - 20);
     ctx.shadowBlur = 0;
 
     for(let i=0; i<9; i++) {
@@ -901,7 +1040,7 @@ function checkBingo() {
         state.roundBingos += newBingosQ;
         state.totalBingos += newBingosQ;
         let offset = state.popupEffects.filter(e => e.type === 'Q').length * -80;
-        state.popupEffects.push({ type: 'Q', text: 'BINGO!!', points: pts, life: 1.0, yOffset: offset });
+        state.popupEffects.push({ type: 'Q', text: 'BINGO!!', big: true, points: pts, life: 1.0, yOffset: offset });
     }
     if (newBingosR > 0) {
         const pts = newBingosR * 500;
@@ -910,7 +1049,7 @@ function checkBingo() {
         state.roundBingos += newBingosR;
         state.totalBingos += newBingosR;
         let offset = state.popupEffects.filter(e => e.type === 'R').length * -80;
-        state.popupEffects.push({ type: 'R', text: 'BINGO!!', points: pts, life: 1.0, yOffset: offset });
+        state.popupEffects.push({ type: 'R', text: 'BINGO!!', big: true, points: pts, life: 1.0, yOffset: offset });
     }
 }
 
@@ -955,7 +1094,7 @@ function startRound(roundNum) {
     state.roundScore = 0;
     state.roundBingos = 0;
     state.roundPerfects = 0;
-    state.equationText = "ここに けいさんしき が ひょうじ されるよ";
+    state.equationText = T('equation_placeholder');
     
     state.quotientPanels.fill(false);
     state.remainderPanels.fill(false);
@@ -1084,7 +1223,7 @@ function gameLoop() {
         
         ctx.fillStyle = `rgba(255, 179, 0, ${alpha})`;
         let fontSize = 45;
-        if (eff.text === 'BINGO!!' || eff.text === 'パーフェクト!') fontSize = 55;
+        if (eff.big) fontSize = 55;
         ctx.font = `bold ${fontSize}px "Arial Black", Arial`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -1177,7 +1316,7 @@ function processAttack(cardIndex, fieldIndex) {
     const quotient = Math.floor(dividend / divisor);
     const remainder = dividend % divisor;
     
-    state.equationText = `${dividend} ÷ ${divisor} ＝ ${quotient} あまり ${remainder}`;
+    state.equationText = `${dividend} ÷ ${divisor} ＝ ${quotient} ${T('equation_remainder_word')} ${remainder}`;
     
     state.ap--;
     
@@ -1241,12 +1380,12 @@ function processAttack(cardIndex, fieldIndex) {
     let dispScoreR = baseR * targetMultiplier;
 
     if (isQHit) {
-        let textQ = (quotient === state.targetQuotient) ? 'ターゲットGET!' : 'HIT!';
+        let textQ = (quotient === state.targetQuotient) ? T('target_get') : T('hit_text');
         let offset = state.popupEffects.filter(e => e.type === 'Q').length * -80;
         state.popupEffects.push({ type: 'Q', text: textQ, points: dispScoreQ, life: 1.0, yOffset: offset });
     }
     if (isRHit) {
-        let textR = (remainder === state.targetRemainder) ? 'ターゲットGET!' : 'HIT!';
+        let textR = (remainder === state.targetRemainder) ? T('target_get') : T('hit_text');
         let offset = state.popupEffects.filter(e => e.type === 'R').length * -80;
         state.popupEffects.push({ type: 'R', text: textR, points: dispScoreR, life: 1.0, yOffset: offset });
     }
@@ -1260,7 +1399,7 @@ function processAttack(cardIndex, fieldIndex) {
         state.roundPerfects++;
         state.totalPerfects++;
         let offset = state.popupEffects.filter(e => e.type === 'Q').length * -80;
-        state.popupEffects.push({ type: 'Q', text: 'パーフェクト!', points: 2000, life: 1.0, yOffset: offset });
+        state.popupEffects.push({ type: 'Q', text: T('perfect_text'), big: true, points: 2000, life: 1.0, yOffset: offset });
     }
     if (!state.perfectR && state.remainderPanels.every(p => p)) {
         state.perfectR = true;
@@ -1269,7 +1408,7 @@ function processAttack(cardIndex, fieldIndex) {
         state.roundPerfects++;
         state.totalPerfects++;
         let offset = state.popupEffects.filter(e => e.type === 'R').length * -80;
-        state.popupEffects.push({ type: 'R', text: 'パーフェクト!', points: 2000, life: 1.0, yOffset: offset });
+        state.popupEffects.push({ type: 'R', text: T('perfect_text'), big: true, points: 2000, life: 1.0, yOffset: offset });
     }
 
     refillHand(cardIndex);
@@ -1320,28 +1459,28 @@ function handleRoundClear() {
     ui.roundClearOverlay.classList.remove('hidden');
     ui.roundClearMsg.innerHTML = `
         <div style="font-size: 1.6rem; text-align: center; display: flex; flex-direction: column; align-items: center;">
-            <p style="margin: 0 0 15px 0; font-size: 2.2rem; font-weight: bold; color: #e64a19;">ラウンド ${state.round} クリア！</p>
+            <p style="margin: 0 0 15px 0; font-size: 2.2rem; font-weight: bold; color: #e64a19;">${T('round_clear_title', {n: state.round})}</p>
             <div style="display: grid; grid-template-columns: auto auto; justify-content: center; gap: 10px 30px; margin-bottom: 15px; width: 100%;">
-                <div style="text-align: right;">APボーナス：</div><div style="color:#e64a19; font-weight:bold; text-align: right;">+${apBonus}</div>
-                <div style="text-align: right;">ラウンドスコア：</div><div style="color:#e64a19; font-weight:bold; text-align: right;">${state.roundScore}</div>
-                <div style="text-align: right;">ビンゴ：</div><div style="color:#e64a19; font-weight:bold; text-align: right;">${state.roundBingos} 回</div>
-                <div style="text-align: right;">パーフェクト：</div><div style="color:#e64a19; font-weight:bold; text-align: right;">${state.roundPerfects} 回</div>
+                <div style="text-align: right;">${T('ap_bonus_label')}</div><div style="color:#e64a19; font-weight:bold; text-align: right;">+${apBonus}</div>
+                <div style="text-align: right;">${T('round_score_label')}</div><div style="color:#e64a19; font-weight:bold; text-align: right;">${state.roundScore}</div>
+                <div style="text-align: right;">${T('bingo_label')}</div><div style="color:#e64a19; font-weight:bold; text-align: right;">${state.roundBingos}${T('times_suffix')}</div>
+                <div style="text-align: right;">${T('perfect_label')}</div><div style="color:#e64a19; font-weight:bold; text-align: right;">${state.roundPerfects}${T('times_suffix')}</div>
             </div>
             <hr style="width: 100%; border-color:#a1887f; margin: 10px 0;">
             <div style="display: grid; grid-template-columns: auto auto; justify-content: center; gap: 10px 30px; width: 100%; margin-top: 10px; color: #e64a19; font-weight: bold; font-size: 2.2rem;">
-                <div style="text-align: right;">合計スコア：</div><div style="text-align: right;">${state.score}</div>
+                <div style="text-align: right;">${T('total_score_label')}</div><div style="text-align: right;">${state.score}</div>
             </div>
         </div>
     `;
-    
+
     if (state.round >= currentMaxRound) {
-        ui.btnNextRound.textContent = "結果を見る";
+        ui.btnNextRound.textContent = T('btn_see_result');
         ui.btnNextRound.onclick = () => {
             ui.roundClearOverlay.classList.add('hidden');
             handleGameClear();
         };
     } else {
-        ui.btnNextRound.textContent = "つぎへ";
+        ui.btnNextRound.textContent = T('btn_next');
         ui.btnNextRound.onclick = () => {
             ui.roundClearOverlay.classList.add('hidden');
             startRound(state.round + 1);
@@ -1361,25 +1500,25 @@ function handleGameClear() {
     ui.result.style.display = 'block';
     
     let titleText = "GAME CLEAR!! 🎉";
-    let historyHtml = state.roundScoreHistory.map((s, i) => `<div style="text-align: right;">ラウンド${i+1}スコア：</div><div style="color:#e64a19; font-weight:bold; text-align: right;">${s}</div>`).join('');
+    let historyHtml = state.roundScoreHistory.map((s, i) => `<div style="text-align: right;">${T('round_n_score', {n: i+1})}</div><div style="color:#e64a19; font-weight:bold; text-align: right;">${s}</div>`).join('');
 
     ui.result.innerHTML = `
         <div style="background: rgba(255,255,255,0.95); padding: 40px 30px; border-radius: 40px; color: #5d4037; text-align: center; border: 12px solid #8bc34a; box-shadow: 0 0 40px rgba(139,195,74,0.6); animation: popin 0.6s ease-out forwards; max-height: 90vh; overflow-y: auto; max-width: 600px; margin: 0 auto;">
             <h2 style="margin:0 0 20px 0; font-size: 3.5rem; color: #ffb300; text-shadow: 3px 3px 0 #33691e, 0 0 15px rgba(255,213,79,0.8); border: none;">${titleText}</h2>
-            
+
             <div style="font-size: 1.6rem; display: flex; flex-direction: column; align-items: center; background: #fff8e1; padding: 20px 30px; border-radius: 20px; border: 3px dashed #a1887f; margin-bottom: 20px;">
                 <div style="display: grid; grid-template-columns: auto auto; justify-content: center; gap: 10px 30px; width: 100%;">
-                    <div style="text-align: right;">合計ビンゴ：</div><div style="color:#e64a19; font-weight:bold; text-align: right;">${state.totalBingos} 回</div>
-                    <div style="text-align: right;">合計パーフェクト：</div><div style="color:#e64a19; font-weight:bold; text-align: right;">${state.totalPerfects} 回</div>
+                    <div style="text-align: right;">${T('total_bingo_label')}</div><div style="color:#e64a19; font-weight:bold; text-align: right;">${state.totalBingos}${T('times_suffix')}</div>
+                    <div style="text-align: right;">${T('total_perfect_label')}</div><div style="color:#e64a19; font-weight:bold; text-align: right;">${state.totalPerfects}${T('times_suffix')}</div>
                     <div style="grid-column: 1 / -1;"><hr style="border-color:#a1887f; margin: 5px 0;"></div>
                     ${historyHtml}
                 </div>
             </div>
-            
+
             <div style="display: grid; grid-template-columns: auto auto; justify-content: center; gap: 10px 30px; width: 100%; margin: 10px 0; font-size: 2.8rem; font-weight: bold; color: #e64a19;">
-                <div style="text-align: right;">総合スコア：</div><div style="text-align: right;">${state.score}</div>
+                <div style="text-align: right;">${T('overall_score_label')}</div><div style="text-align: right;">${state.score}</div>
             </div>
-            <button onclick="location.reload()" class="btn btn-spla-blue" style="font-size: 1.6rem; padding: 15px 40px; margin-top: 10px;">タイトルへ</button>
+            <button onclick="location.reload()" class="btn btn-spla-blue" style="font-size: 1.6rem; padding: 15px 40px; margin-top: 10px;">${T('btn_to_title2')}</button>
         </div>
     `;
 }
@@ -1394,10 +1533,10 @@ function handleGameOver() {
     ui.result.style.display = 'block';
     ui.result.innerHTML = `
         <div style="background: rgba(255,255,255,0.95); padding: 30px; border-radius: 30px; color: #5d4037; text-align: center; border: 8px solid #e57373; box-shadow: 10px 10px 0 #ef9a9a; transform: rotate(2deg);">
-            <h2 style="margin:0; font-size: 3rem; color: #d32f2f; border: none;">AP切れ！</h2>
-            <p style="font-size: 1.2rem; font-weight: bold;">目標を達成できませんでした...</p>
-            <p style="font-size: 2.2rem; font-weight: bold; color: #33691e;">総合スコア: ${state.score}</p>
-            <button onclick="location.reload()" class="btn btn-spla-pink" style="font-size: 1.5rem; padding: 15px 30px; margin-top: 15px;">タイトルへ</button>
+            <h2 style="margin:0; font-size: 3rem; color: #d32f2f; border: none;">${T('ap_zero_title')}</h2>
+            <p style="font-size: 1.2rem; font-weight: bold;">${T('ap_zero_body')}</p>
+            <p style="font-size: 2.2rem; font-weight: bold; color: #33691e;">${T('overall_score_colon')}${state.score}</p>
+            <button onclick="location.reload()" class="btn btn-spla-pink" style="font-size: 1.5rem; padding: 15px 30px; margin-top: 15px;">${T('btn_to_title2')}</button>
         </div>
     `;
     saveScoreData();
@@ -1419,7 +1558,7 @@ function backToTitle() {
 }
 
 ui.btnBackToTitleIngame.addEventListener('click', () => {
-    window.showCustomConfirm('タイトルへもどりますか？<br>（スコアはきろくされません）', () => {
+    window.showCustomConfirm(T('confirm_to_title'), () => {
         backToTitle();
     });
 });
@@ -1429,12 +1568,12 @@ function updateUI() {
     ui.apValue.textContent = state.ap;
     
     const remaining = Math.max(0, state.quota - state.roundHits);
-    ui.quotaRemaining.textContent = `あと ${remaining} こ`;
+    ui.quotaRemaining.textContent = T('quota_remaining', { n: remaining });
 
     ui.round.textContent = state.round + ' / ' + SETTINGS[state.difficulty].maxRound;
     ui.dispHitProgress.textContent = `${state.roundHits} / ${state.quota}`;
     ui.totalScore.textContent = state.score;
-    ui.difficultyLabel.textContent = SETTINGS[state.difficulty].label;
+    ui.difficultyLabel.textContent = T('diff_' + state.difficulty.toLowerCase());
 }
 
 function saveScoreData() {
@@ -1481,7 +1620,7 @@ function renderPlayerList() {
             delBtn.textContent = '×';
             delBtn.onclick = (e) => {
                 e.stopPropagation();
-                window.showCustomConfirm(`${name} をさくじょしますか？`, () => {
+                window.showCustomConfirm(T('delete_confirm', {name: name}), () => {
                     players.splice(index, 1);
                     savePlayers(players);
                     if (state.playerName === name) {
@@ -1511,21 +1650,21 @@ ui.btnAddPlayer.addEventListener('click', () => {
     if (!name) return;
     
     if (!/^[ぁ-んー]+$/.test(name)) {
-        window.showCustomAlert("ひらがな と ー (のばすぼう) だけで 入力してください");
+        window.showCustomAlert(T('alert_hiragana_only'));
         return;
     }
 
-    if (name.length > 12) { window.showCustomAlert("なまえは12もじまでです"); return; }
-    if (containsNgWord(name)) { window.showCustomAlert("そのなまえはつかえません"); return; }
-    
+    if (name.length > 12) { window.showCustomAlert(T('alert_name_too_long')); return; }
+    if (containsNgWord(name)) { window.showCustomAlert(T('alert_ng_word')); return; }
+
     const players = getPlayers();
-    
+
     if (players.length >= 5) {
-        window.showCustomAlert("登録できるのは 5人 までです");
+        window.showCustomAlert(T('alert_max_players'));
         return;
     }
-    
-    if (players.includes(name)) { window.showCustomAlert("すでにあるなまえです"); return; }
+
+    if (players.includes(name)) { window.showCustomAlert(T('alert_duplicate_name')); return; }
     players.push(name);
     savePlayers(players);
     state.playerName = name;
@@ -1537,12 +1676,14 @@ ui.btnAddPlayer.addEventListener('click', () => {
 
 ui.btnViewRanking.addEventListener('click', async () => {
     ui.rankingScreen.classList.remove('hidden');
-    state.rankingMode = 'LOCAL';
-    ui.btnRankLocal.classList.add('active');
-    ui.btnRankWorld.classList.remove('active');
+    state.rankingMode = 'WORLD';
+    ui.btnRankWorld.classList.add('active');
+    ui.btnRankLocal.classList.remove('active');
     updateRankingDisplay();
 });
 ui.btnCloseRanking.addEventListener('click', () => ui.rankingScreen.classList.add('hidden'));
+ui.btnOpenSettings.addEventListener('click', () => openSettings());
+ui.btnCloseSettings.addEventListener('click', () => closeSettings());
 
 ui.btnRankLocal.addEventListener('click', () => {
     state.rankingMode = 'LOCAL';
@@ -1564,22 +1705,49 @@ async function updateRankingDisplay() {
         if (state.rankingMode === 'LOCAL') {
             data = getLocalScores(diff);
         } else {
-            lists[diff].innerHTML = '<li>よみこみ中...</li>';
+            lists[diff].innerHTML = '';
+            const loadingLi = document.createElement('li');
+            loadingLi.textContent = T('rank_loading');
+            lists[diff].appendChild(loadingLi);
             data = await window.fetchOnlineRanking(diff);
         }
         lists[diff].innerHTML = '';
         if (data.length === 0) {
-            lists[diff].innerHTML = '<li style="color:#8d6e63; text-align:center;">データなし</li>';
+            const li = document.createElement('li');
+            li.style.color = '#8d6e63';
+            li.style.textAlign = 'center';
+            li.textContent = T('rank_empty');
+            lists[diff].appendChild(li);
         } else {
             data.forEach((d, i) => {
                 let pName = d.name;
                 if (typeof pName === 'object' || pName === "[object Object]") pName = "ゲスト";
+                let dateStr = '';
+                if (typeof d.date === 'number') {
+                    const dt = new Date(d.date);
+                    dateStr = `${dt.getFullYear()}/${dt.getMonth()+1}/${dt.getDate()}`;
+                } else if (typeof d.date === 'string' && d.date) {
+                    dateStr = d.date;
+                }
                 const li = document.createElement('li');
-                li.innerHTML = `
-                    <span class="ranking-rank">${i+1}</span>
-                    <span class="ranking-name">${pName}</span>
-                    <span class="ranking-score">${d.score}</span>
-                `;
+                const rankSpan = document.createElement('span');
+                rankSpan.className = 'ranking-rank';
+                rankSpan.textContent = i + 1;
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'ranking-name';
+                nameSpan.textContent = pName;
+                const scoreSpan = document.createElement('span');
+                scoreSpan.className = 'ranking-score';
+                scoreSpan.textContent = d.score;
+                li.appendChild(rankSpan);
+                li.appendChild(nameSpan);
+                li.appendChild(scoreSpan);
+                if (dateStr) {
+                    const dateSpan = document.createElement('span');
+                    dateSpan.className = 'rank-date';
+                    dateSpan.textContent = dateStr;
+                    li.appendChild(dateSpan);
+                }
                 lists[diff].appendChild(li);
             });
         }
@@ -1587,10 +1755,17 @@ async function updateRankingDisplay() {
 }
 
 ui.currentPlayerDisplay.textContent = state.playerName;
-const counts = getClearCounts();
-if(counts.EASY > 0) { ui.crowns.EASY.style.visibility = 'visible'; ui.clears.EASY.textContent = `${counts.EASY}回クリア`; }
-if(counts.NORMAL > 0) { ui.crowns.NORMAL.style.visibility = 'visible'; ui.clears.NORMAL.textContent = `${counts.NORMAL}回クリア`; }
-if(counts.HARD > 0) { ui.crowns.HARD.style.visibility = 'visible'; ui.clears.HARD.textContent = `${counts.HARD}回クリア`; }
+function refreshClearCountLabels() {
+    const counts = getClearCounts();
+    ['EASY', 'NORMAL', 'HARD'].forEach(diff => {
+        ui.clears[diff].textContent = T('clear_count', { n: counts[diff] || 0 });
+        if (counts[diff] > 0) {
+            ui.crowns[diff].style.visibility = 'visible';
+        }
+    });
+}
+refreshClearCountLabels();
+applyLanguage();
 </script>
 </body>
 </html>
