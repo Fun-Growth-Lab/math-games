@@ -24,20 +24,6 @@
             h:{'apikey':_k,'Authorization':'Bearer '+_k,'Content-Type':'application/json','Prefer':'return=minimal'},
             rh:{'apikey':_k,'Authorization':'Bearer '+_k} };
         window.currentUser = null;
-
-        // ログイン処理（Supabaseではゲスト名入力）
-        window.handleGoogleAuth = async function() {
-            if (window.currentUser && window.currentUser.uid !== 'guest') {
-                window.currentUser = null;
-                alert("ログアウトしました");
-            } else {
-                const name = prompt("プレイヤー名を入力してください（ランキング表示名）");
-                if (name && name.trim()) {
-                    window.currentUser = {uid: 'player_' + Date.now(), displayName: name.trim()};
-                    alert("ログインしました！\nワールドランキングに 記録されるように なったよ！");
-                }
-            }
-        };
     })();
     </script>
 
@@ -130,14 +116,22 @@
     <canvas id="gameCanvas" width="1280" height="720"></canvas>
     
     <div id="playerInputOverlay" class="overlay-input" style="top: 50%; left: 50%; transform: translate(-50%, -50%); width: 400px;">
-        <h3 style="margin-top:0; color:#5D4037;">なまえをいれてね</h3>
-        <p style="font-size:14px; color:#666;">ひらがな 8もじ まで</p>
-        <input type="text" id="playerNameInput" maxlength="8" placeholder="ひらがなのみ">
+        <h3 style="margin-top:0; color:#5D4037;" data-i18n="pm_name_label">なまえをいれてね</h3>
+        <p style="font-size:14px; color:#666;" data-i18n="pm_name_hint">ひらがな 8もじ まで</p>
+        <input type="text" id="playerNameInput" maxlength="8" placeholder="ひらがなのみ" data-i18n-placeholder="pm_placeholder">
         <div style="display:flex; gap:10px;">
-            <button class="ui-btn" onclick="Game.registerPlayer()">とうろく</button>
-            <button class="ui-btn" style="background-color:#90A4AE; box-shadow:0 4px #546E7A;" onclick="Game.closePlayerInput()">やめる</button>
+            <button class="ui-btn" onclick="Game.registerPlayer()" data-i18n="btn_register">とうろく</button>
+            <button class="ui-btn" style="background-color:#90A4AE; box-shadow:0 4px #546E7A;" onclick="Game.closePlayerInput()" data-i18n="btn_cancel">やめる</button>
         </div>
         <p id="inputError" style="color:red; font-size:14px; margin-bottom:0; min-height:20px;"></p>
+    </div>
+
+    <div id="customConfirmOverlay" class="overlay-input" style="top: 50%; left: 50%; transform: translate(-50%, -50%); width: 420px;">
+        <p id="customConfirmMsg" style="font-size:18px; color:#5D4037; font-weight:bold; white-space:pre-line;"></p>
+        <div style="display:flex; gap:10px;">
+            <button class="ui-btn" id="customConfirmOk">OK</button>
+            <button class="ui-btn" style="background-color:#90A4AE; box-shadow:0 4px #546E7A;" id="customConfirmCancel" data-i18n="btn_cancel">やめる</button>
+        </div>
     </div>
 
     <div id="dbErrorOverlay">
@@ -154,6 +148,142 @@
 </div>
 
 <script>
+// ============================================================
+//  I18N（かんたんなにほんご／日本語／English）
+// ============================================================
+const STRINGS = {
+    ja: {
+        game_title: 'たすてん', title_sub: "～Let's make 10～", label_player_prefix: 'プレーヤー: ', player_unselected: '未選択', guest_name: 'ゲスト',
+        btn_start: 'はじめる', btn_player_select: 'プレーヤーせんたく', btn_ranking: 'ランキング', btn_settings: '⚙ 設定', btn_index: 'INDEXへ',
+        pm_title: 'プレーヤーをえらんでね', btn_add_player: '＋ あたらしいプレーヤー', btn_back: 'もどる',
+        diff_prompt: 'なんいどをえらんでね', diff_easy: 'やさしい', diff_normal: 'ふつう', diff_hard: 'むずかしい', btn_cancel: 'やめる',
+        btn_howto: '❓ あそびかた', label_player: 'プレーヤー', label_difficulty: '難易度', label_boss_defeated: 'BOSS撃破',
+        label_score: 'SCORE', label_tens_count: '10をつくった回数',
+        next_boss_in: '次のBOSSまで: あと{n}回', boss_appearing: 'BOSS 出現中！', all_boss_defeated: '全BOSS撃破！',
+        btn_to_title: 'タイトルへ', select_number_to_clear: 'すうじをえらんでね', btn_use: 'つかう', label_boss_hp: 'BOSS HP',
+        howto_title: 'あそびかた',
+        howto_lines: [
+            "● たて か よこ で 合計１０ をつくろう",
+            "● パネルをドラッグして移動できるよ",
+            "● １０ができたパネルは消えるよ",
+            "● 連続で消してコンボを狙おう！",
+            "",
+            "🪨  岩(HP1) / 🪙コイン(HP1) / 💰バッグ(HP2) / 💎ダイヤ(HP3)",
+            "     隣りの10消しでHP-1。隣接数だけ複数ダメージあり！",
+            "👾👻🤖...  BOSS：隣りの10消しでHP-1。全部削って倒そう！",
+            "     BOSSは岩を生み出すぞ！",
+            "",
+            "🌠  流れ星：隣りを消すとGET！「つかう」で",
+            "     数字を1種類まるごと全消し＋隣接障害物に1ダメージ",
+            "🎆  花火：隣り消しで十字消し！",
+            "",
+            "★  全BOSSを倒すとゲームクリア！ ★",
+        ],
+        btn_close: 'とじる',
+        game_clear_title: '🎉 ゲームクリア！ 🎉', game_over_title: 'ゲームオーバー！',
+        label_score_colon: 'スコア: ', label_tens_colon: '10をつくった回数: ', label_boss_defeated_colon: 'BOSS撃破: {a} / {b}',
+        rank_title: 'ランキング (TOP 10)', rank_tab_local: 'ローカル', rank_tab_world: 'ワールド (ネット)',
+        rank_empty: 'データがありません', rank_loading_or_empty: '読み込み中 または データなし', pts_suffix: ' 点',
+        boss_appear: '{emoji} BOSS 登場！', boss_defeat: '{emoji} 撃破！',
+        settings_title: '⚙ 設定', settings_sub: '言語 / Language', lang_simple: 'かんたんなにほんご', lang_ja: '日本語', lang_en: 'English',
+        alert_empty_name: 'なまえをいれてね', alert_name_too_long: '8もじいないにしてね', alert_hiragana_only: 'ひらがなだけでいれてね',
+        alert_ng_word: 'つかえないことばがふくまれています', confirm_to_title: 'タイトルへ戻りますか？ゲームオーバーになります',
+        pm_name_label: 'なまえをいれてね', pm_name_hint: 'ひらがな 8もじ まで', pm_placeholder: 'ひらがなのみ', btn_register: 'とうろく',
+    },
+    simple: {
+        game_title: 'たすてん', title_sub: "～Let's make 10～", label_player_prefix: 'プレーヤー: ', player_unselected: 'みせんたく', guest_name: 'ゲスト',
+        btn_start: 'はじめる', btn_player_select: 'プレーヤーせんたく', btn_ranking: 'ランキング', btn_settings: '⚙ せってい', btn_index: 'INDEXへ',
+        pm_title: 'プレーヤーを えらんでね', btn_add_player: '＋ あたらしい プレーヤー', btn_back: 'もどる',
+        diff_prompt: 'なんいどを えらんでね', diff_easy: 'やさしい', diff_normal: 'ふつう', diff_hard: 'むずかしい', btn_cancel: 'やめる',
+        btn_howto: '❓ あそびかた', label_player: 'プレーヤー', label_difficulty: 'なんいど', label_boss_defeated: 'BOSSたおした',
+        label_score: 'SCORE', label_tens_count: '10を つくった かいすう',
+        next_boss_in: 'つぎの BOSSまで: あと{n}かい', boss_appearing: 'BOSS しゅつげんちゅう！', all_boss_defeated: 'ぜんぶの BOSSを たおした！',
+        btn_to_title: 'タイトルへ', select_number_to_clear: 'すうじを えらんでね', btn_use: 'つかう', label_boss_hp: 'BOSS HP',
+        howto_title: 'あそびかた',
+        howto_lines: [
+            "● たて か よこ で ごうけい１０ を つくろう",
+            "● パネルを ドラッグして いどうできるよ",
+            "● １０が できた パネルは きえるよ",
+            "● れんぞくで けして コンボを ねらおう！",
+            "",
+            "🪨  いわ(HP1) / 🪙コイン(HP1) / 💰バッグ(HP2) / 💎ダイヤ(HP3)",
+            "     となりの10けしで HP-1。りんせつすうだけ ふくすうダメージ あり！",
+            "👾👻🤖...  BOSS：となりの10けしで HP-1。ぜんぶ けずって たおそう！",
+            "     BOSSは いわを うみだすぞ！",
+            "",
+            "🌠  ながれぼし：となりを けすと GET！「つかう」で",
+            "     すうじを 1しゅるい まるごと ぜんけし＋りんせつ しょうがいぶつに 1ダメージ",
+            "🎆  はなび：となり けしで じゅうじけし！",
+            "",
+            "★  ぜんぶの BOSSを たおすと ゲームクリア！ ★",
+        ],
+        btn_close: 'とじる',
+        game_clear_title: '🎉 ゲームクリア！ 🎉', game_over_title: 'ゲームオーバー！',
+        label_score_colon: 'スコア: ', label_tens_colon: '10を つくった かいすう: ', label_boss_defeated_colon: 'BOSSたおした: {a} / {b}',
+        rank_title: 'ランキング (TOP 10)', rank_tab_local: 'ローカル', rank_tab_world: 'ワールド (ネット)',
+        rank_empty: 'データが ありません', rank_loading_or_empty: 'よみこみちゅう または データなし', pts_suffix: ' てん',
+        boss_appear: '{emoji} BOSS とうじょう！', boss_defeat: '{emoji} たおした！',
+        settings_title: '⚙ せってい', settings_sub: '言語 / Language', lang_simple: 'かんたんなにほんご', lang_ja: '日本語', lang_en: 'English',
+        alert_empty_name: 'なまえを いれてね', alert_name_too_long: '8もじ いないに してね', alert_hiragana_only: 'ひらがなだけで いれてね',
+        alert_ng_word: 'つかえない ことばが ふくまれています', confirm_to_title: 'タイトルへ もどりますか？ ゲームオーバーに なります',
+        pm_name_label: 'なまえを いれてね', pm_name_hint: 'ひらがな 8もじ まで', pm_placeholder: 'ひらがなのみ', btn_register: 'とうろく',
+    },
+    en: {
+        game_title: 'Tasu-Ten', title_sub: "～Let's make 10～", label_player_prefix: 'Player: ', player_unselected: 'None', guest_name: 'Guest',
+        btn_start: 'Start', btn_player_select: 'Select Player', btn_ranking: 'Ranking', btn_settings: '⚙ Settings', btn_index: 'To INDEX',
+        pm_title: 'Choose a Player', btn_add_player: '+ New Player', btn_back: 'Back',
+        diff_prompt: 'Choose a Difficulty', diff_easy: 'Easy', diff_normal: 'Normal', diff_hard: 'Hard', btn_cancel: 'Cancel',
+        btn_howto: '❓ How to Play', label_player: 'Player', label_difficulty: 'Difficulty', label_boss_defeated: 'Bosses Beaten',
+        label_score: 'SCORE', label_tens_count: 'Tens Made',
+        next_boss_in: 'Next BOSS in: {n}', boss_appearing: 'BOSS Appeared!', all_boss_defeated: 'All Bosses Defeated!',
+        btn_to_title: 'To Title', select_number_to_clear: 'Choose a number to clear', btn_use: 'Use', label_boss_hp: 'BOSS HP',
+        howto_title: 'How to Play',
+        howto_lines: [
+            "● Make a total of 10 in a row or column",
+            "● Drag panels to move them",
+            "● A panel that reaches 10 disappears",
+            "● Clear in a row to build combos!",
+            "",
+            "🪨 Rock(HP1) / 🪙Coin(HP1) / 💰Bag(HP2) / 💎Gem(HP3)",
+            "     Clearing a neighboring 10 does -1 HP. Multiple adjacent hits stack!",
+            "👾👻🤖...  BOSS: clearing a neighboring 10 does -1 HP. Wear it down to defeat it!",
+            "     Bosses spawn rocks!",
+            "",
+            "🌠  Shooting star: get one by clearing next to it! \"Use\" it to",
+            "     clear every block of one number + 1 damage to adjacent obstacles",
+            "🎆  Fireworks: clearing next to it clears a cross shape!",
+            "",
+            "★  Defeat all bosses to clear the game! ★",
+        ],
+        btn_close: 'Close',
+        game_clear_title: '🎉 GAME CLEAR! 🎉', game_over_title: 'GAME OVER!',
+        label_score_colon: 'Score: ', label_tens_colon: 'Tens Made: ', label_boss_defeated_colon: 'Bosses Beaten: {a} / {b}',
+        rank_title: 'Ranking (TOP 10)', rank_tab_local: 'Local', rank_tab_world: 'World (Online)',
+        rank_empty: 'No data', rank_loading_or_empty: 'Loading or no data', pts_suffix: ' pt',
+        boss_appear: '{emoji} BOSS Appeared!', boss_defeat: '{emoji} Defeated!',
+        settings_title: '⚙ Settings', settings_sub: '言語 / Language', lang_simple: 'かんたんなにほんご', lang_ja: '日本語', lang_en: 'English',
+        alert_empty_name: 'Please enter a name', alert_name_too_long: 'Keep it to 8 characters or fewer', alert_hiragana_only: 'Please use Hiragana only',
+        alert_ng_word: 'That name contains a word that cannot be used', confirm_to_title: 'Return to title? This will end the game.',
+        pm_name_label: 'Enter a name', pm_name_hint: 'Up to 8 Hiragana characters', pm_placeholder: 'Hiragana only', btn_register: 'Register',
+    },
+};
+let currentLang = localStorage.getItem('tasuten_lang') || 'ja';
+function T(key, params) {
+    const dict = STRINGS[currentLang] || STRINGS.ja;
+    let str = dict[key] !== undefined ? dict[key] : (STRINGS.ja[key] || key);
+    if (params && typeof str === 'string') { Object.keys(params).forEach(k => { str = str.split(`{${k}}`).join(params[k]); }); }
+    return str;
+}
+function applyLanguage() {
+    document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = T(el.getAttribute('data-i18n')); });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { el.setAttribute('placeholder', T(el.getAttribute('data-i18n-placeholder'))); });
+}
+function selectLanguage(lang) {
+    currentLang = lang;
+    localStorage.setItem('tasuten_lang', lang);
+    applyLanguage();
+}
+
 /**
  * 定数・設定
  */
@@ -229,7 +359,8 @@ const Game = (function() {
         PLAYING: 3,
         ANIMATING: 4,
         GAME_OVER: 5,
-        RANKING: 6
+        RANKING: 6,
+        SETTINGS: 7
     };
     
     let currentState = STATE.TITLE;
@@ -288,7 +419,7 @@ const Game = (function() {
     
     // ランキング用
     let rankingData = [];
-    let rankingScope = 'local';
+    let rankingScope = 'world';
     let rankingTab = 'easy'; 
     
     // マウス/タッチ座標
@@ -309,6 +440,7 @@ const Game = (function() {
     
     // 初期化
     function init() {
+        applyLanguage();
         resize();
         window.addEventListener('resize', resize);
         
@@ -905,7 +1037,7 @@ const Game = (function() {
         effects.push({
             x: BASE_WIDTH / 2,
             y: BASE_HEIGHT / 2 - 60,
-            text: `${BOSS_EMOJIS[bIdx]} BOSS 登場！`,
+            text: T('boss_appear', {emoji: BOSS_EMOJIS[bIdx]}),
             life: 90, maxLife: 90,
             color: "#FF1744", scale: 1.4, stroke: "#fff"
         });
@@ -919,7 +1051,7 @@ const Game = (function() {
             effects.push({
                 x: BASE_WIDTH / 2,
                 y: BASE_HEIGHT / 2,
-                text: `${emoji} 撃破！`,
+                text: T('boss_defeat', {emoji: emoji}),
                 life: 150, maxLife: 150,
                 color: "#FFEB3B",
                 subText: "👑",
@@ -1078,6 +1210,7 @@ const Game = (function() {
                 if(currentState === STATE.GAME_OVER) drawGameOver();
                 break;
             case STATE.RANKING: drawRanking(); break;
+            case STATE.SETTINGS: drawSettings(); break;
         }
     }
     
@@ -1103,32 +1236,34 @@ const Game = (function() {
         ctx.font = "bold 100px 'M PLUS Rounded 1c'";
         ctx.strokeStyle = "#fff";
         ctx.lineWidth = 8;
-        ctx.strokeText("たすてん", BASE_WIDTH/2, 140);
+        const titleText = T('game_title');
+        ctx.strokeText(titleText, BASE_WIDTH/2, 140);
         ctx.fillStyle = "#FF6F00";
-        ctx.fillText("たすてん", BASE_WIDTH/2, 140);
-        
+        ctx.fillText(titleText, BASE_WIDTH/2, 140);
+
         // サブタイトル プレーヤー名と重ならないように位置調整
         ctx.font = "bold 40px 'M PLUS Rounded 1c'";
         ctx.lineWidth = 5;
-        ctx.strokeText("～Let's make 10～", BASE_WIDTH/2, 210);
+        ctx.strokeText(T('title_sub'), BASE_WIDTH/2, 210);
         ctx.fillStyle = "#EC407A"; // ピンク系
-        ctx.fillText("～Let's make 10～", BASE_WIDTH/2, 210);
+        ctx.fillText(T('title_sub'), BASE_WIDTH/2, 210);
 
         // ボタン位置をさらに上に（340 -> 320）
         const startY = 320;
         const gap = 75;
-        
+
         // プレーヤー名を表示、位置上げ、色変更
         ctx.fillStyle = "#00695C"; // 深緑
-        ctx.font = "800 36px 'M PLUS Rounded 1c'"; 
-        let pname = currentPlayerIndex >= 0 ? players[currentPlayerIndex] : "未選択";
-        ctx.fillText("プレーヤー: " + pname, BASE_WIDTH/2, startY - 40);
+        ctx.font = "800 36px 'M PLUS Rounded 1c'";
+        let pname = currentPlayerIndex >= 0 ? players[currentPlayerIndex] : T('player_unselected');
+        ctx.fillText(T('label_player_prefix') + pname, BASE_WIDTH/2, startY - 40);
 
         const buttons = [
-            { text: "はじめる", y: startY, action: "start", color: "#FF9800" },
-            { text: "プレーヤーせんたく", y: startY + gap, action: "player", color: "#8D6E63" },
-            { text: "ランキング", y: startY + gap*2, action: "ranking", color: "#7CB342" },
-            { text: "INDEXへ", y: startY + gap*3, action: "index", color: "#9E9E9E" }
+            { text: T('btn_start'), y: startY, action: "start", color: "#FF9800" },
+            { text: T('btn_player_select'), y: startY + gap, action: "player", color: "#8D6E63" },
+            { text: T('btn_ranking'), y: startY + gap*2, action: "ranking", color: "#7CB342" },
+            { text: T('btn_settings'), y: startY + gap*3, action: "settings", color: "#5C6BC0" },
+            { text: T('btn_index'), y: startY + gap*4, action: "index", color: "#9E9E9E" }
         ];
 
         buttons.forEach(btn => {
@@ -1149,19 +1284,19 @@ const Game = (function() {
         ctx.fillStyle = "#5D4037";
         ctx.font = "bold 50px 'M PLUS Rounded 1c'";
         ctx.textAlign = "center";
-        ctx.fillText("プレーヤーをえらんでね", BASE_WIDTH/2, 100);
-        
+        ctx.fillText(T('pm_title'), BASE_WIDTH/2, 100);
+
         players.forEach((p, i) => {
             let y = 180 + i * 80;
             let isSelected = (i === currentPlayerIndex);
             drawButton(BASE_WIDTH/2, y, 400, 60, p, isSelected ? "#7CB342" : "#fff", isSelected ? "#fff" : "#5D4037");
             drawButton(BASE_WIDTH/2 + 250, y, 60, 60, "×", "#E57373");
         });
-        
+
         if(players.length < 5) {
-            drawButton(BASE_WIDTH/2, 180 + players.length * 80, 400, 60, "＋ あたらしいプレーヤー", "#FFB74D", "#5D4037");
+            drawButton(BASE_WIDTH/2, 180 + players.length * 80, 400, 60, T('btn_add_player'), "#FFB74D", "#5D4037");
         }
-        drawButton(BASE_WIDTH/2, 650, 200, 50, "もどる", "#B0BEC5");
+        drawButton(BASE_WIDTH/2, 650, 200, 50, T('btn_back'), "#B0BEC5");
     }
 
     function drawDifficultySelect() {
@@ -1177,12 +1312,12 @@ const Game = (function() {
         ctx.fillStyle = "#fff";
         ctx.font = "bold 50px 'M PLUS Rounded 1c'";
         ctx.textAlign = "center";
-        ctx.fillText("なんいどをえらんでね", BASE_WIDTH/2, 200);
-        
-        drawButton(BASE_WIDTH/2, 300, 300, 70, "やさしい", "#AED581", "#33691E");
-        drawButton(BASE_WIDTH/2, 400, 300, 70, "ふつう", "#FFB74D", "#E65100");
-        drawButton(BASE_WIDTH/2, 500, 300, 70, "むずかしい", "#E57373", "#B71C1C");
-        drawButton(BASE_WIDTH/2, 620, 200, 50, "やめる", "#B0BEC5");
+        ctx.fillText(T('diff_prompt'), BASE_WIDTH/2, 200);
+
+        drawButton(BASE_WIDTH/2, 300, 300, 70, T('diff_easy'), "#AED581", "#33691E");
+        drawButton(BASE_WIDTH/2, 400, 300, 70, T('diff_normal'), "#FFB74D", "#E65100");
+        drawButton(BASE_WIDTH/2, 500, 300, 70, T('diff_hard'), "#E57373", "#B71C1C");
+        drawButton(BASE_WIDTH/2, 620, 200, 50, T('btn_cancel'), "#B0BEC5");
     }
     
     function drawGame() {
@@ -1205,24 +1340,24 @@ const Game = (function() {
         ctx.fillRect(0, 0, 300, BASE_HEIGHT);
 
         // あそびかたボタン（左上）
-        drawButton(150, 38, 230, 48, "❓ あそびかた", "#8D6E63");
+        drawButton(150, 38, 230, 48, T('btn_howto'), "#8D6E63");
 
         ctx.textAlign = "center";
 
         // プレーヤー名
         ctx.fillStyle = "#5D4037";
         ctx.font = "bold 20px 'M PLUS Rounded 1c'";
-        ctx.fillText("プレーヤー", 150, 110);
+        ctx.fillText(T('label_player'), 150, 110);
         ctx.fillStyle = "#00695C";
         ctx.font = "800 30px 'M PLUS Rounded 1c'";
-        let pname = currentPlayerIndex >= 0 ? players[currentPlayerIndex] : "ゲスト";
+        let pname = currentPlayerIndex >= 0 ? players[currentPlayerIndex] : T('guest_name');
         ctx.fillText(pname, 150, 145, 270);
 
         // 難易度
         ctx.fillStyle = "#5D4037";
         ctx.font = "bold 20px 'M PLUS Rounded 1c'";
-        ctx.fillText("難易度", 150, 190);
-        let diffText = difficulty === 'easy' ? 'やさしい' : difficulty === 'normal' ? 'ふつう' : 'むずかしい';
+        ctx.fillText(T('label_difficulty'), 150, 190);
+        let diffText = difficulty === 'easy' ? T('diff_easy') : difficulty === 'normal' ? T('diff_normal') : T('diff_hard');
         let diffColor = difficulty === 'easy' ? '#558B2F' : difficulty === 'normal' ? '#E65100' : '#C62828';
         ctx.fillStyle = diffColor;
         ctx.font = "800 26px 'M PLUS Rounded 1c'";
@@ -1231,7 +1366,7 @@ const Game = (function() {
         // BOSS撃破数
         ctx.fillStyle = "#5D4037";
         ctx.font = "bold 20px 'M PLUS Rounded 1c'";
-        ctx.fillText("BOSS撃破", 150, 265);
+        ctx.fillText(T('label_boss_defeated'), 150, 265);
         ctx.fillStyle = "#E65100";
         ctx.font = "800 42px 'M PLUS Rounded 1c'";
         ctx.fillText(`${bossesDefeated} / ${maxBosses}`, 150, 310);
@@ -1239,7 +1374,7 @@ const Game = (function() {
         // スコア
         ctx.fillStyle = "#5D4037";
         ctx.font = "bold 20px 'M PLUS Rounded 1c'";
-        ctx.fillText("SCORE", 150, 355);
+        ctx.fillText(T('label_score'), 150, 355);
         ctx.fillStyle = "#D81B60";
         ctx.font = "800 48px 'M PLUS Rounded 1c'";
         ctx.fillText(score, 150, 405, 270);
@@ -1247,7 +1382,7 @@ const Game = (function() {
         // 10を作った回数
         ctx.fillStyle = "#5D4037";
         ctx.font = "bold 20px 'M PLUS Rounded 1c'";
-        ctx.fillText("10をつくった回数", 150, 455);
+        ctx.fillText(T('label_tens_count'), 150, 455);
         ctx.fillStyle = "#1565C0";
         ctx.font = "800 42px 'M PLUS Rounded 1c'";
         ctx.fillText(totalTens, 150, 500);
@@ -1258,13 +1393,13 @@ const Game = (function() {
             const nextThresh = BOSS_THRESHOLDS[nextBossIndex];
             const remaining = Math.max(0, nextThresh - totalTens);
             ctx.fillStyle = remaining <= 5 ? "#C62828" : "#5D4037";
-            ctx.fillText(`次のBOSSまで: あと${remaining}回`, 150, 540);
+            ctx.fillText(T('next_boss_in', {n: remaining}), 150, 540);
         } else if(bossesDefeated < maxBosses) {
             ctx.fillStyle = "#C62828";
-            ctx.fillText("BOSS 出現中！", 150, 540);
+            ctx.fillText(T('boss_appearing'), 150, 540);
         } else {
             ctx.fillStyle = "#558B2F";
-            ctx.fillText("全BOSS撃破！", 150, 540);
+            ctx.fillText(T('all_boss_defeated'), 150, 540);
         }
 
         // === 右パネル：アイテム ===
@@ -1272,7 +1407,7 @@ const Game = (function() {
         ctx.fillRect(980, 0, 300, BASE_HEIGHT);
 
         // タイトルへボタン（右上）
-        drawButton(1130, 38, 230, 48, "タイトルへ", "#B0BEC5");
+        drawButton(1130, 38, 230, 48, T('btn_to_title'), "#B0BEC5");
 
         ctx.textAlign = "center";
 
@@ -1285,18 +1420,18 @@ const Game = (function() {
 
         // つかうボタン
         if(starStock > 0 && !isSelectingStar) {
-            drawButton(1130, 300, 200, 52, "つかう", "#FFC107", "#5D4037");
+            drawButton(1130, 300, 200, 52, T('btn_use'), "#FFC107", "#5D4037");
         } else if (isSelectingStar) {
             ctx.fillStyle = "#FF9800";
             ctx.font = "bold 20px 'M PLUS Rounded 1c'";
-            ctx.fillText("すうじをえらんでね", 1130, 300);
+            ctx.fillText(T('select_number_to_clear'), 1130, 300);
         } else {
             ctx.fillStyle = "#BDBDBD";
             roundRect(ctx, 1130-100, 300-26, 200, 52, 10, true, false);
             ctx.fillStyle = "#757575";
             ctx.font = "bold 24px 'M PLUS Rounded 1c'";
             ctx.textBaseline = "middle";
-            ctx.fillText("つかう", 1130, 300);
+            ctx.fillText(T('btn_use'), 1130, 300);
             ctx.textBaseline = "alphabetic";
         }
 
@@ -1310,7 +1445,7 @@ const Game = (function() {
         if(bossCell) {
             ctx.fillStyle = "#C62828";
             ctx.font = "bold 22px 'M PLUS Rounded 1c'";
-            ctx.fillText("BOSS HP", 1130, 400);
+            ctx.fillText(T('label_boss_hp'), 1130, 400);
             const emoji = BOSS_EMOJIS[bossCell.bossIndex] || '👾';
             ctx.font = "44px sans-serif";
             ctx.fillText(emoji, 1130, 450);
@@ -1385,7 +1520,7 @@ const Game = (function() {
             ctx.fillStyle = "#5D4037";
             ctx.font = "bold 30px 'M PLUS Rounded 1c'";
             ctx.textAlign = "center";
-            ctx.fillText("けす すうじ をえらんでね", BASE_WIDTH/2, BASE_HEIGHT/2 - 200);
+            ctx.fillText(T('select_number_to_clear'), BASE_WIDTH/2, BASE_HEIGHT/2 - 200);
 
             for(let i=1; i<=9; i++) {
                 let r = Math.floor((i-1)/3);
@@ -1395,7 +1530,7 @@ const Game = (function() {
                 drawButton(btnX, btnY, 80, 80, i, NUMBER_BG_COLORS[i-1]);
             }
 
-            drawButton(BASE_WIDTH/2, BASE_HEIGHT/2 + 180, 150, 50, "やめる", "#B0BEC5");
+            drawButton(BASE_WIDTH/2, BASE_HEIGHT/2 + 180, 150, 50, T('btn_cancel'), "#B0BEC5");
         }
         
         // ヘルプオーバーレイ
@@ -1471,25 +1606,9 @@ const Game = (function() {
         ctx.fillStyle = "#5D4037";
         ctx.font = "bold 38px 'M PLUS Rounded 1c'";
         ctx.textAlign = "center";
-        ctx.fillText("あそびかた", BASE_WIDTH/2, py + 52);
+        ctx.fillText(T('howto_title'), BASE_WIDTH/2, py + 52);
 
-        const lines = [
-            "● たて か よこ で 合計１０ をつくろう",
-            "● パネルをドラッグして移動できるよ",
-            "● １０ができたパネルは消えるよ",
-            "● 連続で消してコンボを狙おう！",
-            "",
-            "🪨  岩(HP1) / 🪙コイン(HP1) / 💰バッグ(HP2) / 💎ダイヤ(HP3)",
-            "     隣りの10消しでHP-1。隣接数だけ複数ダメージあり！",
-            "👾👻🤖...  BOSS：隣りの10消しでHP-1。全部削って倒そう！",
-            "     BOSSは岩を生み出すぞ！",
-            "",
-            "🌠  流れ星：隣りを消すとGET！「つかう」で",
-            "     数字を1種類まるごと全消し＋隣接障害物に1ダメージ",
-            "🎆  花火：隣り消しで十字消し！",
-            "",
-            "★  全BOSSを倒すとゲームクリア！ ★",
-        ];
+        const lines = T('howto_lines');
         ctx.font = "21px 'M PLUS Rounded 1c'";
         ctx.textAlign = "left";
         let ly = py + 95;
@@ -1499,7 +1618,7 @@ const Game = (function() {
             ly += 30;
         });
 
-        drawButton(BASE_WIDTH/2, py + ph - 36, 200, 50, "とじる", "#FF9800");
+        drawButton(BASE_WIDTH/2, py + ph - 36, 200, 50, T('btn_close'), "#FF9800");
     }
 
     function drawCellContent(x, y, cell, shadow=false) {
@@ -1570,17 +1689,17 @@ const Game = (function() {
 
         ctx.fillStyle = "#fff";
         ctx.textAlign = "center";
-        let titleText = isGameClear ? "🎉 ゲームクリア！ 🎉" : "ゲームオーバー！";
+        let titleText = isGameClear ? T('game_clear_title') : T('game_over_title');
         ctx.font = "bold 72px 'M PLUS Rounded 1c'";
         ctx.fillText(titleText, BASE_WIDTH/2, 220);
 
         ctx.font = "bold 46px 'M PLUS Rounded 1c'";
-        ctx.fillText("スコア: " + score, BASE_WIDTH/2, 320);
+        ctx.fillText(T('label_score_colon') + score, BASE_WIDTH/2, 320);
         ctx.font = "bold 38px 'M PLUS Rounded 1c'";
-        ctx.fillText("10をつくった回数: " + totalTens, BASE_WIDTH/2, 385);
-        ctx.fillText(`BOSS撃破: ${bossesDefeated} / ${maxBosses}`, BASE_WIDTH/2, 445);
+        ctx.fillText(T('label_tens_colon') + totalTens, BASE_WIDTH/2, 385);
+        ctx.fillText(T('label_boss_defeated_colon', {a: bossesDefeated, b: maxBosses}), BASE_WIDTH/2, 445);
 
-        drawButton(BASE_WIDTH/2, 560, 300, 60, "タイトルへ", "#FF9800");
+        drawButton(BASE_WIDTH/2, 560, 300, 60, T('btn_to_title'), "#FF9800");
     }
     
     function drawRanking() {
@@ -1596,29 +1715,29 @@ const Game = (function() {
         ctx.fillStyle = "#5D4037";
         ctx.font = "bold 50px 'M PLUS Rounded 1c'";
         ctx.textAlign = "center";
-        ctx.fillText("ランキング (TOP 10)", BASE_WIDTH/2, 70);
-        
+        ctx.fillText(T('rank_title'), BASE_WIDTH/2, 70);
+
         const scopeY = 120;
-        drawButton(BASE_WIDTH/2 - 150, scopeY, 280, 45, "ローカル", rankingScope==='local' ? "#8D6E63" : "#E0E0E0", rankingScope==='local' ? "#FFF" : "#9E9E9E");
-        drawButton(BASE_WIDTH/2 + 150, scopeY, 280, 45, "ワールド (ネット)", rankingScope==='world' ? "#4285F4" : "#E0E0E0", rankingScope==='world' ? "#FFF" : "#9E9E9E");
+        drawButton(BASE_WIDTH/2 - 150, scopeY, 280, 45, T('rank_tab_local'), rankingScope==='local' ? "#8D6E63" : "#E0E0E0", rankingScope==='local' ? "#FFF" : "#9E9E9E");
+        drawButton(BASE_WIDTH/2 + 150, scopeY, 280, 45, T('rank_tab_world'), rankingScope==='world' ? "#4285F4" : "#E0E0E0", rankingScope==='world' ? "#FFF" : "#9E9E9E");
 
         const tabY = 180;
         const tabW = 200;
         const tabH = 50;
-        
-        drawButton(BASE_WIDTH/2 - 220, tabY, tabW, tabH, "やさしい", rankingTab==='easy' ? "#AED581" : "#E0E0E0", rankingTab==='easy' ? "#33691E" : "#9E9E9E");
-        drawButton(BASE_WIDTH/2, tabY, tabW, tabH, "ふつう", rankingTab==='normal' ? "#FFB74D" : "#E0E0E0", rankingTab==='normal' ? "#E65100" : "#9E9E9E");
-        drawButton(BASE_WIDTH/2 + 220, tabY, tabW, tabH, "むずかしい", rankingTab==='hard' ? "#E57373" : "#E0E0E0", rankingTab==='hard' ? "#B71C1C" : "#9E9E9E");
+
+        drawButton(BASE_WIDTH/2 - 220, tabY, tabW, tabH, T('diff_easy'), rankingTab==='easy' ? "#AED581" : "#E0E0E0", rankingTab==='easy' ? "#33691E" : "#9E9E9E");
+        drawButton(BASE_WIDTH/2, tabY, tabW, tabH, T('diff_normal'), rankingTab==='normal' ? "#FFB74D" : "#E0E0E0", rankingTab==='normal' ? "#E65100" : "#9E9E9E");
+        drawButton(BASE_WIDTH/2 + 220, tabY, tabW, tabH, T('diff_hard'), rankingTab==='hard' ? "#E57373" : "#E0E0E0", rankingTab==='hard' ? "#B71C1C" : "#9E9E9E");
 
         ctx.font = "28px 'M PLUS Rounded 1c'";
         ctx.textAlign = "left";
         let startY = 250;
-        
+
         if(rankingData.length === 0) {
             ctx.fillStyle = "#5D4037";
             ctx.textAlign = "center";
-            let msg = "データがありません";
-            if(rankingScope === 'world') msg = "読み込み中 または データなし";
+            let msg = T('rank_empty');
+            if(rankingScope === 'world') msg = T('rank_loading_or_empty');
             ctx.fillText(msg, BASE_WIDTH/2, 350);
         } else {
             rankingData.forEach((d, i) => {
@@ -1626,12 +1745,64 @@ const Game = (function() {
                 ctx.textAlign = "left";
                 ctx.fillText(`${i+1}. ${d.name}`, 300, startY + i*45);
                 ctx.textAlign = "right";
-                ctx.fillText(`${d.score} 点`, 980, startY + i*45);
+                ctx.fillText(`${d.score}${T('pts_suffix')}`, 980, startY + i*45);
+                if (d.date) {
+                    let dateStr = typeof d.date === 'number' ? (() => { const dt = new Date(d.date); return `${dt.getFullYear()}/${dt.getMonth()+1}/${dt.getDate()}`; })() : d.date;
+                    ctx.save();
+                    ctx.font = "16px 'M PLUS Rounded 1c'";
+                    ctx.fillStyle = "#aaa";
+                    ctx.textAlign = "right";
+                    ctx.fillText(dateStr, 980, startY + i*45 + 20);
+                    ctx.restore();
+                }
             });
         }
-        drawButton(BASE_WIDTH/2, 650, 200, 50, "もどる", "#B0BEC5");
+        drawButton(BASE_WIDTH/2, 650, 200, 50, T('btn_back'), "#B0BEC5");
     }
-    
+
+    function drawSettings() {
+        if (bgImage.complete && bgImage.naturalWidth !== 0) {
+            ctx.drawImage(bgImage, 0, 0, BASE_WIDTH, BASE_HEIGHT);
+            ctx.fillStyle = "rgba(255, 243, 224, 0.9)";
+            ctx.fillRect(0, 0, BASE_WIDTH, BASE_HEIGHT);
+        } else {
+            ctx.fillStyle = "#FFF3E0";
+            ctx.fillRect(0, 0, BASE_WIDTH, BASE_HEIGHT);
+        }
+
+        ctx.fillStyle = "#5D4037";
+        ctx.font = "bold 50px 'M PLUS Rounded 1c'";
+        ctx.textAlign = "center";
+        ctx.fillText(T('settings_title'), BASE_WIDTH/2, 130);
+        ctx.font = "22px 'M PLUS Rounded 1c'";
+        ctx.fillStyle = "#888";
+        ctx.fillText(T('settings_sub'), BASE_WIDTH/2, 175);
+
+        const langs = [
+            { key: 'simple', y: 280 },
+            { key: 'ja', y: 370 },
+            { key: 'en', y: 460 }
+        ];
+        langs.forEach(l => {
+            const isActive = currentLang === l.key;
+            drawButton(BASE_WIDTH/2, l.y, 400, 70, T('lang_' + l.key), isActive ? "#7CB342" : "#fff", isActive ? "#fff" : "#5D4037");
+        });
+
+        drawButton(BASE_WIDTH/2, 620, 200, 50, T('btn_close'), "#B0BEC5");
+    }
+
+    function checkSettingsClick(x, y) {
+        const langs = [
+            { key: 'simple', y: 280 },
+            { key: 'ja', y: 370 },
+            { key: 'en', y: 460 }
+        ];
+        for (const l of langs) {
+            if (isBtnClicked(x, y, BASE_WIDTH/2, l.y, 400, 70)) { selectLanguage(l.key); return; }
+        }
+        if (isBtnClicked(x, y, BASE_WIDTH/2, 620, 200, 50)) { currentState = STATE.TITLE; }
+    }
+
     function shadeColor(hex, percent) {
         if (!hex.startsWith('#') || hex.length !== 7) return hex;
         let num = parseInt(hex.slice(1), 16);
@@ -1698,6 +1869,7 @@ const Game = (function() {
         else if(currentState === STATE.PLAYING) checkGameClick(inputState.x, inputState.y);
         else if(currentState === STATE.GAME_OVER) checkGameOverClick(inputState.x, inputState.y);
         else if(currentState === STATE.RANKING) checkRankingClick(inputState.x, inputState.y);
+        else if(currentState === STATE.SETTINGS) checkSettingsClick(inputState.x, inputState.y);
     }
     
     function handleInputMove(e) {
@@ -1737,14 +1909,16 @@ const Game = (function() {
         const startY = 320;
         const gap = 75;
         if(isBtnClicked(x, y, BASE_WIDTH/2, startY, 320, 60)) {
-            if(currentPlayerIndex === -1) alert("プレーヤーを選択してね");
-            else currentState = STATE.DIFFICULTY_SELECT;
+            currentState = STATE.DIFFICULTY_SELECT;
         }
         else if(isBtnClicked(x, y, BASE_WIDTH/2, startY+gap, 320, 60)) currentState = STATE.PLAYER_SELECT;
         else if(isBtnClicked(x, y, BASE_WIDTH/2, startY+gap*2, 320, 60)) {
-            rankingScope = 'local'; rankingTab = 'easy'; updateRankingView(); currentState = STATE.RANKING;
+            rankingScope = 'world'; rankingTab = 'easy'; updateRankingView(); currentState = STATE.RANKING;
         }
-        else if(isBtnClicked(x, y, BASE_WIDTH/2, startY+gap*3, 320, 60)) window.location.href = '../index.html';
+        else if(isBtnClicked(x, y, BASE_WIDTH/2, startY+gap*3, 320, 60)) {
+            currentState = STATE.SETTINGS;
+        }
+        else if(isBtnClicked(x, y, BASE_WIDTH/2, startY+gap*4, 320, 60)) window.location.href = '../index.html';
     }
     
     function checkPlayerSelectClick(x, y) {
@@ -1805,9 +1979,9 @@ const Game = (function() {
 
         // タイトルへボタン（右上）
         if(isBtnClicked(x, y, 1130, 38, 230, 48)) {
-            if(confirm("タイトルへ戻りますか？ゲームオーバーになります")) {
+            showCustomConfirm(T('confirm_to_title'), () => {
                 currentState = STATE.GAME_OVER; saveScore();
-            }
+            });
             return;
         }
 
@@ -1863,10 +2037,10 @@ const Game = (function() {
         const input = document.getElementById('playerNameInput');
         const err = document.getElementById('inputError');
         const name = input.value.trim();
-        if(!name) { err.innerText = "なまえをいれてね"; return; }
-        if(name.length > 8) { err.innerText = "8もじいないにしてね"; return; }
-        if(!/^[ぁ-んー]+$/.test(name)) { err.innerText = "ひらがなだけでいれてね"; return; }
-        for(let ng of NG_WORDS_HIRAGANA) { if(name.includes(ng)) { err.innerText = "つかえないことばがふくまれています"; return; } }
+        if(!name) { err.innerText = T('alert_empty_name'); return; }
+        if(name.length > 8) { err.innerText = T('alert_name_too_long'); return; }
+        if(!/^[ぁ-んー]+$/.test(name)) { err.innerText = T('alert_hiragana_only'); return; }
+        for(let ng of NG_WORDS_HIRAGANA) { if(name.includes(ng)) { err.innerText = T('alert_ng_word'); return; } }
         players.push(name);
         currentPlayerIndex = players.length - 1;
         savePlayers();
@@ -1874,12 +2048,23 @@ const Game = (function() {
     }
     
     function closePlayerInput() { document.getElementById('playerInputOverlay').style.display = 'none'; }
+
+    function showCustomConfirm(msg, onConfirm) {
+        document.getElementById('customConfirmMsg').textContent = msg;
+        document.getElementById('customConfirmOverlay').style.display = 'flex';
+        document.getElementById('customConfirmOk').onclick = () => {
+            document.getElementById('customConfirmOverlay').style.display = 'none';
+            if (onConfirm) onConfirm();
+        };
+        document.getElementById('customConfirmCancel').onclick = () => {
+            document.getElementById('customConfirmOverlay').style.display = 'none';
+        };
+    }
     
     // ------------------ データ保存・ランキング ------------------
     
     function saveScore() {
-        if(currentPlayerIndex === -1) return;
-        const playerName = players[currentPlayerIndex];
+        const playerName = currentPlayerIndex >= 0 ? players[currentPlayerIndex] : T('guest_name');
         const scoreData = { name: playerName, score: score, difficulty: difficulty, stage: currentStage, date: Date.now() };
         let localScores = JSON.parse(localStorage.getItem('tasuten_scores') || "[]");
         localScores.push(scoreData);
@@ -1889,6 +2074,7 @@ const Game = (function() {
             fetch(window._sb.b + '/rankings', {
                 method: 'POST',
                 headers: window._sb.h,
+                keepalive: true,
                 body: JSON.stringify({
                     game: 'tasu_ten',
                     player_name: playerName,
@@ -1914,6 +2100,7 @@ const Game = (function() {
     function fetchWorldRanking(diff) {
         if(!window._sb) return;
         const params = new URLSearchParams({
+            'select': 'player_name,point_score,difficulty,stage_score,created_at',
             'game': 'eq.tasu_ten',
             'difficulty': 'eq.' + diff,
             'order': 'point_score.desc',
@@ -1922,7 +2109,11 @@ const Game = (function() {
         fetch(window._sb.b + '/rankings?' + params.toString(), { headers: window._sb.rh })
             .then(res => { if(!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
             .then(data => {
-                rankingData = data.map(d => ({ name: d.player_name, score: d.point_score, difficulty: d.difficulty, stage: d.stage_score }));
+                rankingData = data.map(d => {
+                    let dateStr = '';
+                    if (d.created_at) { const dt = new Date(d.created_at); dateStr = `${dt.getFullYear()}/${dt.getMonth()+1}/${dt.getDate()}`; }
+                    return { name: d.player_name, score: d.point_score, difficulty: d.difficulty, stage: d.stage_score, date: dateStr };
+                });
             })
             .catch(err => {
                 console.error("Ranking fetch error", err);
