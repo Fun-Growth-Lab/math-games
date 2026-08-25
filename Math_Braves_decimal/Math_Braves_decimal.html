@@ -27,7 +27,7 @@
     window.saveOnlineScore = async (uid, name, score, difficulty) => {
         if((score||0)<=0) return;
         try {
-            const res = await fetch(`${_b}/rankings`,{method:'POST',headers:_h,
+            const res = await fetch(`${_b}/rankings`,{method:'POST',headers:_h,keepalive:true,
                 body:JSON.stringify({game:'math_braves_decimal',difficulty:difficulty||'normal',player_name:name||'ゲスト',point_score:Math.round(score)||0})});
             if(!res.ok){const t=await res.text();throw new Error(`HTTP ${res.status}: ${t}`);}
         } catch(e){console.error('Ranking save error:',e);}
@@ -38,7 +38,7 @@
             const res = await fetch(`${_b}/rankings?${q}`,{headers:_rh});
             if(!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
-            return data.map(r=>({uid:'',name:r.player_name,score:r.point_score,date:r.created_at?new Date(r.created_at).toLocaleDateString('ja-JP'):''}));
+            return data.map(r=>{let d='';if(r.created_at){const dt=new Date(r.created_at);d=`${dt.getFullYear()}/${dt.getMonth()+1}/${dt.getDate()}`;}return {uid:'',name:r.player_name,score:r.point_score,date:d};});
         } catch(e){console.error('Ranking load error:',e);return [];}
     };
 })();
@@ -240,6 +240,9 @@
         .tab-btn.active#tab-normal { background: var(--btn-blue); }
         .tab-btn.active#tab-hard { background: var(--btn-red); }
 
+        .lang-btn { opacity: 0.6; }
+        .lang-btn.active { opacity: 1; box-shadow: 0 0 0 4px #FFB74D, 0 5px 0 var(--btn-blue-hover); }
+
     </style>
 </head>
 <body>
@@ -250,63 +253,75 @@
     <div id="screen-title" class="ui-layer">
         <div class="title-container">
             <h1>Math Braves</h1>
-            <h2 class="subtitle">～小数～</h2>
+            <h2 class="subtitle" data-i18n="subtitle">～小数～</h2>
             <div id="current-player-display">現在のプレーヤー: ゲスト</div>
-            <button class="menu-btn green" onclick="goToDifficulty()">はじめる</button>
-            <button class="menu-btn blue" onclick="showScreen('screen-player')">プレーヤー選択</button>
+            <button class="menu-btn green" onclick="goToDifficulty()" data-i18n="btn_start">はじめる</button>
+            <button class="menu-btn blue" onclick="showScreen('screen-player')" data-i18n="btn_player_select">プレーヤー選択</button>
             <button id="btn-google-login" class="menu-btn red" onclick="loginGoogle()" style="display:none">Googleでログイン</button>
-            <button class="menu-btn yellow" onclick="showRanking()">ランキング</button>
-            <button class="menu-btn gray" onclick="location.href='../index.html'">INDEXへ戻る</button>
+            <button class="menu-btn yellow" onclick="showRanking()" data-i18n="btn_ranking">ランキング</button>
+            <button class="menu-btn red" onclick="showScreen('screen-settings')" data-i18n="btn_settings">⚙ 設定</button>
+            <button class="menu-btn gray" onclick="location.href='../index.html'" data-i18n="btn_index">INDEXへ戻る</button>
         </div>
         <div id="login-info" style="position: absolute; bottom: 20px; right: 30px; color: var(--text-dark); font-size: 20px; font-weight: bold; background: rgba(255,255,255,0.9); padding: 8px 20px; border-radius: 15px; border: 3px solid #FFECB3; display: none !important;"></div>
     </div>
 
+    <div id="screen-settings" class="ui-layer hidden">
+        <div class="title-container">
+            <h1 style="font-size: 40px; margin-bottom: 10px;" data-i18n="settings_title">⚙ 設定</h1>
+            <p style="font-size:16px; color:#8D6E63; margin-bottom:16px;" data-i18n="settings_sub">言語 / Language</p>
+            <button id="lang-btn-simple" class="menu-btn blue lang-btn" onclick="selectLanguage('simple')" data-i18n="lang_simple">かんたんなにほんご</button>
+            <button id="lang-btn-ja"     class="menu-btn blue lang-btn" onclick="selectLanguage('ja')"     data-i18n="lang_ja">日本語</button>
+            <button id="lang-btn-en"     class="menu-btn blue lang-btn" onclick="selectLanguage('en')"     data-i18n="lang_en">English</button>
+            <button class="menu-btn gray" style="margin-top: 20px;" onclick="showScreen('screen-title')" data-i18n="btn_close">とじる</button>
+        </div>
+    </div>
+
     <div id="screen-difficulty" class="ui-layer hidden">
         <div class="title-container">
-            <h1 style="font-size: 40px; margin-bottom: 20px;">難易度選択</h1>
-            <button class="menu-btn green" onclick="startGame('やさしい')">やさしい (HP 3.0)</button>
-            <button class="menu-btn blue" onclick="startGame('ふつう')">ふつう (HP 2.0)</button>
-            <button class="menu-btn red" onclick="startGame('むずかしい')">むずかしい (HP 1.0)</button>
-            <button class="menu-btn gray" style="margin-top: 20px;" onclick="showScreen('screen-title')">戻る</button>
+            <h1 style="font-size: 40px; margin-bottom: 20px;" data-i18n="diff_prompt">難易度選択</h1>
+            <button class="menu-btn green" onclick="startGame('やさしい')" id="btn-diff-easy">やさしい (HP 3.0)</button>
+            <button class="menu-btn blue" onclick="startGame('ふつう')" id="btn-diff-normal">ふつう (HP 2.0)</button>
+            <button class="menu-btn red" onclick="startGame('むずかしい')" id="btn-diff-hard">むずかしい (HP 1.0)</button>
+            <button class="menu-btn gray" style="margin-top: 20px;" onclick="showScreen('screen-title')" data-i18n="btn_back">戻る</button>
         </div>
     </div>
 
     <div id="screen-player" class="ui-layer hidden">
         <div class="panel">
-            <h2 style="font-size: 30px; margin-top: 0;">プレーヤー選択</h2>
+            <h2 style="font-size: 30px; margin-top: 0;" data-i18n="pm_title">プレーヤー選択</h2>
             <div id="player-list-container" class="player-list"></div>
-            
+
             <div style="margin-top: 20px; border-top: 3px dashed #FFCC80; padding-top: 20px;">
-                <h3 style="font-size: 24px; margin-bottom: 5px;">新規登録 (最大5名)</h3>
-                <p style="font-size: 16px; color: #8D6E63;">※ひらがなと「ー」のみ、8文字まで</p>
-                <input type="text" id="new-player-name" maxlength="8" placeholder="なまえをいれてね">
-                <button class="menu-btn green" style="width: auto; padding: 10px 25px; font-size: 20px;" onclick="registerPlayer()">登録</button>
+                <h3 style="font-size: 24px; margin-bottom: 5px;" data-i18n="pm_register_title">新規登録 (最大5名)</h3>
+                <p style="font-size: 16px; color: #8D6E63;" data-i18n="pm_hint">※ひらがなと「ー」のみ、8文字まで</p>
+                <input type="text" id="new-player-name" maxlength="8" placeholder="なまえをいれてね" data-i18n-placeholder="pm_placeholder">
+                <button class="menu-btn green" style="width: auto; padding: 10px 25px; font-size: 20px;" onclick="registerPlayer()" data-i18n="btn_register">登録</button>
             </div>
-            
+
             <button id="btn-player-back" class="menu-btn gray" style="margin-top: 20px;" onclick="showScreen('screen-title')">選択して戻る</button>
         </div>
     </div>
 
     <div id="screen-ranking" class="ui-layer hidden">
         <div class="panel" style="width: 1000px;">
-            <h2 style="font-size: 30px; margin-top: 0;">ランキング</h2>
+            <h2 style="font-size: 30px; margin-top: 0;" data-i18n="rank_title">ランキング</h2>
             <div class="tabs">
-                <button class="tab-btn" id="tab-local" onclick="switchRankTab('local')">ローカル</button>
-                <button class="tab-btn" id="tab-world" onclick="switchRankTab('world')">ワールド</button>
+                <button class="tab-btn" id="tab-world" onclick="switchRankTab('world')" data-i18n="rank_tab_world">ワールド</button>
+                <button class="tab-btn" id="tab-local" onclick="switchRankTab('local')" data-i18n="rank_tab_local">ローカル</button>
             </div>
             <div class="tabs" style="font-size: 16px;">
-                <button class="tab-btn" id="tab-easy" onclick="switchRankDiff('やさしい')">やさしい</button>
-                <button class="tab-btn" id="tab-normal" onclick="switchRankDiff('ふつう')">ふつう</button>
-                <button class="tab-btn" id="tab-hard" onclick="switchRankDiff('むずかしい')">むずかしい</button>
+                <button class="tab-btn" id="tab-easy" onclick="switchRankDiff('やさしい')" data-i18n="diff_easy">やさしい</button>
+                <button class="tab-btn" id="tab-normal" onclick="switchRankDiff('ふつう')" data-i18n="diff_normal">ふつう</button>
+                <button class="tab-btn" id="tab-hard" onclick="switchRankDiff('むずかしい')" data-i18n="diff_hard">むずかしい</button>
             </div>
             <div style="min-height: 350px;">
                 <table id="ranking-table">
-                    <thead><tr><th>順位</th><th>名前</th><th>クリアステージ</th><th>スコア</th><th>残りHP</th></tr></thead>
+                    <thead><tr><th data-i18n="col_rank">順位</th><th data-i18n="col_name">名前</th><th data-i18n="col_cleared">クリアステージ</th><th data-i18n="col_score">スコア</th><th data-i18n="col_hp">残りHP</th><th data-i18n="col_date">日付</th></tr></thead>
                     <tbody id="ranking-body"></tbody>
                 </table>
-                <div id="ranking-loading" style="font-size:20px; margin-top: 20px; display:none;">読み込み中...</div>
+                <div id="ranking-loading" style="font-size:20px; margin-top: 20px; display:none;" data-i18n="rank_loading">読み込み中...</div>
             </div>
-            <button class="menu-btn gray" style="margin-top: 20px;" onclick="showScreen('screen-title')">戻る</button>
+            <button class="menu-btn gray" style="margin-top: 20px;" onclick="showScreen('screen-title')" data-i18n="btn_back">戻る</button>
         </div>
     </div>
 
@@ -315,7 +330,7 @@
             <h1 id="result-title" style="font-size: 56px; margin-bottom: 30px;"></h1>
             <div id="result-details" style="width: 100%; font-size: 26px; font-weight: bold; color: var(--text-dark); margin-bottom: 30px; text-align: left;">
                 </div>
-            <button class="menu-btn gray" onclick="showScreen('screen-title')">タイトルへもどる</button>
+            <button class="menu-btn gray" onclick="showScreen('screen-title')" data-i18n="btn_to_title2">タイトルへもどる</button>
         </div>
     </div>
 
@@ -325,16 +340,16 @@
     </div>
 
     <div id="change-popup" class="popup-modal hidden">
-        <p style="margin-bottom: 20px; line-height: 1.6;">ダイヤ💎を1つ消費します。<br>どちらをチェンジしますか？</p>
+        <p style="margin-bottom: 20px; line-height: 1.6;" data-i18n-html="change_popup_msg">ダイヤ💎を1つ消費します。<br>どちらをチェンジしますか？</p>
         <div style="display: flex; flex-direction: column; gap: 15px; align-items: center;">
-            <button class="menu-btn blue" style="width: 250px;" onclick="confirmChangeHand()">手札をチェンジ</button>
-            <button class="menu-btn green" style="width: 250px;" onclick="confirmChangeField()">場をチェンジ</button>
-            <button class="menu-btn gray" style="width: 250px;" onclick="cancelChange()">やめる</button>
+            <button class="menu-btn blue" style="width: 250px;" onclick="confirmChangeHand()" data-i18n="btn_change_hand">手札をチェンジ</button>
+            <button class="menu-btn green" style="width: 250px;" onclick="confirmChangeField()" data-i18n="btn_change_field">場をチェンジ</button>
+            <button class="menu-btn gray" style="width: 250px;" onclick="cancelChange()" data-i18n="btn_cancel">やめる</button>
         </div>
     </div>
 
     <div id="joker-popup" class="popup-modal hidden">
-        <p style="margin-bottom: 10px; line-height: 1.6;">
+        <p style="margin-bottom: 10px; line-height: 1.6;" data-i18n-html="joker_popup_msg">
             🃏ジョーカーをつかう！🃏<br>
             好きなすうじを選んでね<br>
             <span style="font-size: 16px;">（0.1 から 2.0 まで）</span>
@@ -345,13 +360,202 @@
             <button class="menu-btn red" style="width: 70px; height: 70px; font-size: 40px; padding: 0; border-radius: 15px;" onclick="changeJokerVal(0.1)">＋</button>
         </div>
         <div style="display: flex; justify-content: center; gap: 15px; margin-top: 10px;">
-            <button class="menu-btn green" style="width: 150px; font-size: 20px;" onclick="decideJoker()">けってい</button>
-            <button class="menu-btn gray" style="width: 150px; font-size: 20px;" onclick="cancelJoker()">やめる</button>
+            <button class="menu-btn green" style="width: 150px; font-size: 20px;" onclick="decideJoker()" data-i18n="btn_decide">けってい</button>
+            <button class="menu-btn gray" style="width: 150px; font-size: 20px;" onclick="cancelJoker()" data-i18n="btn_cancel">やめる</button>
         </div>
     </div>
 </div>
 
 <script>
+    // ============================================================
+    //  I18N（かんたんなにほんご／日本語／English）
+    // ============================================================
+    const STRINGS = {
+        ja: {
+            subtitle: '～小数～', label_current_player: '現在のプレーヤー: {name}',
+            btn_start: 'はじめる', btn_player_select: 'プレーヤー選択', btn_ranking: 'ランキング', btn_settings: '⚙ 設定', btn_index: 'INDEXへ戻る',
+            settings_title: '⚙ 設定', settings_sub: '言語 / Language', lang_simple: 'かんたんなにほんご', lang_ja: '日本語', lang_en: 'English', btn_close: 'とじる',
+            diff_prompt: '難易度選択', diff_easy: 'やさしい', diff_normal: 'ふつう', diff_hard: 'むずかしい', btn_back: '戻る',
+            pm_title: 'プレーヤー選択', pm_register_title: '新規登録 (最大5名)', pm_hint: '※ひらがなと「ー」のみ、8文字まで',
+            pm_placeholder: 'なまえをいれてね', btn_register: '登録', btn_select_back: '選択して戻る', btn_delete: '削除',
+            rank_title: 'ランキング', rank_tab_world: 'ワールド', rank_tab_local: 'ローカル', rank_loading: '読み込み中...', rank_empty: 'データがありません',
+            col_rank: '順位', col_name: '名前', col_cleared: 'クリアステージ', col_score: 'スコア', col_hp: '残りHP', col_date: '日付',
+            btn_to_title2: 'タイトルへもどる',
+            change_popup_msg: 'ダイヤ💎を1つ消費します。<br>どちらをチェンジしますか？',
+            btn_change_hand: '手札をチェンジ', btn_change_field: '場をチェンジ', btn_cancel: 'やめる',
+            joker_popup_msg: '🃏ジョーカーをつかう！🃏<br>好きなすうじを選んでね<br><span style="font-size: 16px;">（0.1 から 2.0 まで）</span>',
+            btn_decide: 'けってい',
+            msg_no_player: 'プレーヤーが登録されていません。\n「ゲスト」としてプレイします。',
+            alert_max_players: '登録できるのは5名までです。', alert_hiragana_only: 'ひらがなと「ー」のみ使えます。',
+            alert_ng_word: 'このなまえは登録できません。', alert_duplicate_name: 'すでに登録されています。',
+            alert_rank_fetch_fail: 'ランキングの取得に失敗しました。',
+            msg_just_bonus: '✨ぴったりボーナス！✨\n{n}.0 に止まったので\n{pts}点 GET！',
+            msg_gold_found: '{icon}財宝を発見！\nスコアが {pts} 増えた！',
+            msg_gem_found: '{icon}ダイヤを発見！\nお助けアイテムを 1個 GET！',
+            msg_snack_found: '🍰おかしを発見！\n{icon} を GET！',
+            msg_snack_complete: 'すごい！おかしをぜんぶあつめた！！\n{list}',
+            msg_dragon_all_sealed: '🐲ドラゴンの攻撃！\nすべてのカードが\n封印されてしまった...',
+            msg_dragon_sealed: '🐲ドラゴンの攻撃！\nカードが{n}枚封印された！',
+            msg_enemy_all_sealed: '👾敵の攻撃！\nすべてのカードが\n封印されてしまった...',
+            msg_enemy_sealed: '👾敵の攻撃！\nカードが1枚封印された！',
+            msg_enemy_no_seal: '👾敵の攻撃！\nしかし封印できるカードがない！',
+            msg_just_5: '🎉ジャスト 5.0 達成！🎉\nボーナス 1000点 GET！\nダメージ 0 でクリア！',
+            msg_hp_zero: 'HPが0になりました。\n5.0を {dmg} オーバーしました...',
+            msg_stage_clear: '🚩ステージクリア！🚩\n5.0を {dmg} オーバーしたため、\nHPが {dmg} 減りました。',
+            result_clear_title: 'ゲームクリア！', result_over_title: 'ゲームオーバー',
+            label_score_colon: 'スコア:', label_snack_bonus: 'おかしボーナス:', label_hp_bonus: 'のこりHPボーナス:', label_total_score: '総合スコア:', pts_suffix: '点',
+            btn_howto: 'あそびかた', btn_to_title: 'タイトルへ', label_hp_colon: 'HP :', label_current_number: 'いまのすうじ',
+            label_stage_colon: 'ステージ :', label_score_colon2: 'スコア :', label_gems_colon: 'ダイヤ💎 :', btn_gem_change: '💎チェンジ',
+            label_snacks_collected: 'あつめたおかし （{n}/12）', label_sealed: '封印', label_turns_left: 'あと{n}',
+            hint_tap_next: '▼ 画面をタップするかキーを押して次へ', hint_tap_close: '▼ 画面のどこかをタップして閉じる',
+            howto_rules: [
+                "① 手札のカードを場の数値カードに重ねよう。",
+                "② カードの数字だけ数直線のバーがグーっと伸びるよ。",
+                "③ 5.0 を超えるとクリアだけど、超えた分HPが減るよ！",
+                "④ 1.0, 2.0, 3.0, 4.0, 5.0 でぴったりとまるとボーナスポイント！",
+                "⑤ イベントマスに止まると敵や宝が出るよ。",
+                "⑥ 全７ステージをHPが０になる前にクリアしよう！",
+                "（アドバイス）",
+                "・敵👾🐲にとまると手札が封印されるよ。",
+                "・財宝🪙💰にとまるとスコアがアップするよ。",
+                "・とったダイヤ💎をつかうと、手札や場をチェンジできるよ。",
+                "・ジョーカー🃏は好きな数字を選べるよ。",
+                "・おかしはたくさん集めるほど最後にスコアが高くなるよ！"
+            ],
+        },
+        simple: {
+            subtitle: '～しょうすう～', label_current_player: 'いまの プレーヤー: {name}',
+            btn_start: 'はじめる', btn_player_select: 'プレーヤーせんたく', btn_ranking: 'ランキング', btn_settings: '⚙ せってい', btn_index: 'INDEXへ もどる',
+            settings_title: '⚙ せってい', settings_sub: '言語 / Language', lang_simple: 'かんたんなにほんご', lang_ja: '日本語', lang_en: 'English', btn_close: 'とじる',
+            diff_prompt: 'なんいど せんたく', diff_easy: 'やさしい', diff_normal: 'ふつう', diff_hard: 'むずかしい', btn_back: 'もどる',
+            pm_title: 'プレーヤーせんたく', pm_register_title: 'しんきとうろく (さいだい5にん)', pm_hint: '※ひらがなと「ー」だけ、8もじまで',
+            pm_placeholder: 'なまえを いれてね', btn_register: 'とうろく', btn_select_back: 'せんたくして もどる', btn_delete: 'さくじょ',
+            rank_title: 'ランキング', rank_tab_world: 'ワールド', rank_tab_local: 'ローカル', rank_loading: 'よみこみちゅう...', rank_empty: 'データが ありません',
+            col_rank: 'じゅんい', col_name: 'なまえ', col_cleared: 'クリアステージ', col_score: 'スコア', col_hp: 'のこりHP', col_date: 'ひづけ',
+            btn_to_title2: 'タイトルへ もどる',
+            change_popup_msg: 'ダイヤ💎を1つ つかいます。<br>どちらを チェンジしますか？',
+            btn_change_hand: 'てふだを チェンジ', btn_change_field: 'ばを チェンジ', btn_cancel: 'やめる',
+            joker_popup_msg: '🃏ジョーカーを つかう！🃏<br>すきな すうじを えらんでね<br><span style="font-size: 16px;">（0.1 から 2.0 まで）</span>',
+            btn_decide: 'けってい',
+            msg_no_player: 'プレーヤーが とうろくされていません。\n「ゲスト」として プレイします。',
+            alert_max_players: 'とうろくできるのは 5にんまでです。', alert_hiragana_only: 'ひらがなと「ー」だけ つかえます。',
+            alert_ng_word: 'このなまえは とうろくできません。', alert_duplicate_name: 'すでに とうろくされています。',
+            alert_rank_fetch_fail: 'ランキングの しゅとくに しっぱいしました。',
+            msg_just_bonus: '✨ぴったりボーナス！✨\n{n}.0に とまったので\n{pts}てん GET！',
+            msg_gold_found: '{icon}ざいほうを はっけん！\nスコアが {pts} ふえた！',
+            msg_gem_found: '{icon}ダイヤを はっけん！\nおたすけアイテムを 1こ GET！',
+            msg_snack_found: '🍰おかしを はっけん！\n{icon} を GET！',
+            msg_snack_complete: 'すごい！おかしを ぜんぶ あつめた！！\n{list}',
+            msg_dragon_all_sealed: '🐲ドラゴンの こうげき！\nすべての カードが\nふういんされてしまった...',
+            msg_dragon_sealed: '🐲ドラゴンの こうげき！\nカードが{n}まい ふういんされた！',
+            msg_enemy_all_sealed: '👾てきの こうげき！\nすべての カードが\nふういんされてしまった...',
+            msg_enemy_sealed: '👾てきの こうげき！\nカードが1まい ふういんされた！',
+            msg_enemy_no_seal: '👾てきの こうげき！\nしかし ふういんできる カードがない！',
+            msg_just_5: '🎉ジャスト 5.0 たっせい！🎉\nボーナス 1000てん GET！\nダメージ 0で クリア！',
+            msg_hp_zero: 'HPが 0に なりました。\n5.0を {dmg} オーバーしました...',
+            msg_stage_clear: '🚩ステージクリア！🚩\n5.0を {dmg} オーバーしたため、\nHPが {dmg} へりました。',
+            result_clear_title: 'ゲームクリア！', result_over_title: 'ゲームオーバー',
+            label_score_colon: 'スコア:', label_snack_bonus: 'おかしボーナス:', label_hp_bonus: 'のこりHPボーナス:', label_total_score: 'そうごうスコア:', pts_suffix: 'てん',
+            btn_howto: 'あそびかた', btn_to_title: 'タイトルへ', label_hp_colon: 'HP :', label_current_number: 'いまの すうじ',
+            label_stage_colon: 'ステージ :', label_score_colon2: 'スコア :', label_gems_colon: 'ダイヤ💎 :', btn_gem_change: '💎チェンジ',
+            label_snacks_collected: 'あつめた おかし （{n}/12）', label_sealed: 'ふういん', label_turns_left: 'あと{n}',
+            hint_tap_next: '▼ がめんを タップするか キーを おして つぎへ', hint_tap_close: '▼ がめんの どこかを タップして とじる',
+            howto_rules: [
+                "① てふだの カードを ばの すうじカードに かさねよう。",
+                "② カードの すうじだけ すうちょくせんの バーが グーっと のびるよ。",
+                "③ 5.0を こえると クリアだけど、こえたぶん HPが へるよ！",
+                "④ 1.0, 2.0, 3.0, 4.0, 5.0で ぴったり とまると ボーナスポイント！",
+                "⑤ イベントマスに とまると てきや たからが でるよ。",
+                "⑥ ぜんぶで７ステージを HPが０に なる まえに クリアしよう！",
+                "（アドバイス）",
+                "・てき👾🐲に とまると てふだが ふういんされるよ。",
+                "・ざいほう🪙💰に とまると スコアが アップするよ。",
+                "・とった ダイヤ💎を つかうと、てふだや ばを チェンジできるよ。",
+                "・ジョーカー🃏は すきな すうじを えらべるよ。",
+                "・おかしは たくさん あつめるほど さいごに スコアが たかくなるよ！"
+            ],
+        },
+        en: {
+            subtitle: '- Decimals -', label_current_player: 'Current Player: {name}',
+            btn_start: 'Start', btn_player_select: 'Select Player', btn_ranking: 'Ranking', btn_settings: '⚙ Settings', btn_index: 'To INDEX',
+            settings_title: '⚙ Settings', settings_sub: '言語 / Language', lang_simple: 'かんたんなにほんご', lang_ja: '日本語', lang_en: 'English', btn_close: 'Close',
+            diff_prompt: 'Choose a Difficulty', diff_easy: 'Easy', diff_normal: 'Normal', diff_hard: 'Hard', btn_back: 'Back',
+            pm_title: 'Select Player', pm_register_title: 'New Registration (Max 5)', pm_hint: '※Hiragana and "ー" only, up to 8 characters',
+            pm_placeholder: 'Enter a name', btn_register: 'Register', btn_select_back: 'Select & Back', btn_delete: 'Delete',
+            rank_title: 'Ranking', rank_tab_world: 'World', rank_tab_local: 'Local', rank_loading: 'Loading...', rank_empty: 'No data',
+            col_rank: 'Rank', col_name: 'Name', col_cleared: 'Cleared Stage', col_score: 'Score', col_hp: 'HP Left', col_date: 'Date',
+            btn_to_title2: 'Back to Title',
+            change_popup_msg: 'This uses 1 Gem💎.<br>Which one do you want to change?',
+            btn_change_hand: 'Change Hand', btn_change_field: 'Change Field', btn_cancel: 'Cancel',
+            joker_popup_msg: '🃏Use the Joker！🃏<br>Choose any number<br><span style="font-size: 16px;">(0.1 to 2.0)</span>',
+            btn_decide: 'Decide',
+            msg_no_player: 'No player registered.\nPlaying as "Guest".',
+            alert_max_players: 'You can register up to 5 players.', alert_hiragana_only: 'Only Hiragana and "ー" can be used.',
+            alert_ng_word: 'This name cannot be registered.', alert_duplicate_name: 'This name is already registered.',
+            alert_rank_fetch_fail: 'Failed to fetch the ranking.',
+            msg_just_bonus: '✨Perfect Bonus！✨\nStopped exactly at {n}.0\n{pts}pt GET！',
+            msg_gold_found: '{icon}Treasure found！\nScore increased by {pts}！',
+            msg_gem_found: '{icon}Gem found！\nGot 1 helper item！',
+            msg_snack_found: '🍰Snack found！\nGot {icon}！',
+            msg_snack_complete: 'Amazing! You collected every snack！！\n{list}',
+            msg_dragon_all_sealed: '🐲Dragon attack！\nAll cards\nhave been sealed...',
+            msg_dragon_sealed: '🐲Dragon attack！\n{n} cards were sealed！',
+            msg_enemy_all_sealed: '👾Enemy attack！\nAll cards\nhave been sealed...',
+            msg_enemy_sealed: '👾Enemy attack！\n1 card was sealed！',
+            msg_enemy_no_seal: '👾Enemy attack！\nBut there was no card to seal！',
+            msg_just_5: '🎉Landed exactly on 5.0！🎉\n1000pt Bonus GET！\nCleared with 0 damage！',
+            msg_hp_zero: 'HP reached 0.\nYou went {dmg} over 5.0...',
+            msg_stage_clear: '🚩Stage Clear！🚩\nYou went {dmg} over 5.0,\nso HP dropped by {dmg}.',
+            result_clear_title: 'GAME CLEAR!', result_over_title: 'GAME OVER',
+            label_score_colon: 'Score:', label_snack_bonus: 'Snack Bonus:', label_hp_bonus: 'HP Bonus:', label_total_score: 'Total Score:', pts_suffix: 'pt',
+            btn_howto: 'How to Play', btn_to_title: 'To Title', label_hp_colon: 'HP :', label_current_number: 'Current Number',
+            label_stage_colon: 'Stage :', label_score_colon2: 'Score :', label_gems_colon: 'Gems💎 :', btn_gem_change: '💎Change',
+            label_snacks_collected: 'Snacks Collected ({n}/12)', label_sealed: 'Sealed', label_turns_left: '{n} left',
+            hint_tap_next: '▼ Tap the screen or press a key to continue', hint_tap_close: '▼ Tap anywhere to close',
+            howto_rules: [
+                "① Place a hand card onto a field number card.",
+                "② The number line bar stretches by the card's value.",
+                "③ Going over 5.0 clears the stage, but you lose HP for the overage!",
+                "④ Landing exactly on 1.0, 2.0, 3.0, 4.0, or 5.0 gives a bonus!",
+                "⑤ Landing on an event tile spawns an enemy or treasure.",
+                "⑥ Clear all 7 stages before your HP hits 0!",
+                "(Tips)",
+                "・Landing on an enemy👾🐲 seals a hand card.",
+                "・Landing on treasure🪙💰 raises your score.",
+                "・Use a collected Gem💎 to change your hand or field.",
+                "・A Joker🃏 lets you pick any number.",
+                "・Collecting more snacks raises your final score!"
+            ],
+        },
+    };
+    let currentLang = localStorage.getItem('mb_dec_lang') || 'ja';
+    function T(key, params) {
+        const dict = STRINGS[currentLang] || STRINGS.ja;
+        let str = dict[key] !== undefined ? dict[key] : (STRINGS.ja[key] || key);
+        if (params && typeof str === 'string') { Object.keys(params).forEach(k => { str = str.split(`{${k}}`).join(params[k]); }); }
+        return str;
+    }
+    function applyLanguage() {
+        document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = T(el.getAttribute('data-i18n')); });
+        document.querySelectorAll('[data-i18n-html]').forEach(el => { el.innerHTML = T(el.getAttribute('data-i18n-html')); });
+        document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { el.setAttribute('placeholder', T(el.getAttribute('data-i18n-placeholder'))); });
+        ['simple', 'ja', 'en'].forEach(l => {
+            const btn = document.getElementById('lang-btn-' + l);
+            if (btn) btn.classList.toggle('active', l === currentLang);
+        });
+        document.getElementById('btn-diff-easy').textContent = `${T('diff_easy')} (HP 3.0)`;
+        document.getElementById('btn-diff-normal').textContent = `${T('diff_normal')} (HP 2.0)`;
+        document.getElementById('btn-diff-hard').textContent = `${T('diff_hard')} (HP 1.0)`;
+        if (typeof updateCurrentPlayerDisplay === 'function') updateCurrentPlayerDisplay();
+        if (typeof renderPlayerList === 'function' && !document.getElementById('screen-player').classList.contains('hidden')) renderPlayerList();
+    }
+    function selectLanguage(lang) {
+        currentLang = lang;
+        localStorage.setItem('mb_dec_lang', lang);
+        applyLanguage();
+    }
+    function openSettings() { showScreen('screen-settings'); }
+
     const COLLECTION_NAME = 'scores_math_braves_decimal';
 
     /* =========================================
@@ -502,7 +706,7 @@
     ========================================= */
     function updateCurrentPlayerDisplay() {
         if (!currentPlayer) currentPlayer = "ゲスト"; // undefined防止
-        document.getElementById('current-player-display').innerText = `現在のプレーヤー: ${currentPlayer}`;
+        document.getElementById('current-player-display').innerText = T('label_current_player', {name: currentPlayer});
     }
 
     function renderPlayerList() {
@@ -511,22 +715,30 @@
         players.forEach((p, index) => {
             const div = document.createElement('div');
             div.className = `player-item ${p.name === currentPlayer ? 'selected' : ''}`;
-            div.innerHTML = `<span>${p.name}</span> <button class="menu-btn red" style="width:auto; padding:6px 12px; font-size:18px; margin:0;" onclick="deletePlayer(${index}, event)">削除</button>`;
+            const nameSpan = document.createElement('span');
+            nameSpan.textContent = p.name;
+            const delBtn = document.createElement('button');
+            delBtn.className = 'menu-btn red';
+            delBtn.style.cssText = 'width:auto; padding:6px 12px; font-size:18px; margin:0;';
+            delBtn.textContent = T('btn_delete');
+            delBtn.onclick = (e) => deletePlayer(index, e);
+            div.appendChild(nameSpan);
+            div.appendChild(delBtn);
             div.onclick = () => selectPlayer(index);
             container.appendChild(div);
         });
-        document.getElementById('btn-player-back').innerText = "選択して戻る";
+        document.getElementById('btn-player-back').innerText = T('btn_select_back');
     }
 
     function registerPlayer() {
-        if(players.length >= 5) { systemAlert('登録できるのは5名までです。'); return; }
+        if(players.length >= 5) { systemAlert(T('alert_max_players')); return; }
         const input = document.getElementById('new-player-name').value.trim();
         if(!input) return;
-        if(!/^[ぁ-んー]+$/.test(input)) { systemAlert('ひらがなと「ー」のみ使えます。'); return; }
+        if(!/^[ぁ-んー]+$/.test(input)) { systemAlert(T('alert_hiragana_only')); return; }
         for(let word of NG_WORDS_HIRAGANA) {
-            if(input.includes(word)) { systemAlert('このなまえは登録できません。'); return; }
+            if(input.includes(word)) { systemAlert(T('alert_ng_word')); return; }
         }
-        if(players.some(p => p.name === input)) { systemAlert('すでに登録されています。'); return; }
+        if(players.some(p => p.name === input)) { systemAlert(T('alert_duplicate_name')); return; }
 
         players.push({ name: input });
         localStorage.setItem('math_braves_players', JSON.stringify(players));
@@ -556,7 +768,7 @@
     /* =========================================
        Ranking
     ========================================= */
-    let currentRankTab = localStorage.getItem('math_braves_rank_tab') || 'local';
+    let currentRankTab = localStorage.getItem('math_braves_rank_tab') || 'world';
     let currentRankDiff = localStorage.getItem('math_braves_rank_diff') || 'やさしい';
 
     function updateRankTabUI() {
@@ -601,7 +813,10 @@
             let localScores = JSON.parse(localStorage.getItem('math_braves_scores')) || [];
             localScores = localScores.filter(s => s.difficulty === currentRankDiff);
             localScores.sort((a,b) => b.clearedStages - a.clearedStages || b.score - a.score || b.remainingHP - a.remainingHP);
-            renderRankingTable(localScores.slice(0, 10));
+            renderRankingTable(localScores.slice(0, 10).map(s => ({
+                playerName: s.playerName, clearedStages: s.clearedStages, score: s.score,
+                remainingHP: s.remainingHP, date: s.timestamp
+            })));
         } else {
             const diffMap = {'やさしい':'easy', 'ふつう':'normal', 'むずかしい':'hard'};
             const diffKey = diffMap[currentRankDiff] || 'normal';
@@ -611,13 +826,14 @@
                     playerName: r.name,
                     clearedStages: '-',
                     score: r.score,
-                    remainingHP: 0
+                    remainingHP: null,
+                    date: r.date
                 }));
                 renderRankingTable(mapped);
             }).catch(err => {
                 document.getElementById('ranking-loading').style.display = 'none';
                 console.error(err);
-                systemAlert("ランキングの取得に失敗しました。");
+                systemAlert(T('alert_rank_fetch_fail'));
             });
         }
     }
@@ -625,9 +841,30 @@
     function renderRankingTable(data) {
         const tbody = document.getElementById('ranking-body');
         tbody.innerHTML = '';
-        if(data.length === 0) { tbody.innerHTML = '<tr><td colspan="5">データがありません</td></tr>'; return; }
+        if(data.length === 0) {
+            const tr = document.createElement('tr');
+            const td = document.createElement('td');
+            td.colSpan = 6;
+            td.textContent = T('rank_empty');
+            tr.appendChild(td);
+            tbody.appendChild(tr);
+            return;
+        }
         data.forEach((d, i) => {
-            tbody.innerHTML += `<tr><td>${i+1}</td><td>${d.playerName}</td><td>${d.clearedStages}</td><td>${d.score}</td><td>${d.remainingHP.toFixed(1)}</td></tr>`;
+            let dateStr = '';
+            if (typeof d.date === 'number') {
+                const dt = new Date(d.date);
+                dateStr = `${dt.getFullYear()}/${dt.getMonth()+1}/${dt.getDate()}`;
+            } else if (typeof d.date === 'string' && d.date) {
+                dateStr = d.date;
+            }
+            const tr = document.createElement('tr');
+            [i+1, d.playerName, d.clearedStages, d.score, d.remainingHP === null ? '-' : d.remainingHP.toFixed(1), dateStr].forEach(val => {
+                const td = document.createElement('td');
+                td.textContent = val;
+                tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
         });
     }
 
@@ -672,7 +909,7 @@
        Game Initialization & Flow
     ========================================= */
     function goToDifficulty() {
-        if(!currentPlayer || currentPlayer === "ゲスト") systemAlert("プレーヤーが登録されていません。\n「ゲスト」としてプレイします。");
+        if(!currentPlayer || currentPlayer === "ゲスト") systemAlert(T('msg_no_player'));
         showScreen('screen-difficulty');
     }
 
@@ -951,7 +1188,7 @@
             let bonus = newVal * 200;
             gameState.score += bonus;
             createParticles(640, 390, '#FFD700', 50);
-            showGameMessage(`✨ぴったりボーナス！✨\n${newVal}.0 に止まったので\n${bonus}点 GET！`);
+            showGameMessage(T('msg_just_bonus', {n: newVal, pts: bonus}));
         }
 
         if(messageQueue.length === 0 && !gameMessage.active) checkStageClear();
@@ -963,28 +1200,28 @@
             let pts = ev.subType === 'mega_gold' ? 1500 : 500;
             gameState.score += pts;
             createParticles(px, py, '#FFF59D', 40);
-            showGameMessage(`${ev.icon}財宝を発見！\nスコアが ${pts} 増えた！`, () => { ev.cleared = true; });
+            showGameMessage(T('msg_gold_found', {icon: ev.icon, pts: pts}), () => { ev.cleared = true; });
         } else if (ev.type === 'gem') {
             gameState.gems++;
             createParticles(px, py, '#81D4FA', 40);
-            showGameMessage(`${ev.icon}ダイヤを発見！\nお助けアイテムを 1個 GET！`, () => { ev.cleared = true; });
+            showGameMessage(T('msg_gem_found', {icon: ev.icon}), () => { ev.cleared = true; });
         } else if (ev.type === 'snack') {
             gameState.snacksCollected.push(ev.icon);
             gameState.availableSnacks = gameState.availableSnacks.filter(s => s !== ev.icon);
             createParticles(px, py, '#F48FB1', 40);
-            
-            let msg = `🍰おかしを発見！\n${ev.icon} を GET！`;
+
+            let msg = T('msg_snack_found', {icon: ev.icon});
             if (gameState.snacksCollected.length === 12) {
                 showGameMessage(msg);
-                showGameMessage(`すごい！おかしをぜんぶあつめた！！\n${ALL_SNACKS.join('')}`, () => { ev.cleared = true; });
+                showGameMessage(T('msg_snack_complete', {list: ALL_SNACKS.join('')}), () => { ev.cleared = true; });
             } else {
                 showGameMessage(msg, () => { ev.cleared = true; });
             }
-            
+
         } else if (ev.type === 'enemy') {
             createParticles(px, py, '#E57373', 50);
             let unsealed = gameState.cards.filter(c => c.sealedTurns === 0);
-            
+
             if(ev.subType === 'dragon') {
                 let sealCount = Math.min(2, unsealed.length);
                 for(let i=0; i<sealCount; i++) {
@@ -994,11 +1231,11 @@
                 }
                 if(gameState.cards.filter(c => c.sealedTurns > 0).length === 5) {
                     appState = 'GAMEOVER_WAIT';
-                    showGameMessage(`🐲ドラゴンの攻撃！\nすべてのカードが\n封印されてしまった...`, () => { 
+                    showGameMessage(T('msg_dragon_all_sealed'), () => {
                         ev.cleared = true; processGameOver();
                     });
                 } else {
-                    showGameMessage(`🐲ドラゴンの攻撃！\nカードが${sealCount}枚封印された！`, () => { ev.cleared = true; });
+                    showGameMessage(T('msg_dragon_sealed', {n: sealCount}), () => { ev.cleared = true; });
                 }
             } else {
                 if(unsealed.length > 0) {
@@ -1006,14 +1243,14 @@
                     target.sealedTurns = 5;
                     if(gameState.cards.filter(c => c.sealedTurns > 0).length === 5) {
                         appState = 'GAMEOVER_WAIT';
-                        showGameMessage(`👾敵の攻撃！\nすべてのカードが\n封印されてしまった...`, () => { 
+                        showGameMessage(T('msg_enemy_all_sealed'), () => {
                             ev.cleared = true; processGameOver();
                         });
                     } else {
-                        showGameMessage(`👾敵の攻撃！\nカードが1枚封印された！`, () => { ev.cleared = true; });
+                        showGameMessage(T('msg_enemy_sealed'), () => { ev.cleared = true; });
                     }
                 } else {
-                    showGameMessage(`👾敵の攻撃！\nしかし封印できるカードがない！`, () => { ev.cleared = true; });
+                    showGameMessage(T('msg_enemy_no_seal'), () => { ev.cleared = true; });
                 }
             }
         }
@@ -1024,17 +1261,17 @@
         if(finalVal >= 5.0) {
             if(finalVal === 5.0) {
                 gameState.score += 1000;
-                showGameMessage("🎉ジャスト 5.0 達成！🎉\nボーナス 1000点 GET！\nダメージ 0 でクリア！", nextStage);
+                showGameMessage(T('msg_just_5'), nextStage);
             } else {
                 let dmg = floatSub(finalVal, 5.0);
                 gameState.hp = floatSub(gameState.hp, dmg);
                 if(gameState.hp <= 0) {
                     appState = 'GAMEOVER_WAIT';
-                    showGameMessage(`HPが0になりました。\n5.0を ${dmg.toFixed(1)} オーバーしました...`, () => {
+                    showGameMessage(T('msg_hp_zero', {dmg: dmg.toFixed(1)}), () => {
                         processGameOver();
                     });
                 } else {
-                    showGameMessage(`🚩ステージクリア！🚩\n5.0を ${dmg.toFixed(1)} オーバーしたため、\nHPが ${dmg.toFixed(1)} 減りました。`, nextStage);
+                    showGameMessage(T('msg_stage_clear', {dmg: dmg.toFixed(1)}), nextStage);
                 }
             }
         }
@@ -1054,8 +1291,8 @@
         
         gameState.score = totalScore;
         saveScore(true);
-        
-        showResultScreen('ゲームクリア！', '#4CAF50', gameState.score - snackBonus - hpBonus, snackBonus, hpBonus, totalScore);
+
+        showResultScreen(T('result_clear_title'), '#4CAF50', gameState.score - snackBonus - hpBonus, snackBonus, hpBonus, totalScore);
     }
 
     function processGameOver() {
@@ -1067,25 +1304,26 @@
         
         gameState.score = totalScore;
         saveScore(false);
-        
-        showResultScreen('ゲームオーバー', '#D32F2F', gameState.score - snackBonus - hpBonus, snackBonus, hpBonus, totalScore);
+
+        showResultScreen(T('result_over_title'), '#D32F2F', gameState.score - snackBonus - hpBonus, snackBonus, hpBonus, totalScore);
     }
 
     function showResultScreen(title, color, baseScore, snackBonus, hpBonus, totalScore) {
         document.querySelectorAll('.ui-layer').forEach(el => el.classList.add('hidden'));
         const resScreen = document.getElementById('screen-result');
         resScreen.classList.remove('hidden');
-        
+
         const titleEl = document.getElementById('result-title');
         titleEl.innerText = title;
         titleEl.style.color = color;
-        
+
         const details = document.getElementById('result-details');
+        const pts = T('pts_suffix');
         details.innerHTML = `
-            <div style="display:flex; justify-content:space-between; margin-bottom: 15px;"><span>スコア:</span> <span>${baseScore} 点</span></div>
-            <div style="display:flex; justify-content:space-between; margin-bottom: 15px;"><span>おかしボーナス:</span> <span>${snackBonus} 点</span></div>
-            <div style="display:flex; justify-content:space-between; margin-bottom: 15px; border-bottom: 3px dashed #BCAAA4; padding-bottom: 15px;"><span>のこりHPボーナス:</span> <span>${hpBonus} 点</span></div>
-            <div style="display:flex; justify-content:space-between; font-size: 38px; color: #E65100; margin-top: 15px;"><span>総合スコア:</span> <span>${totalScore} 点</span></div>
+            <div style="display:flex; justify-content:space-between; margin-bottom: 15px;"><span>${T('label_score_colon')}</span> <span>${baseScore} ${pts}</span></div>
+            <div style="display:flex; justify-content:space-between; margin-bottom: 15px;"><span>${T('label_snack_bonus')}</span> <span>${snackBonus} ${pts}</span></div>
+            <div style="display:flex; justify-content:space-between; margin-bottom: 15px; border-bottom: 3px dashed #BCAAA4; padding-bottom: 15px;"><span>${T('label_hp_bonus')}</span> <span>${hpBonus} ${pts}</span></div>
+            <div style="display:flex; justify-content:space-between; font-size: 38px; color: #E65100; margin-top: 15px;"><span>${T('label_total_score')}</span> <span>${totalScore} ${pts}</span></div>
         `;
     }
 
@@ -1114,18 +1352,18 @@
         ctx.fillStyle = '#5D4037';
         ctx.textAlign = 'center';
         ctx.font = `bold 22px ${FONT_FAMILY}`;
-        ctx.fillText('あそびかた', HOWTO_BTN.x + HOWTO_BTN.w/2, HOWTO_BTN.y + 32);
+        ctx.fillText(T('btn_howto'), HOWTO_BTN.x + HOWTO_BTN.w/2, HOWTO_BTN.y + 32);
 
         drawRoundedRect(ctx, TITLE_BTN.x, TITLE_BTN.y, TITLE_BTN.w, TITLE_BTN.h, 20, '#E0E0E0', '#BDBDBD');
         ctx.fillStyle = '#5D4037';
-        ctx.fillText('タイトルへ', TITLE_BTN.x + TITLE_BTN.w/2, TITLE_BTN.y + 32);
+        ctx.fillText(T('btn_to_title'), TITLE_BTN.x + TITLE_BTN.w/2, TITLE_BTN.y + 32);
 
         // --- Top Center (HP Bar) ---
         drawRoundedRect(ctx, 340, 15, 600, 60, 20, '#FFFFFF', '#BCAAA4');
         ctx.fillStyle = '#5D4037';
         ctx.textAlign = 'left';
         ctx.font = `bold 32px ${FONT_FAMILY}`;
-        ctx.fillText('HP :', 370, 55);
+        ctx.fillText(T('label_hp_colon'), 370, 55);
         
         let hpW = 400, hpH = 30;
         drawRoundedRect(ctx, 450, 30, hpW, hpH, 15, '#EEEEEE', '#BCAAA4');
@@ -1242,7 +1480,7 @@
         
         ctx.fillStyle = '#5D4037';
         ctx.font = `bold 20px ${FONT_FAMILY}`;
-        ctx.fillText('いまのすうじ', 640, cardY - 10);
+        ctx.fillText(T('label_current_number'), 640, cardY - 10);
 
         drawRoundedRect(ctx, cardX, cardY, cardW, cardH, 20, '#FFFFFF', '#FFCC80');
         ctx.fillStyle = '#E65100';
@@ -1256,13 +1494,13 @@
         let labelX = 200, valX = 290;
         
         ctx.textAlign = 'right';
-        ctx.fillStyle = '#5D4037'; ctx.fillText('ステージ :', labelX, 460);
+        ctx.fillStyle = '#5D4037'; ctx.fillText(T('label_stage_colon'), labelX, 460);
         ctx.fillText(`${gameState.stage} / ${gameState.maxStage}`, valX, 460);
-        
-        ctx.fillStyle = '#5D4037'; ctx.fillText('スコア :', labelX, 510);
+
+        ctx.fillStyle = '#5D4037'; ctx.fillText(T('label_score_colon2'), labelX, 510);
         ctx.fillStyle = '#1976D2'; ctx.fillText(`${gameState.score}`, valX, 510);
-        
-        ctx.fillStyle = '#5D4037'; ctx.fillText('ダイヤ💎 :', labelX, 560);
+
+        ctx.fillStyle = '#5D4037'; ctx.fillText(T('label_gems_colon'), labelX, 560);
         ctx.fillStyle = '#00838F'; ctx.fillText(`${gameState.gems}`, valX, 560);
 
         let btnColor = gameState.gems > 0 ? '#FFF59D' : '#E0E0E0';
@@ -1270,7 +1508,7 @@
         ctx.fillStyle = gameState.gems > 0 ? '#5D4037' : '#9E9E9E';
         ctx.textAlign = 'center';
         ctx.font = `bold 28px ${FONT_FAMILY}`;
-        ctx.fillText('💎チェンジ', GEM_BTN.x + GEM_BTN.w/2, GEM_BTN.y + 40);
+        ctx.fillText(T('btn_gem_change'), GEM_BTN.x + GEM_BTN.w/2, GEM_BTN.y + 40);
 
         // --- Right Bottom (Snacks) ---
         drawRoundedRect(ctx, 950, 410, 300, 280, 20, '#FFFFFF', '#FFCC80');
@@ -1278,7 +1516,7 @@
         ctx.fillStyle = '#5D4037';
         ctx.textAlign = 'center';
         ctx.font = `bold 24px ${FONT_FAMILY}`;
-        ctx.fillText(`あつめたおかし （${gameState.snacksCollected.length}/12）`, 1100, 440);
+        ctx.fillText(T('label_snacks_collected', {n: gameState.snacksCollected.length}), 1100, 440);
         
         ctx.font = `46px ${FONT_FAMILY}`;
         ALL_SNACKS.forEach((snack, i) => {
@@ -1318,7 +1556,7 @@
             });
             ctx.font = `bold 22px ${FONT_FAMILY}`;
             ctx.fillStyle = '#8D6E63';
-            ctx.fillText('▼ 画面をタップするかキーを押して次へ', mX + mW/2, mY + mH - 24);
+            ctx.fillText(T('hint_tap_next'), mX + mW/2, mY + mH - 24);
         }
 
         // How To Play Overlay
@@ -1332,30 +1570,17 @@
             ctx.fillStyle = '#5D4037';
             ctx.textAlign = 'center';
             ctx.font = `bold 38px ${FONT_FAMILY}`;
-            ctx.fillText('あそびかた', pX + pW/2, pY + 60);
+            ctx.fillText(T('btn_howto'), pX + pW/2, pY + 60);
 
             ctx.font = `bold 24px ${FONT_FAMILY}`;
             ctx.textAlign = 'left';
-            const rules = [
-                "① 手札のカードを場の数値カードに重ねよう。",
-                "② カードの数字だけ数直線のバーがグーっと伸びるよ。",
-                "③ 5.0 を超えるとクリアだけど、超えた分HPが減るよ！",
-                "④ 1.0, 2.0, 3.0, 4.0, 5.0 でぴったりとまるとボーナスポイント！",
-                "⑤ イベントマスに止まると敵や宝が出るよ。",
-                "⑥ 全７ステージをHPが０になる前にクリアしよう！",
-                "（アドバイス）",
-                "・敵👾🐲にとまると手札が封印されるよ。",
-                "・財宝🪙💰にとまるとスコアがアップするよ。",
-                "・とったダイヤ💎をつかうと、手札や場をチェンジできるよ。",
-                "・ジョーカー🃏は好きな数字を選べるよ。",
-                "・おかしはたくさん集めるほど最後にスコアが高くなるよ！"
-            ];
+            const rules = T('howto_rules');
             rules.forEach((r, i) => ctx.fillText(r, pX + 40, pY + 115 + i * 35));
 
             ctx.textAlign = 'center';
             ctx.fillStyle = '#D32F2F';
             ctx.font = `bold 26px ${FONT_FAMILY}`;
-            ctx.fillText('▼ 画面のどこかをタップして閉じる', pX + pW/2, pY + pH - 25);
+            ctx.fillText(T('hint_tap_close'), pX + pW/2, pY + pH - 25);
         }
     }
 
@@ -1397,8 +1622,8 @@
             drawRoundedRect(ctx, c.x, c.y, cw, ch, 15, 'rgba(0,0,0,0.4)', null);
             ctx.fillStyle = '#FFF';
             ctx.font = `bold 24px ${FONT_FAMILY}`;
-            ctx.fillText('封印', c.x + cw/2, c.y + ch/2 - 10);
-            ctx.fillText(`あと${c.sealedTurns}`, c.x + cw/2, c.y + ch/2 + 25);
+            ctx.fillText(T('label_sealed'), c.x + cw/2, c.y + ch/2 - 10);
+            ctx.fillText(T('label_turns_left', {n: c.sealedTurns}), c.x + cw/2, c.y + ch/2 + 25);
         }
 
         ctx.restore();
@@ -1556,6 +1781,7 @@
     }
 
     updateCurrentPlayerDisplay();
+    applyLanguage();
 
 </script>
 </body>
