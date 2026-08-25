@@ -21,7 +21,7 @@
     window.saveOnlineScore = async (uid, name, score, difficulty) => {
         if((score||0)<=0) return;
         try {
-            const res = await fetch(`${_b}/rankings`,{method:'POST',headers:_h,
+            const res = await fetch(`${_b}/rankings`,{method:'POST',headers:_h,keepalive:true,
                 body:JSON.stringify({game:'math_braves_fraction',difficulty:difficulty||'normal',player_name:name||'ゲスト',point_score:Math.round(score)||0})});
             if(!res.ok){const t=await res.text();throw new Error(`HTTP ${res.status}: ${t}`);}
         } catch(e){console.error('Ranking save error:',e);}
@@ -32,7 +32,7 @@
             const res = await fetch(`${_b}/rankings?${q}`,{headers:_rh});
             if(!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
-            return data.map(r=>({uid:'',name:r.player_name,score:r.point_score,date:r.created_at?new Date(r.created_at).toLocaleDateString('ja-JP'):''}));
+            return data.map(r=>{let d='';if(r.created_at){const dt=new Date(r.created_at);d=`${dt.getFullYear()}/${dt.getMonth()+1}/${dt.getDate()}`;}return {uid:'',name:r.player_name,score:r.point_score,date:d};});
         } catch(e){console.error('Ranking load error:',e);return [];}
     };
 })();
@@ -154,6 +154,9 @@
 
         .hidden { display: none !important; }
         .invisible { visibility: hidden; }
+        .lang-btn { opacity: 0.6; }
+        .lang-btn.active { opacity: 1; outline: 3px solid #f39c12; }
+        .rank-date { font-size: 0.75rem; color: #95a5a6; margin-left: 8px; flex-shrink: 0; }
 
         /* Game Elements */
         .ap-display-container {
@@ -308,7 +311,7 @@
         .frac-den { display: block; width: 100%; text-align: center; }
 
         /* Overlays: 全体を覆う色を暗い半透明にし、背景を見えやすく */
-        #result-overlay, #ranking-screen, #player-manager-overlay, #round-clear-overlay, #difficulty-overlay {
+        #result-overlay, #ranking-screen, #player-manager-overlay, #round-clear-overlay, #difficulty-overlay, #settings-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0, 0, 0, 0.4);
             display: flex; flex-direction: column; justify-content: center; align-items: center;
@@ -448,6 +451,19 @@
         
         .round-display { font-size: 2rem; font-weight: 800; color: #d35400; }
 
+        #custom-alert-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 300;
+        }
+        #custom-alert-box {
+            background: #ffffff; padding: 30px 40px; border-radius: 20px;
+            text-align: center; max-width: 400px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            color: #2d3436;
+        }
+        #custom-alert-msg { font-size: 1.1rem; margin-bottom: 20px; }
+
     </style>
 </head>
 <body>
@@ -464,18 +480,18 @@
 
 <div id="container">
     <div id="left-panel" class="hidden">
-        <h2>あそびかた</h2>
+        <h2 data-i18n="howto_title">あそびかた</h2>
         <div style="font-size: 0.95rem; line-height: 1.6;">
-            <p>1. <strong>カード</strong>を ケーキにのせて<br>数を たしていこう。</p>
-            <p>2. <strong>「1」をこえる</strong>と<br>のこりが つぎの 数になるよ。<br><span style="color:#c0392b; font-weight:bold; font-size:0.85rem;">(例: 5/4 は 1/4 になる)</span></p>
-            <p>3. <strong>3つの ケーキ</strong>の 大きさを<br>ぴったり そろえよう！</p>
-            <p>4. <strong>「1」</strong>の ケーキができると<br>コンボがつながるよ！</p>
-            <p>5. <strong>AP(スタミナ)</strong>が なくなると<br>ゲームオーバーだよ。</p>
-            <p>6. <strong>⭐(スター)</strong>つきの カードは<br>クリアしたときの 点数が<br>ふえるよ！(1こ +10点)</p>
-            <p>7. <strong>きほんてんの けいさん</strong>は<br>「⭐の数 × 10 ＋ ターゲットのてんすう」<br>だよ！</p>
+            <p data-i18n-html="howto_1">1. <strong>カード</strong>を ケーキにのせて<br>数を たしていこう。</p>
+            <p data-i18n-html="howto_2">2. <strong>「1」をこえる</strong>と<br>のこりが つぎの 数になるよ。<br><span style="color:#c0392b; font-weight:bold; font-size:0.85rem;">(例: 5/4 は 1/4 になる)</span></p>
+            <p data-i18n-html="howto_3">3. <strong>3つの ケーキ</strong>の 大きさを<br>ぴったり そろえよう！</p>
+            <p data-i18n-html="howto_4">4. <strong>「1」</strong>の ケーキができると<br>コンボがつながるよ！</p>
+            <p data-i18n-html="howto_5">5. <strong>AP(スタミナ)</strong>が なくなると<br>ゲームオーバーだよ。</p>
+            <p data-i18n-html="howto_6">6. <strong>⭐(スター)</strong>つきの カードは<br>クリアしたときの 点数が<br>ふえるよ！(1こ +10点)</p>
+            <p data-i18n-html="howto_7">7. <strong>きほんてんの けいさん</strong>は<br>「⭐の数 × 10 ＋ ターゲットのてんすう」<br>だよ！</p>
         </div>
         <div style="margin-top:auto; text-align:center;">
-            <button id="btn-to-title" class="btn btn-danger hidden">タイトルへ もどる</button>
+            <button id="btn-to-title" class="btn btn-danger hidden" data-i18n="btn_to_title">タイトルへ もどる</button>
         </div>
     </div>
 
@@ -485,52 +501,66 @@
         <div id="title-screen">
             <div class="title-container">
                 <h1 style="font-family: 'Dela Gothic One', sans-serif; font-size:3.5rem; color:#CD853F; text-shadow: 3px 3px 0 #fff, 4px 4px 0 #d35400; margin-bottom:10px; letter-spacing:2px; line-height: 1.2;">MATH BRAVES</h1>
-                <h2 style="border:none; color:#636e72;">- ぶんすう -</h2>
+                <h2 style="border:none; color:#636e72;" data-i18n="title_sub">- ぶんすう -</h2>
 
                 <div style="margin-bottom: 20px; background: rgba(0,0,0,0.05); padding: 10px 20px; border-radius: 20px; display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; box-sizing: border-box;">
-                    <span>プレーヤー:</span>
+                    <span data-i18n="label_player_title">プレーヤー:</span>
                     <span id="title-player-name" style="font-weight: bold; color: #d35400; font-size: 1.2rem;">ななしさん</span>
                 </div>
 
-                <button id="btn-start" class="btn btn-success title-btn">はじめる</button>
-                <button id="btn-player-select" class="btn title-btn" style="background-color: #85c1e9;">プレーヤー選択</button>
+                <button id="btn-start" class="btn btn-success title-btn" data-i18n="btn_start">はじめる</button>
+                <button id="btn-player-select" class="btn title-btn" style="background-color: #85c1e9;" data-i18n="btn_player_select">プレーヤー選択</button>
                 <button id="btn-login" class="btn btn-danger title-btn" style="display:none">Googleでログイン</button>
                 <button id="btn-logout" class="btn hidden title-btn" style="display:none">ログアウト</button>
-                <button id="btn-view-ranking" class="btn btn-warning title-btn">🏆 ランキング</button>
-                <button id="btn-index" class="btn title-btn" style="background-color: #d5dbdb; margin-bottom: 0;">🏠 INDEXへ</button>
-                
+                <button id="btn-view-ranking" class="btn btn-warning title-btn" data-i18n="btn_ranking">🏆 ランキング</button>
+                <button id="btn-open-settings" class="btn title-btn" style="background-color: #f5cba7;" data-i18n="btn_settings">⚙ 設定</button>
+                <button id="btn-index" class="btn title-btn" style="background-color: #d5dbdb; margin-bottom: 0;" data-i18n="btn_index">🏠 INDEXへ</button>
+
                 <div id="auth-status" style="font-size: 0.8rem; margin-top: 15px; color: #2d3436; font-weight:bold; display:none"></div>
+            </div>
+        </div>
+
+        <div id="settings-screen" class="hidden">
+            <div class="overlay-content" style="width: 380px;">
+                <h2 style="color: #d35400; border:none;" data-i18n="settings_title">⚙ 設定</h2>
+                <p style="font-size:0.9rem; color:#636e72; margin-bottom:16px;" data-i18n="settings_sub">言語 / Language</p>
+                <div style="display:flex; flex-direction:column; gap:10px;">
+                    <button id="lang-btn-simple" class="btn lang-btn" onclick="selectLanguage('simple')" data-i18n="lang_simple">かんたんなにほんご</button>
+                    <button id="lang-btn-ja"     class="btn lang-btn" onclick="selectLanguage('ja')"     data-i18n="lang_ja">日本語</button>
+                    <button id="lang-btn-en"     class="btn lang-btn" onclick="selectLanguage('en')"     data-i18n="lang_en">English</button>
+                </div>
+                <button id="btn-close-settings" class="btn" style="width: 200px; font-size: 1.2rem; margin-top:20px; background-color:#d5dbdb;" data-i18n="btn_close">とじる</button>
             </div>
         </div>
 
         <div id="difficulty-overlay" class="hidden">
             <div class="overlay-content">
-                <h2 style="color: #d35400; margin-bottom: 20px; border:none;">難易度を選択</h2>
+                <h2 style="color: #d35400; margin-bottom: 20px; border:none;" data-i18n="diff_prompt">難易度を選択</h2>
                 <div style="display: flex; gap: 20px; justify-content: center; margin-bottom: 20px;">
                     <div style="text-align:center;">
                         <div id="crown-easy" style="font-size:1.5rem; visibility:hidden;">👑</div>
-                        <button id="btn-easy" class="btn btn-success" style="width: 140px; padding:15px;">しょきゅう</button>
+                        <button id="btn-easy" class="btn btn-success" style="width: 140px; padding:15px;" data-i18n="diff_easy">しょきゅう</button>
                         <div id="clear-easy" style="font-size:0.9rem; color:#636e72;">0回クリア</div>
                     </div>
                     <div style="text-align:center;">
                         <div id="crown-normal" style="font-size:1.5rem; visibility:hidden;">👑</div>
-                        <button id="btn-normal" class="btn" style="width: 140px; padding:15px; background-color: #85c1e9;">ちゅうきゅう</button>
+                        <button id="btn-normal" class="btn" style="width: 140px; padding:15px; background-color: #85c1e9;" data-i18n="diff_normal">ちゅうきゅう</button>
                         <div id="clear-normal" style="font-size:0.9rem; color:#636e72;">0回クリア</div>
                     </div>
                     <div style="text-align:center;">
                         <div id="crown-hard" style="font-size:1.5rem; visibility:hidden;">👑</div>
-                        <button id="btn-hard" class="btn btn-danger" style="width: 140px; padding:15px;">じょうきゅう</button>
+                        <button id="btn-hard" class="btn btn-danger" style="width: 140px; padding:15px;" data-i18n="diff_hard">じょうきゅう</button>
                         <div id="clear-hard" style="font-size:0.9rem; color:#636e72;">0回クリア</div>
                     </div>
                 </div>
-                <button id="btn-close-diff" class="btn" style="background-color: #d5dbdb; padding: 10px 30px;">もどる</button>
+                <button id="btn-close-diff" class="btn" style="background-color: #d5dbdb; padding: 10px 30px;" data-i18n="btn_back">もどる</button>
             </div>
         </div>
 
         <div id="game-ui-layer" class="hidden" style="width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center;">
             
             <div class="ap-display-container">
-                <span class="ap-label">のこりAP</span>
+                <span class="ap-label" data-i18n="label_ap">のこりAP</span>
                 <span id="disp-ap" class="ap-value">10</span>
             </div>
 
@@ -540,7 +570,7 @@
                     <span id="disp-round-coins" class="stat-val coin-val">0</span>
                 </div>
                 <div class="stat-box" style="margin-left:auto; margin-right: 20px;">
-                    <span class="stat-label">コンボ</span>
+                    <span class="stat-label" data-i18n="label_combo">コンボ</span>
                     <span id="disp-combo" class="stat-val combo-val-blue">0</span>
                 </div>
             </div>
@@ -566,8 +596,8 @@
                 <div id="hand-cards" class="cards-container"></div>
                 <div style="border-left: 2px solid #b2bec3; height: 80px; margin: 0 10px;"></div>
                 <button id="btn-change-hand" class="btn btn-change">
-                    <span>チェンジ</span>
-                    <span style="font-size:0.8rem;">(AP -1)</span>
+                    <span data-i18n="btn_change_hand">チェンジ</span>
+                    <span style="font-size:0.8rem;" data-i18n="btn_change_hand_sub">(AP -1)</span>
                 </button>
             </div>
         </div>
@@ -578,16 +608,16 @@
                 
                 <div id="result-calc-container" style="font-size: 1.2rem; margin: 0 auto 20px auto; width: 100%; max-width: 400px; background: rgba(0,0,0,0.05); padding: 20px; border-radius: 15px; box-sizing: border-box;">
                     <div style="display:flex; justify-content:space-between;">
-                        <span>累計スコア</span>
+                        <span data-i18n="label_base_score">累計スコア</span>
                         <span id="res-base-score" style="font-weight:bold;">0</span>
                     </div>
                     <div style="display:flex; justify-content:space-between; color:#e67e22;">
-                        <span>のこりAPボーナス</span>
+                        <span data-i18n="label_ap_bonus">のこりAPボーナス</span>
                         <span>+ <span id="res-ap-bonus" style="font-weight:bold;">0</span></span>
                     </div>
                     <div style="border-bottom: 2px solid #bdc3c7; margin: 10px 0;"></div>
                     <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <span style="font-weight:bold;">最終スコア</span>
+                        <span style="font-weight:bold;" data-i18n="label_final_score">最終スコア</span>
                         <span id="result-score" style="font-size: 2.2rem; font-weight: bold; color: #2ecc71;">0</span>
                     </div>
                 </div>
@@ -602,41 +632,41 @@
                 <h2 style="color:#d35400; border:none;">ROUND CLEAR!</h2>
                 <div style="font-size:1.2rem; margin:20px 0;">
                     <div style="display:flex; justify-content:center; align-items:center; gap:10px;">
-                        <span style="color:#e67e22;">(きそてん)</span>
+                        <span style="color:#e67e22;" data-i18n="label_base_pts">(きそてん)</span>
                         <span>×</span>
-                        <span style="color:#3498db;">(コンボ倍率)</span>
+                        <span style="color:#3498db;" data-i18n="label_combo_rate">(コンボ倍率)</span>
                         <span>＝</span>
-                        <span style="color:#2ecc71;">(獲得)</span>
+                        <span style="color:#2ecc71;" data-i18n="label_gained">(獲得)</span>
                     </div>
                     <div style="font-size:2rem; font-weight:bold; margin-top:10px;">
                         <span id="rc-base">100</span> × <span id="rc-rate">1.5</span> ＝ <span id="rc-total" style="color:#d35400;">150</span>
                     </div>
                 </div>
-                <button id="btn-round-next" class="btn btn-success" style="font-size:1.2rem; padding:10px 40px;">次へ</button>
+                <button id="btn-round-next" class="btn btn-success" style="font-size:1.2rem; padding:10px 40px;" data-i18n="btn_next">次へ</button>
             </div>
         </div>
 
         <div id="player-manager-overlay" class="hidden">
             <div class="overlay-content" style="width: 400px;">
-                <h2 style="color: #d35400; border:none;">プレーヤー選択</h2>
+                <h2 style="color: #d35400; border:none;" data-i18n="pm_title">プレーヤー選択</h2>
                 <div style="display:flex; gap:10px; justify-content:center; margin:20px 0;">
-                    <input type="text" id="input-new-player" placeholder="なまえ(ひらがな)" style="padding:8px; font-size:1rem; border-radius:8px; border:1px solid #ccc; width:180px;">
-                    <button id="btn-add-player" class="btn btn-success">追加</button>
+                    <input type="text" id="input-new-player" placeholder="なまえ(ひらがな)" data-i18n-placeholder="pm_placeholder" style="padding:8px; font-size:1rem; border-radius:8px; border:1px solid #ccc; width:180px;">
+                    <button id="btn-add-player" class="btn btn-success" data-i18n="btn_add">追加</button>
                 </div>
                 <ul id="player-list-ul" style="list-style:none; padding:0; margin:0; max-height:200px; overflow-y:auto; text-align:left;"></ul>
-                <button id="btn-close-player" class="btn" style="margin-top:20px; background-color:#d5dbdb;">閉じる</button>
+                <button id="btn-close-player" class="btn" style="margin-top:20px; background-color:#d5dbdb;" data-i18n="btn_close">閉じる</button>
             </div>
         </div>
 
         <div id="ranking-screen" class="hidden">
             <div class="overlay-content">
-                <h2 style="color:#d35400; border:none; margin-bottom: 20px;">ランキング</h2>
+                <h2 style="color:#d35400; border:none; margin-bottom: 20px;" data-i18n="rank_title">ランキング</h2>
                 <div style="display:flex; justify-content:center; gap:10px; margin-bottom:20px;">
-                    <button id="btn-rank-local" class="btn btn-warning">ローカル</button>
-                    <button id="btn-rank-world" class="btn btn-change">オンライン</button>
+                    <button id="btn-rank-world" class="btn btn-change" data-i18n="rank_tab_world">オンライン</button>
+                    <button id="btn-rank-local" class="btn btn-warning" data-i18n="rank_tab_local">ローカル</button>
                 </div>
                 <div id="ranking-lists"></div>
-                <button id="btn-close-ranking" class="btn" style="margin-top:20px; background-color:#d5dbdb; padding: 10px 30px;">閉じる</button>
+                <button id="btn-close-ranking" class="btn" style="margin-top:20px; background-color:#d5dbdb; padding: 10px 30px;" data-i18n="btn_close">閉じる</button>
             </div>
         </div>
     </div>
@@ -644,20 +674,20 @@
     <div id="right-panel" class="hidden">
         <div id="right-panel-content" class="invisible">
             <div class="info-item">
-                <div class="info-label">プレーヤー</div>
+                <div class="info-label" data-i18n="label_player">プレーヤー</div>
                 <div class="info-value" id="disp-player-name" style="font-size:1.2rem;"></div>
             </div>
-            
+
             <div class="info-item">
-                <div class="info-label">ラウンド</div>
+                <div class="info-label" data-i18n="label_round">ラウンド</div>
                 <div class="info-value"><span id="disp-round" class="round-display">1</span><span style="font-size:1.2rem; color:#d35400;"> / 10</span></div>
             </div>
-            
+
             <div class="info-item">
                 <div class="info-label">
-                    ターゲット<br>
+                    <span data-i18n="label_target">ターゲット</span><br>
                     <span id="disp-target-type" style="font-weight:bold; color:#e67e22; font-size:0.9rem;">チャンス</span><br>
-                    (<span id="disp-target-pts">200</span>点)
+                    (<span id="disp-target-pts">200</span><span data-i18n="pts_suffix">点</span>)
                 </div>
                 <div class="target-container">
                     <div id="target-svg-container"></div>
@@ -666,9 +696,16 @@
             </div>
 
             <div class="info-item">
-                <div class="info-label">スコア</div>
+                <div class="info-label" data-i18n="label_score">スコア</div>
                 <div id="disp-score" class="info-value">0</div>
             </div>
+        </div>
+    </div>
+
+    <div id="custom-alert-overlay" class="hidden">
+        <div id="custom-alert-box">
+            <div id="custom-alert-msg"></div>
+            <button id="btn-custom-alert-ok" class="btn btn-success" style="padding: 8px 30px;">OK</button>
         </div>
     </div>
 </div>
@@ -679,6 +716,117 @@
 </script>
 
 <script>
+// ============================================================
+//  I18N（かんたんなにほんご／日本語／English）
+// ============================================================
+const STRINGS = {
+    ja: {
+        howto_title: 'あそびかた',
+        howto_1: '1. <strong>カード</strong>を ケーキにのせて<br>数を たしていこう。',
+        howto_2: '2. <strong>「1」をこえる</strong>と<br>のこりが つぎの 数になるよ。<br><span style="color:#c0392b; font-weight:bold; font-size:0.85rem;">(例: 5/4 は 1/4 になる)</span>',
+        howto_3: '3. <strong>3つの ケーキ</strong>の 大きさを<br>ぴったり そろえよう！',
+        howto_4: '4. <strong>「1」</strong>の ケーキができると<br>コンボがつながるよ！',
+        howto_5: '5. <strong>AP(スタミナ)</strong>が なくなると<br>ゲームオーバーだよ。',
+        howto_6: '6. <strong>⭐(スター)</strong>つきの カードは<br>クリアしたときの 点数が<br>ふえるよ！(1こ +10点)',
+        howto_7: '7. <strong>きほんてんの けいさん</strong>は<br>「⭐の数 × 10 ＋ ターゲットのてんすう」<br>だよ！',
+        btn_to_title: 'タイトルへ もどる',
+        title_sub: '- ぶんすう -', label_player_title: 'プレーヤー:',
+        btn_start: 'はじめる', btn_player_select: 'プレーヤー選択', btn_ranking: '🏆 ランキング', btn_settings: '⚙ 設定', btn_index: '🏠 INDEXへ',
+        settings_title: '⚙ 設定', settings_sub: '言語 / Language', lang_simple: 'かんたんなにほんご', lang_ja: '日本語', lang_en: 'English',
+        diff_prompt: '難易度を選択', diff_easy: 'しょきゅう', diff_normal: 'ちゅうきゅう', diff_hard: 'じょうきゅう',
+        clear_count: '{n}回クリア', btn_back: 'もどる',
+        label_ap: 'のこりAP', label_combo: 'コンボ', btn_change_hand: 'チェンジ', btn_change_hand_sub: '(AP -1)',
+        result_clear_title: 'GAME CLEAR!', result_over_title: 'GAME OVER',
+        label_base_score: '累計スコア', label_ap_bonus: 'のこりAPボーナス', label_final_score: '最終スコア', new_record: '自己ベスト更新！',
+        label_base_pts: '(きそてん)', label_combo_rate: '(コンボ倍率)', label_gained: '(獲得)', btn_next: '次へ',
+        pm_title: 'プレーヤー選択', pm_placeholder: 'なまえ(ひらがな)', btn_add: '追加', btn_close: '閉じる',
+        pm_select_btn: '選択',
+        rank_title: 'ランキング', rank_tab_local: 'ローカル', rank_tab_world: 'オンライン', rank_loading: '読み込み中...', rank_empty: '記録なし',
+        label_player: 'プレーヤー', label_round: 'ラウンド', label_target: 'ターゲット', pts_suffix: '点', label_score: 'スコア',
+        target_chance: 'チャンス', target_supergood: 'スーパービッグチャンス', target_big: 'ビッグチャンス', target_good: 'グッドチャンス',
+        particle_ap_gain: 'AP +{n}', particle_combo: '{n} コンボ！', particle_coins: '+{n}⭐', particle_target_bonus: 'ターゲットボーナス！',
+        alert_ng_word: 'その名前は使えません', alert_max_players: '登録は5人まで',
+    },
+    simple: {
+        howto_title: 'あそびかた',
+        howto_1: '1. <strong>カード</strong>を ケーキに のせて<br>かずを たしていこう。',
+        howto_2: '2. <strong>「1」を こえる</strong>と<br>のこりが つぎの かずに なるよ。<br><span style="color:#c0392b; font-weight:bold; font-size:0.85rem;">(れい: 5/4 は 1/4に なる)</span>',
+        howto_3: '3. <strong>3つの ケーキ</strong>の おおきさを<br>ぴったり そろえよう！',
+        howto_4: '4. <strong>「1」</strong>の ケーキが できると<br>コンボが つながるよ！',
+        howto_5: '5. <strong>AP(スタミナ)</strong>が なくなると<br>ゲームオーバーだよ。',
+        howto_6: '6. <strong>⭐(スター)</strong>つきの カードは<br>クリアしたときの てんすうが<br>ふえるよ！(1こ +10てん)',
+        howto_7: '7. <strong>きほんてんの けいさん</strong>は<br>「⭐の かず × 10 ＋ ターゲットの てんすう」<br>だよ！',
+        btn_to_title: 'タイトルへ もどる',
+        title_sub: '- ぶんすう -', label_player_title: 'プレーヤー:',
+        btn_start: 'はじめる', btn_player_select: 'プレーヤーせんたく', btn_ranking: '🏆 ランキング', btn_settings: '⚙ せってい', btn_index: '🏠 INDEXへ',
+        settings_title: '⚙ せってい', settings_sub: '言語 / Language', lang_simple: 'かんたんなにほんご', lang_ja: '日本語', lang_en: 'English',
+        diff_prompt: 'なんいどを せんたく', diff_easy: 'しょきゅう', diff_normal: 'ちゅうきゅう', diff_hard: 'じょうきゅう',
+        clear_count: '{n}かい クリア', btn_back: 'もどる',
+        label_ap: 'のこりAP', label_combo: 'コンボ', btn_change_hand: 'チェンジ', btn_change_hand_sub: '(AP -1)',
+        result_clear_title: 'GAME CLEAR!', result_over_title: 'GAME OVER',
+        label_base_score: 'るいけいスコア', label_ap_bonus: 'のこりAPボーナス', label_final_score: 'さいしゅうスコア', new_record: 'じこベストこうしん！',
+        label_base_pts: '(きそてん)', label_combo_rate: '(コンボばいりつ)', label_gained: '(かくとく)', btn_next: 'つぎへ',
+        pm_title: 'プレーヤーせんたく', pm_placeholder: 'なまえ(ひらがな)', btn_add: 'ついか', btn_close: 'とじる',
+        pm_select_btn: 'せんたく',
+        rank_title: 'ランキング', rank_tab_local: 'ローカル', rank_tab_world: 'オンライン', rank_loading: 'よみこみちゅう...', rank_empty: 'きろくなし',
+        label_player: 'プレーヤー', label_round: 'ラウンド', label_target: 'ターゲット', pts_suffix: 'てん', label_score: 'スコア',
+        target_chance: 'チャンス', target_supergood: 'スーパービッグチャンス', target_big: 'ビッグチャンス', target_good: 'グッドチャンス',
+        particle_ap_gain: 'AP +{n}', particle_combo: '{n} コンボ！', particle_coins: '+{n}⭐', particle_target_bonus: 'ターゲットボーナス！',
+        alert_ng_word: 'そのなまえは つかえません', alert_max_players: 'とうろくは 5にんまで',
+    },
+    en: {
+        howto_title: 'How to Play',
+        howto_1: '1. Put a <strong>card</strong> onto a cake<br>to add its number.',
+        howto_2: '2. If it goes <strong>over "1"</strong>,<br>the leftover becomes the next number.<br><span style="color:#c0392b; font-weight:bold; font-size:0.85rem;">(e.g. 5/4 becomes 1/4)</span>',
+        howto_3: '3. Match the size of<br><strong>all 3 cakes</strong> exactly!',
+        howto_4: '4. Making a <strong>"1"</strong> cake<br>keeps your combo going!',
+        howto_5: '5. Running out of <strong>AP (Stamina)</strong><br>ends the game.',
+        howto_6: '6. <strong>⭐ (star)</strong> cards give<br>bonus points when you clear<br>(+10pt each)!',
+        howto_7: '7. <strong>Base score</strong> is<br>"Stars × 10 + Target points"!',
+        btn_to_title: 'Back to Title',
+        title_sub: '- Fractions -', label_player_title: 'Player:',
+        btn_start: 'Start', btn_player_select: 'Select Player', btn_ranking: '🏆 Ranking', btn_settings: '⚙ Settings', btn_index: '🏠 To INDEX',
+        settings_title: '⚙ Settings', settings_sub: '言語 / Language', lang_simple: 'かんたんなにほんご', lang_ja: '日本語', lang_en: 'English',
+        diff_prompt: 'Choose a Difficulty', diff_easy: 'Easy', diff_normal: 'Normal', diff_hard: 'Hard',
+        clear_count: '{n} clears', btn_back: 'Back',
+        label_ap: 'AP Left', label_combo: 'Combo', btn_change_hand: 'Change', btn_change_hand_sub: '(AP -1)',
+        result_clear_title: 'GAME CLEAR!', result_over_title: 'GAME OVER',
+        label_base_score: 'Total Score', label_ap_bonus: 'AP Bonus', label_final_score: 'Final Score', new_record: 'New Best Score!',
+        label_base_pts: '(Base Pts)', label_combo_rate: '(Combo Rate)', label_gained: '(Gained)', btn_next: 'Next',
+        pm_title: 'Select Player', pm_placeholder: 'Name (Hiragana)', btn_add: 'Add', btn_close: 'Close',
+        pm_select_btn: 'Select',
+        rank_title: 'Ranking', rank_tab_local: 'Local', rank_tab_world: 'Online', rank_loading: 'Loading...', rank_empty: 'No records',
+        label_player: 'Player', label_round: 'Round', label_target: 'Target', pts_suffix: 'pt', label_score: 'Score',
+        target_chance: 'Chance', target_supergood: 'Super Big Chance', target_big: 'Big Chance', target_good: 'Good Chance',
+        particle_ap_gain: 'AP +{n}', particle_combo: '{n} Combo!', particle_coins: '+{n}⭐', particle_target_bonus: 'Target Bonus!',
+        alert_ng_word: 'That name cannot be used', alert_max_players: 'You can register up to 5 players',
+    },
+};
+let currentLang = localStorage.getItem('mb_frac_lang') || 'ja';
+function T(key, params) {
+    const dict = STRINGS[currentLang] || STRINGS.ja;
+    let str = dict[key] !== undefined ? dict[key] : (STRINGS.ja[key] || key);
+    if (params) { Object.keys(params).forEach(k => { str = str.split(`{${k}}`).join(params[k]); }); }
+    return str;
+}
+function applyLanguage() {
+    document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = T(el.getAttribute('data-i18n')); });
+    document.querySelectorAll('[data-i18n-html]').forEach(el => { el.innerHTML = T(el.getAttribute('data-i18n-html')); });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { el.setAttribute('placeholder', T(el.getAttribute('data-i18n-placeholder'))); });
+    ['simple', 'ja', 'en'].forEach(l => {
+        const btn = document.getElementById('lang-btn-' + l);
+        if (btn) btn.classList.toggle('active', l === currentLang);
+    });
+    if (typeof updateTitleStats === 'function') updateTitleStats();
+}
+function selectLanguage(lang) {
+    currentLang = lang;
+    localStorage.setItem('mb_frac_lang', lang);
+    applyLanguage();
+}
+function openSettings() { document.getElementById('settings-screen').classList.remove('hidden'); }
+function closeSettings() { document.getElementById('settings-screen').classList.add('hidden'); }
+
 const UNIT_MAX = 24;
 const CONFIG = {
     EASY: {
@@ -737,11 +885,17 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-add-player').onclick = addPlayer;
     document.getElementById('btn-close-player').onclick = () => document.getElementById('player-manager-overlay').classList.add('hidden');
     
-    document.getElementById('btn-view-ranking').onclick = () => showRanking('LOCAL');
+    document.getElementById('btn-view-ranking').onclick = () => showRanking('WORLD');
     document.getElementById('btn-rank-local').onclick = () => showRanking('LOCAL');
     document.getElementById('btn-rank-world').onclick = () => showRanking('WORLD');
     document.getElementById('btn-close-ranking').onclick = () => document.getElementById('ranking-screen').classList.add('hidden');
     document.getElementById('btn-index').onclick = () => window.location.href = "../index.html";
+
+    document.getElementById('btn-open-settings').onclick = () => openSettings();
+    document.getElementById('btn-close-settings').onclick = () => closeSettings();
+    document.getElementById('btn-custom-alert-ok').onclick = () => document.getElementById('custom-alert-overlay').classList.add('hidden');
+
+    applyLanguage();
 
     if(document.getElementById('btn-login')) document.getElementById('btn-login').onclick = () => window.handleLogin && window.handleLogin();
     if(document.getElementById('btn-logout')) document.getElementById('btn-logout').onclick = () => window.handleLogout && window.handleLogout();
@@ -752,6 +906,11 @@ document.addEventListener('DOMContentLoaded', () => {
     initEffectCanvas();
     loopEffect();
 });
+
+function showCustomAlert(msg) {
+    document.getElementById('custom-alert-msg').textContent = msg;
+    document.getElementById('custom-alert-overlay').classList.remove('hidden');
+}
 
 function resize() {
     const container = document.getElementById('container');
@@ -865,30 +1024,30 @@ function nextRound(isFirst = false) {
     window.game.targetValue = types[Math.floor(Math.random() * types.length)];
 
     let tScore = 200;
-    let tLabel = "チャンス";
+    let tLabel = T('target_chance');
     let tColor = "#2d3436";
 
     if (window.game.round === 1) {
         tScore = 200;
-        tLabel = "チャンス";
+        tLabel = T('target_chance');
         tColor = "#2d3436";
     } else {
         const rndScore = Math.random();
-        if (rndScore < 0.05) { 
+        if (rndScore < 0.05) {
             tScore = 500;
-            tLabel = "スーパービッグチャンス";
+            tLabel = T('target_supergood');
             tColor = "#e056fd";
-        } else if (rndScore < 0.15) { 
+        } else if (rndScore < 0.15) {
             tScore = 400;
-            tLabel = "ビッグチャンス";
+            tLabel = T('target_big');
             tColor = "#e74c3c";
-        } else if (rndScore < 0.30) { 
+        } else if (rndScore < 0.30) {
             tScore = 300;
-            tLabel = "グッドチャンス";
-            tColor = "#f1c40f"; 
-        } else { 
+            tLabel = T('target_good');
+            tColor = "#f1c40f";
+        } else {
             tScore = 200;
-            tLabel = "チャンス";
+            tLabel = T('target_chance');
             tColor = "#2d3436";
         }
     }
@@ -1020,7 +1179,7 @@ function roundClear() {
 
     spawnConfetti();
     document.querySelectorAll('.cake-wrapper').forEach(el => el.classList.add('matched'));
-    if (isTarget) spawnTextParticle(640, 200, "ターゲットボーナス！", "#f1c40f", 60);
+    if (isTarget) spawnTextParticle(640, 200, T('particle_target_bonus'), "#f1c40f", 60);
     
     setTimeout(() => {
         const overlay = document.getElementById('round-clear-overlay');
@@ -1043,7 +1202,7 @@ function roundClear() {
 
 function gainAp(amount) {
     window.game.ap += amount;
-    spawnTextParticle(640, 360, `AP +${amount}`, "#e67e22", 70);
+    spawnTextParticle(640, 360, T('particle_ap_gain', {n: amount}), "#e67e22", 70);
     updateHUD();
 }
 
@@ -1055,19 +1214,19 @@ function finishGame(isClear) {
     
     const titleEl = document.querySelector('#result-overlay h2');
     if(isClear) {
-        titleEl.textContent = "GAME CLEAR!";
+        titleEl.textContent = T('result_clear_title');
         titleEl.style.color = "#f1c40f";
     } else {
-        titleEl.textContent = "GAME OVER";
+        titleEl.textContent = T('result_over_title');
         titleEl.style.color = "#95a5a6";
     }
-    
+
     document.getElementById('res-base-score').textContent = currentScore;
     document.getElementById('res-ap-bonus').textContent = apBonus;
     document.getElementById('result-score').textContent = finalScore;
-    
+
     const isNew = saveScore(window.game.config.id, finalScore);
-    document.getElementById('new-record-msg').textContent = isNew ? "自己ベスト更新！" : "";
+    document.getElementById('new-record-msg').textContent = isNew ? T('new_record') : "";
 
     document.getElementById('result-overlay').classList.remove('hidden');
 }
@@ -1197,7 +1356,7 @@ function applyCardToCake(cakeIdx, cardData) {
     window.game.cakes[cakeIdx] = next;
     
     window.game.roundCoins += cardData.coinCount;
-    spawnTextParticle(640, 400, `+${cardData.coinCount}⭐`, "#f1c40f", 30);
+    spawnTextParticle(640, 400, T('particle_coins', {n: cardData.coinCount}), "#f1c40f", 30);
 
     updateCakes();
     
@@ -1206,7 +1365,7 @@ function applyCardToCake(cakeIdx, cardData) {
     
     if (justOne) {
         window.game.combo++;
-        spawnTextParticle(r.left + r.width/2, r.top, `${window.game.combo} コンボ！`, "#e74c3c", 50);
+        spawnTextParticle(r.left + r.width/2, r.top, T('particle_combo', {n: window.game.combo}), "#e74c3c", 50);
     }
     updateHUD();
 }
@@ -1242,8 +1401,25 @@ function openPlayerManager() {
     ul.innerHTML = '';
     list.forEach((name, i) => {
         const li = document.createElement('li');
-        li.innerHTML = `<button class="btn btn-success" onclick="selectPlayer(${i})" style="padding:5px 10px; margin-right:10px;">選択</button> <span style="font-size:1.1rem;">${name}</span> <button class="btn btn-danger" onclick="deletePlayer(${i})" style="float:right; padding:5px 10px;">×</button>`;
         li.style.padding = '5px';
+        const selectBtn = document.createElement('button');
+        selectBtn.className = 'btn btn-success';
+        selectBtn.style.padding = '5px 10px';
+        selectBtn.style.marginRight = '10px';
+        selectBtn.textContent = T('pm_select_btn');
+        selectBtn.onclick = () => selectPlayer(i);
+        const nameSpan = document.createElement('span');
+        nameSpan.style.fontSize = '1.1rem';
+        nameSpan.textContent = name;
+        const delBtn = document.createElement('button');
+        delBtn.className = 'btn btn-danger';
+        delBtn.style.cssFloat = 'right';
+        delBtn.style.padding = '5px 10px';
+        delBtn.textContent = '×';
+        delBtn.onclick = () => deletePlayer(i);
+        li.appendChild(selectBtn);
+        li.appendChild(nameSpan);
+        li.appendChild(delBtn);
         ul.appendChild(li);
     });
     document.getElementById('player-manager-overlay').classList.remove('hidden');
@@ -1264,10 +1440,10 @@ window.deletePlayer = (i) => {
 function addPlayer() {
     const name = document.getElementById('input-new-player').value.trim();
     if(!name) return;
-    for(let ng of NG_WORDS) if(name.includes(ng)) { alert("その名前は使えません"); return; }
-    
+    for(let ng of NG_WORDS) if(name.includes(ng)) { showCustomAlert(T('alert_ng_word')); return; }
+
     const list = JSON.parse(localStorage.getItem(KEY_PLAYER)) || [];
-    if(list.length>=5) { alert("登録は5人まで"); return; }
+    if(list.length>=5) { showCustomAlert(T('alert_max_players')); return; }
     list.push(name);
     localStorage.setItem(KEY_PLAYER, JSON.stringify(list));
     window.selectPlayer(list.length-1);
@@ -1276,7 +1452,7 @@ function addPlayer() {
 function saveScore(diff, score) {
     const key = `${KEY_SCORE}_${diff}`;
     let ranks = JSON.parse(localStorage.getItem(key)) || [];
-    ranks.push({name: window.game.playerName, score: score});
+    ranks.push({name: window.game.playerName, score: score, date: Date.now()});
     ranks.sort((a,b) => b.score - a.score);
     ranks = ranks.slice(0, 10);
     localStorage.setItem(key, JSON.stringify(ranks));
@@ -1294,7 +1470,7 @@ function saveScore(diff, score) {
 function updateTitleStats() {
     const clears = JSON.parse(localStorage.getItem(KEY_CLEARS)) || {EASY:0, NORMAL:0, HARD:0};
     ['EASY','NORMAL','HARD'].forEach(k => {
-        document.getElementById(`clear-${k.toLowerCase()}`).textContent = `${clears[k]}回クリア`;
+        document.getElementById(`clear-${k.toLowerCase()}`).textContent = T('clear_count', {n: clears[k] || 0});
         if(clears[k]>0) document.getElementById(`crown-${k.toLowerCase()}`).style.visibility = 'visible';
     });
 }
@@ -1302,11 +1478,12 @@ function updateTitleStats() {
 function showRanking(mode) {
     document.getElementById('ranking-screen').classList.remove('hidden');
     const container = document.getElementById('ranking-lists');
-    container.innerHTML = '読み込み中...';
-    
+    container.innerHTML = '';
+    container.textContent = T('rank_loading');
+
     const btnLocal = document.getElementById('btn-rank-local');
     const btnWorld = document.getElementById('btn-rank-world');
-    
+
     if (mode === 'LOCAL') {
         btnLocal.classList.add('active'); btnLocal.classList.remove('inactive');
         btnWorld.classList.add('inactive'); btnWorld.classList.remove('active');
@@ -1314,34 +1491,68 @@ function showRanking(mode) {
         btnWorld.classList.add('active'); btnWorld.classList.remove('inactive');
         btnLocal.classList.add('inactive'); btnLocal.classList.remove('active');
     }
-    
-    let html = '';
+
     const renderList = (title, list) => {
-        let h = `<div class="rank-list-wrapper"><h3 class="rank-list-header">${title}</h3><ul class="rank-list">`;
-        if(list.length===0) h+=`<li style="padding:10px; justify-content:center;">記録なし</li>`;
-        list.forEach((d,i) => {
-            h += `<li><span title="${d.name}">${i+1}. ${d.name}</span><span>${d.score}</span></li>`;
-        });
-        h += '</ul></div>';
-        return h;
+        const wrapper = document.createElement('div');
+        wrapper.className = 'rank-list-wrapper';
+        const header = document.createElement('h3');
+        header.className = 'rank-list-header';
+        header.textContent = title;
+        wrapper.appendChild(header);
+        const ul = document.createElement('ul');
+        ul.className = 'rank-list';
+        if (list.length === 0) {
+            const li = document.createElement('li');
+            li.style.padding = '10px';
+            li.style.justifyContent = 'center';
+            li.textContent = T('rank_empty');
+            ul.appendChild(li);
+        } else {
+            list.forEach((d, i) => {
+                let dateStr = '';
+                if (typeof d.date === 'number') {
+                    const dt = new Date(d.date);
+                    dateStr = `${dt.getFullYear()}/${dt.getMonth()+1}/${dt.getDate()}`;
+                } else if (typeof d.date === 'string' && d.date) {
+                    dateStr = d.date;
+                }
+                const li = document.createElement('li');
+                const nameSpan = document.createElement('span');
+                nameSpan.title = d.name;
+                nameSpan.textContent = `${i+1}. ${d.name}`;
+                const scoreSpan = document.createElement('span');
+                scoreSpan.textContent = d.score;
+                if (dateStr) {
+                    const dateSpan = document.createElement('span');
+                    dateSpan.className = 'rank-date';
+                    dateSpan.textContent = dateStr;
+                    scoreSpan.appendChild(dateSpan);
+                }
+                li.appendChild(nameSpan);
+                li.appendChild(scoreSpan);
+                ul.appendChild(li);
+            });
+        }
+        wrapper.appendChild(ul);
+        return wrapper;
     };
 
     if (mode === 'LOCAL') {
+        container.innerHTML = '';
         ['EASY','NORMAL','HARD'].forEach(d => {
             const list = JSON.parse(localStorage.getItem(`${KEY_SCORE}_${d}`)) || [];
-            html += renderList(d, list);
+            container.appendChild(renderList(T('diff_' + d.toLowerCase()), list));
         });
-        container.innerHTML = html;
     } else {
         Promise.all([
             window.fetchOnlineRanking('EASY'),
             window.fetchOnlineRanking('NORMAL'),
             window.fetchOnlineRanking('HARD')
         ]).then(results => {
-            html += renderList('EASY', results[0]);
-            html += renderList('NORMAL', results[1]);
-            html += renderList('HARD', results[2]);
-            container.innerHTML = html;
+            container.innerHTML = '';
+            container.appendChild(renderList(T('diff_easy'), results[0]));
+            container.appendChild(renderList(T('diff_normal'), results[1]));
+            container.appendChild(renderList(T('diff_hard'), results[2]));
         });
     }
 }
