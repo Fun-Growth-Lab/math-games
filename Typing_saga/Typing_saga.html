@@ -50,20 +50,6 @@
             background-color: #111;
         }
 
-        #login-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.85);
-            display: none;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 100;
-        }
-
         .mc-btn {
             background-color: #777;
             border: 2px solid;
@@ -104,12 +90,6 @@
 <div id="game-container">
     <canvas id="gameCanvas" width="960" height="640"></canvas>
     
-    <div id="login-overlay">
-        <h2 style="text-shadow: 2px 2px #000; color: #eee;">ログインが必要です</h2>
-        <button class="mc-btn" id="google-login-btn" style="display:none">Googleでログイン</button>
-        <button class="mc-btn" style="font-size:16px; width:200px;" onclick="document.getElementById('login-overlay').style.display='none'">ログインせず遊ぶ</button>
-    </div>
-
     <input type="text" id="name-text-input" maxlength="12" autocomplete="off"
         style="display:none; position:absolute; left:330px; top:100px; width:300px; height:50px;
         font-size:24px; text-align:center; z-index:50; font-family:'DotGothic16', sans-serif;
@@ -313,7 +293,7 @@ function startGame(diff) {
 
 let rankingState = {
     difficulty: 0,
-    mode: 'local',
+    mode: 'world',
     data: []
 };
 
@@ -964,12 +944,13 @@ function saveScore() {
     let localRanking = JSON.parse(localStorage.getItem('myGame_localRanking')) || [];
 
     // ローカル用データを作成（計算した制圧階層 recordFloor を使用）
+    const nowDt = new Date();
     const localScoreData = {
-        name: gameState.player.name || "名無し", 
+        name: gameState.player.name || "名無し",
         floor: recordFloor, // ★修正
         gold: gameState.player.gold,
         difficulty: gameState.difficulty,
-        dateString: new Date().toLocaleString()
+        date: `${nowDt.getFullYear()}/${nowDt.getMonth()+1}/${nowDt.getDate()}`
     };
 
     // リストに追加
@@ -992,6 +973,7 @@ function saveScore() {
         fetch(window._sb.b + '/rankings', {
             method: 'POST',
             headers: window._sb.h,
+            keepalive: true,
             body: JSON.stringify({
                 game: 'typing_saga',
                 difficulty: diffLabel,
@@ -1037,7 +1019,8 @@ async function loadRanking(diff, mode) {
         rankingState.data = filtered.slice(0, 10).map(d => ({
             name: d.name || "Unknown",
             floor: d.floor,
-            gold: (d.gold !== undefined) ? d.gold : 0
+            gold: (d.gold !== undefined) ? d.gold : 0,
+            date: d.date || ""
         }));
         
     } else {
@@ -1050,17 +1033,21 @@ async function loadRanking(diff, mode) {
                 difficulty: 'eq.' + diffLabel,
                 order: 'point_score.desc,stage_score.desc',
                 limit: '10',
-                select: 'player_name,point_score,stage_score'
+                select: 'player_name,point_score,stage_score,created_at'
             });
             const res = await fetch(window._sb.b + '/rankings?' + params.toString(), {
                 headers: window._sb.rh
             });
             const rows = await res.json();
-            rankingState.data = rows.map(d => ({
-                name: d.player_name,
-                floor: d.point_score,
-                gold: d.stage_score
-            }));
+            rankingState.data = rows.map(d => {
+                const dt = new Date(d.created_at);
+                return {
+                    name: d.player_name,
+                    floor: d.point_score,
+                    gold: d.stage_score,
+                    date: `${dt.getFullYear()}/${dt.getMonth()+1}/${dt.getDate()}`
+                };
+            });
         } catch (e) {
             console.error("Ranking Error:", e);
         }
@@ -1334,13 +1321,14 @@ function drawRanking() {
         drawMcButton(80 + i * 150, 130, 140, 40, d, isActive ? "#fbc02d" : "#555", "#fff");
     });
 
-    drawMcButton(650, 130, 100, 40, "Local", rankingState.mode === 'local' ? "#03a9f4" : "#555", "#fff");
-    drawMcButton(760, 130, 100, 40, "World", rankingState.mode === 'world' ? "#e91e63" : "#555", "#fff");
+    drawMcButton(650, 130, 100, 40, "World", rankingState.mode === 'world' ? "#e91e63" : "#555", "#fff");
+    drawMcButton(760, 130, 100, 40, "Local", rankingState.mode === 'local' ? "#03a9f4" : "#555", "#fff");
 
     drawText("順位", 100, 210, 20, "#aaa");
     drawText("名前", 200, 210, 20, "#aaa");
-    drawText("スコア(G)", 500, 210, 20, "#aaa");
-    drawText("制圧階層", 700, 210, 20, "#aaa");
+    drawText("スコア(G)", 470, 210, 20, "#aaa");
+    drawText("制圧階層", 660, 210, 20, "#aaa");
+    drawText("日付", 830, 210, 20, "#aaa", "center");
     
     ctx.strokeStyle = "#777";
     ctx.beginPath();
@@ -1363,9 +1351,10 @@ function drawRanking() {
             
             // ★修正: d.score ではなく d.gold を表示
             const val = (d.gold !== undefined) ? d.gold : 0;
-            drawText(`${val} G`, 500, y, 20, "#ffeb3b");
-            
-            drawText(`${d.floor}F`, 740, y, 20, "#fff", "center");
+            drawText(`${val} G`, 470, y, 20, "#ffeb3b");
+
+            drawText(`${d.floor}F`, 700, y, 20, "#fff", "center");
+            drawText(d.date || "-", 830, y, 16, "#ccc", "center");
         });
     }
 
@@ -2121,12 +2110,7 @@ canvas.addEventListener('mousedown', e => {
         if (gameState.titleState === 0) {
             // 冒険に出る
             if (x > 330 && x < 630 && y > btnStartY && y < btnStartY + 50) {
-                if (currentAdventurer) {
-                    gameState.titleState = 1; 
-                } else {
-                    gameState.warningMsg = "冒険者を選んで下さい";
-                    gameState.warningTimer = 120;
-                }
+                gameState.titleState = 1;
             }
             // 冒険者を選ぶ
             if (x > 330 && x < 630 && y > btnStartY + btnGap && y < btnStartY + btnGap + 50) {
@@ -2136,11 +2120,11 @@ canvas.addEventListener('mousedown', e => {
             if (x > 330 && x < 470 && y > btnStartY + btnGap*2 && y < btnStartY + btnGap*2 + 50) {
                 gameState.scene = SCENES.RANKING;
                 
-                // ★修正: 画面を開くときに、ボタンの選択状態も「初級・ローカル」にリセットする
+                // 画面を開くときに、ボタンの選択状態も「初級・ワールド」にリセットする
                 rankingState.difficulty = 0;
-                rankingState.mode = 'local';
-                
-                loadRanking(0, 'local'); 
+                rankingState.mode = 'world';
+
+                loadRanking(0, 'world');
             }
             // コレクション
             if (x > 490 && x < 630 && y > btnStartY + btnGap*2 && y < btnStartY + btnGap*2 + 50) {
@@ -2246,11 +2230,11 @@ canvas.addEventListener('mousedown', e => {
         });
         // モードタブ
         if (x > 650 && x < 750 && y > 130 && y < 170) {
-            rankingState.mode = 'local';
+            rankingState.mode = 'world';
             loadRanking(rankingState.difficulty, rankingState.mode);
         }
         if (x > 760 && x < 860 && y > 130 && y < 170) {
-            rankingState.mode = 'world';
+            rankingState.mode = 'local';
             loadRanking(rankingState.difficulty, rankingState.mode);
         }
         // 戻る
