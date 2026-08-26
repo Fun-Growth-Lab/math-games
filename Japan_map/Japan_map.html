@@ -50,11 +50,60 @@
             border: 12px solid #e2f0d9;
             border-radius: 50px;
         }
+        #modal-overlay {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.5);
+            align-items: center; justify-content: center;
+            z-index: 1000;
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+        }
+        #modal-box {
+            background: #fdfdfd;
+            border-radius: 30px;
+            border: 4px solid #e2f0d9;
+            padding: 32px 36px;
+            width: min(90vw, 480px);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.25);
+            text-align: center;
+        }
+        #modal-title {
+            font-size: 22px; font-weight: bold; color: #78c850; margin-bottom: 14px;
+            white-space: pre-line;
+        }
+        #modal-message {
+            font-size: 18px; color: #333; margin-bottom: 18px; white-space: pre-line;
+        }
+        #modal-input {
+            width: 100%; box-sizing: border-box; font-size: 20px; text-align: center;
+            padding: 10px; border: 2px solid #78c850; border-radius: 10px; margin-bottom: 18px;
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+        }
+        #modal-buttons {
+            display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;
+        }
+        #modal-buttons button {
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            font-size: 18px; font-weight: bold; padding: 12px 26px;
+            border: none; border-radius: 20px; cursor: pointer;
+            color: #fff; background: #78c850;
+        }
+        #modal-buttons button.secondary { background: #a0a0a0; }
+        #modal-buttons button.danger { background: #ea4335; }
     </style>
 </head>
 <body>
 
 <canvas id="gameCanvas"></canvas>
+
+<div id="modal-overlay">
+    <div id="modal-box">
+        <div id="modal-title"></div>
+        <div id="modal-message"></div>
+        <input type="text" id="modal-input" style="display:none;" maxlength="8" autocomplete="off">
+        <div id="modal-buttons"></div>
+    </div>
+</div>
 
 <script>
 const BASE_W = 1600;
@@ -146,8 +195,305 @@ const NG_WORDS_HIRAGANA = [
     'あかうんと', 'こじんじょうほう'
 ];
 
+const NEW_PLAYER_MARKER = "あたらしく名前を登録";
+
+let currentLang = localStorage.getItem('japan_map_lang') || 'ja';
+
+const STRINGS = {
+    ja: {
+        title: "日本地図クイズ",
+        player_label: "プレーヤー名：{name}",
+        player_none: "選択されていません",
+        menu_start: "はじめる",
+        menu_player: "プレーヤー選択",
+        menu_ranking: "ランキング",
+        menu_settings: "せってい",
+        menu_index: "INDEXへ",
+        player_select_title: "プレーヤーをえらんでね",
+        register_new: "あたらしく名前を登録",
+        btn_edit: "変更",
+        btn_delete: "削除",
+        btn_back: "もどる",
+        level_select_title: "モードと難易度を選んでね",
+        time_on: "時間表示：ON",
+        time_off: "時間表示：OFF",
+        mode_name: "都道府県",
+        mode_capital: "県庁所在地",
+        mode_region: "地方区分",
+        level_easy: "初級",
+        level_normal: "中級",
+        level_hard: "上級",
+        level_complete: "完全攻略",
+        ranking_title: "ランキング",
+        tab_local: "ローカル",
+        tab_world: "ワールド",
+        difficulty_label: "難易度:",
+        rank_h_rank: "順位",
+        rank_h_name: "なまえ",
+        rank_h_correct: "正解",
+        rank_h_time: "タイム",
+        rank_h_date: "日付",
+        rank_guest: "ゲスト",
+        correct_suffix: "問",
+        sec_suffix: "秒",
+        countdown_hint: "ここにクイズがでるよ",
+        quiz_quit: "やめる",
+        quiz_elapsed: "経過時間：{t}",
+        quiz_q_capital: "この都道府県の県庁所在地は？",
+        quiz_q_region: "この都道府県（地方）の地方区分は？",
+        quiz_q_name: "この都道府県の名前は？",
+        quiz_correct: "正解！",
+        quiz_incorrect: "不正解",
+        quiz_next_hint: "クリックまたはキー入力で次へ",
+        result_title: "終了",
+        result_correct: "正解数：{c}／{t}問",
+        result_time: "タイム：{t} 秒",
+        result_ranking: "ランキング",
+        result_to_title: "タイトルへ",
+        register_prompt_new: "名前を入力してね（ひらがな8文字以内）",
+        register_prompt_edit: "新しい名前を入力してね（ひらがな8文字以内）",
+        alert_hiragana_only: "名前はひらがなと「ー」のみ使用できます。",
+        alert_ng_word: "不適切な言葉が含まれているため、その名前は使用できません。",
+        confirm_delete: "「{name}」を削除しますか？",
+        settings_title: "せってい",
+        lang_ja: "日本語",
+        lang_simple: "かんたんな\nにほんご",
+        lang_en: "English",
+        dialog_ok: "OK",
+        dialog_cancel: "キャンセル",
+        dialog_close: "とじる"
+    },
+    simple: {
+        title: "にほんちずクイズ",
+        player_label: "プレーヤーめい：{name}",
+        player_none: "えらばれていません",
+        menu_start: "はじめる",
+        menu_player: "プレーヤーを えらぶ",
+        menu_ranking: "ランキング",
+        menu_settings: "せってい",
+        menu_index: "INDEXへ",
+        player_select_title: "プレーヤーを えらんでね",
+        register_new: "あたらしく なまえを とうろく",
+        btn_edit: "へんこう",
+        btn_delete: "さくじょ",
+        btn_back: "もどる",
+        level_select_title: "モードと むずかしさを えらんでね",
+        time_on: "じかんひょうじ：ON",
+        time_off: "じかんひょうじ：OFF",
+        mode_name: "とどうふけん",
+        mode_capital: "けんちょうしょざいち",
+        mode_region: "ちほうくぶん",
+        level_easy: "しょきゅう",
+        level_normal: "ちゅうきゅう",
+        level_hard: "じょうきゅう",
+        level_complete: "かんぜんこうりゃく",
+        ranking_title: "ランキング",
+        tab_local: "ローカル",
+        tab_world: "ワールド",
+        difficulty_label: "むずかしさ:",
+        rank_h_rank: "じゅんい",
+        rank_h_name: "なまえ",
+        rank_h_correct: "せいかい",
+        rank_h_time: "タイム",
+        rank_h_date: "ひづけ",
+        rank_guest: "ゲスト",
+        correct_suffix: "もん",
+        sec_suffix: "びょう",
+        countdown_hint: "ここに クイズが でるよ",
+        quiz_quit: "やめる",
+        quiz_elapsed: "けいかじかん：{t}",
+        quiz_q_capital: "このとどうふけんの けんちょうしょざいちは？",
+        quiz_q_region: "このとどうふけん（ちほう）の ちほうくぶんは？",
+        quiz_q_name: "このとどうふけんの なまえは？",
+        quiz_correct: "せいかい！",
+        quiz_incorrect: "ふせいかい",
+        quiz_next_hint: "クリック または キーで つぎへ",
+        result_title: "おわり",
+        result_correct: "せいかいすう：{c}／{t}もん",
+        result_time: "タイム：{t} びょう",
+        result_ranking: "ランキング",
+        result_to_title: "タイトルへ",
+        register_prompt_new: "なまえを にゅうりょくしてね（ひらがな8もじいない）",
+        register_prompt_edit: "あたらしい なまえを にゅうりょくしてね（ひらがな8もじいない）",
+        alert_hiragana_only: "なまえは ひらがなと「ー」だけ つかえます。",
+        alert_ng_word: "よくない ことばが はいっているので、そのなまえは つかえません。",
+        confirm_delete: "「{name}」を さくじょしますか？",
+        settings_title: "せってい",
+        lang_ja: "日本語",
+        lang_simple: "かんたんな\nにほんご",
+        lang_en: "English",
+        dialog_ok: "OK",
+        dialog_cancel: "キャンセル",
+        dialog_close: "とじる"
+    },
+    en: {
+        title: "Japan Map Quiz",
+        player_label: "Player: {name}",
+        player_none: "Not selected",
+        menu_start: "Start",
+        menu_player: "Select Player",
+        menu_ranking: "Ranking",
+        menu_settings: "Settings",
+        menu_index: "To Index",
+        player_select_title: "Select a player",
+        register_new: "Register new name",
+        btn_edit: "Edit",
+        btn_delete: "Delete",
+        btn_back: "Back",
+        level_select_title: "Choose mode and difficulty",
+        time_on: "Timer: ON",
+        time_off: "Timer: OFF",
+        mode_name: "Prefecture",
+        mode_capital: "Capital City",
+        mode_region: "Region",
+        level_easy: "Easy",
+        level_normal: "Normal",
+        level_hard: "Hard",
+        level_complete: "Full Conquest",
+        ranking_title: "Ranking",
+        tab_local: "Local",
+        tab_world: "World",
+        difficulty_label: "Difficulty:",
+        rank_h_rank: "Rank",
+        rank_h_name: "Name",
+        rank_h_correct: "Correct",
+        rank_h_time: "Time",
+        rank_h_date: "Date",
+        rank_guest: "Guest",
+        correct_suffix: "",
+        sec_suffix: "s",
+        countdown_hint: "The quiz appears here",
+        quiz_quit: "Quit",
+        quiz_elapsed: "Time: {t}",
+        quiz_q_capital: "What is this prefecture's capital city?",
+        quiz_q_region: "What region is this prefecture in?",
+        quiz_q_name: "What is this prefecture's name?",
+        quiz_correct: "Correct!",
+        quiz_incorrect: "Incorrect",
+        quiz_next_hint: "Click or press a key to continue",
+        result_title: "Finish",
+        result_correct: "Correct: {c}/{t}",
+        result_time: "Time: {t} sec",
+        result_ranking: "Ranking",
+        result_to_title: "To Title",
+        register_prompt_new: "Enter a name (hiragana, up to 8 characters)",
+        register_prompt_edit: "Enter a new name (hiragana, up to 8 characters)",
+        alert_hiragana_only: "Names can only use hiragana and \"ー\".",
+        alert_ng_word: "That name contains inappropriate words and cannot be used.",
+        confirm_delete: "Delete \"{name}\"?",
+        settings_title: "Settings",
+        lang_ja: "日本語",
+        lang_simple: "かんたんな\nにほんご",
+        lang_en: "English",
+        dialog_ok: "OK",
+        dialog_cancel: "Cancel",
+        dialog_close: "Close"
+    }
+};
+
+function T(key, params) {
+    const dict = STRINGS[currentLang] || {};
+    let s = (key in dict) ? dict[key] : ((key in STRINGS.ja) ? STRINGS.ja[key] : key);
+    if (params) {
+        Object.keys(params).forEach(k => { s = s.split('{' + k + '}').join(params[k]); });
+    }
+    return s;
+}
+
+const modalOverlay = document.getElementById('modal-overlay');
+const modalTitle = document.getElementById('modal-title');
+const modalMessage = document.getElementById('modal-message');
+const modalInput = document.getElementById('modal-input');
+const modalButtons = document.getElementById('modal-buttons');
+
+function closeModal() {
+    modalOverlay.style.display = 'none';
+    modalButtons.innerHTML = '';
+    modalMessage.textContent = '';
+    modalInput.style.display = 'none';
+    modalInput.value = '';
+}
+
+function showCustomAlert(message, title) {
+    modalTitle.textContent = title || '';
+    modalMessage.textContent = message;
+    modalInput.style.display = 'none';
+    modalButtons.innerHTML = '';
+    const okBtn = document.createElement('button');
+    okBtn.textContent = T('dialog_ok');
+    okBtn.onclick = closeModal;
+    modalButtons.appendChild(okBtn);
+    modalOverlay.style.display = 'flex';
+}
+
+function showCustomConfirm(message, onConfirm) {
+    modalTitle.textContent = '';
+    modalMessage.textContent = message;
+    modalInput.style.display = 'none';
+    modalButtons.innerHTML = '';
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = T('dialog_cancel');
+    cancelBtn.className = 'secondary';
+    cancelBtn.onclick = closeModal;
+    const okBtn = document.createElement('button');
+    okBtn.textContent = T('dialog_ok');
+    okBtn.className = 'danger';
+    okBtn.onclick = () => { closeModal(); onConfirm(); };
+    modalButtons.appendChild(cancelBtn);
+    modalButtons.appendChild(okBtn);
+    modalOverlay.style.display = 'flex';
+}
+
+function showCustomPrompt(message, defaultValue, onSubmit) {
+    modalTitle.textContent = '';
+    modalMessage.textContent = message;
+    modalInput.style.display = 'block';
+    modalInput.value = defaultValue || '';
+    modalButtons.innerHTML = '';
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = T('dialog_cancel');
+    cancelBtn.className = 'secondary';
+    cancelBtn.onclick = closeModal;
+    const okBtn = document.createElement('button');
+    okBtn.textContent = T('dialog_ok');
+    okBtn.onclick = () => {
+        const val = modalInput.value;
+        closeModal();
+        onSubmit(val);
+    };
+    modalButtons.appendChild(cancelBtn);
+    modalButtons.appendChild(okBtn);
+    modalOverlay.style.display = 'flex';
+    setTimeout(() => modalInput.focus(), 0);
+}
+
+function showLangModal() {
+    modalTitle.textContent = T('settings_title');
+    modalMessage.textContent = '';
+    modalInput.style.display = 'none';
+    modalButtons.innerHTML = '';
+    const langs = [['ja', 'lang_ja'], ['simple', 'lang_simple'], ['en', 'lang_en']];
+    langs.forEach(([code, key]) => {
+        const btn = document.createElement('button');
+        btn.textContent = T(key);
+        if (currentLang === code) btn.style.background = '#ffaa00';
+        btn.onclick = () => {
+            currentLang = code;
+            localStorage.setItem('japan_map_lang', code);
+            closeModal();
+        };
+        modalButtons.appendChild(btn);
+    });
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = T('dialog_close');
+    closeBtn.className = 'secondary';
+    closeBtn.onclick = closeModal;
+    modalButtons.appendChild(closeBtn);
+    modalOverlay.style.display = 'flex';
+}
+
 let gameState = 'title';
-let currentMode = 'name'; 
+let currentMode = 'name';
 let currentLevel = 4;
 let questions = [];
 let currentIdx = 0;
@@ -164,7 +510,7 @@ let countdownMapImg = null;
 let answeredCodes = [];
 let wrongCodes = [];
 
-let rankingTab = 'local'; 
+let rankingTab = 'world';
 let rankingMode = 'name';
 let rankingLv = 4;
 let rankingData = [];
@@ -206,14 +552,15 @@ function handleInput(e) {
         if (x > 550 && x < 1050) {
             if (y > 290 && y < 365) gameState = 'level_select';
             else if (y > 385 && y < 460) gameState = 'player_select';
-            else if (y > 480 && y < 555) { gameState = 'ranking'; rankingTab = 'local'; rankingMode = 'name'; rankingLv = 4; fetchRanking(); }
-            else if (y > 575 && y < 650) window.location.href = "../index.html";
+            else if (y > 480 && y < 555) { gameState = 'ranking'; rankingTab = 'world'; rankingMode = 'name'; rankingLv = 4; fetchRanking(); }
+            else if (y > 575 && y < 650) showLangModal();
+            else if (y > 670 && y < 745) window.location.href = "../index.html";
         }
     } else if (gameState === 'player_select') {
         if (x > 550 && x < 1050) {
             for (let i = 0; i < 5; i++) {
                 if (y > 200 + i * 100 && y < 280 + i * 100) {
-                    if (localPlayers[i] === "あたらしく名前を登録") {
+                    if (localPlayers[i] === NEW_PLAYER_MARKER) {
                         registerPlayer(i);
                     } else {
                         currentPlayerIdx = i;
@@ -225,22 +572,23 @@ function handleInput(e) {
         }
         if (x > 1080 && x < 1180) {
             for (let i = 0; i < 5; i++) {
-                if (y > 210 + i * 100 && y < 270 + i * 100 && localPlayers[i] !== "あたらしく名前を登録") {
+                if (y > 210 + i * 100 && y < 270 + i * 100 && localPlayers[i] !== NEW_PLAYER_MARKER) {
                     registerPlayer(i, true);
                 }
             }
         }
         if (x > 1200 && x < 1300) {
             for (let i = 0; i < 5; i++) {
-                if (y > 210 + i * 100 && y < 270 + i * 100 && localPlayers[i] !== "あたらしく名前を登録") {
-                    if (confirm(`「${localPlayers[i]}」を削除しますか？`)) {
-                        localPlayers[i] = "あたらしく名前を登録";
+                if (y > 210 + i * 100 && y < 270 + i * 100 && localPlayers[i] !== NEW_PLAYER_MARKER) {
+                    const delName = localPlayers[i];
+                    showCustomConfirm(T('confirm_delete', {name: delName}), () => {
+                        localPlayers[i] = NEW_PLAYER_MARKER;
                         if (currentPlayerIdx === i) {
                             currentPlayerIdx = -1;
                             localStorage.setItem('japan_map_current_player', "-1");
                         }
                         localStorage.setItem('japan_map_players', JSON.stringify(localPlayers));
-                    }
+                    });
                 }
             }
         }
@@ -279,8 +627,8 @@ function handleInput(e) {
         const rightStart = BASE_W/2 + (BASE_W/2 - (tabW * 3 + gap * 2))/2;
 
         if (y > 140 && y < 200) {
-            if (x > leftStart && x < leftStart + tabW) { rankingTab = 'local'; fetchRanking(); }
-            if (x > leftStart + tabW + gap && x < leftStart + tabW * 2 + gap) { rankingTab = 'world'; fetchRanking(); }
+            if (x > leftStart && x < leftStart + tabW) { rankingTab = 'world'; fetchRanking(); }
+            if (x > leftStart + tabW + gap && x < leftStart + tabW * 2 + gap) { rankingTab = 'local'; fetchRanking(); }
             if (x > rightStart && x < rightStart + tabW) { rankingMode = 'name'; fetchRanking(); }
             if (x > rightStart + tabW + gap && x < rightStart + tabW * 2 + gap) { rankingMode = 'capital'; fetchRanking(); }
             if (x > rightStart + (tabW + gap) * 2 && x < rightStart + tabW * 3 + gap * 2) { 
@@ -332,7 +680,7 @@ function handleInput(e) {
         }
         selectedOption = null;
     } else if (gameState === 'result') {
-        if (y > 580 && y < 660 && x > 650 && x < 950) { gameState = 'ranking'; rankingTab = 'local'; rankingMode = currentMode; rankingLv = currentLevel; fetchRanking(); }
+        if (y > 580 && y < 660 && x > 650 && x < 950) { gameState = 'ranking'; rankingTab = 'world'; rankingMode = currentMode; rankingLv = currentLevel; fetchRanking(); }
         if (y > 680 && y < 760 && x > 650 && x < 950) gameState = 'title';
     }
 }
@@ -346,19 +694,20 @@ function checkNGWord(name) {
 }
 
 function registerPlayer(i, isEdit = false) {
-    let msg = isEdit ? "新しい名前を入力してね（ひらがな8文字以内）" : "名前を入力してね（ひらがな8文字以内）";
-    let n = prompt(msg, isEdit ? (localPlayers[i] === "あたらしく名前を登録" ? "" : localPlayers[i]) : "");
-    if (n) {
+    let msg = isEdit ? T('register_prompt_edit') : T('register_prompt_new');
+    let defaultVal = isEdit ? (localPlayers[i] === NEW_PLAYER_MARKER ? "" : localPlayers[i]) : "";
+    showCustomPrompt(msg, defaultVal, (n) => {
+        if (!n) return;
         let trimmed = n.trim().substring(0, 8);
         if (trimmed === "") return;
-        
+
         if (!/^[ぁ-んー]+$/.test(trimmed)) {
-            alert("名前はひらがなと「ー」のみ使用できます。");
+            showCustomAlert(T('alert_hiragana_only'));
             return;
         }
 
         if (checkNGWord(trimmed)) {
-            alert("不適切な言葉が含まれているため、その名前は使用できません。");
+            showCustomAlert(T('alert_ng_word'));
             return;
         }
         localPlayers[i] = trimmed;
@@ -368,7 +717,7 @@ function registerPlayer(i, isEdit = false) {
             localStorage.setItem('japan_map_current_player', i.toString());
             gameState = 'title';
         }
-    }
+    });
 }
 
 function startCountdown(level) {
@@ -447,8 +796,8 @@ function gameLoop() {
 function drawCountdown() {
     if (countdownMapImg && countdownMapImg.complete) ctx.drawImage(countdownMapImg, 20, 100, 1000, 750);
     drawText(countdownVal, 520, 480, 200, "bold", "#ff4500");
-    drawText("ここにクイズがでるよ", 1320, 450, 36, "bold", "#000000");
-    drawButton(1420, 830, 150, 50, "やめる", "#c1e1c1", 20, "#333");
+    drawText(T('countdown_hint'), 1320, 450, 36, "bold", "#000000");
+    drawButton(1420, 830, 150, 50, T('quiz_quit'), "#c1e1c1", 20, "#333");
 }
 
 function drawQuiz() {
@@ -506,10 +855,10 @@ function drawQuiz() {
     if (cachedMapImg && cachedMapImg.complete) ctx.drawImage(cachedMapImg, 20, 100, 1000, 750);
     drawText(`${currentIdx + 1} / ${TOTAL_QUESTIONS}`, 100, 80, 40, "bold", "#000000", "left");
     if (showTime) {
-        drawText(`経過時間：${elapsed}`, 1500, 80, 40, "bold", "#000000", "right");
+        drawText(T('quiz_elapsed', {t: elapsed}), 1500, 80, 40, "bold", "#000000", "right");
     }
-    
-    let qTxt = currentMode === 'capital' ? "この都道府県の県庁所在地は？" : (currentMode === 'region' ? "この都道府県（地方）の地方区分は？" : "この都道府県の名前は？");
+
+    let qTxt = currentMode === 'capital' ? T('quiz_q_capital') : (currentMode === 'region' ? T('quiz_q_region') : T('quiz_q_name'));
     drawText(qTxt, 550, 80, 36, "bold", "#000000");
 
     q.options.forEach((opt, i) => {
@@ -528,12 +877,12 @@ function drawQuiz() {
         const ruby = currentMode === 'capital' ? opt.c_ruby : opt.ruby;
         drawQuizButton(bx, by, 250, 120, label, ruby, color);
     });
-    drawButton(1420, 830, 150, 50, "やめる", "#c1e1c1", 20, "#000000");
+    drawButton(1420, 830, 150, 50, T('quiz_quit'), "#c1e1c1", 20, "#000000");
     if (gameState === 'waiting') {
         const isCorrect = (currentMode === 'region') ? selectedOption.name === q.region : selectedOption.code === q.code;
         ctx.fillStyle = "rgba(0, 0, 0, 0.2)"; ctx.fillRect(0, 0, BASE_W, BASE_H);
-        drawText(isCorrect ? "正解！" : "不正解", BASE_W/2, 400, 120, "bold", isCorrect ? "#ff4500" : "#4682b4");
-        drawText("クリックまたはキー入力で次へ", BASE_W/2, 520, 40, "bold", "#ffffff");
+        drawText(isCorrect ? T('quiz_correct') : T('quiz_incorrect'), BASE_W/2, 400, 120, "bold", isCorrect ? "#ff4500" : "#4682b4");
+        drawText(T('quiz_next_hint'), BASE_W/2, 520, 40, "bold", "#ffffff");
     }
 }
 
@@ -547,15 +896,16 @@ function drawTitle() {
     ctx.roundRect(450, 80, 700, 740, 40);
     ctx.fill();
 
-    drawText("日本地図クイズ", BASE_W/2, 170, 80, "bold", "#78c850");
-    let pName = currentPlayerIdx === -1 ? "選択されていません" : localPlayers[currentPlayerIdx];
-    drawText(`プレーヤー名：${pName}`, BASE_W/2, 240, 36, "bold", "#8d7d6a");
+    drawText(T('title'), BASE_W/2, 170, 80, "bold", "#78c850");
+    let pName = currentPlayerIdx === -1 ? T('player_none') : localPlayers[currentPlayerIdx];
+    drawText(T('player_label', {name: pName}), BASE_W/2, 240, 36, "bold", "#8d7d6a");
 
     const menu = [
-        { t: "はじめる", c: "#78c850" },
-        { t: "プレーヤー選択", c: "#ffaa00" },
-        { t: "ランキング", c: "#5bc0de" },
-        { t: "INDEXへ", c: "#8d7d6a" }
+        { t: T('menu_start'), c: "#78c850" },
+        { t: T('menu_player'), c: "#ffaa00" },
+        { t: T('menu_ranking'), c: "#5bc0de" },
+        { t: T('menu_settings'), c: "#c39bd3" },
+        { t: T('menu_index'), c: "#8d7d6a" }
     ];
     menu.forEach((m, i) => {
         const py = 290 + i * 95;
@@ -565,33 +915,35 @@ function drawTitle() {
 }
 
 function drawPlayerSelect() {
-    drawText("プレーヤーをえらんでね", BASE_W/2, 150, 60, "bold", "#8d7d6a");
+    drawText(T('player_select_title'), BASE_W/2, 150, 60, "bold", "#8d7d6a");
     for (let i = 0; i < 5; i++) {
         let isCurrent = (i === currentPlayerIdx);
-        drawButton(550, 200 + i * 100, 500, 80, localPlayers[i], isCurrent ? "#ffaa00" : "#e2f0d9", 28, isCurrent ? "#fff" : "#333");
-        
-        if (localPlayers[i] !== "あたらしく名前を登録") {
-            drawButton(1080, 210 + i * 100, 100, 60, "変更", "#5bc0de", 20, "#fff");
-            drawButton(1200, 210 + i * 100, 100, 60, "削除", "#ea4335", 20, "#fff");
+        const label = localPlayers[i] === NEW_PLAYER_MARKER ? T('register_new') : localPlayers[i];
+        drawButton(550, 200 + i * 100, 500, 80, label, isCurrent ? "#ffaa00" : "#e2f0d9", 28, isCurrent ? "#fff" : "#333");
+
+        if (localPlayers[i] !== NEW_PLAYER_MARKER) {
+            drawButton(1080, 210 + i * 100, 100, 60, T('btn_edit'), "#5bc0de", 20, "#fff");
+            drawButton(1200, 210 + i * 100, 100, 60, T('btn_delete'), "#ea4335", 20, "#fff");
         }
     }
-    drawButton(700, 720, 200, 80, "もどる", "#c1e1c1", 32, "#000");
+    drawButton(700, 720, 200, 80, T('btn_back'), "#c1e1c1", 32, "#000");
 }
 
 function drawLevelSelect() {
-    drawText("モードと難易度を選んでね", BASE_W/2, 120, 70, "bold", "#78c850");
-    
-    drawButton(1250, 50, 300, 60, showTime ? "時間表示：ON" : "時間表示：OFF", showTime ? "#78c850" : "#a0a0a0", 24);
-    
+    drawText(T('level_select_title'), BASE_W/2, 120, 70, "bold", "#78c850");
+
+    drawButton(1250, 50, 300, 60, showTime ? T('time_on') : T('time_off'), showTime ? "#78c850" : "#a0a0a0", 24);
+
+    const showRuby = currentLang !== 'en';
     const modes = [
-        { t: "都道府県", r: "とどうふけん", c: "#78c850" },
-        { t: "県庁所在地", r: "けんちょうしょざいち", c: "#ffaa00" },
-        { t: "地方区分", r: "ちほうくぶん", c: "#5bc0de" }
+        { key: 'name', t: T('mode_name'), r: showRuby ? "とどうふけん" : "", c: "#78c850" },
+        { key: 'capital', t: T('mode_capital'), r: showRuby ? "けんちょうしょざいち" : "", c: "#ffaa00" },
+        { key: 'region', t: T('mode_region'), r: showRuby ? "ちほうくぶん" : "", c: "#5bc0de" }
     ];
     const levels = [
-        { t: "初級", r: "しょきゅう", c: "#78c850" },
-        { t: "中級", r: "ちゅうきゅう", c: "#5bc0de" },
-        { t: "上級", r: "じょうきゅう", c: "#ffaa00" }
+        { t: T('level_easy'), r: showRuby ? "しょきゅう" : "", c: "#78c850" },
+        { t: T('level_normal'), r: showRuby ? "ちゅうきゅう" : "", c: "#5bc0de" },
+        { t: T('level_hard'), r: showRuby ? "じょうきゅう" : "", c: "#ffaa00" }
     ];
 
     const startXMode = 50;
@@ -608,64 +960,65 @@ function drawLevelSelect() {
         const txtY = py + (btnH - totalH) / 2;
         drawText(m.r, startXMode + 150, txtY + rubySize / 1.1, rubySize, "bold", "#8d7d6a");
         drawText(m.t, startXMode + 150, txtY + rubySize + gap + mainSize / 1.1, mainSize, "bold", m.c);
-        
+
         levels.forEach((l, li) => {
             drawBalancedButton(startXLevel + li * (btnW + 20), py, btnW, btnH, l.t, l.r, l.c);
         });
-        if (m.t !== "地方区分") {
-            drawBalancedButton(startXLevel + 3 * (btnW + 20), py, btnW, btnH, "完全攻略", "かんぜんこうりゃく", "#ff4500");
+        if (m.key !== 'region') {
+            drawBalancedButton(startXLevel + 3 * (btnW + 20), py, btnW, btnH, T('level_complete'), showRuby ? "かんぜんこうりゃく" : "", "#ff4500");
         }
     });
 
-    drawButton(700, 780, 200, 80, "もどる", "#c1e1c1", 32, "#000");
+    drawButton(700, 780, 200, 80, T('btn_back'), "#c1e1c1", 32, "#000");
 }
 
 function drawRanking() {
-    drawText("ランキング", BASE_W/2, 80, 80, "bold", "#78c850");
-    
+    drawText(T('ranking_title'), BASE_W/2, 80, 80, "bold", "#78c850");
+
     const tabW = 210; const gap = 20;
     const leftTotalW = tabW * 2 + gap;
     const leftStart = (BASE_W/2 - gap*2) / 2 - leftTotalW/2 + 50;
-    drawButton(leftStart, 140, tabW, 60, "ローカル", rankingTab === 'local' ? "#78c850" : "#e2f0d9", 22, rankingTab === 'local' ? "#fff" : "#8d7d6a");
-    drawButton(leftStart + tabW + gap, 140, tabW, 60, "ワールド", rankingTab === 'world' ? "#78c850" : "#e2f0d9", 22, rankingTab === 'world' ? "#fff" : "#8d7d6a");
+    drawButton(leftStart, 140, tabW, 60, T('tab_world'), rankingTab === 'world' ? "#78c850" : "#e2f0d9", 22, rankingTab === 'world' ? "#fff" : "#8d7d6a");
+    drawButton(leftStart + tabW + gap, 140, tabW, 60, T('tab_local'), rankingTab === 'local' ? "#78c850" : "#e2f0d9", 22, rankingTab === 'local' ? "#fff" : "#8d7d6a");
 
     const rightTotalW = tabW * 3 + gap * 2;
     const rightStart = BASE_W/2 + (BASE_W/2 - rightTotalW)/2;
-    drawButton(rightStart, 140, tabW, 60, "都道府県", rankingMode === 'name' ? "#ffaa00" : "#e2f0d9", 22, rankingMode === 'name' ? "#fff" : "#8d7d6a");
-    drawButton(rightStart + tabW + gap, 140, tabW, 60, "県庁所在地", rankingMode === 'capital' ? "#ffaa00" : "#e2f0d9", 22, rankingMode === 'capital' ? "#fff" : "#8d7d6a");
-    drawButton(rightStart + (tabW + gap) * 2, 140, tabW, 60, "地方区分", rankingMode === 'region' ? "#ffaa00" : "#e2f0d9", 22, rankingMode === 'region' ? "#fff" : "#8d7d6a");
-    
-    drawText("難易度:", 630, 255, 24, "bold", "#8d7d6a", "right");
-    drawButton(670, 220, 100, 50, "初級", rankingLv === 2 ? "#5bc0de" : "#e2f0d9", 20, rankingLv === 2 ? "#fff" : "#8d7d6a");
-    drawButton(780, 220, 100, 50, "中級", rankingLv === 4 ? "#5bc0de" : "#e2f0d9", 20, rankingLv === 4 ? "#fff" : "#8d7d6a");
-    drawButton(890, 220, 100, 50, "上級", rankingLv === 8 ? "#5bc0de" : "#e2f0d9", 20, rankingLv === 8 ? "#fff" : "#8d7d6a");
+    drawButton(rightStart, 140, tabW, 60, T('mode_name'), rankingMode === 'name' ? "#ffaa00" : "#e2f0d9", 22, rankingMode === 'name' ? "#fff" : "#8d7d6a");
+    drawButton(rightStart + tabW + gap, 140, tabW, 60, T('mode_capital'), rankingMode === 'capital' ? "#ffaa00" : "#e2f0d9", 22, rankingMode === 'capital' ? "#fff" : "#8d7d6a");
+    drawButton(rightStart + (tabW + gap) * 2, 140, tabW, 60, T('mode_region'), rankingMode === 'region' ? "#ffaa00" : "#e2f0d9", 22, rankingMode === 'region' ? "#fff" : "#8d7d6a");
+
+    drawText(T('difficulty_label'), 630, 255, 24, "bold", "#8d7d6a", "right");
+    drawButton(670, 220, 100, 50, T('level_easy'), rankingLv === 2 ? "#5bc0de" : "#e2f0d9", 20, rankingLv === 2 ? "#fff" : "#8d7d6a");
+    drawButton(780, 220, 100, 50, T('level_normal'), rankingLv === 4 ? "#5bc0de" : "#e2f0d9", 20, rankingLv === 4 ? "#fff" : "#8d7d6a");
+    drawButton(890, 220, 100, 50, T('level_hard'), rankingLv === 8 ? "#5bc0de" : "#e2f0d9", 20, rankingLv === 8 ? "#fff" : "#8d7d6a");
     if (rankingMode !== 'region') {
-        drawButton(1000, 220, 120, 50, "完全攻略", rankingLv === 47 ? "#5bc0de" : "#e2f0d9", 20, rankingLv === 47 ? "#fff" : "#8d7d6a");
+        drawButton(1000, 220, 120, 50, T('level_complete'), rankingLv === 47 ? "#5bc0de" : "#e2f0d9", 20, rankingLv === 47 ? "#fff" : "#8d7d6a");
     }
 
     const startX = 300; const startY = 320; const rowH = 45;
     ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.roundRect(startX, startY - 40, 1000, 480, 40); ctx.fill();
     ctx.strokeStyle = "#e2f0d9"; ctx.lineWidth = 4; ctx.stroke();
-    const cols = [100, 350, 650, 850];
-    const headers = ["順位", "なまえ", "正解", "タイム"];
-    headers.forEach((h, i) => drawText(h, startX + cols[i], startY, 28, "bold", "#78c850"));
+    const cols = [100, 300, 570, 750, 900];
+    const headers = [T('rank_h_rank'), T('rank_h_name'), T('rank_h_correct'), T('rank_h_time'), T('rank_h_date')];
+    headers.forEach((h, i) => drawText(h, startX + cols[i], startY, 24, "bold", "#78c850"));
     rankingData.filter(d => d.level == rankingLv && d.mode == rankingMode).slice(0, 10).forEach((d, i) => {
         const py = startY + 50 + i * rowH;
-        const name = d.name || 'ゲスト';
+        const name = d.name || T('rank_guest');
         drawText(i + 1, startX + cols[0], py, 26, "", "#000000");
         drawText(name, startX + cols[1], py, 26, "", "#000000");
-        drawText(`${d.correct || 0}問`, startX + cols[2], py, 26, "", "#000000");
-        drawText(`${parseFloat(d.time).toFixed(2)}秒`, startX + cols[3], py, 26, "", "#000000");
+        drawText(`${d.correct || 0}${T('correct_suffix')}`, startX + cols[2], py, 26, "", "#000000");
+        drawText(`${parseFloat(d.time).toFixed(2)}${T('sec_suffix')}`, startX + cols[3], py, 26, "", "#000000");
+        drawText(d.date || "-", startX + cols[4], py, 20, "", "#666666");
     });
-    drawButton(700, 810, 200, 60, "タイトルへ", "#c1e1c1", 26, "#000");
+    drawButton(700, 810, 200, 60, T('result_to_title'), "#c1e1c1", 26, "#000");
 }
 
 function drawResult() {
-    drawText("終了", BASE_W/2, 250, 120, "bold", "#78c850");
-    drawText(`正解数：${correctCount}／${TOTAL_QUESTIONS}問`, BASE_W/2, 380, 60, "bold", "#000000");
-    drawText(`タイム：${totalTime.toFixed(2)} 秒`, BASE_W/2, 460, 60, "bold", "#000000");
-    drawButton(650, 580, 300, 80, "ランキング", "#c39bd3", 32, "#fff");
-    drawButton(650, 680, 300, 80, "タイトルへ", "#c1e1c1", 32, "#000");
+    drawText(T('result_title'), BASE_W/2, 250, 120, "bold", "#78c850");
+    drawText(T('result_correct', {c: correctCount, t: TOTAL_QUESTIONS}), BASE_W/2, 380, 60, "bold", "#000000");
+    drawText(T('result_time', {t: totalTime.toFixed(2)}), BASE_W/2, 460, 60, "bold", "#000000");
+    drawButton(650, 580, 300, 80, T('result_ranking'), "#c39bd3", 32, "#fff");
+    drawButton(650, 680, 300, 80, T('result_to_title'), "#c1e1c1", 32, "#000");
 }
 
 function drawText(txt, x, y, size, weight = "", color = "#000", align = "center") {
@@ -728,8 +1081,8 @@ function login() { /* ログイン機能は無効（Supabase移行済み） */ }
 function logout() { /* ログアウト機能は無効（Supabase移行済み） */ }
 
 async function saveScore(time) {
-    let localName = 'ゲスト';
-    if (currentPlayerIdx !== -1 && localPlayers[currentPlayerIdx] !== "あたらしく名前を登録") {
+    let localName = T('rank_guest');
+    if (currentPlayerIdx !== -1 && localPlayers[currentPlayerIdx] !== NEW_PLAYER_MARKER) {
         localName = localPlayers[currentPlayerIdx];
     }
 
@@ -753,6 +1106,7 @@ async function saveScore(time) {
         await fetch(window._sb.b + '/rankings', {
             method: 'POST',
             headers: window._sb.h,
+            keepalive: true,
             body: JSON.stringify({
                 game: 'japan_map',
                 difficulty: String(currentLevel),
@@ -770,12 +1124,17 @@ async function saveScore(time) {
     }
 }
 
+function formatDate(dt) {
+    return `${dt.getFullYear()}/${dt.getMonth()+1}/${dt.getDate()}`;
+}
+
 async function fetchRanking() {
     if (rankingTab === 'local') {
         let localScores = JSON.parse(localStorage.getItem('japan_map_scores') || '[]');
         rankingData = localScores
             .filter(d => d.level === rankingLv && d.mode === rankingMode)
-            .sort((a,b) => (b.correct !== a.correct) ? b.correct - a.correct : a.time - b.time);
+            .sort((a,b) => (b.correct !== a.correct) ? b.correct - a.correct : a.time - b.time)
+            .map(d => ({...d, date: d.date ? formatDate(new Date(d.date)) : "-"}));
     } else {
         // Supabase (World)
         try {
@@ -785,7 +1144,7 @@ async function fetchRanking() {
                 class_name: 'eq.' + rankingMode,
                 order: 'point_score.desc,turns.asc',
                 limit: '20',
-                select: 'player_name,point_score,turns'
+                select: 'player_name,point_score,turns,created_at'
             });
             const res = await fetch(window._sb.b + '/rankings?' + params.toString(), {
                 headers: window._sb.rh
@@ -796,7 +1155,8 @@ async function fetchRanking() {
                 correct: d.point_score,
                 time: d.turns,
                 level: rankingLv,
-                mode: rankingMode
+                mode: rankingMode,
+                date: formatDate(new Date(d.created_at))
             }));
         } catch(e) {
             console.error("Ranking Error:", e);
