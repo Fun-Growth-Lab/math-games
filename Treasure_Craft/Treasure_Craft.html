@@ -24,7 +24,7 @@
     window.saveOnlineScore = async (name, score, difficulty) => {
         if((score||0)<=0) return;
         try {
-            const res = await fetch(`${_b}/rankings`,{method:'POST',headers:_h,
+            const res = await fetch(`${_b}/rankings`,{method:'POST',headers:_h,keepalive:true,
                 body:JSON.stringify({game:'treasure_craft',difficulty:difficulty||'normal',player_name:name||'ゲスト',point_score:Math.round(score)||0})});
             if(!res.ok){const t=await res.text();throw new Error(`HTTP ${res.status}: ${t}`);}
         } catch(e){console.error('Ranking save error:',e);}
@@ -35,7 +35,14 @@
             const res = await fetch(`${_b}/rankings?${q}`,{headers:_rh});
             if(!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
-            return data.map(r=>({name:r.player_name,score:r.point_score,date:r.created_at?new Date(r.created_at).toLocaleDateString('ja-JP'):''}));
+            return data.map(r=>{
+                let dateStr = '';
+                if (r.created_at) {
+                    const dt = new Date(r.created_at);
+                    dateStr = `${dt.getFullYear()}/${dt.getMonth()+1}/${dt.getDate()}`;
+                }
+                return {name:r.player_name,score:r.point_score,date:dateStr};
+            });
         } catch(e){console.error('Ranking load error:',e);return [];}
     };
 })();
@@ -201,8 +208,24 @@ let showHelp = false;
 let activePopup = null; 
 let restEffect = { active: false, alpha: 0, phase: 'in' }; 
 
-let rankingTab = "LOCAL"; 
+let rankingTab = "WORLD";
 let rankingDataWorld = null;
+let worldRankingFetching = false;
+
+function loadWorldRanking() {
+    if (rankingDataWorld || worldRankingFetching) return;
+    worldRankingFetching = true;
+    window.fetchOnlineRanking('normal').then(data => {
+        rankingDataWorld = data.map(r => ({
+            name: r.name,
+            assets: r.score,
+            days: '-',
+            isClear: true,
+            date: r.date
+        }));
+    }).catch(() => { rankingDataWorld = []; })
+      .finally(() => { worldRankingFetching = false; });
+}
 
 // ==========================================
 // 5. ロジックヘルパー
@@ -513,7 +536,8 @@ function renderTitle() {
     drawBtn("はじめる", leftX, row1Y, bW, bH, '#ffb3ba', () => { GAME_STATE = "PLAYER_SELECT"; });
 
     drawBtn("ランキング", leftX, row2Y, bW, bH, '#ffd8b1', () => {
-        rankingTab = "LOCAL"; rankingDataWorld = null; GAME_STATE = "RANKING";
+        rankingTab = "WORLD"; rankingDataWorld = null; GAME_STATE = "RANKING";
+        loadWorldRanking();
     });
 
     drawBtn("INDEXへ", rightX, row2Y, bW, bH, '#e2f0cb', () => { window.location.href = "../index.html"; });
@@ -608,7 +632,11 @@ function renderPlayerSelect() {
         }
     }
     
-    drawText("※ひらがな・長音(ー)のみ入力可能、最大8文字（NGワードチェックあり）", 640, 550, 20, '#e74c3c', 'center');
+    drawBtn("ゲストのまま はじめる", 470, 490, 340, 45, '#95a5a6', () => {
+        currentPlayerName = "ゲスト"; initializeGame();
+    });
+
+    drawText("※ひらがな・長音(ー)のみ入力可能、最大8文字（NGワードチェックあり）", 640, 555, 20, '#e74c3c', 'center');
     drawBtn("タイトルへ戻る", 540, 620, 200, 50, '#7f8c8d', () => { GAME_STATE = "TITLE"; });
 }
 
@@ -1012,8 +1040,9 @@ function finishExploration(isClear) {
     
     if (isClear && exploreData.stage.lv === 7) {
         let assets = calculateTotalAssets();
-        let scoreData = { name: currentPlayerName, days: gameData.day, assets: assets, isClear: true };
-        
+        let nowDt = new Date();
+        let scoreData = { name: currentPlayerName, days: gameData.day, assets: assets, isClear: true, date: `${nowDt.getFullYear()}/${nowDt.getMonth()+1}/${nowDt.getDate()}` };
+
         let localRank = JSON.parse(localStorage.getItem('fgl_local_ranking')) || [];
         localRank.push(scoreData);
         localRank.sort((a, b) => {
@@ -1231,7 +1260,8 @@ function renderShop(x, y) {
 function finishGame(isClear) {
     GAME_STATE = "RESULT";
     let assets = calculateTotalAssets();
-    let scoreData = { name: currentPlayerName, days: gameData.day, assets: assets, isClear: isClear };
+    let nowDt = new Date();
+    let scoreData = { name: currentPlayerName, days: gameData.day, assets: assets, isClear: isClear, date: `${nowDt.getFullYear()}/${nowDt.getMonth()+1}/${nowDt.getDate()}` };
 
     let localRank = JSON.parse(localStorage.getItem('fgl_local_ranking')) || [];
     localRank.push(scoreData);
@@ -1243,7 +1273,7 @@ function finishGame(isClear) {
     localStorage.setItem('fgl_local_ranking', JSON.stringify(localRank));
 
     window.saveOnlineScore(currentPlayerName, assets, 'normal')
-        .finally(() => setTimeout(() => { rankingTab="LOCAL"; GAME_STATE="RANKING"; }, 2000));
+        .finally(() => setTimeout(() => { rankingTab="WORLD"; rankingDataWorld=null; GAME_STATE="RANKING"; loadWorldRanking(); }, 2000));
 }
 
 function renderResult() {
@@ -1259,20 +1289,13 @@ function renderRanking() {
     ctx.fillRect(0,0,1280,720);
     drawText("🏆 ランキング 🏆", 640, 60, 50, '#f39c12', 'center');
 
-    drawBtn("ローカル", 440, 120, 150, 40, rankingTab==="LOCAL" ? '#e74c3c' : '#bdc3c7', () => rankingTab="LOCAL");
-    drawBtn("ワールド", 690, 120, 150, 40, rankingTab==="WORLD" ? '#3498db' : '#bdc3c7', () => {
+    drawBtn("ワールド", 440, 120, 150, 40, rankingTab==="WORLD" ? '#3498db' : '#bdc3c7', () => {
         rankingTab="WORLD";
-        if(!rankingDataWorld) {
-            window.fetchOnlineRanking('normal').then(data => {
-                rankingDataWorld = data.map(r => ({
-                    name: r.name,
-                    assets: r.score,
-                    days: '-',
-                    isClear: true
-                }));
-            }).catch(() => { rankingDataWorld = []; });
-        }
+        loadWorldRanking();
     });
+    drawBtn("ローカル", 690, 120, 150, 40, rankingTab==="LOCAL" ? '#e74c3c' : '#bdc3c7', () => rankingTab="LOCAL");
+
+    if (rankingTab === "WORLD") loadWorldRanking();
 
     let displayData = [];
     if(rankingTab === "LOCAL") {
@@ -1286,11 +1309,12 @@ function renderRanking() {
 
     if(displayData && displayData.length > 0) {
         ctx.fillStyle = '#34495e'; ctx.fillRect(tableX, startY, tableW, 40);
-        drawText("順位", tableX+50, startY+20, 20, '#fff', 'center');
-        drawText("名前", tableX+120, startY+20, 20, '#fff', 'left');
-        drawText("日数", tableX+440, startY+20, 20, '#fff', 'center');
-        drawText("総資産", tableX+580, startY+20, 20, '#fff', 'right');
-        drawText("結果", tableX+700, startY+20, 20, '#fff', 'center');
+        drawText("順位", tableX+40, startY+20, 20, '#fff', 'center');
+        drawText("名前", tableX+100, startY+20, 20, '#fff', 'left');
+        drawText("日数", tableX+380, startY+20, 20, '#fff', 'center');
+        drawText("総資産", tableX+500, startY+20, 20, '#fff', 'right');
+        drawText("結果", tableX+610, startY+20, 20, '#fff', 'center');
+        drawText("日付", tableX+730, startY+20, 18, '#fff', 'center');
 
         let cy = startY + 60;
         displayData.slice(0, 10).forEach((d, idx) => {
@@ -1300,12 +1324,13 @@ function renderRanking() {
             }
             let clr = d.isClear ? "★クリア" : "リタイア";
             let tColor = '#2c3e50';
-            drawText(`${idx+1}位`, tableX+50, cy, 20, tColor, 'center');
-            drawText(d.name, tableX+120, cy, 20, tColor, 'left');
-            drawText(`${d.days}日`, tableX+440, cy, 20, tColor, 'center');
-            drawText(`${d.assets} G`, tableX+580, cy, 20, '#f39c12', 'right');
-            drawText(clr, tableX+700, cy, 20, d.isClear ? '#e74c3c' : '#7f8c8d', 'center');
-            
+            drawText(`${idx+1}位`, tableX+40, cy, 20, tColor, 'center');
+            drawText(d.name, tableX+100, cy, 20, tColor, 'left');
+            drawText(`${d.days}日`, tableX+380, cy, 20, tColor, 'center');
+            drawText(`${d.assets} G`, tableX+500, cy, 20, '#f39c12', 'right');
+            drawText(clr, tableX+610, cy, 20, d.isClear ? '#e74c3c' : '#7f8c8d', 'center');
+            drawText(d.date || "-", tableX+730, cy, 16, '#7f8c8d', 'center');
+
             ctx.strokeStyle = '#bdc3c7'; ctx.lineWidth = 1;
             ctx.beginPath(); ctx.moveTo(tableX, cy+20); ctx.lineTo(tableX+tableW, cy+20); ctx.stroke();
             cy += 40;
