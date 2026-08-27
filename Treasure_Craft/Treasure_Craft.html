@@ -21,17 +21,19 @@
     const _h = {'apikey':_k,'Authorization':'Bearer '+_k,'Content-Type':'application/json','Prefer':'return=minimal'};
     const _rh = {'apikey':_k,'Authorization':'Bearer '+_k};
     window.currentUser = {uid:'guest', displayName:''};
-    window.saveOnlineScore = async (name, score, difficulty) => {
+    window.saveOnlineScore = async (name, score, difficulty, extra) => {
         if((score||0)<=0) return;
+        const days = (extra && typeof extra.days === 'number') ? extra.days : 0;
+        const isClear = !!(extra && extra.isClear);
         try {
             const res = await fetch(`${_b}/rankings`,{method:'POST',headers:_h,keepalive:true,
-                body:JSON.stringify({game:'treasure_craft',difficulty:difficulty||'normal',player_name:name||'ゲスト',point_score:Math.round(score)||0})});
+                body:JSON.stringify({game:'treasure_craft',difficulty:difficulty||'normal',player_name:name||'ゲスト',point_score:Math.round(score)||0,stage_score:days,turns:isClear?1:0})});
             if(!res.ok){const t=await res.text();throw new Error(`HTTP ${res.status}: ${t}`);}
         } catch(e){console.error('Ranking save error:',e);}
     };
     window.fetchOnlineRanking = async (difficulty) => {
         try {
-            const q = new URLSearchParams({select:'player_name,point_score,created_at',game:'eq.treasure_craft',difficulty:`eq.${difficulty||'normal'}`,point_score:'gt.0',order:'point_score.desc',limit:'10'});
+            const q = new URLSearchParams({select:'player_name,point_score,stage_score,turns,created_at',game:'eq.treasure_craft',difficulty:`eq.${difficulty||'normal'}`,point_score:'gt.0',order:'point_score.desc',limit:'10'});
             const res = await fetch(`${_b}/rankings?${q}`,{headers:_rh});
             if(!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
@@ -41,7 +43,7 @@
                     const dt = new Date(r.created_at);
                     dateStr = `${dt.getFullYear()}/${dt.getMonth()+1}/${dt.getDate()}`;
                 }
-                return {name:r.player_name,score:r.point_score,date:dateStr};
+                return {name:r.player_name,score:r.point_score,days:r.stage_score,isClear:r.turns===1,date:dateStr};
             });
         } catch(e){console.error('Ranking load error:',e);return [];}
     };
@@ -183,6 +185,510 @@ const NG_WORDS_HIRAGANA = [
     'あどれす', 'めあど', 'じゅうしょ', 'あお', 'あいたい', 'まちあわせ', 'ほてる', 'らぶほ', 'おふかい', 'ぱすわーど', 'ぱす',
     'あかうんと', 'こじんじょうほう'
 ];
+
+let currentLang = localStorage.getItem('tc_lang') || 'ja';
+
+const STRINGS = {
+    ja: {
+        title_main: "トレジャー＆クラフト",
+        title_sub: "～7つの秘境と幻の竜～",
+        btn_start: "はじめる",
+        btn_settings: "設定",
+        btn_ranking: "ランキング",
+        btn_index: "INDEXへ",
+
+        player_select_title: "プレイヤー選択",
+        btn_start_with: "{name} で開始",
+        btn_change: "変更",
+        btn_delete: "消去",
+        btn_register_new: "新しく登録",
+        slot_empty: "（あき）",
+        btn_start_guest: "ゲストのまま はじめる",
+        guest_name: "ゲスト",
+        hiragana_note: "※ひらがな・長音(ー)のみ入力可能、最大8文字（NGワードチェックあり）",
+        btn_back_title: "タイトルへ戻る",
+        prompt_new_name: "新しいプレイヤー名",
+        confirm_delete_player: "{name} を消去してよろしいですか？",
+        confirm_delete_sub: "※この操作は取り消せません",
+        err_hiragana_only: "ひらがな・長音のみ、1〜8文字で入力してください。",
+        err_ng_word: "使用できない言葉が含まれています。",
+
+        panel_status: "ステータス",
+        label_name: "名前: {name}",
+        label_lv: "Lv: {lv}",
+        label_exp_left: "次のレベルまであと: {exp} exp",
+        label_ap: "AP: {cur} / {max}",
+        label_day: "日数: {day}日目",
+        label_atk: "攻撃力: {total} (基本{base} + 装備{equip})",
+        label_def: "防御力: {total} (基本{base} + 装備{equip})",
+        label_mag: "魔法力: {total} (基本{base} + 装備{equip})",
+        slot_none: "なし",
+        btn_unequip: "外す",
+        btn_help: "ヘルプ",
+
+        shop_label_img: "お店",
+        btn_explore: "探索",
+        btn_shop: "お店",
+        btn_rest: "休む",
+        btn_end: "終了",
+        confirm_rest: "休みますか？",
+        confirm_rest_sub: "APが回復して次の日になります。",
+        confirm_end: "ここで冒険を終了して本当によろしいですか？",
+        confirm_end_sub: "※セーブはされません。",
+
+        panel_inventory: "持ち物・クラフト",
+        label_gold: "所持金: {gold} G",
+        btn_sort: "整理",
+        msg_sorted: "道具を整理した。",
+        tab_all: "全て",
+        tab_craft: "合成",
+        tab_enhance: "強化",
+        btn_bulk_sell: "換金物の一括売却",
+        msg_no_sellable: "一括売却できる換金物はありません。",
+        confirm_bulk_sell: "換金物を全て売却して {amount} G に換えます。",
+        confirm_yes_question: "よろしいですか？",
+        msg_bulk_sold: "換金物を一括売却し、{amount} G 得た。",
+
+        btn_equipped: "装備中",
+        btn_equip: "装備",
+        btn_sell: "売却",
+        msg_equipped: "{name}を装備した。",
+        msg_unequipped: "装備を外した。",
+        msg_cant_sell_equipped: "装備中は売却できません。",
+
+        btn_create: "作成",
+        msg_ap_insufficient: "APが足りません。",
+        msg_crafted: "{name}を作成した！",
+
+        max_label: "MAX",
+        msg_enhance_max: "これ以上強化できません。",
+        msg_enhance_nomoney: "お金が足りません。",
+        msg_enhanced: "{name}を強化した！",
+
+        msg_explore_end_exp: "探索終了。経験値 {exp} を獲得した！",
+        msg_potion_consumed: "装備していた薬を消費した。",
+        panel_explore_select: "探索エリア選択",
+        stage_line: "Lv.{lv} {name} (最大{floor}階)",
+        msg_ap_insufficient2: "APが足りません！",
+        msg_potion_advantage: "薬の力で探索が有利になる！",
+        msg_explore_start: "{name}の探索を開始した。",
+        btn_back: "戻る",
+        explore_status_line: "{name} - 現在 {cur} / {max}階",
+        btn_advance: "進む",
+        btn_skip: "SKIP",
+        btn_return: "帰る",
+        msg_returned: "探索を切り上げて帰還した。",
+        msg_ap_none_returned: "APが足りない！帰還した。",
+        msg_too_strong: "敵が強すぎて進めない！逃げ帰った...",
+        msg_got_items: "{floor}階: {items} をGET！",
+        msg_nothing_found: "{floor}階: 何も見つからなかった。",
+        msg_stage_cleared: "{name}の最深部を制覇した！",
+        msg_new_area: "新エリア解放！",
+
+        panel_shop: "お店 (共通パーツ・レシピ)",
+        tab_common: "共通",
+        label_owned: "所持:{count}",
+        btn_soldout: "売切",
+        btn_buy: "購入",
+        msg_recipe_learned: "レシピ習得！",
+        msg_bought: "{name}を購入。",
+
+        result_title: "ゲーム終了",
+        result_assets: "総資産: {assets} G",
+        result_processing: "データ処理中...",
+
+        ranking_title: "🏆 ランキング 🏆",
+        tab_world: "ワールド",
+        tab_local: "ローカル",
+        rank_h_rank: "順位",
+        rank_h_name: "名前",
+        rank_h_days: "日数",
+        rank_h_assets: "総資産",
+        rank_h_result: "結果",
+        rank_h_date: "日付",
+        result_clear: "★クリア",
+        result_retire: "リタイア",
+        rank_position: "{n}位",
+        rank_days_suffix: "{n}日",
+        loading: "読み込み中...",
+        no_data: "データがありません",
+
+        help_title: "序盤の進め方",
+        help_lines: [
+            "最初に、次のことをやってみよう",
+            "①お店に行ってみよう。",
+            "②「ひも」と「木の盾のレシピ」を購入しよう。",
+            "③木の盾を合成して装備しよう。",
+            "④探索ボタンを押して、始まりの森を探索しよう。",
+            "⑤GETしたアイテムを売って、レシピを購入して新しい装備を作ってみよう。",
+            "⑥APがなくなったら休むと回復するよ。",
+            "「竜の火口」の最深部を目指そう！",
+            "",
+            "その他のワンポイントアドバイス",
+            "・換金物はとくに使い道はないので売ってしまおう。🪙の数が多いほど価値が高いよ。",
+            "・レシピは一度買えば作り方は覚えるよ。",
+            "・装備は強いものと弱いものがランダムで作成されるよ。⭐の数でだいたいの強さがわかるよ。",
+            "・薬は一回の探索でなくなってしまうけど、探索の成功率が高くなるよ。",
+            "・セーブは出来ないよ。",
+            "・クリア時の日数と総資産が記録されるよ。良い成績ならランキングに載るよ。"
+        ],
+        btn_close: "閉じる",
+
+        clear_title: "ゲームクリア！",
+        clear_assets: "総資産: {assets} G",
+        clear_level: "最終レベル: Lv.{lv}",
+        clear_days: "クリア日数: {days}日",
+        clear_sending: "ランキングデータ送信中...",
+        btn_confirm: "決定",
+        btn_cancel: "キャンセル",
+        btn_yes: "はい",
+        btn_no: "いいえ",
+        btn_ok_alert: "確認",
+
+        msg_new_day: "{day}日目になった。AP全回復！",
+        msg_levelup: "レベルアップ！Lv{lv}に！最大AP+1 (攻+{atk}/防+{def}/魔+{mag})",
+        settings_title: "設定",
+        lang_ja: "日本語",
+        lang_simple: "かんたんな\nにほんご",
+        lang_en: "English"
+    },
+    simple: {
+        title_main: "トレジャー＆クラフト",
+        title_sub: "～ななつの ひきょうと まぼろしの りゅう～",
+        btn_start: "はじめる",
+        btn_settings: "せってい",
+        btn_ranking: "ランキング",
+        btn_index: "INDEXへ",
+
+        player_select_title: "プレイヤーせんたく",
+        btn_start_with: "{name} で かいし",
+        btn_change: "へんこう",
+        btn_delete: "けす",
+        btn_register_new: "あたらしく とうろく",
+        slot_empty: "（あき）",
+        btn_start_guest: "ゲストのまま はじめる",
+        guest_name: "ゲスト",
+        hiragana_note: "※ひらがな・ちょうおん(ー)だけ にゅうりょくできます。さいだい8もじ",
+        btn_back_title: "タイトルへ もどる",
+        prompt_new_name: "あたらしい プレイヤーめい",
+        confirm_delete_player: "{name} を けしても いいですか？",
+        confirm_delete_sub: "※もとに もどせません",
+        err_hiragana_only: "ひらがな・ちょうおんだけで、1〜8もじで にゅうりょくしてください。",
+        err_ng_word: "つかえない ことばが はいっています。",
+
+        panel_status: "ステータス",
+        label_name: "なまえ: {name}",
+        label_lv: "Lv: {lv}",
+        label_exp_left: "つぎのレベルまで あと: {exp} exp",
+        label_ap: "AP: {cur} / {max}",
+        label_day: "にっすう: {day}にちめ",
+        label_atk: "こうげきりょく: {total} (きほん{base} + そうび{equip})",
+        label_def: "ぼうぎょりょく: {total} (きほん{base} + そうび{equip})",
+        label_mag: "まほうりょく: {total} (きほん{base} + そうび{equip})",
+        slot_none: "なし",
+        btn_unequip: "はずす",
+        btn_help: "ヘルプ",
+
+        shop_label_img: "おみせ",
+        btn_explore: "たんさく",
+        btn_shop: "おみせ",
+        btn_rest: "やすむ",
+        btn_end: "おわる",
+        confirm_rest: "やすみますか？",
+        confirm_rest_sub: "APが かいふくして つぎの ひに なります。",
+        confirm_end: "ここで ぼうけんを おわって ほんとうに いいですか？",
+        confirm_end_sub: "※セーブは されません。",
+
+        panel_inventory: "もちもの・クラフト",
+        label_gold: "しょじきん: {gold} G",
+        btn_sort: "せいり",
+        msg_sorted: "どうぐを せいりした。",
+        tab_all: "すべて",
+        tab_craft: "ごうせい",
+        tab_enhance: "きょうか",
+        btn_bulk_sell: "かんきんぶつの いっかつばいきゃく",
+        msg_no_sellable: "いっかつばいきゃくできる かんきんぶつは ありません。",
+        confirm_bulk_sell: "かんきんぶつを すべて うって {amount} G に かえます。",
+        confirm_yes_question: "よろしいですか？",
+        msg_bulk_sold: "かんきんぶつを いっかつばいきゃくし、{amount} G えた。",
+
+        btn_equipped: "そうびちゅう",
+        btn_equip: "そうび",
+        btn_sell: "うる",
+        msg_equipped: "{name}を そうびした。",
+        msg_unequipped: "そうびを はずした。",
+        msg_cant_sell_equipped: "そうびちゅうは うれません。",
+
+        btn_create: "つくる",
+        msg_ap_insufficient: "APが たりません。",
+        msg_crafted: "{name}を つくった！",
+
+        max_label: "MAX",
+        msg_enhance_max: "これ いじょう きょうかできません。",
+        msg_enhance_nomoney: "おかねが たりません。",
+        msg_enhanced: "{name}を きょうかした！",
+
+        msg_explore_end_exp: "たんさく しゅうりょう。けいけんち {exp} を かくとくした！",
+        msg_potion_consumed: "そうびしていた くすりを つかった。",
+        panel_explore_select: "たんさく エリアせんたく",
+        stage_line: "Lv.{lv} {name} (さいだい{floor}かい)",
+        msg_ap_insufficient2: "APが たりません！",
+        msg_potion_advantage: "くすりの ちからで たんさくが ゆうりに なる！",
+        msg_explore_start: "{name}の たんさくを かいしした。",
+        btn_back: "もどる",
+        explore_status_line: "{name} - げんざい {cur} / {max}かい",
+        btn_advance: "すすむ",
+        btn_skip: "SKIP",
+        btn_return: "かえる",
+        msg_returned: "たんさくを きりあげて きかんした。",
+        msg_ap_none_returned: "APが たりない！きかんした。",
+        msg_too_strong: "てきが つよすぎて すすめない！にげかえった...",
+        msg_got_items: "{floor}かい: {items} を ゲット！",
+        msg_nothing_found: "{floor}かい: なにも みつからなかった。",
+        msg_stage_cleared: "{name}の さいしんぶを せいはした！",
+        msg_new_area: "しんエリア かいほう！",
+
+        panel_shop: "おみせ (きょうつうパーツ・レシピ)",
+        tab_common: "きょうつう",
+        label_owned: "しょじ:{count}",
+        btn_soldout: "うりきれ",
+        btn_buy: "こうにゅう",
+        msg_recipe_learned: "レシピ しゅうとく！",
+        msg_bought: "{name}を こうにゅう。",
+
+        result_title: "ゲーム しゅうりょう",
+        result_assets: "そうしさん: {assets} G",
+        result_processing: "データ しょりちゅう...",
+
+        ranking_title: "🏆 ランキング 🏆",
+        tab_world: "ワールド",
+        tab_local: "ローカル",
+        rank_h_rank: "じゅんい",
+        rank_h_name: "なまえ",
+        rank_h_days: "にっすう",
+        rank_h_assets: "そうしさん",
+        rank_h_result: "けっか",
+        rank_h_date: "ひづけ",
+        result_clear: "★クリア",
+        result_retire: "リタイア",
+        rank_position: "{n}い",
+        rank_days_suffix: "{n}にち",
+        loading: "よみこみちゅう...",
+        no_data: "データが ありません",
+
+        help_title: "じょばんの すすめかた",
+        help_lines: [
+            "さいしょに、つぎの ことを やってみよう",
+            "①おみせに いってみよう。",
+            "②「ひも」と「きのたてのレシピ」を こうにゅうしよう。",
+            "③きのたてを ごうせいして そうびしよう。",
+            "④たんさくボタンを おして、はじまりのもりを たんさくしよう。",
+            "⑤ゲットした アイテムを うって、レシピを こうにゅうして あたらしい そうびを つくってみよう。",
+            "⑥APが なくなったら やすむと かいふくするよ。",
+            "「りゅうのかこう」の さいしんぶを めざそう！",
+            "",
+            "そのほかの ワンポイントアドバイス",
+            "・かんきんぶつは とくに つかいみちが ないので うってしまおう。🪙の かずが おおいほど かちが たかいよ。",
+            "・レシピは いちど かえば つくりかたを おぼえるよ。",
+            "・そうびは つよいものと よわいものが ランダムで さくせいされるよ。⭐の かずで だいたいの つよさが わかるよ。",
+            "・くすりは いっかいの たんさくで なくなってしまうけど、たんさくの せいこうりつが たかくなるよ。",
+            "・セーブは できないよ。",
+            "・クリアじの にっすうと そうしさんが きろくされるよ。よい せいせきなら ランキングに のるよ。"
+        ],
+        btn_close: "とじる",
+
+        clear_title: "ゲームクリア！",
+        clear_assets: "そうしさん: {assets} G",
+        clear_level: "さいしゅうレベル: Lv.{lv}",
+        clear_days: "クリアにっすう: {days}にち",
+        clear_sending: "ランキングデータ そうしんちゅう...",
+        btn_confirm: "けってい",
+        btn_cancel: "キャンセル",
+        btn_yes: "はい",
+        btn_no: "いいえ",
+        btn_ok_alert: "かくにん",
+
+        msg_new_day: "{day}にちめに なった。APぜんかいふく！",
+        msg_levelup: "レベルアップ！Lv{lv}に！さいだいAP+1 (こう+{atk}/ぼう+{def}/ま+{mag})",
+        settings_title: "せってい",
+        lang_ja: "日本語",
+        lang_simple: "かんたんな\nにほんご",
+        lang_en: "English"
+    },
+    en: {
+        title_main: "Treasure & Craft",
+        title_sub: "~ 7 Hidden Realms and the Phantom Dragon ~",
+        btn_start: "Start",
+        btn_settings: "Settings",
+        btn_ranking: "Ranking",
+        btn_index: "To Index",
+
+        player_select_title: "Select Player",
+        btn_start_with: "Start as {name}",
+        btn_change: "Edit",
+        btn_delete: "Delete",
+        btn_register_new: "Register New",
+        slot_empty: "(empty)",
+        btn_start_guest: "Start as Guest",
+        guest_name: "Guest",
+        hiragana_note: "* Hiragana and \"ー\" only, up to 8 characters (NG word check applies)",
+        btn_back_title: "Back to Title",
+        prompt_new_name: "New player name",
+        confirm_delete_player: "Delete \"{name}\"?",
+        confirm_delete_sub: "* This cannot be undone",
+        err_hiragana_only: "Please enter hiragana or \"ー\" only, 1-8 characters.",
+        err_ng_word: "That name contains a word that cannot be used.",
+
+        panel_status: "Status",
+        label_name: "Name: {name}",
+        label_lv: "Lv: {lv}",
+        label_exp_left: "Next level in: {exp} exp",
+        label_ap: "AP: {cur} / {max}",
+        label_day: "Day: {day}",
+        label_atk: "ATK: {total} (base {base} + gear {equip})",
+        label_def: "DEF: {total} (base {base} + gear {equip})",
+        label_mag: "MAG: {total} (base {base} + gear {equip})",
+        slot_none: "None",
+        btn_unequip: "Unequip",
+        btn_help: "Help",
+
+        shop_label_img: "Shop",
+        btn_explore: "Explore",
+        btn_shop: "Shop",
+        btn_rest: "Rest",
+        btn_end: "End",
+        confirm_rest: "Rest now?",
+        confirm_rest_sub: "AP will recover and the day will advance.",
+        confirm_end: "Are you sure you want to end the adventure here?",
+        confirm_end_sub: "* Your progress will not be saved.",
+
+        panel_inventory: "Items & Crafting",
+        label_gold: "Gold: {gold} G",
+        btn_sort: "Sort",
+        msg_sorted: "Sorted your items.",
+        tab_all: "All",
+        tab_craft: "Craft",
+        tab_enhance: "Enhance",
+        btn_bulk_sell: "Sell all loot",
+        msg_no_sellable: "There is no sellable loot right now.",
+        confirm_bulk_sell: "Sell all loot for {amount} G.",
+        confirm_yes_question: "Are you sure?",
+        msg_bulk_sold: "Sold all loot for {amount} G.",
+
+        btn_equipped: "Equipped",
+        btn_equip: "Equip",
+        btn_sell: "Sell",
+        msg_equipped: "Equipped {name}.",
+        msg_unequipped: "Unequipped.",
+        msg_cant_sell_equipped: "Can't sell an equipped item.",
+
+        btn_create: "Craft",
+        msg_ap_insufficient: "Not enough AP.",
+        msg_crafted: "Crafted {name}!",
+
+        max_label: "MAX",
+        msg_enhance_max: "This can't be enhanced any further.",
+        msg_enhance_nomoney: "Not enough gold.",
+        msg_enhanced: "Enhanced {name}!",
+
+        msg_explore_end_exp: "Exploration ended. Gained {exp} exp!",
+        msg_potion_consumed: "Used up the equipped potion.",
+        panel_explore_select: "Select Exploration Area",
+        stage_line: "Lv.{lv} {name} (up to floor {floor})",
+        msg_ap_insufficient2: "Not enough AP!",
+        msg_potion_advantage: "The potion's power gives you an advantage!",
+        msg_explore_start: "Started exploring {name}.",
+        btn_back: "Back",
+        explore_status_line: "{name} - Floor {cur} / {max}",
+        btn_advance: "Advance",
+        btn_skip: "SKIP",
+        btn_return: "Return",
+        msg_returned: "Cut the exploration short and returned home.",
+        msg_ap_none_returned: "Out of AP! Returned home.",
+        msg_too_strong: "The enemies are too strong to proceed! Fled home...",
+        msg_got_items: "Floor {floor}: got {items}!",
+        msg_nothing_found: "Floor {floor}: found nothing.",
+        msg_stage_cleared: "Conquered the depths of {name}!",
+        msg_new_area: "New area unlocked!",
+
+        panel_shop: "Shop (Common Parts & Recipes)",
+        tab_common: "Common",
+        label_owned: "Owned: {count}",
+        btn_soldout: "Sold Out",
+        btn_buy: "Buy",
+        msg_recipe_learned: "Recipe learned!",
+        msg_bought: "Bought {name}.",
+
+        result_title: "Game Over",
+        result_assets: "Total assets: {assets} G",
+        result_processing: "Processing data...",
+
+        ranking_title: "🏆 Ranking 🏆",
+        tab_world: "World",
+        tab_local: "Local",
+        rank_h_rank: "Rank",
+        rank_h_name: "Name",
+        rank_h_days: "Days",
+        rank_h_assets: "Assets",
+        rank_h_result: "Result",
+        rank_h_date: "Date",
+        result_clear: "★ Cleared",
+        result_retire: "Retired",
+        rank_position: "#{n}",
+        rank_days_suffix: "{n}d",
+        loading: "Loading...",
+        no_data: "No data",
+
+        help_title: "Getting Started",
+        help_lines: [
+            "First, try doing the following",
+            "① Visit the shop.",
+            "② Buy \"ひも\" (string) and the recipe for a wooden shield (木の盾).",
+            "③ Craft the wooden shield and equip it.",
+            "④ Press Explore and explore the Starting Forest.",
+            "⑤ Sell the items you get, buy recipes, and craft new gear.",
+            "⑥ When AP runs out, resting will restore it.",
+            "Aim for the depths of the Dragon's Crater!",
+            "",
+            "Other quick tips",
+            "・Loot items have no other use, so just sell them. More 🪙 icons means higher value.",
+            "・Once you buy a recipe, you'll always remember how to craft it.",
+            "・Gear is randomly crafted strong or weak. The number of ⭐ shows roughly how strong it is.",
+            "・A potion is used up after one exploration, but raises your success rate.",
+            "・There's no save feature.",
+            "・Your clear day count and total assets are recorded. A good result will make the ranking."
+        ],
+        btn_close: "Close",
+
+        clear_title: "Game Clear!",
+        clear_assets: "Total assets: {assets} G",
+        clear_level: "Final level: Lv.{lv}",
+        clear_days: "Days to clear: {days}",
+        clear_sending: "Sending ranking data...",
+        btn_confirm: "Confirm",
+        btn_cancel: "Cancel",
+        btn_yes: "Yes",
+        btn_no: "No",
+        btn_ok_alert: "OK",
+
+        msg_new_day: "Day {day}. AP fully restored!",
+        msg_levelup: "Level up! Now Lv{lv}! Max AP+1 (ATK+{atk}/DEF+{def}/MAG+{mag})",
+        settings_title: "Settings",
+        lang_ja: "日本語",
+        lang_simple: "かんたんな\nにほんご",
+        lang_en: "English"
+    }
+};
+
+function T(key, params) {
+    const dict = STRINGS[currentLang] || {};
+    let s = (key in dict) ? dict[key] : ((key in STRINGS.ja) ? STRINGS.ja[key] : key);
+    if (Array.isArray(s)) return s;
+    if (params) {
+        Object.keys(params).forEach(k => { s = s.split('{' + k + '}').join(params[k]); });
+    }
+    return s;
+}
 let GAME_STATE = "TITLE"; 
 let clickZones = [];
 let localPlayers = JSON.parse(localStorage.getItem('fgl_players')) || [];
@@ -219,8 +725,8 @@ function loadWorldRanking() {
         rankingDataWorld = data.map(r => ({
             name: r.name,
             assets: r.score,
-            days: '-',
-            isClear: true,
+            days: (typeof r.days === 'number' && r.days > 0) ? r.days : '-',
+            isClear: !!r.isClear,
             date: r.date
         }));
     }).catch(() => { rankingDataWorld = []; })
@@ -389,7 +895,7 @@ function checkLevelUp() {
         gameData.baseStatus.def += upDef;
         gameData.baseStatus.mag += upMag;
 
-        addMessage(`レベルアップ！Lv${gameData.level}に！最大AP+1 (攻+${upAtk}/防+${upDef}/魔+${upMag})`);
+        addMessage(T('msg_levelup', {lv: gameData.level, atk: upAtk, def: upDef, mag: upMag}));
         reqExp = getNextExp(gameData.level);
     }
 }
@@ -442,7 +948,7 @@ function shadeColor(hex, percent) {
     return '#' + (0x1000000 + r*0x10000 + g*0x100 + b).toString(16).slice(1);
 }
 
-function drawBtn(text, x, y, w, h, color, onClick, disabled=false) {
+function drawBtn(text, x, y, w, h, color, onClick, disabled=false, textColor='#fff') {
     let baseColor = disabled ? '#95a5a6' : color;
     if (disabled && text === "装備中" || text === "売切") {
         baseColor = text === "装備中" ? '#e74c3c' : '#7f8c8d';
@@ -461,7 +967,7 @@ function drawBtn(text, x, y, w, h, color, onClick, disabled=false) {
     ctx.strokeStyle = shadowColor; ctx.lineWidth = 2; ctx.stroke();
 
     let fSize = Math.min(22, Math.floor(h * 0.5));
-    drawText(text, x + w/2, y + h/2 - 1, fSize, '#fff', 'center');
+    drawText(text, x + w/2, y + h/2 - 1, fSize, disabled ? '#fff' : textColor, 'center');
     if (!disabled) addZone(x, y, w, h, onClick);
 }
 
@@ -503,7 +1009,7 @@ function unequipItemByUid(uid) {
     for(let k in gameData.equipment) {
         if(gameData.equipment[k] === uid) {
             gameData.equipment[k] = null;
-            addMessage("装備を外した。");
+            addMessage(T('msg_unequipped'));
             break;
         }
     }
@@ -517,30 +1023,31 @@ function renderTitle() {
     ctx.save();
     ctx.shadowColor = 'rgba(241,196,15,0.7)';
     ctx.shadowBlur = 25;
-    drawText("トレジャー＆クラフト", 640, 120, 80, '#f1c40f', 'center', '900');
+    drawText(T('title_main'), 640, 120, 80, '#f1c40f', 'center', '900');
     ctx.restore();
-    drawText("～7つの秘境と幻の竜～", 640, 210, 40, '#ecf0f1', 'center');
+    drawText(T('title_sub'), 640, 210, 40, '#ecf0f1', 'center');
 
     let startY = 320;
-    let bW = 260; 
+    let bW = 260;
     let bH = 60;
     let gapX = 40;
     let gapY = 40;
-    
+
     let leftX = 640 - bW - (gapX / 2);
     let rightX = 640 + (gapX / 2);
 
     let row1Y = startY;
     let row2Y = startY + bH + gapY;
 
-    drawBtn("はじめる", leftX, row1Y, bW, bH, '#ffb3ba', () => { GAME_STATE = "PLAYER_SELECT"; });
+    drawBtn(T('btn_start'), leftX, row1Y, bW, bH, '#ffb3ba', () => { GAME_STATE = "PLAYER_SELECT"; }, false, '#7f1d2b');
+    drawBtn(T('btn_settings'), rightX, row1Y, bW, bH, '#c39bd3', () => { GAME_STATE = "SETTINGS"; }, false, '#4a235a');
 
-    drawBtn("ランキング", leftX, row2Y, bW, bH, '#ffd8b1', () => {
+    drawBtn(T('btn_ranking'), leftX, row2Y, bW, bH, '#ffd8b1', () => {
         rankingTab = "WORLD"; rankingDataWorld = null; GAME_STATE = "RANKING";
         loadWorldRanking();
-    });
+    }, false, '#7a4a10');
 
-    drawBtn("INDEXへ", rightX, row2Y, bW, bH, '#e2f0cb', () => { window.location.href = "../index.html"; });
+    drawBtn(T('btn_index'), rightX, row2Y, bW, bH, '#e2f0cb', () => { window.location.href = "../index.html"; }, false, '#3d5a1f');
 }
 
 function loginWithGoogle() {}
@@ -571,12 +1078,12 @@ function showPrompt(title, defaultVal, callback) {
 function handleNameRegistration(val, index = -1) {
     if (!val) { activePopup = null; return; }
     if (!/^[ぁ-んー]{1,8}$/.test(val)) {
-        activePopup = { text: "ひらがな・長音のみ、1〜8文字で入力してください。", isAlert: true };
+        activePopup = { text: T('err_hiragana_only'), isAlert: true };
         return;
     }
     for(let w of NG_WORDS_HIRAGANA) {
         if(val.includes(w)) {
-            activePopup = { text: "使用できない言葉が含まれています。", isAlert: true };
+            activePopup = { text: T('err_ng_word'), isAlert: true };
             return;
         }
     }
@@ -596,25 +1103,25 @@ function handleNameRegistration(val, index = -1) {
 
 function renderPlayerSelect() {
     drawImageRect('title', 0, 0, 1280, 720);
-    ctx.fillStyle = 'rgba(236, 240, 241, 0.85)'; 
+    ctx.fillStyle = 'rgba(236, 240, 241, 0.85)';
     ctx.fillRect(0,0,1280,720);
-    drawText("プレイヤー選択", 640, 80, 40, '#2c3e50', 'center');
+    drawText(T('player_select_title'), 640, 80, 40, '#2c3e50', 'center');
 
     for (let i = 0; i < 5; i++) {
         let py = 150 + i * 70;
         if (i < localPlayers.length) {
-            drawBtn(`${localPlayers[i]} で開始`, 470, py, 340, 50, '#3498db', () => {
+            drawBtn(T('btn_start_with', {name: localPlayers[i]}), 470, py, 340, 50, '#3498db', () => {
                 currentPlayerName = localPlayers[i]; initializeGame();
             });
-            drawBtn("変更", 830, py, 100, 50, '#f39c12', () => {
-                showPrompt("新しいプレイヤー名", localPlayers[i], (val) => {
+            drawBtn(T('btn_change'), 830, py, 100, 50, '#f39c12', () => {
+                showPrompt(T('prompt_new_name'), localPlayers[i], (val) => {
                     handleNameRegistration(val, i);
                 });
             });
-            drawBtn("消去", 950, py, 100, 50, '#e74c3c', () => {
+            drawBtn(T('btn_delete'), 950, py, 100, 50, '#e74c3c', () => {
                 activePopup = {
-                    text: `${localPlayers[i]} を消去してよろしいですか？`,
-                    subtext: "※この操作は取り消せません",
+                    text: T('confirm_delete_player', {name: localPlayers[i]}),
+                    subtext: T('confirm_delete_sub'),
                     onYes: () => {
                         localPlayers.splice(i, 1);
                         localStorage.setItem('fgl_players', JSON.stringify(localPlayers));
@@ -622,42 +1129,42 @@ function renderPlayerSelect() {
                 };
             });
         } else if (i === localPlayers.length) {
-            drawBtn("新しく登録", 470, py, 340, 50, '#2ecc71', () => {
-                showPrompt("新しいプレイヤー名", "", (val) => {
+            drawBtn(T('btn_register_new'), 470, py, 340, 50, '#2ecc71', () => {
+                showPrompt(T('prompt_new_name'), "", (val) => {
                     handleNameRegistration(val, -1);
                 });
             });
         } else {
-            drawBtn("（あき）", 470, py, 340, 50, '#bdc3c7', () => {});
+            drawBtn(T('slot_empty'), 470, py, 340, 50, '#bdc3c7', () => {});
         }
     }
-    
-    drawBtn("ゲストのまま はじめる", 470, 490, 340, 45, '#95a5a6', () => {
-        currentPlayerName = "ゲスト"; initializeGame();
+
+    drawBtn(T('btn_start_guest'), 470, 490, 340, 45, '#95a5a6', () => {
+        currentPlayerName = T('guest_name'); initializeGame();
     });
 
-    drawText("※ひらがな・長音(ー)のみ入力可能、最大8文字（NGワードチェックあり）", 640, 555, 20, '#e74c3c', 'center');
-    drawBtn("タイトルへ戻る", 540, 620, 200, 50, '#7f8c8d', () => { GAME_STATE = "TITLE"; });
+    drawText(T('hiragana_note'), 640, 555, 20, '#e74c3c', 'center');
+    drawBtn(T('btn_back_title'), 540, 620, 200, 50, '#7f8c8d', () => { GAME_STATE = "TITLE"; });
 }
 
 // --- メインUI ---
 function drawStatusPanel(x, y) {
-    drawPanel(x, y, 330, 680, "ステータス");
+    drawPanel(x, y, 330, 680, T('panel_status'));
     let cy = y + 70;
-    drawText(`名前: ${currentPlayerName}`, x+20, cy, 24, '#2c3e50'); cy += 40;
-    
+    drawText(T('label_name', {name: currentPlayerName}), x+20, cy, 24, '#2c3e50'); cy += 40;
+
     let reqExp = getNextExp(gameData.level);
     let expLeft = reqExp - gameData.exp;
-    drawText(`Lv: ${gameData.level}`, x+20, cy, 22, '#2c3e50'); cy += 30;
-    
-    let expStr = `次のレベルまであと: ${expLeft} exp`;
+    drawText(T('label_lv', {lv: gameData.level}), x+20, cy, 22, '#2c3e50'); cy += 30;
+
+    let expStr = T('label_exp_left', {exp: expLeft});
     let expFontSize = 18;
     if (expLeft >= 1000000) expFontSize = 14;
     else if (expLeft >= 100000) expFontSize = 16;
     drawText(expStr, x+20, cy, expFontSize, '#2c3e50'); cy += 40;
-    
-    drawText(`AP: ${gameData.ap} / ${gameData.maxAp}`, x+20, cy, 24, '#d35400'); cy += 40;
-    drawText(`日数: ${gameData.day}日目`, x+20, cy, 24, '#2c3e50'); cy += 50;
+
+    drawText(T('label_ap', {cur: gameData.ap, max: gameData.maxAp}), x+20, cy, 24, '#d35400'); cy += 40;
+    drawText(T('label_day', {day: gameData.day}), x+20, cy, 24, '#2c3e50'); cy += 50;
 
     let eq = gameData.equipment;
     let wStat = eq.weapon ? getActualStat(getInvItem(eq.weapon)) : 0;
@@ -675,16 +1182,16 @@ function drawStatusPanel(x, y) {
     let defFSize = defTotal >= 1000 ? 14 : 18;
     let magFSize = magTotal >= 1000 ? 14 : 18;
 
-    drawText(`攻撃力: ${atkTotal} (基本${gameData.baseStatus.atk} + 装備${wStat})`, x+20, cy, atkFSize, '#2980b9'); cy += 30;
-    drawText(`防御力: ${defTotal} (基本${gameData.baseStatus.def} + 装備${defEqTotal})`, x+20, cy, defFSize, '#27ae60'); cy += 30;
-    drawText(`魔法力: ${magTotal} (基本${gameData.baseStatus.mag} + 装備${mStat})`, x+20, cy, magFSize, '#8e44ad'); cy += 40;
+    drawText(T('label_atk', {total: atkTotal, base: gameData.baseStatus.atk, equip: wStat}), x+20, cy, atkFSize, '#2980b9'); cy += 30;
+    drawText(T('label_def', {total: defTotal, base: gameData.baseStatus.def, equip: defEqTotal}), x+20, cy, defFSize, '#27ae60'); cy += 30;
+    drawText(T('label_mag', {total: magTotal, base: gameData.baseStatus.mag, equip: mStat}), x+20, cy, magFSize, '#8e44ad'); cy += 40;
 
     const slots = [
         {key:'weapon', icon:'buki'}, {key:'shield', icon:'tate'},
         {key:'armor', icon:'yoroi'}, {key:'accessory', icon:'yubiwa'}, {key:'potion', icon:'kusuri'}
     ];
     slots.forEach(s => {
-        let itemStr = "なし";
+        let itemStr = T('slot_none');
         let starStr = "";
         let color = '#7f8c8d';
         if(eq[s.key]) {
@@ -712,12 +1219,12 @@ function drawStatusPanel(x, y) {
         }
         
         if(eq[s.key]) {
-            drawBtn("外す", x+270, cy-14, 45, 28, '#e74c3c', () => { unequipItemByUid(eq[s.key]); });
+            drawBtn(T('btn_unequip'), x+270, cy-14, 45, 28, '#e74c3c', () => { unequipItemByUid(eq[s.key]); });
         }
         cy += 45;
     });
 
-    drawBtn("ヘルプ", x+20, y+620, 290, 40, '#f39c12', () => { showHelp = true; });
+    drawBtn(T('btn_help'), x+20, y+620, 290, 40, '#f39c12', () => { showHelp = true; });
 }
 
 function drawCenterPanel(x, y) {
@@ -728,7 +1235,7 @@ function drawCenterPanel(x, y) {
         ctx.fillStyle = '#8e44ad'; ctx.fillRect(x+10, y+10, 390, 219);
         ctx.fillStyle = '#fff'; ctx.font = 'bold 30px "M PLUS Rounded 1c"';
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText('お店', x+205, y+119);
+        ctx.fillText(T('shop_label_img'), x+205, y+119);
     } else {
         drawImageRect(imgKey, x+10, y+10, 390, 219);
     }
@@ -737,33 +1244,33 @@ function drawCenterPanel(x, y) {
     ctx.strokeStyle = '#bdc3c7'; ctx.strokeRect(x+10, y+240, 390, 250);
     for(let i=0; i<gameData.messages.length; i++) drawText(gameData.messages[i], x+20, y+265 + i*22, 16, '#2c3e50');
 
-    drawBtn("探索", x+20, y+510, 175, 60, '#2ecc71', () => { GAME_STATE = "EXPLORE_SELECT"; });
-    drawBtn("お店", x+215, y+510, 175, 60, '#9b59b6', () => { GAME_STATE = "SHOP"; });
-    drawBtn("休む", x+20, y+590, 175, 60, '#f1c40f', () => {
+    drawBtn(T('btn_explore'), x+20, y+510, 175, 60, '#2ecc71', () => { GAME_STATE = "EXPLORE_SELECT"; });
+    drawBtn(T('btn_shop'), x+215, y+510, 175, 60, '#9b59b6', () => { GAME_STATE = "SHOP"; });
+    drawBtn(T('btn_rest'), x+20, y+590, 175, 60, '#f1c40f', () => {
         activePopup = {
-            text: "休みますか？",
-            subtext: "APが回復して次の日になります。",
+            text: T('confirm_rest'),
+            subtext: T('confirm_rest_sub'),
             onYes: () => {
                 restEffect.active = true; restEffect.alpha = 0; restEffect.phase = 'in';
             }
         };
     });
-    drawBtn("終了", x+215, y+590, 175, 60, '#e74c3c', () => {
+    drawBtn(T('btn_end'), x+215, y+590, 175, 60, '#e74c3c', () => {
         activePopup = {
-            text: "ここで冒険を終了して本当によろしいですか？",
-            subtext: "※セーブはされません。",
+            text: T('confirm_end'),
+            subtext: T('confirm_end_sub'),
             onYes: () => finishGame(false)
         };
     });
 }
 
 function drawRightPanel(x, y) {
-    drawPanel(x, y, 460, 680, "持ち物・クラフト");
+    drawPanel(x, y, 460, 680, T('panel_inventory'));
     let cy = y + 70;
-    
-    drawText(`所持金: ${gameData.gold} G`, x+20, cy, 24, '#f39c12');
-    
-    drawBtn("整理", x+360, cy-20, 80, 40, '#0097e6', () => {
+
+    drawText(T('label_gold', {gold: gameData.gold}), x+20, cy, 24, '#f39c12');
+
+    drawBtn(T('btn_sort'), x+360, cy-20, 80, 40, '#0097e6', () => {
         const typeOrder = {1:1, 2:2, 3:3, 4:4, 5:5, 9:6, 6:7, 7:8, 8:9};
         gameData.inventory.sort((a, b) => {
             let m1 = getObjById(ITEMS, a.itemId);
@@ -771,17 +1278,17 @@ function drawRightPanel(x, y) {
             if (typeOrder[m1.type] !== typeOrder[m2.type]) return typeOrder[m1.type] - typeOrder[m2.type];
             return a.itemId - b.itemId;
         });
-        addMessage("道具を整理した。");
+        addMessage(T('msg_sorted'));
     });
-    
+
     cy += 40;
 
-    drawBtn("全て", x+20, cy, 70, 35, currentInvTab==="ALL" ? '#3498db' : '#bdc3c7', () => {currentInvTab="ALL"; invPage=0;});
-    drawBtn("合成", x+95, cy, 70, 35, currentInvTab==="CRAFT" ? '#3498db' : '#bdc3c7', () => {currentInvTab="CRAFT"; invPage=0;});
-    drawBtn("強化", x+170, cy, 70, 35, currentInvTab==="ENHANCE" ? '#3498db' : '#bdc3c7', () => {currentInvTab="ENHANCE"; invPage=0;});
-    
+    drawBtn(T('tab_all'), x+20, cy, 70, 35, currentInvTab==="ALL" ? '#3498db' : '#bdc3c7', () => {currentInvTab="ALL"; invPage=0;});
+    drawBtn(T('tab_craft'), x+95, cy, 70, 35, currentInvTab==="CRAFT" ? '#3498db' : '#bdc3c7', () => {currentInvTab="CRAFT"; invPage=0;});
+    drawBtn(T('tab_enhance'), x+170, cy, 70, 35, currentInvTab==="ENHANCE" ? '#3498db' : '#bdc3c7', () => {currentInvTab="ENHANCE"; invPage=0;});
+
     if(currentInvTab === "ALL") {
-        drawBtn("換金物の一括売却", x+245, cy, 195, 35, '#e67e22', () => {
+        drawBtn(T('btn_bulk_sell'), x+245, cy, 195, 35, '#e67e22', () => {
             let lootItems = [];
             let totalVal = 0;
             gameData.inventory.forEach(inv => {
@@ -804,18 +1311,18 @@ function drawRightPanel(x, y) {
             });
             
             if(lootItems.length === 0) {
-                addMessage("一括売却できる換金物はありません。");
+                addMessage(T('msg_no_sellable'));
                 return;
             }
             activePopup = {
-                text: `換金物を全て売却して ${totalVal} G に換えます。`,
-                subtext: "よろしいですか？",
+                text: T('confirm_bulk_sell', {amount: totalVal}),
+                subtext: T('confirm_yes_question'),
                 onYes: () => {
                     lootItems.forEach(inv => {
                         gameData.gold += getObjById(ITEMS, inv.itemId).price * inv.count;
                         gameData.inventory = gameData.inventory.filter(i => i.uid !== inv.uid);
                     });
-                    addMessage(`換金物を一括売却し、${totalVal} G 得た。`);
+                    addMessage(T('msg_bulk_sold', {amount: totalVal}));
                 }
             };
         });
@@ -871,13 +1378,13 @@ function renderInventoryList(x, y, cy) {
 
         if(isEquip || isPotion) {
             if(isEquipped) {
-                drawBtn("装備中", x+320, cy-15, 60, 30, '#e74c3c', () => unequipItemByUid(inv.uid));
+                drawBtn(T('btn_equipped'), x+320, cy-15, 60, 30, '#e74c3c', () => unequipItemByUid(inv.uid));
             } else {
-                drawBtn("装備", x+320, cy-15, 60, 30, '#2ecc71', () => equipItem(inv));
+                drawBtn(T('btn_equip'), x+320, cy-15, 60, 30, '#2ecc71', () => equipItem(inv));
             }
-            drawBtn("売却", x+390, cy-15, 50, 30, '#e67e22', () => sellItem(inv, master));
+            drawBtn(T('btn_sell'), x+390, cy-15, 50, 30, '#e67e22', () => sellItem(inv, master));
         } else {
-            drawBtn("売却", x+360, cy-15, 80, 30, '#e67e22', () => sellItem(inv, master));
+            drawBtn(T('btn_sell'), x+360, cy-15, 80, 30, '#e67e22', () => sellItem(inv, master));
         }
         cy += 45; 
     });
@@ -891,11 +1398,11 @@ function equipItem(inv) {
     let m = getObjById(ITEMS, inv.itemId), key = "";
     if(m.type === 1) key = 'weapon'; if(m.type === 2) key = 'shield';
     if(m.type === 3) key = 'armor'; if(m.type === 4) key = 'accessory'; if(m.type === 5) key = 'potion';
-    if(key) { gameData.equipment[key] = inv.uid; addMessage(`${m.name}を装備した。`); }
+    if(key) { gameData.equipment[key] = inv.uid; addMessage(T('msg_equipped', {name: m.name})); }
 }
 
 function sellItem(inv, master) {
-    for(let k in gameData.equipment) { if(gameData.equipment[k] === inv.uid) return addMessage("装備中は売却できません。"); }
+    for(let k in gameData.equipment) { if(gameData.equipment[k] === inv.uid) return addMessage(T('msg_cant_sell_equipped')); }
     gameData.gold += master.price; 
     removeItem(inv.itemId, 1);
     if(master.type >= 1 && master.type <= 4) gameData.inventory = gameData.inventory.filter(i => i.uid !== inv.uid);
@@ -936,13 +1443,13 @@ function renderCraftList(x, y, cy) {
             drawText(targetMaster.name, x+15, cy-15, 20, canCraft ? tColor : '#95a5a6');
             drawText(`${reqs.baseItem.name}(${cBase}/1) + ${reqs.matItem.name}(${cMat}/${reqs.matCount})`, x+15, cy+15, 16, '#7f8c8d');
             
-            drawBtn("作成", x+350, cy-20, 80, 40, canCraft ? '#3498db' : '#bdc3c7', () => {
-                if(gameData.ap < 1) return addMessage("APが足りません。");
+            drawBtn(T('btn_create'), x+350, cy-20, 80, 40, canCraft ? '#3498db' : '#bdc3c7', () => {
+                if(gameData.ap < 1) return addMessage(T('msg_ap_insufficient'));
                 removeItem(reqs.baseItem.id, 1);
                 removeItem(reqs.matItem.id, reqs.matCount);
                 gameData.ap -= 1;
                 addItem(targetId, targetMaster.type <= 4 ? getGaussianStat(targetMaster.stat) : 0, 1);
-                addMessage(`${targetMaster.name}を作成した！`);
+                addMessage(T('msg_crafted', {name: targetMaster.name}));
             }, !canCraft);
         } else {
             let m1 = getObjById(ITEMS, rule.mat1Id), m2 = rule.mat2Id ? getObjById(ITEMS, rule.mat2Id) : null;
@@ -952,12 +1459,12 @@ function renderCraftList(x, y, cy) {
             drawText(targetMaster.name, x+15, cy-15, 20, canCraft ? tColor : '#95a5a6');
             drawText(`${m1.name}(${c1}/1)` + (m2 ? ` + ${m2.name}(${c2}/1)` : ""), x+15, cy+15, 16, '#7f8c8d');
             
-            drawBtn("作成", x+350, cy-20, 80, 40, canCraft ? '#3498db' : '#bdc3c7', () => {
-                if(gameData.ap < 1) return addMessage("APが足りません。");
+            drawBtn(T('btn_create'), x+350, cy-20, 80, 40, canCraft ? '#3498db' : '#bdc3c7', () => {
+                if(gameData.ap < 1) return addMessage(T('msg_ap_insufficient'));
                 removeItem(rule.mat1Id, 1); if(rule.mat2Id) removeItem(rule.mat2Id, 1);
                 gameData.ap -= 1;
                 addItem(targetId, targetMaster.type <= 4 ? getGaussianStat(targetMaster.stat) : 0, 1);
-                addMessage(`${targetMaster.name}を作成した！`);
+                addMessage(T('msg_crafted', {name: targetMaster.name}));
             }, !canCraft);
         }
         cy += 65; 
@@ -997,16 +1504,16 @@ function renderEnhanceList(x, y, cy) {
 
         let cost = master.price * 2;
         let canEnhance = gameData.gold >= cost && upg < 10;
-        let costTxt = upg >= 10 ? "MAX" : `${cost}G`;
+        let costTxt = upg >= 10 ? T('max_label') : `${cost}G`;
 
         drawText(costTxt, x + 300, cy, 18, '#f39c12', 'right');
 
-        drawBtn("強化", x+320, cy-15, 120, 30, canEnhance ? '#9b59b6' : '#bdc3c7', () => {
-            if (upg >= 10) return addMessage("これ以上強化できません。");
-            if (gameData.gold < cost) return addMessage("お金が足りません。");
+        drawBtn(T('tab_enhance'), x+320, cy-15, 120, 30, canEnhance ? '#9b59b6' : '#bdc3c7', () => {
+            if (upg >= 10) return addMessage(T('msg_enhance_max'));
+            if (gameData.gold < cost) return addMessage(T('msg_enhance_nomoney'));
             gameData.gold -= cost;
             inv.upgrade = upg + 1;
-            addMessage(`${master.name}を強化した！`);
+            addMessage(T('msg_enhanced', {name: master.name}));
         }, !canEnhance);
         
         cy += 45; 
@@ -1020,7 +1527,7 @@ function renderEnhanceList(x, y, cy) {
 // --- 探索・お店 ---
 function finishExploration(isClear) {
     if (exploreData && exploreData.gainedExpTotal > 0) {
-        addMessage(`探索終了。経験値 ${exploreData.gainedExpTotal} を獲得した！`);
+        addMessage(T('msg_explore_end_exp', {exp: exploreData.gainedExpTotal}));
     }
 
     checkLevelUp();
@@ -1035,7 +1542,7 @@ function finishExploration(isClear) {
                 gameData.inventory = gameData.inventory.filter(i => i.uid !== pUid);
             }
         }
-        addMessage("装備していた薬を消費した。");
+        addMessage(T('msg_potion_consumed'));
     }
     
     if (isClear && exploreData.stage.lv === 7) {
@@ -1060,7 +1567,7 @@ function finishExploration(isClear) {
             saving: true
         };
 
-        window.saveOnlineScore(currentPlayerName, assets, 'normal')
+        window.saveOnlineScore(currentPlayerName, assets, 'normal', {days: gameData.day, isClear: true})
             .finally(() => { if(activePopup && activePopup.isClearPopup) activePopup.saving = false; });
         GAME_STATE = "MAIN";
     } else {
@@ -1069,15 +1576,15 @@ function finishExploration(isClear) {
 }
 
 function renderExploreSelect(x, y) {
-    drawPanel(x, y, 410, 680, "探索エリア選択");
+    drawPanel(x, y, 410, 680, T('panel_explore_select'));
     let cy = y + 80;
     STAGES.forEach(stg => {
         let isUnlock = stg.lv <= gameData.maxStageLv;
-        let maxFloor = stg.lv * 5 + 5; 
+        let maxFloor = stg.lv * 5 + 5;
 
-        drawText(`Lv.${stg.lv} ${stg.name} (最大${maxFloor}階)`, x+20, cy, 18, isUnlock ? '#2c3e50' : '#95a5a6');
-        drawBtn("探索", x+300, cy-15, 90, 40, isUnlock ? '#e74c3c' : '#bdc3c7', () => {
-            if(gameData.ap < 1) return addMessage("APが足りません！");
+        drawText(T('stage_line', {lv: stg.lv, name: stg.name, floor: maxFloor}), x+20, cy, 18, isUnlock ? '#2c3e50' : '#95a5a6');
+        drawBtn(T('btn_explore'), x+300, cy-15, 90, 40, isUnlock ? '#e74c3c' : '#bdc3c7', () => {
+            if(gameData.ap < 1) return addMessage(T('msg_ap_insufficient2'));
             
             let cp = calcCombatPower();
             let n = stg.lv;
@@ -1102,15 +1609,15 @@ function renderExploreSelect(x, y) {
             };
 
             if (gameData.equipment.potion) {
-                addMessage("薬の力で探索が有利になる！");
+                addMessage(T('msg_potion_advantage'));
             }
-            addMessage(`${stg.name}の探索を開始した。`);
+            addMessage(T('msg_explore_start', {name: stg.name}));
 
             GAME_STATE = "EXPLORING";
         }, !isUnlock);
         cy += 75;
     });
-    drawBtn("戻る", x+145, y+620, 120, 50, '#7f8c8d', () => { GAME_STATE = "MAIN"; });
+    drawBtn(T('btn_back'), x+145, y+620, 120, 50, '#7f8c8d', () => { GAME_STATE = "MAIN"; });
 }
 
 function renderExploring(x, y) {
@@ -1122,27 +1629,27 @@ function renderExploring(x, y) {
     ctx.strokeStyle = '#bdc3c7'; ctx.strokeRect(x+10, y+240, 390, 250);
     for(let i=0; i<gameData.messages.length; i++) drawText(gameData.messages[i], x+20, y+265 + i*22, 16, '#2c3e50');
 
-    drawText(`${exploreData.stage.name} - 現在 ${exploreData.currentFloor} / ${exploreData.maxFloor}階`, x+205, y+520, 20, '#2c3e50', 'center');
+    drawText(T('explore_status_line', {name: exploreData.stage.name, cur: exploreData.currentFloor, max: exploreData.maxFloor}), x+205, y+520, 20, '#2c3e50', 'center');
 
-    drawBtn("進む", x+20, y+560, 115, 60, '#3498db', () => advanceFloor(false));
-    drawBtn("SKIP", x+145, y+560, 115, 60, '#e67e22', () => advanceFloor(true));
-    drawBtn("帰る", x+270, y+560, 115, 60, '#95a5a6', () => { 
-        addMessage("探索を切り上げて帰還した。"); 
-        finishExploration(false); 
+    drawBtn(T('btn_advance'), x+20, y+560, 115, 60, '#3498db', () => advanceFloor(false));
+    drawBtn(T('btn_skip'), x+145, y+560, 115, 60, '#e67e22', () => advanceFloor(true));
+    drawBtn(T('btn_return'), x+270, y+560, 115, 60, '#95a5a6', () => {
+        addMessage(T('msg_returned'));
+        finishExploration(false);
     });
 }
 
 function advanceFloor(isSkip) {
     do {
         if(gameData.ap < 1) {
-            addMessage("APが足りない！帰還した。");
+            addMessage(T('msg_ap_none_returned'));
             finishExploration(false);
             break;
         }
 
         if(exploreData.currentFloor >= exploreData.maxPossibleFloor) {
-            addMessage("敵が強すぎて進めない！逃げ帰った...");
-            gameData.ap -= 1; 
+            addMessage(T('msg_too_strong'));
+            gameData.ap -= 1;
             finishExploration(false);
             break;
         }
@@ -1180,17 +1687,17 @@ function advanceFloor(isSkip) {
                 dropMsgs.push(`${itemMaster.name}×${count}`);
             }
             if(dropMsgs.length > 0) {
-                addMessage(`${exploreData.currentFloor}階: ${dropMsgs.join('、')} をGET！`);
+                addMessage(T('msg_got_items', {floor: exploreData.currentFloor, items: dropMsgs.join(currentLang === 'en' ? ', ' : '、')}));
             } else {
-                addMessage(`${exploreData.currentFloor}階: 何も見つからなかった。`);
+                addMessage(T('msg_nothing_found', {floor: exploreData.currentFloor}));
             }
         } else {
-            addMessage(`${exploreData.currentFloor}階: 何も見つからなかった。`);
+            addMessage(T('msg_nothing_found', {floor: exploreData.currentFloor}));
         }
 
         if(exploreData.currentFloor >= exploreData.maxFloor) {
-            addMessage(`${stg.name}の最深部を制覇した！`);
-            if(gameData.maxStageLv === stg.lv) { gameData.maxStageLv++; addMessage(`新エリア解放！`); }
+            addMessage(T('msg_stage_cleared', {name: stg.name}));
+            if(gameData.maxStageLv === stg.lv) { gameData.maxStageLv++; addMessage(T('msg_new_area')); }
             finishExploration(true);
             break;
         }
@@ -1199,10 +1706,10 @@ function advanceFloor(isSkip) {
 }
 
 function renderShop(x, y) {
-    drawPanel(x, y, 410, 680, "お店 (共通パーツ・レシピ)");
-    drawText(`所持金: ${gameData.gold} G`, x+20, y+70, 24, '#f39c12');
-    
-    drawBtn("共通", x+20, y+100, 50, 30, shopTab==="COMMON" ? '#e67e22' : '#bdc3c7', () => {shopTab="COMMON"; shopPage=0;});
+    drawPanel(x, y, 410, 680, T('panel_shop'));
+    drawText(T('label_gold', {gold: gameData.gold}), x+20, y+70, 24, '#f39c12');
+
+    drawBtn(T('tab_common'), x+20, y+100, 50, 30, shopTab==="COMMON" ? '#e67e22' : '#bdc3c7', () => {shopTab="COMMON"; shopPage=0;});
     for(let i=1; i<=7; i++) {
         drawBtn(`Lv${i}`, x+75 + (i-1)*45, y+100, 40, 30, shopTab===`LV${i}` ? '#e67e22' : '#bdc3c7', () => {shopTab=`LV${i}`; shopPage=0;});
     }
@@ -1235,16 +1742,16 @@ function renderShop(x, y) {
         let btnH = 35;
 
         if (item.type === 9) {
-            drawText(`所持:${countItem(item.id)}`, btnX - 10, cy, 14, '#2c3e50', 'right');
+            drawText(T('label_owned', {count: countItem(item.id)}), btnX - 10, cy, 14, '#2c3e50', 'right');
         }
 
         if (isSoldOut) {
-            drawBtn("売切", btnX, btnY, btnW, btnH, '#bdc3c7', () => {}, true);
+            drawBtn(T('btn_soldout'), btnX, btnY, btnW, btnH, '#bdc3c7', () => {}, true);
         } else {
-            drawBtn("購入", btnX, btnY, btnW, btnH, canBuy ? '#3498db' : '#bdc3c7', () => {
+            drawBtn(T('btn_buy'), btnX, btnY, btnW, btnH, canBuy ? '#3498db' : '#bdc3c7', () => {
                 gameData.gold -= item.price;
-                if(item.type === 10) { gameData.unlockedRecipes.push(item.id); addMessage(`レシピ習得！`); }
-                else { addItem(item.id, 0, 1); addMessage(`${item.name}を購入。`); }
+                if(item.type === 10) { gameData.unlockedRecipes.push(item.id); addMessage(T('msg_recipe_learned')); }
+                else { addItem(item.id, 0, 1); addMessage(T('msg_bought', {name: item.name})); }
             }, !canBuy);
         }
         cy += 65;
@@ -1253,7 +1760,7 @@ function renderShop(x, y) {
     drawText(`${shopPage+1} / ${Math.max(0, Math.ceil(shopItems.length/7)-1)+1}`, x+205, y+650, 20, '#2c3e50', 'center');
     if(shopPage > 0) drawBtn("＜", x+110, y+630, 50, 40, '#34495e', () => shopPage--);
     if(shopPage < Math.ceil(shopItems.length/7)-1) drawBtn("＞", x+250, y+630, 50, 40, '#34495e', () => shopPage++);
-    drawBtn("戻る", x+20, y+630, 80, 40, '#7f8c8d', () => { GAME_STATE = "MAIN"; });
+    drawBtn(T('btn_back'), x+20, y+630, 80, 40, '#7f8c8d', () => { GAME_STATE = "MAIN"; });
 }
 
 // --- リザルト・ランキング・ポップアップ ---
@@ -1272,28 +1779,28 @@ function finishGame(isClear) {
     });
     localStorage.setItem('fgl_local_ranking', JSON.stringify(localRank));
 
-    window.saveOnlineScore(currentPlayerName, assets, 'normal')
+    window.saveOnlineScore(currentPlayerName, assets, 'normal', {days: gameData.day, isClear: isClear})
         .finally(() => setTimeout(() => { rankingTab="WORLD"; rankingDataWorld=null; GAME_STATE="RANKING"; loadWorldRanking(); }, 2000));
 }
 
 function renderResult() {
     ctx.fillStyle = '#ecf0f1'; ctx.fillRect(0,0,1280,720);
-    drawText("ゲーム終了", 640, 200, 60, '#2c3e50', 'center');
-    drawText(`総資産: ${calculateTotalAssets()} G`, 640, 360, 30, '#f39c12', 'center');
-    drawText("データ処理中...", 640, 500, 20, '#7f8c8d', 'center');
+    drawText(T('result_title'), 640, 200, 60, '#2c3e50', 'center');
+    drawText(T('result_assets', {assets: calculateTotalAssets()}), 640, 360, 30, '#f39c12', 'center');
+    drawText(T('result_processing'), 640, 500, 20, '#7f8c8d', 'center');
 }
 
 function renderRanking() {
     drawImageRect('title', 0, 0, 1280, 720);
     ctx.fillStyle = 'rgba(236, 240, 241, 0.85)'; 
     ctx.fillRect(0,0,1280,720);
-    drawText("🏆 ランキング 🏆", 640, 60, 50, '#f39c12', 'center');
+    drawText(T('ranking_title'), 640, 60, 50, '#f39c12', 'center');
 
-    drawBtn("ワールド", 440, 120, 150, 40, rankingTab==="WORLD" ? '#3498db' : '#bdc3c7', () => {
+    drawBtn(T('tab_world'), 440, 120, 150, 40, rankingTab==="WORLD" ? '#3498db' : '#bdc3c7', () => {
         rankingTab="WORLD";
         loadWorldRanking();
     });
-    drawBtn("ローカル", 690, 120, 150, 40, rankingTab==="LOCAL" ? '#e74c3c' : '#bdc3c7', () => rankingTab="LOCAL");
+    drawBtn(T('tab_local'), 690, 120, 150, 40, rankingTab==="LOCAL" ? '#e74c3c' : '#bdc3c7', () => rankingTab="LOCAL");
 
     if (rankingTab === "WORLD") loadWorldRanking();
 
@@ -1309,12 +1816,12 @@ function renderRanking() {
 
     if(displayData && displayData.length > 0) {
         ctx.fillStyle = '#34495e'; ctx.fillRect(tableX, startY, tableW, 40);
-        drawText("順位", tableX+40, startY+20, 20, '#fff', 'center');
-        drawText("名前", tableX+100, startY+20, 20, '#fff', 'left');
-        drawText("日数", tableX+380, startY+20, 20, '#fff', 'center');
-        drawText("総資産", tableX+500, startY+20, 20, '#fff', 'right');
-        drawText("結果", tableX+610, startY+20, 20, '#fff', 'center');
-        drawText("日付", tableX+730, startY+20, 18, '#fff', 'center');
+        drawText(T('rank_h_rank'), tableX+40, startY+20, 20, '#fff', 'center');
+        drawText(T('rank_h_name'), tableX+100, startY+20, 20, '#fff', 'left');
+        drawText(T('rank_h_days'), tableX+380, startY+20, 20, '#fff', 'center');
+        drawText(T('rank_h_assets'), tableX+500, startY+20, 20, '#fff', 'right');
+        drawText(T('rank_h_result'), tableX+610, startY+20, 20, '#fff', 'center');
+        drawText(T('rank_h_date'), tableX+730, startY+20, 18, '#fff', 'center');
 
         let cy = startY + 60;
         displayData.slice(0, 10).forEach((d, idx) => {
@@ -1322,11 +1829,11 @@ function renderRanking() {
                 ctx.fillStyle = 'rgba(189, 195, 199, 0.3)';
                 ctx.fillRect(tableX, cy - 20, tableW, 40);
             }
-            let clr = d.isClear ? "★クリア" : "リタイア";
+            let clr = d.isClear ? T('result_clear') : T('result_retire');
             let tColor = '#2c3e50';
-            drawText(`${idx+1}位`, tableX+40, cy, 20, tColor, 'center');
+            drawText(T('rank_position', {n: idx+1}), tableX+40, cy, 20, tColor, 'center');
             drawText(d.name, tableX+100, cy, 20, tColor, 'left');
-            drawText(`${d.days}日`, tableX+380, cy, 20, tColor, 'center');
+            drawText(T('rank_days_suffix', {n: d.days}), tableX+380, cy, 20, tColor, 'center');
             drawText(`${d.assets} G`, tableX+500, cy, 20, '#f39c12', 'right');
             drawText(clr, tableX+610, cy, 20, d.isClear ? '#e74c3c' : '#7f8c8d', 'center');
             drawText(d.date || "-", tableX+730, cy, 16, '#7f8c8d', 'center');
@@ -1335,14 +1842,58 @@ function renderRanking() {
             ctx.beginPath(); ctx.moveTo(tableX, cy+20); ctx.lineTo(tableX+tableW, cy+20); ctx.stroke();
             cy += 40;
         });
-        
+
         ctx.strokeStyle = '#34495e'; ctx.lineWidth = 2;
         ctx.strokeRect(tableX, startY, tableW, cy - startY);
     } else {
-        drawText(rankingTab==="WORLD" && !rankingDataWorld ? "読み込み中..." : "データがありません", 640, 300, 24, '#2c3e50', 'center');
+        drawText(rankingTab==="WORLD" && !rankingDataWorld ? T('loading') : T('no_data'), 640, 300, 24, '#2c3e50', 'center');
     }
 
-    drawBtn("タイトルへ戻る", 540, 640, 200, 50, '#2c3e50', () => { GAME_STATE = "TITLE"; });
+    drawBtn(T('btn_back_title'), 540, 640, 200, 50, '#2c3e50', () => { GAME_STATE = "TITLE"; });
+}
+
+function renderSettings() {
+    drawImageRect('title', 0, 0, 1280, 720);
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(0,0,1280,720);
+
+    let px = 340, py = 220, pw = 600, ph = 300;
+    ctx.fillStyle = '#ecf0f1';
+    ctx.beginPath(); ctx.roundRect(px, py, pw, ph, 15); ctx.fill();
+    ctx.strokeStyle = '#34495e'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.roundRect(px, py, pw, ph, 15); ctx.stroke();
+
+    drawText(T('settings_title'), px + pw/2, py + 45, 30, '#2c3e50', 'center', '900');
+
+    const langs = [
+        {code: 'ja', key: 'lang_ja', c: '#f39c12'},
+        {code: 'simple', key: 'lang_simple', c: '#2ecc71'},
+        {code: 'en', key: 'lang_en', c: '#3498db'}
+    ];
+    const btnW = 160, btnH = 90, gap = 20;
+    const startX = px + (pw - (btnW*3 + gap*2)) / 2;
+    langs.forEach((l, i) => {
+        const bx = startX + i * (btnW + gap);
+        const by = py + 85;
+        const isActive = currentLang === l.code;
+        const color = isActive ? l.c : '#bdc3c7';
+        ctx.beginPath(); ctx.roundRect(bx, by, btnW, btnH, 12);
+        ctx.fillStyle = color; ctx.fill();
+        if (isActive) { ctx.strokeStyle = '#2c3e50'; ctx.lineWidth = 3; ctx.stroke(); }
+        const label = T(l.key);
+        const lines = label.split('\n');
+        const lineH = 22;
+        const startTextY = by + btnH/2 - (lines.length-1)*lineH/2;
+        lines.forEach((line, li) => {
+            drawText(line, bx + btnW/2, startTextY + li*lineH, 18, '#fff', 'center');
+        });
+        addZone(bx, by, btnW, btnH, () => {
+            currentLang = l.code;
+            localStorage.setItem('tc_lang', l.code);
+        });
+    });
+
+    drawBtn(T('btn_close'), px + pw/2 - 100, py + ph - 65, 200, 45, '#7f8c8d', () => { GAME_STATE = "TITLE"; });
 }
 
 function renderHelpPopup() {
@@ -1355,37 +1906,21 @@ function renderHelpPopup() {
     ctx.beginPath(); ctx.roundRect(px, py, pw, ph, 15); ctx.clip();
     ctx.fillStyle = '#ecf0f1'; ctx.fill();
     ctx.fillStyle = '#34495e'; ctx.fillRect(px, py, pw, 50);
-    drawText("序盤の進め方", px + pw/2, py + 25, 24, '#fff', 'center');
+    drawText(T('help_title'), px + pw/2, py + 25, 24, '#fff', 'center');
     ctx.restore();
     ctx.strokeStyle = '#34495e'; ctx.lineWidth = 4;
     ctx.beginPath(); ctx.roundRect(px, py, pw, ph, 15); ctx.stroke();
-    
-    let lines = [
-        "最初に、次のことをやってみよう",
-        "①お店に行ってみよう。",
-        "②「ひも」と「木の盾のレシピ」を購入しよう。",
-        "③木の盾を合成して装備しよう。",
-        "④探索ボタンを押して、始まりの森を探索しよう。",
-        "⑤GETしたアイテムを売って、レシピを購入して新しい装備を作ってみよう。",
-        "⑥APがなくなったら休むと回復するよ。",
-        "「竜の火口」の最深部を目指そう！",
-        "",
-        "その他のワンポイントアドバイス",
-        "・換金物はとくに使い道はないので売ってしまおう。🪙の数が多いほど価値が高いよ。",
-        "・レシピは一度買えば作り方は覚えるよ。",
-        "・装備は強いものと弱いものがランダムで作成されるよ。⭐の数でだいたいの強さがわかるよ。",
-        "・薬は一回の探索でなくなってしまうけど、探索の成功率が高くなるよ。",
-        "・セーブは出来ないよ。",
-        "・クリア時の日数と総資産が記録されるよ。良い成績ならランキングに載るよ。"
-    ];
-    
+
+    let lines = T('help_lines');
+    let fSize = currentLang === 'en' ? 16 : 18;
+
     let cy = py + 80;
     for (let line of lines) {
-        drawText(line, px + 30, cy, 18, '#2c3e50', 'left', 'normal');
+        drawText(line, px + 30, cy, fSize, '#2c3e50', 'left', 'normal');
         cy += 28;
     }
-    
-    drawBtn("閉じる", px + pw/2 - 75, py + 570, 150, 50, '#e74c3c', () => { showHelp = false; });
+
+    drawBtn(T('btn_close'), px + pw/2 - 75, py + 570, 150, 50, '#e74c3c', () => { showHelp = false; });
 }
 
 function renderPopup() {
@@ -1408,18 +1943,18 @@ function renderPopup() {
     ctx.beginPath(); ctx.roundRect(px, py, pw, ph, 15); ctx.stroke();
     
     if (activePopup.isClearPopup) {
-        drawText("ゲームクリア！", px + pw/2, py + 40, 30, '#f1c40f', 'center', '900');
+        drawText(T('clear_title'), px + pw/2, py + 40, 30, '#f1c40f', 'center', '900');
         drawImageRect('clear', px + 40, py + 70, 520, 292);
-        
+
         let cy = py + 390;
-        drawText(`総資産: ${activePopup.assets} G`, px + pw/2, cy, 22, '#f39c12', 'center'); cy += 30;
-        drawText(`最終レベル: Lv.${activePopup.level}`, px + pw/2, cy, 20, '#2c3e50', 'center'); cy += 30;
-        drawText(`クリア日数: ${activePopup.days}日`, px + pw/2, cy, 20, '#2c3e50', 'center'); cy += 40;
-        
+        drawText(T('clear_assets', {assets: activePopup.assets}), px + pw/2, cy, 22, '#f39c12', 'center'); cy += 30;
+        drawText(T('clear_level', {lv: activePopup.level}), px + pw/2, cy, 20, '#2c3e50', 'center'); cy += 30;
+        drawText(T('clear_days', {days: activePopup.days}), px + pw/2, cy, 20, '#2c3e50', 'center'); cy += 40;
+
         if (activePopup.saving) {
-            drawText("ランキングデータ送信中...", px + pw/2, cy, 16, '#7f8c8d', 'center');
+            drawText(T('clear_sending'), px + pw/2, cy, 16, '#7f8c8d', 'center');
         } else {
-            drawBtn("タイトルへ戻る", px + pw/2 - 100, cy - 20, 200, 50, '#3498db', () => {
+            drawBtn(T('btn_back_title'), px + pw/2 - 100, cy - 20, 200, 50, '#3498db', () => {
                 activePopup = null;
                 GAME_STATE = "TITLE";
             });
@@ -1429,10 +1964,10 @@ function renderPopup() {
         if (activePopup.subtext) {
             drawText(activePopup.subtext, px + pw/2, py + 120, 16, '#e74c3c', 'center');
         }
-        drawBtn("決定", px + 100, py + 140, 150, 45, '#3498db', () => {
+        drawBtn(T('btn_confirm'), px + 100, py + 140, 150, 45, '#3498db', () => {
             if(activePopup.onYes) activePopup.onYes();
         });
-        drawBtn("キャンセル", px + 350, py + 140, 150, 45, '#7f8c8d', () => {
+        drawBtn(T('btn_cancel'), px + 350, py + 140, 150, 45, '#7f8c8d', () => {
             if(activePopup.onNo) activePopup.onNo();
         });
     } else {
@@ -1440,16 +1975,16 @@ function renderPopup() {
         if (activePopup.subtext) {
             drawText(activePopup.subtext, px + pw/2, py + 95, 18, '#e74c3c', 'center');
         }
-        
+
         if(activePopup.isAlert) {
-            drawBtn("確認", px + pw/2 - 75, py + 130, 150, 45, '#3498db', () => { activePopup = null; });
+            drawBtn(T('btn_ok_alert'), px + pw/2 - 75, py + 130, 150, 45, '#3498db', () => { activePopup = null; });
         } else {
-            drawBtn("はい", px + 100, py + 130, 150, 45, '#e74c3c', () => {
+            drawBtn(T('btn_yes'), px + 100, py + 130, 150, 45, '#e74c3c', () => {
                 let onYes = activePopup.onYes;
                 activePopup = null;
                 if(onYes) onYes();
             });
-            drawBtn("いいえ", px + 350, py + 130, 150, 45, '#7f8c8d', () => {
+            drawBtn(T('btn_no'), px + 350, py + 130, 150, 45, '#7f8c8d', () => {
                 activePopup = null;
             });
         }
@@ -1468,6 +2003,7 @@ function loop() {
         case "SHOP": drawStatusPanel(20, 20); renderShop(370, 20); drawRightPanel(800, 20); break;
         case "RESULT": renderResult(); break;
         case "RANKING": renderRanking(); break;
+        case "SETTINGS": renderSettings(); break;
     }
 
     if (showHelp) {
@@ -1487,7 +2023,7 @@ function loop() {
                 restEffect.phase = 'out';
                 gameData.day++;
                 gameData.ap = gameData.maxAp;
-                addMessage(`${gameData.day}日目になった。AP全回復！`);
+                addMessage(T('msg_new_day', {day: gameData.day}));
             }
         } else {
             restEffect.alpha -= 0.05;
