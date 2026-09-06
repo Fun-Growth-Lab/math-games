@@ -2048,11 +2048,20 @@ function tallyElements(rect){
     }
     return tally;
 }
+// マス目のDOM要素はsetupGridDom()で1度だけ作られる（gridEl.children[r*GRID_COLS+c]の順）。
+// grid[r][c]を後から書き換えても見た目には反映されないため、卵を消費した際はここで明示的にアイコンを消す
+function clearGridCellVisual(r, c){
+    if (!gridEl) return;
+    const cellEl = gridEl.children[r*GRID_COLS + c];
+    if (!cellEl) return;
+    const wrap = cellEl.querySelector('.gem-wrap');
+    if (wrap) wrap.remove();
+}
 // 部屋の範囲内にある卵を数え、その場のマスからは取り除く（部屋に取り込まれるため）
 function tallyEggsAndClear(rect){
     let eggs = 0;
     for (let r=rect.r0;r<=rect.r1;r++) for (let c=rect.c0;c<=rect.c1;c++){
-        if (grid[r][c]==='egg'){ eggs++; grid[r][c] = null; }
+        if (grid[r][c]==='egg'){ eggs++; grid[r][c] = null; clearGridCellVisual(r, c); }
     }
     return eggs;
 }
@@ -5055,11 +5064,10 @@ function renderRoomDetail(){
             if (maxLv<=0) return '';
             const meta = abilityRowMeta(abilityType);
             const mult = roomAbilityMultiplier(rm, abilityType).toFixed(1);
-            let row = `<div class="room-detail-row" style="flex-wrap:wrap; row-gap:2px;">
+            let row = `<div class="room-detail-row">
                 <span class="gem-chip-sq ${meta.gem}"></span>
-                <span class="prod-value-big">${meta.label}アップ</span>
-                <span class="prod-value-big" style="color:var(--teal);">Lv.${curLv}</span>
-                <span class="prod-value-big" style="margin-left:auto; color:var(--gold);">${mult}${ui('label_times_suffix')}</span>
+                <span>${meta.label}アップ <b style="color:var(--teal);">Lv.${curLv}</b></span>
+                <b style="margin-left:auto; color:var(--gold);">${mult}${ui('label_times_suffix')}</b>
             </div>`;
             if (curLv < maxLv){
                 const cost = abilityUpgradeCost(abilityType, curLv+1);
