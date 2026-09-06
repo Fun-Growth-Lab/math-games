@@ -278,7 +278,6 @@
             font-size: 1.05rem; box-shadow: 0 1px 5px 1px rgba(0,0,0,0.55); transition: transform 0.2s;
         }
         .special-badge.badge-egg { border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fffaf0, #f3d99a 65%, #c99a4a); }
-        .special-badge.badge-chest { border-radius: 7px; background: linear-gradient(135deg, #ffe27a, #d69a2e 55%, #7a4f14); }
         .special-badge.focus { transform: scale(1.28); }
         .gem-citrine   { background: linear-gradient(135deg,#fff4a3,var(--el-vitality) 60%,#8f6a00); color: var(--el-vitality); }
         .gem-sapphire  { background: linear-gradient(135deg,#8fc4ff,var(--el-mana) 60%,#0f3d8f); color: var(--el-mana); }
@@ -667,6 +666,15 @@
         </div>
     </div>
 
+    <!-- ==================== STAGE ITEM DROP (post-battle) ==================== -->
+    <div id="stage-itemdrop-modal" class="modal-backdrop hidden">
+        <div class="modal-box" style="min-width:320px;">
+            <div class="modal-title" data-i18n="loot_found_title">🎁 アイテムを発見！</div>
+            <div id="stage-itemdrop-body"></div>
+            <button class="btn btn-primary btn-sm" style="margin-top:14px;" data-i18n="btn_close" onclick="closeStageItemDropModal()">とじる</button>
+        </div>
+    </div>
+
     <!-- ==================== DEMON LORD SKILL SELECT (in-battle) ==================== -->
     <div id="skill-select-modal" class="modal-backdrop hidden">
         <div class="modal-box" style="min-width:320px; max-width:440px;">
@@ -946,7 +954,6 @@ const UI_TEXT = {
     el_summon: { ja: '強化の素', ja_easy: 'きょうかの もと', en: 'Enhancement Essence' },
     el_attack: { ja: '攻撃の素', ja_easy: 'こうげきの もと', en: 'Attack Essence' },
     el_egg: { ja: '卵', ja_easy: 'たまご', en: 'Egg' },
-    el_chest: { ja: '宝箱', ja_easy: 'たからばこ', en: 'Chest' },
 
     build_panel_title: { ja: '建設', ja_easy: 'けんせつ', en: 'Construction' },
     room_detail_title: { ja: '部屋情報', ja_easy: 'へや じょうほう', en: 'Room Info' },
@@ -1224,7 +1231,7 @@ function renderElemLegend(){
     const wrap = document.getElementById('elem-legend');
     if (!wrap) return;
     wrap.innerHTML = ELEMENT_TYPES.map(t => `<div class="elem-chip"><span class="gem-chip ${t.gem}"></span>${ui('el_'+t.key)}</div>`).join('')
-        + `<div class="elem-chip">🥚 ${ui('el_egg')}</div><div class="elem-chip">🎁 ${ui('el_chest')}</div>`;
+        + `<div class="elem-chip">🥚 ${ui('el_egg')}</div>`;
 }
 function applyI18n(){
     document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = ui(el.getAttribute('data-i18n')); });
@@ -1515,16 +1522,14 @@ const ELEMENT_TYPES = [
     { key:'attack',   prob:0.03, gem:'gem-ruby' },
 ];
 const EGG_SPAWN_PROB = 0.10;   // 卵の出現確率（マップ生成時、素と同じ抽選に混ぜる）
-const CHEST_SPAWN_PROB = 0.05; // 宝箱の出現確率
-let grid = [];      // grid[r][c] = elementKey or 'egg' or 'chest' or null
+let grid = [];      // grid[r][c] = elementKey or 'egg' or null
 let occupied = [];  // occupied[r][c] = true/false
 
-// 素4種（合計20%）＋卵（10%）＋宝箱（5%）＋ハズレ（65%）
+// 素4種（合計20%）＋卵（10%）＋ハズレ（70%）。宝箱はマップ抽選から廃止（装備はステージ報酬＋勇者撃破ドロップに一本化）
 function rollCell(){
     let r = Math.random(), acc = 0;
     for (const t of ELEMENT_TYPES){ acc += t.prob; if (r < acc) return t.key; }
     acc += EGG_SPAWN_PROB; if (r < acc) return 'egg';
-    acc += CHEST_SPAWN_PROB; if (r < acc) return 'chest';
     return null;
 }
 function generateMap(){
@@ -1645,6 +1650,7 @@ function startNewDungeon(){
     gamePhase = 'build'; stage = 1;
     inventory = []; nextInventoryId = 1; equipModalMonsterId = null;
     demonLordSkillLevels = {}; demonLordSkillUsesThisBattle = 0; demonLordSkillUsedKeysThisBattle = []; pendingDemonLordSkill = null;
+    battleStageItemDrops = [];
     nextRoomId = 1; nextCorridorId = 1; nextMonsterId = 1; nextTrapId = 1; selectedRoomId = null; selectedMonsterId = null; demonLordMoveSelected = false;
     highlightedMonsterId = null; monsterSortKey = 'type'; highlightedTrapId = null;
     healIndividualOpen = false;
@@ -1691,13 +1697,13 @@ function setupGridDom(){
                 cell.classList.add('alt');
             }
             const key = grid[r][c];
-            if (key==='egg' || key==='chest'){
+            if (key==='egg'){
                 const wrap = document.createElement('div');
                 wrap.className = 'gem-wrap special-wrap';
                 const badge = document.createElement('div');
-                badge.className = 'special-badge ' + (key==='egg' ? 'badge-egg' : 'badge-chest');
+                badge.className = 'special-badge badge-egg';
                 badge.dataset.type = key;
-                badge.textContent = key==='egg' ? '🥚' : '🎁';
+                badge.textContent = '🥚';
                 wrap.appendChild(badge);
                 cell.appendChild(wrap);
             } else if (key){
@@ -2042,15 +2048,13 @@ function tallyElements(rect){
     }
     return tally;
 }
-// 部屋の範囲内にある卵・宝箱を数え、その場のマスからは取り除く（部屋に取り込まれるため）
-function tallySpecialsAndClear(rect){
-    let eggs = 0, chests = 0;
+// 部屋の範囲内にある卵を数え、その場のマスからは取り除く（部屋に取り込まれるため）
+function tallyEggsAndClear(rect){
+    let eggs = 0;
     for (let r=rect.r0;r<=rect.r1;r++) for (let c=rect.c0;c<=rect.c1;c++){
-        const k = grid[r][c];
-        if (k==='egg'){ eggs++; grid[r][c] = null; }
-        else if (k==='chest'){ chests++; grid[r][c] = null; }
+        if (grid[r][c]==='egg'){ eggs++; grid[r][c] = null; }
     }
-    return { eggs, chests };
+    return eggs;
 }
 function markOccupied(cells){ cells.forEach(({r,c}) => { occupied[r][c] = true; }); }
 
@@ -2062,10 +2066,10 @@ function confirmBuild(){
     const w = pendingRect.c1-pendingRect.c0+1, h = pendingRect.r1-pendingRect.r0+1;
     const roomId = nextRoomId++;
     const elements = tallyElements(pendingRect);
-    const specials = tallySpecialsAndClear(pendingRect);
+    const eggCount = tallyEggsAndClear(pendingRect);
     const monsterCapacity = Math.ceil(eggExpectedValue(area));
     const room = { id:roomId, r0:pendingRect.r0, c0:pendingRect.c0, r1:pendingRect.r1, c1:pendingRect.c1, w, h, area, elements, type:null, monsterCapacity,
-                   pendingEggs: specials.eggs, pendingChests: specials.chests };
+                   pendingEggs: eggCount };
     markOccupied(cellsOfRect(pendingRect));
     rooms.push(room);
     markOccupied(cCells);
@@ -2829,6 +2833,8 @@ function attemptAttackMonster(attackerUnit, monsterUnit){
 // ---- 経験値・レベル・ランクアップ ----
 // 勇者を倒した瞬間に付与される経験値（倒した本人のみ。部屋の強化倍率つき）
 const KILL_XP_BASE = 100;
+const HERO_ITEM_DROP_CHANCE = 0.2; // 勇者を倒すたびにこの確率で装備品がドロップする（ステージクリア後にまとめて表示）
+let battleStageItemDrops = []; // このステージの戦闘中にドロップしたアイテムkeyの一覧（ステージクリア後のポップアップ表示用）
 // Lvアップに必要な累積経験値は100の倍数（Lv.1=累計100、Lv.2=累計200…）
 const XP_PER_LEVEL = 100;
 function monsterLevel(xp){ return Math.floor((xp||0) / XP_PER_LEVEL); }
@@ -3233,21 +3239,14 @@ function hatchEggsInRoom(room, count){
     }
     return born;
 }
-// 部屋が確定した瞬間：範囲内で見つかった卵を空きの範囲で孵化させ、宝箱はその場ですべて開封する
+// 部屋が確定した瞬間：範囲内で見つかった卵を空きの範囲で孵化させる
 function resolveRoomHatchAndLoot(room){
     const freeSlots = Math.max(0, room.monsterCapacity - roomMonsterCount(room.id));
     const hatchCount = Math.min(room.pendingEggs||0, freeSlots);
     const born = hatchEggsInRoom(room, hatchCount);
     room.pendingEggs = (room.pendingEggs||0) - hatchCount;
-    const itemKeys = [];
-    for (let i=0;i<(room.pendingChests||0);i++){
-        const key = rollEquipmentItem();
-        inventory.push({ id: nextInventoryId++, itemKey: key });
-        itemKeys.push(key);
-    }
-    room.pendingChests = 0;
     renderAll();
-    openHatchAndLootModal(room, born, itemKeys);
+    openHatchAndLootModal(room, born, []);
 }
 // 他の部屋へモンスターを移動させて空きができたとき、その部屋で待機中の卵をまとめて孵化させる
 function tryHatchWaitingEggs(roomId){
@@ -3848,6 +3847,7 @@ function startBattle(){
     battleGlobalTick = -1;
     nextWaveIndex = 0;
     demonLordSkillUsesThisBattle = 0; demonLordSkillUsedKeysThisBattle = []; pendingDemonLordSkill = null;
+    battleStageItemDrops = [];
     // 選択中のゲームプリセットから、侵攻(ステージ)番号に応じた人数・ステータスで勇者を生成する
     // （4クラスを順番に繰り返し割り当てる。人数はheroCountForStage、攻撃系ステータスはheroOffenseMultで人数に応じて調整）
     const preset = currentGamePreset();
@@ -4165,6 +4165,12 @@ function applyDamage(side, target, dmg, attackerUnit){
             logBattle(uif('battle_log_hero_down', uif('hero_label', target.id)));
             // 勇者を倒したのが実際のモンスター（魔王・罠は対象外）であれば経験値を付与する
             if (attackerUnit && !attackerUnit.isDemonLord && attackerUnit.speciesKey) grantKillXp(attackerUnit);
+            // 倒れた勇者は一定確率で装備品をドロップする（ステージクリア後にまとめて表示）
+            if (Math.random() < HERO_ITEM_DROP_CHANCE){
+                const key = rollEquipmentItem();
+                inventory.push({ id: nextInventoryId++, itemKey: key });
+                battleStageItemDrops.push(key);
+            }
         } else if (target.isDemonLord){
             target.alive = false;
             logBattle(uif('battle_log_defeated', ui('demonlord_label')));
@@ -4733,6 +4739,21 @@ function openStageIncomeModal(vitGain, manaGain, evolvedList){
 }
 function closeStageIncomeModal(){
     document.getElementById('stage-income-modal').classList.add('hidden');
+    if (battleStageItemDrops.length>0){ openStageItemDropModal(); }
+    else { maybeOfferDemonLordSkillReward(); }
+}
+function openStageItemDropModal(){
+    const counts = {};
+    battleStageItemDrops.forEach(key => { counts[key] = (counts[key]||0) + 1; });
+    document.getElementById('stage-itemdrop-body').innerHTML = Object.keys(counts).map(key => {
+        const it = itemInfo(key);
+        return `<div class="hatch-result-row">${it.icon} ${escapeHtml(it.name_ja)} <b>×${counts[key]}</b></div>`;
+    }).join('');
+    document.getElementById('stage-itemdrop-modal').classList.remove('hidden');
+}
+function closeStageItemDropModal(){
+    document.getElementById('stage-itemdrop-modal').classList.add('hidden');
+    battleStageItemDrops = [];
     maybeOfferDemonLordSkillReward();
 }
 function closeBattleResultAndRestart(){
@@ -5203,6 +5224,7 @@ document.addEventListener('keydown', (ev) => {
     if (isOpen('equip-modal')){ ev.preventDefault(); closeEquipModal(); return; }
     if (isOpen('skill-select-modal')){ ev.preventDefault(); closeDemonLordSkillMenu(); return; }
     if (isOpen('stage-income-modal')){ ev.preventDefault(); closeStageIncomeModal(); return; }
+    if (isOpen('stage-itemdrop-modal')){ ev.preventDefault(); closeStageItemDropModal(); return; }
     if (isOpen('record-modal')){ ev.preventDefault(); closeRecordModal(); return; }
     if (isOpen('battle-result-modal')){
         const btns = document.querySelectorAll('#battle-result-actions button');
