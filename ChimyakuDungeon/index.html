@@ -608,6 +608,7 @@
                 </div>
                 <div id="battle-panel" class="side-panel hidden">
                     <div class="side-panel-title" id="battle-stage-label">ステージ1</div>
+                    <div id="demonlord-skill-bar"></div>
                     <div id="battle-heroes-list"></div>
                     <div id="battle-log" class="battle-log"></div>
                 </div>
@@ -653,6 +654,23 @@
             <div class="modal-title" id="hatch-result-title">🥚→👾</div>
             <div id="hatch-result-body"></div>
             <button class="btn btn-primary btn-sm" style="margin-top:14px;" data-i18n="btn_close" onclick="closeHatchResultModal()">とじる</button>
+        </div>
+    </div>
+
+    <!-- ==================== DEMON LORD SKILL SELECT (in-battle) ==================== -->
+    <div id="skill-select-modal" class="modal-backdrop hidden">
+        <div class="modal-box" style="min-width:320px; max-width:440px;">
+            <div class="modal-title" data-i18n="skill_select_title">👑 魔王スキル</div>
+            <div id="skill-select-body"></div>
+            <button class="btn btn-sm" style="margin-top:14px;" data-i18n="btn_close" onclick="closeDemonLordSkillMenu()">とじる</button>
+        </div>
+    </div>
+
+    <!-- ==================== DEMON LORD SKILL REWARD (post-battle) ==================== -->
+    <div id="skill-reward-modal" class="modal-backdrop hidden">
+        <div class="modal-box" style="min-width:320px; max-width:440px;">
+            <div class="modal-title" data-i18n="skill_reward_title">🎁 魔王スキルを1つ習得</div>
+            <div id="skill-reward-body"></div>
         </div>
     </div>
 
@@ -1005,6 +1023,27 @@ const UI_TEXT = {
     equip_inventory_label: { ja: '倉庫のアイテム', ja_easy: 'そうこの アイテム', en: 'Inventory' },
     equip_inventory_empty: { ja: '（アイテムがありません）', ja_easy: '（アイテムが ないよ）', en: '(No items)' },
     btn_unequip: { ja: '外す', ja_easy: 'はずす', en: 'Unequip' },
+
+    skill_target_hero: { ja: '単体', ja_easy: 'ひとり', en: 'Single' },
+    skill_target_room: { ja: '部屋全体', ja_easy: 'へや ぜんいん', en: 'Room' },
+    skill_target_all: { ja: 'マップ全体', ja_easy: 'マップ ぜんいん', en: 'All' },
+    skill_tier_small: { ja: '小ダメージ', ja_easy: 'ちいさい ダメージ', en: 'Small Dmg' },
+    skill_tier_medium: { ja: '中ダメージ', ja_easy: 'ちゅうくらいの ダメージ', en: 'Medium Dmg' },
+    skill_tier_big: { ja: '大ダメージ', ja_easy: 'おおきい ダメージ', en: 'Big Dmg' },
+    label_stack_suffix: { ja: 'スタック', ja_easy: 'スタック', en: ' stacks' },
+    label_per_turn_suffix: { ja: '/ターン', ja_easy: '/ターン', en: '/turn' },
+    label_turns_suffix: { ja: 'ターン', ja_easy: 'ターン', en: ' turns' },
+    btn_demonlord_skill: { ja: n => `👑 魔王スキル（残り${n}回）`, ja_easy: n => `👑 まおうスキル（あと${n}かい）`, en: n => `👑 Demon Lord Skill (${n} left)` },
+    skill_select_title: { ja: '👑 魔王スキル', ja_easy: '👑 まおうスキル', en: '👑 Demon Lord Skill' },
+    skill_none_known: { ja: 'まだスキルを覚えていません', ja_easy: 'まだ スキルを おぼえていないよ', en: 'No skills learned yet' },
+    skill_uses_left_label: { ja: (n,max) => `この戦闘での残り使用回数：${n}/${max}`, ja_easy: (n,max) => `のこり つかえる かいすう：${n}/${max}`, en: (n,max) => `Uses left this battle: ${n}/${max}` },
+    skill_used_tag: { ja: '（使用済み）', ja_easy: '（つかった）', en: '(Used)' },
+    skill_target_prompt: { ja: name => `「${name}」の対象をマップでクリックしてください`, ja_easy: name => `「${name}」の たいしょうを マップで クリックしてね`, en: name => `Click a target on the map for "${name}"` },
+    err_skill_no_target: { ja: '対象がいません', ja_easy: 'たいしょうが いないよ', en: 'No valid target' },
+    skill_reward_title: { ja: '🎁 魔王スキルを1つ習得', ja_easy: '🎁 まおうスキルを 1つ おぼえる', en: '🎁 Learn a Demon Lord Skill' },
+    skill_reward_new_label: { ja: 'NEW', ja_easy: 'NEW', en: 'NEW' },
+    battle_log_demonlord_skill_dmg: { ja: (name,heroName,dmg) => `魔王の「${name}」！${heroName}に${dmg}のダメージ`, ja_easy: (name,heroName,dmg) => `まおうの「${name}」！${heroName}に ${dmg}の ダメージ`, en: (name,heroName,dmg) => `Demon Lord's "${name}"! ${dmg} damage to ${heroName}` },
+    battle_log_demonlord_skill: { ja: name => `魔王の「${name}」が発動！`, ja_easy: name => `まおうの「${name}」が はつどう！`, en: name => `Demon Lord's "${name}" activates!` },
 
     btn_place_demonlord: { ja: '👑 魔王配置', ja_easy: '👑 まおうを おく', en: '👑 Place Demon Lord' },
     btn_open_heal: { ja: '💊 回復', ja_easy: '💊 かいふく', en: '💊 Heal' },
@@ -1588,6 +1627,7 @@ function startNewDungeon(){
     mana = STARTING_MANA;
     gamePhase = 'build'; stage = 1;
     inventory = []; nextInventoryId = 1; equipModalMonsterId = null;
+    demonLordSkillLevels = {}; demonLordSkillUsesThisBattle = 0; demonLordSkillUsedKeysThisBattle = []; pendingDemonLordSkill = null;
     nextRoomId = 1; nextCorridorId = 1; nextMonsterId = 1; nextTrapId = 1; selectedRoomId = null; selectedMonsterId = null; demonLordMoveSelected = false;
     highlightedMonsterId = null; monsterSortKey = 'type'; highlightedTrapId = null;
     healIndividualOpen = false;
@@ -1832,6 +1872,10 @@ function onGridMove(e){
     else if (trapPlaceMode) renderOverlays();
 }
 function onGridClick(e){
+    if (gamePhase==='battle'){
+        if (pendingDemonLordSkill) handleBattleSkillTargetClick(e);
+        return;
+    }
     if (gamePhase!=='build') return;
     const cell = cellFromEvent(e);
     if (!cell) return;
@@ -3551,6 +3595,188 @@ function currentGamePreset(){ return GAME_PRESETS.find(g=>g.key===currentGamePre
 // 魔王専用の固定ステータス（暫定値）。通常モンスターより大幅に強いボス値
 const DEMON_LORD_STATS = { hp: 220, atk: 22, def: 14, magAtk: 30, magDef: 20 };
 
+// ============================================================
+// 魔王の戦闘中スキル（コスト無し・1戦闘につき3回まで・同じスキルは1戦闘1回まで）
+// ============================================================
+// target: 'hero'=勇者1体を選ぶ／'room'=部屋を選び、その部屋の勇者全員／'all'=マップ全体の勇者全員
+// dmgType指定のものは瞬間ダメージ（Lv1毎に+25%）。statusのものは状態異常付与（毒だけは特別扱い＝Lv=スタック数）
+const DEMON_LORD_SKILLS = [
+    { key:'fierce_strike',    name_ja:'猛襲の一撃',   icon:'⚔️', target:'hero', dmgType:'physical', tier:'big' },
+    { key:'ruin_bolt',        name_ja:'破滅の魔弾',   icon:'🔮', target:'hero', dmgType:'magic',    tier:'big' },
+    { key:'ground_rend',      name_ja:'地割れ衝撃',   icon:'💥', target:'room', dmgType:'physical', tier:'medium' },
+    { key:'inferno_dance',    name_ja:'業火の乱舞',   icon:'🔥', target:'room', dmgType:'magic',    tier:'medium' },
+    { key:'mist_of_delusion', name_ja:'幻惑の霧',     icon:'❓', target:'room', status:'confusion', baseDuration:3 },
+    { key:'miasma_of_curses', name_ja:'呪毒の瘴気',   icon:'☠️', target:'room', status:'poison' },
+    { key:'chains_of_binding',name_ja:'束縛の鎖',     icon:'💫', target:'hero', status:'paralysis', baseDuration:1 },
+    { key:'icebound_curse',   name_ja:'氷結の呪縛',   icon:'🧊', target:'room', status:'freeze',     baseDuration:2 },
+    { key:'earth_wrath',      name_ja:'大地の怒り',   icon:'🌎', target:'all',  dmgType:'physical', tier:'small' },
+    { key:'abyssal_pulse',    name_ja:'深淵の波動',   icon:'🌌', target:'all',  dmgType:'magic',    tier:'small' },
+];
+const SKILL_DMG_MULT = { small:0.5, medium:1.5, big:3 };
+const SKILL_TARGET_LABEL_KEY = { hero:'skill_target_hero', room:'skill_target_room', all:'skill_target_all' };
+const SKILL_TIER_LABEL_KEY = { small:'skill_tier_small', medium:'skill_tier_medium', big:'skill_tier_big' };
+const SKILL_STATUS_LABEL_KEY = { poison:'status_poison', confusion:'status_confusion', paralysis:'status_paralysis', freeze:'status_freeze' };
+const DEMON_LORD_SKILL_MAX_USES = 3;
+let demonLordSkillLevels = {};             // skillKey -> 習得Lv（0または未登場＝未習得）
+let demonLordSkillUsesThisBattle = 0;      // この戦闘での合計使用回数
+let demonLordSkillUsedKeysThisBattle = []; // この戦闘で使用済みのスキルkey（同じスキルは1戦闘1回まで）
+let pendingDemonLordSkill = null;          // 対象選択待ちのスキル（nullなら選択待ちではない）
+function demonLordSkillLevel(key){ return demonLordSkillLevels[key] || 0; }
+function demonLordSkillOwned(key){ return demonLordSkillLevel(key) > 0; }
+function demonLordSkillAvailable(key){
+    return demonLordSkillOwned(key) && demonLordSkillUsesThisBattle < DEMON_LORD_SKILL_MAX_USES && !demonLordSkillUsedKeysThisBattle.includes(key);
+}
+// 瞬間ダメージ系スキルの威力（魔王自身の攻/魔攻が基準。Lvが1上がるごとに+25%）
+function demonLordSkillDamage(sk){
+    const level = Math.max(1, demonLordSkillLevel(sk.key));
+    const baseAtk = sk.dmgType==='magic' ? demonLordUnit.magAtk : demonLordUnit.atk;
+    const mult = SKILL_DMG_MULT[sk.tier] * (1 + 0.25*(level-1));
+    return Math.max(1, Math.round(baseAtk * mult));
+}
+// スキル選択画面・報酬選択画面で使う短い説明文
+function demonLordSkillDescription(sk){
+    const targetLabel = ui(SKILL_TARGET_LABEL_KEY[sk.target]);
+    const level = Math.max(1, demonLordSkillLevel(sk.key));
+    if (sk.status==='poison'){
+        return `${targetLabel} / ${ui('status_poison')}${level}${ui('label_stack_suffix')}（${stackingStatusDamage('poison', level)}${ui('label_per_turn_suffix')}）`;
+    }
+    if (sk.status){
+        const duration = sk.baseDuration + (level-1);
+        return `${targetLabel} / ${ui(SKILL_STATUS_LABEL_KEY[sk.status])} ${duration}${ui('label_turns_suffix')}`;
+    }
+    const statLabel = sk.dmgType==='magic' ? ui('monster_stat_magatk') : ui('monster_stat_atk');
+    return `${targetLabel} / ${statLabel}${ui(SKILL_TIER_LABEL_KEY[sk.tier])}`;
+}
+function demonLordSkillTargetHeroes(sk, targetInfo){
+    if (sk.target==='hero') return targetInfo && targetInfo.hero ? [targetInfo.hero] : [];
+    if (sk.target==='room') return battleHeroes.filter(h=>h.alive && h.roomId===targetInfo.roomId);
+    return battleHeroes.filter(h=>h.alive);
+}
+// スキルを実際に発動する（対象は事前に確定済み）。使用回数・使用済みフラグもここで消費する
+function resolveDemonLordSkill(sk, targetInfo){
+    const targets = demonLordSkillTargetHeroes(sk, targetInfo);
+    if (targets.length===0) return;
+    const level = Math.max(1, demonLordSkillLevel(sk.key));
+    if (sk.dmgType){
+        const power = demonLordSkillDamage(sk);
+        targets.forEach(h => {
+            const dmg = damageToMonster(power, h, sk.dmgType);
+            applyDamage('hero', h, dmg, demonLordUnit);
+            logBattle(uif('battle_log_demonlord_skill_dmg', sk.name_ja, uif('hero_label', h.id), dmg));
+        });
+    } else if (sk.status==='poison'){
+        targets.forEach(h => { for (let i=0;i<level;i++) applyStatus(h, 'poison', 0); });
+        logBattle(uif('battle_log_demonlord_skill', sk.name_ja));
+    } else if (sk.status){
+        const duration = sk.baseDuration + (level-1);
+        targets.forEach(h => applyStatus(h, sk.status, duration));
+        logBattle(uif('battle_log_demonlord_skill', sk.name_ja));
+    }
+    demonLordSkillUsesThisBattle++;
+    demonLordSkillUsedKeysThisBattle.push(sk.key);
+    renderAll();
+}
+// スキル発動後：勇者が全滅していれば戦闘終了処理へ（battleStepを経由しないため、ここで自前チェックする）
+function checkBattleEndAfterSkill(){
+    if (gamePhase==='battle' && battleHeroes.filter(h=>h.alive).length===0) endBattle('victory');
+}
+function renderDemonLordSkillBar(){
+    const wrap = document.getElementById('demonlord-skill-bar');
+    if (!wrap) return;
+    const known = DEMON_LORD_SKILLS.filter(sk => demonLordSkillOwned(sk.key));
+    if (known.length===0){ wrap.innerHTML = ''; return; }
+    const usesLeft = DEMON_LORD_SKILL_MAX_USES - demonLordSkillUsesThisBattle;
+    wrap.innerHTML = `<button class="btn btn-purple btn-sm" style="width:100%; margin-bottom:8px;" onclick="openDemonLordSkillMenu()" ${usesLeft<=0?'disabled':''}>${uif('btn_demonlord_skill', usesLeft)}</button>`;
+}
+function openDemonLordSkillMenu(){
+    if (gamePhase!=='battle') return;
+    renderSkillSelectModal();
+    document.getElementById('skill-select-modal').classList.remove('hidden');
+}
+function closeDemonLordSkillMenu(){ document.getElementById('skill-select-modal').classList.add('hidden'); }
+function renderSkillSelectModal(){
+    const body = document.getElementById('skill-select-body');
+    const known = DEMON_LORD_SKILLS.filter(sk => demonLordSkillOwned(sk.key));
+    if (known.length===0){ body.innerHTML = `<div class="room-detail-row">${ui('skill_none_known')}</div>`; return; }
+    let html = `<div class="room-detail-row">${uif('skill_uses_left_label', DEMON_LORD_SKILL_MAX_USES-demonLordSkillUsesThisBattle, DEMON_LORD_SKILL_MAX_USES)}</div>`;
+    html += `<div class="sort-btn-row stacked">` + known.map(sk => {
+        const lv = demonLordSkillLevel(sk.key);
+        const used = demonLordSkillUsedKeysThisBattle.includes(sk.key);
+        const available = demonLordSkillAvailable(sk.key);
+        return `<button class="sort-btn" style="text-align:left; padding:8px 12px;" ${available?'':'disabled'} onclick="onDemonLordSkillPicked('${sk.key}')">
+            <div style="font-weight:800;">${sk.icon} ${escapeHtml(sk.name_ja)} <span style="color:var(--teal);">Lv.${lv}</span></div>
+            <div style="font-size:0.74rem; color:var(--ink-dim);">${demonLordSkillDescription(sk)}${used?'　'+ui('skill_used_tag'):''}</div>
+        </button>`;
+    }).join('') + `</div>`;
+    body.innerHTML = html;
+}
+function onDemonLordSkillPicked(key){
+    if (!demonLordSkillAvailable(key)) return;
+    const sk = DEMON_LORD_SKILLS.find(s=>s.key===key);
+    closeDemonLordSkillMenu();
+    if (sk.target==='all'){
+        resolveDemonLordSkill(sk, null);
+        checkBattleEndAfterSkill();
+        return;
+    }
+    pendingDemonLordSkill = sk;
+    battlePaused = true;
+    clearTimeout(battleTimer);
+    updateSpeedButtons();
+    showToast(uif('skill_target_prompt', sk.name_ja));
+}
+// マップクリックで対象（勇者1体 or 部屋）を確定し、スキルを発動して戦闘を再開する
+function handleBattleSkillTargetClick(e){
+    const sk = pendingDemonLordSkill;
+    if (!sk) return;
+    const cell = cellFromEvent(e);
+    if (!cell) return;
+    let targetInfo = null;
+    if (sk.target==='hero'){
+        const hero = battleHeroes.find(h=>h.alive && h.r===cell.r && h.c===cell.c);
+        if (!hero){ showToast(ui('err_skill_no_target')); return; }
+        targetInfo = { hero };
+    } else if (sk.target==='room'){
+        const room = rooms.find(r => cell.r>=r.r0 && cell.r<=r.r1 && cell.c>=r.c0 && cell.c<=r.c1);
+        if (!room || !battleHeroes.some(h=>h.alive && h.roomId===room.id)){ showToast(ui('err_skill_no_target')); return; }
+        targetInfo = { roomId: room.id };
+    } else {
+        return;
+    }
+    pendingDemonLordSkill = null;
+    resolveDemonLordSkill(sk, targetInfo);
+    if (gamePhase==='battle' && battleHeroes.filter(h=>h.alive).length===0){ endBattle('victory'); return; }
+    battlePaused = false;
+    updateSpeedButtons();
+    if (gamePhase==='battle') battleTimer = setTimeout(battleStep, Math.max(0, battlePendingDelay/battleSpeed));
+}
+// ---- ステージクリア報酬：3種類の中から1つ選んでスキルを習得/レベルアップ ----
+let pendingSkillRewardChoices = [];
+function maybeOfferDemonLordSkillReward(){
+    const pool = DEMON_LORD_SKILLS.slice();
+    for (let i=pool.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [pool[i],pool[j]]=[pool[j],pool[i]]; }
+    pendingSkillRewardChoices = pool.slice(0, Math.min(3, pool.length));
+    renderSkillRewardModal();
+    document.getElementById('skill-reward-modal').classList.remove('hidden');
+}
+function renderSkillRewardModal(){
+    const body = document.getElementById('skill-reward-body');
+    body.innerHTML = pendingSkillRewardChoices.map(sk => {
+        const curLv = demonLordSkillLevel(sk.key);
+        const lvText = curLv>0 ? `Lv.${curLv} → Lv.${curLv+1}` : ui('skill_reward_new_label');
+        return `<button class="sort-btn" style="width:100%; text-align:left; padding:10px 14px; margin-bottom:8px;" onclick="chooseSkillReward('${sk.key}')">
+            <div style="font-weight:800;">${sk.icon} ${escapeHtml(sk.name_ja)}</div>
+            <div style="font-size:0.78rem; color:var(--ink-dim); margin-top:2px;">${demonLordSkillDescription(sk)}</div>
+            <div style="font-size:0.82rem; color:var(--gold); font-weight:700; margin-top:2px;">${lvText}</div>
+        </button>`;
+    }).join('');
+}
+function chooseSkillReward(key){
+    demonLordSkillLevels[key] = (demonLordSkillLevels[key]||0) + 1;
+    pendingSkillRewardChoices = [];
+    document.getElementById('skill-reward-modal').classList.add('hidden');
+}
+
 let battleHeroes = [];
 let roomBattleQueues = {}; // roomId -> このtickで消化する行動キュー（部屋ごとに独立して同時進行させる）
 let battleGlobalTick = -1; // battleStep()が呼ばれるたびに+1。0,12,24...で次の波が湧く
@@ -3583,6 +3809,7 @@ function startBattle(){
     roomBattleQueues = {};
     battleGlobalTick = -1;
     nextWaveIndex = 0;
+    demonLordSkillUsesThisBattle = 0; demonLordSkillUsedKeysThisBattle = []; pendingDemonLordSkill = null;
     // 選択中のゲームプリセットから、侵攻(ステージ)番号に応じた人数・ステータスで勇者を生成する
     // （4クラスを順番に繰り返し割り当てる。人数はheroCountForStage、攻撃系ステータスはheroOffenseMultで人数に応じて調整）
     const preset = currentGamePreset();
@@ -4466,7 +4693,10 @@ function openStageIncomeModal(vitGain, manaGain, evolvedList){
     }
     document.getElementById('stage-income-modal').classList.remove('hidden');
 }
-function closeStageIncomeModal(){ document.getElementById('stage-income-modal').classList.add('hidden'); }
+function closeStageIncomeModal(){
+    document.getElementById('stage-income-modal').classList.add('hidden');
+    maybeOfferDemonLordSkillReward();
+}
 function closeBattleResultAndRestart(){
     document.getElementById('battle-result-modal').classList.add('hidden');
     startNewDungeon();
@@ -4489,7 +4719,7 @@ function renderAll(){
     renderBuildActions();
     renderOverlays();
     renderRoomDetail();
-    if (gamePhase!=='build') renderHeroList();
+    if (gamePhase!=='build'){ renderHeroList(); renderDemonLordSkillBar(); }
 }
 // ユニット（モンスター・魔王・勇者）のアイコンはDOM要素を使い回して位置(left/top)だけ更新する。
 // 部屋の枠のように毎回作り直すと、CSSのtransitionが働かず瞬間移動になってしまうため。
@@ -4933,6 +5163,7 @@ document.addEventListener('keydown', (ev) => {
     if (isOpen('howto-modal')){ ev.preventDefault(); closeHowTo(); return; }
     if (isOpen('hatch-result-modal')){ ev.preventDefault(); closeHatchResultModal(); return; }
     if (isOpen('equip-modal')){ ev.preventDefault(); closeEquipModal(); return; }
+    if (isOpen('skill-select-modal')){ ev.preventDefault(); closeDemonLordSkillMenu(); return; }
     if (isOpen('stage-income-modal')){ ev.preventDefault(); closeStageIncomeModal(); return; }
     if (isOpen('record-modal')){ ev.preventDefault(); closeRecordModal(); return; }
     if (isOpen('battle-result-modal')){
