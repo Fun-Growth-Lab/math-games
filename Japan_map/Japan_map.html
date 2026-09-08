@@ -516,6 +516,10 @@ let rankingTab = 'world';
 let rankingMode = 'name';
 let rankingLv = 4;
 let rankingData = [];
+let rankingFetchSeq = 0; // 連続クリック時に古い通信結果が新しい選択を上書きしないようにするための通し番号
+// この日時以降に保存された世界ランキングの記録から、タイムに小数第2位まで記録するようにした。
+// それより前の記録はstage_score(端数)が保存されていないため、整数秒のまま表示する。
+const DECIMAL_CUTOFF = new Date('2026-09-08T16:10:00.000Z');
 
 let countdownVal = 3;
 let countdownTimer = null;
@@ -1009,7 +1013,8 @@ function drawRanking() {
         drawText(i + 1, startX + cols[0], py, 26, "", "#000000");
         drawText(name, startX + cols[1], py, 26, "", "#000000");
         drawText(`${d.correct || 0}${T('correct_suffix')}`, startX + cols[2], py, 26, "", "#000000");
-        drawText(`${parseFloat(d.time).toFixed(2)}${T('sec_suffix')}`, startX + cols[3], py, 26, "", "#000000");
+        const timeText = d.timeHasDecimal ? parseFloat(d.time).toFixed(2) : String(Math.round(d.time));
+        drawText(`${timeText}${T('sec_suffix')}`, startX + cols[3], py, 26, "", "#000000");
         drawText(d.date || "-", startX + cols[4], py, 20, "", "#666666");
     });
     drawButton(700, 810, 200, 60, T('result_to_title'), "#c1e1c1", 26, "#000");
@@ -1104,6 +1109,12 @@ async function saveScore(time) {
     localStorage.setItem('japan_map_scores', JSON.stringify(localScores.slice(0, 100)));
 
     // --- Supabase保存 (World) ---
+    // turnsは整数カラムのため小数を直接保存できない。
+    // turnsに整数秒、（このゲームでは未使用の）stage_scoreに小数第2位までの端数(0-99)を分けて保存し、
+    // 読み出し側 fetchRanking() で turns + stage_score/100 として復元する。
+    // ※過去の記録はstage_scoreが常に0(=端数未記録)のため、created_atがDECIMAL_CUTOFF以降の
+    //   記録のみ小数表示の対象とし、過去の記録は従来通り整数秒のまま表示する。
+    const totalCenti = Math.round(parseFloat(time) * 100);
     try {
         await fetch(window._sb.b + '/rankings', {
             method: 'POST',
@@ -1114,8 +1125,8 @@ async function saveScore(time) {
                 difficulty: String(currentLevel),
                 player_name: localName,
                 point_score: correctCount,
-                stage_score: 0,
-                turns: Math.round(parseFloat(time)),
+                stage_score: totalCenti % 100,
+                turns: Math.floor(totalCenti / 100),
                 class_name: currentMode,
                 created_at: new Date().toISOString()
             })
@@ -1131,12 +1142,16 @@ function formatDate(dt) {
 }
 
 async function fetchRanking() {
+    // 連続で難易度・タブ等を切り替えたとき、後から返ってきた古い通信結果が
+    // 最新の選択結果を上書きしてしまう（＝反応が重い・遅れて見える）のを防ぐガード
+    const seq = ++rankingFetchSeq;
     if (rankingTab === 'local') {
         let localScores = JSON.parse(localStorage.getItem('japan_map_scores') || '[]');
-        rankingData = localScores
+        const data = localScores
             .filter(d => d.level === rankingLv && d.mode === rankingMode)
             .sort((a,b) => (b.correct !== a.correct) ? b.correct - a.correct : a.time - b.time)
-            .map(d => ({...d, date: d.date ? formatDate(new Date(d.date)) : "-"}));
+            .map(d => ({...d, timeHasDecimal: true, date: d.date ? formatDate(new Date(d.date)) : "-"}));
+        if (seq === rankingFetchSeq) rankingData = data;
     } else {
         // Supabase (World)
         try {
@@ -1146,23 +1161,29 @@ async function fetchRanking() {
                 class_name: 'eq.' + rankingMode,
                 order: 'point_score.desc,turns.asc',
                 limit: '20',
-                select: 'player_name,point_score,turns,created_at'
+                select: 'player_name,point_score,turns,stage_score,created_at'
             });
             const res = await fetch(window._sb.b + '/rankings?' + params.toString(), {
                 headers: window._sb.rh
             });
             const rows = await res.json();
-            rankingData = rows.map(d => ({
-                name: d.player_name,
-                correct: d.point_score,
-                time: d.turns,
-                level: rankingLv,
-                mode: rankingMode,
-                date: formatDate(new Date(d.created_at))
-            }));
+            if (seq !== rankingFetchSeq) return; // より新しいリクエストが後から発行済みなので破棄
+            rankingData = rows.map(d => {
+                // DECIMAL_CUTOFF以降に保存された記録のみ、stage_scoreに小数第2位の端数が入っている
+                const hasDecimal = new Date(d.created_at) >= DECIMAL_CUTOFF;
+                return {
+                    name: d.player_name,
+                    correct: d.point_score,
+                    time: hasDecimal ? (d.turns || 0) + (d.stage_score || 0) / 100 : (d.turns || 0),
+                    timeHasDecimal: hasDecimal,
+                    level: rankingLv,
+                    mode: rankingMode,
+                    date: formatDate(new Date(d.created_at))
+                };
+            });
         } catch(e) {
             console.error("Ranking Error:", e);
-            rankingData = [];
+            if (seq === rankingFetchSeq) rankingData = [];
         }
     }
 }
