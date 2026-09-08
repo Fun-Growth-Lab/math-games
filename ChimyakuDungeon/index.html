@@ -332,6 +332,10 @@
         .role-text-melee { color: #ff6b78; font-weight: 700; }
         .role-text-ranged { color: #6be08e; font-weight: 700; }
         .role-text-magic { color: #7cb8f7; font-weight: 700; }
+        /* 役割ごとにオーラ（輪郭に沿った柔らかい発光）で見分ける。丸枠で囲むのではなく、絵柄そのものが光る形にする */
+        .monster-icon.role-melee { filter: drop-shadow(0 0 5px #ff6b78) drop-shadow(0 0 5px #ff6b78); }
+        .monster-icon.role-ranged { filter: drop-shadow(0 0 5px #6be08e) drop-shadow(0 0 5px #6be08e); }
+        .monster-icon.role-magic { filter: drop-shadow(0 0 5px #7cb8f7) drop-shadow(0 0 5px #7cb8f7); }
         .monster-icon > *:not(.monster-hp-bar) { position:relative; z-index:1; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.7)); }
         .monster-icon .unit-sprite {
             display:block; width:100%; height:100%;
@@ -402,7 +406,7 @@
         .demonlord-icon {
             position:absolute; display:flex; align-items:center; justify-content:center;
             font-size: 1.5rem; pointer-events:none; z-index:2; transition: left 0.25s linear, top 0.25s linear;
-            filter: drop-shadow(0 0 6px rgba(255,80,80,0.8));
+            filter: drop-shadow(0 0 6px var(--el-summon)) drop-shadow(0 0 6px var(--el-summon));
         }
         .demonlord-icon.selected { transform: scale(1.25); filter: drop-shadow(0 0 10px var(--gold)); }
         .hero-icon {
@@ -4026,7 +4030,9 @@ function startBattle(){
     demonLordUnit.alive = demonLordUnit.hp > 0;
     demonLordUnit.roomId = demonLordRoomId; // モンスター側の行動関数がunit.roomIdで部屋を判定できるようにする
     // 戦闘中にモンスターが移動しても、建設フェーズに戻ったときは戦闘開始前の配置に戻す
+    // （魔王も近接モンスターと同じ行動ロジックを使うため、対象を追って移動することがある）
     monsters.forEach(m => { m.preBattleR = m.r; m.preBattleC = m.c; });
+    demonLordUnit.preBattleR = demonLordUnit.r; demonLordUnit.preBattleC = demonLordUnit.c;
     selectedRoomId = null; selectedMonsterId = null; demonLordMoveSelected = false; highlightedMonsterId = null;
     document.getElementById('battle-stage-label').textContent = uif('battle_stage_label', stage);
     document.getElementById('battle-log').innerHTML = '';
@@ -4858,6 +4864,7 @@ function proceedNextStage(){
     battleHeroes = []; demonLordUnit = null; roomBattleQueues = {};
     // 戦闘開始前の配置に戻す（HP0のモンスターもHP0のまま元の位置に復活する）
     monsters.forEach(m => { if (m.preBattleR!==undefined){ m.r = m.preBattleR; m.c = m.preBattleC; } });
+    if (demonLordCell && demonLordCell.preBattleR!==undefined){ demonLordCell.r = demonLordCell.preBattleR; demonLordCell.c = demonLordCell.preBattleC; }
     // 敵の侵攻を退けた後に、部屋の生産量をまとめて収入として加算する
     let vitGain = 0, manaGain = 0;
     rooms.forEach(room => {
@@ -4985,7 +4992,7 @@ function renderUnitIcons(){
             ? `<span class="unit-sprite" style="background-image:url('images/mamono/${imgFile}'); background-position:${facingToBgPosition(m.facing)};"></span>`
             : `<span>${speciesInfo(m.speciesKey).emoji}</span>`;
         el.innerHTML = bodyHtml
-            + (m.hp<m.maxHp ? hpBarHtml(m.hp, m.maxHp) : '')
+            + (downed ? '' : hpBarHtml(m.hp, m.maxHp))
             + statusMark
             + (downed ? '<span class="downed-mark">✕</span>' : '');
     });
@@ -4998,7 +5005,7 @@ function renderUnitIcons(){
         if (!el){ el = document.createElement('div'); el.id = dlKey; gridEl.appendChild(el); }
         el.className = 'demonlord-icon' + (demonLordMoveSelected ? ' selected' : '');
         el.style.left = px(demonLordCell.c)+'px'; el.style.top = px(demonLordCell.r)+'px';
-        const hpBar = demonLordCell.hp!==undefined && demonLordCell.hp<demonLordCell.maxHp ? hpBarHtml(demonLordCell.hp, demonLordCell.maxHp, 'var(--danger)') : '';
+        const hpBar = demonLordCell.hp!==undefined ? hpBarHtml(demonLordCell.hp, demonLordCell.maxHp, 'var(--danger)') : '';
         const dlBody = `<span class="unit-sprite" style="background-image:url('images/mamono/demon_lord.png'); background-position:${facingToBgPosition(demonLordCell.facing)};"></span>`;
         el.innerHTML = dlBody + hpBar;
         el.style.width = CELL+'px'; el.style.height = CELL+'px';
