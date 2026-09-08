@@ -415,6 +415,11 @@
             border: 2px solid var(--danger); box-shadow: 0 0 8px rgba(255,107,94,0.7);
         }
         .hero-icon span { position:relative; z-index:1; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.7)); }
+        .hero-icon .unit-sprite, .demonlord-icon .unit-sprite {
+            display:block; width:100%; height:100%; position:relative; z-index:1;
+            background-repeat:no-repeat; background-size:200% 200%; image-rendering:pixelated;
+            filter: drop-shadow(0 1px 2px rgba(0,0,0,0.7));
+        }
         .battle-log { max-height: 260px; overflow-y:auto; font-size: 0.75rem; color: var(--ink-dim); line-height: 1.6; margin-top: 8px; border-top: 1px dashed var(--card-bdr); padding-top: 8px; }
         #battle-heroes-list { max-height: 180px; overflow-y:auto; padding-right:2px; }
         .battle-log div:last-child { color: var(--gold); font-weight: 700; }
@@ -2903,7 +2908,7 @@ const LINE_MAX_STAGE = {};
 MONSTER_SPECIES.forEach(s => { LINE_MAX_STAGE[s.line] = Math.max(LINE_MAX_STAGE[s.line]||0, s.stage); });
 // ランクアップに必要なLvのしきい値。3進化系統(4段階)はLv10/20/30、2進化系統(3段階)はLv15/30
 function rankUpLevelThresholds(line){
-    return (LINE_MAX_STAGE[line]||0) >= 4 ? [10,20,30] : [15,30];
+    return (LINE_MAX_STAGE[line]||0) >= 4 ? [5,10,15] : [5,10];
 }
 // モンスター名をランク（stage）で色分けする。ランク1〜4：白→緑→青→金
 // 2進化系統(3段階)はランク3の色を使わず、最終形態が3進化系統の最終形態と同じ金色になるようにする
@@ -2948,13 +2953,15 @@ function statModStars(mod){
     return 5;
 }
 // 種族の基本値×個体倍率を実際のステータスとして反映する（孵化時・進化時に呼ぶ）
+// 実際のステータス＝（種族の基本値）×（個体差倍率）×（1＋0.1×Lv）。m.levelは呼び出し前に最新の値にしておくこと
 function applyStatModsToMonster(m, sp){
     const mods = m.statMods;
-    m.maxHp = Math.max(1, Math.round(sp.hp * mods.hp));
-    m.atk = Math.max(1, Math.round(sp.atk * mods.atk));
-    m.def = Math.max(1, Math.round(sp.def * mods.def));
-    m.magAtk = Math.max(1, Math.round(sp.magAtk * mods.magAtk));
-    m.magDef = Math.max(1, Math.round(sp.magDef * mods.magDef));
+    const lvMult = 1 + 0.1*(m.level||0);
+    m.maxHp = Math.max(1, Math.round(sp.hp * mods.hp * lvMult));
+    m.atk = Math.max(1, Math.round(sp.atk * mods.atk * lvMult));
+    m.def = Math.max(1, Math.round(sp.def * mods.def * lvMult));
+    m.magAtk = Math.max(1, Math.round(sp.magAtk * mods.magAtk * lvMult));
+    m.magDef = Math.max(1, Math.round(sp.magDef * mods.magDef * lvMult));
 }
 function applyEvolution(m, next){
     m.speciesKey = next.key;
@@ -2987,6 +2994,7 @@ function runLevelUpPass(){
         const newLevel = monsterLevel(m.xp);
         if (newLevel > (m.level||0)){
             m.level = newLevel;
+            applyStatModsToMonster(m, sp); // Lvアップ分の能力上昇を反映（HPは全回復させず、上がった上限に対する現在値のまま）
             rankUpQueue.push(m.id);
         }
     });
@@ -4006,7 +4014,7 @@ function startBattle(){
         const st = tierStats(tier[0], tier[1], tier[2], tier[3], tier[4]);
         const hp = st.hp*HERO_HP_MULT, atk = st.atk*offenseMult, def = st.def*offenseMult,
               magAtk = st.magAtk*offenseMult, magDef = st.magDef*offenseMult;
-        battleHeroes.push({ id:i+1, priority:i+1, heroClassKey:classKey,
+        battleHeroes.push({ id:i+1, priority:i+1, heroClassKey:classKey, gender: Math.random()<0.5?'m':'f',
             hp, maxHp:hp, atk, def, magAtk, magDef,
             alive:true, r:-1, c:-1, emoji:cls.emoji, statusEffects:[], buffs:[], activeCooldowns:[], chargeTurns:0,
             state:'pending', roomId:null, behavior:null,
@@ -4991,7 +4999,8 @@ function renderUnitIcons(){
         el.className = 'demonlord-icon' + (demonLordMoveSelected ? ' selected' : '');
         el.style.left = px(demonLordCell.c)+'px'; el.style.top = px(demonLordCell.r)+'px';
         const hpBar = demonLordCell.hp!==undefined && demonLordCell.hp<demonLordCell.maxHp ? hpBarHtml(demonLordCell.hp, demonLordCell.maxHp, 'var(--danger)') : '';
-        el.innerHTML = (inBattle ? '🐲' : '👑') + hpBar;
+        const dlBody = `<span class="unit-sprite" style="background-image:url('images/mamono/demon_lord.png'); background-position:${facingToBgPosition(demonLordCell.facing)};"></span>`;
+        el.innerHTML = dlBody + hpBar;
         el.style.width = CELL+'px'; el.style.height = CELL+'px';
     }
 
@@ -5004,7 +5013,8 @@ function renderUnitIcons(){
             el.className = 'hero-icon';
             el.style.left = px(h.c)+'px'; el.style.top = px(h.r)+'px'; el.style.width = CELL+'px'; el.style.height = CELL+'px';
             const statusMark = (h.statusEffects||[]).length ? `<span class="status-mark">${(h.statusEffects||[]).map(statusEmojiWithStack).join('')}</span>` : '';
-            el.innerHTML = `<span>${h.emoji}</span>${hpBarHtml(h.hp, h.maxHp, 'var(--teal)')}${statusMark}`;
+            const heroBody = `<span class="unit-sprite" style="background-image:url('images/yuusya/${h.heroClassKey}_${h.gender||'m'}.png'); background-position:${facingToBgPosition(h.facing)};"></span>`;
+            el.innerHTML = heroBody + hpBarHtml(h.hp, h.maxHp, 'var(--teal)') + statusMark;
         });
     }
 
