@@ -1118,6 +1118,12 @@ const UI_TEXT = {
     err_skill_already_selected: { ja: 'すでに選んでいます', ja_easy: 'もう えらんでいるよ', en: 'Already selected' },
     skill_reward_title: { ja: '🎁 魔王スキルを1つ習得', ja_easy: '🎁 まおうスキルを 1つ おぼえる', en: '🎁 Learn a Demon Lord Skill' },
     skill_reward_new_label: { ja: 'NEW', ja_easy: 'NEW', en: 'NEW' },
+    evolve_stone_name: { ja: name => `${name}の石`, ja_easy: name => `${name}の いし`, en: name => `${name} Stone` },
+    evolve_stone_effect_label: { ja: '進化に使う石', ja_easy: 'しんかに つかう いし', en: 'Evolution stone' },
+    evolve_section_title: { ja: '進化', ja_easy: 'しんか', en: 'Evolution' },
+    evolve_hint_label: { ja: names => `必要な石：${names}`, ja_easy: names => `ひつような いし：${names}`, en: names => `Needed stone: ${names}` },
+    btn_evolve_with_stone: { ja: name => `${name}で進化させる`, ja_easy: name => `${name}で しんかさせる`, en: name => `Evolve with ${name}` },
+    evolve_max_stage_label: { ja: 'これ以上進化しない', ja_easy: 'もう しんかしないよ', en: 'Fully evolved' },
     battle_log_demonlord_skill_dmg: { ja: (name,heroName,dmg) => `魔王の「${name}」！${heroName}に${dmg}のダメージ`, ja_easy: (name,heroName,dmg) => `まおうの「${name}」！${heroName}に ${dmg}の ダメージ`, en: (name,heroName,dmg) => `Demon Lord's "${name}"! ${dmg} damage to ${heroName}` },
     battle_log_demonlord_skill: { ja: name => `魔王の「${name}」が発動！`, ja_easy: name => `まおうの「${name}」が はつどう！`, en: name => `Demon Lord's "${name}" activates!` },
 
@@ -1707,7 +1713,7 @@ function startNewDungeon(){
     vitality = STARTING_VITALITY;
     mana = STARTING_MANA;
     gamePhase = 'build'; stage = 1;
-    inventory = []; nextInventoryId = 1; equipModalMonsterId = null;
+    inventory = []; nextInventoryId = 1; equipModalMonsterId = null; stoneInventory = {};
     demonLordSkillLevels = {}; demonLordSkillUsesThisBattle = 0; demonLordSkillUsedKeysThisBattle = []; pendingDemonLordSkill = null;
     battleStageItemDrops = [];
     nextRoomId = 1; nextCorridorId = 1; nextMonsterId = 1; nextTrapId = 1; selectedRoomId = null; selectedMonsterId = null; demonLordMoveSelected = false;
@@ -2791,9 +2797,9 @@ function buffedDef(unit, baseDef, statKind){
     if (unit.speciesKey && statKind){
         const slotType = statKind==='magDef' ? 'magDefense' : 'defense';
         value *= roomStatBoostMultiplier(unit.roomId, slotType);
-        value *= equipmentStatMultiplier(unit, slotType);
+        value += equipmentStatBonus(unit, statKind);
     }
-    return Math.round(value);
+    return Math.round(Math.max(0, value));
 }
 // ユニットの種族/クラス情報を取得する（モンスターはspeciesKeyから、勇者はheroClassKeyから参照する）。
 // 魔王などどちらのデータも持たないユニットはnullを返す。これによりパッシブ・アクティブ・耐性などの仕組みを
@@ -2847,9 +2853,9 @@ function effectiveAtk(unit){
     if (unit.speciesKey){
         const slotType = dmgType==='magic' ? 'magAttack' : 'attack';
         value *= roomStatBoostMultiplier(unit.roomId, slotType);
-        value *= equipmentStatMultiplier(unit, slotType);
+        value += equipmentStatBonus(unit, dmgType==='magic' ? 'magAtk' : 'atk');
     }
-    return Math.round(value);
+    return Math.round(Math.max(0, value));
 }
 // 攻撃タイプに応じて、対象がどちらの防御力を参照すべきかを返す
 function statDefFor(target, dmgType){
@@ -2933,6 +2939,22 @@ function monsterLevelRowHtml(m, sp){
     const lv = m.level||0;
     return `<div class="monster-stat-line"><span>Lv.${lv}${nextThreshold!==undefined?uif('monster_next_rankup_label', nextThreshold):''}</span></div>`;
 }
+// モンスター詳細ポップアップの進化セクション。進化の石はLv不問で、対応する石を持っていればいつでも使える
+function monsterEvolveSectionHtml(m, sp){
+    const candidates = nextStageCandidates(m.speciesKey);
+    if (candidates.length===0) return `<div class="monster-stat-line"><span>${ui('evolve_max_stage_label')}</span></div>`;
+    const hintNames = candidates.map(c => escapeHtml(stoneName(c.key+'_stone'))).join('・');
+    let html = `<div class="side-panel-title" style="margin-top:8px;">${ui('evolve_section_title')}</div>`;
+    html += `<div class="monster-stat-line" style="color:var(--ink-dim); font-size:0.74rem;">${uif('evolve_hint_label', hintNames)}</div>`;
+    candidates.forEach(c => {
+        const stoneKey = c.key+'_stone';
+        const owned = stoneInventory[stoneKey]||0;
+        if (owned>0){
+            html += `<button class="btn btn-sm" style="width:100%; margin-top:4px;" onclick="evolveMonsterWithStone(${m.id}, '${stoneKey}')">💎 ${uif('btn_evolve_with_stone', escapeHtml(stoneName(stoneKey)))}（×${owned}）</button>`;
+        }
+    });
+    return html;
+}
 let battleEvolutions = []; // 今回のステージクリアでランクアップした魔物の一覧（収入ポップアップ表示用）。proceedNextStage()でリセットする
 // 勇者を倒した瞬間に呼ぶ。戦闘中は経験値をためるだけで、レベル判定・ランクアップ判定は迎撃後にまとめて行う（runLevelUpPass参照）
 // 強化部屋の効果は経験値ではなく「能力上昇」（攻撃力/防御力/魔攻/魔防）に変わったため、経験値は部屋の影響を受けない固定値
@@ -2990,6 +3012,8 @@ function pickEvolutionTarget(candidates){
 // 迎撃直後に1回呼ぶ。全モンスターの経験値からLvを再計算し、Lvが上がった個体をキューに積む
 // （実際にランクアップが必要かどうかはprocessNextRankUpの中で都度チェックする）
 let rankUpQueue = [];
+// モンスターの進化は「進化の石」を使う方式になったため、ここではLvアップ分の能力再計算だけを行う
+// （rankUpQueueへの自動登録はしない＝レベル到達での自動進化ポップアップは出さない。関連コードは再利用時のため残置）
 function runLevelUpPass(){
     rankUpQueue = [];
     monsters.forEach(m => {
@@ -2999,7 +3023,6 @@ function runLevelUpPass(){
         if (newLevel > (m.level||0)){
             m.level = newLevel;
             applyStatModsToMonster(m, sp); // Lvアップ分の能力上昇を反映（HPは全回復させず、上がった上限に対する現在値のまま）
-            rankUpQueue.push(m.id);
         }
     });
 }
@@ -3181,9 +3204,7 @@ function closeMonsterDetailModal(){
     monsterDetailModalId = null;
 }
 function starHtml(n){
-    let s = '';
-    for (let i=0;i<5;i++) s += i<n ? '★' : '☆';
-    return `<span class="star-rating">${s}</span>`;
+    return `<span class="star-rating">${'★'.repeat(Math.max(0,n))}</span>`;
 }
 function monsterDetailStatRowHtml(labelKey, value, mod){
     return `<div class="monster-stat-card">
@@ -3203,7 +3224,7 @@ function renderMonsterDetailModal(){
         : `<div class="monster-detail-emoji">${sp.emoji}</div>`;
     const downed = m.hp <= 0;
     const statusMark = (m.statusEffects||[]).map(statusEmojiWithStack).join(' ');
-    const xpRow = monsterLevelRowHtml(m, sp);
+    const evolveSection = monsterEvolveSectionHtml(m, sp);
     const eq = m.equippedItem ? itemInfo(m.equippedItem.itemKey) : null;
     const hpPct = m.maxHp>0 ? Math.max(0, Math.min(100, m.hp/m.maxHp*100)) : 0;
     document.getElementById('monster-detail-body').innerHTML = `
@@ -3225,7 +3246,7 @@ function renderMonsterDetailModal(){
             ${monsterDetailStatRowHtml('monster_stat_magatk', m.magAtk, mods.magAtk)}
             ${monsterDetailStatRowHtml('monster_stat_magdef', m.magDef, mods.magDef)}
         </div>
-        ${xpRow}
+        ${evolveSection}
         <div class="room-detail-row" style="cursor:pointer; margin-top:8px;" onclick="openEquipModal(${m.id});">
             <span>${ui('equip_label')}</span>
             <b style="margin-left:auto;">${eq ? eq.icon+' '+escapeHtml(eq.name_ja) : ui('equip_none_label')}</b>
@@ -3378,7 +3399,7 @@ function hatchEggsInRoom(room, count){
         if (cells.length===0) cells = cellsOfRect(room);
     }
     for (let i=cells.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [cells[i],cells[j]]=[cells[j],cells[i]]; }
-    const initialXp = Math.max(0, (stage-1) * XP_PER_LEVEL);
+    const initialXp = Math.max(XP_PER_LEVEL, (stage-1) * XP_PER_LEVEL); // モンスターはLv1からスタートする
     const born = [];
     for (let i=0;i<count;i++){
         const sp = STAGE1_SPECIES[Math.floor(Math.random()*STAGE1_SPECIES.length)];
@@ -3444,40 +3465,113 @@ function openHatchAndLootModal(room, born, itemKeys){
 function closeHatchResultModal(){ document.getElementById('hatch-result-modal').classList.add('hidden'); }
 
 // ============================================================
-// 装備品（宝箱から入手。1体につき1個だけ装備できる）
+// 装備品（勇者撃破ドロップから入手。1体につき1個だけ装備できる。一筆迷宮の装備を踏襲）
 // ============================================================
-const EQUIPMENT_ITEMS = [
-    { key:'copper_sword',     name_ja:'銅の剣',       icon:'🗡️', stat:'attack',     bonus:0.10, weight:5 },
-    { key:'steel_sword',      name_ja:'鋼の剣',       icon:'⚔️', stat:'attack',     bonus:0.20, weight:2 },
-    { key:'magic_sword_gram', name_ja:'魔剣グラム',   icon:'🔱', stat:'attack',     bonus:0.35, weight:1 },
-    { key:'sorcery_wand',     name_ja:'魔導の杖',     icon:'🪄', stat:'magAttack',  bonus:0.10, weight:5 },
-    { key:'sage_staff',       name_ja:'賢者の杖',     icon:'🔮', stat:'magAttack',  bonus:0.20, weight:2 },
-    { key:'grand_runestaff',  name_ja:'大魔導杖ルーン', icon:'✨', stat:'magAttack',  bonus:0.35, weight:1 },
-    { key:'leather_armor',    name_ja:'革の鎧',       icon:'🛡️', stat:'defense',    bonus:0.10, weight:5 },
-    { key:'steel_armor',      name_ja:'鋼鉄の鎧',     icon:'🛡️', stat:'defense',    bonus:0.20, weight:2 },
-    { key:'mithril_armor',    name_ja:'ミスリルの鎧', icon:'🛡️', stat:'defense',    bonus:0.35, weight:1 },
-    { key:'ward_robe',        name_ja:'護符のローブ', icon:'🧥', stat:'magDefense', bonus:0.10, weight:5 },
-    { key:'sacred_robe',      name_ja:'聖なるローブ', icon:'👘', stat:'magDefense', bonus:0.20, weight:2 },
-    { key:'archmage_robe',    name_ja:'大賢者のローブ', icon:'👑', stat:'magDefense', bonus:0.35, weight:1 },
+// 素材7段階：木（斧だけ「石」）／鉄／銀／金／ダマスカス／ダイヤ／オリハルコン。倍率は木を1とした比率
+const MATERIALS7 = ['木', '鉄', '銀', '金', 'ダマスカス', 'ダイヤ', 'オリハルコン'];
+const MATERIAL_TIER_MULT = [1, 1.5, 2.25, 3.25, 4.5, 6, 8];
+// 形ごとの基本値（木＝tier0のときの数値）。斧・鎧はマイナス補正込み
+const ITEM_SHAPES = [
+    { key:'bow',      name:'弓',     icon:'🏹', stats:{ atk:15 } },
+    { key:'sword',    name:'剣',     icon:'⚔️', stats:{ atk:10, magAtk:10 } },
+    { key:'axe',      name:'斧',     icon:'🪓', stats:{ atk:20, def:-5 } },
+    { key:'helm',     name:'兜',     icon:'🪖', stats:{ def:10, magDef:5 } },
+    { key:'shield',   name:'盾',     icon:'🛡️', stats:{ def:8, magDef:8 } },
+    { key:'armor',    name:'鎧',     icon:'🥋', stats:{ def:12, magDef:12, atk:-2, magAtk:-2 } },
+    { key:'ring',     name:'指輪',   icon:'💍', stats:{ magAtk:15 } },
+    { key:'staff',    name:'杖',     icon:'🪄', stats:{ atk:7, magAtk:10 } },
+    { key:'grimoire', name:'魔導書', icon:'📖', stats:{ magAtk:20, magDef:-5 } },
 ];
+// 弓はレンジャー/ハンター系統、剣はナイト/ロード系統が装備すると1.5倍（speciesKeyの部分一致で判定）
+const ITEM_ROLE_BONUS_KEYWORDS = { bow:['ranger','hunter'], sword:['knight','lord'] };
+function itemRoleBonusMultiplier(shapeKey, speciesKey){
+    const keywords = ITEM_ROLE_BONUS_KEYWORDS[shapeKey];
+    if (!keywords || !speciesKey) return 1;
+    return keywords.some(k=>speciesKey.includes(k)) ? 1.5 : 1;
+}
+// 形×素材7段階＝63種類の装備を生成する
+const EQUIPMENT_ITEMS = [];
+ITEM_SHAPES.forEach(shape => {
+    MATERIALS7.forEach((matName, tierIdx) => {
+        const mult = MATERIAL_TIER_MULT[tierIdx];
+        const stats = {};
+        Object.keys(shape.stats).forEach(k => {
+            const v = shape.stats[k] * mult;
+            stats[k] = v>=0 ? Math.round(v) : -Math.round(-v);
+        });
+        const displayMat = (shape.key==='axe' && tierIdx===0) ? '石' : matName;
+        EQUIPMENT_ITEMS.push({ key:`${shape.key}_${tierIdx}`, name_ja:`${displayMat}の${shape.name}`, icon:shape.icon, shape:shape.key, tier:tierIdx, stats });
+    });
+});
 function itemInfo(key){ return EQUIPMENT_ITEMS.find(it=>it.key===key); }
-const ITEM_STAT_LABEL_KEY = { attack:'monster_stat_atk', defense:'monster_stat_def', magAttack:'monster_stat_magatk', magDefense:'monster_stat_magdef' };
-function itemBonusLabel(it){ return `${ui(ITEM_STAT_LABEL_KEY[it.stat])}+${Math.round(it.bonus*100)}%`; }
+const ITEM_STAT_LABEL_KEY = { atk:'monster_stat_atk', def:'monster_stat_def', magAtk:'monster_stat_magatk', magDef:'monster_stat_magdef' };
+function itemBonusLabel(it){
+    return Object.keys(it.stats).map(k => `${ui(ITEM_STAT_LABEL_KEY[k])}${it.stats[k]>=0?'+':''}${it.stats[k]}`).join(' ');
+}
+// ステージが進むほど上位素材が出やすくなる重み（7ステージ想定。木→オリハルコンへ徐々に移行）
+const EQUIPMENT_TIER_STAGE_TABLE = [
+    [70,30, 0, 0, 0, 0, 0],
+    [40,45,15, 0, 0, 0, 0],
+    [15,40,35,10, 0, 0, 0],
+    [ 0,20,40,30,10, 0, 0],
+    [ 0, 0,25,35,30,10, 0],
+    [ 0, 0,10,20,35,25,10],
+    [ 0, 0, 0,10,20,35,35],
+];
+function equipmentTierWeights(stageNum){
+    const idx = Math.min(EQUIPMENT_TIER_STAGE_TABLE.length, Math.max(1, stageNum)) - 1;
+    return EQUIPMENT_TIER_STAGE_TABLE[idx];
+}
+function weightedRandomIndex(weights){
+    const total = weights.reduce((a,b)=>a+b,0);
+    let r = Math.random()*total;
+    for (let i=0;i<weights.length;i++){ r-=weights[i]; if (r<=0) return i; }
+    return weights.length-1;
+}
 function rollEquipmentItem(){
-    const totalW = EQUIPMENT_ITEMS.reduce((a,it)=>a+it.weight,0);
-    let r = Math.random()*totalW;
-    for (const it of EQUIPMENT_ITEMS){ r -= it.weight; if (r<0) return it.key; }
-    return EQUIPMENT_ITEMS[0].key;
+    const tierIdx = weightedRandomIndex(equipmentTierWeights(stage));
+    const shape = ITEM_SHAPES[Math.floor(Math.random()*ITEM_SHAPES.length)];
+    return `${shape.key}_${tierIdx}`;
 }
 let inventory = [];       // { id, itemKey } の配列（未装備のまま倉庫にある装備品）
 let nextInventoryId = 1;
 let equipModalMonsterId = null;
-// 装備品による能力倍率（罠・強化部屋の能力上昇と同じ「掛け算」で乗る）
-function equipmentStatMultiplier(unit, statKind){
-    if (!unit.speciesKey || !unit.equippedItem) return 1;
+// 装備品による能力の加算量（種族による1.5倍ボーナスを含む）。罠・強化部屋の倍率とは別枠で加算する
+function equipmentStatBonus(unit, statKey){
+    if (!unit.speciesKey || !unit.equippedItem) return 0;
     const it = itemInfo(unit.equippedItem.itemKey);
-    if (!it || it.stat!==statKind) return 1;
-    return 1 + it.bonus;
+    if (!it || !(statKey in it.stats)) return 0;
+    return it.stats[statKey] * itemRoleBonusMultiplier(it.shape, unit.speciesKey);
+}
+
+// ============================================================
+// 進化の石（勇者ドロップの30%。モンスターの進化はこの石を使うことで行う。手に入る石は完全にランダム）
+// ============================================================
+const EVOLUTION_STONE_DROP_RATE = 0.3;
+const EVOLUTION_STONE_SPECIES = MONSTER_SPECIES.filter(sp => sp.stage>1); // 進化後の姿ひとつひとつに石が対応する
+function rollEvolutionStone(){
+    const sp = EVOLUTION_STONE_SPECIES[Math.floor(Math.random()*EVOLUTION_STONE_SPECIES.length)];
+    return sp.key + '_stone';
+}
+function stoneTargetSpeciesKey(stoneKey){ return stoneKey.replace(/_stone$/, ''); }
+function stoneName(stoneKey){
+    const sp = speciesInfo(stoneTargetSpeciesKey(stoneKey));
+    return sp ? uif('evolve_stone_name', sp.name_ja) : stoneKey;
+}
+let stoneInventory = {}; // stoneKey -> 所持数
+// 進化の石を1個消費して、モンスターをその石が示す種族へ進化させる（対象外の石が渡された場合は何もしない）
+function evolveMonsterWithStone(monsterId, stoneKey){
+    const m = monsters.find(x=>x.id===monsterId);
+    if (!m || !(stoneInventory[stoneKey]>0)) return;
+    const targetKey = stoneTargetSpeciesKey(stoneKey);
+    const next = nextStageCandidates(m.speciesKey).find(c=>c.key===targetKey);
+    if (!next) return;
+    stoneInventory[stoneKey]--;
+    if (stoneInventory[stoneKey]<=0) delete stoneInventory[stoneKey];
+    applyEvolution(m, next);
+    renderMonsterDetailModal();
+    renderRoomDetail();
+    renderAll();
 }
 function openEquipModal(monsterId){
     equipModalMonsterId = monsterId;
@@ -3947,6 +4041,7 @@ function handleBattleSkillTargetClick(e){
 // ---- ステージクリア報酬：3種類の中から1つ選んでスキルを習得/レベルアップ ----
 let pendingSkillRewardChoices = [];
 function maybeOfferDemonLordSkillReward(){
+    return; // 魔王スキルはいったん停止中：ステージクリア時に習得できないようにする（コードは残置）
     const pool = DEMON_LORD_SKILLS.slice();
     for (let i=pool.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [pool[i],pool[j]]=[pool[j],pool[i]]; }
     pendingSkillRewardChoices = pool.slice(0, Math.min(3, pool.length));
@@ -4183,7 +4278,9 @@ function heroArriveAtRoom(hero, roomId){
     const room = rooms.find(r=>r.id===roomId);
     // 複数の勇者が同時に同じマスへ到着してしまった場合はワープで散らす（入場直後でも行動はそのまま続けられる）
     if (room && battleCellOccupied(roomId, hero.r, hero.c, hero)) warpHero(hero, room, roomId);
-    hero.behavior = Math.random()<0.5 ? 'stay' : 'roam';
+    // 魔王がこの部屋にいれば必ず滞在して戦う（50%抽選はしない）。いなければ従来通り50%で滞在/移動を決める
+    const demonLordHere = demonLordUnit && demonLordUnit.alive && demonLordRoomId===roomId;
+    hero.behavior = demonLordHere ? 'stay' : (Math.random()<0.5 ? 'stay' : 'roam');
     logBattle(uif('battle_log_enter', uif('hero_label', hero.id), roomDisplayNameById(roomId)));
     if (hero.behavior==='roam') heroDepartToNextRoom(hero);
 }
@@ -4324,11 +4421,17 @@ function applyDamage(side, target, dmg, attackerUnit){
             logBattle(uif('battle_log_hero_down', uif('hero_label', target.id)));
             // 勇者を倒したのが実際のモンスター（魔王・罠は対象外）であれば経験値を付与する
             if (attackerUnit && !attackerUnit.isDemonLord && attackerUnit.speciesKey) grantKillXp(attackerUnit);
-            // 倒れた勇者は一定確率で装備品をドロップする（ステージクリア後にまとめて表示）
+            // 倒れた勇者は一定確率でアイテムをドロップする（アイテム入手確率自体は変えず、その中身を30%進化の石／70%武器防具で振り分ける）
             if (Math.random() < HERO_ITEM_DROP_CHANCE){
-                const key = rollEquipmentItem();
-                inventory.push({ id: nextInventoryId++, itemKey: key });
-                battleStageItemDrops.push(key);
+                if (Math.random() < EVOLUTION_STONE_DROP_RATE){
+                    const stoneKey = rollEvolutionStone();
+                    stoneInventory[stoneKey] = (stoneInventory[stoneKey]||0) + 1;
+                    battleStageItemDrops.push({ kind:'stone', key: stoneKey });
+                } else {
+                    const key = rollEquipmentItem();
+                    inventory.push({ id: nextInventoryId++, itemKey: key });
+                    battleStageItemDrops.push({ kind:'equip', key });
+                }
             }
         } else if (target.isDemonLord){
             target.alive = false;
@@ -4381,11 +4484,12 @@ function resolveHeroAction(hero, room){
     return resolveHeroMeleeAction(hero, room);
 }
 // 同じ部屋に魔王がいれば最優先。いなければ最も近いモンスターを狙う（いなければnull）
+// 部屋に魔王がいても、まずは近くのモンスターを優先して攻撃し、全滅させてから魔王へ向かう
 function pickHeroTarget(hero){
-    const demonLordInRoom = demonLordUnit && demonLordUnit.alive && demonLordRoomId===hero.roomId;
-    if (demonLordInRoom) return demonLordUnit;
     const monsterTargets = getRoomMonsters(hero.roomId).filter(t=>!t.isDemonLord);
-    return pickNearestTarget(hero, monsterTargets);
+    if (monsterTargets.length>0) return pickNearestTarget(hero, monsterTargets);
+    const demonLordInRoom = demonLordUnit && demonLordUnit.alive && demonLordRoomId===hero.roomId;
+    return demonLordInRoom ? demonLordUnit : null;
 }
 // 通常攻撃1回分（命中判定・ダメージ適用・ログまで）の共通処理。戻り値は魔王を倒したかどうか
 function heroAttack(hero, target){
@@ -4640,22 +4744,12 @@ function resolveMeleeMonsterAction(unit, room){
         moveOneStepToward(unit, target, room, unit.roomId);
     }
 }
-// ---- 中距離モンスターの行動：1〜3マス先を攻撃可（攻撃力は近接の半分）。隣接時は2分の1の確率で離脱を試みる ----
+// ---- 中距離モンスターの行動：1〜3マス先を攻撃可（攻撃力は近接の半分）。射程に入るまで動き、入ったら攻撃し続ける ----
 function resolveRangedMonsterAction(unit, room){
     const targets = battleHeroes.filter(h=>h.alive && h.roomId===unit.roomId);
     if (targets.length===0) return;
     const target = pickNearestTarget(unit, targets);
     const dist = manhattan(unit, target);
-    if (dist<=1 && Math.random()<0.5){
-        const free = surroundingFreeCells(unit, room, unit.roomId);
-        if (free.length>0){
-            const dest = free[Math.floor(Math.random()*free.length)];
-            unit.r = dest.r; unit.c = dest.c;
-            logBattle(uif('battle_log_retreat', unitLabel('monster', unit)));
-            return;
-        }
-        // 空きマスがなければそのまま攻撃へフォールスルー
-    }
     if (dist<=3){
         showProjectileEffect(unit, target);
         const atk = effectiveAtk(unit);
@@ -4904,14 +4998,24 @@ function closeStageIncomeModal(){
 }
 function openStageItemDropModal(){
     const counts = {};
-    battleStageItemDrops.forEach(key => { counts[key] = (counts[key]||0) + 1; });
-    document.getElementById('stage-itemdrop-body').innerHTML = Object.keys(counts).map(key => {
+    battleStageItemDrops.forEach(drop => { const k = drop.kind+':'+drop.key; counts[k] = (counts[k]||0) + 1; });
+    document.getElementById('stage-itemdrop-body').innerHTML = Object.keys(counts).map(combinedKey => {
+        const [kind, key] = combinedKey.split(':');
+        const n = counts[combinedKey];
+        if (kind==='stone'){
+            return `<div class="item-drop-row">
+                <span class="item-drop-icon">💎</span>
+                <span class="item-drop-name">${escapeHtml(stoneName(key))}</span>
+                <span class="item-drop-effect">${ui('evolve_stone_effect_label')}</span>
+                ${n>1?`<b class="item-drop-count">×${n}</b>`:''}
+            </div>`;
+        }
         const it = itemInfo(key);
         return `<div class="item-drop-row">
             <span class="item-drop-icon">${it.icon}</span>
             <span class="item-drop-name">${escapeHtml(it.name_ja)}</span>
             <span class="item-drop-effect">${itemBonusLabel(it)}</span>
-            ${counts[key]>1?`<b class="item-drop-count">×${counts[key]}</b>`:''}
+            ${n>1?`<b class="item-drop-count">×${n}</b>`:''}
         </div>`;
     }).join('');
     document.getElementById('stage-itemdrop-modal').classList.remove('hidden');
