@@ -278,6 +278,34 @@
             transition: transform 0.2s;
         }
         .egg-icon.focus { transform: scale(1.28); }
+        .skill-name-row { display:flex; align-items:baseline; gap:6px; }
+        .skill-name-big { font-size:1.25rem; font-weight:800; color:var(--gold); text-shadow:0 1px 3px rgba(0,0,0,0.5); }
+        .item-drop-row { display:flex; align-items:center; gap:8px; padding:8px 4px; border-bottom:1px solid rgba(255,255,255,0.08); }
+        .item-drop-row:last-child { border-bottom:none; }
+        .item-drop-icon { font-size:1.6rem; flex-shrink:0; }
+        .item-drop-name { font-size:1.15rem; font-weight:800; color:var(--gold); text-shadow:0 1px 3px rgba(0,0,0,0.5); }
+        .item-drop-effect { font-size:0.8rem; color:var(--teal); margin-left:auto; padding-left:8px; }
+        .item-drop-count { color:var(--ink-dim); flex-shrink:0; }
+        .monster-detail-art { display:flex; align-items:center; justify-content:center; margin-bottom:6px; }
+        .monster-detail-sprite {
+            width:96px; height:96px; background-repeat:no-repeat; background-size:200% 200%; background-position:0% 0%;
+            image-rendering:pixelated; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.55));
+        }
+        .monster-detail-emoji { font-size:4.6rem; line-height:1; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.55)); }
+        .monster-detail-title { display:flex; align-items:baseline; justify-content:center; gap:10px; font-size:1.3rem; font-weight:800; }
+        .monster-detail-lv { color:var(--gold); font-size:1.6rem; text-shadow:0 0 10px rgba(255,201,92,0.55); }
+        .monster-detail-sub { text-align:center; color:var(--ink-dim); font-size:0.8rem; margin:2px 0 12px; }
+        .monster-detail-hp-row { display:flex; align-items:center; gap:8px; margin-bottom:12px; font-size:0.85rem; }
+        .monster-detail-hpbar { flex:1; height:10px; background:rgba(0,0,0,0.45); border-radius:5px; overflow:hidden; border:1px solid rgba(255,255,255,0.15); }
+        .monster-detail-hpbar-fill { height:100%; background: linear-gradient(90deg,#ff6b6b,#ffb84d); transition: width 0.3s; }
+        .monster-stat-grid { display:grid; grid-template-columns: 1fr 1fr; gap:8px; }
+        .monster-stat-card {
+            display:flex; flex-direction:column; align-items:center; gap:2px;
+            background: rgba(255,255,255,0.05); border:1px solid var(--card-bdr); border-radius:10px; padding:8px 4px;
+        }
+        .monster-stat-card-label { font-size:0.72rem; color:var(--ink-dim); }
+        .monster-stat-card-value { font-size:1.3rem; font-weight:800; color:var(--ink); }
+        .star-rating { color:var(--gold); font-size:0.85rem; letter-spacing:1px; }
         .gem-citrine   { background: linear-gradient(135deg,#fff4a3,var(--el-vitality) 60%,#8f6a00); color: var(--el-vitality); }
         .gem-sapphire  { background: linear-gradient(135deg,#8fc4ff,var(--el-mana) 60%,#0f3d8f); color: var(--el-mana); }
         .gem-amethyst  { background: linear-gradient(135deg,#d1a8ff,var(--el-summon) 60%,#4a1580); color: var(--el-summon); }
@@ -691,6 +719,14 @@
         </div>
     </div>
 
+    <!-- ==================== MONSTER DETAIL (center popup) ==================== -->
+    <div id="monster-detail-modal" class="modal-backdrop hidden">
+        <div class="modal-box" style="min-width:300px; max-width:380px;">
+            <div id="monster-detail-body"></div>
+            <button class="btn btn-sm" style="margin-top:14px; width:100%;" data-i18n="btn_close" onclick="closeMonsterDetailModal()">とじる</button>
+        </div>
+    </div>
+
     <!-- ==================== EQUIP ITEM ==================== -->
     <div id="equip-modal" class="modal-backdrop hidden">
         <div class="modal-box" style="min-width:320px; max-width:420px;">
@@ -1060,6 +1096,15 @@ const UI_TEXT = {
     skill_target_prompt_multi: { ja: (name,n,max) => `「${name}」の対象を選んでください（${n}/${max}体）`, ja_easy: (name,n,max) => `「${name}」の たいしょうを えらんでね（${n}/${max}たい）`, en: (name,n,max) => `Pick targets for "${name}" (${n}/${max})` },
     skill_target_hero_multi: { ja: n => n<=1 ? '単体' : `単体（最大${n}体）`, ja_easy: n => n<=1 ? 'ひとり' : `ひとりずつ（さいだい${n}たい）`, en: n => n<=1 ? 'Single' : `Single (up to ${n})` },
     skill_paralysis_desc: { ja: pct => `麻痺（毎ターン${pct}%で解除）`, ja_easy: pct => `まひ（まいターン ${pct}%で かいじょ）`, en: pct => `Paralysis (${pct}% to clear each turn)` },
+    dmg_type_physical: { ja: '物理', ja_easy: 'ぶつり', en: 'Physical' },
+    dmg_type_magic: { ja: '魔法', ja_easy: 'まほう', en: 'Magic' },
+    skill_desc_dmg_hero: { ja: (d,t) => `勇者1体に${d}の${t}`, ja_easy: (d,t) => `ゆうしゃ 1たいに ${d}の ${t}`, en: (d,t) => `${t} to 1 hero (${d})` },
+    skill_desc_dmg_room: { ja: (d,t) => `部屋の勇者全員に${d}の${t}`, ja_easy: (d,t) => `へやの ゆうしゃ ぜんいんに ${d}の ${t}`, en: (d,t) => `${t} to all heroes in a room (${d})` },
+    skill_desc_dmg_all: { ja: (d,t) => `マップの勇者全員に${d}の${t}`, ja_easy: (d,t) => `マップの ゆうしゃ ぜんいんに ${d}の ${t}`, en: (d,t) => `${t} to all heroes on the map (${d})` },
+    skill_desc_confusion: { ja: n => `勇者を混乱させる（最大${n}体）`, ja_easy: n => `ゆうしゃを こんらんさせる（さいだい${n}たい）`, en: n => `Confuses heroes (up to ${n})` },
+    skill_desc_poison: { ja: n => `勇者を毒にする（最大${n}体）`, ja_easy: n => `ゆうしゃを どくにする（さいだい${n}たい）`, en: n => `Poisons heroes (up to ${n})` },
+    skill_desc_paralysis: { ja: (pct,n) => `勇者を麻痺させる（毎ターン${pct}%で解除・最大${n}体）`, ja_easy: (pct,n) => `ゆうしゃを まひさせる（まいターン${pct}%で かいじょ・さいだい${n}たい）`, en: (pct,n) => `Paralyzes heroes (${pct}%/turn to clear, up to ${n})` },
+    skill_desc_freeze: { ja: (turns,n) => `勇者を凍らせる（${turns}ターン・最大${n}体）`, ja_easy: (turns,n) => `ゆうしゃを こおらせる（${turns}ターン・さいだい${n}たい）`, en: (turns,n) => `Freezes heroes (${turns} turns, up to ${n})` },
     err_skill_no_target: { ja: '対象がいません', ja_easy: 'たいしょうが いないよ', en: 'No valid target' },
     err_skill_already_selected: { ja: 'すでに選んでいます', ja_easy: 'もう えらんでいるよ', en: 'Already selected' },
     skill_reward_title: { ja: '🎁 魔王スキルを1つ習得', ja_easy: '🎁 まおうスキルを 1つ おぼえる', en: '🎁 Learn a Demon Lord Skill' },
@@ -2886,10 +2931,35 @@ function grantKillXp(killerUnit){
     killerUnit.xp = (killerUnit.xp||0) + KILL_XP_BASE;
 }
 // モンスターの見た目・ステータスを進化先のものに差し替える（ランクアップ確定時に呼ぶ）
+// ---- モンスターの個体差（得意/不得意）----
+// 能力ごとに種族の基本値の71%〜150%まで幅がある。同じ種族でも1体ごとに得意な能力が違う、という個性付け。
+// この倍率（statMods）は孵化した瞬間に1回だけ抽選され、進化・レベルアップで変化しない（その個体の生まれ持った資質のため）
+const STAT_MOD_MIN = 0.71, STAT_MOD_MAX = 1.50;
+function rollStatMods(){
+    const roll = () => STAT_MOD_MIN + Math.random()*(STAT_MOD_MAX-STAT_MOD_MIN);
+    return { hp: roll(), atk: roll(), def: roll(), magAtk: roll(), magDef: roll() };
+}
+// 倍率を★の数（1〜5）に変換する。71-75%=★1／76-85%=★2／86-110%=★3／111-130%=★4／131-150%=★5
+function statModStars(mod){
+    if (mod <= 0.75) return 1;
+    if (mod <= 0.85) return 2;
+    if (mod <= 1.10) return 3;
+    if (mod <= 1.30) return 4;
+    return 5;
+}
+// 種族の基本値×個体倍率を実際のステータスとして反映する（孵化時・進化時に呼ぶ）
+function applyStatModsToMonster(m, sp){
+    const mods = m.statMods;
+    m.maxHp = Math.max(1, Math.round(sp.hp * mods.hp));
+    m.atk = Math.max(1, Math.round(sp.atk * mods.atk));
+    m.def = Math.max(1, Math.round(sp.def * mods.def));
+    m.magAtk = Math.max(1, Math.round(sp.magAtk * mods.magAtk));
+    m.magDef = Math.max(1, Math.round(sp.magDef * mods.magDef));
+}
 function applyEvolution(m, next){
     m.speciesKey = next.key;
-    m.maxHp = next.hp; m.hp = next.hp; // ランクアップした瞬間は全回復する
-    m.atk = next.atk; m.def = next.def; m.magAtk = next.magAtk; m.magDef = next.magDef;
+    applyStatModsToMonster(m, next); // 個体の得意/不得意（statMods）は引き継いだまま、新しい種族の基本値に対して再計算する
+    m.hp = m.maxHp; // ランクアップした瞬間は全回復する
 }
 // 同じ系統(line)の次の段階(stage+1)の候補をすべて探す（分岐がなければ1件、分岐があれば複数件）。
 // すでに分岐済み(branchが設定済み)の場合は、同じbranchのものだけに絞る。
@@ -3047,40 +3117,25 @@ function sortMonsters(list){
 function setMonsterSortKey(key){ monsterSortKey = key; renderRoomDetail(); }
 
 // ---- モンスター詳細カード（部屋一覧・移動選択時の両方で使う） ----
-// 通常は1行（アイコン・名前・HP）だけのコンパクト表示。クリックした（highlightedMonsterIdと一致する）
-// モンスターだけ、役割・攻撃力・防御力・魔攻・魔防・経験値の詳細行を展開して表示する
+// 一覧では1行（アイコン・名前・HP）だけのコンパクト表示。タップすると画面中央に詳細ポップアップを開く
+// （モンスターは1体1体大切な個体なので、ステータスはリストの中で小さく畳むのではなく専用ポップアップでしっかり見せる）
 function monsterCardHtml(m, opts){
     opts = opts || {};
     const sp = speciesInfo(m.speciesKey);
-    const expanded = !!opts.highlight;
-    const clickAttr = opts.clickable ? ` onclick="highlightMonsterOnMap(${m.id})"` : '';
+    const selected = !!opts.highlight;
+    const clickAttr = opts.clickable ? ` onclick="selectMonsterCard(${m.id})"` : '';
     const downed = m.hp <= 0;
     const downedTag = downed ? ` <span style="color:var(--danger,#ff6b6b);">✕${escapeHtml(ui('monster_downed_tag'))}</span>` : '';
     const statusMark = (m.statusEffects||[]).map(statusEmojiWithStack).join(' ');
-    let html = `<div class="monster-detail-row compact${expanded?' selected':''}"${clickAttr} style="${opts.clickable?'cursor:pointer;':''}">
+    return `<div class="monster-detail-row compact${selected?' selected':''}"${clickAttr} style="${opts.clickable?'cursor:pointer;':''}">
         <div class="monster-compact-line">
             <span>${sp.emoji} <span style="color:${monsterNameColor(sp)}; font-weight:700;">${escapeHtml(monsterDisplayName(m))}</span></span>
             <span class="${roleTextClass(sp.role)}">（${roleLabel(sp.role)}）</span>
             ${statusMark?`<span>${statusMark}</span>`:''}
             ${downedTag}
             <span class="monster-compact-hp">${ui('monster_stat_hp')} ${m.hp}/${m.maxHp}</span>
-        </div>`;
-    if (expanded){
-        const xpRow = monsterLevelRowHtml(m, sp);
-        const eq = m.equippedItem ? itemInfo(m.equippedItem.itemKey) : null;
-        html += `<div class="monster-stat-line">
-            <span>${ui('monster_stat_atk')} ${m.atk}</span>
-            <span>${ui('monster_stat_def')} ${m.def}</span>
-            <span>${ui('monster_stat_magatk')} ${m.magAtk}</span>
-            <span>${ui('monster_stat_magdef')} ${m.magDef}</span>
-        </div>${xpRow}
-        <div class="room-detail-row" style="cursor:pointer;" onclick="event.stopPropagation(); openEquipModal(${m.id});">
-            <span>${ui('equip_label')}</span>
-            <b style="margin-left:auto;">${eq ? eq.icon+' '+escapeHtml(eq.name_ja) : ui('equip_none_label')}</b>
-        </div>`;
-    }
-    html += `</div>`;
-    return html;
+        </div>
+    </div>`;
 }
 let highlightedTrapId = null;
 function highlightTrapOnMap(id){
@@ -3093,6 +3148,77 @@ function highlightMonsterOnMap(id){
     renderRoomDetail();
     renderHealIndividualPanel();
     renderOverlays();
+}
+// 一覧のモンスターをタップしたときの動作：マップ上でハイライトしつつ、詳細ポップアップを開く
+function selectMonsterCard(id){
+    highlightedMonsterId = id;
+    renderRoomDetail();
+    renderHealIndividualPanel();
+    renderOverlays();
+    openMonsterDetailModal(id);
+}
+// ---- モンスター詳細ポップアップ（画面中央）：絵柄・Lv・ステータス（★で得意/不得意も表示）をまとめて見せる ----
+let monsterDetailModalId = null;
+function openMonsterDetailModal(id){
+    monsterDetailModalId = id;
+    renderMonsterDetailModal();
+    document.getElementById('monster-detail-modal').classList.remove('hidden');
+}
+function closeMonsterDetailModal(){
+    document.getElementById('monster-detail-modal').classList.add('hidden');
+    monsterDetailModalId = null;
+}
+function starHtml(n){
+    let s = '';
+    for (let i=0;i<5;i++) s += i<n ? '★' : '☆';
+    return `<span class="star-rating">${s}</span>`;
+}
+function monsterDetailStatRowHtml(labelKey, value, mod){
+    return `<div class="monster-stat-card">
+        <span class="monster-stat-card-label">${ui(labelKey)}</span>
+        <span class="monster-stat-card-value">${value}</span>
+        ${starHtml(statModStars(mod))}
+    </div>`;
+}
+function renderMonsterDetailModal(){
+    const m = monsters.find(x=>x.id===monsterDetailModalId);
+    if (!m){ closeMonsterDetailModal(); return; }
+    const sp = speciesInfo(m.speciesKey);
+    const mods = m.statMods || { hp:1, atk:1, def:1, magAtk:1, magDef:1 };
+    const imgFile = SPECIES_IMAGE_MAP[m.speciesKey];
+    const artHtml = imgFile
+        ? `<div class="monster-detail-sprite" style="background-image:url('images/mamono/${imgFile}');"></div>`
+        : `<div class="monster-detail-emoji">${sp.emoji}</div>`;
+    const downed = m.hp <= 0;
+    const statusMark = (m.statusEffects||[]).map(statusEmojiWithStack).join(' ');
+    const xpRow = monsterLevelRowHtml(m, sp);
+    const eq = m.equippedItem ? itemInfo(m.equippedItem.itemKey) : null;
+    const hpPct = m.maxHp>0 ? Math.max(0, Math.min(100, m.hp/m.maxHp*100)) : 0;
+    document.getElementById('monster-detail-body').innerHTML = `
+        <div class="monster-detail-art">${artHtml}</div>
+        <div class="monster-detail-title">
+            <span style="color:${monsterNameColor(sp)};">${escapeHtml(monsterDisplayName(m))}</span>
+            <b class="monster-detail-lv">Lv.${m.level||0}</b>
+        </div>
+        <div class="monster-detail-sub">${roleLabel(sp.role)}${statusMark?'　'+statusMark:''}${downed?'　'+ui('monster_downed_tag'):''}</div>
+        <div class="monster-detail-hp-row">
+            <span>${ui('monster_stat_hp')}</span>
+            <div class="monster-detail-hpbar"><div class="monster-detail-hpbar-fill" style="width:${hpPct}%;"></div></div>
+            <b>${m.hp}/${m.maxHp}</b>
+            ${starHtml(statModStars(mods.hp))}
+        </div>
+        <div class="monster-stat-grid">
+            ${monsterDetailStatRowHtml('monster_stat_atk', m.atk, mods.atk)}
+            ${monsterDetailStatRowHtml('monster_stat_def', m.def, mods.def)}
+            ${monsterDetailStatRowHtml('monster_stat_magatk', m.magAtk, mods.magAtk)}
+            ${monsterDetailStatRowHtml('monster_stat_magdef', m.magDef, mods.magDef)}
+        </div>
+        ${xpRow}
+        <div class="room-detail-row" style="cursor:pointer; margin-top:8px;" onclick="openEquipModal(${m.id});">
+            <span>${ui('equip_label')}</span>
+            <b style="margin-left:auto;">${eq ? eq.icon+' '+escapeHtml(eq.name_ja) : ui('equip_none_label')}</b>
+        </div>
+    `;
 }
 
 // ============================================================
@@ -3246,9 +3372,11 @@ function hatchEggsInRoom(room, count){
         const sp = STAGE1_SPECIES[Math.floor(Math.random()*STAGE1_SPECIES.length)];
         const cell = cells[i % cells.length];
         const m = { id: nextMonsterId++, roomId: room.id, r: cell.r, c: cell.c, speciesKey: sp.key,
-                    hp: sp.hp, maxHp: sp.hp, atk: sp.atk, def: sp.def, magAtk: sp.magAtk, magDef: sp.magDef, chargeTurns: 0,
+                    hp: 0, maxHp: 0, atk: 0, def: 0, magAtk: 0, magDef: 0, statMods: rollStatMods(), chargeTurns: 0,
                     activeCooldowns: [], statusEffects: [], buffs: [], xp: initialXp, level: monsterLevel(initialXp),
                     equippedItem: null };
+        applyStatModsToMonster(m, sp);
+        m.hp = m.maxHp;
         monsters.push(m);
         born.push(m);
     }
@@ -3642,16 +3770,16 @@ const DEMON_LORD_STATS = { hp: 220, atk: 22, def: 14, magAtk: 30, magDef: 20 };
 // target: 'hero'=勇者を選ぶ（状態異常系はLvが上がるほど選べる人数が増える）／'room'=部屋を選び、その部屋の勇者全員／'all'=マップ全体の勇者全員
 // dmgType指定のものは瞬間ダメージ（Lv1毎に+25%）。statusのものは状態異常付与
 const DEMON_LORD_SKILLS = [
-    { key:'fierce_strike',    name_ja:'猛襲の一撃',   icon:'⚔️', target:'hero', dmgType:'physical', tier:'big' },
-    { key:'ruin_bolt',        name_ja:'破滅の魔弾',   icon:'🔮', target:'hero', dmgType:'magic',    tier:'big' },
-    { key:'ground_rend',      name_ja:'地割れ衝撃',   icon:'💥', target:'room', dmgType:'physical', tier:'medium' },
-    { key:'inferno_dance',    name_ja:'業火の乱舞',   icon:'🔥', target:'room', dmgType:'magic',    tier:'medium' },
-    { key:'mist_of_delusion', name_ja:'幻惑の霧',     icon:'❓', target:'hero', status:'confusion', baseDuration:3 },
-    { key:'miasma_of_curses', name_ja:'呪毒の瘴気',   icon:'☠️', target:'hero', status:'poison' },
-    { key:'chains_of_binding',name_ja:'束縛の鎖',     icon:'💫', target:'hero', status:'paralysis' },
-    { key:'icebound_curse',   name_ja:'氷結の呪縛',   icon:'🧊', target:'hero', status:'freeze',     baseDuration:2 },
-    { key:'earth_wrath',      name_ja:'大地の怒り',   icon:'🌎', target:'all',  dmgType:'physical', tier:'small' },
-    { key:'abyssal_pulse',    name_ja:'深淵の波動',   icon:'🌌', target:'all',  dmgType:'magic',    tier:'small' },
+    { key:'fierce_strike',    name_ja:'ストライク', icon:'⚔️', target:'hero', dmgType:'physical', tier:'big' },
+    { key:'ruin_bolt',        name_ja:'メテオ',     icon:'🔮', target:'hero', dmgType:'magic',    tier:'big' },
+    { key:'ground_rend',      name_ja:'クエイク',   icon:'💥', target:'room', dmgType:'physical', tier:'medium' },
+    { key:'inferno_dance',    name_ja:'フレア',     icon:'🔥', target:'room', dmgType:'magic',    tier:'medium' },
+    { key:'mist_of_delusion', name_ja:'パニック',   icon:'❓', target:'hero', status:'confusion', baseDuration:3 },
+    { key:'miasma_of_curses', name_ja:'ポイズン',   icon:'☠️', target:'hero', status:'poison' },
+    { key:'chains_of_binding',name_ja:'スタン',     icon:'💫', target:'hero', status:'paralysis' },
+    { key:'icebound_curse',   name_ja:'フリーズ',   icon:'🧊', target:'hero', status:'freeze',     baseDuration:2 },
+    { key:'earth_wrath',      name_ja:'アース',     icon:'🌎', target:'all',  dmgType:'physical', tier:'small' },
+    { key:'abyssal_pulse',    name_ja:'ファイア',   icon:'🌌', target:'all',  dmgType:'magic',    tier:'small' },
 ];
 const SKILL_DMG_MULT = { small:0.5, medium:1.5, big:3 };
 const SKILL_TARGET_LABEL_KEY = { hero:'skill_target_hero', room:'skill_target_room', all:'skill_target_all' };
@@ -3679,18 +3807,20 @@ function demonLordSkillDamage(sk){
     const mult = SKILL_DMG_MULT[sk.tier] * (1 + 0.25*(level-1));
     return Math.max(1, Math.round(baseAtk * mult));
 }
-// スキル選択画面・報酬選択画面で使う短い説明文
+// スキル選択画面・報酬選択画面で使う、誰が読んでもわかるシンプルな説明文
 function demonLordSkillDescription(sk){
     const level = Math.max(1, demonLordSkillLevel(sk.key));
-    if (sk.target==='hero' && sk.status){
-        const targetLabel = uif('skill_target_hero_multi', demonLordSkillMaxTargets(sk) || level);
-        if (sk.status==='poison') return `${targetLabel} / ${ui('status_poison')}`;
-        if (sk.status==='paralysis') return `${targetLabel} / ${uif('skill_paralysis_desc', Math.round(PARALYSIS_CLEAR_CHANCE*100))}`;
-        return `${targetLabel} / ${ui(SKILL_STATUS_LABEL_KEY[sk.status])} ${sk.baseDuration}${ui('label_turns_suffix')}`;
+    if (sk.status){
+        const n = demonLordSkillMaxTargets(sk) || level;
+        if (sk.status==='poison') return uif('skill_desc_poison', n);
+        if (sk.status==='paralysis') return uif('skill_desc_paralysis', Math.round(PARALYSIS_CLEAR_CHANCE*100), n);
+        if (sk.status==='confusion') return uif('skill_desc_confusion', n);
+        return uif('skill_desc_freeze', sk.baseDuration, n);
     }
-    const targetLabel = ui(SKILL_TARGET_LABEL_KEY[sk.target]);
-    const statLabel = sk.dmgType==='magic' ? ui('monster_stat_magatk') : ui('monster_stat_atk');
-    return `${targetLabel} / ${statLabel}${ui(SKILL_TIER_LABEL_KEY[sk.tier])}`;
+    const dmgLabel = ui(sk.dmgType==='magic' ? 'dmg_type_magic' : 'dmg_type_physical');
+    const tierLabel = ui(SKILL_TIER_LABEL_KEY[sk.tier]);
+    const descKey = sk.target==='hero' ? 'skill_desc_dmg_hero' : (sk.target==='room' ? 'skill_desc_dmg_room' : 'skill_desc_dmg_all');
+    return uif(descKey, dmgLabel, tierLabel);
 }
 // スキルを実際に発動する（対象は事前に確定済みの勇者配列）。使用回数・使用済みフラグもここで消費する
 function resolveDemonLordSkill(sk, targets){
@@ -3741,8 +3871,8 @@ function renderSkillSelectModal(){
         const used = demonLordSkillUsedKeysThisBattle.includes(sk.key);
         const available = demonLordSkillAvailable(sk.key);
         return `<button class="sort-btn" style="text-align:left; padding:8px 12px;" ${available?'':'disabled'} onclick="onDemonLordSkillPicked('${sk.key}')">
-            <div style="font-weight:800;">${sk.icon} ${escapeHtml(sk.name_ja)} <span style="color:var(--teal);">Lv.${lv}</span></div>
-            <div style="font-size:0.74rem; color:var(--ink-dim);">${demonLordSkillDescription(sk)}${used?'　'+ui('skill_used_tag'):''}</div>
+            <div class="skill-name-row">${sk.icon} <span class="skill-name-big">${escapeHtml(sk.name_ja)}</span> <span style="color:var(--teal); font-weight:800;">Lv.${lv}</span></div>
+            <div style="font-size:0.78rem; color:var(--ink-dim); margin-top:2px;">${demonLordSkillDescription(sk)}${used?'　'+ui('skill_used_tag'):''}</div>
         </button>`;
     }).join('') + `</div>`;
     body.innerHTML = html;
@@ -3817,9 +3947,9 @@ function renderSkillRewardModal(){
         const curLv = demonLordSkillLevel(sk.key);
         const lvText = curLv>0 ? `Lv.${curLv} → Lv.${curLv+1}` : ui('skill_reward_new_label');
         return `<button class="sort-btn" style="width:100%; text-align:left; padding:10px 14px; margin-bottom:8px;" onclick="chooseSkillReward('${sk.key}')">
-            <div style="font-weight:800;">${sk.icon} ${escapeHtml(sk.name_ja)}</div>
+            <div class="skill-name-row">${sk.icon} <span class="skill-name-big">${escapeHtml(sk.name_ja)}</span></div>
             <div style="font-size:0.78rem; color:var(--ink-dim); margin-top:2px;">${demonLordSkillDescription(sk)}</div>
-            <div style="font-size:0.82rem; color:var(--gold); font-weight:700; margin-top:2px;">${lvText}</div>
+            <div style="font-size:0.82rem; color:var(--teal); font-weight:700; margin-top:2px;">${lvText}</div>
         </button>`;
     }).join('');
 }
@@ -4762,7 +4892,12 @@ function openStageItemDropModal(){
     battleStageItemDrops.forEach(key => { counts[key] = (counts[key]||0) + 1; });
     document.getElementById('stage-itemdrop-body').innerHTML = Object.keys(counts).map(key => {
         const it = itemInfo(key);
-        return `<div class="hatch-result-row">${it.icon} ${escapeHtml(it.name_ja)} <b>×${counts[key]}</b></div>`;
+        return `<div class="item-drop-row">
+            <span class="item-drop-icon">${it.icon}</span>
+            <span class="item-drop-name">${escapeHtml(it.name_ja)}</span>
+            <span class="item-drop-effect">${itemBonusLabel(it)}</span>
+            ${counts[key]>1?`<b class="item-drop-count">×${counts[key]}</b>`:''}
+        </div>`;
     }).join('');
     document.getElementById('stage-itemdrop-modal').classList.remove('hidden');
 }
@@ -5239,6 +5374,7 @@ document.addEventListener('keydown', (ev) => {
     if (isOpen('howto-modal')){ ev.preventDefault(); closeHowTo(); return; }
     if (isOpen('hatch-result-modal')){ ev.preventDefault(); closeHatchResultModal(); return; }
     if (isOpen('equip-modal')){ ev.preventDefault(); closeEquipModal(); return; }
+    if (isOpen('monster-detail-modal')){ ev.preventDefault(); closeMonsterDetailModal(); return; }
     if (isOpen('skill-select-modal')){ ev.preventDefault(); closeDemonLordSkillMenu(); return; }
     if (isOpen('stage-income-modal')){ ev.preventDefault(); closeStageIncomeModal(); return; }
     if (isOpen('stage-itemdrop-modal')){ ev.preventDefault(); closeStageItemDropModal(); return; }
