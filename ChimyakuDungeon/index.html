@@ -232,6 +232,7 @@
             font-size: 0.78rem; font-weight: 700; color: var(--ink-dim);
         }
         .elem-chip .gem-chip { width:13px; height:13px; margin-right:0; }
+        .elem-chip-egg-icon { width:15px; height:15px; object-fit:contain; }
         .bd-main { display:flex; gap: 10px; align-items:flex-start; justify-content:space-between; z-index:1; flex:1; min-height:0; }
 
         .bd-gridwrap { position: relative; flex-shrink:0; }
@@ -478,7 +479,7 @@
         .cost-total { display:flex; justify-content:space-between; font-size: 1.0rem; font-weight:800; color: var(--gold); border-top: 1px dashed var(--card-bdr); margin-top:6px; padding-top:6px; }
         .btn-row { display:flex; gap:8px; margin-top: 10px; }
         .btn-row .btn { flex:1; width:auto; margin:0; }
-        .room-detail-row { display:flex; align-items:center; gap:6px; font-size: 0.78rem; margin-bottom:4px; }
+        .room-detail-row { display:flex; align-items:center; gap:6px; font-size: 0.78rem; margin-bottom:4px; color: var(--ink); }
         .stat-panel {
             background: rgba(0,0,0,0.2); border: 1px solid var(--card-bdr); border-radius: 10px;
             padding: 8px 10px 4px; margin-bottom: 8px;
@@ -984,8 +985,9 @@ const UI_TEXT = {
     stage_income_vit_label: { ja: '活力の増加量', ja_easy: 'かつりょくの ふえた りょう', en: 'Vitality Gained' },
     stage_income_mana_label: { ja: '魔力の増加量', ja_easy: 'まりょくの ふえた りょう', en: 'Mana Gained' },
     stage_income_ranked_title: { ja: 'ランクアップした魔物', ja_easy: 'ランクアップした まもの', en: 'Ranked-up Monsters' },
-    stage_income_none_ranked: { ja: '今回、ランクアップした魔物はいません', ja_easy: 'こんかい、ランクアップした まものは いないよ', en: 'No monsters ranked up this time' },
+    stage_income_none_ranked: { ja: '今回、Lvが上がった魔物はいません', ja_easy: 'こんかい、Lvが あがった まものは いないよ', en: 'No monsters leveled up this time' },
     evolve_arrow_label: { ja: (from,to) => `${from} → ${to}`, ja_easy: (from,to) => `${from} → ${to}`, en: (from,to) => `${from} → ${to}` },
+    levelup_arrow_label: { ja: (from,to) => `Lv.${from}➡Lv.${to}`, ja_easy: (from,to) => `Lv.${from}➡Lv.${to}`, en: (from,to) => `Lv.${from}➡Lv.${to}` },
     battle_log_evolved: { ja: (from,to) => `${from}が${to}にランクアップした！`, ja_easy: (from,to) => `${from}が ${to}に ランクアップした！`, en: (from,to) => `${from} ranked up into ${to}!` },
     rankup_title: { ja: '⭐ ランクアップ！', ja_easy: '⭐ ランクアップ！', en: '⭐ Rank Up!' },
     rankup_notice_msg: { ja: (from,to) => `${from}は${to}にランクアップした！`, ja_easy: (from,to) => `${from}は ${to}に ランクアップした！`, en: (from,to) => `${from} ranked up into ${to}!` },
@@ -1290,7 +1292,7 @@ function renderElemLegend(){
     const wrap = document.getElementById('elem-legend');
     if (!wrap) return;
     wrap.innerHTML = ELEMENT_TYPES.map(t => `<div class="elem-chip"><span class="gem-chip ${t.gem}"></span>${ui('el_'+t.key)}</div>`).join('')
-        + `<div class="elem-chip">🥚 ${ui('el_egg')}</div>`;
+        + `<div class="elem-chip"><img src="images/egg.png" class="elem-chip-egg-icon" alt="">${ui('el_egg')}</div>`;
 }
 function applyI18n(){
     document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = ui(el.getAttribute('data-i18n')); });
@@ -2273,7 +2275,7 @@ function roomAbilityMaxLv(room, abilityType, effectiveType){
 // 能力Lvによる倍率（表示にも各種計算にも使う共通関数）
 // 活力・魔力：素の数はすでに基礎生産（素の数×20）側に入っているので、倍率は単純に(1+Lv)
 // 強化・攻撃：素の数がそのまま倍率に効く＝ 1 + 係数×素の数×Lv （Lv0なら1倍＝通常通り）
-const ABILITY_MULT_COEF = { summon: 0.2, attack: 0.1 };
+const ABILITY_MULT_COEF = { summon: 0.2, attack: 0.5 };
 function roomAbilityMultiplier(room, abilityType, effectiveType){
     const lv = roomAbilityLv(room, abilityType, effectiveType);
     if (abilityType==='vitality' || abilityType==='mana') return 1 + lv;
@@ -2797,7 +2799,7 @@ function buffedDef(unit, baseDef, statKind){
     if (unit.speciesKey && statKind){
         const slotType = statKind==='magDef' ? 'magDefense' : 'defense';
         value *= roomStatBoostMultiplier(unit.roomId, slotType);
-        value += equipmentStatBonus(unit, statKind);
+        value *= (1 + equipmentStatBonusPct(unit, statKind));
     }
     return Math.round(Math.max(0, value));
 }
@@ -2853,7 +2855,7 @@ function effectiveAtk(unit){
     if (unit.speciesKey){
         const slotType = dmgType==='magic' ? 'magAttack' : 'attack';
         value *= roomStatBoostMultiplier(unit.roomId, slotType);
-        value += equipmentStatBonus(unit, dmgType==='magic' ? 'magAtk' : 'atk');
+        value *= (1 + equipmentStatBonusPct(unit, dmgType==='magic' ? 'magAtk' : 'atk'));
     }
     return Math.round(Math.max(0, value));
 }
@@ -2943,7 +2945,7 @@ function monsterLevelRowHtml(m, sp){
 function monsterEvolveSectionHtml(m, sp){
     const candidates = nextStageCandidates(m.speciesKey);
     if (candidates.length===0) return `<div class="monster-stat-line"><span>${ui('evolve_max_stage_label')}</span></div>`;
-    const hintNames = candidates.map(c => escapeHtml(stoneName(c.key+'_stone'))).join('・');
+    const hintNames = candidates.map(c => escapeHtml(stoneName(c.key+'_stone'))).join('<br>');
     let html = `<div class="side-panel-title" style="margin-top:8px;">${ui('evolve_section_title')}</div>`;
     html += `<div class="monster-stat-line" style="color:var(--ink-dim); font-size:0.74rem;">${uif('evolve_hint_label', hintNames)}</div>`;
     candidates.forEach(c => {
@@ -2955,7 +2957,8 @@ function monsterEvolveSectionHtml(m, sp){
     });
     return html;
 }
-let battleEvolutions = []; // 今回のステージクリアでランクアップした魔物の一覧（収入ポップアップ表示用）。proceedNextStage()でリセットする
+let battleEvolutions = []; // （現在は未使用。ランクアップは進化の石を使う方式になったため、収入ポップアップでは表示しない）
+let battleLevelUps = []; // 今回のステージでLvが上がったモンスターの一覧（収入ポップアップ表示用）。proceedNextStage()でリセットする
 // 勇者を倒した瞬間に呼ぶ。戦闘中は経験値をためるだけで、レベル判定・ランクアップ判定は迎撃後にまとめて行う（runLevelUpPass参照）
 // 強化部屋の効果は経験値ではなく「能力上昇」（攻撃力/防御力/魔攻/魔防）に変わったため、経験値は部屋の影響を受けない固定値
 function grantKillXp(killerUnit){
@@ -3021,8 +3024,10 @@ function runLevelUpPass(){
         if (!sp || !sp.line) return;
         const newLevel = monsterLevel(m.xp);
         if (newLevel > (m.level||0)){
+            const fromLevel = m.level||0;
             m.level = newLevel;
             applyStatModsToMonster(m, sp); // Lvアップ分の能力上昇を反映（HPは全回復させず、上がった上限に対する現在値のまま）
+            battleLevelUps.push({ m, fromLevel, toLevel: newLevel });
         }
     });
 }
@@ -3090,7 +3095,7 @@ function confirmRankUpChoice(nextKey){
 // ランクアップ処理がすべて終わったら、ステージの収入ポップアップを開く
 let pendingStageIncome = { vit:0, mana:0 };
 function afterAllRankUpsResolved(){
-    openStageIncomeModal(pendingStageIncome.vit, pendingStageIncome.mana, battleEvolutions);
+    openStageIncomeModal(pendingStageIncome.vit, pendingStageIncome.mana, battleLevelUps);
 }
 
 // ---- 混乱：毎ターン一定確率でランダムな方向へ移動/攻撃してしまう（外れれば通常通りの行動） ----
@@ -3506,7 +3511,7 @@ ITEM_SHAPES.forEach(shape => {
 function itemInfo(key){ return EQUIPMENT_ITEMS.find(it=>it.key===key); }
 const ITEM_STAT_LABEL_KEY = { atk:'monster_stat_atk', def:'monster_stat_def', magAtk:'monster_stat_magatk', magDef:'monster_stat_magdef' };
 function itemBonusLabel(it){
-    return Object.keys(it.stats).map(k => `${ui(ITEM_STAT_LABEL_KEY[k])}${it.stats[k]>=0?'+':''}${it.stats[k]}`).join(' ');
+    return Object.keys(it.stats).map(k => `${ui(ITEM_STAT_LABEL_KEY[k])}${it.stats[k]>=0?'+':''}${it.stats[k]}%`).join(' ');
 }
 // ステージが進むほど上位素材が出やすくなる重み（7ステージ想定。木→オリハルコンへ徐々に移行）
 const EQUIPMENT_TIER_STAGE_TABLE = [
@@ -3537,11 +3542,12 @@ let inventory = [];       // { id, itemKey } の配列（未装備のまま倉�
 let nextInventoryId = 1;
 let equipModalMonsterId = null;
 // 装備品による能力の加算量（種族による1.5倍ボーナスを含む）。罠・強化部屋の倍率とは別枠で加算する
-function equipmentStatBonus(unit, statKey){
+// 装備の数値は「加算されるパーセント」として扱う（例：+10は+10%）。ここでは0.10のような割合で返す
+function equipmentStatBonusPct(unit, statKey){
     if (!unit.speciesKey || !unit.equippedItem) return 0;
     const it = itemInfo(unit.equippedItem.itemKey);
     if (!it || !(statKey in it.stats)) return 0;
-    return it.stats[statKey] * itemRoleBonusMultiplier(it.shape, unit.speciesKey);
+    return (it.stats[statKey] / 100) * itemRoleBonusMultiplier(it.shape, unit.speciesKey);
 }
 
 // ============================================================
@@ -4093,7 +4099,7 @@ function startBattle(){
     closeHealIndividualPanel();
     gamePhase = 'battle';
     traps.forEach(t => { t.cooldown = 0; }); // 罠の再使用までのターン数はステージごとにリセットする
-    battleEvolutions = []; // ランクアップの一覧は迎撃後にproceedNextStage()で改めてリセットするが、念のためここでも空にしておく
+    battleEvolutions = []; battleLevelUps = []; // 収入ポップアップ用の一覧は迎撃後にproceedNextStage()で改めてリセットするが、念のためここでも空にしておく
     battleSpeed = 1; battlePaused = false;
     roomBattleQueues = {};
     battleGlobalTick = -1;
@@ -4973,20 +4979,20 @@ function proceedNextStage(){
     renderAll();
     // 経験値からのレベル判定・ランクアップ処理をまとめて行う（1体ずつポップアップで確認してから収入ポップアップを開く）
     pendingStageIncome = { vit: vitGain, mana: manaGain };
-    battleEvolutions = [];
+    battleEvolutions = []; battleLevelUps = [];
     runLevelUpPass();
     processNextRankUp();
 }
-function openStageIncomeModal(vitGain, manaGain, evolvedList){
+function openStageIncomeModal(vitGain, manaGain, levelUpList){
     document.getElementById('stage-income-vit').textContent = vitGain;
     document.getElementById('stage-income-mana').textContent = manaGain;
     const list = document.getElementById('stage-income-ranked-list');
-    if (evolvedList.length===0){
+    if (levelUpList.length===0){
         list.innerHTML = `<div style="color:var(--ink-dim); font-size:0.82rem;">${ui('stage_income_none_ranked')}</div>`;
     } else {
-        list.innerHTML = evolvedList.map(({m, fromName}) => {
+        list.innerHTML = levelUpList.map(({m, fromLevel, toLevel}) => {
             const sp = speciesInfo(m.speciesKey);
-            return `<div class="modal-score-row"><span>${sp.emoji} ${escapeHtml(uif('evolve_arrow_label', fromName, monsterDisplayName(m)))}</span></div>`;
+            return `<div class="modal-score-row"><span>${sp.emoji} ${escapeHtml(monsterDisplayName(m))} ${uif('levelup_arrow_label', fromLevel, toLevel)}</span></div>`;
         }).join('');
     }
     document.getElementById('stage-income-modal').classList.remove('hidden');
