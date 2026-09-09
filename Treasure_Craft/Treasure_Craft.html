@@ -197,6 +197,12 @@ const STRINGS = {
         btn_ranking: "ランキング",
         btn_index: "INDEXへ",
 
+        continue_choice_title: "セーブデータがあります",
+        continue_choice_sub: "つづきから再開するか、はじめから始めるか選んでください。",
+        btn_continue: "つづきから",
+        btn_new_game: "はじめから",
+        confirm_new_game_erase: "はじめから始めると、現在のセーブデータは消えます。よろしいですか？",
+
         player_select_title: "プレイヤー選択",
         btn_start_with: "{name} で開始",
         btn_change: "変更",
@@ -234,7 +240,7 @@ const STRINGS = {
         confirm_rest: "休みますか？",
         confirm_rest_sub: "APが回復して次の日になります。",
         confirm_end: "ここで冒険を終了して本当によろしいですか？",
-        confirm_end_sub: "※セーブはされません。",
+        confirm_end_sub: "※終了すると、この時点の結果がランキングに記録され、セーブデータは消去されます。",
 
         panel_inventory: "持ち物・クラフト",
         label_gold: "所持金: {gold} G",
@@ -329,7 +335,7 @@ const STRINGS = {
             "・レシピは一度買えば作り方は覚えるよ。",
             "・装備は強いものと弱いものがランダムで作成されるよ。⭐の数でだいたいの強さがわかるよ。",
             "・薬は一回の探索でなくなってしまうけど、探索の成功率が高くなるよ。",
-            "・セーブは出来ないよ。",
+            "・冒険の状況は自動でセーブされるよ。次に遊ぶときは「つづきから」で再開できるよ。",
             "・クリア時の日数と総資産が記録されるよ。良い成績ならランキングに載るよ。"
         ],
         btn_close: "閉じる",
@@ -359,6 +365,12 @@ const STRINGS = {
         btn_settings: "せってい",
         btn_ranking: "ランキング",
         btn_index: "INDEXへ",
+
+        continue_choice_title: "セーブデータが あります",
+        continue_choice_sub: "つづきから さいかいするか、はじめから はじめるか えらんでください。",
+        btn_continue: "つづきから",
+        btn_new_game: "はじめから",
+        confirm_new_game_erase: "はじめから はじめると、いまの セーブデータが きえます。よろしいですか？",
 
         player_select_title: "プレイヤーせんたく",
         btn_start_with: "{name} で かいし",
@@ -397,7 +409,7 @@ const STRINGS = {
         confirm_rest: "やすみますか？",
         confirm_rest_sub: "APが かいふくして つぎの ひに なります。",
         confirm_end: "ここで ぼうけんを おわって ほんとうに いいですか？",
-        confirm_end_sub: "※セーブは されません。",
+        confirm_end_sub: "※おわると、いまの けっかが ランキングに きろくされ、セーブデータは きえます。",
 
         panel_inventory: "もちもの・クラフト",
         label_gold: "しょじきん: {gold} G",
@@ -492,7 +504,7 @@ const STRINGS = {
             "・レシピは いちど かえば つくりかたを おぼえるよ。",
             "・そうびは つよいものと よわいものが ランダムで さくせいされるよ。⭐の かずで だいたいの つよさが わかるよ。",
             "・くすりは いっかいの たんさくで なくなってしまうけど、たんさくの せいこうりつが たかくなるよ。",
-            "・セーブは できないよ。",
+            "・ぼうけんの じょうきょうは じどうで セーブされるよ。つぎに あそぶときは「つづきから」で さいかいできるよ。",
             "・クリアじの にっすうと そうしさんが きろくされるよ。よい せいせきなら ランキングに のるよ。"
         ],
         btn_close: "とじる",
@@ -522,6 +534,12 @@ const STRINGS = {
         btn_settings: "Settings",
         btn_ranking: "Ranking",
         btn_index: "To Index",
+
+        continue_choice_title: "Save Data Found",
+        continue_choice_sub: "Continue your saved adventure, or start a new one?",
+        btn_continue: "Continue",
+        btn_new_game: "New Game",
+        confirm_new_game_erase: "Starting a new game will erase your current save data. Are you sure?",
 
         player_select_title: "Select Player",
         btn_start_with: "Start as {name}",
@@ -560,7 +578,7 @@ const STRINGS = {
         confirm_rest: "Rest now?",
         confirm_rest_sub: "AP will recover and the day will advance.",
         confirm_end: "Are you sure you want to end the adventure here?",
-        confirm_end_sub: "* Your progress will not be saved.",
+        confirm_end_sub: "* Ending now will record your current result to the ranking and erase your save data.",
 
         panel_inventory: "Items & Crafting",
         label_gold: "Gold: {gold} G",
@@ -655,7 +673,7 @@ const STRINGS = {
             "・Once you buy a recipe, you'll always remember how to craft it.",
             "・Gear is randomly crafted strong or weak. The number of ⭐ shows roughly how strong it is.",
             "・A potion is used up after one exploration, but raises your success rate.",
-            "・There's no save feature.",
+            "・Your adventure is saved automatically. Next time, pick \"Continue\" to pick up where you left off.",
             "・Your clear day count and total assets are recorded. A good result will make the ranking."
         ],
         btn_close: "Close",
@@ -717,6 +735,66 @@ let restEffect = { active: false, alpha: 0, phase: 'in' };
 let rankingTab = "WORLD";
 let rankingDataWorld = null;
 let worldRankingFetching = false;
+
+// ==========================================
+// セーブ・ロード
+// ==========================================
+const SAVE_KEY = 'tc_save';
+const SAVABLE_STATES = ["MAIN", "EXPLORE_SELECT", "EXPLORING", "SHOP"]; // 冒険中の状態のみセーブ対象
+
+function hasSave() {
+    try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; }
+}
+function clearSave() {
+    try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
+}
+function autoSave() {
+    if (!SAVABLE_STATES.includes(GAME_STATE)) return; // タイトルや結果画面等では上書きしない
+    try {
+        const saveObj = {
+            v: 1,
+            playerName: currentPlayerName,
+            gameState: GAME_STATE,
+            gameData: gameData,
+            exploreData: GAME_STATE === "EXPLORING" ? exploreData : null,
+            currentInvTab: currentInvTab, invPage: invPage, craftTabLevel: craftTabLevel,
+            shopTab: shopTab, shopPage: shopPage
+        };
+        localStorage.setItem(SAVE_KEY, JSON.stringify(saveObj));
+    } catch (e) {}
+}
+function loadGame() {
+    let data = null;
+    try { data = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) {}
+    if (!data || !data.gameData) { GAME_STATE = "PLAYER_SELECT"; return; }
+
+    currentPlayerName = data.playerName || T('guest_name');
+    gameData = data.gameData;
+    // サニタイズ：JSON復元後の配列・オブジェクトの整合性を保証
+    if (!Array.isArray(gameData.inventory)) gameData.inventory = [];
+    if (!gameData.equipment) gameData.equipment = { weapon: null, shield: null, armor: null, accessory: null, potion: null };
+    if (!Array.isArray(gameData.messages)) gameData.messages = [];
+    if (!gameData.baseStatus) gameData.baseStatus = { atk: 0, def: 0, mag: 0 };
+
+    currentInvTab = data.currentInvTab || "ALL";
+    invPage = data.invPage || 0;
+    craftTabLevel = data.craftTabLevel || 1;
+    shopTab = data.shopTab || "COMMON";
+    shopPage = data.shopPage || 0;
+
+    GAME_STATE = SAVABLE_STATES.includes(data.gameState) ? data.gameState : "MAIN";
+
+    if (GAME_STATE === "EXPLORING" && data.exploreData) {
+        exploreData = data.exploreData;
+        // stageは保存時のコピーなので、STAGES配列内の本来のオブジェクトに再リンクしておく
+        const stg = (typeof STAGES !== 'undefined') ? STAGES.find(s => s.lv === exploreData.stage.lv) : null;
+        if (stg) exploreData.stage = stg;
+    } else if (GAME_STATE === "EXPLORING") {
+        GAME_STATE = "MAIN"; // 探索データが壊れている場合はメイン画面に戻す
+    }
+
+    autoSave(); // 復元後の状態ですぐ再セーブしておく
+}
 
 function loadWorldRanking() {
     if (rankingDataWorld || worldRankingFetching) return;
@@ -1039,7 +1117,13 @@ function renderTitle() {
     let row1Y = startY;
     let row2Y = startY + bH + gapY;
 
-    drawBtn(T('btn_start'), leftX, row1Y, bW, bH, '#ffb3ba', () => { GAME_STATE = "PLAYER_SELECT"; }, false, '#7f1d2b');
+    drawBtn(T('btn_start'), leftX, row1Y, bW, bH, '#ffb3ba', () => {
+        if (hasSave()) {
+            activePopup = { isContinueChoice: true };
+        } else {
+            GAME_STATE = "PLAYER_SELECT";
+        }
+    }, false, '#7f1d2b');
     drawBtn(T('btn_settings'), rightX, row1Y, bW, bH, '#c39bd3', () => { GAME_STATE = "SETTINGS"; }, false, '#4a235a');
 
     drawBtn(T('btn_ranking'), leftX, row2Y, bW, bH, '#ffd8b1', () => {
@@ -1765,6 +1849,7 @@ function renderShop(x, y) {
 
 // --- リザルト・ランキング・ポップアップ ---
 function finishGame(isClear) {
+    clearSave(); // 冒険を終了して結果を確定するので、このセーブデータは消去する
     GAME_STATE = "RESULT";
     let assets = calculateTotalAssets();
     let nowDt = new Date();
@@ -1929,9 +2014,11 @@ function renderPopup() {
     ctx.fillRect(0,0,1280,720);
     
     let px = 340, py = 260, pw = 600, ph = 200;
-    
+
     if (activePopup.isClearPopup) {
         py = 100; ph = 520;
+    } else if (activePopup.isContinueChoice) {
+        py = 240; ph = 240;
     }
 
     ctx.save();
@@ -1959,6 +2046,21 @@ function renderPopup() {
                 GAME_STATE = "TITLE";
             });
         }
+    } else if (activePopup.isContinueChoice) {
+        drawText(T('continue_choice_title'), px + pw/2, py + 45, 24, '#2c3e50', 'center');
+        drawText(T('continue_choice_sub'), px + pw/2, py + 80, 15, '#7f8c8d', 'center');
+        drawBtn(T('btn_continue'), px + 40, py + 115, 240, 55, '#3498db', () => {
+            activePopup = null;
+            loadGame();
+        });
+        drawBtn(T('btn_new_game'), px + pw - 280, py + 115, 240, 55, '#e74c3c', () => {
+            activePopup = {
+                text: T('confirm_new_game_erase'),
+                onYes: () => { clearSave(); GAME_STATE = "PLAYER_SELECT"; },
+                onNo: () => { activePopup = { isContinueChoice: true }; }
+            };
+        });
+        drawBtn(T('btn_cancel'), px + pw/2 - 75, py + 180, 150, 40, '#95a5a6', () => { activePopup = null; });
     } else if(activePopup.isPrompt) {
         drawText(activePopup.text, px + pw/2, py + 40, 22, '#2c3e50', 'center');
         if (activePopup.subtext) {
@@ -1985,7 +2087,9 @@ function renderPopup() {
                 if(onYes) onYes();
             });
             drawBtn(T('btn_no'), px + 350, py + 130, 150, 45, '#7f8c8d', () => {
+                let onNo = activePopup.onNo;
                 activePopup = null;
+                if(onNo) onNo();
             });
         }
     }
@@ -2024,6 +2128,7 @@ function loop() {
                 gameData.day++;
                 gameData.ap = gameData.maxAp;
                 addMessage(T('msg_new_day', {day: gameData.day}));
+                autoSave();
             }
         } else {
             restEffect.alpha -= 0.05;
@@ -2045,7 +2150,7 @@ cvs.addEventListener("click", (e) => {
     const y = (e.clientY - rect.top) * scaleY;
     for (let i = clickZones.length - 1; i >= 0; i--) {
         let z = clickZones[i];
-        if (x >= z.x && x <= z.x + z.w && y >= z.y && y <= z.y + z.h) { z.onClick(); break; }
+        if (x >= z.x && x <= z.x + z.w && y >= z.y && y <= z.y + z.h) { z.onClick(); autoSave(); break; }
     }
 });
 
