@@ -108,6 +108,102 @@
             box-shadow: none;
         }
         .hidden { display: none !important; }
+
+        /* ===== あそびかた（ヘルプ）オーバーレイ ===== */
+        #howtoOverlay {
+            position: absolute;
+            inset: 0;
+            z-index: 150;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.6);
+        }
+        #howtoOverlay.show { display: flex; }
+        .howto-panel {
+            width: 940px;
+            max-width: 94%;
+            max-height: 90%;
+            background: #FFF8E1;
+            border: 5px solid #FF9800;
+            border-radius: 24px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 18px 55px rgba(0, 0, 0, 0.45);
+        }
+        .howto-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 24px;
+            background: #FF9800;
+            color: #fff;
+            flex-shrink: 0;
+        }
+        .howto-head .howto-title { font-size: 30px; font-weight: 800; }
+        .howto-close {
+            width: 44px;
+            height: 44px;
+            border: none;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.25);
+            color: #fff;
+            font-size: 20px;
+            font-weight: 800;
+            cursor: pointer;
+        }
+        .howto-close:active { transform: translateY(2px); }
+        .howto-body {
+            padding: 22px 24px 8px;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            touch-action: pan-y;
+            flex: 1;
+        }
+        .howto-sec {
+            background: #fff;
+            border: 2px solid #FFE0B2;
+            border-radius: 16px;
+            padding: 14px 18px 16px;
+            margin-bottom: 14px;
+        }
+        .howto-sec-head {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 22px;
+            font-weight: 800;
+            color: #E65100;
+            margin-bottom: 8px;
+        }
+        .howto-sec-head .ic { font-size: 28px; line-height: 1; }
+        .howto-sec p {
+            margin: 6px 0;
+            font-size: 17.5px;
+            line-height: 1.65;
+            color: #5D4037;
+        }
+        .howto-egs { margin-top: 8px; }
+        .howto-egs .eg {
+            display: inline-block;
+            background: #FFF3E0;
+            border: 1.5px solid #FFCC80;
+            border-radius: 9px;
+            padding: 4px 12px;
+            margin: 4px 6px 0 0;
+            font-size: 16.5px;
+            font-weight: 700;
+            color: #E65100;
+        }
+        .howto-foot {
+            padding: 14px;
+            text-align: center;
+            border-top: 2px solid #FFE0B2;
+            background: #FFF8E1;
+            flex-shrink: 0;
+        }
+        .howto-foot .ui-btn { font-size: 22px; padding: 12px 44px; }
     </style>
 </head>
 <body>
@@ -131,6 +227,19 @@
         <div style="display:flex; gap:10px;">
             <button class="ui-btn" id="customConfirmOk">OK</button>
             <button class="ui-btn" style="background-color:#90A4AE; box-shadow:0 4px #546E7A;" id="customConfirmCancel" data-i18n="btn_cancel">やめる</button>
+        </div>
+    </div>
+
+    <div id="howtoOverlay" onclick="if(event.target===this)Game.closeHowto()">
+        <div class="howto-panel">
+            <div class="howto-head">
+                <span class="howto-title" id="howtoTitle" data-i18n="howto_title">あそびかた</span>
+                <button class="howto-close" onclick="Game.closeHowto()" aria-label="close">✕</button>
+            </div>
+            <div class="howto-body" id="howtoBody"></div>
+            <div class="howto-foot">
+                <button class="ui-btn" onclick="Game.closeHowto()" id="howtoCloseBtn" data-i18n="btn_close">とじる</button>
+            </div>
         </div>
     </div>
 
@@ -162,22 +271,38 @@ const STRINGS = {
         next_boss_in: '次のBOSSまで: あと{n}回', boss_appearing: 'BOSS 出現中！', all_boss_defeated: '全BOSS撃破！',
         btn_to_title: 'タイトルへ', select_number_to_clear: 'すうじをえらんでね', btn_use: 'つかう', label_boss_hp: 'BOSS HP',
         howto_title: 'あそびかた',
-        howto_lines: [
-            "● たて か よこ で 合計１０ をつくろう",
-            "● パネルをドラッグして移動できるよ",
-            "● １０ができたパネルは消えるよ",
-            "● 連続で消してコンボを狙おう！",
-            "",
-            "🪨  岩(HP1) / 🪙コイン(HP1) / 💰バッグ(HP2) / 💎ダイヤ(HP3)",
-            "     隣りの10消しでHP-1。隣接数だけ複数ダメージあり！",
-            "👾👻🤖...  BOSS：隣りの10消しでHP-1。全部削って倒そう！",
-            "     BOSSは岩を生み出すぞ！",
-            "",
-            "🌠  流れ星：隣りを消すとGET！「つかう」で",
-            "     数字を1種類まるごと全消し＋隣接障害物に1ダメージ",
-            "🎆  花火：隣り消しで十字消し！",
-            "",
-            "★  全BOSSを倒すとゲームクリア！ ★",
+        howto_sections: [
+            { ic: '🎯', head: 'ゲームの目的', lines: [
+                'タテかヨコにとなり合った数字パネルの合計を、ちょうど「10」にすると、そのパネルが消えるよ。',
+                'マスがいっぱいになる前に消しつづけて、ボスを全部たおせばゲームクリア！'
+            ] },
+            { ic: '👆', head: 'そうさ', lines: [
+                '数字パネルを、あいているマスへドラッグして動かせるよ。',
+                'パネルを1つ動かすたびに1ターン進み、新しいパネルが増えるよ。',
+                'マスがすべてうまるとゲームオーバー。こまめに「10」をつくって消そう。'
+            ] },
+            { ic: '🔟', head: '「10」のつくりかた', lines: [
+                'タテ または ヨコ に、となり合う2枚以上の数字の合計が ちょうど10 になればOK。',
+                'あいだに岩やアイテムがあるとつながらないよ。'
+            ], egs: ['3 と 7', '2・3・5', '1・2・3・4'] },
+            { ic: '🔥', head: 'コンボ', lines: [
+                '1回の動きで2か所以上消したり、消えたあとに続けて「10」ができるとコンボ！',
+                'コンボがつながるほどスコアが大きくアップするよ。'
+            ] },
+            { ic: '👾', head: 'ボス', lines: [
+                '「10をつくった回数」が一定数に達するとボスが出現！',
+                'ボスのとなりで「10」を消すたびに、ボスのHPが1へる。HPを0にすると撃破！',
+                'ボスは毎ターン、まわりに岩を置いてくるよ。',
+                'たおすボスの数 … やさしい：3体／ふつう：4体／むずかしい：5体。むずかしいほどパネルが増えるのも速いよ。'
+            ] },
+            { ic: '🪨', head: 'じゃまなモノ', lines: [
+                '数字ではないので「10」づくりには使えないよ。となりで「10」を消すとHPがへって、こわせる。',
+                '同じターンに数字がいくつもとなり合っていれば、その数だけまとめてダメージ！'
+            ], egs: ['🪨 岩：HP1（スコアなし）', '🪙 コイン：HP1（+300てん）', '💰 バッグ：HP2（+1000てん）'] },
+            { ic: '✨', head: 'アイテム', lines: [
+                '🌠 流れ星 … となりで「10」を消すとゲット（ストックされる）。「つかう」で数字を1つえらぶと、その数字のパネルが全部消えて、となりのじゃまなモノにもダメージ。ターンは進まないよ。',
+                '🎆 花火 … となりで「10」を消すと爆発！ タテとヨコに十字1列をまるごと消すよ。'
+            ] }
         ],
         btn_close: 'とじる',
         game_clear_title: '🎉 ゲームクリア！ 🎉', game_over_title: 'ゲームオーバー！',
@@ -200,22 +325,38 @@ const STRINGS = {
         next_boss_in: 'つぎの BOSSまで: あと{n}かい', boss_appearing: 'BOSS しゅつげんちゅう！', all_boss_defeated: 'ぜんぶの BOSSを たおした！',
         btn_to_title: 'タイトルへ', select_number_to_clear: 'すうじを えらんでね', btn_use: 'つかう', label_boss_hp: 'BOSS HP',
         howto_title: 'あそびかた',
-        howto_lines: [
-            "● たて か よこ で ごうけい１０ を つくろう",
-            "● パネルを ドラッグして いどうできるよ",
-            "● １０が できた パネルは きえるよ",
-            "● れんぞくで けして コンボを ねらおう！",
-            "",
-            "🪨  いわ(HP1) / 🪙コイン(HP1) / 💰バッグ(HP2) / 💎ダイヤ(HP3)",
-            "     となりの10けしで HP-1。りんせつすうだけ ふくすうダメージ あり！",
-            "👾👻🤖...  BOSS：となりの10けしで HP-1。ぜんぶ けずって たおそう！",
-            "     BOSSは いわを うみだすぞ！",
-            "",
-            "🌠  ながれぼし：となりを けすと GET！「つかう」で",
-            "     すうじを 1しゅるい まるごと ぜんけし＋りんせつ しょうがいぶつに 1ダメージ",
-            "🎆  はなび：となり けしで じゅうじけし！",
-            "",
-            "★  ぜんぶの BOSSを たおすと ゲームクリア！ ★",
+        howto_sections: [
+            { ic: '🎯', head: 'ゲームの もくてき', lines: [
+                'タテか ヨコで となりあった すうじパネルの ごうけいを、ちょうど「10」に すると、その パネルが きえるよ。',
+                'マスが いっぱいに なる まえに けしつづけて、ボスを ぜんぶ たおせば ゲームクリア！'
+            ] },
+            { ic: '👆', head: 'そうさ', lines: [
+                'すうじパネルを、あいている マスへ ドラッグして うごかせるよ。',
+                'パネルを 1つ うごかすたびに 1ターン すすみ、あたらしい パネルが ふえるよ。',
+                'マスが すべて うまると ゲームオーバー。こまめに「10」を つくって けそう。'
+            ] },
+            { ic: '🔟', head: '「10」の つくりかた', lines: [
+                'タテ または ヨコ に、となりあう 2まい いじょうの すうじの ごうけいが ちょうど 10 に なればOK。',
+                'あいだに いわや アイテムが あると つながらないよ。'
+            ], egs: ['3 と 7', '2・3・5', '1・2・3・4'] },
+            { ic: '🔥', head: 'コンボ', lines: [
+                '1かいの うごきで 2かしょ いじょう けしたり、きえた あとに つづけて「10」が できると コンボ！',
+                'コンボが つながるほど スコアが 大きく アップするよ。'
+            ] },
+            { ic: '👾', head: 'ボス', lines: [
+                '「10を つくった かいすう」が ふえると ボスが しゅつげん！',
+                'ボスの となりで「10」を けすたびに、ボスの HPが 1 へる。HPを 0に すると たおせる！',
+                'ボスは まいターン、まわりに いわを おいてくるよ。',
+                'たおす ボスの かず … やさしい：3たい／ふつう：4たい／むずかしい：5たい。むずかしいほど パネルが ふえるのも はやいよ。'
+            ] },
+            { ic: '🪨', head: 'じゃまな モノ', lines: [
+                'すうじでは ないので「10」づくりには つかえないよ。となりで「10」を けすと HPが へって、こわせる。',
+                'おなじターンに すうじが いくつも となりあって いれば、その かずだけ まとめて ダメージ！'
+            ], egs: ['🪨 いわ：HP1（スコアなし）', '🪙 コイン：HP1（+300てん）', '💰 バッグ：HP2（+1000てん）'] },
+            { ic: '✨', head: 'アイテム', lines: [
+                '🌠 ながれぼし … となりで「10」を けすと ゲット（ストックされる）。「つかう」で すうじを 1つ えらぶと、その すうじの パネルが ぜんぶ きえて、となりの じゃまな モノにも ダメージ。ターンは すすまないよ。',
+                '🎆 はなび … となりで「10」を けすと ばくはつ！ タテと ヨコに じゅうじ 1れつを まるごと けすよ。'
+            ] }
         ],
         btn_close: 'とじる',
         game_clear_title: '🎉 ゲームクリア！ 🎉', game_over_title: 'ゲームオーバー！',
@@ -238,22 +379,38 @@ const STRINGS = {
         next_boss_in: 'Next BOSS in: {n}', boss_appearing: 'BOSS Appeared!', all_boss_defeated: 'All Bosses Defeated!',
         btn_to_title: 'To Title', select_number_to_clear: 'Choose a number to clear', btn_use: 'Use', label_boss_hp: 'BOSS HP',
         howto_title: 'How to Play',
-        howto_lines: [
-            "● Make a total of 10 in a row or column",
-            "● Drag panels to move them",
-            "● A panel that reaches 10 disappears",
-            "● Clear in a row to build combos!",
-            "",
-            "🪨 Rock(HP1) / 🪙Coin(HP1) / 💰Bag(HP2) / 💎Gem(HP3)",
-            "     Clearing a neighboring 10 does -1 HP. Multiple adjacent hits stack!",
-            "👾👻🤖...  BOSS: clearing a neighboring 10 does -1 HP. Wear it down to defeat it!",
-            "     Bosses spawn rocks!",
-            "",
-            "🌠  Shooting star: get one by clearing next to it! \"Use\" it to",
-            "     clear every block of one number + 1 damage to adjacent obstacles",
-            "🎆  Fireworks: clearing next to it clears a cross shape!",
-            "",
-            "★  Defeat all bosses to clear the game! ★",
+        howto_sections: [
+            { ic: '🎯', head: 'Goal', lines: [
+                'Make the numbers next to each other in a row or column add up to exactly 10, and those panels disappear.',
+                'Keep clearing before the board fills up, and defeat every boss to clear the game!'
+            ] },
+            { ic: '👆', head: 'Controls', lines: [
+                'Drag a number panel into any empty square to move it.',
+                'Every move takes 1 turn, and new panels appear each turn.',
+                'If the board fills up completely, it\'s game over. Keep making 10s to stay alive.'
+            ] },
+            { ic: '🔟', head: 'Making 10', lines: [
+                'Two or more adjacent numbers in a row or column must add up to exactly 10.',
+                'A rock or item in between breaks the chain.'
+            ], egs: ['3 + 7', '2 + 3 + 5', '1 + 2 + 3 + 4'] },
+            { ic: '🔥', head: 'Combo', lines: [
+                'Clear two or more spots in one move, or chain another 10 right after a clear, to score a combo!',
+                'The longer the combo, the bigger the score bonus.'
+            ] },
+            { ic: '👾', head: 'Boss', lines: [
+                'A boss appears once you have made enough 10s.',
+                'Each 10 you clear next to the boss deals 1 damage. Bring its HP to 0 to defeat it!',
+                'The boss drops rocks around itself every turn.',
+                'Bosses to beat: Easy 3 / Normal 4 / Hard 5. Higher difficulty also fills the board faster.'
+            ] },
+            { ic: '🪨', head: 'Obstacles', lines: [
+                'These aren\'t numbers, so they can\'t be used to make 10. Clear a 10 next to one to damage it.',
+                'If several matching numbers touch it in the same turn, it takes that many hits at once!'
+            ], egs: ['🪨 Rock: HP1 (no score)', '🪙 Coin: HP1 (+300 pts)', '💰 Bag: HP2 (+1000 pts)'] },
+            { ic: '✨', head: 'Items', lines: [
+                '🌠 Shooting Star - get one by clearing a 10 next to it (it goes into your stock). Tap "Use" and pick a number to clear every panel of that number, plus damage adjacent obstacles. It does not use a turn.',
+                '🎆 Fireworks - clear a 10 next to it and it explodes, wiping out a full row and column in a cross.'
+            ] }
         ],
         btn_close: 'Close',
         game_clear_title: '🎉 GAME CLEAR! 🎉', game_over_title: 'GAME OVER!',
@@ -277,6 +434,27 @@ function T(key, params) {
 function applyLanguage() {
     document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = T(el.getAttribute('data-i18n')); });
     document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { el.setAttribute('placeholder', T(el.getAttribute('data-i18n-placeholder'))); });
+    renderHowto();
+}
+
+// あそびかた（ヘルプ）の中身を現在の言語で組み立てる
+function renderHowto() {
+    const body = document.getElementById('howtoBody');
+    if (!body) return;
+    const sections = T('howto_sections');
+    if (!Array.isArray(sections)) return;
+    const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    body.innerHTML = sections.map(sec => {
+        const lines = (sec.lines || []).map(l => `<p>${esc(l)}</p>`).join('');
+        const egs = (sec.egs && sec.egs.length)
+            ? `<div class="howto-egs">${sec.egs.map(e => `<span class="eg">${esc(e)}</span>`).join('')}</div>`
+            : '';
+        return `<div class="howto-sec">
+            <div class="howto-sec-head"><span class="ic">${esc(sec.ic || '')}</span><span>${esc(sec.head || '')}</span></div>
+            ${lines}${egs}
+        </div>`;
+    }).join('');
+    body.scrollTop = 0;
 }
 function selectLanguage(lang) {
     currentLang = lang;
@@ -518,7 +696,7 @@ const Game = (function() {
         starStock = 0;
         isSelectingStar = false;
         isGameClear = false;
-        isShowingHelp = false;
+        closeHowto();
 
         // ボス関連リセット
         totalTens = 0;
@@ -1317,7 +1495,8 @@ const Game = (function() {
         drawButton(BASE_WIDTH/2, 300, 300, 70, T('diff_easy'), "#AED581", "#33691E");
         drawButton(BASE_WIDTH/2, 400, 300, 70, T('diff_normal'), "#FFB74D", "#E65100");
         drawButton(BASE_WIDTH/2, 500, 300, 70, T('diff_hard'), "#E57373", "#B71C1C");
-        drawButton(BASE_WIDTH/2, 620, 200, 50, T('btn_cancel'), "#B0BEC5");
+        drawButton(BASE_WIDTH/2 - 135, 620, 200, 50, T('btn_cancel'), "#B0BEC5");
+        drawButton(BASE_WIDTH/2 + 135, 620, 230, 50, T('btn_howto'), "#8D6E63");
     }
     
     function drawGame() {
@@ -1533,9 +1712,6 @@ const Game = (function() {
             drawButton(BASE_WIDTH/2, BASE_HEIGHT/2 + 180, 150, 50, T('btn_cancel'), "#B0BEC5");
         }
         
-        // ヘルプオーバーレイ
-        if(isShowingHelp) drawHelpOverlay();
-
         // エフェクト描画
         effects.forEach(ef => {
             ctx.save();
@@ -1586,39 +1762,19 @@ const Game = (function() {
         });
     }
 
-    function drawHelpOverlay() {
-        ctx.fillStyle = "rgba(0,0,0,0.78)";
-        ctx.fillRect(0, 0, BASE_WIDTH, BASE_HEIGHT);
-
-        const pw = 660, ph = 590;
-        const px = BASE_WIDTH/2 - pw/2, py = BASE_HEIGHT/2 - ph/2;
-        ctx.save();
-        ctx.shadowColor = "rgba(0,0,0,0.35)";
-        ctx.shadowBlur = 25;
-        ctx.shadowOffsetY = 10;
-        ctx.fillStyle = "#FFF8E1";
-        roundRect(ctx, px, py, pw, ph, 20, true, false);
-        ctx.restore();
-        ctx.strokeStyle = "#FF9800";
-        ctx.lineWidth = 3;
-        roundRect(ctx, px, py, pw, ph, 20, false, true);
-
-        ctx.fillStyle = "#5D4037";
-        ctx.font = "bold 38px 'M PLUS Rounded 1c'";
-        ctx.textAlign = "center";
-        ctx.fillText(T('howto_title'), BASE_WIDTH/2, py + 52);
-
-        const lines = T('howto_lines');
-        ctx.font = "21px 'M PLUS Rounded 1c'";
-        ctx.textAlign = "left";
-        let ly = py + 95;
-        lines.forEach(line => {
-            ctx.fillStyle = line.startsWith("★") ? "#E65100" : "#5D4037";
-            ctx.fillText(line, px + 28, ly);
-            ly += 30;
-        });
-
-        drawButton(BASE_WIDTH/2, py + ph - 36, 200, 50, T('btn_close'), "#FF9800");
+    // あそびかた（ヘルプ）の開閉。中身はHTML/CSS側（#howtoOverlay）で表示する
+    function openHowto() {
+        renderHowto();
+        const ov = document.getElementById('howtoOverlay');
+        if (ov) ov.classList.add('show');
+        const body = document.getElementById('howtoBody');
+        if (body) body.scrollTop = 0; // 表示後にスクロール位置を先頭へ
+        isShowingHelp = true;
+    }
+    function closeHowto() {
+        const ov = document.getElementById('howtoOverlay');
+        if (ov) ov.classList.remove('show');
+        isShowingHelp = false;
     }
 
     function drawCellContent(x, y, cell, shadow=false) {
@@ -1863,7 +2019,9 @@ const Game = (function() {
         inputState.x = ( (e.clientX || e.pageX) - rect.left) * scaleX;
         inputState.y = ( (e.clientY || e.pageY) - rect.top) * scaleY;
         inputState.isDown = true;
-        
+
+        if(isShowingHelp) return; // あそびかた表示中は盤面・ボタン操作を無効化（閉じるのはHTML側のボタン）
+
         if(currentState === STATE.TITLE) checkTitleClick(inputState.x, inputState.y);
         else if(currentState === STATE.PLAYER_SELECT) checkPlayerSelectClick(inputState.x, inputState.y);
         else if(currentState === STATE.DIFFICULTY_SELECT) checkDifficultyClick(inputState.x, inputState.y);
@@ -1949,17 +2107,11 @@ const Game = (function() {
         if(isBtnClicked(x, y, BASE_WIDTH/2, 300, 300, 70)) startNewGame('easy');
         else if(isBtnClicked(x, y, BASE_WIDTH/2, 400, 300, 70)) startNewGame('normal');
         else if(isBtnClicked(x, y, BASE_WIDTH/2, 500, 300, 70)) startNewGame('hard');
-        else if(isBtnClicked(x, y, BASE_WIDTH/2, 620, 200, 50)) currentState = STATE.TITLE;
+        else if(isBtnClicked(x, y, BASE_WIDTH/2 - 135, 620, 200, 50)) currentState = STATE.TITLE;
+        else if(isBtnClicked(x, y, BASE_WIDTH/2 + 135, 620, 230, 50)) openHowto();
     }
     
     function checkGameClick(x, y) {
-        // ヘルプ表示中
-        if(isShowingHelp) {
-            const ph = 590, py = BASE_HEIGHT/2 - ph/2;
-            if(isBtnClicked(x, y, BASE_WIDTH/2, py + ph - 36, 200, 50)) isShowingHelp = false;
-            return;
-        }
-
         // アイテム選択中のクリック処理
         if(isSelectingStar) {
             for(let i=1; i<=9; i++) {
@@ -1988,7 +2140,7 @@ const Game = (function() {
 
         // あそびかたボタン（左上）
         if(isBtnClicked(x, y, 150, 38, 230, 48)) {
-            isShowingHelp = true;
+            openHowto();
             return;
         }
 
@@ -2123,7 +2275,7 @@ const Game = (function() {
 
     function loop() { update(); draw(); requestAnimationFrame(loop); }
     window.onload = init;
-    return { registerPlayer: registerPlayer, closePlayerInput: closePlayerInput };
+    return { registerPlayer: registerPlayer, closePlayerInput: closePlayerInput, closeHowto: closeHowto };
 })();
 </script>
 </body>
