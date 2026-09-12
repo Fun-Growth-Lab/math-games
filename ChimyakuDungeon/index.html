@@ -549,8 +549,21 @@
         .monster-list-name { flex:1 1 auto; min-width:64px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .monster-list-action { flex:0 0 auto; display:flex; align-items:center; gap:4px; white-space:nowrap; }
         .monster-list-unplaced { color: var(--gold,#ffd85c); font-weight:700; font-size:0.68rem; }
-        .monster-list-action-btn { padding:2px 8px; font-size:0.66rem; }
+        /* 小さいボタンだとhoverのtranslateYでカーソルの真下から外れてhover/leaveを高速に繰り返す「点滅」バグが起きるため、
+           このボタンだけはtransformを無効化し、色の変化だけでhoverを表現する */
+        .monster-list-action-btn { padding:2px 8px; font-size:0.66rem; transform:none !important; }
+        .monster-list-action-btn:hover { transform:none !important; filter:brightness(1.15); }
+        .monster-list-action-btn:active { transform:none !important; }
+        .monster-list-action-btn.deploy { background: linear-gradient(to bottom,#8fe0a8,#2f8f4e); color:#0a2e15; border-color:#b8f0c8; box-shadow: 0 3px 0 #1c5c30; }
+        .monster-list-action-btn.retrieve { background: linear-gradient(to bottom,#ffcf8a,#c97a1e); color:#3a2000; border-color:#ffe0b0; box-shadow: 0 3px 0 #8a5414; }
         .monster-list-lv { flex:0 0 auto; width:34px; color: var(--gold); font-weight:800; font-size:0.72rem; text-align:right; }
+        .monster-list-room { flex:0 0 auto; width:72px; color: var(--ink-dim); font-size:0.68rem; text-align:right; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        /* 一覧・カードのモンスターアイコン：実イラスト（4方向シートの正面/下向き）があればそれを使う */
+        .monster-icon-thumb {
+            display:inline-block; width:20px; height:20px; vertical-align:-5px;
+            background-repeat:no-repeat; background-size:200% 200%; background-position:0% 0%; image-rendering:pixelated;
+        }
+        .monster-icon-thumb-emoji { display:inline-block; }
         .monster-list-stars { flex:0 0 auto; width:64px; text-align:right; font-size:0.72rem; }
         .monster-list-hp { flex:0 0 auto; width:66px; color: var(--ink); font-weight:700; font-size:0.68rem; text-align:right; white-space:nowrap; }
         .monster-list-equip { flex:0 0 auto; width:100px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color: var(--ink-dim); font-size:0.68rem; text-align:right; }
@@ -1349,6 +1362,7 @@ const UI_TEXT = {
     sort_atk: { ja: '攻撃力', ja_easy: 'こうげきりょく', en: 'ATK' },
     sort_def: { ja: '防御力', ja_easy: 'ぼうぎょりょく', en: 'DEF' },
     sort_magAtk: { ja: '魔法攻撃力', ja_easy: 'まほう こうげきりょく', en: 'Sp.ATK' },
+    sort_room: { ja: '部屋', ja_easy: 'へや', en: 'Room' },
     move_info_title: { ja: '選択中', ja_easy: 'せんたくちゅう', en: 'Selected' },
     status_poison: { ja: '毒', ja_easy: 'どく', en: 'Poison' },
     status_burn: { ja: '火傷', ja_easy: 'やけど', en: 'Burn' },
@@ -3319,10 +3333,13 @@ function resolveConfusedAction(unit, room, roomId, side){
 }
 
 // ---- モンスター一覧のソート ----
-const SORT_KEYS = ['type','atk','def','magAtk'];
+const SORT_KEYS = ['type','atk','def','magAtk']; // 部屋詳細サイドパネル用（同じ部屋の中だけなので「部屋」ソートは意味がない）
+const MONSTER_LIST_SORT_KEYS = ['type','atk','def','magAtk','room']; // 魔物一覧モーダル用（部屋ソートも追加）
 let monsterSortKey = 'type';
 function sortValue(m, key){
     if (key==='type') return -ROLE_SORT_INDEX[speciesInfo(m.speciesKey).role];
+    // 部屋番号の昇順（部屋1→2→3…）で並べたいので符号を反転。未配置(null)は常に最後に回す
+    if (key==='room') return m.roomId===null ? -Infinity : -m.roomId;
     return m[key];
 }
 function sortMonsters(list){
@@ -3335,8 +3352,18 @@ function sortMonsters(list){
         return 0;
     });
 }
-function setMonsterSortKey(key){ monsterSortKey = key; renderRoomDetail(); }
+function setMonsterSortKey(key){
+    monsterSortKey = key;
+    renderRoomDetail();
+    if (!document.getElementById('monster-list-modal').classList.contains('hidden')) renderMonsterListModal();
+}
 
+// 一覧・カードで使うモンスターの小アイコン。実イラストがあればそれを、なければ絵文字にフォールバックする
+function monsterIconHtml(sp){
+    const imgFile = SPECIES_IMAGE_MAP[sp.key];
+    if (!imgFile) return `<span class="monster-icon-thumb-emoji">${sp.emoji}</span>`;
+    return `<span class="monster-icon-thumb" style="background-image:url('images/mamono/${imgFile}');"></span>`;
+}
 // ---- モンスター詳細カード（部屋一覧・移動選択時の両方で使う） ----
 // 一覧では1行（アイコン・名前・HP）だけのコンパクト表示。タップすると画面中央に詳細ポップアップを開く
 // （モンスターは1体1体大切な個体なので、ステータスはリストの中で小さく畳むのではなく専用ポップアップでしっかり見せる）
@@ -3358,12 +3385,14 @@ function monsterCardHtml(m, opts){
         const equipText = eq ? `${eq.icon} ${escapeHtml(eq.name_ja)}` : ui('equip_none_label');
         const inlineTag = (statusMark || downedTag) ? ` ${statusMark?`<span>${statusMark}</span>`:''}${downedTag}` : '';
         const actionHtml = stocked
-            ? `<span class="monster-list-unplaced">${escapeHtml(ui('monster_stocked_tag'))}</span><button class="btn btn-sm monster-list-action-btn" onclick="event.stopPropagation(); deployStockedMonster(${m.id});">${ui('btn_deploy_stocked')}</button>`
-            : `<button class="btn btn-sm monster-list-action-btn" onclick="event.stopPropagation(); retrieveMonsterToStock(${m.id});">${ui('btn_retrieve_stocked')}</button>`;
+            ? `<span class="monster-list-unplaced">${escapeHtml(ui('monster_stocked_tag'))}</span><button class="btn btn-sm monster-list-action-btn deploy" onclick="event.stopPropagation(); deployStockedMonster(${m.id});">${ui('btn_deploy_stocked')}</button>`
+            : `<button class="btn btn-sm monster-list-action-btn retrieve" onclick="event.stopPropagation(); retrieveMonsterToStock(${m.id});">${ui('btn_retrieve_stocked')}</button>`;
+        const roomText = stocked ? '' : escapeHtml(roomDisplayNameById(m.roomId));
         return `<div class="monster-detail-row detailed${selected?' selected':''}"${clickAttr} style="${opts.clickable?'cursor:pointer;':''}">
             <div class="monster-list-row">
-                <span class="monster-list-name">${sp.emoji} <span style="color:${monsterNameColor(sp)}; font-weight:700;">${escapeHtml(monsterDisplayName(m))}</span> <span class="${roleTextClass(sp.role)}">（${roleLabel(sp.role)}）</span>${inlineTag}</span>
+                <span class="monster-list-name">${monsterIconHtml(sp)} <span style="color:${monsterNameColor(sp)}; font-weight:700;">${escapeHtml(monsterDisplayName(m))}</span> <span class="${roleTextClass(sp.role)}">（${roleLabel(sp.role)}）</span>${inlineTag}</span>
                 <span class="monster-list-action">${actionHtml}</span>
+                <span class="monster-list-room">${roomText}</span>
                 <span class="monster-list-lv">Lv.${m.level||0}</span>
                 <span class="monster-list-stars">${starHtml(statModStars(overallStatMod(m)))}</span>
                 <span class="monster-list-hp">${ui('monster_stat_hp')} ${m.hp}/${m.maxHp}</span>
@@ -3373,7 +3402,7 @@ function monsterCardHtml(m, opts){
     }
     return `<div class="monster-detail-row compact${selected?' selected':''}"${clickAttr} style="${opts.clickable?'cursor:pointer;':''}">
         <div class="monster-compact-line">
-            <span>${sp.emoji} <span style="color:${monsterNameColor(sp)}; font-weight:700;">${escapeHtml(monsterDisplayName(m))}</span></span>
+            <span>${monsterIconHtml(sp)} <span style="color:${monsterNameColor(sp)}; font-weight:700;">${escapeHtml(monsterDisplayName(m))}</span></span>
             <span class="${roleTextClass(sp.role)}">（${roleLabel(sp.role)}）</span>
             ${statusMark?`<span>${statusMark}</span>`:''}
             ${downedTag}${stockedTag}
@@ -3833,8 +3862,11 @@ function openMonsterListModal(){
 function closeMonsterListModal(){ document.getElementById('monster-list-modal').classList.add('hidden'); }
 function renderMonsterListModal(){
     const body = document.getElementById('monster-list-body');
-    if (monsters.length===0){ body.innerHTML = `<div class="room-detail-row">${ui('monster_list_modal_empty')}</div>`; return; }
-    body.innerHTML = sortMonsters(monsters).map(m => monsterCardHtml(m, { clickable:true, detailed:true, highlight: m.id===highlightedMonsterId })).join('');
+    const sortRow = `<div class="sort-btn-row tight">` + MONSTER_LIST_SORT_KEYS.map(k =>
+        `<button class="sort-btn${monsterSortKey===k?' active':''}" onclick="setMonsterSortKey('${k}')">${ui('sort_'+k)}</button>`
+    ).join('') + `</div>`;
+    if (monsters.length===0){ body.innerHTML = sortRow + `<div class="room-detail-row">${ui('monster_list_modal_empty')}</div>`; return; }
+    body.innerHTML = sortRow + sortMonsters(monsters).map(m => monsterCardHtml(m, { clickable:true, detailed:true, highlight: m.id===highlightedMonsterId })).join('');
 }
 function openItemInventoryModal(){
     renderItemInventoryModal();
