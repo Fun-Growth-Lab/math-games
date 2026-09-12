@@ -575,6 +575,21 @@
         }
         .monster-icon-thumb-emoji { display:inline-block; }
         .monster-list-stars { flex:0 0 auto; width:64px; text-align:right; font-size:0.72rem; }
+        .monster-list-rank { flex:0 0 auto; width:30px; text-align:right; }
+        /* 総合戦闘力ランクバッジ（SS〜G）。個体差の★とは別軸で、種族・Lv込みの強さを色で一目瞭然にする */
+        .rank-badge {
+            display:inline-block; min-width:22px; padding:1px 4px; border-radius:5px;
+            font-size:0.68rem; font-weight:900; text-align:center; color:#fff; text-shadow:0 1px 1px rgba(0,0,0,0.5);
+        }
+        .rank-badge.rank-SS { background: linear-gradient(135deg,#ff5f6d,#c21807); box-shadow:0 0 5px rgba(255,60,50,0.7); }
+        .rank-badge.rank-S  { background: linear-gradient(135deg,#ffb347,#e6551a); }
+        .rank-badge.rank-A  { background: linear-gradient(135deg,#c48bff,#8e2de2); }
+        .rank-badge.rank-B  { background: linear-gradient(135deg,#5cc2ff,#1f6fd6); }
+        .rank-badge.rank-C  { background: linear-gradient(135deg,#6be08e,#1f9e5c); }
+        .rank-badge.rank-D  { background: linear-gradient(135deg,#8fd3c8,#3e8e83); }
+        .rank-badge.rank-E  { background: linear-gradient(135deg,#b8b0a4,#7a7268); }
+        .rank-badge.rank-F  { background: linear-gradient(135deg,#8a8378,#55504a); }
+        .rank-badge.rank-G  { background: linear-gradient(135deg,#6b5644,#3a2c1e); }
         .monster-list-hp { flex:0 0 auto; width:66px; color: var(--ink); font-weight:700; font-size:0.68rem; text-align:right; white-space:nowrap; }
         .monster-list-equip { flex:0 0 auto; width:100px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color: var(--ink-dim); font-size:0.68rem; text-align:right; }
         .monster-stat-line { display:flex; flex-wrap:wrap; gap: 8px; color: var(--ink-dim); margin-top: 3px; font-size: 0.72rem; }
@@ -879,6 +894,7 @@
     <div id="monster-list-modal" class="modal-backdrop hidden">
         <div class="modal-box" style="min-width:320px; width:95vw; max-width:900px; max-height:80vh; overflow-y:auto; padding-left:16px; padding-right:16px;">
             <div class="modal-title" data-i18n="monster_list_modal_title">👾 魔物一覧</div>
+            <button class="btn btn-sm btn-teal" style="width:100%; margin-bottom:10px;" data-i18n="btn_auto_deploy" onclick="autoDeployStockedMonsters()">🏠 自動配置</button>
             <div id="monster-list-body"></div>
             <button class="btn btn-sm" style="margin-top:14px; width:100%;" data-i18n="btn_close" onclick="closeMonsterListModal()">とじる</button>
         </div>
@@ -1366,6 +1382,9 @@ const UI_TEXT = {
     btn_retrieve_stocked: { ja: '回収', ja_easy: 'かいしゅう', en: 'Retrieve' },
     status_deploy_stocked: { ja: '配置する部屋のマスをクリックしてください', ja_easy: 'はいちする へやの マスを クリックしてね', en: 'Click a cell in the room to deploy this monster' },
     err_deploy_build_only: { ja: 'ダンジョン作成中のみ操作できます', ja_easy: 'ダンジョンを つくっている ときだけ できるよ', en: 'You can only do this while building the dungeon' },
+    btn_auto_deploy: { ja: '🏠 自動配置', ja_easy: '🏠 じどう はいち', en: '🏠 Auto-deploy' },
+    status_auto_deploy_done: { ja: n => `${n}体を自動配置しました`, ja_easy: n => `${n}たいを じどうはいち したよ`, en: n => `Auto-deployed ${n} monster(s)` },
+    err_no_room_space: { ja: '配置できる空きのある部屋がありません', ja_easy: 'はいちできる あきの ある へやが ないよ', en: 'No room has space to deploy into' },
     role_melee: { ja: '近距離', ja_easy: 'きんきょり', en: 'Melee' },
     role_ranged: { ja: '中距離', ja_easy: 'ちゅうきょり', en: 'Mid-range' },
     role_magic: { ja: '長距離', ja_easy: 'ちょうきょり', en: 'Long-range' },
@@ -1796,7 +1815,7 @@ function eggCountForBlock(){
     if (lo===hi) return lo;
     return Math.random() < (avg-lo) ? hi : lo;
 }
-function placeEggsInBlocks(){
+function placeEggsInBlocks(g){
     for (let br=ROOM_MIN_ROW; br<GRID_ROWS; br+=EGG_BLOCK_SIZE){
         for (let bc=0; bc<GRID_COLS; bc+=EGG_BLOCK_SIZE){
             const cells = [];
@@ -1805,31 +1824,62 @@ function placeEggsInBlocks(){
             }
             for (let i=cells.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [cells[i],cells[j]]=[cells[j],cells[i]]; }
             const eggCount = Math.min(eggCountForBlock(), cells.length);
-            for (let i=0;i<eggCount;i++) grid[cells[i].r][cells[i].c] = 'egg';
+            for (let i=0;i<eggCount;i++) g[cells[i].r][cells[i].c] = 'egg';
         }
     }
 }
-function generateMap(){
-    grid = []; occupied = [];
-    for (let r=0;r<GRID_ROWS;r++){
-        const row=[], orow=[];
-        for (let c=0;c<GRID_COLS;c++){ row.push(null); orow.push(false); }
-        grid.push(row); occupied.push(orow);
-    }
-    placeEggsInBlocks();
+// グローバル状態を書き換えない純粋関数版：素・卵の抽選結果だけを新しい配列として返す（裏で先読み生成するために分離）
+function buildRandomGrid(){
+    const g = [];
+    for (let r=0;r<GRID_ROWS;r++) g.push(new Array(GRID_COLS).fill(null));
+    placeEggsInBlocks(g);
     for (let r=ROOM_MIN_ROW;r<GRID_ROWS;r++){
         for (let c=0;c<GRID_COLS;c++){
-            if (grid[r][c]!=='egg') grid[r][c] = rollElementOnly();
+            if (g[r][c]!=='egg') g[r][c] = rollElementOnly();
         }
     }
+    return g;
+}
+function emptyOccupied(){
+    const o = []; for (let r=0;r<GRID_ROWS;r++) o.push(new Array(GRID_COLS).fill(false)); return o;
+}
+function generateMap(){
+    grid = buildRandomGrid();
+    occupied = emptyOccupied();
 }
 function elementInfo(key){ return ELEMENT_TYPES.find(t => t.key === key); }
+
+// ---- マップの先読み生成：リロードボタンが押される前に、次のマップ抽選結果とDOMを裏で用意しておく ----
+// （setupGridDomのDOM構築が重いため、クリック時にゼロから作るのではなく、事前に作っておいたものと差し替えるだけにする）
+let pendingMapPregen = null; // { grid, dom } | null
+let mapPregenScheduled = false;
+function scheduleMapPregen(){
+    if (rooms.length>0) return; // リロードできるのは最初の部屋を作るまでなので、それ以降は先読み不要
+    if (pendingMapPregen || mapPregenScheduled) return;
+    mapPregenScheduled = true;
+    const run = () => {
+        mapPregenScheduled = false;
+        if (rooms.length>0 || pendingMapPregen) return; // 待っている間に部屋が確定した/既に用意済みなら中止
+        const g = buildRandomGrid();
+        pendingMapPregen = { grid: g, dom: buildGridDom(g) };
+    };
+    if (window.requestIdleCallback) requestIdleCallback(run, { timeout: 1000 });
+    else setTimeout(run, 60);
+}
 // 最初の部屋を作るまでは、素の配置を何度でも引き直せる（無制限リロード）
 function rerollMap(){
     if (rooms.length>0) return;
-    generateMap();
-    setupGridDom();
+    if (pendingMapPregen){
+        grid = pendingMapPregen.grid;
+        occupied = emptyOccupied();
+        setupGridDom(pendingMapPregen.dom);
+        pendingMapPregen = null;
+    } else {
+        generateMap();
+        setupGridDom();
+    }
     renderAll();
+    scheduleMapPregen(); // 続けて次の分も裏で用意しておく
 }
 
 // ============================================================
@@ -1939,9 +1989,11 @@ function startNewDungeon(){
     healIndividualOpen = false;
     document.getElementById('heal-ind-panel').classList.add('hidden');
     resetPendingState();
+    pendingMapPregen = null; mapPregenScheduled = false; // 前回のダンジョンの先読み結果が残っていないようにする
     setupGridDom();
     updatePhaseUI();
     renderAll();
+    scheduleMapPregen(); // リロードボタンが押される前から、次のマップを裏で用意しておく
 }
 function resetPendingState(){
     mode = 'idle'; anchorCell = null; hoverCell = null; pendingRect = null;
@@ -1961,11 +2013,11 @@ function closeHowTo(){ document.getElementById('howto-modal').classList.add('hid
 
 // ---- グリッドDOM構築 ----
 let gridEl;
-function setupGridDom(){
-    gridEl = document.getElementById('grid');
-    gridEl.style.width = (GRID_COLS*CELL) + 'px';
-    gridEl.style.height = (GRID_ROWS*CELL) + 'px';
-    gridEl.innerHTML = '';
+// 指定した素配列(g)からマス目のDOMをまとめて作る（グローバル状態には触れない）。戻り値をgridElに挿入するのは呼び出し側の役目
+// ライブのgridElへ直接1マスずつappendするより、いったんDocumentFragmentへ組み立ててから1回で挿入する方が速く、
+// かつ裏で先読み生成する際にも（画面に見えないまま）同じ関数で組み立てられる
+function buildGridDom(g){
+    const frag = document.createDocumentFragment();
     for (let r=0;r<GRID_ROWS;r++){
         for (let c=0;c<GRID_COLS;c++){
             const cell = document.createElement('div');
@@ -1979,7 +2031,7 @@ function setupGridDom(){
             } else if (Math.random() < 0.35){
                 cell.classList.add('alt');
             }
-            const key = grid[r][c];
+            const key = g[r][c];
             if (key==='egg'){
                 const wrap = document.createElement('div');
                 wrap.className = 'gem-wrap special-wrap';
@@ -2000,9 +2052,18 @@ function setupGridDom(){
                 wrap.appendChild(gem);
                 cell.appendChild(wrap);
             }
-            gridEl.appendChild(cell);
+            frag.appendChild(cell);
         }
     }
+    return frag;
+}
+// prebuiltDomを渡した場合はそれをそのまま使う（先読み済みのマップと差し替えるとき用）。省略時は現在のgridから組み立てる
+function setupGridDom(prebuiltDom){
+    gridEl = document.getElementById('grid');
+    gridEl.style.width = (GRID_COLS*CELL) + 'px';
+    gridEl.style.height = (GRID_ROWS*CELL) + 'px';
+    gridEl.innerHTML = '';
+    gridEl.appendChild(prebuiltDom || buildGridDom(grid));
     gridEl.onclick = onGridClick;
     gridEl.onmousemove = onGridMove;
     gridEl.onmouseleave = () => { hoverCell = null; updateGemFocus(null); renderOverlays(); };
@@ -2034,7 +2095,7 @@ function normalizeRect(a,b){
 // ---- 建設ボタン（初期状態） ----
 function demonLordCardHtml(){
     return `<div class="monster-detail-row">
-        <div>🐲 ${ui('demonlord_label')}</div>
+        <div><span class="monster-icon-thumb" style="background-image:url('images/mamono/demon_lord.png');"></span> ${ui('demonlord_label')}</div>
         <div class="monster-stat-line">
             <span>${ui('monster_stat_hp')} ${DEMON_LORD_STATS.hp}</span>
             <span>${ui('monster_stat_atk')} ${DEMON_LORD_STATS.atk}</span>
@@ -2910,6 +2971,41 @@ function roleLabel(role){ return ui('role_'+role); }
 function roleTextClass(role){ return 'role-text-'+role; }
 const ROLE_SORT_INDEX = { melee:0, ranged:1, magic:2 };
 
+// ============================================================
+// 総合戦闘力ランク（SS/S/A/B/C/D/E/F/G）
+// 個体差の★（能力ごとの得意/不得意）とは別物で、種族・Lvも含めた「今のそのモンスターの総合的な強さ」を
+// 一目で比べられるようにするための指標。装備による能力上昇は含めない（m.hp等の素のステータスのみ使う）
+// ============================================================
+// 5ステータスをSTAT_TIER_UNITで正規化してから合計する＝「実質的な平均ランク値×5」のスケールに揃える
+// （HPは係数8、他は3〜4で割ることで、値の大きさが違う5ステータスを対等に足し合わせられるようにする）
+function powerScore(u){
+    return u.hp/STAT_TIER_UNIT.hp + u.atk/STAT_TIER_UNIT.atk + u.def/STAT_TIER_UNIT.def
+         + u.magAtk/STAT_TIER_UNIT.magAtk + u.magDef/STAT_TIER_UNIT.magDef;
+}
+// 全モンスター種のLv0・個体差なし(1.0倍)時点でのpowerScoreを平均した値＝種族間のばらつきをならした基準値
+const AVG_SPECIES_POWER_SCORE = MONSTER_SPECIES.reduce((sum,sp) => sum + powerScore(sp), 0) / MONSTER_SPECIES.length;
+// Lv、個体差なし(1.0倍)のときの「平均的なモンスター」の基準スコア
+function referencePowerScoreAtLevel(lv){ return AVG_SPECIES_POWER_SCORE * (1 + 0.1*lv); }
+// 全7ステージクリア時点でのモンスターの平均Lvの目安（暫定値）。
+// 全侵攻の勇者は合計100体、キル1体につき+100XP(=+1Lv)で、卵は各ステージで一定確率で孵化し続けるため
+// 平均的な孵化タイミングと部屋数を踏まえるとLv10前後になると見込んで採用（要調整）
+const RANK_REFERENCE_LEVEL_B = 10;
+const RANK_LEVELS = ['G','F','E','D','C','B','A','S','SS']; // 添字0=G(最弱)～8=SS(最強)
+const RANK_B_INDEX = 5; // 'B'の添字
+// Lv1・個体差なし(1.0倍)がちょうど'F'(添字1)の中心に来るよう、ランク1段あたりの倍率を逆算する
+// （個体差71%〜150%の幅がG〜Eの3段にほぼ収まるように、Lv1の平均をG/F/Eの中心＝Fに置く）
+const RANK_STEP_RATIO = Math.pow(
+    referencePowerScoreAtLevel(RANK_REFERENCE_LEVEL_B) / referencePowerScoreAtLevel(1),
+    1 / (RANK_B_INDEX - 1)
+);
+function combatRank(m){
+    const score = powerScore(m);
+    const refB = referencePowerScoreAtLevel(RANK_REFERENCE_LEVEL_B);
+    let idx = Math.round(Math.log(score/refB) / Math.log(RANK_STEP_RATIO)) + RANK_B_INDEX;
+    idx = Math.max(0, Math.min(RANK_LEVELS.length-1, idx));
+    return RANK_LEVELS[idx];
+}
+
 // ---- 状態異常・アクティブスキルの共通ルール（暫定値。詳細な数値は今後調整） ----
 const ACTIVE_SKILL_COOLDOWN = 2; // 使用後は2ターン使えず、3ターン目で再使用可（罠と同じ間隔）
 const STATUS_EFFECT_DURATION = { paralysis:1, confusion:2, freeze:2 }; // 毒・火傷はターン経過では消えない（部屋の戦闘終了まで残る）。麻痺は下のPARALYSIS_CLEAR_CHANCEで別途判定するため実際には未使用（互換のため残置）
@@ -3305,7 +3401,7 @@ function openRankUpModal(m, sp, candidates){
     if (candidates.length<=1){
         const next = candidates[0];
         body.innerHTML = `
-            <div style="text-align:center; font-size:2.4rem; margin:6px 0;">${next.emoji}</div>
+            <div style="text-align:center; margin:6px 0;">${monsterIconHtml(next, 64)}</div>
             <p class="modal-msg" style="text-align:center;">${escapeHtml(uif('rankup_notice_msg', sp.name_ja, next.name_ja))}</p>
             <button class="btn btn-primary btn-sm" style="width:100%; margin-top:10px;" onclick="confirmRankUpChoice('${next.key}')">${ui('btn_ok')}</button>
         `;
@@ -3313,7 +3409,7 @@ function openRankUpModal(m, sp, candidates){
         body.innerHTML = `
             <p class="modal-msg" style="text-align:center;">${escapeHtml(uif('rankup_choice_msg', sp.name_ja))}</p>
             <div class="btn-row" style="flex-wrap:wrap; justify-content:center;">
-                ${candidates.map(c => `<button class="btn btn-sm" style="flex:1 1 45%;" onclick="confirmRankUpChoice('${c.key}')">${c.emoji} ${escapeHtml(c.name_ja)}</button>`).join('')}
+                ${candidates.map(c => `<button class="btn btn-sm" style="flex:1 1 45%;" onclick="confirmRankUpChoice('${c.key}')">${monsterIconHtml(c)} ${escapeHtml(c.name_ja)}</button>`).join('')}
             </div>
         `;
     }
@@ -3409,10 +3505,17 @@ function setMonsterSortKey(key){
 }
 
 // 一覧・カードで使うモンスターの小アイコン。実イラストがあればそれを、なければ絵文字にフォールバックする
-function monsterIconHtml(sp){
+// sizePxを渡すと、その一辺(px)の正方形アイコンにする（省略時は20px＝一覧の行アイコンサイズ）
+function monsterIconHtml(sp, sizePx){
+    const size = sizePx || 20;
     const imgFile = SPECIES_IMAGE_MAP[sp.key];
-    if (!imgFile) return `<span class="monster-icon-thumb-emoji">${sp.emoji}</span>`;
-    return `<span class="monster-icon-thumb" style="background-image:url('images/mamono/${imgFile}');"></span>`;
+    if (!imgFile) return `<span class="monster-icon-thumb-emoji" style="font-size:${size}px;">${sp.emoji}</span>`;
+    return `<span class="monster-icon-thumb" style="width:${size}px; height:${size}px; background-image:url('images/mamono/${imgFile}');"></span>`;
+}
+// 総合戦闘力ランクのバッジ（SS〜G）。個体ごとの★（得意/不得意）とは別に、種族・Lvを含めた強さを一目で見せる
+function rankBadgeHtml(m){
+    const rank = combatRank(m);
+    return `<span class="rank-badge rank-${rank}">${rank}</span>`;
 }
 // ---- モンスター詳細カード（部屋一覧・移動選択時の両方で使う） ----
 // 一覧では1行（アイコン・名前・HP）だけのコンパクト表示。タップすると画面中央に詳細ポップアップを開く
@@ -3445,6 +3548,7 @@ function monsterCardHtml(m, opts){
                 <span class="monster-list-action">${actionHtml}</span>
                 <span class="monster-list-room">${roomText}</span>
                 <span class="monster-list-lv">Lv.${m.level||0}</span>
+                <span class="monster-list-rank">${rankBadgeHtml(m)}</span>
                 <span class="monster-list-stars">${starHtml(statModStars(overallStatMod(m)))}</span>
                 <span class="monster-list-hp">${ui('monster_stat_hp')} ${m.hp}/${m.maxHp}</span>
                 <span class="monster-list-equip">${equipText}</span>
@@ -3485,6 +3589,24 @@ function deployStockedMonster(id){
     renderBuildActions();
     renderOverlays();
     updateSidePanelVisibility();
+}
+// ストック中のモンスターを、総合戦闘力の高い順に、空きのある部屋へランダムに自動配置する
+// （強い個体から優先的に部屋を確保していき、どの部屋に入れるかは毎回ランダムに選ぶ）
+function autoDeployStockedMonsters(){
+    if (gamePhase!=='build'){ showToast(ui('err_deploy_build_only')); return; }
+    const candidates = stockedMonsters().slice().sort((a,b) => powerScore(b) - powerScore(a));
+    if (candidates.length===0) return;
+    let placedCount = 0;
+    candidates.forEach(m => {
+        const openRooms = rooms.filter(r => r.type && roomMonsterCount(r.id) < r.monsterCapacity);
+        if (openRooms.length===0) return;
+        const room = openRooms[Math.floor(Math.random()*openRooms.length)];
+        if (placeMonsterInRoomOrStock(m, room)) placedCount++;
+    });
+    renderMonsterListModal();
+    renderRoomDetail();
+    renderAll();
+    showToast(placedCount>0 ? uif('status_auto_deploy_done', placedCount) : ui('err_no_room_space'));
 }
 // 部屋に配置済みのモンスターをストックへ戻す（魔物一覧の「回収」ボタンから）
 function retrieveMonsterToStock(id){
@@ -3545,6 +3667,7 @@ function renderMonsterDetailModal(){
         <div class="monster-detail-title">
             <span style="color:${monsterNameColor(sp)};">${escapeHtml(monsterDisplayName(m))}</span>
             <b class="monster-detail-lv">Lv.${m.level||0}</b>
+            ${rankBadgeHtml(m)}
         </div>
         <div class="monster-detail-sub">${roleLabel(sp.role)}${statusMark?'　'+statusMark:''}${downed?'　'+ui('monster_downed_tag'):''}</div>
         <div class="monster-detail-hp-row">
@@ -3575,10 +3698,11 @@ function getHealableUnits(){
     const list = monsters.filter(m=>m.hp<m.maxHp).map(m => ({
         ref:m, kind:'monster', id:m.id,
         label: `${roomDisplayNameById(m.roomId)} ${speciesInfo(m.speciesKey).name_ja}`,
-        emoji: speciesInfo(m.speciesKey).emoji,
+        iconHtml: monsterIconHtml(speciesInfo(m.speciesKey)),
     }));
     if (demonLordCell && demonLordCell.hp!==undefined && demonLordCell.hp<demonLordCell.maxHp){
-        list.push({ ref:demonLordCell, kind:'demonlord', id:null, label: ui('demonlord_label'), emoji:'🐲' });
+        list.push({ ref:demonLordCell, kind:'demonlord', id:null, label: ui('demonlord_label'),
+            iconHtml: `<span class="monster-icon-thumb" style="background-image:url('images/mamono/demon_lord.png');"></span>` });
     }
     return list;
 }
@@ -3661,7 +3785,7 @@ function renderHealIndividualPanel(){
         const iconClick = u.kind==='monster' ? ` onclick="highlightMonsterOnMap(${u.id})"` : '';
         const iconGlow = (u.kind==='monster' && u.id===highlightedMonsterId) ? ' style="filter:drop-shadow(0 0 5px var(--gold));"' : '';
         return `<div class="heal-ind-row">
-            <span class="heal-ind-icon"${iconClick}${iconGlow}>${u.emoji}</span>
+            <span class="heal-ind-icon"${iconClick}${iconGlow}>${u.iconHtml}</span>
             <span class="heal-ind-info">
                 <div class="heal-ind-name">${escapeHtml(u.label)}</div>
                 <div class="heal-ind-hp">${u.ref.hp}/${u.ref.maxHp}</div>
@@ -3768,7 +3892,7 @@ function openHatchAndLootModal(room, born, itemKeys){
         born.forEach(m => { counts[m.speciesKey] = (counts[m.speciesKey]||0) + 1; });
         body += Object.keys(counts).map(key => {
             const sp = speciesInfo(key);
-            return `<div class="hatch-result-row">${sp.emoji} ${escapeHtml(sp.name_ja)} <b>×${counts[key]}</b></div>`;
+            return `<div class="hatch-result-row">${monsterIconHtml(sp, 24)} ${escapeHtml(sp.name_ja)} <b>×${counts[key]}</b></div>`;
         }).join('');
     }
     if (hasItems){
@@ -3970,7 +4094,7 @@ function openItemTargetPicker(kind, keyOrId, candidateMonsters){
     pendingItemAction = { kind, keyOrId };
     document.getElementById('item-target-picker-body').innerHTML = candidateMonsters.map(m => {
         const sp = speciesInfo(m.speciesKey);
-        return `<button class="sort-btn" style="width:100%; text-align:left;" onclick="confirmItemTargetPick(${m.id})">${sp.emoji} <span style="color:${monsterNameColor(sp)};">${escapeHtml(monsterDisplayName(m))}</span> Lv.${m.level||0}</button>`;
+        return `<button class="sort-btn" style="width:100%; text-align:left;" onclick="confirmItemTargetPick(${m.id})">${monsterIconHtml(sp)} <span style="color:${monsterNameColor(sp)};">${escapeHtml(monsterDisplayName(m))}</span> Lv.${m.level||0}</button>`;
     }).join('');
     document.getElementById('item-target-picker-modal').classList.remove('hidden');
 }
@@ -3999,7 +4123,7 @@ function renderEquipModal(){
     const m = monsters.find(x=>x.id===equipModalMonsterId);
     if (!m){ closeEquipModal(); return; }
     const sp = speciesInfo(m.speciesKey);
-    document.getElementById('equip-modal-title').textContent = `${sp.emoji} ${sp.name_ja}`;
+    document.getElementById('equip-modal-title').innerHTML = `${monsterIconHtml(sp, 24)} ${escapeHtml(sp.name_ja)}`;
     let html = '';
     if (m.equippedItem){
         const it = itemInfo(m.equippedItem.itemKey);
@@ -4594,7 +4718,7 @@ function renderHeroList(){
         </div>
     `).join('') + (demonLordUnit ? `
         <div class="hero-hp-row${demonLordUnit.alive?'':' dead'}">
-            <span>🐲 ${ui('demonlord_label')}</span>
+            <span><span class="monster-icon-thumb" style="background-image:url('images/mamono/demon_lord.png');"></span> ${ui('demonlord_label')}</span>
             <div class="hero-hp-track"><div class="hero-hp-fill" style="background:var(--danger); width:${Math.max(0,demonLordUnit.hp/demonLordUnit.maxHp*100)}%"></div></div>
             <span>${Math.max(0,demonLordUnit.hp)}/${demonLordUnit.maxHp}</span>
         </div>` : '');
@@ -5442,7 +5566,7 @@ function openStageIncomeModal(vitGain, manaGain, levelUpList){
     } else {
         list.innerHTML = levelUpList.map(({m, fromLevel, toLevel}) => {
             const sp = speciesInfo(m.speciesKey);
-            return `<div class="modal-score-row"><span>${sp.emoji} ${escapeHtml(monsterDisplayName(m))} ${uif('levelup_arrow_label', fromLevel, toLevel)}</span></div>`;
+            return `<div class="modal-score-row"><span>${monsterIconHtml(sp)} ${escapeHtml(monsterDisplayName(m))} ${uif('levelup_arrow_label', fromLevel, toLevel)}</span></div>`;
         }).join('');
     }
     document.getElementById('stage-income-modal').classList.remove('hidden');
@@ -5468,7 +5592,7 @@ function openStageItemDropModal(){
         if (kind==='monster'){
             const sp = speciesInfo(key);
             return `<div class="item-drop-row">
-                <span class="item-drop-icon">${sp.emoji}</span>
+                <span class="item-drop-icon">${monsterIconHtml(sp, 28)}</span>
                 <span class="item-drop-name">${escapeHtml(sp.name_ja)}</span>
                 <span class="item-drop-effect">${ui('label_summoned_monster')}</span>
                 ${n>1?`<b class="item-drop-count">×${n}</b>`:''}
