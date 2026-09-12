@@ -339,6 +339,7 @@
         .dmg-breakdown-divider { height:1px; background:var(--card-bdr); margin:10px 0; }
         .dmg-breakdown-row.dmg-breakdown-summary .dmg-breakdown-label { color:var(--gold); font-weight:800; }
         .dmg-breakdown-row.dmg-breakdown-summary .dmg-breakdown-bar-fill { background: linear-gradient(90deg, var(--gold-dk), var(--gold)); }
+        .auto-heal-summary-row { color: var(--teal); font-weight:700; font-size:0.85rem; text-align:left; }
         .gem-citrine   { background: linear-gradient(135deg,#fff4a3,var(--el-vitality) 60%,#8f6a00); color: var(--el-vitality); }
         .gem-sapphire  { background: linear-gradient(135deg,#8fc4ff,var(--el-mana) 60%,#0f3d8f); color: var(--el-mana); }
         .gem-amethyst  { background: linear-gradient(135deg,#d1a8ff,var(--el-summon) 60%,#4a1580); color: var(--el-summon); }
@@ -557,7 +558,16 @@
         .monster-list-action-btn.deploy { background: linear-gradient(to bottom,#8fe0a8,#2f8f4e); color:#0a2e15; border-color:#b8f0c8; box-shadow: 0 3px 0 #1c5c30; }
         .monster-list-action-btn.retrieve { background: linear-gradient(to bottom,#ffcf8a,#c97a1e); color:#3a2000; border-color:#ffe0b0; box-shadow: 0 3px 0 #8a5414; }
         .monster-list-lv { flex:0 0 auto; width:34px; color: var(--gold); font-weight:800; font-size:0.72rem; text-align:right; }
-        .monster-list-room { flex:0 0 auto; width:72px; color: var(--ink-dim); font-size:0.68rem; text-align:right; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .monster-list-room { flex:0 0 auto; width:84px; text-align:right; overflow:hidden; }
+        /* 部屋名を部屋タイプの色でラベル化（素のgemクラスをそのまま流用して色分け） */
+        .room-name-badge {
+            display:inline-flex; align-items:center; padding:2px 8px; border-radius:10px;
+            font-size:0.66rem; font-weight:700; white-space:nowrap; border:1px solid transparent;
+        }
+        .room-name-badge.gem-citrine  { background: rgba(255,212,0,0.18); color: var(--el-vitality); border-color: rgba(255,212,0,0.45); }
+        .room-name-badge.gem-sapphire { background: rgba(64,152,255,0.18); color: var(--el-mana); border-color: rgba(64,152,255,0.45); }
+        .room-name-badge.gem-amethyst { background: rgba(165,92,255,0.18); color: var(--el-summon); border-color: rgba(165,92,255,0.45); }
+        .room-name-badge.gem-ruby     { background: rgba(255,71,87,0.18); color: var(--el-tool); border-color: rgba(255,71,87,0.45); }
         /* 一覧・カードのモンスターアイコン：実イラスト（4方向シートの正面/下向き）があればそれを使う */
         .monster-icon-thumb {
             display:inline-block; width:20px; height:20px; vertical-align:-5px;
@@ -1114,6 +1124,7 @@ const UI_TEXT = {
     stage_income_mana_label: { ja: '魔力の増加量', ja_easy: 'まりょくの ふえた りょう', en: 'Mana Gained' },
     stage_income_ranked_title: { ja: 'レベルアップ', ja_easy: 'レベルアップ', en: 'Level Up' },
     dmg_breakdown_title: { ja: '🗡️ ダメージ内訳', ja_easy: '🗡️ ダメージの ないわけ', en: '🗡️ Damage Breakdown' },
+    auto_heal_summary_label: { ja: (before,after,healed) => `💊 自動回復でHPを${healed}回復しました（魔力 ${before}→${after}）`, ja_easy: (before,after,healed) => `💊 じどうかいふくで HPを ${healed} かいふくしたよ（まりょく ${before}→${after}）`, en: (before,after,healed) => `💊 Auto-heal restored ${healed} HP (Mana ${before}→${after})` },
     dmg_melee_physical: { ja: '物理近距離', ja_easy: 'ぶつり・きんきょり', en: 'Physical Melee' },
     dmg_ranged_physical: { ja: '物理中距離', ja_easy: 'ぶつり・ちゅうきょり', en: 'Physical Ranged' },
     dmg_magicrole_physical: { ja: '物理遠距離', ja_easy: 'ぶつり・えんきょり', en: 'Physical Long-range' },
@@ -2428,6 +2439,13 @@ function roomDisplayNameById(id){
     const idx = sameType.findIndex(r=>r.id===id) + 1;
     return ui('roomtype_short_'+room.type) + idx;
 }
+// 部屋タイプの素の色（gemクラス）を返す。魔物一覧の部屋名ラベルの色分けに使う
+function roomGemClassById(id){
+    const room = rooms.find(r=>r.id===id);
+    if (!room || !room.type) return null;
+    const rt = ROOM_TYPES.find(t=>t.key===room.type);
+    return rt ? rt.gem : null;
+}
 // ※攻撃部屋（部屋全体攻撃）は廃止（攻撃の素ともども削除）。関連コード(resolveRoomAttack等)は再利用のため残置
 const ROOM_TYPES = [
     { key:'vitality', gem:'gem-citrine' },
@@ -3121,11 +3139,15 @@ function openDamageBreakdownModal(){
         </div>`;
     }
     let html = rows.map(rowHtml).join('') + `<div class="dmg-breakdown-divider"></div>` + summaryRows.map(rowHtml).join('');
+    if (lastAutoHealInfo){
+        html += `<div class="dmg-breakdown-divider"></div><div class="auto-heal-summary-row">${uif('auto_heal_summary_label', lastAutoHealInfo.before, lastAutoHealInfo.after, lastAutoHealInfo.healed)}</div>`;
+    }
     document.getElementById('damage-breakdown-body').innerHTML = html;
     document.getElementById('damage-breakdown-modal').classList.remove('hidden');
 }
 function closeDamageBreakdownModal(){
     document.getElementById('damage-breakdown-modal').classList.add('hidden');
+    lastAutoHealInfo = null;
     maybeOfferDemonLordSkillReward();
 }
 // Lvアップに必要な累積経験値は100の倍数（Lv.1=累計100、Lv.2=累計200…）
@@ -3415,7 +3437,8 @@ function monsterCardHtml(m, opts){
         const actionHtml = stocked
             ? `<span class="monster-list-unplaced">${escapeHtml(ui('monster_stocked_tag'))}</span><button class="btn btn-sm monster-list-action-btn deploy" onclick="event.stopPropagation(); deployStockedMonster(${m.id});">${ui('btn_deploy_stocked')}</button>`
             : `<button class="btn btn-sm monster-list-action-btn retrieve" onclick="event.stopPropagation(); retrieveMonsterToStock(${m.id});">${ui('btn_retrieve_stocked')}</button>`;
-        const roomText = stocked ? '' : escapeHtml(roomDisplayNameById(m.roomId));
+        const roomGem = stocked ? null : roomGemClassById(m.roomId);
+        const roomText = stocked ? '' : `<span class="room-name-badge ${roomGem||''}">${escapeHtml(roomDisplayNameById(m.roomId))}</span>`;
         return `<div class="monster-detail-row detailed${selected?' selected':''}"${clickAttr} style="${opts.clickable?'cursor:pointer;':''}">
             <div class="monster-list-row">
                 <span class="monster-list-name">${monsterIconHtml(sp)} <span style="color:${monsterNameColor(sp)}; font-weight:700;">${escapeHtml(monsterDisplayName(m))}</span> <span class="${roleTextClass(sp.role)}">（${roleLabel(sp.role)}）</span>${inlineTag}</span>
@@ -3650,6 +3673,7 @@ function renderHealIndividualPanel(){
 
 // ---- 自動回復（ステージクリアで収入が入った直後に呼ばれる。ONなら最もHPが低いユニットから自動で埋める） ----
 let autoHealEnabled = false;
+let lastAutoHealInfo = null; // { before, after, healed }。ステージクリア後の最後のポップアップに表示するため保持
 function toggleAutoHeal(){
     autoHealEnabled = !autoHealEnabled;
     renderAutoHealButton();
@@ -5395,7 +5419,12 @@ function proceedNextStage(){
     });
     vitality += vitGain;
     mana += manaGain;
+    const manaBeforeAutoHeal = mana;
     autoHealIfEnabled(); // 自動回復ONなら、この収入分の魔力でHPの低いモンスターから自動的に回復させる
+    // 実際に回復が行われた場合のみ記録する（ステージクリア後の最後のポップアップで表示するため）
+    lastAutoHealInfo = (mana < manaBeforeAutoHeal)
+        ? { before: manaBeforeAutoHeal, after: mana, healed: manaBeforeAutoHeal - mana }
+        : null;
     updatePhaseUI();
     renderAll();
     // 経験値からのレベル判定・ランクアップ処理をまとめて行う（1体ずつポップアップで確認してから収入ポップアップを開く）
