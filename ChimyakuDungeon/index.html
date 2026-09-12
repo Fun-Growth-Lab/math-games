@@ -1765,23 +1765,51 @@ const ELEMENT_TYPES = [
     { key:'summon',   prob:0.03, gem:'gem-amethyst' },
     { key:'tool',     prob:0.03, gem:'gem-ruby' },
 ];
-const EGG_SPAWN_PROB = 0.10;   // 卵の出現確率（マップ生成時、素と同じ抽選に混ぜる）
+const EGG_SPAWN_PROB = 0.10;   // 卵の出現確率（目標平均。1マスずつの独立抽選だと1か所に固まりやすいため、下のブロック単位配置で平均を揃える）
 let grid = [];      // grid[r][c] = elementKey or 'egg' or null
 let occupied = [];  // occupied[r][c] = true/false
 
-// 素4種（合計20%）＋卵（10%）＋ハズレ（70%）。宝箱はマップ抽選から廃止（装備はステージ報酬＋勇者撃破ドロップに一本化）
-function rollCell(){
+// 素4種（合計20%）のみの抽選（卵は下のplaceEggsInBlocks()で別途配置済みのため、素はそれ以外のマスにのみ置く）
+function rollElementOnly(){
     let r = Math.random(), acc = 0;
     for (const t of ELEMENT_TYPES){ acc += t.prob; if (r < acc) return t.key; }
-    acc += EGG_SPAWN_PROB; if (r < acc) return 'egg';
     return null;
+}
+// 卵が1か所に固まらないよう、5×5マスのブロック単位で個数を決めてから配置場所をブロック内でランダムに抽選する。
+// ブロックあたりの期待値 = EGG_SPAWN_PROB × 25マス（例：10%×25=2.5体）。整数でなければ端数の確率で+1個多い方を選び、
+// 全ブロック平均するとちょうどEGG_SPAWN_PROB通りの出現率になるようにする
+const EGG_BLOCK_SIZE = 5;
+function eggCountForBlock(){
+    const avg = EGG_SPAWN_PROB * EGG_BLOCK_SIZE * EGG_BLOCK_SIZE;
+    const lo = Math.floor(avg), hi = Math.ceil(avg);
+    if (lo===hi) return lo;
+    return Math.random() < (avg-lo) ? hi : lo;
+}
+function placeEggsInBlocks(){
+    for (let br=ROOM_MIN_ROW; br<GRID_ROWS; br+=EGG_BLOCK_SIZE){
+        for (let bc=0; bc<GRID_COLS; bc+=EGG_BLOCK_SIZE){
+            const cells = [];
+            for (let r=br; r<Math.min(br+EGG_BLOCK_SIZE, GRID_ROWS); r++){
+                for (let c=bc; c<Math.min(bc+EGG_BLOCK_SIZE, GRID_COLS); c++) cells.push({r,c});
+            }
+            for (let i=cells.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [cells[i],cells[j]]=[cells[j],cells[i]]; }
+            const eggCount = Math.min(eggCountForBlock(), cells.length);
+            for (let i=0;i<eggCount;i++) grid[cells[i].r][cells[i].c] = 'egg';
+        }
+    }
 }
 function generateMap(){
     grid = []; occupied = [];
     for (let r=0;r<GRID_ROWS;r++){
         const row=[], orow=[];
-        for (let c=0;c<GRID_COLS;c++){ row.push(r<ROOM_MIN_ROW ? null : rollCell()); orow.push(false); }
+        for (let c=0;c<GRID_COLS;c++){ row.push(null); orow.push(false); }
         grid.push(row); occupied.push(orow);
+    }
+    placeEggsInBlocks();
+    for (let r=ROOM_MIN_ROW;r<GRID_ROWS;r++){
+        for (let c=0;c<GRID_COLS;c++){
+            if (grid[r][c]!=='egg') grid[r][c] = rollElementOnly();
+        }
     }
 }
 function elementInfo(key){ return ELEMENT_TYPES.find(t => t.key === key); }
