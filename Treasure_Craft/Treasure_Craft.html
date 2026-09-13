@@ -236,11 +236,11 @@ const STRINGS = {
         btn_explore: "探索",
         btn_shop: "お店",
         btn_rest: "休む",
-        btn_end: "終了",
+        btn_end: "中断する",
         confirm_rest: "休みますか？",
         confirm_rest_sub: "APが回復して次の日になります。",
-        confirm_end: "ここで冒険を終了して本当によろしいですか？",
-        confirm_end_sub: "※終了すると、この時点の結果がランキングに記録され、セーブデータは消去されます。",
+        confirm_end: "ここで冒険を中断してタイトルへ戻りますか？",
+        confirm_end_sub: "※ここまでの内容は自動でセーブされているので、次回「つづきから」で再開できます。",
 
         panel_inventory: "持ち物・クラフト",
         label_gold: "所持金: {gold} G",
@@ -405,11 +405,11 @@ const STRINGS = {
         btn_explore: "たんさく",
         btn_shop: "おみせ",
         btn_rest: "やすむ",
-        btn_end: "おわる",
+        btn_end: "ちゅうだんする",
         confirm_rest: "やすみますか？",
         confirm_rest_sub: "APが かいふくして つぎの ひに なります。",
-        confirm_end: "ここで ぼうけんを おわって ほんとうに いいですか？",
-        confirm_end_sub: "※おわると、いまの けっかが ランキングに きろくされ、セーブデータは きえます。",
+        confirm_end: "ここで ぼうけんを ちゅうだんして タイトルへ もどりますか？",
+        confirm_end_sub: "※ここまでの ないようは じどうで セーブされているので、つぎに「つづきから」で さいかいできます。",
 
         panel_inventory: "もちもの・クラフト",
         label_gold: "しょじきん: {gold} G",
@@ -574,11 +574,11 @@ const STRINGS = {
         btn_explore: "Explore",
         btn_shop: "Shop",
         btn_rest: "Rest",
-        btn_end: "End",
+        btn_end: "Pause",
         confirm_rest: "Rest now?",
         confirm_rest_sub: "AP will recover and the day will advance.",
-        confirm_end: "Are you sure you want to end the adventure here?",
-        confirm_end_sub: "* Ending now will record your current result to the ranking and erase your save data.",
+        confirm_end: "Pause your adventure and return to the title?",
+        confirm_end_sub: "* Your progress is saved automatically, so you can pick up right where you left off with \"Continue\".",
 
         panel_inventory: "Items & Crafting",
         label_gold: "Gold: {gold} G",
@@ -1017,6 +1017,35 @@ function drawText(text, x, y, size, color, align="left", weight="bold") {
     ctx.fillText(text, x, y);
 }
 
+// 長い文章をmaxWidthに収まるよう複数行に折り返す（日本語はスペースが無いため1文字単位、
+// スペースがある言語（英語など）は単語単位でラップする）
+function wrapTextLines(text, maxWidth, font) {
+    ctx.save();
+    ctx.font = font;
+    const str = String(text);
+    const tokens = str.includes(' ') ? str.split(' ') : Array.from(str);
+    const sep = str.includes(' ') ? ' ' : '';
+    const lines = [];
+    let line = '';
+    tokens.forEach(tok => {
+        const candidate = line ? line + sep + tok : tok;
+        if (line && ctx.measureText(candidate).width > maxWidth) {
+            lines.push(line);
+            line = tok;
+        } else {
+            line = candidate;
+        }
+    });
+    if (line) lines.push(line);
+    ctx.restore();
+    return lines.length ? lines : [''];
+}
+
+// 折り返し済みの複数行テキストを中央揃えで描画（topYは1行目の中心Y座標）
+function drawTextLines(lines, cx, topY, lineHeight, size, color, weight="bold") {
+    lines.forEach((line, i) => drawText(line, cx, topY + i * lineHeight, size, color, 'center', weight));
+}
+
 function shadeColor(hex, percent) {
     if (!hex.startsWith('#') || hex.length !== 7) return hex;
     let num = parseInt(hex.slice(1), 16);
@@ -1339,11 +1368,13 @@ function drawCenterPanel(x, y) {
             }
         };
     });
-    drawBtn(T('btn_end'), x+215, y+590, 175, 60, '#e74c3c', () => {
+    drawBtn(T('btn_end'), x+215, y+590, 175, 60, '#7f8c8d', () => {
         activePopup = {
             text: T('confirm_end'),
             subtext: T('confirm_end_sub'),
-            onYes: () => finishGame(false)
+            // 冒険は自動セーブされているため、ランキング登録やセーブ消去は行わず
+            // タイトルへ戻るだけ（次回「つづきから」でこの続きを再開できる）
+            onYes: () => { GAME_STATE = "TITLE"; }
         };
     });
 }
@@ -2009,26 +2040,69 @@ function renderHelpPopup() {
 }
 
 function renderPopup() {
-    clickZones = []; 
+    clickZones = [];
     ctx.fillStyle = 'rgba(0,0,0,0.6)';
     ctx.fillRect(0,0,1280,720);
-    
+
     let px = 340, py = 260, pw = 600, ph = 200;
+    const textMaxW = pw - 80; // ボックス左右の余白を確保したテキスト最大幅
+
+    // --- 折り返し内容に応じて、ボックスの高さ(ph)と縦位置(py)を先に計算する ---
+    let contLayout = null; // isContinueChoice用
+    let msgLayout = null;  // 汎用confirm/alert用
 
     if (activePopup.isClearPopup) {
         py = 100; ph = 520;
     } else if (activePopup.isContinueChoice) {
-        py = 240; ph = 240;
+        const titleFont = 'bold 24px "M PLUS Rounded 1c"';
+        const subFont = 'bold 15px "M PLUS Rounded 1c"';
+        const titleLines = wrapTextLines(T('continue_choice_title'), textMaxW, titleFont);
+        const subLines = wrapTextLines(T('continue_choice_sub'), textMaxW, subFont);
+        const titleLH = 28, subLH = 20;
+
+        const titleY = 45;
+        const titleEndY = titleY + (titleLines.length - 1) * titleLH;
+        const subY = titleEndY + 35;
+        const subEndY = subY + (subLines.length - 1) * subLH;
+        const bigBtnY = subEndY + 45;
+        const cancelY = bigBtnY + 65;
+
+        contLayout = { titleLines, subLines, titleLH, subLH, titleY, subY, bigBtnY, cancelY };
+        ph = cancelY + 40;
+        py = 360 - ph / 2;
+    } else if (!activePopup.isPrompt) {
+        // 汎用のconfirm/alertポップアップ（text + 任意のsubtext）
+        const titleFont = 'bold 22px "M PLUS Rounded 1c"';
+        const subFont = 'bold 18px "M PLUS Rounded 1c"';
+        const titleLines = wrapTextLines(activePopup.text, textMaxW, titleFont);
+        const subLines = activePopup.subtext ? wrapTextLines(activePopup.subtext, textMaxW, subFont) : [];
+        const titleLH = 28, subLH = 24;
+
+        const titleY = 60;
+        const titleEndY = titleY + (titleLines.length - 1) * titleLH;
+        let btnY;
+        let subY = 0;
+        if (subLines.length > 0) {
+            subY = titleEndY + 35;
+            const subEndY = subY + (subLines.length - 1) * subLH;
+            btnY = subEndY + 35;
+        } else {
+            btnY = titleEndY + 35;
+        }
+
+        msgLayout = { titleLines, subLines, titleLH, subLH, titleY, subY, btnY };
+        ph = Math.max(200, btnY + 70);
+        py = 360 - ph / 2;
     }
 
     ctx.save();
     ctx.beginPath(); ctx.roundRect(px, py, pw, ph, 15); ctx.clip();
     ctx.fillStyle = '#ecf0f1'; ctx.fill();
     ctx.restore();
-    
+
     ctx.strokeStyle = '#34495e'; ctx.lineWidth = 4;
     ctx.beginPath(); ctx.roundRect(px, py, pw, ph, 15); ctx.stroke();
-    
+
     if (activePopup.isClearPopup) {
         drawText(T('clear_title'), px + pw/2, py + 40, 30, '#f1c40f', 'center', '900');
         drawImageRect('clear', px + 40, py + 70, 520, 292);
@@ -2047,20 +2121,21 @@ function renderPopup() {
             });
         }
     } else if (activePopup.isContinueChoice) {
-        drawText(T('continue_choice_title'), px + pw/2, py + 45, 24, '#2c3e50', 'center');
-        drawText(T('continue_choice_sub'), px + pw/2, py + 80, 15, '#7f8c8d', 'center');
-        drawBtn(T('btn_continue'), px + 40, py + 115, 240, 55, '#3498db', () => {
+        const L = contLayout;
+        drawTextLines(L.titleLines, px + pw/2, py + L.titleY, L.titleLH, 24, '#2c3e50');
+        drawTextLines(L.subLines, px + pw/2, py + L.subY, L.subLH, 15, '#7f8c8d');
+        drawBtn(T('btn_continue'), px + 40, py + L.bigBtnY, 240, 55, '#3498db', () => {
             activePopup = null;
             loadGame();
         });
-        drawBtn(T('btn_new_game'), px + pw - 280, py + 115, 240, 55, '#e74c3c', () => {
+        drawBtn(T('btn_new_game'), px + pw - 280, py + L.bigBtnY, 240, 55, '#e74c3c', () => {
             activePopup = {
                 text: T('confirm_new_game_erase'),
                 onYes: () => { clearSave(); GAME_STATE = "PLAYER_SELECT"; },
                 onNo: () => { activePopup = { isContinueChoice: true }; }
             };
         });
-        drawBtn(T('btn_cancel'), px + pw/2 - 75, py + 180, 150, 40, '#95a5a6', () => { activePopup = null; });
+        drawBtn(T('btn_cancel'), px + pw/2 - 75, py + L.cancelY, 150, 40, '#95a5a6', () => { activePopup = null; });
     } else if(activePopup.isPrompt) {
         drawText(activePopup.text, px + pw/2, py + 40, 22, '#2c3e50', 'center');
         if (activePopup.subtext) {
@@ -2073,20 +2148,19 @@ function renderPopup() {
             if(activePopup.onNo) activePopup.onNo();
         });
     } else {
-        drawText(activePopup.text, px + pw/2, py + 60, 22, '#2c3e50', 'center');
-        if (activePopup.subtext) {
-            drawText(activePopup.subtext, px + pw/2, py + 95, 18, '#e74c3c', 'center');
-        }
+        const L = msgLayout;
+        drawTextLines(L.titleLines, px + pw/2, py + L.titleY, L.titleLH, 22, '#2c3e50');
+        drawTextLines(L.subLines, px + pw/2, py + L.subY, L.subLH, 18, '#e74c3c');
 
         if(activePopup.isAlert) {
-            drawBtn(T('btn_ok_alert'), px + pw/2 - 75, py + 130, 150, 45, '#3498db', () => { activePopup = null; });
+            drawBtn(T('btn_ok_alert'), px + pw/2 - 75, py + L.btnY, 150, 45, '#3498db', () => { activePopup = null; });
         } else {
-            drawBtn(T('btn_yes'), px + 100, py + 130, 150, 45, '#e74c3c', () => {
+            drawBtn(T('btn_yes'), px + 100, py + L.btnY, 150, 45, '#e74c3c', () => {
                 let onYes = activePopup.onYes;
                 activePopup = null;
                 if(onYes) onYes();
             });
-            drawBtn(T('btn_no'), px + 350, py + 130, 150, 45, '#7f8c8d', () => {
+            drawBtn(T('btn_no'), px + 350, py + L.btnY, 150, 45, '#7f8c8d', () => {
                 let onNo = activePopup.onNo;
                 activePopup = null;
                 if(onNo) onNo();
