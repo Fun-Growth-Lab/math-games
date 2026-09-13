@@ -922,7 +922,9 @@ const Game = {
             try {
                 const params = new URLSearchParams({
                     'select': 'player_name,stage_score,turns,created_at',
-                    'game': 'eq.number_brick',
+                    // タイムを小数第2位まで記録するturnsのエンコード方式に変更したため、
+                    // 旧データ(整数秒のみ)と混在しないよう新しいgame識別子に切り替えてランキングを作り直す
+                    'game': 'eq.number_brick_v2',
                     'difficulty': 'eq.' + selectedDiff,
                     'order': 'stage_score.desc,turns.asc',
                     'limit': '10'
@@ -937,7 +939,7 @@ const Game = {
                         const dt = new Date(d.created_at);
                         dateStr = `${dt.getFullYear()}/${dt.getMonth()+1}/${dt.getDate()}`;
                     }
-                    return { name: d.player_name, stage: d.stage_score, avgTime: d.turns, date: dateStr };
+                    return { name: d.player_name, stage: d.stage_score, avgTime: (d.turns || 0) / 100, date: dateStr };
                 });
                 this.renderRankingTable(mapped);
             } catch (e) {
@@ -1478,11 +1480,13 @@ const Game = {
                 headers: window._sb.h,
                 keepalive: true,
                 body: JSON.stringify({
-                    game: 'number_brick',
+                    game: 'number_brick_v2',
                     player_name: this.currentPlayer,
                     point_score: stage,
                     stage_score: stage,
-                    turns: Math.round(avgTime),
+                    // turnsは整数カラムのため、小数第2位まで保持できるよう100倍した「センチ秒」の整数で保存する
+                    // （読み出し側 loadRanking() で /100 して元の秒に戻す）
+                    turns: Math.round(avgTime * 100),
                     difficulty: this.difficulty
                 })
             }).then(res => {
