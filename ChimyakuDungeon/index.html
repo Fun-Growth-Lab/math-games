@@ -367,7 +367,7 @@
         }
         .monster-icon {
             position:absolute; display:flex; align-items:center; justify-content:center;
-            font-size: 1.3rem; pointer-events:none; z-index:2; transition: left 0.25s linear, top 0.25s linear;
+            font-size: 1.3rem; pointer-events:none; z-index:2; touch-action:none; transition: left 0.12s linear, top 0.12s linear;
         }
         .role-text-melee { color: #ff6b78; font-weight: 700; }
         .role-text-ranged { color: #6be08e; font-weight: 700; }
@@ -446,17 +446,18 @@
         .monster-hp-bar-fill { height:100%; background: var(--accent); }
         .demonlord-icon {
             position:absolute; display:flex; align-items:center; justify-content:center;
-            font-size: 1.5rem; pointer-events:none; z-index:2; transition: left 0.25s linear, top 0.25s linear;
+            font-size: 1.5rem; pointer-events:none; z-index:2; touch-action:none; transition: left 0.12s linear, top 0.12s linear;
             filter: drop-shadow(0 0 6px var(--el-summon)) drop-shadow(0 0 6px var(--el-summon));
         }
         .demonlord-icon.selected { transform: scale(1.25); filter: drop-shadow(0 0 10px var(--gold)); }
         /* 魔王の初期配置：配置ボタンを押した直後に表示する、ドラッグ開始用の大きな魔王アイコン */
         .demonlord-drag-source {
-            display:block; width:56px; height:56px; margin: 10px auto; cursor:grab;
+            display:block; width:56px; height:56px; margin: 10px auto; cursor:grab; touch-action:none;
             background-repeat:no-repeat; background-size:200% 200%; background-position:0% 0%; image-rendering:pixelated;
             filter: drop-shadow(0 0 6px var(--el-summon)) drop-shadow(0 0 6px var(--el-summon));
         }
         .demonlord-drag-source:active { cursor:grabbing; }
+        .touch-drag-ghost { position:fixed !important; pointer-events:none !important; z-index:9999 !important; opacity:0.85; transition:none !important; }
         .hero-icon {
             position:absolute; display:flex; align-items:center; justify-content:center;
             font-size: 1.25rem; pointer-events:none; z-index:2; transition: left 0.22s linear, top 0.22s linear;
@@ -580,7 +581,6 @@
             background-repeat:no-repeat; background-size:200% 200%; background-position:0% 0%; image-rendering:pixelated;
         }
         .monster-icon-thumb-emoji { display:inline-block; }
-        .monster-list-stars { flex:0 0 auto; width:64px; text-align:right; font-size:0.72rem; }
         .monster-list-rank { flex:0 0 auto; width:30px; text-align:right; }
         /* 総合戦闘力ランクバッジ（SS〜G）。個体差の★とは別軸で、種族・Lv込みの強さを色で一目瞭然にする */
         .rank-badge {
@@ -596,6 +596,8 @@
         .rank-badge.rank-E  { background: linear-gradient(135deg,#b8b0a4,#7a7268); }
         .rank-badge.rank-F  { background: linear-gradient(135deg,#8a8378,#55504a); }
         .rank-badge.rank-G  { background: linear-gradient(135deg,#6b5644,#3a2c1e); }
+        /* マップ上のモンスターアイコン左上に出す縮小版ランクバッジ（建設フェーズのみ表示） */
+        .map-rank-badge { position:absolute !important; top:-4px; left:-4px; z-index:3 !important; min-width:0; padding:0 3px; font-size:0.52rem; line-height:1.3; border-radius:4px; }
         .monster-list-hp { flex:0 0 auto; width:66px; color: var(--ink); font-weight:700; font-size:0.68rem; text-align:right; white-space:nowrap; }
         .monster-list-equip { flex:0 0 auto; width:100px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color: var(--ink-dim); font-size:0.68rem; text-align:right; }
         .monster-stat-line { display:flex; flex-wrap:wrap; gap: 8px; color: var(--ink-dim); margin-top: 3px; font-size: 0.72rem; }
@@ -781,7 +783,9 @@
                     <button class="btn btn-reroll" id="btn-reroll-map" onclick="rerollMap()" title="素の配置をリロードする（無制限）" data-i18n="btn_reroll_map">🔄 マップのリロード（無制限）</button>
                     <button class="btn btn-danger btn-footer-primary btn-start-battle-big" id="btn-start-battle" onclick="requestStartBattle()" data-i18n="btn_start_battle">⚔️ 敵を迎え撃つ</button>
                     <div class="footer-btn-row">
-                        <button class="btn btn-purple btn-footer-primary" id="btn-place-demonlord" draggable="true" ondragstart="onDemonLordButtonDragStart(event)" onclick="beginDemonLordSelect()" data-i18n="btn_place_demonlord">👑 魔王を配置</button>
+                        <button class="btn btn-purple btn-footer-primary" id="btn-place-demonlord" draggable="true" style="touch-action:none;"
+                            ondragstart="onDemonLordButtonDragStart(event)" ondragend="onDemonLordButtonDragEnd(event)"
+                            onclick="beginDemonLordSelect()" data-i18n="btn_place_demonlord">👑 魔王を配置</button>
                         <button class="btn btn-gold btn-footer-primary" id="btn-open-monsters" onclick="openMonsterListModal()" data-i18n="btn_open_monsters">👾 魔物</button>
                     </div>
                     <div class="footer-btn-row">
@@ -900,7 +904,10 @@
     <div id="monster-list-modal" class="modal-backdrop hidden">
         <div class="modal-box" style="min-width:320px; width:95vw; max-width:900px; max-height:80vh; overflow-y:auto; padding-left:16px; padding-right:16px;">
             <div class="modal-title" data-i18n="monster_list_modal_title">👾 魔物一覧</div>
-            <button class="btn btn-sm btn-teal" style="width:100%; margin-bottom:10px;" data-i18n="btn_auto_deploy" onclick="autoDeployStockedMonsters()">🏠 自動配置</button>
+            <div style="display:flex; gap:6px; margin-bottom:10px;">
+                <button class="btn btn-sm btn-teal" style="flex:1;" data-i18n="btn_auto_deploy" onclick="autoDeployStockedMonsters()">🏠 自動配置</button>
+                <button class="btn btn-sm" style="flex:1;" data-i18n="btn_retrieve_all" onclick="retrieveAllMonsters()">📦 全回収</button>
+            </div>
             <div id="monster-list-body"></div>
             <button class="btn btn-sm" style="margin-top:14px; width:100%;" data-i18n="btn_close" onclick="closeMonsterListModal()">とじる</button>
         </div>
@@ -1390,7 +1397,10 @@ const UI_TEXT = {
     status_deploy_stocked: { ja: '配置する部屋のマスをクリックしてください', ja_easy: 'はいちする へやの マスを クリックしてね', en: 'Click a cell in the room to deploy this monster' },
     err_deploy_build_only: { ja: 'ダンジョン作成中のみ操作できます', ja_easy: 'ダンジョンを つくっている ときだけ できるよ', en: 'You can only do this while building the dungeon' },
     btn_auto_deploy: { ja: '🏠 自動配置', ja_easy: '🏠 じどう はいち', en: '🏠 Auto-deploy' },
+    btn_retrieve_all: { ja: '📦 全回収', ja_easy: '📦 ぜんぶ かいしゅう', en: '📦 Retrieve All' },
     status_auto_deploy_done: { ja: n => `${n}体を自動配置しました`, ja_easy: n => `${n}たいを じどうはいち したよ`, en: n => `Auto-deployed ${n} monster(s)` },
+    status_retrieve_all_done: { ja: n => `${n}体をストックに回収しました`, ja_easy: n => `${n}たいを ストックに かいしゅう したよ`, en: n => `Retrieved ${n} monster(s) to stock` },
+    err_no_monster_to_retrieve: { ja: '配置されているモンスターがいません', ja_easy: 'はいちされている モンスターが いないよ', en: 'No monsters are currently deployed' },
     err_no_room_space: { ja: '配置できる空きのある部屋がありません', ja_easy: 'はいちできる あきの ある へやが ないよ', en: 'No room has space to deploy into' },
     role_melee: { ja: '近距離', ja_easy: 'きんきょり', en: 'Melee' },
     role_ranged: { ja: '中距離', ja_easy: 'ちゅうきょり', en: 'Mid-range' },
@@ -2165,9 +2175,17 @@ function renderBuildActions(){
     }
     if (mode === 'select-demonlord'){
         wrap.innerHTML = `<div class="side-panel-title">${ui('btn_place_demonlord')}</div>`
-            + `<span class="demonlord-drag-source" draggable="true" ondragstart="onDemonLordButtonDragStart(event)" style="background-image:url('images/mamono/demon_lord.png');"></span>`
+            + `<span id="demonlord-drag-source" class="demonlord-drag-source" draggable="true"
+                    ondragstart="onDemonLordButtonDragStart(event)" ondragend="onDemonLordButtonDragEnd(event)"
+                    style="background-image:url('images/mamono/demon_lord.png');"></span>`
             + `<div class="status-text">${escapeHtml(ui('status_pick_demonlord'))}</div>`
             + `<button class="btn btn-sm" style="width:100%; margin-top:6px;" onclick="cancelBuild()">${ui('btn_cancel')}</button>`;
+        // HTMLの ontouchstart 属性はブラウザによって認識されないことがあるため、確実にプロパティで登録する
+        const dragIcon = document.getElementById('demonlord-drag-source');
+        dragIcon.ontouchstart = (ev) => onUnitTouchStart(ev, dragIcon, 'demonlord-initial');
+        dragIcon.ontouchmove = onUnitTouchMove;
+        dragIcon.ontouchend = onUnitTouchEnd;
+        dragIcon.ontouchcancel = onUnitTouchEnd;
         return;
     }
     if (mode === 'idle'){
@@ -3342,7 +3360,7 @@ function monsterEvolveSectionHtml(m, sp){
         const stoneKey = c.key+'_stone';
         const owned = stoneInventory[stoneKey]||0;
         if (owned>0){
-            html += `<button class="btn btn-sm" style="width:100%; margin-top:4px;" onclick="evolveMonsterWithStone(${m.id}, '${stoneKey}')">💎 ${uif('btn_evolve_with_stone', escapeHtml(stoneName(stoneKey)))}（×${owned}）</button>`;
+            html += `<button class="btn btn-sm" style="width:100%; margin-top:4px;" onclick="evolveMonsterWithStone(${m.id}, '${stoneKey}')">${stoneEmoji(stoneKey)} ${uif('btn_evolve_with_stone', escapeHtml(stoneName(stoneKey)))}（×${owned}）</button>`;
         }
     });
     return html;
@@ -3372,11 +3390,6 @@ function statModStars(mod){
     if (mod <= 1.10) return 3;
     if (mod <= 1.30) return 4;
     return 5;
-}
-// 5能力（HP/攻撃/防御/魔攻/魔防）の個体差倍率を平均した「総合能力」の倍率。一覧で1体ずつの当たり外れをざっくり★で見せるために使う
-function overallStatMod(m){
-    const mods = m.statMods;
-    return (mods.hp + mods.atk + mods.def + mods.magAtk + mods.magDef) / 5;
 }
 // 種族の基本値×個体倍率を実際のステータスとして反映する（孵化時・進化時に呼ぶ）
 // 実際のステータス＝（種族の基本値）×（個体差倍率）×（1＋0.1×Lv）。m.levelは呼び出し前に最新の値にしておくこと
@@ -3607,7 +3620,6 @@ function monsterCardHtml(m, opts){
                 <span class="monster-list-room">${roomText}</span>
                 <span class="monster-list-lv">Lv.${m.level||0}</span>
                 <span class="monster-list-rank">${rankBadgeHtml(m)}</span>
-                <span class="monster-list-stars">${starHtml(statModStars(overallStatMod(m)))}</span>
                 <span class="monster-list-hp">${ui('monster_stat_hp')} ${m.hp}/${m.maxHp}</span>
                 <span class="monster-list-equip">${equipText}</span>
             </div>
@@ -3678,6 +3690,17 @@ function retrieveMonsterToStock(id){
     renderRoomDetail();
     renderAll();
 }
+// 配置済みの魔物を全員ストックへ戻す（魔物一覧の「全回収」ボタンから。自動配置のやり直し・部屋の作り直し前の一括撤収に使う）
+function retrieveAllMonsters(){
+    if (gamePhase!=='build'){ showToast(ui('err_deploy_build_only')); return; }
+    const placed = monsters.filter(m => m.roomId!==null);
+    if (placed.length===0){ showToast(ui('err_no_monster_to_retrieve')); return; }
+    placed.forEach(m => { m.roomId = null; });
+    renderMonsterListModal();
+    renderRoomDetail();
+    renderAll();
+    showToast(uif('status_retrieve_all_done', placed.length));
+}
 // 一覧のモンスターをタップしたときの動作：マップ上でハイライトしつつ、詳細ポップアップを開く
 function selectMonsterCard(id){
     highlightedMonsterId = id;
@@ -3734,7 +3757,6 @@ function renderMonsterDetailModal(){
             <span>${ui('monster_stat_hp')}</span>
             <div class="monster-detail-hpbar"><div class="monster-detail-hpbar-fill" style="width:${hpPct}%;"></div></div>
             <b>${m.hp}/${m.maxHp}</b>
-            ${starHtml(statModStars(mods.hp))}
         </div>
         <div class="monster-stat-grid">
             ${monsterDetailStatRowHtml('monster_stat_atk', m.atk, mods.atk)}
@@ -4070,6 +4092,15 @@ function stoneName(stoneKey){
     const sp = speciesInfo(stoneTargetSpeciesKey(stoneKey));
     return sp ? uif('evolve_stone_name', sp.name_ja) : stoneKey;
 }
+// 進化の石は全部💎だと見分けがつかないので、対象の系統(line)ごとに絵文字を変える
+const LINE_STONE_EMOJI = {
+    golem:'🟤', minotaur:'🔴', slime:'🟢', werewolf:'⚫', griffon:'🔵', spirit:'⚪',
+    goblin:'🟠', pixie:'🟣', dark_elf:'🟪', undead:'🟫', elf:'🟩', dragon:'🔶'
+};
+function stoneEmoji(stoneKey){
+    const sp = speciesInfo(stoneTargetSpeciesKey(stoneKey));
+    return (sp && LINE_STONE_EMOJI[sp.line]) || '💎';
+}
 let stoneInventory = {}; // stoneKey -> 所持数
 // 進化の石を1個消費して、モンスターをその石が示す種族へ進化させる（対象外の石が渡された場合は何もしない）
 function evolveMonsterWithStone(monsterId, stoneKey){
@@ -4116,7 +4147,7 @@ function renderItemInventoryModal(){
         stoneKeys.map(sk => {
             const usable = monstersEligibleForStone(sk).length>0;
             return `<button class="item-grid-btn${usable?' usable-glow':''}" onclick="pickStoneFromInventory('${sk}')">
-                <span class="item-slot-icon-emoji">💎</span>
+                <span class="item-slot-icon-emoji">${stoneEmoji(sk)}</span>
                 <span class="item-slot-name">${escapeHtml(stoneName(sk))}</span>
                 <span class="item-slot-count">×${stoneInventory[sk]}</span>
             </button>`;
@@ -4274,6 +4305,67 @@ function onDemonLordButtonDragStart(ev){
     if (gamePhase!=='build'){ ev.preventDefault(); return; }
     ev.dataTransfer.setData('text/plain', 'demonlord-initial');
     ev.dataTransfer.effectAllowed = 'move';
+    // ドラッグ中、行き先が決まるまでは元の位置の見た目を半透明にする（ドラッグ画像を巻き込まないよう1フレーム遅らせる）
+    setTimeout(() => { ev.target.style.opacity = '0.4'; }, 0);
+}
+function onDemonLordButtonDragEnd(ev){ ev.target.style.opacity = ''; }
+// 座標(clientX/Y)が乗っている部屋を探す（タッチドラッグのドロップ先判定に使う）
+function roomContainingCell(cell){
+    return cell ? rooms.find(r => cell.r>=r.r0 && cell.r<=r.r1 && cell.c>=r.c0 && cell.c<=r.c1) : null;
+}
+// タッチ操作でのドラッグ移動（HTML5のdraggable属性はスマホ・タブレットのタッチでは発火しないため、独自に実装して同じhandleUnitDropを呼ぶ）
+// 指を置いただけ（＝タップ）では発動させず、一定距離動いてから初めてドラッグ扱いにする（そうしないと通常のタップ選択と衝突するため）
+const TOUCH_DRAG_THRESHOLD = 8;
+let touchDragCandidate = null; // { data, sourceEl, startX, startY }
+let touchDragState = null; // { data, sourceEl, ghostEl, width, height }
+function onUnitTouchStart(ev, sourceEl, data){
+    if (gamePhase!=='build' || ev.touches.length!==1) return;
+    const t = ev.touches[0];
+    touchDragCandidate = { data, sourceEl, startX: t.clientX, startY: t.clientY };
+}
+function onUnitTouchMove(ev){
+    if (touchDragState){ ev.preventDefault(); moveTouchDrag(ev.touches[0]); return; }
+    if (!touchDragCandidate || ev.touches.length!==1) return;
+    const t = ev.touches[0];
+    const dx = t.clientX - touchDragCandidate.startX, dy = t.clientY - touchDragCandidate.startY;
+    if (Math.hypot(dx,dy) > TOUCH_DRAG_THRESHOLD){
+        ev.preventDefault();
+        beginTouchDrag(touchDragCandidate.sourceEl, touchDragCandidate.data, t);
+        touchDragCandidate = null;
+    }
+}
+function onUnitTouchEnd(ev){
+    if (touchDragState) endTouchDrag(ev.changedTouches[0]);
+    touchDragCandidate = null;
+}
+function beginTouchDrag(sourceEl, data, touch){
+    const r = sourceEl.getBoundingClientRect();
+    const ghost = sourceEl.cloneNode(true);
+    ghost.removeAttribute('id');
+    ghost.className += ' touch-drag-ghost';
+    ghost.style.position = 'fixed';
+    ghost.style.transition = 'none';
+    ghost.style.width = r.width+'px'; ghost.style.height = r.height+'px';
+    ghost.style.left = (touch.clientX - r.width/2)+'px'; ghost.style.top = (touch.clientY - r.height/2)+'px';
+    document.body.appendChild(ghost);
+    sourceEl.style.opacity = '0.4';
+    touchDragState = { data, sourceEl, ghostEl: ghost, width: r.width, height: r.height };
+}
+function moveTouchDrag(touch){
+    if (!touchDragState || !touch) return;
+    touchDragState.ghostEl.style.left = (touch.clientX - touchDragState.width/2)+'px';
+    touchDragState.ghostEl.style.top = (touch.clientY - touchDragState.height/2)+'px';
+}
+function endTouchDrag(touch){
+    if (!touchDragState) return;
+    const { data, sourceEl, ghostEl } = touchDragState;
+    ghostEl.remove();
+    sourceEl.style.opacity = '';
+    touchDragState = null;
+    if (!touch) return;
+    const cell = cellFromEvent({ clientX: touch.clientX, clientY: touch.clientY });
+    const room = roomContainingCell(cell);
+    if (room) handleUnitDrop(room, cell.r, cell.c, data);
 }
 // dataは 'demonlord-initial'（右パネルの配置ボタンからのドラッグ＝新規配置） / 'demonlord'（マップ上の魔王アイコンからのドラッグ＝移動）
 // / 'monster:<id>'（マップ上のモンスターアイコンからのドラッグ）のいずれか
@@ -5668,7 +5760,7 @@ function openStageItemDropModal(){
         const n = counts[combinedKey];
         if (kind==='stone'){
             return `<div class="item-drop-row">
-                <span class="item-drop-icon">💎</span>
+                <span class="item-drop-icon">${stoneEmoji(key)}</span>
                 <span class="item-drop-name">${escapeHtml(stoneName(key))}</span>
                 ${n>1?`<b class="item-drop-count">×${n}</b>`:''}
             </div>`;
@@ -5782,9 +5874,12 @@ function renderUnitIcons(){
         const bodyHtml = imgFile
             ? `<span class="unit-sprite" style="background-image:url('images/mamono/${imgFile}'); background-position:${facingToBgPosition(m.facing)};"></span>`
             : `<span>${speciesInfo(m.speciesKey).emoji}</span>`;
+        // 総合戦闘力ランクは建設フェーズ（配置検討中）だけマップ上にも小さく出す。戦闘中は邪魔になるので出さない
+        const mapRankMark = inBattle ? '' : `<span class="rank-badge map-rank-badge rank-${combatRank(m)}">${combatRank(m)}</span>`;
         el.innerHTML = bodyHtml
             + (downed ? '' : hpBarHtml(m.hp, m.maxHp))
             + statusMark
+            + mapRankMark
             + (downed ? '<span class="downed-mark">✕</span>' : '');
         // 建設フェーズ中のみドラッグ＆ドロップ・クリック選択を有効にする（戦闘中はクリックが素通りする必要があるため無効）
         el.draggable = !inBattle;
@@ -5794,7 +5889,9 @@ function renderUnitIcons(){
             el.ondragstart = (ev) => {
                 ev.dataTransfer.setData('text/plain', 'monster:'+m.id);
                 ev.dataTransfer.effectAllowed = 'move';
+                setTimeout(() => { el.style.opacity = '0.4'; }, 0);
             };
+            el.ondragend = () => { el.style.opacity = ''; };
             el.ondragover = (ev) => { ev.preventDefault(); ev.dataTransfer.dropEffect = 'move'; };
             el.ondrop = (ev) => {
                 ev.preventDefault();
@@ -5807,6 +5904,11 @@ function renderUnitIcons(){
                 const room = rooms.find(x=>x.id===m.roomId);
                 if (room) handleRoomCellClick(room, m.r, m.c);
             };
+            // スマホ・タブレットのタッチ操作でも同じドラッグ移動ができるようにする（HTML5のdraggable属性はタッチでは発火しないため）
+            el.ontouchstart = (ev) => onUnitTouchStart(ev, el, 'monster:'+m.id);
+            el.ontouchmove = onUnitTouchMove;
+            el.ontouchend = onUnitTouchEnd;
+            el.ontouchcancel = onUnitTouchEnd;
         }
     });
 
@@ -5829,7 +5931,9 @@ function renderUnitIcons(){
             el.ondragstart = (ev) => {
                 ev.dataTransfer.setData('text/plain', 'demonlord');
                 ev.dataTransfer.effectAllowed = 'move';
+                setTimeout(() => { el.style.opacity = '0.4'; }, 0);
             };
+            el.ondragend = () => { el.style.opacity = ''; };
             el.ondragover = (ev) => { ev.preventDefault(); ev.dataTransfer.dropEffect = 'move'; };
             el.ondrop = (ev) => {
                 ev.preventDefault();
@@ -5842,6 +5946,10 @@ function renderUnitIcons(){
                 const room = rooms.find(x=>x.id===demonLordRoomId);
                 if (room) handleRoomCellClick(room, demonLordCell.r, demonLordCell.c);
             };
+            el.ontouchstart = (ev) => onUnitTouchStart(ev, el, 'demonlord');
+            el.ontouchmove = onUnitTouchMove;
+            el.ontouchend = onUnitTouchEnd;
+            el.ontouchcancel = onUnitTouchEnd;
         }
     }
 
@@ -6203,6 +6311,14 @@ document.getElementById('build-screen').addEventListener('click', (ev) => {
     if (ev.target.closest('#grid') || ev.target.closest('.bd-side')) return;
     deselectRoom();
 }, true);
+// 「魔王を配置」ボタンのタッチドラッグ（HTMLの ontouchstart 属性はブラウザによって認識されないことがあるため、確実にプロパティで登録する）
+(() => {
+    const btn = document.getElementById('btn-place-demonlord');
+    btn.ontouchstart = (ev) => onUnitTouchStart(ev, btn, 'demonlord-initial');
+    btn.ontouchmove = onUnitTouchMove;
+    btn.ontouchend = onUnitTouchEnd;
+    btn.ontouchcancel = onUnitTouchEnd;
+})();
 // ポップアップ表示中はEnterキーで「決定」操作を進められるようにする（マウス/タッチの移動を減らすため）
 document.addEventListener('keydown', (ev) => {
     if (ev.key !== 'Enter') return;
