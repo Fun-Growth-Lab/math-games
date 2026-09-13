@@ -774,7 +774,7 @@
                     <button class="btn btn-reroll" id="btn-reroll-map" onclick="rerollMap()" title="素の配置をリロードする（無制限）" data-i18n="btn_reroll_map">🔄 マップのリロード（無制限）</button>
                     <button class="btn btn-danger btn-footer-primary btn-start-battle-big" id="btn-start-battle" onclick="requestStartBattle()" data-i18n="btn_start_battle">⚔️ 敵を迎え撃つ</button>
                     <div class="footer-btn-row">
-                        <button class="btn btn-purple btn-footer-primary" id="btn-place-demonlord" onclick="beginDemonLordSelect()" data-i18n="btn_place_demonlord">👑 魔王を配置</button>
+                        <button class="btn btn-purple btn-footer-primary" id="btn-place-demonlord" draggable="true" ondragstart="onDemonLordButtonDragStart(event)" onclick="beginDemonLordSelect()" data-i18n="btn_place_demonlord">👑 魔王を配置</button>
                         <button class="btn btn-gold btn-footer-primary" id="btn-open-monsters" onclick="openMonsterListModal()" data-i18n="btn_open_monsters">👾 魔物</button>
                     </div>
                     <div class="footer-btn-row">
@@ -3149,6 +3149,16 @@ function unitDmgType(unit){
     if (info.dmgType) return info.dmgType;
     return info.role==='magic' ? 'magic' : 'physical';
 }
+// そのユニットの間合い（近距離/中距離/遠距離）。役割(role)がそのまま間合いを表す。魔王はrole情報を持たないため近距離扱い
+function unitRole(unit){
+    if (unit.isDemonLord) return 'melee';
+    const info = unitClassInfo(unit);
+    return info ? info.role : 'melee';
+}
+// 間合いによる攻撃力補正：攻撃力・魔法攻撃力そのものは変えず、ダメージ計算時にだけ掛ける倍率
+// 近距離(melee)は125%、中距離(ranged)は100%、遠距離(magic)は75%
+const RANGE_ATK_MULT = { melee: 1.25, ranged: 1.00, magic: 0.75 };
+function rangeAtkMultiplier(unit){ return RANGE_ATK_MULT[unitRole(unit)] ?? 1.0; }
 // そのユニットが攻撃力として参照するステータス値（攻撃タイプに応じて攻撃力／魔法攻撃力を切り替え、対応するバフも乗せる）
 function effectiveAtk(unit){
     const dmgType = unitDmgType(unit);
@@ -3158,6 +3168,7 @@ function effectiveAtk(unit){
     if (unit.speciesKey){
         value *= (1 + equipmentStatBonusPct(unit, dmgType==='magic' ? 'magAtk' : 'atk'));
     }
+    value *= rangeAtkMultiplier(unit);
     return Math.round(Math.max(0, value));
 }
 // 攻撃タイプに応じて、対象がどちらの防御力を参照すべきかを返す
@@ -4221,6 +4232,37 @@ function moveDemonLordTo(destRoomId, r, c){
     if (cellOccupiedBuild(destRoomId, r, c, 'demonlord')){ showToast(ui('err_cell_occupied')); return; }
     demonLordRoomId = destRoomId;
     demonLordCell.r = r; demonLordCell.c = c;
+}
+// ---- モンスター・魔王のドラッグ＆ドロップ移動（クリックでの選択→移動と同じ処理を、ドラッグでも呼べるようにする） ----
+function onDemonLordButtonDragStart(ev){
+    if (gamePhase!=='build'){ ev.preventDefault(); return; }
+    ev.dataTransfer.setData('text/plain', 'demonlord-initial');
+    ev.dataTransfer.effectAllowed = 'move';
+}
+// dataは 'demonlord-initial'（右パネルの配置ボタンからのドラッグ＝新規配置） / 'demonlord'（マップ上の魔王アイコンからのドラッグ＝移動）
+// / 'monster:<id>'（マップ上のモンスターアイコンからのドラッグ）のいずれか
+function handleUnitDrop(room, r, c, data){
+    if (gamePhase!=='build' || !data) return;
+    selectedMonsterId = null;
+    demonLordMoveSelected = false;
+    if (data==='demonlord-initial'){
+        if (isDoorwayCell(room, r, c)){ showToast(ui('err_doorway_blocked')); return; }
+        if (monsterAt(room.id, r, c)){ showToast(ui('err_cell_occupied')); return; }
+        setDemonLord(room.id, r, c);
+        return;
+    }
+    if (data==='demonlord'){
+        moveDemonLordTo(room.id, r, c);
+        updateStatus('');
+        renderAll();
+        return;
+    }
+    if (data.indexOf('monster:')===0){
+        const mv = monsters.find(m=>m.id===Number(data.slice('monster:'.length)));
+        if (mv) moveMonsterTo(mv, room, r, c);
+        renderAll();
+        return;
+    }
 }
 function handleRoomCellClick(room, r, c){
     if (gamePhase!=='build') return;
@@ -5708,6 +5750,28 @@ function renderUnitIcons(){
             + (downed ? '' : hpBarHtml(m.hp, m.maxHp))
             + statusMark
             + (downed ? '<span class="downed-mark">✕</span>' : '');
+        // 建設フェーズ中のみドラッグ＆ドロップ・クリック選択を有効にする（戦闘中はクリックが素通りする必要があるため無効）
+        el.draggable = !inBattle;
+        el.style.pointerEvents = inBattle ? 'none' : 'auto';
+        el.style.cursor = inBattle ? '' : 'grab';
+        if (!inBattle){
+            el.ondragstart = (ev) => {
+                ev.dataTransfer.setData('text/plain', 'monster:'+m.id);
+                ev.dataTransfer.effectAllowed = 'move';
+            };
+            el.ondragover = (ev) => { ev.preventDefault(); ev.dataTransfer.dropEffect = 'move'; };
+            el.ondrop = (ev) => {
+                ev.preventDefault();
+                ev.stopPropagation();
+                const room = rooms.find(x=>x.id===m.roomId);
+                if (room) handleUnitDrop(room, m.r, m.c, ev.dataTransfer.getData('text/plain'));
+            };
+            el.onclick = (ev) => {
+                ev.stopPropagation();
+                const room = rooms.find(x=>x.id===m.roomId);
+                if (room) handleRoomCellClick(room, m.r, m.c);
+            };
+        }
     });
 
     const dlKey = 'unit-dl';
@@ -5722,6 +5786,27 @@ function renderUnitIcons(){
         const dlBody = `<span class="unit-sprite" style="background-image:url('images/mamono/demon_lord.png'); background-position:${facingToBgPosition(demonLordCell.facing)};"></span>`;
         el.innerHTML = dlBody + hpBar;
         el.style.width = CELL+'px'; el.style.height = CELL+'px';
+        el.draggable = !inBattle;
+        el.style.pointerEvents = inBattle ? 'none' : 'auto';
+        el.style.cursor = inBattle ? '' : 'grab';
+        if (!inBattle){
+            el.ondragstart = (ev) => {
+                ev.dataTransfer.setData('text/plain', 'demonlord');
+                ev.dataTransfer.effectAllowed = 'move';
+            };
+            el.ondragover = (ev) => { ev.preventDefault(); ev.dataTransfer.dropEffect = 'move'; };
+            el.ondrop = (ev) => {
+                ev.preventDefault();
+                ev.stopPropagation();
+                const room = rooms.find(x=>x.id===demonLordRoomId);
+                if (room) handleUnitDrop(room, demonLordCell.r, demonLordCell.c, ev.dataTransfer.getData('text/plain'));
+            };
+            el.onclick = (ev) => {
+                ev.stopPropagation();
+                const room = rooms.find(x=>x.id===demonLordRoomId);
+                if (room) handleRoomCellClick(room, demonLordCell.r, demonLordCell.c);
+            };
+        }
     }
 
     if (inBattle){
@@ -5775,6 +5860,14 @@ function renderOverlays(){
             const cell = cellFromEvent(ev);
             if (!cell) return;
             handleRoomCellClick(rm, cell.r, cell.c);
+        };
+        d.ondragover = (ev) => { ev.preventDefault(); ev.dataTransfer.dropEffect = 'move'; };
+        d.ondrop = (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            const cell = cellFromEvent(ev);
+            if (!cell) return;
+            handleUnitDrop(rm, cell.r, cell.c, ev.dataTransfer.getData('text/plain'));
         };
         gridEl.appendChild(d);
     });
