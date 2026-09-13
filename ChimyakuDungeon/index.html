@@ -564,6 +564,8 @@
         .monster-list-action-btn:active { transform:none !important; }
         .monster-list-action-btn.deploy { background: linear-gradient(to bottom,#8fe0a8,#2f8f4e); color:#0a2e15; border-color:#b8f0c8; box-shadow: 0 3px 0 #1c5c30; }
         .monster-list-action-btn.retrieve { background: linear-gradient(to bottom,#ffcf8a,#c97a1e); color:#3a2000; border-color:#ffe0b0; box-shadow: 0 3px 0 #8a5414; }
+        /* 「全回収」ボタンは個別の「回収」ボタンと同じ色にして、回収系の操作だと分かりやすくする */
+        .btn-retrieve-all { background: linear-gradient(to bottom,#ffcf8a,#c97a1e); color:#3a2000; border-color:#ffe0b0; box-shadow: 0 3px 0 #8a5414; }
         .monster-list-lv { flex:0 0 auto; width:34px; color: var(--gold); font-weight:800; font-size:0.72rem; text-align:right; }
         .monster-list-room { flex:0 0 auto; width:84px; text-align:right; overflow:hidden; }
         /* 部屋名を部屋タイプの色でラベル化（素のgemクラスをそのまま流用して色分け） */
@@ -906,7 +908,7 @@
             <div class="modal-title" data-i18n="monster_list_modal_title">👾 魔物一覧</div>
             <div style="display:flex; gap:6px; margin-bottom:10px;">
                 <button class="btn btn-sm btn-teal" style="flex:1;" data-i18n="btn_auto_deploy" onclick="autoDeployStockedMonsters()">🏠 自動配置</button>
-                <button class="btn btn-sm" style="flex:1;" data-i18n="btn_retrieve_all" onclick="retrieveAllMonsters()">📦 全回収</button>
+                <button class="btn btn-sm btn-retrieve-all" style="flex:1;" data-i18n="btn_retrieve_all" onclick="retrieveAllMonsters()">📦 全回収</button>
             </div>
             <div id="monster-list-body"></div>
             <button class="btn btn-sm" style="margin-top:14px; width:100%;" data-i18n="btn_close" onclick="closeMonsterListModal()">とじる</button>
@@ -2180,12 +2182,12 @@ function renderBuildActions(){
                     style="background-image:url('images/mamono/demon_lord.png');"></span>`
             + `<div class="status-text">${escapeHtml(ui('status_pick_demonlord'))}</div>`
             + `<button class="btn btn-sm" style="width:100%; margin-top:6px;" onclick="cancelBuild()">${ui('btn_cancel')}</button>`;
-        // HTMLの ontouchstart 属性はブラウザによって認識されないことがあるため、確実にプロパティで登録する
+        // HTMLの onpointerdown 属性はブラウザによって認識されないことがあるため、確実にプロパティで登録する
         const dragIcon = document.getElementById('demonlord-drag-source');
-        dragIcon.ontouchstart = (ev) => onUnitTouchStart(ev, dragIcon, 'demonlord-initial');
-        dragIcon.ontouchmove = onUnitTouchMove;
-        dragIcon.ontouchend = onUnitTouchEnd;
-        dragIcon.ontouchcancel = onUnitTouchEnd;
+        dragIcon.onpointerdown = (ev) => onUnitPointerDown(ev, dragIcon, 'demonlord-initial');
+        dragIcon.onpointermove = onUnitPointerMove;
+        dragIcon.onpointerup = onUnitPointerUp;
+        dragIcon.onpointercancel = onUnitPointerUp;
         return;
     }
     if (mode === 'idle'){
@@ -4317,32 +4319,36 @@ function onDemonLordButtonDragEnd(ev){ ev.target.style.opacity = ''; }
 function roomContainingCell(cell){
     return cell ? rooms.find(r => cell.r>=r.r0 && cell.r<=r.r1 && cell.c>=r.c0 && cell.c<=r.c1) : null;
 }
-// タッチ操作でのドラッグ移動（HTML5のdraggable属性はスマホ・タブレットのタッチでは発火しないため、独自に実装して同じhandleUnitDropを呼ぶ）
+// タッチ・ペン操作でのドラッグ移動。Touch Eventsは端末によってHTML5のdraggable属性と衝突し発火しないことがあるため、
+// より安定して全入力デバイスに対応できるPointer Eventsで独自に実装する（マウスは従来通りdraggable属性のネイティブDnDに任せる）
 // 指を置いただけ（＝タップ）では発動させず、一定距離動いてから初めてドラッグ扱いにする（そうしないと通常のタップ選択と衝突するため）
 const TOUCH_DRAG_THRESHOLD = 8;
-let touchDragCandidate = null; // { data, sourceEl, startX, startY }
-let touchDragState = null; // { data, sourceEl, ghostEl, width, height }
-function onUnitTouchStart(ev, sourceEl, data){
-    if (gamePhase!=='build' || ev.touches.length!==1) return;
-    const t = ev.touches[0];
-    touchDragCandidate = { data, sourceEl, startX: t.clientX, startY: t.clientY };
+let touchDragCandidate = null; // { data, sourceEl, pointerId, startX, startY }
+let touchDragState = null; // { data, sourceEl, ghostEl, width, height, pointerId }
+function onUnitPointerDown(ev, sourceEl, data){
+    if (gamePhase!=='build' || ev.pointerType==='mouse') return;
+    touchDragCandidate = { data, sourceEl, pointerId: ev.pointerId, startX: ev.clientX, startY: ev.clientY };
 }
-function onUnitTouchMove(ev){
-    if (touchDragState){ ev.preventDefault(); moveTouchDrag(ev.touches[0]); return; }
-    if (!touchDragCandidate || ev.touches.length!==1) return;
-    const t = ev.touches[0];
-    const dx = t.clientX - touchDragCandidate.startX, dy = t.clientY - touchDragCandidate.startY;
+function onUnitPointerMove(ev){
+    if (touchDragState){
+        if (ev.pointerId!==touchDragState.pointerId) return;
+        ev.preventDefault();
+        moveTouchDrag(ev);
+        return;
+    }
+    if (!touchDragCandidate || ev.pointerId!==touchDragCandidate.pointerId) return;
+    const dx = ev.clientX - touchDragCandidate.startX, dy = ev.clientY - touchDragCandidate.startY;
     if (Math.hypot(dx,dy) > TOUCH_DRAG_THRESHOLD){
         ev.preventDefault();
-        beginTouchDrag(touchDragCandidate.sourceEl, touchDragCandidate.data, t);
+        beginTouchDrag(touchDragCandidate.sourceEl, touchDragCandidate.data, ev, touchDragCandidate.pointerId);
         touchDragCandidate = null;
     }
 }
-function onUnitTouchEnd(ev){
-    if (touchDragState) endTouchDrag(ev.changedTouches[0]);
-    touchDragCandidate = null;
+function onUnitPointerUp(ev){
+    if (touchDragState && ev.pointerId===touchDragState.pointerId){ endTouchDrag(ev); return; }
+    if (touchDragCandidate && ev.pointerId===touchDragCandidate.pointerId) touchDragCandidate = null;
 }
-function beginTouchDrag(sourceEl, data, touch){
+function beginTouchDrag(sourceEl, data, point, pointerId){
     const r = sourceEl.getBoundingClientRect();
     const ghost = sourceEl.cloneNode(true);
     ghost.removeAttribute('id');
@@ -4350,24 +4356,24 @@ function beginTouchDrag(sourceEl, data, touch){
     ghost.style.position = 'fixed';
     ghost.style.transition = 'none';
     ghost.style.width = r.width+'px'; ghost.style.height = r.height+'px';
-    ghost.style.left = (touch.clientX - r.width/2)+'px'; ghost.style.top = (touch.clientY - r.height/2)+'px';
+    ghost.style.left = (point.clientX - r.width/2)+'px'; ghost.style.top = (point.clientY - r.height/2)+'px';
     document.body.appendChild(ghost);
     sourceEl.style.opacity = '0.4';
-    touchDragState = { data, sourceEl, ghostEl: ghost, width: r.width, height: r.height };
+    touchDragState = { data, sourceEl, ghostEl: ghost, width: r.width, height: r.height, pointerId };
 }
-function moveTouchDrag(touch){
-    if (!touchDragState || !touch) return;
-    touchDragState.ghostEl.style.left = (touch.clientX - touchDragState.width/2)+'px';
-    touchDragState.ghostEl.style.top = (touch.clientY - touchDragState.height/2)+'px';
+function moveTouchDrag(point){
+    if (!touchDragState || !point) return;
+    touchDragState.ghostEl.style.left = (point.clientX - touchDragState.width/2)+'px';
+    touchDragState.ghostEl.style.top = (point.clientY - touchDragState.height/2)+'px';
 }
-function endTouchDrag(touch){
+function endTouchDrag(point){
     if (!touchDragState) return;
     const { data, sourceEl, ghostEl } = touchDragState;
     ghostEl.remove();
     sourceEl.style.opacity = '';
     touchDragState = null;
-    if (!touch) return;
-    const cell = cellFromEvent({ clientX: touch.clientX, clientY: touch.clientY });
+    if (!point) return;
+    const cell = cellFromEvent({ clientX: point.clientX, clientY: point.clientY });
     const room = roomContainingCell(cell);
     if (room) handleUnitDrop(room, cell.r, cell.c, data);
 }
@@ -4375,6 +4381,8 @@ function endTouchDrag(touch){
 // / 'monster:<id>'（マップ上のモンスターアイコンからのドラッグ）のいずれか
 function handleUnitDrop(room, r, c, data){
     if (gamePhase!=='build' || !data) return;
+    // 部屋を作成している途中は、既存の部屋やモンスターへのドロップも受け付けない（クリック操作と同じ制限）
+    if (mode==='placing-rect' || mode==='await-connector' || mode==='await-entrance-connector' || mode==='confirm') return;
     selectedMonsterId = null;
     demonLordMoveSelected = false;
     if (data==='demonlord-initial'){
@@ -4403,6 +4411,8 @@ function handleRoomCellClick(room, r, c){
         placeTrapAt(room, r, c);
         return;
     }
+    // 部屋を作成している途中（範囲選択・通路候補選択・確認待ち）は、既存の部屋やモンスターの操作に割り込ませない
+    if (mode==='placing-rect' || mode==='await-connector' || mode==='await-entrance-connector' || mode==='confirm') return;
     if (mode==='select-demonlord'){
         if (isDoorwayCell(room, r, c)){ showToast(ui('err_doorway_blocked')); return; }
         if (monsterAt(room.id, r, c)){ showToast(ui('err_cell_occupied')); return; }
@@ -5909,10 +5919,10 @@ function renderUnitIcons(){
                 if (room) handleRoomCellClick(room, m.r, m.c);
             };
             // スマホ・タブレットのタッチ操作でも同じドラッグ移動ができるようにする（HTML5のdraggable属性はタッチでは発火しないため）
-            el.ontouchstart = (ev) => onUnitTouchStart(ev, el, 'monster:'+m.id);
-            el.ontouchmove = onUnitTouchMove;
-            el.ontouchend = onUnitTouchEnd;
-            el.ontouchcancel = onUnitTouchEnd;
+            el.onpointerdown = (ev) => onUnitPointerDown(ev, el, 'monster:'+m.id);
+            el.onpointermove = onUnitPointerMove;
+            el.onpointerup = onUnitPointerUp;
+            el.onpointercancel = onUnitPointerUp;
         }
     });
 
@@ -5950,10 +5960,10 @@ function renderUnitIcons(){
                 const room = rooms.find(x=>x.id===demonLordRoomId);
                 if (room) handleRoomCellClick(room, demonLordCell.r, demonLordCell.c);
             };
-            el.ontouchstart = (ev) => onUnitTouchStart(ev, el, 'demonlord');
-            el.ontouchmove = onUnitTouchMove;
-            el.ontouchend = onUnitTouchEnd;
-            el.ontouchcancel = onUnitTouchEnd;
+            el.onpointerdown = (ev) => onUnitPointerDown(ev, el, 'demonlord');
+            el.onpointermove = onUnitPointerMove;
+            el.onpointerup = onUnitPointerUp;
+            el.onpointercancel = onUnitPointerUp;
         }
     }
 
@@ -6315,13 +6325,13 @@ document.getElementById('build-screen').addEventListener('click', (ev) => {
     if (ev.target.closest('#grid') || ev.target.closest('.bd-side')) return;
     deselectRoom();
 }, true);
-// 「魔王を配置」ボタンのタッチドラッグ（HTMLの ontouchstart 属性はブラウザによって認識されないことがあるため、確実にプロパティで登録する）
+// 「魔王を配置」ボタンのタッチドラッグ（HTMLの onpointerdown 属性はブラウザによって認識されないことがあるため、確実にプロパティで登録する）
 (() => {
     const btn = document.getElementById('btn-place-demonlord');
-    btn.ontouchstart = (ev) => onUnitTouchStart(ev, btn, 'demonlord-initial');
-    btn.ontouchmove = onUnitTouchMove;
-    btn.ontouchend = onUnitTouchEnd;
-    btn.ontouchcancel = onUnitTouchEnd;
+    btn.onpointerdown = (ev) => onUnitPointerDown(ev, btn, 'demonlord-initial');
+    btn.onpointermove = onUnitPointerMove;
+    btn.onpointerup = onUnitPointerUp;
+    btn.onpointercancel = onUnitPointerUp;
 })();
 // ポップアップ表示中はEnterキーで「決定」操作を進められるようにする（マウス/タッチの移動を減らすため）
 document.addEventListener('keydown', (ev) => {
