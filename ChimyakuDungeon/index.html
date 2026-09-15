@@ -2641,10 +2641,12 @@ function toolQuality(room, lvOverride){
     const lv = lvOverride!==undefined ? lvOverride : roomAbilityLv(room, 'tool');
     return count * lv;
 }
-// 召喚部屋：召喚のクオリティで「2進化目のモンスターが出る確率」が上がる（上限75%）
-const SUMMON_STAGE2_CHANCE_COEF = 0.05, SUMMON_STAGE2_CHANCE_CAP = 0.75;
+// 召喚部屋：召喚のクオリティで「2進化目のモンスターが出る確率」が上がる。
+// クオリティ1で0%、クオリティ30で100%になるよう線形補間し、30以上は頭打ち（道具の質と同じ考え方）
+const SUMMON_QUALITY_MIN = 1, SUMMON_QUALITY_MAX = 30;
 function monsterSummonStage2Chance(room, lvOverride){
-    return Math.min(SUMMON_STAGE2_CHANCE_CAP, SUMMON_STAGE2_CHANCE_COEF*summonQuality(room, lvOverride));
+    const q = Math.max(SUMMON_QUALITY_MIN, Math.min(SUMMON_QUALITY_MAX, summonQuality(room, lvOverride)));
+    return (q - SUMMON_QUALITY_MIN) / (SUMMON_QUALITY_MAX - SUMMON_QUALITY_MIN);
 }
 function roomAbilityMultiplier(room, abilityType, effectiveType){
     const lv = roomAbilityLv(room, abilityType, effectiveType);
@@ -3948,17 +3950,15 @@ function hatchEggsInRoom(room, count){
     }
     return born;
 }
-// 召喚のクオリティ(summonQuality)1あたり、初期Lvに乗るボーナス。4クオリティごとに+1Lv
-const SUMMON_QUALITY_LEVEL_DIVISOR = 4;
-// 召喚部屋がステージクリア後に生み出すモンスターを1体作る（稀に2進化目そのものが出る。初期Lvはステージ＋召喚のクオリティの両方で決まる）
+// 召喚部屋がステージクリア後に生み出すモンスターを1体作る（稀に2進化目そのものが出る）
+// 初期Lvはステージが1つ上がるごとに1ずつ増える（クオリティは2進化目の確率にだけ反映し、初期Lvには影響させない）
 // 個体差(statMods)は通常の孵化個体と同じ完全ランダム（rollStatModsのデフォルト範囲）にする＝「質」はLvと2進化目確率だけで表現する
 function createSummonMonster(room){
     const useStage2 = Math.random() < monsterSummonStage2Chance(room);
     const pool = useStage2 ? SUMMON_STAGE2_SPECIES : SUMMON_STAGE1_SPECIES;
     const sp = pool[Math.floor(Math.random()*pool.length)];
-    const baseLevel = Math.max(1, stage-1);
-    const bonusLevel = Math.floor(summonQuality(room) / SUMMON_QUALITY_LEVEL_DIVISOR);
-    const initialXp = (baseLevel + bonusLevel) * XP_PER_LEVEL;
+    const initialLevel = Math.max(1, stage-1);
+    const initialXp = initialLevel * XP_PER_LEVEL;
     const m = { id: nextMonsterId++, roomId: null, r: 0, c: 0, speciesKey: sp.key,
                 hp: 0, maxHp: 0, atk: 0, def: 0, magAtk: 0, magDef: 0,
                 statMods: rollStatMods(), chargeTurns: 0,
