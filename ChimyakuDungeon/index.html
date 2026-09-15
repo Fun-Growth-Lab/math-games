@@ -2643,13 +2643,8 @@ function toolQuality(room, lvOverride){
 }
 // 召喚部屋：召喚のクオリティで「2進化目のモンスターが出る確率」が上がる（上限75%）
 const SUMMON_STAGE2_CHANCE_COEF = 0.05, SUMMON_STAGE2_CHANCE_CAP = 0.75;
-// 掘削部屋：道具のクオリティで「★5（伝説）アイテムが出る確率」が上がる（上限50%）
-const TOOL_LEGENDARY_CHANCE_COEF = 0.04, TOOL_LEGENDARY_CHANCE_CAP = 0.50;
 function monsterSummonStage2Chance(room, lvOverride){
     return Math.min(SUMMON_STAGE2_CHANCE_CAP, SUMMON_STAGE2_CHANCE_COEF*summonQuality(room, lvOverride));
-}
-function itemDigLegendaryChance(room, lvOverride){
-    return Math.min(TOOL_LEGENDARY_CHANCE_CAP, TOOL_LEGENDARY_CHANCE_COEF*toolQuality(room, lvOverride));
 }
 function roomAbilityMultiplier(room, abilityType, effectiveType){
     const lv = roomAbilityLv(room, abilityType, effectiveType);
@@ -2669,19 +2664,18 @@ function abilityRowMeta(abilityType){
 
 // ※旧「強化部屋の能力上昇スロット」システムは凍結（召喚/攻撃/道具の各能力に役割を譲ったため撤去。関連コードはここで削除済み）
 // 指定Lvでの能力効果を計算する（Lvアップ確認ポップアップのbefore/after比較に使う）。
-// 活力・魔力は実際の生産量（数値）、攻撃は倍率、召喚・道具は確率(0〜1)を返す
+// 活力・魔力は実際の生産量（数値）、攻撃は倍率を返す。召喚・道具は内部確率を画面に出さずLv表示のみにしているため、
+// ここでは呼ばれない（isChanceTypeとしてrequestUpgradeRoomAbility側で分岐済み）
 function abilityEffectAtLv(room, abilityType, lv){
     const count = room.elements[abilityType] || 0;
     if (abilityType==='vitality' || abilityType==='mana') return Math.round(count * BASE_PRODUCTION_PER_ELEMENT * (1 + lv));
     if (abilityType==='attack') return 1 + ABILITY_MULT_COEF.attack*count*lv;
-    if (abilityType==='summon') return Math.min(SUMMON_STAGE2_CHANCE_CAP, SUMMON_STAGE2_CHANCE_COEF*count*lv);
-    if (abilityType==='tool') return Math.min(TOOL_LEGENDARY_CHANCE_CAP, TOOL_LEGENDARY_CHANCE_COEF*count*lv);
     return 1;
 }
 function abilityEffectText(abilityType, value){
     if (abilityType==='vitality' || abilityType==='mana') return String(value);
     if (abilityType==='attack') return value.toFixed(1) + ui('label_times_suffix');
-    return Math.round(value*100) + '%'; // 召喚・道具：確率表示
+    return Math.round(value*100) + '%'; // 保険（現状は召喚・道具に対して呼ばれないため未使用）
 }
 // ---- 能力Lvアップの確認ポップアップ（部屋共有の活力/魔力アップ、罠1つずつの威力アップ、強化スロット1つずつの能力上昇アップの3種類を共通の1つのポップアップで扱う） ----
 let pendingAbilityUpgrade = null; // { kind:'room', roomId, abilityType } | { kind:'trap', trapId } | { kind:'summonSlot', roomId, slotType }
@@ -4066,16 +4060,21 @@ function weightedRandomIndex(weights){
     for (let i=0;i<weights.length;i++){ r-=weights[i]; if (r<=0) return i; }
     return weights.length-1;
 }
-// 掘削部屋の道具の素の数×アイテム生産Lvで★5(伝説)の確率が上がる（itemDigLegendaryChance）。
-// 残りの確率は★1〜★4に4:3:2:1の比率（低ランクほど出やすい）で配分するシンプルな式にする
+// 掘削部屋のアイテムの質（★1〜★5の出現割合）。道具のクオリティ(toolQuality)が上がるほど★3〜★5の「重み」が
+// 段階的に伸びていき、相対的に★1・★2が出にくくなっていく（★4なども★5と一緒に伸びる、なだらかなグラデーション）。
+// ★1・★2の重みは常に4:3のまま据え置き、★3〜★5の重みはクオリティ20で頭打ちにする（それ以上素を積んでも伸びない）。
+// 頭打ち時の最終的な出現割合は ★1:4%／★2:3%／★3:22%／★4:31%／★5:40% に収束し、
+// どれだけ道具の素を積んでも★5がほぼ100%になってしまうことはない
+const TOOL_QUALITY_CAP = 20;
 function itemDigTierWeights(room){
-    const p5 = itemDigLegendaryChance(room);
-    const remaining = 1 - p5;
-    const shares = [4,3,2,1];
-    const shareSum = shares.reduce((a,b)=>a+b,0);
-    const weights = shares.map(s => remaining * s / shareSum);
-    weights.push(p5);
-    return weights; // [★1,★2,★3,★4,★5]
+    const q = Math.min(TOOL_QUALITY_CAP, toolQuality(room));
+    const raw1 = 4;
+    const raw2 = 3;
+    const raw3 = 2 + 1.0*q;
+    const raw4 = 1 + 1.5*q;
+    const raw5 = 0 + 2.0*q;
+    const total = raw1 + raw2 + raw3 + raw4 + raw5;
+    return [raw1/total, raw2/total, raw3/total, raw4/total, raw5/total]; // [★1,★2,★3,★4,★5]
 }
 function rollDugItem(room){
     const tierIdx = weightedRandomIndex(itemDigTierWeights(room));
