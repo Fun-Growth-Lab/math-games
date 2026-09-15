@@ -4060,21 +4060,17 @@ function weightedRandomIndex(weights){
     for (let i=0;i<weights.length;i++){ r-=weights[i]; if (r<=0) return i; }
     return weights.length-1;
 }
-// 掘削部屋のアイテムの質（★1〜★5の出現割合）。道具のクオリティ(toolQuality)が上がるほど★3〜★5の「重み」が
-// 段階的に伸びていき、相対的に★1・★2が出にくくなっていく（★4なども★5と一緒に伸びる、なだらかなグラデーション）。
-// ★1・★2の重みは常に4:3のまま据え置き、★3〜★5の重みはクオリティ20で頭打ちにする（それ以上素を積んでも伸びない）。
-// 頭打ち時の最終的な出現割合は ★1:4%／★2:3%／★3:22%／★4:31%／★5:40% に収束し、
-// どれだけ道具の素を積んでも★5がほぼ100%になってしまうことはない
-const TOOL_QUALITY_CAP = 20;
+// 掘削部屋のアイテムの質（★1〜★5の出現割合）。道具のクオリティ(toolQuality)が最低値(1)のときは★1中心に尖らせ、
+// クオリティ30で下の表に収束するよう線形補間する。クオリティ30以上はそれ以上変化しない（頭打ち）
+// クオリティ1　：★1 80%／★2 15%／★3  5%／★4  0%／★5  0%
+// クオリティ30以上：★1  0%／★2 10%／★3 20%／★4 30%／★5 40%
+const TOOL_QUALITY_MIN = 1, TOOL_QUALITY_MAX = 30;
+const TOOL_TIER_WEIGHTS_AT_MIN = [0.80, 0.15, 0.05, 0.00, 0.00];
+const TOOL_TIER_WEIGHTS_AT_MAX = [0.00, 0.10, 0.20, 0.30, 0.40];
 function itemDigTierWeights(room){
-    const q = Math.min(TOOL_QUALITY_CAP, toolQuality(room));
-    const raw1 = 4;
-    const raw2 = 3;
-    const raw3 = 2 + 1.0*q;
-    const raw4 = 1 + 1.5*q;
-    const raw5 = 0 + 2.0*q;
-    const total = raw1 + raw2 + raw3 + raw4 + raw5;
-    return [raw1/total, raw2/total, raw3/total, raw4/total, raw5/total]; // [★1,★2,★3,★4,★5]
+    const q = Math.max(TOOL_QUALITY_MIN, Math.min(TOOL_QUALITY_MAX, toolQuality(room)));
+    const t = (q - TOOL_QUALITY_MIN) / (TOOL_QUALITY_MAX - TOOL_QUALITY_MIN);
+    return TOOL_TIER_WEIGHTS_AT_MIN.map((v0,i) => v0 + t*(TOOL_TIER_WEIGHTS_AT_MAX[i]-v0)); // [★1,★2,★3,★4,★5]
 }
 function rollDugItem(room){
     const tierIdx = weightedRandomIndex(itemDigTierWeights(room));
