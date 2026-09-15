@@ -1240,9 +1240,9 @@ const UI_TEXT = {
     roomtype_summon: { ja: '召喚部屋', ja_easy: 'しょうかんべや', en: 'Summoning Room' },
     roomtype_attack: { ja: '攻撃部屋', ja_easy: 'こうげきべや', en: 'Attack Room' },
     roomtype_tool: { ja: '掘削部屋', ja_easy: 'くっさくべや', en: 'Excavation Room' },
-    roomtype_hint_summon: { ja: 'ステージクリアごとにモンスターを1体召喚する', ja_easy: 'ステージクリアごとに モンスターを 1たい しょうかんする', en: 'Summons 1 monster after every stage clear' },
+    roomtype_hint_summon: { ja: 'ステージクリアごとに、召喚Lvの数だけモンスターを召喚する', ja_easy: 'ステージクリアごとに、しょうかんLvの かずだけ モンスターを しょうかんする', en: 'Summons monsters (as many as the Summon Lv) after every stage clear' },
     roomtype_hint_attack: { ja: '戦闘中、部屋にいる勇者全員に定期的に攻撃する', ja_easy: 'せんとうちゅう、へやに いる ゆうしゃ ぜんいんに ていきてきに こうげきする', en: 'Periodically attacks every hero in the room during battle' },
-    roomtype_hint_tool: { ja: 'ステージクリアごとに装備品を1つ掘削する', ja_easy: 'ステージクリアごとに そうびひんを 1つ くっさくする', en: 'Excavates 1 piece of equipment after every stage clear' },
+    roomtype_hint_tool: { ja: 'ステージクリアごとに、生産Lvの数だけ装備品を掘削する', ja_easy: 'ステージクリアごとに、せいさんLvの かずだけ そうびひんを くっさくする', en: 'Excavates equipment (as many as the Production Lv) after every stage clear' },
     roomtype_confirm_msg: { ja: 'これでいいですか？', ja_easy: 'これで いい？', en: 'Is this OK?' },
     stat_vit_prod: { ja: '活力生産', ja_easy: 'かつりょく せいさん', en: 'Vitality Production' },
     stat_mana_prod: { ja: '魔力生産', ja_easy: 'まりょく せいさん', en: 'Mana Production' },
@@ -2629,19 +2629,27 @@ function roomAbilityMaxLv(room, abilityType, effectiveType){
 // 活力・魔力：素の数はすでに基礎生産（素の数×20）側に入っているので、倍率は単純に(1+Lv)
 // 攻撃：素の数がそのまま倍率に効く＝ 1 + 係数×素の数×Lv （Lv0なら1倍＝通常通り）。攻撃部屋のダメージ計算に使う
 const ABILITY_MULT_COEF = { attack: 0.2 };
-// 召喚部屋：召喚の素の数×魔物召喚Lvで「2進化目のモンスターが出る確率」が上がる（上限75%）
-const SUMMON_STAGE2_CHANCE_COEF = 0.05, SUMMON_STAGE2_CHANCE_CAP = 0.75;
-// 掘削部屋：道具の素の数×アイテム生産Lvで「★5（伝説）アイテムが出る確率」が上がる（上限50%）
-const TOOL_LEGENDARY_CHANCE_COEF = 0.04, TOOL_LEGENDARY_CHANCE_CAP = 0.50;
-function monsterSummonStage2Chance(room, lvOverride){
+// クオリティ＝（素の数）×（能力Lv）。召喚・道具それぞれで「量」（何体/何個手に入るか＝能力Lvそのもの）とは別に
+// 「質」（どれだけ強い/良いものが出るか）を表す共通の内部指標として使う（画面には%ではなくLvだけを見せる）
+function summonQuality(room, lvOverride){
     const count = room.elements.summon || 0;
     const lv = lvOverride!==undefined ? lvOverride : roomAbilityLv(room, 'summon');
-    return Math.min(SUMMON_STAGE2_CHANCE_CAP, SUMMON_STAGE2_CHANCE_COEF*count*lv);
+    return count * lv;
 }
-function itemDigLegendaryChance(room, lvOverride){
+function toolQuality(room, lvOverride){
     const count = room.elements.tool || 0;
     const lv = lvOverride!==undefined ? lvOverride : roomAbilityLv(room, 'tool');
-    return Math.min(TOOL_LEGENDARY_CHANCE_CAP, TOOL_LEGENDARY_CHANCE_COEF*count*lv);
+    return count * lv;
+}
+// 召喚部屋：召喚のクオリティで「2進化目のモンスターが出る確率」が上がる（上限75%）
+const SUMMON_STAGE2_CHANCE_COEF = 0.05, SUMMON_STAGE2_CHANCE_CAP = 0.75;
+// 掘削部屋：道具のクオリティで「★5（伝説）アイテムが出る確率」が上がる（上限50%）
+const TOOL_LEGENDARY_CHANCE_COEF = 0.04, TOOL_LEGENDARY_CHANCE_CAP = 0.50;
+function monsterSummonStage2Chance(room, lvOverride){
+    return Math.min(SUMMON_STAGE2_CHANCE_CAP, SUMMON_STAGE2_CHANCE_COEF*summonQuality(room, lvOverride));
+}
+function itemDigLegendaryChance(room, lvOverride){
+    return Math.min(TOOL_LEGENDARY_CHANCE_CAP, TOOL_LEGENDARY_CHANCE_COEF*toolQuality(room, lvOverride));
 }
 function roomAbilityMultiplier(room, abilityType, effectiveType){
     const lv = roomAbilityLv(room, abilityType, effectiveType);
@@ -2698,9 +2706,11 @@ function requestUpgradeRoomAbility(roomId, abilityType){
     if (vitality<cost.vit || mana<cost.mana){ showToast(ui('err_vitality')); return; }
     pendingAbilityUpgrade = { kind:'room', roomId, abilityType };
     const meta = abilityRowMeta(abilityType);
-    const before = abilityEffectAtLv(room, abilityType, curLv);
-    const after = abilityEffectAtLv(room, abilityType, nextLv);
-    openAbilityUpgradeModal(meta.label, abilityEffectText(abilityType, before), abilityEffectText(abilityType, after), cost);
+    // 召喚・道具は内部的な確率を見せても分かりづらいだけなので、Lv表示だけにする
+    const isChanceType = (abilityType==='summon' || abilityType==='tool');
+    const beforeText = isChanceType ? `Lv.${curLv}` : abilityEffectText(abilityType, abilityEffectAtLv(room, abilityType, curLv));
+    const afterText = isChanceType ? `Lv.${nextLv}` : abilityEffectText(abilityType, abilityEffectAtLv(room, abilityType, nextLv));
+    openAbilityUpgradeModal(meta.label, beforeText, afterText, cost);
 }
 // 罠1つの威力レベルを1つ上げる（部屋共有ではなく罠ごとに個別のレベルを持つ）
 function requestUpgradeTrapPower(trapId){
@@ -2753,13 +2763,10 @@ function costSpanHtml(vit, mana, insufficient){
     return parts.join(' ／ ');
 }
 // 活力・召喚能力のアップは魔力を、魔力・掘削能力のアップは活力を消費する。
-// 活力・魔力は生産倍率(1+Lv)、召喚・道具は確率上昇(係数×個数×Lv)と、どちらも1段ごとの効果が常に一定のため、
-// コストも等差数列にする（活力・魔力：200+50×(目標Lv-1)＝Lv0→1が200・Lv1→2が250・Lv2→3が300・Lv3→4が350…
-//  召喚・道具はその半分の刻み：100+25×(目標Lv-1)＝Lv1→2が125・Lv2→3が150・Lv3→4が175…）
+// 召喚・道具も活力・魔力と同じ数の効果（召喚数・道具数＝能力Lvそのもの）を持つようになったため、コストも同じ式にする
+// 等差数列：200+50×(目標Lv-1)＝Lv0→1が200・Lv1→2が250・Lv2→3が300・Lv3→4が350…
 function abilityUpgradeCost(abilityType, targetLv){
-    const isMinor = (abilityType==='summon' || abilityType==='tool');
-    const base = isMinor ? 100 : 200;
-    const step = isMinor ? 25 : 50;
+    const base = 200, step = 50;
     const amount = base + step*(targetLv-1);
     if (abilityType==='vitality' || abilityType==='summon') return { vit:0, mana:amount };
     return { vit:amount, mana:0 };
@@ -3383,8 +3390,6 @@ function grantKillXp(killerUnit){
 // 能力ごとに種族の基本値の71%〜150%まで幅がある。同じ種族でも1体ごとに得意な能力が違う、という個性付け。
 // この倍率（statMods）は孵化した瞬間に1回だけ抽選され、進化・レベルアップで変化しない（その個体の生まれ持った資質のため）
 const STAT_MOD_MIN = 0.71, STAT_MOD_MAX = 1.50;
-// 召喚モンスターは「最初から強い」個性付け＝下限が100%（平均以上が保証される）になる
-const SUMMON_STAT_MOD_MIN = 1.00, SUMMON_STAT_MOD_MAX = 1.50;
 function rollStatMods(min = STAT_MOD_MIN, max = STAT_MOD_MAX){
     const roll = () => min + Math.random()*(max-min);
     return { hp: roll(), atk: roll(), def: roll(), magAtk: roll(), magDef: roll() };
@@ -3765,10 +3770,10 @@ function renderMonsterDetailModal(){
             <b>${m.hp}/${m.maxHp}</b>
         </div>
         <div class="monster-stat-grid">
-            ${monsterDetailStatRowHtml('monster_stat_atk', m.atk, mods.atk)}
-            ${monsterDetailStatRowHtml('monster_stat_def', m.def, mods.def)}
-            ${monsterDetailStatRowHtml('monster_stat_magatk', m.magAtk, mods.magAtk)}
-            ${monsterDetailStatRowHtml('monster_stat_magdef', m.magDef, mods.magDef)}
+            ${monsterDetailStatRowHtml('monster_stat_atk', statDisplayWithEquip(m,'atk'), mods.atk)}
+            ${monsterDetailStatRowHtml('monster_stat_def', statDisplayWithEquip(m,'def'), mods.def)}
+            ${monsterDetailStatRowHtml('monster_stat_magatk', statDisplayWithEquip(m,'magAtk'), mods.magAtk)}
+            ${monsterDetailStatRowHtml('monster_stat_magdef', statDisplayWithEquip(m,'magDef'), mods.magDef)}
         </div>
         ${evolveSection}
         <div class="room-detail-row" style="cursor:pointer; margin-top:8px;" onclick="openEquipModal(${m.id});">
@@ -3948,15 +3953,20 @@ function hatchEggsInRoom(room, count){
     }
     return born;
 }
-// 召喚部屋がステージクリア後に生み出すモンスターを1体作る（召喚されるモンスター＝最初から強い。個体差の下限が高めで、稀に2進化目そのものが出る）
+// 召喚のクオリティ(summonQuality)1あたり、初期Lvに乗るボーナス。4クオリティごとに+1Lv
+const SUMMON_QUALITY_LEVEL_DIVISOR = 4;
+// 召喚部屋がステージクリア後に生み出すモンスターを1体作る（稀に2進化目そのものが出る。初期Lvはステージ＋召喚のクオリティの両方で決まる）
+// 個体差(statMods)は通常の孵化個体と同じ完全ランダム（rollStatModsのデフォルト範囲）にする＝「質」はLvと2進化目確率だけで表現する
 function createSummonMonster(room){
     const useStage2 = Math.random() < monsterSummonStage2Chance(room);
     const pool = useStage2 ? SUMMON_STAGE2_SPECIES : SUMMON_STAGE1_SPECIES;
     const sp = pool[Math.floor(Math.random()*pool.length)];
-    const initialXp = Math.max(XP_PER_LEVEL, (stage-1) * XP_PER_LEVEL);
+    const baseLevel = Math.max(1, stage-1);
+    const bonusLevel = Math.floor(summonQuality(room) / SUMMON_QUALITY_LEVEL_DIVISOR);
+    const initialXp = (baseLevel + bonusLevel) * XP_PER_LEVEL;
     const m = { id: nextMonsterId++, roomId: null, r: 0, c: 0, speciesKey: sp.key,
                 hp: 0, maxHp: 0, atk: 0, def: 0, magAtk: 0, magDef: 0,
-                statMods: rollStatMods(SUMMON_STAT_MOD_MIN, SUMMON_STAT_MOD_MAX), chargeTurns: 0,
+                statMods: rollStatMods(), chargeTurns: 0,
                 activeCooldowns: [], statusEffects: [], buffs: [], xp: initialXp, level: monsterLevel(initialXp),
                 equippedItem: null, origin: 'summon' };
     applyStatModsToMonster(m, sp);
@@ -4082,6 +4092,14 @@ function equipmentStatBonusPct(unit, statKey){
     const it = itemInfo(unit.equippedItem.itemKey);
     if (!it || !(statKey in it.stats)) return 0;
     return (it.stats[statKey] / 100) * itemRoleBonusMultiplier(it.shape, unit.speciesKey);
+}
+// 装備込みの数値を表示する。装備の影響を受けているステータスだけ「装備込み（素の値）」の形にし、影響がなければ素の値だけ表示する
+function statDisplayWithEquip(m, statKey){
+    const base = m[statKey];
+    const bonusPct = equipmentStatBonusPct(m, statKey);
+    if (!bonusPct) return String(base);
+    const equipped = Math.round(base * (1 + bonusPct));
+    return `${equipped}（${base}）`;
 }
 
 // ============================================================
@@ -5718,17 +5736,23 @@ function proceedNextStage(){
         if (!room.type) return;
         const prod = computeRoomProduction(room, room.type);
         vitGain += prod.vit; manaGain += prod.mana;
-        // 召喚部屋：1部屋につき必ずモンスターを1体召喚する（入りきらなければストックへ）
+        // 召喚部屋：召喚の数(=召喚Lv)だけモンスターを召喚する（入りきらなければストックへ）
         if (room.type==='summon'){
-            const m = createSummonMonster(room);
-            placeMonsterInRoomOrStock(m, room);
-            battleStageItemDrops.push({ kind:'monster', key: m.speciesKey });
+            const summonCount = roomAbilityLv(room, 'summon');
+            for (let i=0;i<summonCount;i++){
+                const m = createSummonMonster(room);
+                placeMonsterInRoomOrStock(m, room);
+                battleStageItemDrops.push({ kind:'monster', key: m.speciesKey });
+            }
         }
-        // 掘削部屋：1部屋につき必ず装備を1つ掘り出す
+        // 掘削部屋：道具の数(=アイテム生産Lv)だけ装備を掘り出す
         if (room.type==='tool'){
-            const key = rollDugItem(room);
-            inventory.push({ id: nextInventoryId++, itemKey: key });
-            battleStageItemDrops.push({ kind:'equip', key });
+            const toolCount = roomAbilityLv(room, 'tool');
+            for (let i=0;i<toolCount;i++){
+                const key = rollDugItem(room);
+                inventory.push({ id: nextInventoryId++, itemKey: key });
+                battleStageItemDrops.push({ kind:'equip', key });
+            }
         }
     });
     vitality += vitGain;
@@ -6192,14 +6216,13 @@ function renderRoomDetail(){
             const maxLv = roomAbilityMaxLv(rm, abilityType);
             if (maxLv<=0) return '';
             const meta = abilityRowMeta(abilityType);
+            // 召喚・道具は内部的な確率(%)を見せても分かりづらいだけなので、Lv表示のみにする（効果自体はLvに応じて内部で計算する）
             const isChanceType = (abilityType==='summon' || abilityType==='tool');
-            const valueText = isChanceType
-                ? abilityEffectText(abilityType, abilityEffectAtLv(rm, abilityType, curLv))
-                : roomAbilityMultiplier(rm, abilityType).toFixed(1) + ui('label_times_suffix');
+            const valueText = isChanceType ? '' : roomAbilityMultiplier(rm, abilityType).toFixed(1) + ui('label_times_suffix');
             let row = `<div class="room-detail-row">
                 <span class="gem-chip-sq ${meta.gem}"></span>
                 <span>${meta.label}${isChanceType?'':'アップ'} <b style="color:var(--teal);">Lv.${curLv}</b></span>
-                <b style="margin-left:auto; color:var(--gold);">${valueText}</b>
+                ${valueText ? `<b style="margin-left:auto; color:var(--gold);">${valueText}</b>` : ''}
             </div>`;
             if (curLv < maxLv){
                 const cost = abilityUpgradeCost(abilityType, curLv+1);
