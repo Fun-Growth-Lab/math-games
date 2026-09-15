@@ -173,6 +173,9 @@
         }
         .card:active { cursor: grabbing; }
         .card:hover { border-color: #FF7043; color: #FF7043; box-shadow: 0 6px 0 #E64A19; top: -3px; }
+        /* タップモード：ドラッグではなくワンタップで代入するので、掴む(grab)ではなく押す(pointer)カーソルにする */
+        .card.tap-mode { cursor: pointer; }
+        .card.tap-mode:active { cursor: pointer; transform: translateY(4px); box-shadow: 0 2px 0 #6D4C41; }
 
         /* 右側：コレクションエリア */
         #collection-area { 
@@ -429,6 +432,11 @@
                         <button id="lang-btn-simple" class="btn btn-normal lang-btn" onclick="selectLanguage('simple')" data-i18n="lang.simple">かんたんなにほんご</button>
                         <button id="lang-btn-ja" class="btn btn-normal lang-btn" onclick="selectLanguage('ja')" data-i18n="lang.ja">日本語</button>
                         <button id="lang-btn-en" class="btn btn-normal lang-btn" onclick="selectLanguage('en')" data-i18n="lang.en">English</button>
+                    </div>
+                    <p style="font-size:16px; color:#8D6E63; margin-bottom:15px; margin-top:20px;" data-i18n="settings.inputmode">カードの出し方</p>
+                    <div style="display:flex; gap:10px;">
+                        <button id="input-mode-drag" class="btn btn-normal lang-btn" onclick="selectInputMode('drag')" data-i18n="inputmode.drag" style="flex:1;">ドラッグ</button>
+                        <button id="input-mode-tap" class="btn btn-normal lang-btn" onclick="selectInputMode('tap')" data-i18n="inputmode.tap" style="flex:1;">タップ</button>
                     </div>
                     <button class="btn btn-gray" onclick="closeSettings()" style="width:200px; margin-top:20px;" data-i18n="btn.close">とじる</button>
                 </div>
@@ -712,6 +720,9 @@
                 'lang.simple': 'かんたんなにほんご',
                 'lang.ja': '日本語',
                 'lang.en': 'English',
+                'settings.inputmode': 'カードの だしかた',
+                'inputmode.drag': 'ドラッグ',
+                'inputmode.tap': 'タップ',
                 'btn.close': 'とじる',
                 'numberselect.title': '💎 いくつすすむ？',
                 'btn.cancel': 'やめる',
@@ -809,6 +820,9 @@
                 'lang.simple': 'かんたんなにほんご',
                 'lang.ja': '日本語',
                 'lang.en': 'English',
+                'settings.inputmode': 'カードの出し方',
+                'inputmode.drag': 'ドラッグ',
+                'inputmode.tap': 'タップ',
                 'btn.close': 'とじる',
                 'numberselect.title': '💎 いくつすすむ？',
                 'btn.cancel': 'やめる',
@@ -906,6 +920,9 @@
                 'lang.simple': 'かんたんなにほんご',
                 'lang.ja': '日本語',
                 'lang.en': 'English',
+                'settings.inputmode': 'Card Input',
+                'inputmode.drag': 'Drag',
+                'inputmode.tap': 'Tap',
                 'btn.close': 'Close',
                 'numberselect.title': '💎 Move how many?',
                 'btn.cancel': 'Cancel',
@@ -971,6 +988,8 @@
         };
 
         let currentLang = localStorage.getItem('mathSugorokuLang') || 'simple';
+        // カードの出し方（'drag'=ドラッグして代入 / 'tap'=タップするだけで即座に代入）
+        let cardInputMode = localStorage.getItem('mathSugorokuInputMode') || 'drag';
 
         function T(key, params) {
             const dict = STRINGS[currentLang] || STRINGS.simple;
@@ -989,6 +1008,7 @@
                 const btn = document.getElementById('lang-btn-' + l);
                 if (btn) btn.classList.toggle('active', l === currentLang);
             });
+            updateInputModeUI();
             if (currentPlayerIndex < 0) {
                 currentPlayerName = T('player.default');
             }
@@ -1001,7 +1021,21 @@
             applyLanguage();
         }
 
+        function selectInputMode(mode) {
+            cardInputMode = mode;
+            localStorage.setItem('mathSugorokuInputMode', mode);
+            updateInputModeUI();
+            renderHand(); // 手札のイベント設定をやり直す（ドラッグ⇔タップの切り替えを即反映）
+        }
+        function updateInputModeUI() {
+            ['drag', 'tap'].forEach(m => {
+                const btn = document.getElementById('input-mode-' + m);
+                if (btn) btn.classList.toggle('active', m === cardInputMode);
+            });
+        }
+
         function openSettings() {
+            updateInputModeUI();
             document.getElementById('settings-screen').classList.remove('hidden');
         }
         function closeSettings() {
@@ -2024,18 +2058,28 @@
                 if (withEffect) div.classList.add("flip-effect");
                 div.innerText = toZenkaku(num);
                 div.style.color = cardColors[num] || "#5D4037"; // 数値によって色を変える
-                
-                // ドラッグ＆ドロップ
-                div.draggable = true;
-                div.ondragstart = (e) => {
-                    e.dataTransfer.setData('text/plain', idx);
-                    e.dataTransfer.effectAllowed = 'move';
-                };
-                
-                // モバイル対応用
-                div.addEventListener('touchstart', handleTouchStart, {passive: false});
-                div.addEventListener('touchmove', handleTouchMove, {passive: false});
-                div.addEventListener('touchend', handleTouchEnd, {passive: false});
+
+                if (cardInputMode === 'tap') {
+                    // タップ（クリック）するだけで即座に式へ代入するモード
+                    div.classList.add('tap-mode');
+                    div.addEventListener('click', () => playCard(idx));
+                    div.addEventListener('touchend', (e) => {
+                        e.preventDefault();
+                        playCard(idx);
+                    }, {passive: false});
+                } else {
+                    // ドラッグ＆ドロップ
+                    div.draggable = true;
+                    div.ondragstart = (e) => {
+                        e.dataTransfer.setData('text/plain', idx);
+                        e.dataTransfer.effectAllowed = 'move';
+                    };
+
+                    // モバイル対応用
+                    div.addEventListener('touchstart', handleTouchStart, {passive: false});
+                    div.addEventListener('touchmove', handleTouchMove, {passive: false});
+                    div.addEventListener('touchend', handleTouchEnd, {passive: false});
+                }
 
                 handContainer.appendChild(div);
             });
@@ -2250,6 +2294,7 @@
         window.openSettings = openSettings;
         window.closeSettings = closeSettings;
         window.selectLanguage = selectLanguage;
+        window.selectInputMode = selectInputMode;
 
     </script>
 </body>
