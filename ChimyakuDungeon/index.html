@@ -3950,14 +3950,21 @@ function hatchEggsInRoom(room, count){
     }
     return born;
 }
+// 召喚モンスターの初期Lv：ステージ数n＋（召喚の素の数×召喚Lv×0.1）を計算し、小数部分はレベルが1つ上がる確率として扱う
+// （例：値が3.2なら80%でLv3、20%でLv4になる）。クオリティが高い部屋ほど、同じステージでも高いLvが出やすくなる
+function summonInitialLevel(room){
+    const value = stage + summonQuality(room)*0.1;
+    const floorLevel = Math.floor(value);
+    const frac = value - floorLevel;
+    return Math.random() < frac ? floorLevel + 1 : floorLevel;
+}
 // 召喚部屋がステージクリア後に生み出すモンスターを1体作る（稀に2進化目そのものが出る）
-// 初期Lvはステージが1つ上がるごとに1ずつ増える（クオリティは2進化目の確率にだけ反映し、初期Lvには影響させない）
 // 個体差(statMods)は通常の孵化個体と同じ完全ランダム（rollStatModsのデフォルト範囲）にする＝「質」はLvと2進化目確率だけで表現する
 function createSummonMonster(room){
     const useStage2 = Math.random() < monsterSummonStage2Chance(room);
     const pool = useStage2 ? SUMMON_STAGE2_SPECIES : SUMMON_STAGE1_SPECIES;
     const sp = pool[Math.floor(Math.random()*pool.length)];
-    const initialLevel = Math.max(1, stage-1);
+    const initialLevel = summonInitialLevel(room);
     const initialXp = initialLevel * XP_PER_LEVEL;
     const m = { id: nextMonsterId++, roomId: null, r: 0, c: 0, speciesKey: sp.key,
                 hp: 0, maxHp: 0, atk: 0, def: 0, magAtk: 0, magDef: 0,
