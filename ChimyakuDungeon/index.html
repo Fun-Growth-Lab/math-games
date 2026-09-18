@@ -325,12 +325,13 @@
         .monster-detail-hpbar-fill { height:100%; background: linear-gradient(90deg,#ff6b6b,#ffb84d); transition: width 0.3s; }
         .monster-stat-grid { display:grid; grid-template-columns: 1fr 1fr; gap:8px; }
         .monster-stat-card {
-            display:flex; flex-direction:column; align-items:center; gap:2px;
+            display:flex; flex-direction:column; align-items:center; gap:3px;
             background: rgba(255,255,255,0.05); border:1px solid var(--card-bdr); border-radius:10px; padding:8px 4px;
         }
         .monster-stat-card-label { font-size:0.72rem; color:var(--ink-dim); }
-        .monster-stat-card-value { font-size:1.3rem; font-weight:800; color:var(--ink); }
-        .star-rating { color:var(--gold); font-size:0.85rem; letter-spacing:1px; }
+        .monster-stat-card-value { font-size:0.78rem; font-weight:700; color:var(--ink-dim); }
+        /* ステータスカード内の大きなランク表示（G〜SS）。一覧・マップの縮小版rank-badgeと同じ配色を、ここでは主役として大きく見せる */
+        .stat-rank-badge { display:inline-block; min-width:0; width:auto; padding:2px 12px; border-radius:8px; font-size:1.4rem; }
         .dmg-breakdown-row { margin-bottom:8px; text-align:left; }
         .dmg-breakdown-label { font-size:0.76rem; color:var(--ink-dim); margin-bottom:2px; }
         .dmg-breakdown-bar-track { height:10px; background:rgba(0,0,0,0.4); border-radius:5px; overflow:hidden; border:1px solid var(--card-bdr); }
@@ -615,6 +616,20 @@
             padding: 4px 8px; cursor: pointer;
         }
         .sort-btn.active { background: linear-gradient(to bottom,#eef2f6,var(--accent)); border-color: var(--accent-dk); color: #1c2128; }
+        /* モンスター選択ピッカー（進化の石・装備の対象選び）：小さすぎて読みづらかったのでカード状に大きくし、
+           多い時はグリッドで折り返しつつ縦スクロールできるようにする */
+        .monster-picker-grid {
+            display:grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap:8px;
+            max-height:52vh; overflow-y:auto; padding:2px; margin-bottom:6px;
+        }
+        .monster-picker-btn {
+            display:flex; flex-direction:column; align-items:center; gap:4px; text-align:center;
+            background: #1c140e; border: 2px solid var(--card-bdr); border-radius: 14px;
+            color: var(--ink); font-family: inherit; cursor: pointer; padding: 10px 6px;
+        }
+        .monster-picker-btn:hover { border-color: var(--accent); }
+        .monster-picker-name { font-size:0.9rem; font-weight:800; line-height:1.25; }
+        .monster-picker-meta { display:flex; align-items:center; gap:6px; font-size:0.78rem; color:var(--ink-dim); font-weight:700; }
         .trap-orient-row { display:flex; gap:6px; margin-bottom:8px; }
         .trap-orient-row .sort-btn { flex:1; text-align:center; padding:8px 0; font-size:0.82rem; font-weight:800; }
         .prod-value-big { font-size: 1.35rem; font-weight: 800; text-shadow: 0 1px 4px rgba(0,0,0,0.5); }
@@ -872,6 +887,15 @@
         </div>
     </div>
 
+    <!-- ==================== EVOLUTION RESULT (center popup) ==================== -->
+    <div id="evolution-result-modal" class="modal-backdrop hidden">
+        <div class="modal-box" style="min-width:300px; max-width:380px;">
+            <div class="modal-title" id="evolution-result-title"></div>
+            <div id="evolution-result-body"></div>
+            <button class="btn btn-sm" style="margin-top:14px; width:100%;" data-i18n="btn_close" onclick="closeEvolutionResultModal()">とじる</button>
+        </div>
+    </div>
+
     <!-- ==================== EQUIP ITEM ==================== -->
     <div id="equip-modal" class="modal-backdrop hidden">
         <div class="modal-box" style="min-width:320px; max-width:420px;">
@@ -895,9 +919,9 @@
 
     <!-- ==================== ITEM TARGET PICKER ==================== -->
     <div id="item-target-picker-modal" class="modal-backdrop hidden">
-        <div class="modal-box" style="min-width:300px; max-width:380px;">
+        <div class="modal-box" style="min-width:320px; width:95vw; max-width:640px; max-height:85vh; overflow-y:auto;">
             <div class="modal-title" data-i18n="item_target_picker_title">対象を選んでください</div>
-            <div id="item-target-picker-body" class="sort-btn-row stacked"></div>
+            <div id="item-target-picker-body" class="monster-picker-grid"></div>
             <button class="btn btn-sm" style="margin-top:14px; width:100%;" data-i18n="btn_close" onclick="closeItemTargetPicker()">とじる</button>
         </div>
     </div>
@@ -1320,6 +1344,7 @@ const UI_TEXT = {
     skill_reward_title: { ja: '🎁 魔王スキルを1つ習得', ja_easy: '🎁 まおうスキルを 1つ おぼえる', en: '🎁 Learn a Demon Lord Skill' },
     skill_reward_new_label: { ja: 'NEW', ja_easy: 'NEW', en: 'NEW' },
     evolve_stone_name: { ja: name => `${name}の石`, ja_easy: name => `${name}の いし`, en: name => `${name} Stone` },
+    evolution_result_title: { ja: name => `✨ ${name}に進化した！`, ja_easy: name => `✨ ${name}に しんかした！`, en: name => `✨ Evolved into ${name}!` },
     evolve_stone_effect_label: { ja: '進化に使う石', ja_easy: 'しんかに つかう いし', en: 'Evolution stone' },
     label_summoned_monster: { ja: '召喚で仲間になった', ja_easy: 'しょうかんで なかまに なった', en: 'Summoned as an ally' },
     evolve_section_title: { ja: '進化', ja_easy: 'しんか', en: 'Evolution' },
@@ -2324,6 +2349,9 @@ function onGridClick(e){
     if (mode==='idle'){
         if (occupied[cell.r][cell.c]) return;
         if (selectedRoomId!==null){ deselectRoom(); return; }
+        // モンスター・魔王を移動先待ちの状態で空きマスをクリックしたら、部屋の新規作成を始めるのではなく
+        // 移動選択そのものをキャンセルする（選択中に建設モードへ入り込めてしまう不具合を防ぐ）
+        if (selectedMonsterId!==null || demonLordMoveSelected){ cancelMoveSelection(); return; }
         beginRoomPlacement();
         anchorCell = cell;
         updateStatus(ui('status_pick_corner2'));
@@ -2616,14 +2644,18 @@ function roomAbilityLv(room, abilityType, effectiveType){
     const stored = room.abilityLv[abilityType];
     return stored!==undefined ? Math.max(stored, baseline) : baseline;
 }
+// 活力・魔力の能力Lvは最大5（他の能力は引き続き最大10）
+const VITALITY_MANA_MAX_LV = 5;
 function roomAbilityMaxLv(room, abilityType, effectiveType){
     const et = effectiveType!==undefined ? effectiveType : room.type;
     if (!roomAbilityUnlocked(room, abilityType)) return 0;
-    if (et===abilityType) return 10;
+    const isVitMana = (abilityType==='vitality' || abilityType==='mana');
+    const ownMax = isVitMana ? VITALITY_MANA_MAX_LV : 10;
+    if (et===abilityType) return ownMax;
     // 通路連結による能力上昇の恩恵は活力・魔力の生産のみが対象（召喚・攻撃・道具は自室のみで完結する）
-    if (abilityType!=='vitality' && abilityType!=='mana') return 0;
+    if (!isVitMana) return 0;
     const counts = connectedRoomTypeCounts(room.id);
-    return Math.min(10, counts[abilityType]||0);
+    return Math.min(ownMax, counts[abilityType]||0);
 }
 // 能力Lvによる倍率（表示にも各種計算にも使う共通関数）
 // 活力・魔力：素の数はすでに基礎生産（素の数×20）側に入っているので、倍率は単純に(1+Lv)
@@ -2650,7 +2682,8 @@ function monsterSummonStage2Chance(room, lvOverride){
 }
 function roomAbilityMultiplier(room, abilityType, effectiveType){
     const lv = roomAbilityLv(room, abilityType, effectiveType);
-    if (abilityType==='vitality' || abilityType==='mana') return 1 + lv;
+    // 活力・魔力はLvごとに2倍・4倍・8倍・16倍・32倍と伸びが大きくなるようにする（以前の1+Lvだと伸び幅が小さすぎた）
+    if (abilityType==='vitality' || abilityType==='mana') return Math.pow(2, lv);
     if (abilityType==='attack'){ const count = room.elements.attack||0; return 1 + ABILITY_MULT_COEF.attack*count*lv; }
     return 1; // 召喚・道具は倍率ではなく確率で表現するため、ここでは意味を持たない
 }
@@ -2670,7 +2703,7 @@ function abilityRowMeta(abilityType){
 // ここでは呼ばれない（isChanceTypeとしてrequestUpgradeRoomAbility側で分岐済み）
 function abilityEffectAtLv(room, abilityType, lv){
     const count = room.elements[abilityType] || 0;
-    if (abilityType==='vitality' || abilityType==='mana') return Math.round(count * BASE_PRODUCTION_PER_ELEMENT * (1 + lv));
+    if (abilityType==='vitality' || abilityType==='mana') return Math.round(count * BASE_PRODUCTION_PER_ELEMENT * Math.pow(2, lv));
     if (abilityType==='attack') return 1 + ABILITY_MULT_COEF.attack*count*lv;
     return 1;
 }
@@ -2759,11 +2792,11 @@ function costSpanHtml(vit, mana, insufficient){
     return parts.join(' ／ ');
 }
 // 活力・召喚能力のアップは魔力を、魔力・掘削能力のアップは活力を消費する。
-// 召喚・道具も活力・魔力と同じ数の効果（召喚数・道具数＝能力Lvそのもの）を持つようになったため、コストも同じ式にする
-// 等差数列：200+50×(目標Lv-1)＝Lv0→1が200・Lv1→2が250・Lv2→3が300・Lv3→4が350…
+// 活力・魔力はLv5までの固定コスト表（2倍ずつ増える倍率の伸びに合わせて、コストも段階ごとに倍増させる）
+const VITALITY_MANA_UPGRADE_COST = [null, 200, 400, 800, 1600, 3200]; // 添字＝目標Lv(1〜5)
 function abilityUpgradeCost(abilityType, targetLv){
-    const base = 200, step = 50;
-    const amount = base + step*(targetLv-1);
+    const isVitMana = (abilityType==='vitality' || abilityType==='mana');
+    const amount = isVitMana ? VITALITY_MANA_UPGRADE_COST[targetLv] : (200 + 50*(targetLv-1));
     if (abilityType==='vitality' || abilityType==='summon') return { vit:0, mana:amount };
     return { vit:amount, mana:0 };
 }
@@ -3075,6 +3108,21 @@ function combatRank(m){
     const score = powerScore(m);
     const refB = referencePowerScoreAtLevel(RANK_REFERENCE_LEVEL_B);
     let idx = Math.round(Math.log(score/refB) / Math.log(RANK_STEP_RATIO)) + RANK_B_INDEX;
+    idx = Math.max(0, Math.min(RANK_LEVELS.length-1, idx));
+    return RANK_LEVELS[idx];
+}
+// ステータス単体（攻撃力・防御力・魔法攻撃力・魔法防御力）のG〜SSランク。★（個体差71〜150%表示）の代わりに使う。
+// Lvによる伸び率はどのステータスも共通(1+0.25×Lv)なので、総合戦闘力ランクと同じRANK_STEP_RATIO/RANK_B_INDEXがそのまま使える。
+// 基準値だけ、そのステータス1つの種族平均値に差し替える
+const AVG_SPECIES_STAT = {};
+['atk','def','magAtk','magDef'].forEach(k => {
+    AVG_SPECIES_STAT[k] = MONSTER_SPECIES.reduce((sum,sp) => sum + sp[k], 0) / MONSTER_SPECIES.length;
+});
+function referenceStatAtLevel(statKey, lv){ return AVG_SPECIES_STAT[statKey] * (1 + 0.25*lv); }
+function statRank(m, statKey){
+    const value = effectiveStatValue(m, statKey);
+    const refB = referenceStatAtLevel(statKey, RANK_REFERENCE_LEVEL_B);
+    let idx = Math.round(Math.log(value/refB) / Math.log(RANK_STEP_RATIO)) + RANK_B_INDEX;
     idx = Math.max(0, Math.min(RANK_LEVELS.length-1, idx));
     return RANK_LEVELS[idx];
 }
@@ -3390,14 +3438,6 @@ const STAT_MOD_MIN = 0.71, STAT_MOD_MAX = 1.50;
 function rollStatMods(min = STAT_MOD_MIN, max = STAT_MOD_MAX){
     const roll = () => min + Math.random()*(max-min);
     return { hp: roll(), atk: roll(), def: roll(), magAtk: roll(), magDef: roll() };
-}
-// 倍率を★の数（1〜5）に変換する。71-75%=★1／76-85%=★2／86-110%=★3／111-130%=★4／131-150%=★5
-function statModStars(mod){
-    if (mod <= 0.75) return 1;
-    if (mod <= 0.85) return 2;
-    if (mod <= 1.10) return 3;
-    if (mod <= 1.30) return 4;
-    return 5;
 }
 // 種族の基本値×個体倍率を実際のステータスとして反映する（孵化時・進化時に呼ぶ）
 // 実際のステータス＝（種族の基本値）×（個体差倍率）×（1＋0.25×Lv）。m.levelは呼び出し前に最新の値にしておくこと
@@ -3729,31 +3769,26 @@ function closeMonsterDetailModal(){
     document.getElementById('monster-detail-modal').classList.add('hidden');
     monsterDetailModalId = null;
 }
-function starHtml(n){
-    return `<span class="star-rating">${'★'.repeat(Math.max(0,n))}</span>`;
-}
-function monsterDetailStatRowHtml(labelKey, value, mod){
+// ステータス1つ分のカード：ラベル→G〜SSランク（大きく）→実数値（小さく、装備込みなら「装備込み（素）」）の順
+function monsterDetailStatRowHtml(labelKey, m, statKey){
+    const rank = statRank(m, statKey);
     return `<div class="monster-stat-card">
         <span class="monster-stat-card-label">${ui(labelKey)}</span>
-        <span class="monster-stat-card-value">${value}</span>
-        ${starHtml(statModStars(mod))}
+        <span class="rank-badge stat-rank-badge rank-${rank}">${rank}</span>
+        <span class="monster-stat-card-value">${statDisplayWithEquip(m, statKey)}</span>
     </div>`;
 }
-function renderMonsterDetailModal(){
-    const m = monsters.find(x=>x.id===monsterDetailModalId);
-    if (!m){ closeMonsterDetailModal(); return; }
+// 絵柄・名前・Lv・総合ランク・HP・4ステータスの「見た目のまとめ」部分。モンスター詳細ポップアップと進化結果ポップアップで共用する
+function monsterDetailCoreHtml(m){
     const sp = speciesInfo(m.speciesKey);
-    const mods = m.statMods || { hp:1, atk:1, def:1, magAtk:1, magDef:1 };
     const imgFile = SPECIES_IMAGE_MAP[m.speciesKey];
     const artHtml = imgFile
         ? `<div class="monster-detail-sprite" style="background-image:url('images/mamono/${imgFile}');"></div>`
         : `<div class="monster-detail-emoji">${sp.emoji}</div>`;
     const downed = m.hp <= 0;
     const statusMark = (m.statusEffects||[]).map(statusEmojiWithStack).join(' ');
-    const evolveSection = monsterEvolveSectionHtml(m, sp);
-    const eq = m.equippedItem ? itemInfo(m.equippedItem.itemKey) : null;
     const hpPct = m.maxHp>0 ? Math.max(0, Math.min(100, m.hp/m.maxHp*100)) : 0;
-    document.getElementById('monster-detail-body').innerHTML = `
+    return `
         <div class="monster-detail-art">${artHtml}</div>
         <div class="monster-detail-title">
             <span style="color:${monsterNameColor(sp)};">${escapeHtml(monsterDisplayName(m))}</span>
@@ -3767,11 +3802,19 @@ function renderMonsterDetailModal(){
             <b>${m.hp}/${m.maxHp}</b>
         </div>
         <div class="monster-stat-grid">
-            ${monsterDetailStatRowHtml('monster_stat_atk', statDisplayWithEquip(m,'atk'), mods.atk)}
-            ${monsterDetailStatRowHtml('monster_stat_def', statDisplayWithEquip(m,'def'), mods.def)}
-            ${monsterDetailStatRowHtml('monster_stat_magatk', statDisplayWithEquip(m,'magAtk'), mods.magAtk)}
-            ${monsterDetailStatRowHtml('monster_stat_magdef', statDisplayWithEquip(m,'magDef'), mods.magDef)}
-        </div>
+            ${monsterDetailStatRowHtml('monster_stat_atk', m, 'atk')}
+            ${monsterDetailStatRowHtml('monster_stat_def', m, 'def')}
+            ${monsterDetailStatRowHtml('monster_stat_magatk', m, 'magAtk')}
+            ${monsterDetailStatRowHtml('monster_stat_magdef', m, 'magDef')}
+        </div>`;
+}
+function renderMonsterDetailModal(){
+    const m = monsters.find(x=>x.id===monsterDetailModalId);
+    if (!m){ closeMonsterDetailModal(); return; }
+    const sp = speciesInfo(m.speciesKey);
+    const evolveSection = monsterEvolveSectionHtml(m, sp);
+    const eq = m.equippedItem ? itemInfo(m.equippedItem.itemKey) : null;
+    document.getElementById('monster-detail-body').innerHTML = monsterDetailCoreHtml(m) + `
         ${evolveSection}
         <div class="room-detail-row" style="cursor:pointer; margin-top:8px;" onclick="openEquipModal(${m.id});">
             <span>${ui('equip_label')}</span>
@@ -4096,13 +4139,18 @@ function equipmentStatBonusPct(unit, statKey){
     if (!it || !(statKey in it.stats)) return 0;
     return (it.stats[statKey] / 100) * itemRoleBonusMultiplier(it.shape, unit.speciesKey);
 }
+// 装備込みの実際の数値（装備の影響がなければ素の値のまま）。ランク表示・数値表示の両方でこれを基準にする
+function effectiveStatValue(m, statKey){
+    const base = m[statKey];
+    const bonusPct = equipmentStatBonusPct(m, statKey);
+    return bonusPct ? Math.round(base * (1 + bonusPct)) : base;
+}
 // 装備込みの数値を表示する。装備の影響を受けているステータスだけ「装備込み（素の値）」の形にし、影響がなければ素の値だけ表示する
 function statDisplayWithEquip(m, statKey){
     const base = m[statKey];
     const bonusPct = equipmentStatBonusPct(m, statKey);
     if (!bonusPct) return String(base);
-    const equipped = Math.round(base * (1 + bonusPct));
-    return `${equipped}（${base}）`;
+    return `${effectiveStatValue(m, statKey)}（${base}）`;
 }
 
 // ============================================================
@@ -4139,9 +4187,19 @@ function evolveMonsterWithStone(monsterId, stoneKey){
     stoneInventory[stoneKey]--;
     if (stoneInventory[stoneKey]<=0) delete stoneInventory[stoneKey];
     applyEvolution(m, next);
-    renderMonsterDetailModal();
     renderRoomDetail();
     renderAll();
+    openEvolutionResultModal(m);
+}
+// 進化の石を使った直後に、進化後の姿とステータスをまとめて見せる結果ポップアップ
+function openEvolutionResultModal(m){
+    const sp = speciesInfo(m.speciesKey);
+    document.getElementById('evolution-result-title').textContent = uif('evolution_result_title', sp.name_ja);
+    document.getElementById('evolution-result-body').innerHTML = monsterDetailCoreHtml(m);
+    document.getElementById('evolution-result-modal').classList.remove('hidden');
+}
+function closeEvolutionResultModal(){
+    document.getElementById('evolution-result-modal').classList.add('hidden');
 }
 function monstersEligibleForStone(stoneKey){
     const targetKey = stoneTargetSpeciesKey(stoneKey);
@@ -4206,13 +4264,32 @@ function pickEquipFromInventory(itemKey){
     if (!invItem) return;
     openItemTargetPicker('equip', invItem.id, monsters);
 }
-// モンスターが複数いて絞れないとき（または装備は常に）、対象を選ばせる小さなピッカーを開く
+// 装備した場合に実際に増える数値の合計（%表示のステータス上昇を、そのモンスターの現在値に対する実数へ換算する）
+function equipGainAmount(m, itemKey){
+    const it = itemInfo(itemKey);
+    if (!it) return 0;
+    return Object.keys(it.stats).reduce((sum, statKey) => {
+        const pct = (it.stats[statKey] / 100) * itemRoleBonusMultiplier(it.shape, m.speciesKey);
+        return sum + (m[statKey]||0) * pct;
+    }, 0);
+}
+// モンスターが複数いて絞れないとき（または装備は常に）、対象を選ばせるピッカーを開く。
+// 装備選びのときは、そのアイテムを装備すると数値が最も伸びるモンスターの順に並べる
 function openItemTargetPicker(kind, keyOrId, candidateMonsters){
     if (candidateMonsters.length===0){ showToast(ui('err_no_eligible_monster')); return; }
     pendingItemAction = { kind, keyOrId };
-    document.getElementById('item-target-picker-body').innerHTML = candidateMonsters.map(m => {
+    let list = candidateMonsters;
+    if (kind==='equip'){
+        const invItem = inventory.find(i=>i.id===keyOrId);
+        if (invItem) list = list.slice().sort((a,b) => equipGainAmount(b, invItem.itemKey) - equipGainAmount(a, invItem.itemKey));
+    }
+    document.getElementById('item-target-picker-body').innerHTML = list.map(m => {
         const sp = speciesInfo(m.speciesKey);
-        return `<button class="sort-btn" style="width:100%; text-align:left;" onclick="confirmItemTargetPick(${m.id})">${monsterIconHtml(sp)} <span style="color:${monsterNameColor(sp)};">${escapeHtml(monsterDisplayName(m))}</span> Lv.${m.level||0} ${rankBadgeHtml(m)}</button>`;
+        return `<button class="monster-picker-btn" onclick="confirmItemTargetPick(${m.id})">
+            ${monsterIconHtml(sp, 40)}
+            <span class="monster-picker-name" style="color:${monsterNameColor(sp)};">${escapeHtml(monsterDisplayName(m))}</span>
+            <span class="monster-picker-meta">Lv.${m.level||0} ${rankBadgeHtml(m)}</span>
+        </button>`;
     }).join('');
     document.getElementById('item-target-picker-modal').classList.remove('hidden');
 }
@@ -6214,6 +6291,8 @@ function renderRoomDetail(){
         html += `</div>`;
 
         // ---- 部屋の能力（スキル）：活力/魔力/攻撃はLvアップで倍率が、召喚/道具はLvアップでレア枠の確率が上がる ----
+        // 何の能力か一目で分かるよう、素の色（活力=黄／魔力=青／召喚=紫／道具=赤）でラベルを色分けし、文字も大きめにする
+        const ABILITY_LABEL_COLOR = { vitality:'var(--el-vitality)', mana:'var(--el-mana)', summon:'var(--el-summon)', tool:'var(--el-tool)' };
         function abilityRowHtml(abilityType){
             const curLv = roomAbilityLv(rm, abilityType);
             const maxLv = roomAbilityMaxLv(rm, abilityType);
@@ -6224,7 +6303,8 @@ function renderRoomDetail(){
             const valueText = isChanceType ? '' : roomAbilityMultiplier(rm, abilityType).toFixed(1) + ui('label_times_suffix');
             let row = `<div class="room-detail-row">
                 <span class="gem-chip-sq ${meta.gem}"></span>
-                <span>${meta.label}${isChanceType?'':'アップ'} <b style="color:var(--teal);">Lv.${curLv}</b></span>
+                <span style="color:${ABILITY_LABEL_COLOR[abilityType]}; font-weight:800; font-size:0.86rem;">${meta.label}${isChanceType?'':'アップ'}</span>
+                <b style="color:var(--teal);">Lv.${curLv}</b>
                 ${valueText ? `<b style="margin-left:auto; color:var(--gold);">${valueText}</b>` : ''}
             </div>`;
             if (curLv < maxLv){
@@ -6277,10 +6357,9 @@ function renderRoomDetail(){
         <span>${ui('monster_list_title')}</span><span${capacityFull?' style="color:var(--danger); font-weight:800;"':''}>(${roomMonsters.length}/${rm.monsterCapacity})</span>
     </div>`;
     if (roomMonsters.length>0){
-        html += `<div class="sort-btn-row tight">` + SORT_KEYS.map(k =>
-            `<button class="sort-btn${monsterSortKey===k?' active':''}" onclick="setMonsterSortKey('${k}')">${ui('sort_'+k)}</button>`
-        ).join('') + `</div>`;
-        html += sortMonsters(roomMonsters).map(m => monsterCardHtml(m, { clickable:true, highlight: m.id===highlightedMonsterId })).join('');
+        // 部屋の中の一覧はソートボタンを置かず、常に総合戦闘力が高い順で表示する
+        const sorted = roomMonsters.slice().sort((a,b) => powerScore(b) - powerScore(a));
+        html += sorted.map(m => monsterCardHtml(m, { clickable:true, highlight: m.id===highlightedMonsterId })).join('');
     }
     body.innerHTML = html;
 }
@@ -6380,6 +6459,7 @@ document.addEventListener('keydown', (ev) => {
     if (isOpen('item-inventory-modal')){ ev.preventDefault(); closeItemInventoryModal(); return; }
     if (isOpen('monster-list-modal')){ ev.preventDefault(); closeMonsterListModal(); return; }
     if (isOpen('monster-detail-modal')){ ev.preventDefault(); closeMonsterDetailModal(); return; }
+    if (isOpen('evolution-result-modal')){ ev.preventDefault(); closeEvolutionResultModal(); return; }
     if (isOpen('skill-select-modal')){ ev.preventDefault(); closeDemonLordSkillMenu(); return; }
     if (isOpen('stage-income-modal')){ ev.preventDefault(); closeStageIncomeModal(); return; }
     if (isOpen('stage-itemdrop-modal')){ ev.preventDefault(); closeStageItemDropModal(); return; }
