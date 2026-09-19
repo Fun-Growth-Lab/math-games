@@ -1476,6 +1476,14 @@ const UI_TEXT = {
     role_ranged: { ja: '中距離', ja_easy: 'ちゅうきょり', en: 'Mid-range' },
     role_magic: { ja: '長距離', ja_easy: 'ちょうきょり', en: 'Long-range' },
     room_special_hpregen: { ja: 'HP自動回復', ja_easy: 'HPじどうかいふく', en: 'HP Auto-Heal' },
+    // 部屋の特殊能力欄は横幅に余裕があるため、他の場所で使う省略表記（攻／防など）ではなく正式名称で表示する
+    room_special_label_atk: { ja: '攻撃力', ja_easy: 'こうげきりょく', en: 'Attack' },
+    room_special_label_def: { ja: '防御力', ja_easy: 'ぼうぎょりょく', en: 'Defense' },
+    room_special_label_magatk: { ja: '魔法攻撃力', ja_easy: 'まほうこうげきりょく', en: 'Magic Attack' },
+    room_special_label_magdef: { ja: '魔法防御力', ja_easy: 'まほうぼうぎょりょく', en: 'Magic Defense' },
+    room_special_label_melee: { ja: '近距離攻撃', ja_easy: 'きんきょり こうげき', en: 'Melee Attack' },
+    room_special_label_ranged: { ja: '中距離攻撃', ja_easy: 'ちゅうきょり こうげき', en: 'Mid-range Attack' },
+    room_special_label_magic: { ja: '長距離攻撃', ja_easy: 'ちょうきょり こうげき', en: 'Long-range Attack' },
     room_level_label: { ja: 'Lv', ja_easy: 'Lv', en: 'Lv' },
     sort_type: { ja: 'タイプ', ja_easy: 'タイプ', en: 'Type' },
     sort_atk: { ja: '攻撃力', ja_easy: 'こうげきりょく', en: 'ATK' },
@@ -2760,8 +2768,8 @@ const ROOM_SPECIAL_ABILITY_TYPES = ['atk','def','magAtk','magDef','hpRegen','mel
 // スロットが解放されるLv→そのスロットの効果量。Lv1で+10%、Lv3で+20%、Lv5で+30%
 const ROOM_SPECIAL_ABILITY_SLOTS = { 1:0.10, 3:0.20, 5:0.30 };
 function roomSpecialAbilityLabel(type){
-    return { atk:ui('monster_stat_atk'), def:ui('monster_stat_def'), magAtk:ui('monster_stat_magatk'), magDef:ui('monster_stat_magdef'),
-        hpRegen:ui('room_special_hpregen'), melee:ui('role_melee'), ranged:ui('role_ranged'), magic:ui('role_magic') }[type];
+    return { atk:ui('room_special_label_atk'), def:ui('room_special_label_def'), magAtk:ui('room_special_label_magatk'), magDef:ui('room_special_label_magdef'),
+        hpRegen:ui('room_special_hpregen'), melee:ui('room_special_label_melee'), ranged:ui('room_special_label_ranged'), magic:ui('room_special_label_magic') }[type];
 }
 // 部屋のレベル（＝自分のタイプの能力Lv）がスロット解放ラインに達していれば、未確定のスロットをランダムに1つ確定させる。
 // 既に確定済みのスロットは再抽選しない（一度決まった特殊能力はそのまま維持される）
@@ -4795,16 +4803,23 @@ const HERO_BASELINE_COUNT = 4;
 function heroOffenseMult(stageNum){ return HERO_BASE_OFFENSE_MULT * (HERO_BASELINE_COUNT / heroCountForStage(stageNum)); }
 // tierStartはステージ1の勇者の強さをそのまま決める（侵攻1では線形補間の比率t=0でtierStartがそのまま使われるため）。
 // ステージ1が少し強すぎるとのフィードバックを受け、各能力を1ランクずつ下げた（下限1）。tierEnd（最終侵攻7の強さ）は変更していない。
+// 【攻撃役3職（剣士・アーチャー・メイジ）の攻撃値の決め方】
+// 間合い補正（RANGE_ATK_MULT：近125%／中100%／長75%）は攻撃力そのものに掛かるので、
+// 3職の「攻撃として参照するステータスの素の値」を同じ値Rにそろえれば、最終的な攻撃力の比が 近:中:長＝125:100:75 になる。
+// 物理は攻撃力(1ランク=4)、魔法は魔法攻撃力(1ランク=3)なので、同じRでもランク値は R/4 と R/3 で異なる。
+// R＝ステージ1で16、ステージ7で30（魔法攻撃力のランク上限10×3＝30が上限。これ以上だと上限に丸められて比率が崩れる）。
+// プリーストは回復・支援役のため攻撃値は据え置き（この3職の比率の対象外）。
+const HERO_ATK_RAW_START = 16, HERO_ATK_RAW_END = 30;
 const HERO_CLASSES = [
     { key:'swordsman', name_ja:'剣士',     emoji:'⚔️', role:'melee',  dmgType:'physical',
-        tierStart:[5,4,3,1,1], tierEnd:[9,9,7,1,4],
+        tierStart:[5,HERO_ATK_RAW_START/4,3,1,1], tierEnd:[9,HERO_ATK_RAW_END/4,7,1,4],
         passive:[{ type:'physicalResist', value:0.15 }],
         active:[{ type:'buff', category:'atkUp', value:0.2, scope:'self' }] },
     { key:'archer',     name_ja:'アーチャー', emoji:'🏹', role:'ranged', dmgType:'physical',
-        tierStart:[4,5,2,1,1], tierEnd:[7,10,5,1,3],
+        tierStart:[4,HERO_ATK_RAW_START/4,2,1,1], tierEnd:[7,HERO_ATK_RAW_END/4,5,1,3],
         passive:[{ type:'extraAttack', chance:0.30 }] },
     { key:'mage',       name_ja:'メイジ',   emoji:'🔮', role:'magic',  dmgType:'magic',
-        tierStart:[3,1,1,5,2], tierEnd:[6,1,4,10,5],
+        tierStart:[3,1,1,HERO_ATK_RAW_START/3,2], tierEnd:[6,1,4,HERO_ATK_RAW_END/3,5],
         passive:[{ type:'magicAmplify', value:0.2 }],
         active:[{ type:'bigAttack', multiplier:2 }] },
     { key:'priest',     name_ja:'プリースト', emoji:'✨', role:'melee',  dmgType:'physical',
@@ -4814,9 +4829,14 @@ const HERO_CLASSES = [
 ];
 function heroClassInfo(key){ return HERO_CLASSES.find(c=>c.key===key); }
 // 侵攻(ステージ)番号に応じてtierStart～tierEndを線形補間する（侵攻1〜7、7段階で補間）
+// 攻撃として参照するステータス（物理=攻撃力[1]／魔法=魔法攻撃力[3]）だけは、間合い補正の比率を正確に保つため整数に丸めず小数のまま補間する
 function lerpHeroTier(cls, stageNum){
     const t = Math.max(0, Math.min(1, (stageNum-1) / (STAGE_FINAL-1)));
-    return cls.tierStart.map((s,i) => Math.max(1, Math.min(10, Math.round(s + (cls.tierEnd[i]-s)*t))));
+    const atkIndex = cls.dmgType==='magic' ? 3 : 1;
+    return cls.tierStart.map((s,i) => {
+        const v = s + (cls.tierEnd[i]-s)*t;
+        return Math.max(1, Math.min(10, i===atkIndex && cls.key!=='priest' ? v : Math.round(v)));
+    });
 }
 // ゲームプリセット：4人の勇者クラスの組み合わせ。複数パターン用意していく想定で配列にしてある
 const GAME_PRESETS = [
