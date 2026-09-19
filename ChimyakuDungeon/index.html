@@ -292,6 +292,8 @@
         .egg-icon.focus { transform: scale(1.28); }
         .skill-name-row { display:flex; align-items:baseline; gap:6px; }
         .skill-name-big { font-size:1.25rem; font-weight:800; color:var(--gold); text-shadow:0 1px 3px rgba(0,0,0,0.5); }
+        .loot-section-title { font-size:0.95rem; font-weight:800; color:var(--gold); margin:10px 0 2px; padding-bottom:3px; border-bottom:2px solid var(--card-bdr); }
+        .loot-section-title:first-child { margin-top:0; }
         .item-drop-row { display:flex; align-items:center; gap:8px; padding:8px 4px; border-bottom:1px solid rgba(255,255,255,0.08); }
         .item-drop-row:last-child { border-bottom:none; }
         .item-drop-icon { font-size:1.6rem; flex-shrink:0; display:flex; align-items:center; }
@@ -1343,7 +1345,10 @@ const UI_TEXT = {
     stat_attack: { ja: '攻撃の素', ja_easy: 'こうげきの もと', en: 'Attack Essence' },
 
     hatch_result_msg: { ja: n => `${n}体のモンスターが生まれました！`, ja_easy: n => `${n}たいの モンスターが うまれたよ！`, en: n => `${n} monster(s) were born!` },
-    loot_found_title: { ja: '🎁 アイテムを発見！', ja_easy: '🎁 アイテムを みつけたよ！', en: '🎁 Item Found!' },
+    loot_found_title: { ja: '🎁 戦利品', ja_easy: '🎁 せんりひん', en: '🎁 Spoils' },
+    loot_section_stone: { ja: '獲得したアイテム', ja_easy: 'てに いれた アイテム', en: 'Items Obtained' },
+    loot_section_monster: { ja: '召喚された魔物', ja_easy: 'しょうかん された まもの', en: 'Summoned Monsters' },
+    loot_section_equip: { ja: '発見した道具', ja_easy: 'みつけた どうぐ', en: 'Tools Found' },
     equip_label: { ja: '装備', ja_easy: 'そうび', en: 'Equipment' },
     equip_current_label: { ja: '現在の装備', ja_easy: 'いまの そうび', en: 'Currently Equipped' },
     equip_none_label: { ja: 'なし', ja_easy: 'なし', en: 'None' },
@@ -6224,36 +6229,47 @@ function closeStageIncomeModal(){
     if (battleStageItemDrops.length>0){ openStageItemDropModal(); }
     else { openDamageBreakdownModal(); }
 }
+// 戦利品は「獲得したアイテム（進化の石）」「召喚された魔物」「発見した道具（装備）」の3つの見出しに分けて一度に表示する（該当がない見出しは出さない）
 function openStageItemDropModal(){
     const counts = {};
     battleStageItemDrops.forEach(drop => { const k = drop.kind+':'+drop.key; counts[k] = (counts[k]||0) + 1; });
-    document.getElementById('stage-itemdrop-body').innerHTML = Object.keys(counts).map(combinedKey => {
+    const rowsByKind = { stone:[], monster:[], equip:[] };
+    Object.keys(counts).forEach(combinedKey => {
         const [kind, key] = combinedKey.split(':');
         const n = counts[combinedKey];
+        const countHtml = n>1 ? `<b class="item-drop-count">×${n}</b>` : '';
         if (kind==='stone'){
-            return `<div class="item-drop-row">
+            rowsByKind.stone.push(`<div class="item-drop-row">
                 <span class="item-drop-icon">${stoneEmoji(key)}</span>
                 <span class="item-drop-name">${escapeHtml(stoneName(key))}</span>
-                ${n>1?`<b class="item-drop-count">×${n}</b>`:''}
-            </div>`;
-        }
-        if (kind==='monster'){
+                ${countHtml}
+            </div>`);
+        } else if (kind==='monster'){
             const sp = speciesInfo(key);
-            return `<div class="item-drop-row">
+            rowsByKind.monster.push(`<div class="item-drop-row">
                 <span class="item-drop-icon">${monsterIconHtml(sp, 28)}</span>
                 <span class="item-drop-name">${escapeHtml(sp.name_ja)}</span>
-                <span class="item-drop-effect">${ui('label_summoned_monster')}</span>
-                ${n>1?`<b class="item-drop-count">×${n}</b>`:''}
-            </div>`;
+                ${countHtml}
+            </div>`);
+        } else {
+            const it = itemInfo(key);
+            rowsByKind.equip.push(`<div class="item-drop-row">
+                <span class="item-drop-icon">${itemImageHtml(it)}</span>
+                <span class="item-drop-name">${escapeHtml(it.name_ja)}</span>
+                <span class="item-drop-effect">${itemBonusLabel(it)}</span>
+                ${countHtml}
+            </div>`);
         }
-        const it = itemInfo(key);
-        return `<div class="item-drop-row">
-            <span class="item-drop-icon">${itemImageHtml(it)}</span>
-            <span class="item-drop-name">${escapeHtml(it.name_ja)}</span>
-            <span class="item-drop-effect">${itemBonusLabel(it)}</span>
-            ${n>1?`<b class="item-drop-count">×${n}</b>`:''}
-        </div>`;
-    }).join('');
+    });
+    const sections = [
+        { kind:'stone',   titleKey:'loot_section_stone' },
+        { kind:'monster', titleKey:'loot_section_monster' },
+        { kind:'equip',   titleKey:'loot_section_equip' },
+    ];
+    document.getElementById('stage-itemdrop-body').innerHTML = sections
+        .filter(sec => rowsByKind[sec.kind].length>0)
+        .map(sec => `<div class="loot-section-title">${ui(sec.titleKey)}</div>${rowsByKind[sec.kind].join('')}`)
+        .join('');
     document.getElementById('stage-itemdrop-modal').classList.remove('hidden');
 }
 function closeStageItemDropModal(){
