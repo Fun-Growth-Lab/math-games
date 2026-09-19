@@ -550,8 +550,10 @@
         }
         .monster-detail-row.selected { border-color: var(--teal); background: rgba(95,201,232,0.12); }
         .monster-detail-row.compact { padding: 5px 10px; margin-bottom: 4px; }
-        .monster-compact-line { display:flex; align-items:center; flex-wrap:wrap; gap:6px; }
-        .monster-compact-hp { margin-left:auto; color: var(--ink-dim); white-space:nowrap; }
+        /* HPだけ2段目に落ちて縦幅が増えないよう、1行に収まるようnowrap＋名前を省略可能にする */
+        .monster-compact-line { display:flex; align-items:center; flex-wrap:nowrap; gap:4px; }
+        .monster-compact-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; flex:0 1 auto; }
+        .monster-compact-hp { margin-left:auto; color: var(--ink-dim); white-space:nowrap; flex:0 0 auto; }
         /* 魔物一覧の詳細1行表示（Lv・総合能力の★・HP・装備まで1体1行に収める） */
         .monster-detail-row.detailed { padding: 7px 12px; margin-bottom: 5px; text-align:left; }
         .monster-list-row { display:flex; align-items:center; gap:6px; flex-wrap:nowrap; overflow-x:auto; }
@@ -622,6 +624,8 @@
             display:grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap:8px;
             max-height:52vh; overflow-y:auto; padding:2px; margin-bottom:6px;
         }
+        /* 迎撃前の勇者プレビューは、少人数のときに左詰めにならないよう列全体を中央寄せする */
+        #battle-confirm-hero-grid { justify-content:center; }
         .monster-picker-btn {
             display:flex; flex-direction:column; align-items:center; gap:4px; text-align:center;
             background: #1c140e; border: 2px solid var(--card-bdr); border-radius: 14px;
@@ -1451,7 +1455,6 @@ const UI_TEXT = {
     role_ranged: { ja: '中距離', ja_easy: 'ちゅうきょり', en: 'Mid-range' },
     role_magic: { ja: '長距離', ja_easy: 'ちょうきょり', en: 'Long-range' },
     room_special_hpregen: { ja: 'HP自動回復', ja_easy: 'HPじどうかいふく', en: 'HP Auto-Heal' },
-    room_special_title: { ja: '部屋の特殊能力', ja_easy: 'へやの とくしゅのうりょく', en: 'Room Special Abilities' },
     room_level_label: { ja: 'Lv', ja_easy: 'Lv', en: 'Lv' },
     sort_type: { ja: 'タイプ', ja_easy: 'タイプ', en: 'Type' },
     sort_atk: { ja: '攻撃力', ja_easy: 'こうげきりょく', en: 'ATK' },
@@ -1963,7 +1966,7 @@ function rerollMap(){
 const ROOM_MIN = 2; // 部屋の1辺の最小マス数。上限は撤廃
 const ROOM_COST_PER_CELL = 8;      // 暫定値。生産・戦闘システム実装後にバランス再調整予定
 const CORRIDOR_COST_PER_CELL = 5;  // 暫定値
-const STARTING_VITALITY = 1000;
+const STARTING_VITALITY = 500;
 const STARTING_MANA = 500;
 const EGG_EXPECTED_BASE = 1, EGG_EXPECTED_PER_CELL = 0.1; // 卵の期待値 = 1 + 0.1×部屋の面積
 
@@ -3141,6 +3144,8 @@ const EGG_STAGE1_SPECIES = MONSTER_SPECIES.filter(s=>s.stage===1 && EGG_LINES.in
 const SUMMON_STAGE1_SPECIES = MONSTER_SPECIES.filter(s=>s.stage===1 && SUMMON_LINES.includes(s.line));
 const SUMMON_STAGE2_SPECIES = MONSTER_SPECIES.filter(s=>s.stage===2 && SUMMON_LINES.includes(s.line));
 function roleLabel(role){ return ui('role_'+role); }
+// 部屋詳細の1行表示など、幅が厳しい場所向けの1文字省略ラベル（近距離→近／中距離→中／長距離→長）
+function roleShortLabel(role){ return { melee:'近', ranged:'中', magic:'長' }[role] || ''; }
 function roleTextClass(role){ return 'role-text-'+role; }
 const ROLE_SORT_INDEX = { melee:0, ranged:1, magic:2 };
 
@@ -3754,8 +3759,9 @@ function monsterCardHtml(m, opts){
     }
     return `<div class="monster-detail-row compact${selected?' selected':''}"${clickAttr} style="${opts.clickable?'cursor:pointer;':''}">
         <div class="monster-compact-line">
-            <span>${monsterIconHtml(sp)} <span style="color:${monsterNameColor(sp)}; font-weight:700;">${escapeHtml(monsterDisplayName(m))}</span></span>
-            <span class="${roleTextClass(sp.role)}">（${roleLabel(sp.role)}）</span>
+            ${monsterIconHtml(sp)}
+            <span class="monster-compact-name" style="color:${monsterNameColor(sp)}; font-weight:700;">${escapeHtml(monsterDisplayName(m))}</span>
+            <span class="${roleTextClass(sp.role)}">${roleShortLabel(sp.role)}</span>
             <span style="color:var(--gold); font-weight:700;">Lv.${m.level||0}</span>
             ${rankBadgeHtml(m)}
             ${statusMark?`<span>${statusMark}</span>`:''}
@@ -6477,14 +6483,16 @@ function renderRoomDetail(){
                 });
             }
         }
-        if (skillRows){
+        // 「部屋の能力」（Lvアップ）と「部屋の特殊能力」（Lv1/3/5でランダム獲得するバフ）は見出しを1つに統一する
+        if (skillRows || (rm.specialAbilities||[]).length>0){
             html += `<div class="side-panel-title" style="margin-top:10px;">${ui('section_ability_title')}</div>`;
+        }
+        if (skillRows){
             html += `<div class="stat-panel">${skillRows}</div>`;
         }
-        // ---- 部屋の特殊能力：部屋のレベル(Lv1/3/5)に応じてランダムで確定した、部屋のモンスターへのバフ一覧 ----
         if ((rm.specialAbilities||[]).length>0){
             const ROOM_SPECIAL_ICON = { atk:'⚔️', def:'🛡️', magAtk:'🔮', magDef:'🌀', hpRegen:'💗', melee:'🗡️', ranged:'🏹', magic:'✨' };
-            html += `<div class="side-panel-title" style="margin-top:10px;">${ui('room_special_title')}</div><div class="stat-panel">`;
+            html += `<div class="stat-panel">`;
             html += rm.specialAbilities.map(a => `<div class="room-special-row">
                 <span class="room-special-icon">${ROOM_SPECIAL_ICON[a.type]}</span>
                 <span>${roomSpecialAbilityLabel(a.type)}</span>
