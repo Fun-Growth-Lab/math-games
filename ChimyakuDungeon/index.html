@@ -3236,7 +3236,9 @@ function statRank(m, statKey){
 }
 
 // ---- 状態異常・アクティブスキルの共通ルール（暫定値。詳細な数値は今後調整） ----
-const ACTIVE_SKILL_COOLDOWN = 2; // 使用後は2ターン使えず、3ターン目で再使用可（罠と同じ間隔）
+// アクティブスキル（勇者・モンスター共通）：間合い別の発動確率と、1戦闘あたりの発動回数上限
+const ACTIVE_SKILL_CHANCE = { melee:0.4, ranged:0.3, magic:0.2 };
+const ACTIVE_SKILL_MAX_USES = 3;
 const STATUS_EFFECT_DURATION = { paralysis:1, confusion:2, freeze:2 }; // 毒・火傷はターン経過では消えない（部屋の戦闘終了まで残る）。麻痺は下のPARALYSIS_CLEAR_CHANCEで別途判定するため実際には未使用（互換のため残置）
 const PARALYSIS_CLEAR_CHANCE = 0.5; // 麻痺は固定ターン数ではなく、毎ターンこの確率で解除判定を行う（凍結との差別化）
 const STATUS_EFFECT_DAMAGE = { poison:4, burn:6 }; // 毒・火傷の基本ダメージ。重ねがけごとに基本値の半分ずつ増える（4→6→8→10／6→9→12→15…）
@@ -4833,13 +4835,12 @@ const HERO_CLASSES = [
 ];
 // 勇者はパッシブを持たず、職ごとに1つだけのスキルを持つ。攻撃・行動の機会ごとに間合い別の確率で抽選し、1戦闘につき最大3回まで発動できる
 // （発動できなくなるターンのルール＝クールダウンはない）。使い切った後は通常攻撃のみ
-const HERO_SKILL_CHANCE = { melee:0.4, ranged:0.3, magic:0.2 };
-const HERO_SKILL_MAX_USES = 3;
+// （モンスターのアクティブスキルも同じ確率・同じ回数上限。ACTIVE_SKILL_CHANCE／ACTIVE_SKILL_MAX_USES）
 function heroClassInfo(key){ return HERO_CLASSES.find(c=>c.key===key); }
 function heroSkillTriggers(hero){
     const cls = heroClassInfo(hero.heroClassKey);
-    if (!cls || !cls.skill || (hero.skillUses||0) >= HERO_SKILL_MAX_USES) return false;
-    return Math.random() < HERO_SKILL_CHANCE[cls.role];
+    if (!cls || !cls.skill || (hero.skillUses||0) >= ACTIVE_SKILL_MAX_USES) return false;
+    return Math.random() < ACTIVE_SKILL_CHANCE[cls.role];
 }
 // 侵攻(ステージ)番号に応じてtierStart～tierEndを線形補間する（侵攻1〜7、7段階で補間）
 // 攻撃として参照するステータス（物理=攻撃力[1]／魔法=魔法攻撃力[3]）だけは、間合い補正の比率を正確に保つため整数に丸めず小数のまま補間する
@@ -5139,7 +5140,7 @@ function startBattle(){
     demonLordUnit.roomId = demonLordRoomId; // モンスター側の行動関数がunit.roomIdで部屋を判定できるようにする
     // 戦闘中にモンスターが移動しても、建設フェーズに戻ったときは戦闘開始前の配置に戻す
     // （魔王も近接モンスターと同じ行動ロジックを使うため、対象を追って移動することがある）
-    monsters.forEach(m => { m.preBattleR = m.r; m.preBattleC = m.c; });
+    monsters.forEach(m => { m.preBattleR = m.r; m.preBattleC = m.c; m.skillUses = 0; }); // スキルの発動回数は戦闘ごとにリセットする
     demonLordUnit.preBattleR = demonLordUnit.r; demonLordUnit.preBattleC = demonLordUnit.c;
     selectedRoomId = null; selectedMonsterId = null; demonLordMoveSelected = false; highlightedMonsterId = null;
     document.getElementById('battle-stage-label').textContent = uif('battle_stage_label', stage);
@@ -5648,7 +5649,8 @@ function resolveHeroMagicAction(hero, room){
 // ---- モンスターの行動の入り口。状態異常判定→アクティブスキル（使用可能なら）→通常行動の順で処理する ----
 // 戻り値: 混乱の同士討ちで魔王がこの一撃で倒された場合はtrue（呼び出し側でゲームオーバー判定に使う）
 // アクティブスキルはspecies.activeに配列で持たせる（1体が複数のアクティブスキルを持てるようにするため）。
-// 各スキルは自分専用のクールダウンを持ち、毎ターン「使用可能なスキルの中からランダムに1つ」だけ試行する。
+// 勇者と同じ仕様：毎ターン間合い別の確率（近40%／中30%／長20%）で抽選し、当たれば持っているスキルからランダムに1つ試行する。
+// 1戦闘につき1体あたり合計3回まで（スキルが複数あっても合計）。クールダウンはなく、使い切ったら通常行動のみ
 function resolveMonsterTurn(unit, room, role){
     applyRegenTick(unit, 'monster'); // 再生は行動可否に関わらず手番の最初に発動する
     tickBuffs(unit); // バフの残りターン数もここで減らす
@@ -5657,15 +5659,11 @@ function resolveMonsterTurn(unit, room, role){
     if (confused) return confused.demonLordJustDied; // 混乱発動時はアクティブ/通常行動どちらも行わない
     const sp = unit.isDemonLord ? null : speciesInfo(unit.speciesKey);
     const actives = (sp && sp.active) || [];
-    if (!unit.activeCooldowns || unit.activeCooldowns.length!==actives.length) unit.activeCooldowns = actives.map(()=>0);
-    const readyIndices = actives.map((s,i)=>i).filter(i => unit.activeCooldowns[i]<=0);
-    if (readyIndices.length>0){
-        const i = readyIndices[Math.floor(Math.random()*readyIndices.length)];
-        const used = resolveMonsterActiveSkill(unit, sp, actives[i], room);
-        if (used){ unit.activeCooldowns[i] = ACTIVE_SKILL_COOLDOWN; return false; }
-        // 射程外などで発動できなかった場合はこのスキルのクールダウンを消費せず通常行動にフォールバックする
+    if (actives.length>0 && (unit.skillUses||0) < ACTIVE_SKILL_MAX_USES && Math.random() < ACTIVE_SKILL_CHANCE[role]){
+        const skill = actives[Math.floor(Math.random()*actives.length)];
+        if (resolveMonsterActiveSkill(unit, sp, skill, room)){ unit.skillUses = (unit.skillUses||0) + 1; return false; }
+        // 射程外などで発動できなかった場合は回数を消費せず通常行動にフォールバックする
     }
-    actives.forEach((s,i) => { if (unit.activeCooldowns[i]>0) unit.activeCooldowns[i]--; });
     if (role==='ranged') resolveRangedMonsterAction(unit, room);
     else if (role==='magic') resolveMagicMonsterAction(unit, room);
     else resolveMeleeMonsterAction(unit, room);
