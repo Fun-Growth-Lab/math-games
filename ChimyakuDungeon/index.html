@@ -630,6 +630,13 @@
         .monster-picker-btn:hover { border-color: var(--accent); }
         .monster-picker-name { font-size:0.9rem; font-weight:800; line-height:1.25; }
         .monster-picker-meta { display:flex; align-items:center; gap:6px; font-size:0.78rem; color:var(--ink-dim); font-weight:700; }
+        /* 侵攻プレビュー用：クリック不可の表示専用カード（見た目は同じグリッドに揃える） */
+        .monster-picker-btn.static { cursor:default; }
+        .monster-picker-btn.static:hover { border-color: var(--card-bdr); }
+        .hero-preview-sprite {
+            width:40px; height:40px; background-repeat:no-repeat; background-size:200% 200%; background-position:0% 0%;
+            image-rendering:pixelated;
+        }
         .trap-orient-row { display:flex; gap:6px; margin-bottom:8px; }
         .trap-orient-row .sort-btn { flex:1; text-align:center; padding:8px 0; font-size:0.82rem; font-weight:800; }
         .prod-value-big { font-size: 1.35rem; font-weight: 800; text-shadow: 0 1px 4px rgba(0,0,0,0.5); }
@@ -819,8 +826,9 @@
 
     <!-- ==================== BATTLE CONFIRM ==================== -->
     <div id="battle-confirm-modal" class="modal-backdrop hidden">
-        <div class="modal-box">
+        <div class="modal-box" style="width:95vw; max-width:640px; max-height:85vh; overflow-y:auto;">
             <p class="modal-msg" id="battle-confirm-msg"></p>
+            <div id="battle-confirm-hero-grid" class="monster-picker-grid"></div>
             <button class="btn btn-danger btn-sm" onclick="confirmStartBattle()" data-i18n="btn_yes">はい</button>
             <button class="btn btn-sm" onclick="closeBattleConfirm()" data-i18n="btn_no">いいえ</button>
         </div>
@@ -839,7 +847,7 @@
     <div id="hatch-result-modal" class="modal-backdrop hidden">
         <div class="modal-box" style="min-width:320px;">
             <div class="modal-title" id="hatch-result-title">🥚→👾</div>
-            <div id="hatch-result-body"></div>
+            <div id="hatch-result-body" style="max-height:50vh; overflow-y:auto; text-align:left;"></div>
             <button class="btn btn-primary btn-sm" style="margin-top:14px;" data-i18n="btn_close" onclick="closeHatchResultModal()">とじる</button>
         </div>
     </div>
@@ -848,7 +856,7 @@
     <div id="stage-itemdrop-modal" class="modal-backdrop hidden">
         <div class="modal-box" style="min-width:320px;">
             <div class="modal-title" data-i18n="loot_found_title">🎁 アイテムを発見！</div>
-            <div id="stage-itemdrop-body"></div>
+            <div id="stage-itemdrop-body" style="max-height:50vh; overflow-y:auto; text-align:left;"></div>
             <button class="btn btn-primary btn-sm" style="margin-top:14px;" data-i18n="btn_close" onclick="closeStageItemDropModal()">とじる</button>
         </div>
     </div>
@@ -932,6 +940,7 @@
             <div class="modal-title" data-i18n="monster_list_modal_title">👾 魔物一覧</div>
             <div style="display:flex; gap:6px; margin-bottom:10px;">
                 <button class="btn btn-sm btn-teal" style="flex:1;" data-i18n="btn_auto_deploy" onclick="autoDeployStockedMonsters()">🏠 自動配置</button>
+                <button class="btn btn-sm btn-purple" style="flex:1;" data-i18n="btn_auto_rearrange" onclick="autoRearrangeMonstersByPower()">🔀 強さで並替</button>
                 <button class="btn btn-sm btn-retrieve-all" style="flex:1;" data-i18n="btn_retrieve_all" onclick="retrieveAllMonsters()">📦 全回収</button>
             </div>
             <div id="monster-list-body"></div>
@@ -954,7 +963,7 @@
             <div class="modal-score-row"><span><span class="gem-chip-sq gem-citrine"></span><span data-i18n="stage_income_vit_label">活力の増加量</span></span><b id="stage-income-vit">0</b></div>
             <div class="modal-score-row"><span><span class="gem-chip-sq gem-sapphire"></span><span data-i18n="stage_income_mana_label">魔力の増加量</span></span><b id="stage-income-mana">0</b></div>
             <div class="side-panel-title" style="margin-top:12px;" data-i18n="stage_income_ranked_title">進化した魔物</div>
-            <div id="stage-income-ranked-list"></div>
+            <div id="stage-income-ranked-list" style="max-height:40vh; overflow-y:auto; text-align:left;"></div>
             <button class="btn btn-primary btn-sm" style="margin-top:14px; width:100%;" data-i18n="btn_close" onclick="closeStageIncomeModal()">とじる</button>
         </div>
     </div>
@@ -1424,8 +1433,10 @@ const UI_TEXT = {
     status_deploy_stocked: { ja: '配置する部屋のマスをクリックしてください', ja_easy: 'はいちする へやの マスを クリックしてね', en: 'Click a cell in the room to deploy this monster' },
     err_deploy_build_only: { ja: 'ダンジョン作成中のみ操作できます', ja_easy: 'ダンジョンを つくっている ときだけ できるよ', en: 'You can only do this while building the dungeon' },
     btn_auto_deploy: { ja: '🏠 自動配置', ja_easy: '🏠 じどう はいち', en: '🏠 Auto-deploy' },
+    btn_auto_rearrange: { ja: '🔀 強さで並替', ja_easy: '🔀 つよさで ならびかえ', en: '🔀 Rearrange by Power' },
     btn_retrieve_all: { ja: '📦 全回収', ja_easy: '📦 ぜんぶ かいしゅう', en: '📦 Retrieve All' },
     status_auto_deploy_done: { ja: n => `${n}体を自動配置しました`, ja_easy: n => `${n}たいを じどうはいち したよ`, en: n => `Auto-deployed ${n} monster(s)` },
+    status_auto_rearrange_done: { ja: '部屋ごとに、通路の出入口に近い順で強いモンスターを並べ直しました', ja_easy: 'へやごとに、つうろの でいりぐちに ちかい じゅんで つよい モンスターを ならべなおしたよ', en: 'Rearranged each room so stronger monsters are closer to the entrance' },
     status_retrieve_all_done: { ja: n => `${n}体をストックに回収しました`, ja_easy: n => `${n}たいを ストックに かいしゅう したよ`, en: n => `Retrieved ${n} monster(s) to stock` },
     err_no_monster_to_retrieve: { ja: '配置されているモンスターがいません', ja_easy: 'はいちされている モンスターが いないよ', en: 'No monsters are currently deployed' },
     err_no_room_space: { ja: '配置できる空きのある部屋がありません', ja_easy: 'はいちできる あきの ある へやが ないよ', en: 'No room has space to deploy into' },
@@ -2190,7 +2201,7 @@ function renderBuildActions(){
     if (selectedMonsterId!==null){
         const m = monsters.find(x=>x.id===selectedMonsterId);
         wrap.innerHTML = `<div class="side-panel-title">${ui('move_info_title')}</div>`
-            + (m ? monsterCardHtml(m, { highlight:true }) : '')
+            + (m ? monsterDetailCoreHtml(m) : '')
             + `<button class="btn btn-sm" style="width:100%; margin-top:6px;" onclick="cancelMoveSelection()">${ui('btn_cancel')}</button>`;
         return;
     }
@@ -2608,10 +2619,10 @@ const ROOM_TYPES = [
     { key:'tool',     gem:'gem-ruby' },     // アイテム掘削部屋
 ];
 const ROOM_TYPES_SELECTABLE = ROOM_TYPES;
-// ---- 部屋の能力レベル（活力増加Lv・魔力増加Lv・経験値増加Lv・罠威力増加Lv）----
-// 部屋の能力（活力/魔力/強化/攻撃）：自分の部屋タイプと一致する能力は該当する素を1つ以上持っていれば自動でLv1。
-// 他タイプの能力（通路でつながった部屋から得る能力）は自動付与なし＝Lv0スタートで、活力・魔力を払ってアップグレードする。
-// 上限Lvは、自分の種類なら10、他の種類なら通路で直結した該当タイプの部屋の数（未接続なら0＝能力欄自体が出ない）
+// ---- 部屋の能力レベル（活力増加Lv・魔力増加Lv・召喚Lv・掘削Lv）----
+// 部屋の能力：自分の部屋タイプと一致する能力は該当する素を1つ以上持っていれば自動でLv1。上限は4能力とも共通でLv5。
+// 他タイプの能力は自動付与なし・上限0（自室のタイプでしか能力アップできない）。
+// 部屋どうしを通路でつなぐメリットは、能力Lvではなく素の数そのものを底上げする形で表現する（effectiveElementCount参照）
 function connectedRoomTypeCounts(roomId){
     const counts = {};
     corridors.forEach(cd => {
@@ -2623,6 +2634,22 @@ function connectedRoomTypeCounts(roomId){
         if (other && other.type) counts[other.type] = (counts[other.type]||0) + 1;
     });
     return counts;
+}
+// 部屋接続のメリット：通路で直結した隣の部屋が持つ素の数の20%が、そのままこちらの部屋の実質の素の数に上乗せされる。
+// 例：活力の素を4個持つ部屋に隣接していれば、活力の実質数が+0.8される（隣接部屋が複数あれば全部足し合わせる）。
+// 表示は小数点第一位までに丸めるが、計算はこの関数の返り値（丸めない）をそのまま使う
+const ADJACENT_ROOM_ELEMENT_BONUS_RATE = 0.20;
+function effectiveElementCount(room, elementType){
+    let total = room.elements[elementType] || 0;
+    corridors.forEach(cd => {
+        let otherId = null;
+        if (cd.fromId===room.id) otherId = cd.toId;
+        else if (cd.toId===room.id) otherId = cd.fromId;
+        if (otherId===null || otherId==='entrance') return;
+        const other = rooms.find(r=>r.id===otherId);
+        if (other) total += (other.elements[elementType]||0) * ADJACENT_ROOM_ELEMENT_BONUS_RATE;
+    });
+    return total;
 }
 // effectiveType省略時はroom.typeを使う。部屋タイプ選択のプレビュー中など、
 // まだroom.typeが確定していない候補の種類で計算したいときに明示的に渡す
@@ -2644,18 +2671,12 @@ function roomAbilityLv(room, abilityType, effectiveType){
     const stored = room.abilityLv[abilityType];
     return stored!==undefined ? Math.max(stored, baseline) : baseline;
 }
-// 活力・魔力の能力Lvは最大5（他の能力は引き続き最大10）
-const VITALITY_MANA_MAX_LV = 5;
+// 4能力とも最大Lv5（部屋接続による恩恵は、能力Lvの底上げではなく素の数の底上げ(effectiveElementCount)で表現する）
+const ABILITY_MAX_LV = 5;
 function roomAbilityMaxLv(room, abilityType, effectiveType){
     const et = effectiveType!==undefined ? effectiveType : room.type;
     if (!roomAbilityUnlocked(room, abilityType)) return 0;
-    const isVitMana = (abilityType==='vitality' || abilityType==='mana');
-    const ownMax = isVitMana ? VITALITY_MANA_MAX_LV : 10;
-    if (et===abilityType) return ownMax;
-    // 通路連結による能力上昇の恩恵は活力・魔力の生産のみが対象（召喚・攻撃・道具は自室のみで完結する）
-    if (!isVitMana) return 0;
-    const counts = connectedRoomTypeCounts(room.id);
-    return Math.min(ownMax, counts[abilityType]||0);
+    return et===abilityType ? ABILITY_MAX_LV : 0;
 }
 // 能力Lvによる倍率（表示にも各種計算にも使う共通関数）
 // 活力・魔力：素の数はすでに基礎生産（素の数×20）側に入っているので、倍率は単純に(1+Lv)
@@ -2664,12 +2685,12 @@ const ABILITY_MULT_COEF = { attack: 0.2 };
 // クオリティ＝（素の数）×（能力Lv）。召喚・道具それぞれで「量」（何体/何個手に入るか＝能力Lvそのもの）とは別に
 // 「質」（どれだけ強い/良いものが出るか）を表す共通の内部指標として使う（画面には%ではなくLvだけを見せる）
 function summonQuality(room, lvOverride){
-    const count = room.elements.summon || 0;
+    const count = effectiveElementCount(room, 'summon');
     const lv = lvOverride!==undefined ? lvOverride : roomAbilityLv(room, 'summon');
     return count * lv;
 }
 function toolQuality(room, lvOverride){
-    const count = room.elements.tool || 0;
+    const count = effectiveElementCount(room, 'tool');
     const lv = lvOverride!==undefined ? lvOverride : roomAbilityLv(room, 'tool');
     return count * lv;
 }
@@ -2702,9 +2723,8 @@ function abilityRowMeta(abilityType){
 // 活力・魔力は実際の生産量（数値）、攻撃は倍率を返す。召喚・道具は内部確率を画面に出さずLv表示のみにしているため、
 // ここでは呼ばれない（isChanceTypeとしてrequestUpgradeRoomAbility側で分岐済み）
 function abilityEffectAtLv(room, abilityType, lv){
-    const count = room.elements[abilityType] || 0;
-    if (abilityType==='vitality' || abilityType==='mana') return Math.round(count * BASE_PRODUCTION_PER_ELEMENT * Math.pow(2, lv));
-    if (abilityType==='attack') return 1 + ABILITY_MULT_COEF.attack*count*lv;
+    if (abilityType==='vitality' || abilityType==='mana') return Math.round(effectiveElementCount(room, abilityType) * BASE_PRODUCTION_PER_ELEMENT * Math.pow(2, lv));
+    if (abilityType==='attack'){ const count = room.elements.attack||0; return 1 + ABILITY_MULT_COEF.attack*count*lv; }
     return 1;
 }
 function abilityEffectText(abilityType, value){
@@ -2792,11 +2812,10 @@ function costSpanHtml(vit, mana, insufficient){
     return parts.join(' ／ ');
 }
 // 活力・召喚能力のアップは魔力を、魔力・掘削能力のアップは活力を消費する。
-// 活力・魔力はLv5までの固定コスト表（2倍ずつ増える倍率の伸びに合わせて、コストも段階ごとに倍増させる）
-const VITALITY_MANA_UPGRADE_COST = [null, 200, 400, 800, 1600, 3200]; // 添字＝目標Lv(1〜5)
+// 4能力とも最大Lv5・同じ固定コスト表（段階ごとに倍増）に統一
+const ABILITY_UPGRADE_COST = [null, 200, 400, 800, 1600, 3200]; // 添字＝目標Lv(1〜5)
 function abilityUpgradeCost(abilityType, targetLv){
-    const isVitMana = (abilityType==='vitality' || abilityType==='mana');
-    const amount = isVitMana ? VITALITY_MANA_UPGRADE_COST[targetLv] : (200 + 50*(targetLv-1));
+    const amount = ABILITY_UPGRADE_COST[targetLv];
     if (abilityType==='vitality' || abilityType==='summon') return { vit:0, mana:amount };
     return { vit:amount, mana:0 };
 }
@@ -2815,8 +2834,8 @@ function upgradeRoomAbility(roomId, abilityType){
     renderAll();
 }
 function computeRoomProduction(room, type){
-    const vit  = Math.round((room.elements.vitality||0) * BASE_PRODUCTION_PER_ELEMENT * roomAbilityMultiplier(room, 'vitality', type));
-    const mana = Math.round((room.elements.mana||0)     * BASE_PRODUCTION_PER_ELEMENT * roomAbilityMultiplier(room, 'mana', type));
+    const vit  = Math.round(effectiveElementCount(room, 'vitality') * BASE_PRODUCTION_PER_ELEMENT * roomAbilityMultiplier(room, 'vitality', type));
+    const mana = Math.round(effectiveElementCount(room, 'mana')     * BASE_PRODUCTION_PER_ELEMENT * roomAbilityMultiplier(room, 'mana', type));
     const summon = room.elements.summon||0;
     const attack = room.elements.attack||0;
     return { vit, mana, summon, attack };
@@ -4209,7 +4228,28 @@ function monstersEligibleForStone(stoneKey){
 // ---- 魔物一覧（アイテム欄と対になる画面。マップ右の「👾 魔物」ボタンから開く） ----
 function openMonsterListModal(){
     renderMonsterListModal();
+    const modalBox = document.querySelector('#monster-list-modal .modal-box');
+    modalBox.scrollTop = 0; // hidden化してもスクロール位置は保持されたままなので、開くたびに一番上へ戻す
     document.getElementById('monster-list-modal').classList.remove('hidden');
+}
+// 部屋ごとに、既に配置されているモンスターだけを対象に「通路の出入口に近いマスほど強いモンスターが入る」ように並べ替える。
+// 部屋やモンスターの総数・どの部屋に何体いるかという配置構造そのものは変えない（自動配置のようにゼロから置き直さない）
+function autoRearrangeMonstersByPower(){
+    if (gamePhase!=='build') return;
+    rooms.forEach(room => {
+        const occupants = monsters.filter(m => m.roomId===room.id);
+        if (occupants.length<2) return;
+        const doorways = roomDoorwayCells(room);
+        if (doorways.length===0) return;
+        const distToDoor = (r,c) => Math.min(...doorways.map(d => Math.abs(d.r-r)+Math.abs(d.c-c)));
+        const cells = occupants.map(m => ({r:m.r, c:m.c})).sort((a,b) => distToDoor(a.r,a.c)-distToDoor(b.r,b.c));
+        const sortedMonsters = occupants.slice().sort((a,b) => powerScore(b)-powerScore(a));
+        sortedMonsters.forEach((m,i) => { m.r = cells[i].r; m.c = cells[i].c; });
+    });
+    renderMonsterListModal();
+    renderRoomDetail();
+    renderAll();
+    showToast(ui('status_auto_rearrange_done'));
 }
 function closeMonsterListModal(){ document.getElementById('monster-list-modal').classList.add('hidden'); }
 function renderMonsterListModal(){
@@ -4649,10 +4689,10 @@ function trapAffectedCells(trap, room){
 // ============================================================
 const STAGE_FINAL = 7; // 最終侵攻。ここの勇者を倒すとゲームクリア
 // ステージごとの勇者の総数（侵攻が進むほど増える）。1ターンに4体ずつ、この人数に達するまで入ってくる
-const HERO_STAGE_COUNTS = { 1:4, 2:8, 3:12, 4:16, 5:20, 6:20, 7:20 };
+// ステージ数nに対して2n人（ステージ1で2人、ステージ10で20人）
 const HEROES_PER_WAVE = 4;
 const WAVE_INTERVAL_TICKS = 12; // 次の4体が入ってくるまでのtick数（暫定値。1tickは行動1回分の間隔）
-function heroCountForStage(stageNum){ return HERO_STAGE_COUNTS[stageNum] || HERO_STAGE_COUNTS[STAGE_FINAL]; }
+function heroCountForStage(stageNum){ return 2 * stageNum; }
 // 勇者のクラス定義。モンスターと同じ形式（passive/activeは配列）でスキルを持てる。
 // tierStart/tierEndは侵攻1・侵攻7でのステータス（1〜10ランク値、モンスターと同じtierStats換算を使う）。
 // 中間の侵攻は線形補間する（lerpHeroTierを参照）。役割(role)は近接/中距離/遠距離の立ち回りを決める。
@@ -4903,11 +4943,33 @@ let battleSpeed = 1;
 let battlePaused = false;
 let battlePendingDelay = 300;
 
+// 迎撃ボタンを押した時点で、実際に侵攻してくる勇者の並び（クラス・性別）を確定しておく。
+// startBattle()側でもこの並びをそのまま使うので、確認ポップアップに出したプレビューと実際の侵攻が必ず一致する
+let pendingBattleHeroPreview = [];
+function buildBattleHeroPreview(){
+    const preset = currentGamePreset();
+    const heroCount = heroCountForStage(stage);
+    const list = [];
+    for (let i=0;i<heroCount;i++){
+        const classKey = preset.heroClassKeys[i % preset.heroClassKeys.length];
+        list.push({ classKey, gender: Math.random()<0.5?'m':'f' });
+    }
+    return list;
+}
+function heroPreviewCardHtml(entry){
+    const cls = heroClassInfo(entry.classKey);
+    return `<div class="monster-picker-btn static">
+        <span class="hero-preview-sprite" style="background-image:url('images/yuusya/${entry.classKey}_${entry.gender}.png');"></span>
+        <span class="monster-picker-name">${escapeHtml(cls.name_ja)}</span>
+    </div>`;
+}
 function requestStartBattle(){
     if (gamePhase!=='build') return;
     if (rooms.length===0){ showToast(ui('err_no_rooms_battle')); return; }
     if (demonLordRoomId===null || !demonLordCell){ showToast(ui('err_no_demonlord')); return; }
+    pendingBattleHeroPreview = buildBattleHeroPreview();
     document.getElementById('battle-confirm-msg').textContent = uif('confirm_start_battle_msg', stage);
+    document.getElementById('battle-confirm-hero-grid').innerHTML = pendingBattleHeroPreview.map(heroPreviewCardHtml).join('');
     document.getElementById('battle-confirm-modal').classList.remove('hidden');
 }
 function closeBattleConfirm(){ document.getElementById('battle-confirm-modal').classList.add('hidden'); }
@@ -4928,20 +4990,20 @@ function startBattle(){
     demonLordSkillUsesThisBattle = 0; demonLordSkillUsedKeysThisBattle = []; pendingDemonLordSkill = null;
     battleStageItemDrops = [];
     battleDamageStats = freshDamageStats();
-    // 選択中のゲームプリセットから、侵攻(ステージ)番号に応じた人数・ステータスで勇者を生成する
-    // （4クラスを順番に繰り返し割り当てる。人数はheroCountForStage、攻撃系ステータスはheroOffenseMultで人数に応じて調整）
-    const preset = currentGamePreset();
+    // 侵攻してくる勇者の並び（クラス・性別）は、迎撃確認ポップアップで見せたプレビューと必ず一致させる
+    // （人数はheroCountForStage、攻撃系ステータスはheroOffenseMultで人数に応じて調整）
     const heroCount = heroCountForStage(stage);
     const offenseMult = heroOffenseMult(stage);
+    const heroPreview = pendingBattleHeroPreview.length===heroCount ? pendingBattleHeroPreview : buildBattleHeroPreview();
     battleHeroes = [];
     for (let i=0;i<heroCount;i++){
-        const classKey = preset.heroClassKeys[i % preset.heroClassKeys.length];
+        const classKey = heroPreview[i].classKey;
         const cls = heroClassInfo(classKey);
         const tier = lerpHeroTier(cls, stage);
         const st = tierStats(tier[0], tier[1], tier[2], tier[3], tier[4]);
         const hp = st.hp*HERO_HP_MULT, atk = st.atk*offenseMult, def = st.def*offenseMult,
               magAtk = st.magAtk*offenseMult, magDef = st.magDef*offenseMult;
-        battleHeroes.push({ id:i+1, priority:i+1, heroClassKey:classKey, gender: Math.random()<0.5?'m':'f',
+        battleHeroes.push({ id:i+1, priority:i+1, heroClassKey:classKey, gender: heroPreview[i].gender,
             hp, maxHp:hp, atk, def, magAtk, magDef,
             alive:true, r:-1, c:-1, emoji:cls.emoji, statusEffects:[], buffs:[], activeCooldowns:[], chargeTurns:0,
             state:'pending', roomId:null, behavior:null,
@@ -6301,10 +6363,15 @@ function renderRoomDetail(){
             // 召喚・道具は内部的な確率(%)を見せても分かりづらいだけなので、Lv表示のみにする（効果自体はLvに応じて内部で計算する）
             const isChanceType = (abilityType==='summon' || abilityType==='tool');
             const valueText = isChanceType ? '' : roomAbilityMultiplier(rm, abilityType).toFixed(1) + ui('label_times_suffix');
+            // 隣接部屋からの接続ボーナスで素の実質数が増えている場合だけ、小数点第一位までの実質数を添えて見せる
+            const rawCount = rm.elements[abilityType]||0;
+            const effCount = effectiveElementCount(rm, abilityType);
+            const countText = effCount>rawCount ? `<span style="font-size:0.68rem; color:var(--ink-dim);">(素${effCount.toFixed(1)})</span>` : '';
             let row = `<div class="room-detail-row">
                 <span class="gem-chip-sq ${meta.gem}"></span>
                 <span style="color:${ABILITY_LABEL_COLOR[abilityType]}; font-weight:800; font-size:0.86rem;">${meta.label}${isChanceType?'':'アップ'}</span>
                 <b style="color:var(--teal);">Lv.${curLv}</b>
+                ${countText}
                 ${valueText ? `<b style="margin-left:auto; color:var(--gold);">${valueText}</b>` : ''}
             </div>`;
             if (curLv < maxLv){
