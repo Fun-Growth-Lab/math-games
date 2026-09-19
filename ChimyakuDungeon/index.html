@@ -4821,7 +4821,7 @@ const HERO_HP_MULT = 2;
 const HERO_BASE_OFFENSE_MULT = 2;
 const HERO_BASELINE_COUNT = 4;
 function heroOffenseMult(stageNum){ return HERO_BASE_OFFENSE_MULT * (HERO_BASELINE_COUNT / heroCountForStage(stageNum)); }
-// tierStartはステージ1の勇者の強さをそのまま決める（侵攻1では線形補間の比率t=0でtierStartがそのまま使われるため）。
+// tierStartはステージ1の勇者の強さを決める（侵攻1では線形補間の比率t=0でtierStartがそのまま使われるため）。下のHERO_START_STRENGTH_SCALEで一律に下げている。
 // ステージ1が少し強すぎるとのフィードバックを受け、各能力を1ランクずつ下げた（下限1）。tierEnd（最終侵攻7の強さ）は変更していない。
 // 【攻撃役3職（剣士・アーチャー・メイジ）の攻撃値の決め方】
 // 間合い補正（RANGE_ATK_MULT：近125%／中100%／長75%）は攻撃力そのものに掛かるので、
@@ -4867,6 +4867,10 @@ const HERO_CLASSES = [
         tierStart:[3,1,1,4,3], tierEnd:[6,1,4,8,6],
         skill:{ type:'curseAll', value:0.3 } },
 ];
+// ステージ1の勇者が強すぎるとのフィードバックで、序盤の強さだけを全ステータス一律で65%にする（最終侵攻7のtierEndは変更しない）。
+// 1ランク（最小値）はそれ以上下げない。攻撃役3職の攻撃の素の値も同じ比率で下がるため、近:中:長=125:100:75の比は変わらない
+const HERO_START_STRENGTH_SCALE = 0.65;
+HERO_CLASSES.forEach(c => { c.tierStart = c.tierStart.map(v => Math.max(1, v * HERO_START_STRENGTH_SCALE)); });
 // 勇者はパッシブを持たず、職ごとに1つだけのスキルを持つ。攻撃・行動の機会ごとに間合い別の確率で抽選し、1戦闘につき最大3回まで発動できる
 // （発動できなくなるターンのルール＝クールダウンはない）。使い切った後は通常攻撃のみ
 // （モンスターのアクティブスキルも同じ確率・同じ回数上限。ACTIVE_SKILL_CHANCE／ACTIVE_SKILL_MAX_USES）
@@ -4877,13 +4881,12 @@ function heroSkillTriggers(hero){
     return Math.random() < ACTIVE_SKILL_CHANCE[cls.role];
 }
 // 侵攻(ステージ)番号に応じてtierStart～tierEndを線形補間する（侵攻1〜7、7段階で補間）
-// 攻撃として参照するステータス（物理=攻撃力[1]／魔法=魔法攻撃力[3]）だけは、間合い補正の比率を正確に保つため整数に丸めず小数のまま補間する
+// 序盤の強さを比率で下げているため、整数に丸めず小数（2桁）のまま補間する（丸めると比率が崩れる）
 function lerpHeroTier(cls, stageNum){
     const t = Math.max(0, Math.min(1, (stageNum-1) / (STAGE_FINAL-1)));
-    const atkIndex = cls.dmgType==='magic' ? 3 : 1;
     return cls.tierStart.map((s,i) => {
         const v = s + (cls.tierEnd[i]-s)*t;
-        return Math.max(1, Math.min(10, i===atkIndex && cls.exactAtk ? v : Math.round(v)));
+        return Math.max(1, Math.min(10, Math.round(v*100)/100));
     });
 }
 // ゲームプリセット：4人の勇者クラスの組み合わせ。複数パターン用意していく想定で配列にしてある
