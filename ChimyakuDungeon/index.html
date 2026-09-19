@@ -667,6 +667,10 @@
         .room-special-row { display:flex; align-items:center; gap:6px; font-size:0.8rem; padding:3px 0; }
         .room-special-icon { font-size:1rem; }
         .room-special-pct { margin-left:auto; color:var(--gold); font-weight:800; }
+        /* 生産行の下に入れ子で置く、その部屋タイプの能力（Lv・倍率・Lvアップ）の枠 */
+        .ability-block { margin:2px 0 8px 14px; padding:6px 8px; border-left:3px solid var(--card-bdr); background:rgba(255,255,255,0.04); border-radius:0 8px 8px 0; }
+        .ability-block-row { display:flex; align-items:center; gap:6px; }
+        .elem-count-note { font-size:0.72rem; color:var(--ink-dim); }
         .hero-preview-emoji { display:flex; align-items:center; justify-content:center; font-size:1.7rem; }
         .hero-preview-sprite {
             width:40px; height:40px; background-repeat:no-repeat; background-size:200% 200%; background-position:0% 0%;
@@ -1318,6 +1322,8 @@ const UI_TEXT = {
     stat_tool_prod: { ja: 'アイテム生産', ja_easy: 'アイテム せいさん', en: 'Item Production' },
     label_vit_short: { ja: '活力', ja_easy: 'かつりょく', en: 'Vit' },
     label_mana_short: { ja: '魔力', ja_easy: 'まりょく', en: 'Mana' },
+    label_ability_suffix: { ja: '能力', ja_easy: 'のうりょく', en: ' Ability' },
+    label_element_short: { ja: '素', ja_easy: 'もと', en: 'El. ' },
     label_times_suffix: { ja: '倍', ja_easy: 'ばい', en: 'x' },
     label_max_short: { ja: '上限', ja_easy: 'じょうげん', en: 'MAX' },
     ability_label_attack: { ja: '攻撃能力', ja_easy: 'こうげき のうりょく', en: 'Attack Ability' },
@@ -6635,17 +6641,14 @@ function renderRoomDetail(){
     if (rm.id===demonLordRoomId) html += `<div class="room-type-badge">${ui('demonlord_here_label')}</div>`;
     const roomMonsters = monsters.filter(m=>m.roomId===rm.id);
     if (rm.type){
-        // ---- 生産量（見出しは出さず、部屋名の下にそのまま数値だけ表示する） ----
+        // ---- 生産量・素の数・部屋の能力 ----
+        // 「活力生産（素9.4）　848」のように、通路でつながった隣の部屋からの流入を含む素の実質数を各生産の右に添える。
+        // 自分のタイプの生産の下には、その能力（Lv・倍率・Lvアップ）を入れ子の枠でまとめる
         const prod = computeRoomProduction(rm, rm.type);
-        html += `<div class="stat-panel">`;
-        html += `<div class="room-detail-row"><span class="gem-chip-sq gem-citrine"></span><span>${ui('stat_vit_prod')}</span><b class="prod-value-big" style="margin-left:auto; color:#ffd85c;">${prod.vit}</b></div>`;
-        html += `<div class="room-detail-row"><span class="gem-chip-sq gem-sapphire"></span><span>${ui('stat_mana_prod')}</span><b class="prod-value-big" style="margin-left:auto; color:#5cc2ff;">${prod.mana}</b></div>`;
-        html += `</div>`;
-
-        // ---- 部屋の能力（スキル）：活力/魔力/攻撃はLvアップで倍率が、召喚/道具はLvアップでレア枠の確率が上がる ----
         // 何の能力か一目で分かるよう、素の色（活力=黄／魔力=青／召喚=紫／道具=赤）でラベルを色分けし、文字も大きめにする
         const ABILITY_LABEL_COLOR = { vitality:'var(--el-vitality)', mana:'var(--el-mana)', summon:'var(--el-summon)', tool:'var(--el-tool)' };
-        function abilityRowHtml(abilityType){
+        const PROD_VALUE_COLOR = { vitality:'#ffd85c', mana:'#5cc2ff' };
+        function abilityBlockHtml(abilityType){
             const curLv = roomAbilityLv(rm, abilityType);
             const maxLv = roomAbilityMaxLv(rm, abilityType);
             if (maxLv<=0) return '';
@@ -6653,25 +6656,33 @@ function renderRoomDetail(){
             // 召喚・道具は内部的な確率(%)を見せても分かりづらいだけなので、Lv表示のみにする（効果自体はLvに応じて内部で計算する）
             const isChanceType = (abilityType==='summon' || abilityType==='tool');
             const valueText = isChanceType ? '' : roomAbilityMultiplier(rm, abilityType).toFixed(1) + ui('label_times_suffix');
-            // 隣接部屋からの接続ボーナスで素の実質数が増えている場合だけ、小数点第一位までの実質数を添えて見せる
-            const rawCount = rm.elements[abilityType]||0;
-            const effCount = effectiveElementCount(rm, abilityType);
-            const countText = effCount>rawCount ? `<span style="font-size:0.68rem; color:var(--ink-dim);">(素${effCount.toFixed(1)})</span>` : '';
-            let row = `<div class="room-detail-row">
-                <span class="gem-chip-sq ${meta.gem}"></span>
-                <span style="color:${ABILITY_LABEL_COLOR[abilityType]}; font-weight:800; font-size:0.86rem;">${meta.label}${isChanceType?'':'アップ'}</span>
-                <b style="color:var(--teal);">Lv.${curLv}</b>
-                ${countText}
-                ${valueText ? `<b style="margin-left:auto; color:var(--gold);">${valueText}</b>` : ''}
-            </div>`;
+            let blk = `<div class="ability-block">
+                <div class="ability-block-row">
+                    <span style="color:${ABILITY_LABEL_COLOR[abilityType]}; font-weight:800; font-size:0.86rem;">${meta.label}${ui('label_ability_suffix')}</span>
+                    <b style="color:var(--teal);">Lv.${curLv}</b>
+                    ${valueText ? `<b style="margin-left:auto; color:var(--gold);">${valueText}</b>` : ''}
+                </div>`;
             if (curLv < maxLv){
                 const cost = abilityUpgradeCost(abilityType, curLv+1);
-                row += `<button class="btn btn-sm" style="width:100%; margin-bottom:6px;" onclick="requestUpgradeRoomAbility(${rm.id},'${abilityType}')" ${(vitality<cost.vit||mana<cost.mana)?'disabled':''}>${uif('btn_upgrade_ability', cost.vit, cost.mana)}</button>`;
+                blk += `<button class="btn btn-sm" style="width:100%; margin-top:4px;" onclick="requestUpgradeRoomAbility(${rm.id},'${abilityType}')" ${(vitality<cost.vit||mana<cost.mana)?'disabled':''}>${uif('btn_upgrade_ability', cost.vit, cost.mana)}</button>`;
             }
-            return row;
+            return blk + `</div>`;
         }
-        let skillRows = abilityRowHtml('vitality') + abilityRowHtml('mana')
-            + abilityRowHtml('summon') + abilityRowHtml('tool');
+        function productionRowHtml(abilityType, value){
+            const meta = abilityRowMeta(abilityType);
+            const eff = effectiveElementCount(rm, abilityType);
+            const valueHtml = value===null ? '' : `<b class="prod-value-big" style="margin-left:auto; color:${PROD_VALUE_COLOR[abilityType]};">${value}</b>`;
+            const labelColor = value===null ? `color:${ABILITY_LABEL_COLOR[abilityType]}; font-weight:800;` : '';
+            return `<div class="room-detail-row"><span class="gem-chip-sq ${meta.gem}"></span><span style="${labelColor}">${meta.label}</span><span class="elem-count-note">（${ui('label_element_short')}${eff.toFixed(1)}）</span>${valueHtml}</div>`
+                + (rm.type===abilityType ? abilityBlockHtml(abilityType) : '');
+        }
+        html += `<div class="stat-panel">`;
+        html += productionRowHtml('vitality', prod.vit) + productionRowHtml('mana', prod.mana);
+        if (rm.type==='summon') html += productionRowHtml('summon', null);
+        if (rm.type==='tool') html += productionRowHtml('tool', null);
+        html += `</div>`;
+        // 以降は罠（凍結中のシステム。スロットを持つ部屋だけ）の行。「部屋の能力」見出しの下に特殊能力と並べて出す
+        let skillRows = '';
         {
             const roomTrapsList = traps.filter(t=>t.roomId===rm.id);
             const trapCapacity = rm.trapSlots ? roomTrapCapacity(rm) : 0;
