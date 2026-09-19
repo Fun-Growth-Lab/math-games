@@ -3374,14 +3374,15 @@ function statusResistChance(unit, chance){
 // dmgTypeを明示している種族/クラスはそちらを優先し、なければrole（遠距離=magic、それ以外=physical）から自動判定する。
 // 距離(role)と攻撃タイプ(dmgType)は独立しているため、近距離でも魔法攻撃の系統を作れる（エルフ系統など）。
 function unitDmgType(unit){
+    if (unit.isDemonLord) return 'magic'; // 魔王は魔法の遠距離攻撃（魔法攻撃力/魔法防御力を参照）
     const info = unitClassInfo(unit);
-    if (!info) return 'physical'; // 魔王などデータを持たないユニットは物理として扱う
+    if (!info) return 'physical';
     if (info.dmgType) return info.dmgType;
     return info.role==='magic' ? 'magic' : 'physical';
 }
-// そのユニットの間合い（近距離/中距離/遠距離）。役割(role)がそのまま間合いを表す。魔王はrole情報を持たないため近距離扱い
+// そのユニットの間合い（近距離/中距離/遠距離）。役割(role)がそのまま間合いを表す。魔王は遠距離(magic)
 function unitRole(unit){
-    if (unit.isDemonLord) return 'melee';
+    if (unit.isDemonLord) return 'magic';
     const info = unitClassInfo(unit);
     return info ? info.role : 'melee';
 }
@@ -5179,6 +5180,7 @@ function startBattle(){
     demonLordUnit = demonLordCell;
     demonLordUnit.alive = demonLordUnit.hp > 0;
     demonLordUnit.roomId = demonLordRoomId; // モンスター側の行動関数がunit.roomIdで部屋を判定できるようにする
+    demonLordUnit.chargeTurns = 0; // 魔法の溜めは戦闘ごとにリセットする
     // 戦闘中にモンスターが移動しても、建設フェーズに戻ったときは戦闘開始前の配置に戻す
     // （魔王も近接モンスターと同じ行動ロジックを使うため、対象を追って移動することがある）
     monsters.forEach(m => { m.preBattleR = m.r; m.preBattleC = m.c; m.skillUseCounts = []; }); // スキルの発動回数は戦闘ごとにリセットする
@@ -6096,7 +6098,7 @@ function battleStep(){
         if (action.side==='hero'){
             died = resolveHeroAction(action.unit, room);
         } else {
-            const role = action.unit.isDemonLord ? 'melee' : speciesInfo(action.unit.speciesKey).role;
+            const role = action.unit.isDemonLord ? 'magic' : speciesInfo(action.unit.speciesKey).role; // 魔王は動かずに3ターン溜めて範囲魔法を放つ
             died = resolveMonsterTurn(action.unit, room, role);
         }
         if (died) demonLordJustDied = true;
