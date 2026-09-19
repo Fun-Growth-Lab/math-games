@@ -633,6 +633,13 @@
         /* 侵攻プレビュー用：クリック不可の表示専用カード（見た目は同じグリッドに揃える） */
         .monster-picker-btn.static { cursor:default; }
         .monster-picker-btn.static:hover { border-color: var(--card-bdr); }
+        .room-level-badge {
+            margin-left:auto; font-size:1.2rem; color:var(--gold); text-shadow:0 0 8px rgba(255,201,92,0.5);
+        }
+        /* 部屋の特殊能力一覧 */
+        .room-special-row { display:flex; align-items:center; gap:6px; font-size:0.8rem; padding:3px 0; }
+        .room-special-icon { font-size:1rem; }
+        .room-special-pct { margin-left:auto; color:var(--gold); font-weight:800; }
         .hero-preview-sprite {
             width:40px; height:40px; background-repeat:no-repeat; background-size:200% 200%; background-position:0% 0%;
             image-rendering:pixelated;
@@ -1443,6 +1450,9 @@ const UI_TEXT = {
     role_melee: { ja: '近距離', ja_easy: 'きんきょり', en: 'Melee' },
     role_ranged: { ja: '中距離', ja_easy: 'ちゅうきょり', en: 'Mid-range' },
     role_magic: { ja: '長距離', ja_easy: 'ちょうきょり', en: 'Long-range' },
+    room_special_hpregen: { ja: 'HP自動回復', ja_easy: 'HPじどうかいふく', en: 'HP Auto-Heal' },
+    room_special_title: { ja: '部屋の特殊能力', ja_easy: 'へやの とくしゅのうりょく', en: 'Room Special Abilities' },
+    room_level_label: { ja: 'Lv', ja_easy: 'Lv', en: 'Lv' },
     sort_type: { ja: 'タイプ', ja_easy: 'タイプ', en: 'Type' },
     sort_atk: { ja: '攻撃力', ja_easy: 'こうげきりょく', en: 'ATK' },
     sort_def: { ja: '防御力', ja_easy: 'ぼうぎょりょく', en: 'DEF' },
@@ -2718,6 +2728,42 @@ function abilityRowMeta(abilityType){
     }[abilityType];
 }
 
+// ============================================================
+// 部屋の特殊能力（部屋のレベル＝自分のタイプの能力Lvが1/3/5に達するたびに、8種類の中からランダムで1つ獲得する）
+// 部屋にいるモンスターだけに効くバフ効果。同じ種類の効果は加算される（例：攻撃力+10%と攻撃力+30%で+40%）
+// ============================================================
+const ROOM_SPECIAL_ABILITY_TYPES = ['atk','def','magAtk','magDef','hpRegen','melee','ranged','magic'];
+// スロットが解放されるLv→そのスロットの効果量。Lv1で+10%、Lv3で+20%、Lv5で+30%
+const ROOM_SPECIAL_ABILITY_SLOTS = { 1:0.10, 3:0.20, 5:0.30 };
+function roomSpecialAbilityLabel(type){
+    return { atk:ui('monster_stat_atk'), def:ui('monster_stat_def'), magAtk:ui('monster_stat_magatk'), magDef:ui('monster_stat_magdef'),
+        hpRegen:ui('room_special_hpregen'), melee:ui('role_melee'), ranged:ui('role_ranged'), magic:ui('role_magic') }[type];
+}
+// 部屋のレベル（＝自分のタイプの能力Lv）がスロット解放ラインに達していれば、未確定のスロットをランダムに1つ確定させる。
+// 既に確定済みのスロットは再抽選しない（一度決まった特殊能力はそのまま維持される）
+function ensureRoomSpecialAbilities(room){
+    if (!room.type) return;
+    room.specialAbilities = room.specialAbilities || [];
+    const lv = roomAbilityLv(room, room.type);
+    Object.keys(ROOM_SPECIAL_ABILITY_SLOTS).map(Number).forEach(slotLv => {
+        if (lv < slotLv) return;
+        if (room.specialAbilities.some(a => a.slotLv===slotLv)) return;
+        const type = ROOM_SPECIAL_ABILITY_TYPES[Math.floor(Math.random()*ROOM_SPECIAL_ABILITY_TYPES.length)];
+        room.specialAbilities.push({ slotLv, type, pct: ROOM_SPECIAL_ABILITY_SLOTS[slotLv] });
+    });
+}
+// その部屋が持つ特殊能力のうち、指定した種類の効果量の合計（同じ種類は加算）
+function roomSpecialTypeBonusPct(room, type){
+    if (!room || !room.specialAbilities) return 0;
+    return room.specialAbilities.filter(a => a.type===type).reduce((sum,a) => sum+a.pct, 0);
+}
+// ユニットが今いる部屋の特殊能力による加算率（モンスターのみ対象。魔王・勇者には効かない）
+function unitRoomSpecialBonusPct(unit, type){
+    if (!unit.speciesKey || unit.roomId===null || unit.roomId===undefined) return 0;
+    const room = rooms.find(r=>r.id===unit.roomId);
+    return roomSpecialTypeBonusPct(room, type);
+}
+
 // ※旧「強化部屋の能力上昇スロット」システムは凍結（召喚/攻撃/道具の各能力に役割を譲ったため撤去。関連コードはここで削除済み）
 // 指定Lvでの能力効果を計算する（Lvアップ確認ポップアップのbefore/after比較に使う）。
 // 活力・魔力は実際の生産量（数値）、攻撃は倍率を返す。召喚・道具は内部確率を画面に出さずLv表示のみにしているため、
@@ -2831,6 +2877,7 @@ function upgradeRoomAbility(roomId, abilityType){
     vitality -= cost.vit; mana -= cost.mana;
     room.abilityLv = room.abilityLv || {};
     room.abilityLv[abilityType] = nextLv;
+    ensureRoomSpecialAbilities(room);
     renderAll();
 }
 function computeRoomProduction(room, type){
@@ -2912,6 +2959,7 @@ function roomTypeConfirm(){
     const room = rooms.find(r=>r.id===pendingTypeRoomId);
     room.type = pendingType;
     // ※罠システム・旧「能力スロット」システムは凍結中（データ構造は再利用のため残置、ここでは初期化しない）
+    ensureRoomSpecialAbilities(room); // 部屋タイプ確定＝自分のタイプの能力がLv1で自動解放されるので、1つ目の特殊能力もここで確定する
     document.getElementById('roomtype-modal').classList.add('hidden');
     selectedRoomId = room.id;
     pendingTypeRoomId = null; pendingType = null;
@@ -3233,7 +3281,7 @@ function buffedDef(unit, baseDef, statKind){
     const buffPct = buffValue(unit, 'defense');
     let value = buffPct>0 ? baseDef*(1+buffPct) : baseDef;
     if (unit.speciesKey && statKind){
-        value *= (1 + equipmentStatBonusPct(unit, statKind));
+        value *= (1 + equipmentStatBonusPct(unit, statKind) + unitRoomSpecialBonusPct(unit, statKind));
     }
     return Math.round(Math.max(0, value));
 }
@@ -3297,7 +3345,9 @@ function effectiveAtk(unit){
     const buffPct = buffValue(unit, dmgType==='magic' ? 'magAtkUp' : 'atkUp');
     let value = buffPct>0 ? base*(1+buffPct) : base;
     if (unit.speciesKey){
-        value *= (1 + equipmentStatBonusPct(unit, dmgType==='magic' ? 'magAtk' : 'atk'));
+        const statKey = dmgType==='magic' ? 'magAtk' : 'atk';
+        // 部屋の特殊能力は、そのステータス種類（攻撃力/魔法攻撃力）そのものへの加算と、間合い（近距離/中距離/遠距離）が一致するものの加算を両方合算する
+        value *= (1 + equipmentStatBonusPct(unit, statKey) + unitRoomSpecialBonusPct(unit, statKey) + unitRoomSpecialBonusPct(unit, unitRole(unit)));
     }
     value *= rangeAtkMultiplier(unit);
     return Math.round(Math.max(0, value));
@@ -3342,6 +3392,16 @@ function applyRegenTick(unit, side){
     const heal = Math.max(1, Math.round(unit.maxHp * p.value));
     unit.hp = Math.min(unit.maxHp, unit.hp + heal);
     logBattle(uif('battle_log_regen', unitLabel(side, unit), heal));
+}
+// 部屋の特殊能力「HP自動回復」：毎ターンの終わりに、部屋にいるモンスターのHPを最大HPの一定割合だけ回復する（HP0の魔物は対象外）
+function applyRoomHpRegenTick(room, roomMonsters){
+    const pct = roomSpecialTypeBonusPct(room, 'hpRegen');
+    if (pct<=0) return;
+    (roomMonsters || getRoomMonsters(room.id)).forEach(m => {
+        if (m.hp<=0 || m.hp>=m.maxHp) return;
+        const heal = Math.max(1, Math.round(m.maxHp * pct));
+        m.hp = Math.min(m.maxHp, m.hp + heal);
+    });
 }
 // 勇者からモンスターへの攻撃を試みる。回避が発動すればhit:falseで命中しない。攻撃側の攻撃タイプ(物理/魔法)を参照する
 function attemptAttackMonster(attackerUnit, monsterUnit){
@@ -5797,6 +5857,7 @@ function battleStep(){
             return;
         }
         if (!roomBattleQueues[roomId] || roomBattleQueues[roomId].length===0){
+            applyRoomHpRegenTick(room, roomMonsters); // 直前の1巡が終わった（＝1ターン終了）タイミングで部屋のHP自動回復を適用する
             const roomHeroes = battleHeroes.filter(h=>h.roomId===roomId && h.state==='inRoom' && h.behavior==='stay' && h.alive);
             roomBattleQueues[roomId] = [
                 ...roomHeroes.map(h=>({side:'hero', unit:h})),
@@ -6341,7 +6402,9 @@ function renderRoomDetail(){
     if (!rm){ panel.classList.add('hidden'); return; }
     panel.classList.remove('hidden');
     const typeGem = rm.type ? (ROOM_TYPES.find(x=>x.key===rm.type)||{}).gem : null;
-    let html = `<div style="font-weight:800; margin-bottom:6px; display:flex; align-items:center; gap:6px;">${typeGem?`<span class="gem-chip ${typeGem}"></span>`:''}${escapeHtml(roomDisplayNameById(rm.id))}</div>`;
+    // 部屋のレベル＝自分のタイプの能力Lv。特殊能力の解放にも直結するので大きく目立たせて表示する
+    const roomLvBadge = rm.type ? `<b class="room-level-badge">${ui('room_level_label')}.${roomAbilityLv(rm, rm.type)}</b>` : '';
+    let html = `<div style="font-weight:800; margin-bottom:6px; display:flex; align-items:center; gap:6px;">${typeGem?`<span class="gem-chip ${typeGem}"></span>`:''}${escapeHtml(roomDisplayNameById(rm.id))}${roomLvBadge}</div>`;
     if (rm.id===demonLordRoomId) html += `<div class="room-type-badge">${ui('demonlord_here_label')}</div>`;
     const roomMonsters = monsters.filter(m=>m.roomId===rm.id);
     if (rm.type){
@@ -6417,6 +6480,17 @@ function renderRoomDetail(){
         if (skillRows){
             html += `<div class="side-panel-title" style="margin-top:10px;">${ui('section_ability_title')}</div>`;
             html += `<div class="stat-panel">${skillRows}</div>`;
+        }
+        // ---- 部屋の特殊能力：部屋のレベル(Lv1/3/5)に応じてランダムで確定した、部屋のモンスターへのバフ一覧 ----
+        if ((rm.specialAbilities||[]).length>0){
+            const ROOM_SPECIAL_ICON = { atk:'⚔️', def:'🛡️', magAtk:'🔮', magDef:'🌀', hpRegen:'💗', melee:'🗡️', ranged:'🏹', magic:'✨' };
+            html += `<div class="side-panel-title" style="margin-top:10px;">${ui('room_special_title')}</div><div class="stat-panel">`;
+            html += rm.specialAbilities.map(a => `<div class="room-special-row">
+                <span class="room-special-icon">${ROOM_SPECIAL_ICON[a.type]}</span>
+                <span>${roomSpecialAbilityLabel(a.type)}</span>
+                <span class="room-special-pct">+${Math.round(a.pct*100)}%</span>
+            </div>`).join('');
+            html += `</div>`;
         }
     }
     const capacityFull = roomMonsters.length >= rm.monsterCapacity;
