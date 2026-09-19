@@ -410,6 +410,8 @@
         .floating-damage.dmg-small { font-size:0.72rem; color:#e8e8e8; text-shadow: 0 1px 3px rgba(0,0,0,0.85); }
         .floating-damage.dmg-mid   { font-size:0.95rem; color:#fff2b0; text-shadow: 0 1px 3px rgba(0,0,0,0.85); }
         .floating-damage.dmg-big   { font-size:1.2rem; color:#ff9838; text-shadow: 0 0 6px rgba(255,152,56,0.85), 0 1px 3px rgba(0,0,0,0.85); }
+        .floating-damage.dmg-heal  { font-size:1rem; color:#6ff08a; text-shadow: 0 0 6px rgba(111,240,138,0.8), 0 1px 3px rgba(0,0,0,0.85); }
+        .floating-damage.dmg-skill { font-size:0.85rem; color:#7fe3ff; text-shadow: 0 0 6px rgba(127,227,255,0.8), 0 1px 3px rgba(0,0,0,0.85); }
         .floating-damage.dmg-huge  { font-size:1.55rem; color:#ff3b3b; letter-spacing:0.5px; text-shadow: 0 0 8px rgba(255,59,59,0.9), 0 1px 3px rgba(0,0,0,0.85); }
         .projectile-fx {
             position:absolute; width: 30px; height: 30px; display:flex; align-items:center; justify-content:center;
@@ -1475,6 +1477,11 @@ const UI_TEXT = {
     role_melee: { ja: '近距離', ja_easy: 'きんきょり', en: 'Melee' },
     role_ranged: { ja: '中距離', ja_easy: 'ちゅうきょり', en: 'Mid-range' },
     role_magic: { ja: '長距離', ja_easy: 'ちょうきょり', en: 'Long-range' },
+    hero_skill_strong: { ja: '強攻撃！', ja_easy: 'つよい こうげき！', en: 'Power Strike!' },
+    hero_skill_charge: { ja: '溜め…', ja_easy: 'ため…', en: 'Charging…' },
+    hero_skill_fail: { ja: '失敗…', ja_easy: 'しっぱい…', en: 'Missed…' },
+    hero_skill_all: { ja: '全体攻撃！', ja_easy: 'ぜんたい こうげき！', en: 'Blast All!' },
+    hero_skill_heal: { ja: '全体回復！', ja_easy: 'ぜんたい かいふく！', en: 'Group Heal!' },
     room_special_hpregen: { ja: 'HP自動回復', ja_easy: 'HPじどうかいふく', en: 'HP Auto-Heal' },
     // 部屋の特殊能力欄は横幅に余裕があるため、他の場所で使う省略表記（攻／防など）ではなく正式名称で表示する
     room_special_label_atk: { ja: '攻撃力', ja_easy: 'こうげきりょく', en: 'Attack' },
@@ -3438,10 +3445,10 @@ function applyRoomHpRegenTick(room, roomMonsters){
     });
 }
 // 勇者からモンスターへの攻撃を試みる。回避が発動すればhit:falseで命中しない。攻撃側の攻撃タイプ(物理/魔法)を参照する
-function attemptAttackMonster(attackerUnit, monsterUnit){
+function attemptAttackMonster(attackerUnit, monsterUnit, atkMult){
     if (rollEvasion(monsterUnit)) return { hit:false, dmg:0 };
     const dmgType = unitDmgType(attackerUnit);
-    return { hit:true, dmg: heroDamageToMonster(effectiveAtk(attackerUnit), monsterUnit, dmgType) };
+    return { hit:true, dmg: heroDamageToMonster(Math.round(effectiveAtk(attackerUnit) * (atkMult || 1)), monsterUnit, dmgType) };
 }
 
 // ---- 経験値・レベル・ランクアップ ----
@@ -4791,7 +4798,7 @@ const STAGE_FINAL = 7; // 最終侵攻。ここの勇者を倒すとゲームク
 const HEROES_PER_WAVE = 4;
 const WAVE_INTERVAL_TICKS = 12; // 次の4体が入ってくるまでのtick数（暫定値。1tickは行動1回分の間隔）
 function heroCountForStage(stageNum){ return 2 * stageNum; }
-// 勇者のクラス定義。モンスターと同じ形式（passive/activeは配列）でスキルを持てる。
+// 勇者のクラス定義。
 // tierStart/tierEndは侵攻1・侵攻7でのステータス（1〜10ランク値、モンスターと同じtierStats換算を使う）。
 // 中間の侵攻は線形補間する（lerpHeroTierを参照）。役割(role)は近接/中距離/遠距離の立ち回りを決める。
 // HPは人数に関わらず今まで通り2倍のまま（下げすぎて一撃死しないように）。
@@ -4813,21 +4820,27 @@ const HERO_ATK_RAW_START = 16, HERO_ATK_RAW_END = 30;
 const HERO_CLASSES = [
     { key:'swordsman', name_ja:'剣士',     emoji:'⚔️', role:'melee',  dmgType:'physical',
         tierStart:[5,HERO_ATK_RAW_START/4,3,1,1], tierEnd:[9,HERO_ATK_RAW_END/4,7,1,4],
-        passive:[{ type:'physicalResist', value:0.15 }],
-        active:[{ type:'buff', category:'atkUp', value:0.2, scope:'self' }] },
+        skill:{ type:'strongAttack', multiplier:1.8 } },
     { key:'archer',     name_ja:'アーチャー', emoji:'🏹', role:'ranged', dmgType:'physical',
         tierStart:[4,HERO_ATK_RAW_START/4,2,1,1], tierEnd:[7,HERO_ATK_RAW_END/4,5,1,3],
-        passive:[{ type:'extraAttack', chance:0.30 }] },
+        skill:{ type:'chargedShot', multiplier:2 } },
     { key:'mage',       name_ja:'メイジ',   emoji:'🔮', role:'magic',  dmgType:'magic',
         tierStart:[3,1,1,HERO_ATK_RAW_START/3,2], tierEnd:[6,1,4,HERO_ATK_RAW_END/3,5],
-        passive:[{ type:'magicAmplify', value:0.2 }],
-        active:[{ type:'bigAttack', multiplier:2 }] },
+        skill:{ type:'allAttack' } },
     { key:'priest',     name_ja:'プリースト', emoji:'✨', role:'melee',  dmgType:'physical',
         tierStart:[6,3,4,1,3], tierEnd:[10,6,7,1,6],
-        passive:[{ type:'regen', value:0.05 }],
-        active:[{ type:'buff', category:'defense', value:0.2, scope:'party' }] },
+        skill:{ type:'groupHeal', ratio:0.3 } },
 ];
+// 勇者はパッシブを持たず、職ごとに1つだけのスキルを持つ。攻撃・行動の機会ごとに間合い別の確率で抽選し、1戦闘につき最大3回まで発動できる
+// （発動できなくなるターンのルール＝クールダウンはない）。使い切った後は通常攻撃のみ
+const HERO_SKILL_CHANCE = { melee:0.4, ranged:0.3, magic:0.2 };
+const HERO_SKILL_MAX_USES = 3;
 function heroClassInfo(key){ return HERO_CLASSES.find(c=>c.key===key); }
+function heroSkillTriggers(hero){
+    const cls = heroClassInfo(hero.heroClassKey);
+    if (!cls || !cls.skill || (hero.skillUses||0) >= HERO_SKILL_MAX_USES) return false;
+    return Math.random() < HERO_SKILL_CHANCE[cls.role];
+}
 // 侵攻(ステージ)番号に応じてtierStart～tierEndを線形補間する（侵攻1〜7、7段階で補間）
 // 攻撃として参照するステータス（物理=攻撃力[1]／魔法=魔法攻撃力[3]）だけは、間合い補正の比率を正確に保つため整数に丸めず小数のまま補間する
 function lerpHeroTier(cls, stageNum){
@@ -5115,7 +5128,7 @@ function startBattle(){
               magAtk = st.magAtk*offenseMult, magDef = st.magDef*offenseMult;
         battleHeroes.push({ id:i+1, priority:i+1, heroClassKey:classKey, gender: heroPreview[i].gender,
             hp, maxHp:hp, atk, def, magAtk, magDef,
-            alive:true, r:-1, c:-1, emoji:cls.emoji, statusEffects:[], buffs:[], activeCooldowns:[], chargeTurns:0,
+            alive:true, r:-1, c:-1, emoji:cls.emoji, statusEffects:[], buffs:[], skillUses:0, shotTarget:null, chargeTurns:0,
             state:'pending', roomId:null, behavior:null,
             transitPath:null, transitStepIndex:0, transitNextRoomId:null,
             corridorVisitOrder:[], spawnWave: Math.floor(i/HEROES_PER_WAVE) });
@@ -5417,11 +5430,18 @@ function floatingDamageClass(ratio){
 }
 // 戦闘ログの代わりに、被弾したアイコンの真上にダメージ数字を浮かび上がらせて消す
 function showFloatingDamage(side, target, dmg){
-    if (!gridEl || dmg<=0) return;
+    if (dmg<=0) return;
     const ratio = target.maxHp>0 ? dmg/target.maxHp : 0;
+    spawnFloatingText(target, Math.round(dmg), floatingDamageClass(ratio));
+}
+// 勇者スキルの回復量（緑）・スキル名（水色）も同じ浮かぶ文字で見せる
+function showFloatingHeal(target, amount){ spawnFloatingText(target, '+'+amount, 'floating-damage dmg-heal'); }
+function showSkillCallout(unit, text){ spawnFloatingText(unit, text, 'floating-damage dmg-skill'); }
+function spawnFloatingText(target, text, className){
+    if (!gridEl) return;
     const num = document.createElement('div');
-    num.className = floatingDamageClass(ratio);
-    num.textContent = Math.round(dmg);
+    num.className = className;
+    num.textContent = text;
     num.style.left = (px(target.c) + CELL/2) + 'px';
     num.style.top = px(target.r) + 'px';
     gridEl.appendChild(num);
@@ -5486,26 +5506,15 @@ function surroundingFreeCells(unit, room, roomId){
 }
 
 // ---- 勇者の行動（近接のみ。斜めからは攻撃できない） ----
-// 勇者の行動の入り口。モンスターと同じく、状態異常判定→アクティブスキル（使用可能なら）→通常行動の順で処理する。
-// クラスのrole（近距離/中距離/遠距離）で立ち回りが変わり、パッシブ/アクティブも配列で複数持てる。
+// 勇者の行動の入り口。状態異常判定→クラスのrole（近距離/中距離/遠距離）ごとの行動の順で処理する。
+// スキルの抽選は各roleの行動の中（攻撃の機会ごと）で行う。
 function resolveHeroAction(hero, room){
-    applyRegenTick(hero, 'hero'); // 再生は行動可否に関わらず手番の最初に発動する
     tickBuffs(hero);
     if (tickStatusEffectsAndCheckSkip(hero, 'hero')) return false; // 麻痺・凍結でこのターン動けない
     const confused = resolveConfusedAction(hero, room, hero.roomId, 'hero');
     if (confused) return confused.demonLordJustDied;
     const cls = heroClassInfo(hero.heroClassKey);
     const role = cls ? cls.role : 'melee';
-    const actives = (cls && cls.active) || [];
-    if (!hero.activeCooldowns || hero.activeCooldowns.length!==actives.length) hero.activeCooldowns = actives.map(()=>0);
-    const readyIndices = actives.map((s,i)=>i).filter(i => hero.activeCooldowns[i]<=0);
-    if (readyIndices.length>0){
-        const i = readyIndices[Math.floor(Math.random()*readyIndices.length)];
-        const result = resolveHeroActiveSkill(hero, cls, actives[i], room);
-        if (result.used){ hero.activeCooldowns[i] = ACTIVE_SKILL_COOLDOWN; return result.demonLordJustDied; }
-        // 射程外などで発動できなかった場合はこのスキルのクールダウンを消費せず通常行動にフォールバックする
-    }
-    actives.forEach((s,i) => { if (hero.activeCooldowns[i]>0) hero.activeCooldowns[i]--; });
     if (role==='ranged') return resolveHeroRangedAction(hero, room);
     if (role==='magic') return resolveHeroMagicAction(hero, room);
     return resolveHeroMeleeAction(hero, room);
@@ -5519,35 +5528,81 @@ function pickHeroTarget(hero){
     return demonLordInRoom ? demonLordUnit : null;
 }
 // 通常攻撃1回分（命中判定・ダメージ適用・ログまで）の共通処理。戻り値は魔王を倒したかどうか
-function heroAttack(hero, target){
-    const result = attemptAttackMonster(hero, target);
+// atkMultはスキル用の攻撃力倍率（防御力で軽減する前の攻撃力に掛かる）
+function heroAttack(hero, target, atkMult){
+    const result = attemptAttackMonster(hero, target, atkMult);
     if (!result.hit){ logBattle(uif('battle_log_evaded', uif('hero_label', hero.id), unitLabel('monster', target))); return false; }
     const demonLordDied = applyDamage('monster', target, result.dmg);
     logBattle(uif('battle_log_attack', uif('hero_label', hero.id), unitLabel('monster', target), result.dmg));
     return demonLordDied;
 }
 // ---- 近接クラスの行動：同じ部屋に魔王がいれば最優先で狙う。隣接していれば即攻撃、近づけなければ邪魔なモンスターを攻撃する ----
+// 近接クラスのスキル：剣士は攻撃の機会ごとに抽選して強攻撃（攻撃力1.8倍）、プリーストは手番の頭に抽選して部屋の勇者全員を回復する
+function heroMeleeAttack(hero, target){
+    const skill = heroClassInfo(hero.heroClassKey).skill;
+    if (skill && skill.type==='strongAttack' && heroSkillTriggers(hero)){
+        hero.skillUses++;
+        showSkillCallout(hero, ui('hero_skill_strong'));
+        return heroAttack(hero, target, skill.multiplier);
+    }
+    return heroAttack(hero, target);
+}
+// 戻り値：回復を発動したらtrue（その手番は回復で使い切る）。誰もダメージを受けていなければ抽選しない
+function tryHeroGroupHeal(hero){
+    const skill = heroClassInfo(hero.heroClassKey).skill;
+    if (!skill || skill.type!=='groupHeal') return false;
+    const allies = battleHeroes.filter(h => h.alive && h.roomId===hero.roomId);
+    if (!allies.some(h => h.hp<h.maxHp)) return false;
+    if (!heroSkillTriggers(hero)) return false;
+    hero.skillUses++;
+    showSkillCallout(hero, ui('hero_skill_heal'));
+    allies.forEach(h => {
+        const heal = Math.min(h.maxHp - h.hp, Math.round(h.maxHp * skill.ratio));
+        if (heal<=0) return;
+        h.hp += heal;
+        showFloatingHeal(h, heal);
+    });
+    return true;
+}
 function resolveHeroMeleeAction(hero, room){
+    if (tryHeroGroupHeal(hero)) return false;
     const demonLordInRoom = demonLordUnit && demonLordUnit.alive && demonLordRoomId===hero.roomId;
     const monsterTargets = getRoomMonsters(hero.roomId).filter(t=>!t.isDemonLord);
     if (demonLordInRoom){
-        if (isAdjacentOrtho(hero, demonLordUnit)) return heroAttack(hero, demonLordUnit);
+        if (isAdjacentOrtho(hero, demonLordUnit)) return heroMeleeAttack(hero, demonLordUnit);
         if (moveOneStepToward(hero, demonLordUnit, room, hero.roomId)) return false;
         const blocker = monsterTargets.find(m => isAdjacentOrtho(hero, m));
-        if (blocker) return heroAttack(hero, blocker);
+        if (blocker) return heroMeleeAttack(hero, blocker);
         return false;
     }
     if (monsterTargets.length===0) return false;
     const target = pickNearestTarget(hero, monsterTargets);
-    if (isAdjacentOrtho(hero, target)) return heroAttack(hero, target);
+    if (isAdjacentOrtho(hero, target)) return heroMeleeAttack(hero, target);
     moveOneStepToward(hero, target, room, hero.roomId);
     return false;
 }
 // ---- 中距離クラスの行動：3マス以内から攻撃 ----
+// アーチャーのスキル「追加攻撃」：射程内で抽選に当たると1ターン溜め（狙う相手を固定）、次のターンに攻撃力2倍で撃つ。
+// 撃つ時点で相手がいなくなっていたら失敗（そのターンは何もできない。使用回数は溜めた時点で消費済み）
 function resolveHeroRangedAction(hero, room){
+    const skill = heroClassInfo(hero.heroClassKey).skill;
+    if (hero.shotTarget){
+        const target = hero.shotTarget;
+        hero.shotTarget = null;
+        const stillThere = target.isDemonLord ? target.alive : (target.hp>0 && target.roomId===hero.roomId);
+        if (!stillThere){ showSkillCallout(hero, ui('hero_skill_fail')); return false; }
+        showProjectileEffect(hero, target);
+        return heroAttack(hero, target, skill.multiplier);
+    }
     const target = pickHeroTarget(hero);
     if (!target) return false;
     if (manhattan(hero, target)<=3){
+        if (skill && skill.type==='chargedShot' && heroSkillTriggers(hero)){
+            hero.skillUses++;
+            hero.shotTarget = target;
+            showSkillCallout(hero, ui('hero_skill_charge'));
+            return false;
+        }
         showProjectileEffect(hero, target);
         return heroAttack(hero, target);
     }
@@ -5564,9 +5619,18 @@ function resolveHeroMagicAction(hero, room){
     hero.chargeTurns = 0;
     const targets = getRoomMonsters(hero.roomId); // 魔王も範囲に含めて全体攻撃
     if (targets.length===0) return false;
-    const centerTarget = targets[Math.floor(Math.random()*targets.length)];
-    const blastCells = MAGIC_BLAST_OFFSETS.map(([dr,dc]) => ({ r:centerTarget.r+dr, c:centerTarget.c+dc }))
-        .filter(cell => cell.r>=0 && cell.r<GRID_ROWS && cell.c>=0 && cell.c<GRID_COLS);
+    // スキル「全体攻撃」：溜め終わりの発動時に抽選し、当たれば爆発の範囲に関係なく部屋の敵全員へ通常の威力で攻撃する
+    const skillAll = heroSkillTriggers(hero);
+    let blastCells;
+    if (skillAll){
+        hero.skillUses++;
+        showSkillCallout(hero, ui('hero_skill_all'));
+        blastCells = targets.map(m => ({ r:m.r, c:m.c }));
+    } else {
+        const centerTarget = targets[Math.floor(Math.random()*targets.length)];
+        blastCells = MAGIC_BLAST_OFFSETS.map(([dr,dc]) => ({ r:centerTarget.r+dr, c:centerTarget.c+dc }))
+            .filter(cell => cell.r>=0 && cell.r<GRID_ROWS && cell.c>=0 && cell.c<GRID_COLS);
+    }
     showMagicBurstEffect(blastCells);
     const hitCells = new Set(blastCells.map(cell => `${cell.r},${cell.c}`));
     const power = effectiveAtk(hero);
@@ -5580,30 +5644,6 @@ function resolveHeroMagicAction(hero, room){
     });
     logBattle(uif('battle_log_magic_burst', uif('hero_label', hero.id)));
     return demonLordJustDied;
-}
-// 勇者のアクティブスキル1つ分の発動本体。戻り値: { used, demonLordJustDied }
-function resolveHeroActiveSkill(hero, cls, skill, room){
-    if (skill.type==='buff'){ return { used: resolveBuffSkill(hero, cls, skill, room), demonLordJustDied:false }; }
-    if (skill.type==='bigAttack'){ return resolveHeroBigAttackSkill(hero, cls, skill, room); }
-    return { used:false, demonLordJustDied:false };
-}
-// 大技：通常攻撃と同じ間合いだが威力が高い単体攻撃
-function resolveHeroBigAttackSkill(hero, cls, skill, room){
-    const target = pickHeroTarget(hero);
-    if (!target) return { used:false, demonLordJustDied:false };
-    const role = cls.role;
-    const inRange = role==='melee' ? isAdjacentOrtho(hero, target) : (role==='ranged' ? manhattan(hero, target)<=3 : true);
-    if (!inRange){
-        moveOneStepToward(hero, target, room, hero.roomId);
-        return { used:false, demonLordJustDied:false };
-    }
-    if (role!=='melee') showProjectileEffect(hero, target);
-    const result = attemptAttackMonster(hero, target);
-    if (!result.hit){ logBattle(uif('battle_log_evaded', uif('hero_label', hero.id), unitLabel('monster', target))); return { used:true, demonLordJustDied:false }; }
-    const bigDmg = Math.max(1, Math.round(result.dmg * skill.multiplier));
-    const demonLordJustDied = applyDamage('monster', target, bigDmg);
-    logBattle(uif('battle_log_hero_big_attack', uif('hero_label', hero.id), unitLabel('monster', target), bigDmg));
-    return { used:true, demonLordJustDied };
 }
 // ---- モンスターの行動の入り口。状態異常判定→アクティブスキル（使用可能なら）→通常行動の順で処理する ----
 // 戻り値: 混乱の同士討ちで魔王がこの一撃で倒された場合はtrue（呼び出し側でゲームオーバー判定に使う）
