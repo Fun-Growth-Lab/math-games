@@ -186,6 +186,16 @@
             box-shadow: 0 18px 44px rgba(0,0,0,0.6);
         }
         .modal-msg { font-size: 1.0rem; font-weight: 700; color: var(--ink); margin-bottom: 20px; line-height: 1.8; text-align: left; }
+        /* 迎撃確認ポップアップのステージ見出し：説明文は省き、ステージ数を大きく光らせて目を引く */
+        .battle-confirm-stage-title {
+            text-align:center; font-size:1.9rem; font-weight:900; letter-spacing:2px;
+            color: var(--gold,#ffd85c); margin-bottom:14px;
+            animation: battleConfirmGlow 1.6s ease-in-out infinite alternate;
+        }
+        @keyframes battleConfirmGlow {
+            from { text-shadow: 0 0 8px rgba(255,216,92,0.6), 0 0 16px rgba(255,216,92,0.35), 0 2px 3px rgba(0,0,0,0.6); }
+            to   { text-shadow: 0 0 16px rgba(255,216,92,1), 0 0 32px rgba(255,216,92,0.75), 0 2px 3px rgba(0,0,0,0.6); }
+        }
         .modal-title { font-size: 1.6rem; font-weight: 800; color: var(--accent); margin-bottom: 14px; }
         .modal-score-row { display:flex; justify-content:space-between; gap: 20px; padding: 6px 4px; font-size: 0.95rem; color: var(--ink-dim); border-bottom: 1px dashed var(--card-bdr); }
         .modal-score-row b { color: var(--ink); font-weight: 800; }
@@ -392,6 +402,15 @@
             position:absolute; bottom:-4px; left:-4px; z-index:2; font-size: 0.8rem;
             text-shadow: 0 0 3px #000, 0 0 3px #000;
         }
+        /* 戦闘ログの代わりに、被弾したアイコンの上に浮かぶダメージ数字。最大HPに対する割合が大きいほど目立つ色・大きさにする */
+        .floating-damage {
+            position:absolute; z-index:6; pointer-events:none; font-weight:800; white-space:nowrap;
+            transform: translate(-50%,0);
+        }
+        .floating-damage.dmg-small { font-size:0.72rem; color:#e8e8e8; text-shadow: 0 1px 3px rgba(0,0,0,0.85); }
+        .floating-damage.dmg-mid   { font-size:0.95rem; color:#fff2b0; text-shadow: 0 1px 3px rgba(0,0,0,0.85); }
+        .floating-damage.dmg-big   { font-size:1.2rem; color:#ff9838; text-shadow: 0 0 6px rgba(255,152,56,0.85), 0 1px 3px rgba(0,0,0,0.85); }
+        .floating-damage.dmg-huge  { font-size:1.55rem; color:#ff3b3b; letter-spacing:0.5px; text-shadow: 0 0 8px rgba(255,59,59,0.9), 0 1px 3px rgba(0,0,0,0.85); }
         .projectile-fx {
             position:absolute; width: 30px; height: 30px; display:flex; align-items:center; justify-content:center;
             font-size: 1.1rem; pointer-events:none; z-index:5; transition: left 0.24s linear, top 0.24s linear;
@@ -479,9 +498,7 @@
             background-repeat:no-repeat; background-size:200% 200%; image-rendering:pixelated;
             filter: drop-shadow(0 1px 2px rgba(0,0,0,0.7));
         }
-        .battle-log { max-height: 260px; overflow-y:auto; font-size: 0.75rem; color: var(--ink-dim); line-height: 1.6; margin-top: 8px; border-top: 1px dashed var(--card-bdr); padding-top: 8px; }
         #battle-heroes-list { max-height: 180px; overflow-y:auto; padding-right:2px; }
-        .battle-log div:last-child { color: var(--gold); font-weight: 700; }
         .hero-hp-row { display:flex; align-items:center; gap:6px; font-size: 0.78rem; margin-bottom: 5px; }
         .hero-hp-row.dead { opacity: 0.4; text-decoration: line-through; }
         .hero-hp-track { flex:1; height:6px; background: rgba(0,0,0,0.4); border-radius:3px; overflow:hidden; }
@@ -624,8 +641,12 @@
             display:grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap:8px;
             max-height:52vh; overflow-y:auto; padding:2px; margin-bottom:6px;
         }
-        /* 迎撃前の勇者プレビューは、少人数のときに左詰めにならないよう列全体を中央寄せする */
-        #battle-confirm-hero-grid { justify-content:center; }
+        /* 迎撃前の勇者プレビューは、少人数のときに左詰めにならないよう中央寄せする。
+           grid+auto-fillは1fr列が常に横幅いっぱいに伸びてjustify-content:centerが効かないため、flexに変更する */
+        #battle-confirm-hero-grid {
+            display:flex; flex-wrap:wrap; justify-content:center; gap:8px;
+        }
+        #battle-confirm-hero-grid .monster-picker-btn { flex:0 0 150px; }
         .monster-picker-btn {
             display:flex; flex-direction:column; align-items:center; gap:4px; text-align:center;
             background: #1c140e; border: 2px solid var(--card-bdr); border-radius: 14px;
@@ -809,7 +830,6 @@
                     <div class="side-panel-title" id="battle-stage-label">ステージ1</div>
                     <div id="demonlord-skill-bar"></div>
                     <div id="battle-heroes-list"></div>
-                    <div id="battle-log" class="battle-log"></div>
                 </div>
                 <div id="room-detail-panel" class="side-panel hidden">
                     <div id="room-detail-body"></div>
@@ -838,7 +858,7 @@
     <!-- ==================== BATTLE CONFIRM ==================== -->
     <div id="battle-confirm-modal" class="modal-backdrop hidden">
         <div class="modal-box" style="width:95vw; max-width:640px; max-height:85vh; overflow-y:auto;">
-            <p class="modal-msg" id="battle-confirm-msg"></p>
+            <div id="battle-confirm-stage-title" class="battle-confirm-stage-title"></div>
             <div id="battle-confirm-hero-grid" class="monster-picker-grid"></div>
             <button class="btn btn-danger btn-sm" onclick="confirmStartBattle()" data-i18n="btn_yes">はい</button>
             <button class="btn btn-sm" onclick="closeBattleConfirm()" data-i18n="btn_no">いいえ</button>
@@ -951,7 +971,7 @@
             <div class="modal-title" data-i18n="monster_list_modal_title">👾 魔物一覧</div>
             <div style="display:flex; gap:6px; margin-bottom:10px;">
                 <button class="btn btn-sm btn-teal" style="flex:1;" data-i18n="btn_auto_deploy" onclick="autoDeployStockedMonsters()">🏠 自動配置</button>
-                <button class="btn btn-sm btn-purple" style="flex:1;" data-i18n="btn_auto_rearrange" onclick="autoRearrangeMonstersByPower()">🔀 強さで並替</button>
+                <button class="btn btn-sm btn-purple" style="flex:1;" data-i18n="btn_auto_rearrange" onclick="deployStrongestMonsters()">💪 強い魔物を配置</button>
                 <button class="btn btn-sm btn-retrieve-all" style="flex:1;" data-i18n="btn_retrieve_all" onclick="retrieveAllMonsters()">📦 全回収</button>
             </div>
             <div id="monster-list-body"></div>
@@ -1403,7 +1423,7 @@ const UI_TEXT = {
     btn_start_battle: { ja: '⚔️ 迎撃', ja_easy: '⚔️ てきを むかえうつ', en: '⚔️ Face the Invaders' },
     err_no_demonlord: { ja: '先に魔王を配置してください', ja_easy: 'さきに まおうを おいてね', en: 'Place the Demon Lord first' },
     err_no_rooms_battle: { ja: '部屋がまだありません', ja_easy: 'へやが まだ ないよ', en: 'No rooms have been built yet' },
-    confirm_start_battle_msg: { ja: n => `ステージ${n}：勇者たちが攻めてきます。開始すると建設・配置ができなくなります。よろしいですか？`, ja_easy: n => `ステージ${n}：ゆうしゃたちが せめてくるよ。はじめると けんせつ・はいちが できなくなるよ。いい？`, en: n => `Stage ${n}: The heroes are attacking. Once started, building and placement will be locked. Proceed?` },
+    battle_confirm_stage_title: { ja: n => `ステージ ${n}`, ja_easy: n => `ステージ ${n}`, en: n => `Stage ${n}` },
     battle_stage_label: { ja: n => `⚔️ ステージ${n}`, ja_easy: n => `⚔️ ステージ${n}`, en: n => `⚔️ Stage ${n}` },
     hud_stage_label: { ja: n => `ステージ ${n}`, ja_easy: n => `ステージ ${n}`, en: n => `Stage ${n}` },
     battle_log_enter: { ja: (heroLabel,name) => `${heroLabel}が${name}に突入！`, ja_easy: (heroLabel,name) => `${heroLabel}が ${name}に とつにゅう！`, en: (heroLabel,name) => `${heroLabel} entered ${name}!` },
@@ -1444,10 +1464,11 @@ const UI_TEXT = {
     status_deploy_stocked: { ja: '配置する部屋のマスをクリックしてください', ja_easy: 'はいちする へやの マスを クリックしてね', en: 'Click a cell in the room to deploy this monster' },
     err_deploy_build_only: { ja: 'ダンジョン作成中のみ操作できます', ja_easy: 'ダンジョンを つくっている ときだけ できるよ', en: 'You can only do this while building the dungeon' },
     btn_auto_deploy: { ja: '🏠 自動配置', ja_easy: '🏠 じどう はいち', en: '🏠 Auto-deploy' },
-    btn_auto_rearrange: { ja: '🔀 強さで並替', ja_easy: '🔀 つよさで ならびかえ', en: '🔀 Rearrange by Power' },
+    btn_auto_rearrange: { ja: '💪 強い魔物を配置', ja_easy: '💪 つよい モンスターを はいち', en: '💪 Deploy Strongest' },
     btn_retrieve_all: { ja: '📦 全回収', ja_easy: '📦 ぜんぶ かいしゅう', en: '📦 Retrieve All' },
     status_auto_deploy_done: { ja: n => `${n}体を自動配置しました`, ja_easy: n => `${n}たいを じどうはいち したよ`, en: n => `Auto-deployed ${n} monster(s)` },
-    status_auto_rearrange_done: { ja: '部屋ごとに、通路の出入口に近い順で強いモンスターを並べ直しました', ja_easy: 'へやごとに、つうろの でいりぐちに ちかい じゅんで つよい モンスターを ならべなおしたよ', en: 'Rearranged each room so stronger monsters are closer to the entrance' },
+    status_auto_rearrange_done: { ja: n => `マップ上の総合戦闘力が高くなるよう、${n}体を入れ替えました`, ja_easy: n => `マップの うえの つよさが たかくなるように、${n}たいを いれかえたよ`, en: n => `Swapped ${n} monster(s) to maximize total power on the map` },
+    status_auto_rearrange_none: { ja: 'すでに最も強い魔物が配置されています', ja_easy: 'もう いちばん つよい モンスターが はいちされているよ', en: 'The strongest monsters are already deployed' },
     status_retrieve_all_done: { ja: n => `${n}体をストックに回収しました`, ja_easy: n => `${n}たいを ストックに かいしゅう したよ`, en: n => `Retrieved ${n} monster(s) to stock` },
     err_no_monster_to_retrieve: { ja: '配置されているモンスターがいません', ja_easy: 'はいちされている モンスターが いないよ', en: 'No monsters are currently deployed' },
     err_no_room_space: { ja: '配置できる空きのある部屋がありません', ja_easy: 'はいちできる あきの ある へやが ないよ', en: 'No room has space to deploy into' },
@@ -4298,24 +4319,27 @@ function openMonsterListModal(){
     modalBox.scrollTop = 0; // hidden化してもスクロール位置は保持されたままなので、開くたびに一番上へ戻す
     document.getElementById('monster-list-modal').classList.remove('hidden');
 }
-// 部屋ごとに、既に配置されているモンスターだけを対象に「通路の出入口に近いマスほど強いモンスターが入る」ように並べ替える。
-// 部屋やモンスターの総数・どの部屋に何体いるかという配置構造そのものは変えない（自動配置のようにゼロから置き直さない）
-function autoRearrangeMonstersByPower(){
+// マップ上（配置済み）の総合戦闘力の合計が最大になるよう、配置済みモンスターとストックのモンスターを入れ替える。
+// 「配置中で最も弱い個体」と「ストックで最も強い個体」を比較し、ストックの方が強ければ入れ替える……を
+// これ以上入れ替えられなくなるまで繰り返す（部屋の構造やどのマスに誰がいたかは、入れ替え対象以外そのまま維持する）
+function deployStrongestMonsters(){
     if (gamePhase!=='build') return;
-    rooms.forEach(room => {
-        const occupants = monsters.filter(m => m.roomId===room.id);
-        if (occupants.length<2) return;
-        const doorways = roomDoorwayCells(room);
-        if (doorways.length===0) return;
-        const distToDoor = (r,c) => Math.min(...doorways.map(d => Math.abs(d.r-r)+Math.abs(d.c-c)));
-        const cells = occupants.map(m => ({r:m.r, c:m.c})).sort((a,b) => distToDoor(a.r,a.c)-distToDoor(b.r,b.c));
-        const sortedMonsters = occupants.slice().sort((a,b) => powerScore(b)-powerScore(a));
-        sortedMonsters.forEach((m,i) => { m.r = cells[i].r; m.c = cells[i].c; });
-    });
+    const deployed = monsters.filter(m => m.roomId!==null).sort((a,b) => powerScore(a)-powerScore(b));
+    const stocked = stockedMonsters().slice().sort((a,b) => powerScore(b)-powerScore(a));
+    let swapCount = 0;
+    let i = 0, j = 0;
+    while (i<deployed.length && j<stocked.length && powerScore(stocked[j])>powerScore(deployed[i])){
+        const weak = deployed[i], strong = stocked[j];
+        const roomId = weak.roomId, r = weak.r, c = weak.c;
+        weak.roomId = null; weak.r = 0; weak.c = 0;
+        strong.roomId = roomId; strong.r = r; strong.c = c;
+        swapCount++;
+        i++; j++;
+    }
     renderMonsterListModal();
     renderRoomDetail();
     renderAll();
-    showToast(ui('status_auto_rearrange_done'));
+    showToast(swapCount>0 ? uif('status_auto_rearrange_done', swapCount) : ui('status_auto_rearrange_none'));
 }
 function closeMonsterListModal(){ document.getElementById('monster-list-modal').classList.add('hidden'); }
 function renderMonsterListModal(){
@@ -5034,7 +5058,7 @@ function requestStartBattle(){
     if (rooms.length===0){ showToast(ui('err_no_rooms_battle')); return; }
     if (demonLordRoomId===null || !demonLordCell){ showToast(ui('err_no_demonlord')); return; }
     pendingBattleHeroPreview = buildBattleHeroPreview();
-    document.getElementById('battle-confirm-msg').textContent = uif('confirm_start_battle_msg', stage);
+    document.getElementById('battle-confirm-stage-title').textContent = uif('battle_confirm_stage_title', stage);
     document.getElementById('battle-confirm-hero-grid').innerHTML = pendingBattleHeroPreview.map(heroPreviewCardHtml).join('');
     document.getElementById('battle-confirm-modal').classList.remove('hidden');
 }
@@ -5086,8 +5110,8 @@ function startBattle(){
     demonLordUnit.preBattleR = demonLordUnit.r; demonLordUnit.preBattleC = demonLordUnit.c;
     selectedRoomId = null; selectedMonsterId = null; demonLordMoveSelected = false; highlightedMonsterId = null;
     document.getElementById('battle-stage-label').textContent = uif('battle_stage_label', stage);
-    document.getElementById('battle-log').innerHTML = '';
     updatePhaseUI();
+    renderAll(); // 部屋・通路・罠などの静的な表示はここで一度だけ確定させ、以降のターン更新は軽量なrenderBattleTick()に任せる
     scheduleBattleStep(200);
 }
 
@@ -5117,13 +5141,8 @@ function updateSidePanelVisibility(){
     document.getElementById('room-detail-panel').classList.toggle('force-hidden', moveSelecting);
 }
 
-function logBattle(msg){
-    const log = document.getElementById('battle-log');
-    const row = document.createElement('div');
-    row.textContent = msg;
-    log.appendChild(row);
-    log.scrollTop = log.scrollHeight;
-}
+// 文字のログ欄は廃止し、代わりにマップ上のアイコンを直接演出する（被弾演出はapplyDamage側のshowFloatingDamage/triggerHitEffectで表現する）
+function logBattle(msg){}
 function renderHeroList(){
     const wrap = document.getElementById('battle-heroes-list');
     wrap.innerHTML = battleHeroes.map(h => `
@@ -5369,9 +5388,37 @@ function triggerHitEffect(side, target){
         { transform: 'translate(0,0)' },
     ], { duration: 220, easing: 'ease-out' });
 }
+// 最大HPに対するダメージの割合で、浮かぶ数字の色・大きさを変える（大ダメージほど目立たせる）
+function floatingDamageClass(ratio){
+    if (ratio >= 0.4) return 'floating-damage dmg-huge';
+    if (ratio >= 0.2) return 'floating-damage dmg-big';
+    if (ratio >= 0.08) return 'floating-damage dmg-mid';
+    return 'floating-damage dmg-small';
+}
+// 戦闘ログの代わりに、被弾したアイコンの真上にダメージ数字を浮かび上がらせて消す
+function showFloatingDamage(side, target, dmg){
+    if (!gridEl || dmg<=0) return;
+    const ratio = target.maxHp>0 ? dmg/target.maxHp : 0;
+    const num = document.createElement('div');
+    num.className = floatingDamageClass(ratio);
+    num.textContent = Math.round(dmg);
+    num.style.left = (px(target.c) + CELL/2) + 'px';
+    num.style.top = px(target.r) + 'px';
+    gridEl.appendChild(num);
+    if (num.animate){
+        const anim = num.animate([
+            { transform: 'translate(-50%,0)', opacity: 1 },
+            { transform: 'translate(-50%,-30px)', opacity: 0 },
+        ], { duration: 700, easing: 'ease-out' });
+        anim.onfinish = () => num.remove();
+    } else {
+        setTimeout(() => num.remove(), 700);
+    }
+}
 function applyDamage(side, target, dmg, attackerUnit){
     target.hp -= dmg;
     triggerHitEffect(side, target);
+    showFloatingDamage(side, target, dmg);
     // バランス確認用：モンスター（魔王・罠は含まない）が勇者に与えたダメージを役割×攻撃タイプ別に集計する
     if (side==='hero' && attackerUnit && attackerUnit.speciesKey){
         const asp = speciesInfo(attackerUnit.speciesKey);
@@ -5841,6 +5888,14 @@ function resolveRoomAttack(room){
 
 // 1tickにつき：①移動中の勇者を全員1マス進める→②新しい波を必要なら送り出す→③滞在中の部屋を1手ずつ全部屋分すすめる、を行う。
 // 複数の部屋が同時に戦闘状態になるが、ログは1本にまとめ、速度操作も全体共通のまま
+// 戦闘中は毎ターンrenderAll()（部屋・通路・罠のDOMまで毎回作り直す重い処理）を呼ぶと動作が重くなるため、
+// 戦闘中に実際に変化するもの（ユニットの位置・HP・状態異常、勇者一覧、魔王スキルバー）だけを更新する軽量版を使う。
+// 部屋・通路・罠のレイアウトは戦闘中は変化しないので、建設フェーズに戻ったときだけ通常のrenderAll()で作り直せば十分
+function renderBattleTick(){
+    renderUnitIcons();
+    renderHeroList();
+    renderDemonLordSkillBar();
+}
 function battleStep(){
     if (gamePhase!=='battle') return;
     battleGlobalTick++;
@@ -5893,7 +5948,7 @@ function battleStep(){
         }
     });
 
-    renderAll();
+    renderBattleTick();
 
     if (demonLordJustDied) return endBattle('defeat');
     if (battleHeroes.filter(h=>h.alive).length===0) return endBattle('victory');
