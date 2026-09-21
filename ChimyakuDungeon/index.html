@@ -1527,13 +1527,13 @@ const UI_TEXT = {
     passive_lifesteal_name: { ja: '吸収', en: 'Life Drain' },
     passive_lifesteal_desc: { ja: v => `勇者に与えたダメージの${v}分、自分のHPを回復する`, en: v => `Heals ${v} of the damage it deals` },
     passive_reflect_name: { ja: '反射', en: 'Reflect' },
-    passive_reflect_desc: { ja: v => `勇者に攻撃されたとき、受けたダメージの${v}を攻撃した勇者に返す`, en: v => `Returns ${v} of damage taken to the attacking hero` },
+    passive_reflect_desc: { ja: v => `勇者の近接単体攻撃を受けたとき、受けたダメージの${v}をその勇者に返す`, en: v => `Returns ${v} of damage taken to the attacking hero` },
     passive_guts_name: { ja: '不屈', en: 'Guts' },
     passive_guts_desc: { ja: v => `HPが半分以下のとき、攻撃力が${v}上がる`, en: v => `Attack +${v} while HP is at or below half` },
     passive_ward_name: { ja: '加護', en: 'Ward' },
-    passive_ward_desc: { ja: v => `同じ部屋の仲間全員（自分含む）の防御力・魔法防御力を${v}上げる（重ならず最大のみ）`, en: v => `Raises defense and magic defense of everyone in the room by ${v}` },
+    passive_ward_desc: { ja: v => `同じ部屋の仲間全員（自分含む）の防御力・魔法防御力を${v}上げる（複数いると重なる）`, en: v => `Raises defense and magic defense of everyone in the room by ${v} (stacks)` },
     passive_inspire_name: { ja: '鼓舞', en: 'Inspire' },
-    passive_inspire_desc: { ja: v => `同じ部屋の仲間全員（自分含む）の攻撃力を${v}上げる（重ならず最大のみ）`, en: v => `Raises attack of everyone in the room by ${v}` },
+    passive_inspire_desc: { ja: v => `同じ部屋の仲間全員（自分含む）の攻撃力を${v}上げる（複数いると重なる）`, en: v => `Raises attack of everyone in the room by ${v} (stacks)` },
     passive_statusOnHit_name: { ja: st => `${st}の一撃`, en: st => `${st} Strike` },
     passive_statusOnHit_desc: { ja: (pct,st) => `通常攻撃が命中すると、${pct}の確率で${st}を付与する`, en: (pct,st) => `${pct} chance to inflict ${st} on a normal attack` },
     passive_statusResist_name: { ja: '状態異常耐性', en: 'Status Resist' },
@@ -1548,7 +1548,7 @@ const UI_TEXT = {
     skill_dragonBreath_desc: { ja: m => `範囲攻撃（威力${m}倍）`, en: m => `Area attack (${m}x power)` },
     skill_breath_status: { ja: (pct,st) => `。${pct}の確率で${st}を付与`, en: (pct,st) => `. ${pct} chance to inflict ${st}` },
     skill_buff_name: { ja: (stat,scope) => `${stat}アップ（${scope}）`, en: (stat,scope) => `${stat} Up (${scope})` },
-    skill_buff_desc: { ja: (who,stat,pct) => `${who}の${stat}を${pct}上げる（3ターン。使っても通常行動は続けて行う。同じ効果は重ならない）`, en: (who,stat,pct) => `Raises ${who} ${stat} by ${pct} (3 turns)` },
+    skill_buff_desc: { ja: (who,stat,pct,turns) => `${who}の${stat}を${pct}上げる（${turns}ターン。重ねがけできる）`, en: (who,stat,pct,turns) => `Raises ${who} ${stat} by ${pct} (${turns} turns, stackable)` },
     skill_scope_self: { ja: '自分', en: 'self' },
     skill_scope_party: { ja: '味方全体', en: 'party' },
     skill_scope_party_long: { ja: '同じ部屋の仲間全員', en: "the party's" },
@@ -3338,8 +3338,8 @@ const MONSTER_PASSIVE_TABLE = {
     undead_ranger:{type:'guts',value:0.30}, undead_hunter:{type:'guts',value:0.50},
     // エルフ：基本=状態異常耐性／マジックナイト系=加護／メイジ系=鼓舞
     elf:{type:'statusResist',value:0.20},
-    elf_knight:{type:'ward',value:0.10}, elf_lord:{type:'ward',value:0.15},
-    elf_mage:{type:'inspire',value:0.05}, elf_wizard:{type:'inspire',value:0.08},
+    elf_knight:{type:'ward',value:0.04}, elf_lord:{type:'ward',value:0.06},
+    elf_mage:{type:'inspire',value:0.03}, elf_wizard:{type:'inspire',value:0.05},
     // ドラゴン：本流=追加攻撃／属性ドラゴンは通常攻撃に状態異常
     dragon:{type:'extraAttack',chance:0.20}, high_dragon:{type:'extraAttack',chance:0.20}, great_dragon:{type:'extraAttack',chance:0.30},
     fire_dragon:{type:'statusOnHit',statusType:'burn',chance:0.25}, thunder_dragon:{type:'statusOnHit',statusType:'paralysis',chance:0.20},
@@ -3374,6 +3374,28 @@ MONSTER_SPECIES.forEach(sp => {
     const extra = MONSTER_EXTRA_ACTIVES[sp.key];
     if (extra) sp.active = [...(sp.active||[]), ...extra];
 });
+// ---- バフ系アクティブの効果（スキルごとに値と持続ターンを変える。バフ使用は1手番を使うため、自分用は大きめ・味方全体は小さめ） ----
+const MONSTER_BUFF_TUNING = {
+    // 防御力アップ
+    stone_golem:{value:0.40,turns:3}, goblin_knight:{value:0.50,turns:2},                                   // 自分
+    iron_golem:{value:0.25,turns:3}, mithril_golem:{value:0.30,turns:4}, undead_lord:{value:0.20,turns:4}, elf_lord:{value:0.25,turns:4}, // 味方全体
+    // 攻撃力アップ
+    werewolf:{value:0.40,turns:3}, great_minotaur:{value:0.45,turns:3}, great_griffon:{value:0.50,turns:3}, goblin_hunter:{value:0.35,turns:4}, undead_hunter:{value:0.30,turns:4}, // 自分
+    high_werewolf:{value:0.15,turns:3}, goblin_lord:{value:0.20,turns:3}, great_dragon:{value:0.25,turns:4}, // 味方全体
+    // 魔法攻撃力アップ
+    pixie_knight:{value:0.40,turns:3}, dark_elf_lord:{value:0.45,turns:3}, elf:{value:0.30,turns:4},          // 自分
+    great_spirit:{value:0.20,turns:4},                                                                        // 味方全体
+    // 耐性アップ
+    great_slime:{value:0.30,turns:4}, undead_knight:{value:0.35,turns:3},                                      // 物理耐性(自分)
+    elf_knight:{value:0.40,turns:3}, pixie_wizard:{value:0.30,turns:3},                                        // 魔法耐性(自分／味方全体)
+    pixie_lord:{value:0.40,turns:3},                                                                           // 状態異常耐性(味方全体)
+};
+MONSTER_SPECIES.forEach(sp => (sp.active||[]).forEach(a => {
+    if (a.type!=='buff') return;
+    const t = MONSTER_BUFF_TUNING[sp.key];
+    if (!t) throw new Error('バフ未設定: ' + sp.key);
+    a.value = t.value; a.turns = t.turns;
+}));
 function speciesInfo(key){ return MONSTER_SPECIES.find(s=>s.key===key); }
 const STAGE1_SPECIES = MONSTER_SPECIES.filter(s=>s.stage===1);
 // 卵から生まれる系統／召喚される系統（互いに排他）。進化分岐の有無で区別する：
@@ -3516,17 +3538,20 @@ function clearStackingStatusEffects(unit){
 }
 // ---- 部屋バフ：3ターン・同じ種類は重ねがけせず残りターン数を延長するだけ（エルフロードの全体防護など） ----
 const BUFF_DURATION = 3;
-function applyBuff(unit, category, value, turns){
+// 攻撃側の強化・弱体（攻撃力アップ／魔法攻撃力アップ／攻撃力ダウン）は、自分の手番の頭にターンが減るため、
+// そのままだと「Nターン」が実質N-1回の行動ぶんになってしまう。持続をN回の行動ぶんにそろえるため1つ余分に持たせる
+const BUFF_EXTRA_TURN_CATEGORIES = ['atkUp','magAtkUp','atkDown'];
+// バフは重ねがけできる（1回ごとに別の効果として累積し、それぞれ自分のターン数で切れる）。種類ごとの合計の上限
+const BUFF_TOTAL_CAP = { atkUp:1.0, magAtkUp:1.0, defense:1.0, physicalResist:1.0, magicResist:0.9, statusResist:0.9, atkDown:0.6 };
+// srcは使った本人の識別子。同じ本人が効果が残っているうちに同じバフを重ねがけするのは無駄なので防ぐ（別の仲間のバフとは重なる）
+function applyBuff(unit, category, value, turns, src){
     if (!unit.buffs) unit.buffs = [];
-    const existing = unit.buffs.find(b => b.category===category);
-    if (existing){ existing.turnsLeft = Math.max(existing.turnsLeft, turns); existing.value = Math.max(existing.value, value); } // 同じ種類は重ねがけできない（効果は大きい方、残りターンは長い方）
-    else unit.buffs.push({ category, value, turnsLeft: turns });
+    unit.buffs.push({ category, value, src, turnsLeft: turns + (BUFF_EXTRA_TURN_CATEGORIES.includes(category) ? 1 : 0) });
 }
 function buffValue(unit, category){
-    const b = (unit.buffs||[]).find(b => b.category===category);
-    return b ? b.value : 0;
+    const total = (unit.buffs||[]).reduce((sum,b) => b.category===category ? sum + b.value : sum, 0);
+    return BUFF_TOTAL_CAP[category]!==undefined ? Math.min(BUFF_TOTAL_CAP[category], total) : total;
 }
-// 自分の手番の最初に呼ぶ。バフの残りターン数を減らし、切れたものは取り除く
 function tickBuffs(unit){
     if (!unit.buffs) return;
     unit.buffs = unit.buffs.filter(b => --b.turnsLeft > 0);
@@ -3554,7 +3579,7 @@ function unitClassInfo(unit){
 // 物理耐性（パッシブ＋バフ合算）。モンスター・勇者どちらのダメージ軽減にも使う
 function unitPhysicalResist(unit){
     const p = unitPassive(unit, 'physicalResist');
-    return Math.min(0.9, (p ? p.value : 0) + buffValue(unit, 'physicalResist'));
+    return Math.min(1.0, (p ? p.value : 0) + buffValue(unit, 'physicalResist')); // 物理耐性は100%（物理ダメージ最小1）まで
 }
 // 魔法耐性（パッシブ＋バフ合算）
 function unitMagicResist(unit){
@@ -3600,9 +3625,9 @@ function rangeAtkMultiplier(unit){ return RANGE_ATK_MULT[unitRole(unit)] ?? 1.0;
 // ---- モンスターのパッシブ（戦闘中に効くもの）の計算 ----
 // 同じ部屋で生きている（HPが残っている）モンスターの一覧
 function aliveRoomMonsters(roomId){ return monsters.filter(o => o.roomId===roomId && o.hp>0); }
-// 部屋の味方が持つオーラ系パッシブ（鼓舞・加護）の効果量（自分自身も含め、最も高い1つだけ）
+// 部屋の味方が持つオーラ系パッシブ（鼓舞・加護）の効果量の合計（自分自身も含む。重ねがけありなので1体あたりの値は小さめ）
 function roomAuraSum(unit, type){
-    return aliveRoomMonsters(unit.roomId).reduce((mx,o) => { const p = unitPassive(o, type); return Math.max(mx, p ? p.value : 0); }, 0); // 同じオーラは重ならず、部屋で最も高いものだけ適用
+    return aliveRoomMonsters(unit.roomId).reduce((sum,o) => { const p = unitPassive(o, type); return sum + (p ? p.value : 0); }, 0); // 重ねがけあり（部屋の味方の分を合算）
 }
 // 勇者に対する威嚇：同じ部屋にいる生きたモンスターの威嚇のうち最も大きい値だけ、勇者の攻撃力が下がる
 function roomIntimidate(roomId){
@@ -4182,7 +4207,7 @@ function activeSkillText(sk){
     }
     if (sk.type==='buff'){
         const stat = ui('buff_stat_'+sk.category);
-        return { name: uif('skill_buff_name', stat, ui(sk.scope==='party' ? 'skill_scope_party' : 'skill_scope_self')), desc: uif('skill_buff_desc', ui(sk.scope==='party' ? 'skill_scope_party_long' : 'skill_scope_self'), stat, pctText(sk.value)) };
+        return { name: uif('skill_buff_name', stat, ui(sk.scope==='party' ? 'skill_scope_party' : 'skill_scope_self')), desc: uif('skill_buff_desc', ui(sk.scope==='party' ? 'skill_scope_party_long' : 'skill_scope_self'), stat, pctText(sk.value), sk.turns || BUFF_DURATION) };
     }
     return { name: sk.type, desc: '' };
 }
@@ -5479,6 +5504,16 @@ function confirmStartBattle(){
     startBattle();
 }
 
+// 戦闘中だけ意味を持つ状態（バフ・状態異常・スキル使用回数・積み重ね・溜め）をリセットする。
+// 戦闘の開始時と終了後（建設フェーズに戻るとき）に呼び、前の戦闘の効果が次の戦闘や建設画面に残らないようにする
+function resetBattleTransientState(){
+    const units = monsters.slice();
+    if (demonLordCell) units.push(demonLordCell);
+    units.forEach(u => {
+        u.buffs = []; u.statusEffects = []; u.statusImmune = {}; u.chargeTurns = 0;
+        u.skillUseCounts = []; u.rageStacks = 0; u.confidenceStacks = 0; u.timidStacks = 0;
+    });
+}
 function startBattle(){
     closeHealIndividualPanel();
     gamePhase = 'battle';
@@ -5514,7 +5549,8 @@ function startBattle(){
     demonLordUnit.chargeTurns = 0; // 魔法の溜めは戦闘ごとにリセットする
     // 戦闘中にモンスターが移動しても、建設フェーズに戻ったときは戦闘開始前の配置に戻す
     // （魔王も近接モンスターと同じ行動ロジックを使うため、対象を追って移動することがある）
-    monsters.forEach(m => { m.preBattleR = m.r; m.preBattleC = m.c; m.skillUseCounts = []; m.rageStacks = 0; m.confidenceStacks = 0; m.timidStacks = 0; m.statusImmune = {}; }); // スキルの発動回数は戦闘ごとにリセットする
+    monsters.forEach(m => { m.preBattleR = m.r; m.preBattleC = m.c; });
+    resetBattleTransientState(); // スキルの発動回数・バフ・状態異常などは戦闘ごとにリセットする
     demonLordUnit.preBattleR = demonLordUnit.r; demonLordUnit.preBattleC = demonLordUnit.c;
     selectedRoomId = null; selectedMonsterId = null; demonLordMoveSelected = false; highlightedMonsterId = null;
     document.getElementById('battle-stage-label').textContent = uif('battle_stage_label', stage);
@@ -5928,10 +5964,11 @@ function pickHeroTarget(hero){
 }
 // 通常攻撃1回分（命中判定・ダメージ適用・ログまで）の共通処理。戻り値は魔王を倒したかどうか
 // atkMultはスキル用の攻撃力倍率（防御力で軽減する前の攻撃力に掛かる）。statusSkillを渡すと、命中後に状態異常も抽選する
-function heroAttack(hero, target, atkMult, statusSkill){
+// meleeがtrueのとき（近接クラスの単体攻撃）だけ、攻撃者を渡して反射の対象にする
+function heroAttack(hero, target, atkMult, statusSkill, melee){
     const result = attemptAttackMonster(hero, target, atkMult);
     if (!result.hit){ logBattle(uif('battle_log_evaded', uif('hero_label', hero.id), unitLabel('monster', target))); return false; }
-    const demonLordDied = applyDamage('monster', target, result.dmg, hero);
+    const demonLordDied = applyDamage('monster', target, result.dmg, melee ? hero : undefined);
     logBattle(uif('battle_log_attack', uif('hero_label', hero.id), unitLabel('monster', target), result.dmg));
     if (statusSkill) tryApplyHeroStatus(target, statusSkill);
     return demonLordDied;
@@ -5955,9 +5992,9 @@ function heroMeleeAttack(hero, target){
     if (skill && (skill.type==='strongAttack' || skill.type==='statusStrike') && heroSkillTriggers(hero)){
         hero.skillUses++;
         showSkillCallout(hero, ui(heroSkillCalloutKey(skill)));
-        return heroAttack(hero, target, skill.multiplier, skill.type==='statusStrike' ? skill : null);
+        return heroAttack(hero, target, skill.multiplier, skill.type==='statusStrike' ? skill : null, true);
     }
-    return heroAttack(hero, target);
+    return heroAttack(hero, target, undefined, undefined, true);
 }
 // 手番の頭に抽選する近接クラスのスキル。戻り値：発動したらtrue（その手番はスキルで使い切る）
 // プリースト＝同じ部屋の勇者全員をHP30%回復（誰もダメージを受けていなければ抽選しない）
@@ -6111,7 +6148,7 @@ function resolveMonsterTurn(unit, room, role){
         const i = usable[Math.floor(Math.random()*usable.length)];
         if (resolveMonsterActiveSkill(unit, sp, actives[i], room)){
             unit.skillUseCounts[i] = (unit.skillUseCounts[i]||0) + 1;
-            if (actives[i].type!=='buff') return false; // バフは手番を消費せず、使ったあとそのまま通常行動を行う（自分用のバフが「攻撃を1回捨てて2ターン強化」で損にならないように）
+            return false; // アクティブスキルは必ず1手番を使う（バフも同じ）
         }
         // 射程外などで発動できなかった場合は回数を消費せず通常行動にフォールバックする
     }
@@ -6143,7 +6180,9 @@ function resolveBuffSkill(unit, sp, skill, room){
         targets = [unit];
     }
     if (targets.length===0) return false;
-    targets.forEach(t => applyBuff(t, skill.category, skill.value, BUFF_DURATION));
+    const src = (isHero ? 'h' : 'm') + unit.id;
+    if (targets.some(t => (t.buffs||[]).some(b => b.category===skill.category && b.src===src))) return false; // 自分が前に使った同じバフがまだ残っているときは使わない（回数も消費しない）
+    targets.forEach(t => applyBuff(t, skill.category, skill.value, skill.turns || BUFF_DURATION, src));
     const logKey = skill.scope==='party' ? 'battle_log_party_buff' : 'battle_log_self_buff';
     logBattle(uif(logKey, unitLabel(side, unit), ui('buff_label_'+skill.category)));
     return true;
@@ -6507,6 +6546,7 @@ function proceedNextStage(){
     battleHeroes = []; demonLordUnit = null; roomBattleQueues = {};
     // 戦闘開始前の配置に戻す（HP0のモンスターもHP0のまま元の位置に復活する）
     monsters.forEach(m => { if (m.preBattleR!==undefined){ m.r = m.preBattleR; m.c = m.preBattleC; } });
+    resetBattleTransientState();
     if (demonLordCell && demonLordCell.preBattleR!==undefined){ demonLordCell.r = demonLordCell.preBattleR; demonLordCell.c = demonLordCell.preBattleC; }
     // 敵の侵攻を退けた後に、部屋の生産量をまとめて収入として加算する
     let vitGain = 0, manaGain = 0;
