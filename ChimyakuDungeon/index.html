@@ -2233,11 +2233,21 @@ function rerollMap(){
 // 建設ロジック / ダンジョン状態
 // ============================================================
 const ROOM_MIN = 2; // 部屋の1辺の最小マス数。上限は撤廃
-const ROOM_COST_PER_CELL = 8;      // 暫定値。生産・戦闘システム実装後にバランス再調整予定
+// 部屋の建設費と配置数の調整値（バランスを変えるときはここだけ触ればよい）。
+// 建設費 = （面積が linearUntilArea 以下）perCell×面積 ／（それより大きい）perCell×面積 + curve×(面積−linearUntilArea)²、に細長補正 (1+thinPenalty×(長辺−短辺)) を掛ける。
+// 小さい部屋は1マスあたり一定の線形、大きい部屋は面積の2乗に近い伸び方になり、境目は傾きが同じで滑らかにつながる（例：7×7＝480）
+const ROOM_COST = { perCell:8, linearUntilArea:28, curve:0.2, thinPenalty:0.1 };
+// 魔物の最大配置数 = 四捨五入(coef×√面積)。面積が増えるほど面積あたりの数は減る（上限はないが伸びは緩やか）
+const ROOM_CAPACITY_COEF = 0.85;
+function roomBuildCost(w, h){
+    const area = w*h;
+    const base = ROOM_COST.perCell*area + (area > ROOM_COST.linearUntilArea ? ROOM_COST.curve*Math.pow(area - ROOM_COST.linearUntilArea, 2) : 0);
+    return Math.round(base * (1 + ROOM_COST.thinPenalty*Math.abs(w-h)));
+}
+function roomMonsterCapacity(area){ return Math.max(1, Math.round(ROOM_CAPACITY_COEF*Math.sqrt(area))); }
 const CORRIDOR_COST_PER_CELL = 5;  // 暫定値
 const STARTING_VITALITY = 500;
 const STARTING_MANA = 500;
-const EGG_EXPECTED_BASE = 1, EGG_EXPECTED_PER_CELL = 0.1; // 卵の期待値 = 1 + 0.1×部屋の面積
 
 let rooms = [];       // {id, r0,c0,r1,c1, w,h,area, elements:{}, type, eggs}
 let corridors = [];   // {id, cells:[{r,c}], fromLabel, toId}
@@ -2761,7 +2771,7 @@ function currentCorridorCells(){
 function costForCorridor(cCellsLength){
     const w = pendingRect.c1-pendingRect.c0+1, h = pendingRect.r1-pendingRect.r0+1;
     const area = w*h;
-    const roomCost = area*ROOM_COST_PER_CELL;
+    const roomCost = roomBuildCost(w, h);
     const corridorCost = cCellsLength*CORRIDOR_COST_PER_CELL;
     return { area, roomCost, corridorCost, total: roomCost+corridorCost };
 }
@@ -2770,7 +2780,7 @@ function computeCosts(){
 }
 // 部屋のモンスター最大収容数（卵はマップ上に個別配置されるため、実際に生まれる数はここに至るまでの卵の有無次第）
 function expectedMonsterRangeLabel(area){
-    return String(Math.ceil(eggExpectedValue(area)));
+    return String(roomMonsterCapacity(area));
 }
 function renderCostPanel(){
     document.getElementById('cost-confirm-modal').classList.remove('hidden');
@@ -2832,7 +2842,7 @@ function confirmBuild(){
     const roomId = nextRoomId++;
     const elements = tallyElements(pendingRect);
     const eggCount = tallyEggsAndClear(pendingRect);
-    const monsterCapacity = Math.ceil(eggExpectedValue(area));
+    const monsterCapacity = roomMonsterCapacity(area);
     const room = { id:roomId, r0:pendingRect.r0, c0:pendingRect.c0, r1:pendingRect.r1, c1:pendingRect.c1, w, h, area, elements, type:null, monsterCapacity,
                    pendingEggs: eggCount };
     markOccupied(cellsOfRect(pendingRect));
@@ -3268,15 +3278,6 @@ function roomTypeConfirm(){
 // ============================================================
 // 卵とモンスター（部屋確定と同時に自動孵化する）
 // ============================================================
-function eggExpectedValue(area){ return EGG_EXPECTED_BASE + EGG_EXPECTED_PER_CELL * area; }
-// 卵の期待値 = 1 + 0.1×面積。期待値1.2なら1体は確定、20%の確率で+1体、という形で整数個に変換する
-function rollEggCount(area){
-    const expected = eggExpectedValue(area);
-    const base = Math.floor(expected);
-    const extra = (Math.random() < (expected - base)) ? 1 : 0;
-    return base + extra;
-}
-
 // モンスターの種類ごとの基本値。役割(role)は近接/中距離/遠距離の戦い方分類。
 // 種類の抽選は今はランダム（召喚因子との連動は未実装）。
 // role別の戦い方: melee=隣接のみ攻撃／ranged=1〜3マス攻撃可（atk自体が近接の半分程度、防御力は通常どおり影響）・隣接時は離脱判定あり／
@@ -7117,7 +7118,7 @@ function renderOverlays(){
         badge.className = 'precost-badge';
         badge.style.left = (px(rect.c0) + px(rw)/2) + 'px';
         badge.style.top = px(rect.r0) + 'px';
-        badge.textContent = uif('precost_label', rw*rh*ROOM_COST_PER_CELL);
+        badge.textContent = uif('precost_label', roomBuildCost(rw, rh));
         gridEl.appendChild(badge);
     }
     // 接続候補・確定待ちの新部屋プレビュー
