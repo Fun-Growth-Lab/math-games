@@ -4039,8 +4039,19 @@ function closeDamageBreakdownModal(){
     maybeOfferDemonLordSkillReward();
 }
 // Lvアップに必要な累積経験値は100の倍数（Lv.1=累計100、Lv.2=累計200…）
+// 必要経験値：Lv0→1は XP_PER_LEVEL、Lvが1上がるごとに次のLvまでの必要経験値が XP_LEVEL_STEP_GROWTH ずつ増える
+// （Lv L→L+1 に必要な経験値 = XP_PER_LEVEL + XP_LEVEL_STEP_GROWTH×L。Lv Lに必要な累計 = 100×L + 5×L×(L−1)、増加量10の場合）
 const XP_PER_LEVEL = 100;
-function monsterLevel(xp){ return Math.floor((xp||0) / XP_PER_LEVEL); }
+const XP_LEVEL_STEP_GROWTH = 10;
+function xpForLevel(lv){ return XP_PER_LEVEL*lv + XP_LEVEL_STEP_GROWTH/2*lv*(lv-1); }
+function monsterLevel(xp){
+    xp = Math.max(0, xp||0);
+    const g = XP_LEVEL_STEP_GROWTH, b = XP_PER_LEVEL - g/2;
+    let lv = g>0 ? Math.floor((-b + Math.sqrt(b*b + 2*g*xp)) / g) : Math.floor(xp / XP_PER_LEVEL);
+    while (xpForLevel(lv+1) <= xp) lv++;      // 浮動小数点の誤差を吸収する
+    while (lv>0 && xpForLevel(lv) > xp) lv--;
+    return lv;
+}
 // 系統(line)ごとの最終stage番号（MONSTER_SPECIES全体から自動集計）
 const LINE_MAX_STAGE = {};
 MONSTER_SPECIES.forEach(s => { LINE_MAX_STAGE[s.line] = Math.max(LINE_MAX_STAGE[s.line]||0, s.stage); });
@@ -4088,8 +4099,17 @@ let battleEvolutions = []; // （現在は未使用。ランクアップは進�
 let battleLevelUps = []; // 今回のステージでLvが上がったモンスターの一覧（収入ポップアップ表示用）。proceedNextStage()でリセットする
 // 勇者を倒した瞬間に呼ぶ。戦闘中は経験値をためるだけで、レベル判定・ランクアップ判定は迎撃後にまとめて行う（runLevelUpPass参照）
 // 強化部屋の効果は経験値ではなく「能力上昇」（攻撃力/防御力/魔攻/魔防）に変わったため、経験値は部屋の影響を受けない固定値
+// 倒した本人は減らずに満額（KILL_XP_BASE）をもらい、それとは別にマップに配置中のモンスターへ分け与える：
+// 倒した本人と同じ部屋の仲間には20%、他の部屋のモンスターには10%（ストック中は対象外。戦闘不能の個体は対象）。
+// 魔王は分け与えを受けない（自分が倒した分だけ）。魔王が倒した場合の「同じ部屋」は魔王のいる部屋
+const KILL_XP_SHARE_ROOM = 0.2, KILL_XP_SHARE_MAP = 0.1;
 function grantKillXp(killerUnit){
     killerUnit.xp = (killerUnit.xp||0) + KILL_XP_BASE; // 魔王も同じ（勇者を倒すとXPが入る）
+    const killerRoomId = killerUnit.isDemonLord ? demonLordRoomId : killerUnit.roomId;
+    monsters.forEach(m => {
+        if (m===killerUnit || m.roomId===null) return;
+        m.xp = (m.xp||0) + Math.round(KILL_XP_BASE * (m.roomId===killerRoomId ? KILL_XP_SHARE_ROOM : KILL_XP_SHARE_MAP));
+    });
 }
 // モンスターの見た目・ステータスを進化先のものに差し替える（ランクアップ確定時に呼ぶ）
 // ---- モンスターの個体差（得意/不得意）----
@@ -4747,7 +4767,7 @@ function placeMonsterInRoomOrStock(m, room){
 // 部屋の卵をすべて即座に孵化させる（部屋の空き数に関わらず全部孵化させ、入りきらない分はストックへ回す）
 function hatchEggsInRoom(room, count){
     if (count<=0) return [];
-    const initialXp = Math.max(XP_PER_LEVEL, (stage-1) * XP_PER_LEVEL); // モンスターはLv1からスタートする
+    const initialXp = xpForLevel(Math.max(1, stage-1)); // モンスターはLv1からスタートする（後のステージほど高いLvから）
     const born = [];
     for (let i=0;i<count;i++){
         const sp = EGG_STAGE1_SPECIES[Math.floor(Math.random()*EGG_STAGE1_SPECIES.length)];
@@ -4778,7 +4798,7 @@ function createSummonMonster(room){
     const pool = useStage2 ? SUMMON_STAGE2_SPECIES : SUMMON_STAGE1_SPECIES;
     const sp = pool[Math.floor(Math.random()*pool.length)];
     const initialLevel = summonInitialLevel(room);
-    const initialXp = initialLevel * XP_PER_LEVEL;
+    const initialXp = xpForLevel(initialLevel);
     const m = { id: nextMonsterId++, roomId: null, r: 0, c: 0, speciesKey: sp.key,
                 hp: 0, maxHp: 0, atk: 0, def: 0, magAtk: 0, magDef: 0,
                 statMods: rollStatMods(), chargeTurns: 0,
@@ -5457,7 +5477,7 @@ function setDemonLord(roomId, r, c){
     demonLordRoomId = roomId;
     const prev = demonLordCell; // 置き直しのときはLv・経験値を引き継ぐ
     demonLordCell = { r, c, hp: 0, maxHp: 0, atk: 0, def: 0, magAtk: 0, magDef: 0,
-                       level: prev ? (prev.level||1) : 1, xp: prev ? (prev.xp||XP_PER_LEVEL) : XP_PER_LEVEL,
+                       level: prev ? (prev.level||1) : 1, xp: prev ? (prev.xp||xpForLevel(1)) : xpForLevel(1),
                        isDemonLord: true, alive: true };
     applyDemonLordLevel(demonLordCell);
     demonLordCell.hp = demonLordCell.maxHp;
