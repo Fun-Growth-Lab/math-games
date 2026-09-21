@@ -3500,6 +3500,10 @@ MONSTER_SPECIES.forEach(sp => (sp.active||[]).forEach(a => {
     if (!t) throw new Error('バフ未設定: ' + sp.key);
     a.value = t.value; a.turns = t.turns; a.name = t.name;
 }));
+// ---- 長距離弓（アンデッドレンジャー・ハンター）：間合いは「長距離」だが、魔法の範囲攻撃ではなく弓で単体を撃つ ----
+// 射程5マス・溜めなし。攻撃力補正は中距離(100%)と長距離魔法(75%)の中間の87.5%
+const LONGBOW_RANGE = 5, LONGBOW_ATK_MULT = 0.875;
+['undead_ranger','undead_hunter'].forEach(k => { const sp = MONSTER_SPECIES.find(x => x.key===k); sp.longBow = true; sp.rangeMult = LONGBOW_ATK_MULT; });
 function speciesInfo(key){ return MONSTER_SPECIES.find(s=>s.key===key); }
 const STAGE1_SPECIES = MONSTER_SPECIES.filter(s=>s.stage===1);
 // 卵から生まれる系統／召喚される系統（互いに排他）。進化分岐の有無で区別する：
@@ -3723,7 +3727,11 @@ function unitRole(unit){
 // 間合いによる攻撃力補正：攻撃力・魔法攻撃力そのものは変えず、ダメージ計算時にだけ掛ける倍率
 // 近距離(melee)は125%、中距離(ranged)は100%、遠距離(magic)は75%
 const RANGE_ATK_MULT = { melee: 1.25, ranged: 1.00, magic: 0.75 };
-function rangeAtkMultiplier(unit){ return RANGE_ATK_MULT[unitRole(unit)] ?? 1.0; }
+function rangeAtkMultiplier(unit){
+    const info = unit.speciesKey ? speciesInfo(unit.speciesKey) : null;
+    if (info && info.rangeMult!==undefined) return info.rangeMult; // 長距離弓など、間合いごとの標準値と違う補正を持つ種族
+    return RANGE_ATK_MULT[unitRole(unit)] ?? 1.0;
+}
 // そのユニットが攻撃力として参照するステータス値（攻撃タイプに応じて攻撃力／魔法攻撃力を切り替え、対応するバフも乗せる）
 // ---- モンスターのパッシブ（戦闘中に効くもの）の計算 ----
 // 同じ部屋で生きている（HPが残っている）モンスターの一覧
@@ -4396,7 +4404,7 @@ function monsterDetailCoreHtml(m, opts){
                     <b class="monster-detail-lv">Lv.${m.level||0}</b>
                     ${rankBadgeHtml(m)}
                 </div>
-                <div class="monster-detail-sub"><span class="unit-role ${roleTextClass(sp.role)}">${roleLabel(sp.role)}</span>${statusMark?'　'+statusMark:''}${downed?'　'+ui('monster_downed_tag'):''}</div>
+                <div class="monster-detail-sub"><span class="unit-role ${roleTextClass(sp.role)}">${roleLabel(sp.role)}${sp.longBow ? '（弓）' : ''}</span>${statusMark?'　'+statusMark:''}${downed?'　'+ui('monster_downed_tag'):''}</div>
                 <div class="monster-detail-hp-row">
                     <span>${ui('monster_stat_hp')}</span>
                     <div class="monster-detail-hpbar"><div class="monster-detail-hpbar-fill" style="width:${hpPct}%;"></div></div>
@@ -6295,6 +6303,7 @@ function resolveMonsterTurn(unit, room, role){
         // 射程外などで発動できなかった場合は回数を消費せず通常行動にフォールバックする
     }
     if (role==='ranged') resolveRangedMonsterAction(unit, room);
+    else if (role==='magic' && sp && sp.longBow) resolveRangedMonsterAction(unit, room, LONGBOW_RANGE); // 長距離弓：単体を遠くから撃つ
     else if (role==='magic') resolveMagicMonsterAction(unit, room);
     else resolveMeleeMonsterAction(unit, room);
     return false;
@@ -6333,7 +6342,7 @@ function resolveStatusAttackSkill(unit, sp, skill, room){
     if (targets.length===0) return false;
     // 遠距離(magic)系統は範囲攻撃、それ以外は単体攻撃（近接=隣接のみ、中距離=3マス以内）
     const dmgType = unitDmgType(unit);
-    if (sp.role==='magic'){
+    if (sp.role==='magic' && !sp.longBow){
         const centerHero = pickBlastCenter(targets);
         const blastCells = MAGIC_BLAST_OFFSETS.map(([dr,dc]) => ({ r:centerHero.r+dr, c:centerHero.c+dc }))
             .filter(cell => cell.r>=0 && cell.r<GRID_ROWS && cell.c>=0 && cell.c<GRID_COLS);
@@ -6350,8 +6359,8 @@ function resolveStatusAttackSkill(unit, sp, skill, room){
         return true;
     }
     const target = pickNearestTarget(unit, tauntFilter(targets));
-    const isRanged = sp.role==='ranged';
-    const inRange = isRanged ? manhattan(unit, target)<=3 : isAdjacentOrtho(unit, target);
+    const isRanged = sp.role==='ranged' || !!sp.longBow;
+    const inRange = isRanged ? manhattan(unit, target)<=(sp.longBow ? LONGBOW_RANGE : 3) : isAdjacentOrtho(unit, target);
     if (!inRange){
         moveOneStepToward(unit, target, room, unit.roomId);
         return false;
@@ -6443,12 +6452,12 @@ function resolveMeleeMonsterAction(unit, room){
     }
 }
 // ---- 中距離モンスターの行動：1〜3マス先を攻撃可（攻撃力は近接の半分）。射程に入るまで動き、入ったら攻撃し続ける ----
-function resolveRangedMonsterAction(unit, room){
+function resolveRangedMonsterAction(unit, room, range){
     const targets = battleHeroes.filter(h=>h.alive && h.roomId===unit.roomId);
     if (targets.length===0) return;
     const target = pickNearestTarget(unit, tauntFilter(targets));
     const dist = manhattan(unit, target);
-    if (dist<=3){
+    if (dist<=(range || 3)){
         showProjectileEffect(unit, target);
         const atk = effectiveAtk(unit);
         const dmgType = unitDmgType(unit);
