@@ -353,6 +353,15 @@
         .eq-actions { margin-top:10px; display:flex; flex-direction:column; gap:8px; }
         .eq-actions .btn { width:100%; font-size:1.05rem; padding:11px 8px; }
         .eq-note { font-size:0.85rem; color:var(--ink-dim); font-weight:700; text-align:center; }
+        /* 魔王ボタンを押したとき右パネルに出る「配置／ステータス」のカード。フッターの丸いボタンとは別の見た目にする */
+        .dl-menu-btn { display:flex; align-items:center; gap:12px; width:100%; margin-bottom:8px; padding:12px 14px; text-align:left; font-family:inherit; color:var(--ink);
+            background:#1c140e; border:2px solid var(--card-bdr); border-left:6px solid var(--el-summon); border-radius:12px; cursor:pointer; }
+        .dl-menu-btn:hover:not(:disabled) { border-color:var(--gold); border-left-color:var(--gold); background:rgba(255,201,92,0.08); }
+        .dl-menu-btn:disabled { opacity:0.4; cursor:default; }
+        .dl-menu-icon { font-size:1.8rem; line-height:1; flex:0 0 auto; }
+        .dl-menu-text { display:flex; flex-direction:column; gap:1px; min-width:0; }
+        .dl-menu-text b { font-size:1.1rem; font-weight:800; }
+        .dl-menu-text small { font-size:0.78rem; font-weight:700; color:var(--ink-dim); }
         .eq-empty-msg { font-size:1rem; color:var(--ink-dim); font-weight:700; padding:22px 8px; text-align:center; border:2px dashed rgba(255,255,255,0.15); border-radius:14px; grid-column:1 / -1; }
         /* 詳細画面の「所持アイテム」行：画像＋名前（希少度の色）。押すと装備画面が開く */
         .unit-skill-row.eq-row { display:flex; align-items:center; gap:8px; min-height:46px; border:1px solid var(--rar, transparent); }
@@ -996,10 +1005,6 @@
                 <div id="bd-side-footer" class="bd-side-footer">
                     <button class="btn btn-reroll" id="btn-reroll-map" onclick="rerollMap()" title="素の配置をリロードする（無制限）" data-i18n="btn_reroll_map">🔄 マップのリロード（無制限）</button>
                     <button class="btn btn-danger btn-footer-primary btn-start-battle-big" id="btn-start-battle" onclick="requestStartBattle()" data-i18n="btn_start_battle">⚔️ 敵を迎え撃つ</button>
-                    <div class="footer-btn-row hidden" id="demonlord-menu">
-                        <button class="btn btn-purple btn-footer-primary" id="btn-dl-place" onclick="demonLordMenuPlace()" data-i18n="btn_dl_place">📍 配置</button>
-                        <button class="btn btn-purple btn-footer-primary" id="btn-dl-status" onclick="demonLordMenuStatus()" data-i18n="btn_dl_status">📊 ステータス</button>
-                    </div>
                     <div class="footer-btn-row">
                         <button class="btn btn-purple btn-footer-primary" id="btn-place-demonlord" onclick="toggleDemonLordMenu()" data-i18n="btn_place_demonlord">👑 魔王</button>
                         <button class="btn btn-gold btn-footer-primary" id="btn-open-monsters" onclick="openMonsterListModal()" data-i18n="btn_open_monsters">👾 魔物</button>
@@ -1579,8 +1584,11 @@ const UI_TEXT = {
     battle_log_demonlord_skill: { ja: name => `魔王の「${name}」が発動！`, ja_easy: name => `まおうの「${name}」が はつどう！`, en: name => `Demon Lord's "${name}" activates!` },
 
     btn_place_demonlord: { ja: '👑 魔王', ja_easy: '👑 まおう', en: '👑 Demon Lord' },
-    btn_dl_place: { ja: '📍 配置', ja_easy: '📍 おく', en: '📍 Place' },
-    btn_dl_status: { ja: '📊 ステータス', ja_easy: '📊 つよさ', en: '📊 Status' },
+    demonlord_menu_title: { ja: '👑 魔王', ja_easy: '👑 まおう', en: '👑 Demon Lord' },
+    dl_menu_place: { ja: '配置', ja_easy: 'おく', en: 'Place' },
+    dl_menu_place_desc: { ja: '魔王を部屋に置く', ja_easy: 'まおうを へやに おく', en: 'Put the Demon Lord in a room' },
+    dl_menu_status: { ja: 'ステータス', ja_easy: 'つよさ', en: 'Status' },
+    dl_menu_status_desc: { ja: '強さとスキルを見る', ja_easy: 'つよさを みる', en: 'View stats and skills' },
     demonlord_place_title: { ja: '👑 魔王の配置', ja_easy: '👑 まおうを おく', en: '👑 Place Demon Lord' },
     open_detail_hint: { ja: 'クリックで詳細を見る', ja_easy: 'おすと くわしく みられるよ', en: 'Click for details' },
     btn_open_heal: { ja: '💊 回復', ja_easy: '💊 かいふく', en: '💊 Heal' },
@@ -2407,6 +2415,7 @@ let gamePhase = 'build'; // 'build' | 'battle'
 let stage = 1;
 
 let mode = 'idle'; // idle | placing-rect | await-entrance-connector | await-connector | confirm
+let demonLordMenuOpen = false; // 魔王ボタンで開く「配置／ステータス」メニューを右パネルに出しているか
 let anchorCell = null;
 let hoverCell = null;
 let pendingRect = null;
@@ -2441,7 +2450,7 @@ function startNewDungeon(){
     scheduleMapPregen(); // リロードボタンが押される前から、次のマップを裏で用意しておく
 }
 function resetPendingState(){
-    mode = 'idle'; anchorCell = null; hoverCell = null; pendingRect = null;
+    mode = 'idle'; demonLordMenuOpen = false; anchorCell = null; hoverCell = null; pendingRect = null;
     pendingCandidates = []; pendingEntranceCandidates = []; pendingConnector = null; pendingEntranceCol = null; pendingCorridorCells = null;
 }
 
@@ -2583,7 +2592,7 @@ function cancelMoveSelection(){
 function renderBuildActions(){
     const wrap = document.getElementById('build-actions');
     // モンスター・魔王・罠を選択中は、外側の「建設」見出しを隠す（選択をキャンセルしない限り建設できないため）
-    document.getElementById('build-panel-title').classList.toggle('hidden', !!(trapPlaceMode || selectedMonsterId!==null || demonLordMoveSelected));
+    document.getElementById('build-panel-title').classList.toggle('hidden', !!(trapPlaceMode || selectedMonsterId!==null || demonLordMoveSelected || demonLordMenuOpen));
     if (trapPlaceMode){
         const meta = trapKindMeta(trapPlaceMode.kind);
         const isLine = meta.shape==='line-h' || meta.shape==='line-v';
@@ -2610,6 +2619,19 @@ function renderBuildActions(){
         wrap.innerHTML = `<div class="side-panel-title">${ui('move_info_title_demonlord')}</div>`
             + demonLordCardHtml({ artClick: 'openDemonLordDetailModal()' })
             + `<button class="btn btn-sm" style="width:100%; margin-top:6px;" onclick="cancelMoveSelection()">${ui('btn_cancel')}</button>`;
+        return;
+    }
+    if (demonLordMenuOpen){
+        wrap.innerHTML = `<div class="side-panel-title">${ui('demonlord_menu_title')}</div>`
+            + `<button class="dl-menu-btn" ${rooms.length===0 ? 'disabled' : ''} onclick="demonLordMenuPlace()">
+                   <span class="dl-menu-icon">📍</span>
+                   <span class="dl-menu-text"><b>${ui('dl_menu_place')}</b><small>${ui('dl_menu_place_desc')}</small></span>
+               </button>`
+            + `<button class="dl-menu-btn" ${demonLordCell ? '' : 'disabled'} onclick="demonLordMenuStatus()">
+                   <span class="dl-menu-icon">📊</span>
+                   <span class="dl-menu-text"><b>${ui('dl_menu_status')}</b><small>${ui('dl_menu_status_desc')}</small></span>
+               </button>`
+            + `<button class="btn btn-sm" style="width:100%; margin-top:6px;" onclick="closeDemonLordMenu()">${ui('btn_cancel')}</button>`;
         return;
     }
     if (mode === 'select-demonlord'){
@@ -3679,6 +3701,13 @@ function statRank(m, statKey){
     let idx = Math.round(Math.log(value/refB) / Math.log(RANK_STEP_RATIO)) + RANK_B_INDEX;
     idx = Math.max(0, Math.min(RANK_LEVELS.length-1, idx));
     return RANK_LEVELS[idx];
+}
+// そのステータスがちょうど指定ランク（G〜SS）に届く最小の値（装備なしの素の値）。魔王の魔法攻撃力の基準に使う
+function minStatForRank(statKey, rankLetter){
+    const target = RANK_LEVELS.indexOf(rankLetter);
+    let v = 1;
+    while (v < 100000 && RANK_LEVELS.indexOf(statRank({ [statKey]: v }, statKey)) < target) v++;
+    return v;
 }
 
 // ---- 状態異常・アクティブスキルの共通ルール（暫定値。詳細な数値は今後調整） ----
@@ -5342,6 +5371,7 @@ function handleUnitDrop(room, r, c, data){
 }
 function handleRoomCellClick(room, r, c){
     if (gamePhase!=='build') return;
+    demonLordMenuOpen = false; // マップを操作したら魔王メニューは閉じる（以降の処理が右パネルを描き直す）
     if (trapPlaceMode){
         if (room.id!==trapPlaceMode.roomId){ showToast(ui('err_trap_wrong_room')); return; }
         placeTrapAt(room, r, c);
@@ -5383,18 +5413,26 @@ function handleRoomCellClick(room, r, c){
     selectRoom(room.id);
 }
 
-// ---- 魔王ボタン：押すと上に「配置」「ステータス」の選択肢が出る ----
-function closeDemonLordMenu(){ document.getElementById('demonlord-menu').classList.add('hidden'); }
-function toggleDemonLordMenu(){
-    const menu = document.getElementById('demonlord-menu');
-    if (!menu.classList.contains('hidden')){ closeDemonLordMenu(); return; }
-    cancelRoomCreationIfActive();
-    document.getElementById('btn-dl-place').disabled = rooms.length===0;      // 部屋がまだないと置けない
-    document.getElementById('btn-dl-status').disabled = !demonLordCell;       // まだ配置していないとステータスは見られない
-    menu.classList.remove('hidden');
+// ---- 魔王ボタン：押すと、右パネルの上部（魔王を配置するときと同じ場所）に「配置」「ステータス」のカードが出る ----
+// 下のボタン群は動かさない。フラグ(demonLordMenuOpen)はresetPendingState()・戦闘開始・マップのクリックで自動的に下ろされる
+function closeDemonLordMenu(){
+    if (!demonLordMenuOpen) return;
+    demonLordMenuOpen = false;
+    renderBuildActions();
 }
-function demonLordMenuPlace(){ closeDemonLordMenu(); beginDemonLordSelect(); }
-function demonLordMenuStatus(){ closeDemonLordMenu(); openDemonLordDetailModal(); }
+function toggleDemonLordMenu(){
+    if (demonLordMenuOpen){ closeDemonLordMenu(); return; }
+    cancelRoomCreationIfActive();
+    resetPendingState(); // 配置待ちなど他の操作中だったら終了する（フラグも下りる）
+    selectedMonsterId = null; demonLordMoveSelected = false;
+    updateStatus('');
+    demonLordMenuOpen = true;
+    renderBuildActions();
+    renderOverlays();
+    updateSidePanelVisibility();
+}
+function demonLordMenuPlace(){ beginDemonLordSelect(); }
+function demonLordMenuStatus(){ demonLordMenuOpen = false; renderBuildActions(); openDemonLordDetailModal(); }
 
 // ---- 魔王の配置（プレイヤーが部屋の中の1マスをクリックして手動選択） ----
 function beginDemonLordSelect(){
@@ -5605,15 +5643,15 @@ let currentGamePresetKey = 'game1'; // 現在選択中のゲームプリセッ�
 function currentGamePreset(){ return GAME_PRESETS.find(g=>g.key===currentGamePresetKey); }
 // 魔王専用の固定ステータス（暫定値）。通常モンスターより大幅に強いボス値
 // 魔王のLv1の基本値：最終形態（stage3）のモンスターの平均を基準にする。HPは平均の4倍と高めに、攻撃・防御系は平均の1.2倍（少し強い程度）
-// ただし魔法攻撃力だけは強すぎて魔王ばかりLvが上がってしまうため、スピリット(1段階目)のLv2で個体差が最大(×1.5)の個体と同じ値（=約34）にする
+// ただし魔法攻撃力だけは強すぎて魔王ばかりLvが上がってしまうため、ステータスのランクがちょうどD（G〜SSのうち下から4番目）に届く最小値にする
 const DEMON_LORD_HP_MULT = 4, DEMON_LORD_STAT_MULT = 1.2;
+const DEMON_LORD_MAGATK_RANK = 'D';
 const FINAL_FORM_SPECIES = MONSTER_SPECIES.filter(sp => sp.stage===3);
 const finalFormAvg = k => FINAL_FORM_SPECIES.reduce((sum,sp) => sum + sp[k], 0) / FINAL_FORM_SPECIES.length;
-const DEMON_LORD_MAGATK_REF = MONSTER_SPECIES.find(sp => sp.key==='spirit').magAtk * (1 + 0.25*2) * STAT_MOD_MAX;
 const DEMON_LORD_STATS = {
     hp: Math.round(finalFormAvg('hp') * DEMON_LORD_HP_MULT),
     atk: Math.round(finalFormAvg('atk') * DEMON_LORD_STAT_MULT), def: Math.round(finalFormAvg('def') * DEMON_LORD_STAT_MULT),
-    magAtk: Math.round(DEMON_LORD_MAGATK_REF), magDef: Math.round(finalFormAvg('magDef') * DEMON_LORD_STAT_MULT),
+    magAtk: minStatForRank('magAtk', DEMON_LORD_MAGATK_RANK), magDef: Math.round(finalFormAvg('magDef') * DEMON_LORD_STAT_MULT),
 };
 
 // ============================================================
@@ -5933,7 +5971,7 @@ function updatePhaseUI(){
     document.getElementById('battle-panel').classList.toggle('hidden', !battling);
     document.getElementById('btn-start-battle').classList.toggle('hidden', battling);
     document.getElementById('btn-place-demonlord').classList.toggle('hidden', battling);
-    if (battling) closeDemonLordMenu();
+    if (battling) demonLordMenuOpen = false;
     document.getElementById('btn-open-monsters').classList.toggle('hidden', battling);
     document.getElementById('btn-open-items').classList.toggle('hidden', battling);
     document.getElementById('btn-open-heal').classList.toggle('hidden', battling);
