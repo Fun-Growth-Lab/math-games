@@ -1531,9 +1531,9 @@ const UI_TEXT = {
     passive_guts_name: { ja: '不屈', en: 'Guts' },
     passive_guts_desc: { ja: v => `HPが半分以下のとき、攻撃力が${v}上がる`, en: v => `Attack +${v} while HP is at or below half` },
     passive_ward_name: { ja: '加護', en: 'Ward' },
-    passive_ward_desc: { ja: v => `同じ部屋の仲間全員（自分含む）の防御力・魔法防御力を${v}上げる`, en: v => `Raises defense and magic defense of everyone in the room by ${v}` },
+    passive_ward_desc: { ja: v => `同じ部屋の仲間全員（自分含む）の防御力・魔法防御力を${v}上げる（重ならず最大のみ）`, en: v => `Raises defense and magic defense of everyone in the room by ${v}` },
     passive_inspire_name: { ja: '鼓舞', en: 'Inspire' },
-    passive_inspire_desc: { ja: v => `同じ部屋の仲間全員（自分含む）の攻撃力を${v}上げる`, en: v => `Raises attack of everyone in the room by ${v}` },
+    passive_inspire_desc: { ja: v => `同じ部屋の仲間全員（自分含む）の攻撃力を${v}上げる（重ならず最大のみ）`, en: v => `Raises attack of everyone in the room by ${v}` },
     passive_statusOnHit_name: { ja: st => `${st}の一撃`, en: st => `${st} Strike` },
     passive_statusOnHit_desc: { ja: (pct,st) => `通常攻撃が命中すると、${pct}の確率で${st}を付与する`, en: (pct,st) => `${pct} chance to inflict ${st} on a normal attack` },
     passive_statusResist_name: { ja: '状態異常耐性', en: 'Status Resist' },
@@ -1548,7 +1548,7 @@ const UI_TEXT = {
     skill_dragonBreath_desc: { ja: m => `範囲攻撃（威力${m}倍）`, en: m => `Area attack (${m}x power)` },
     skill_breath_status: { ja: (pct,st) => `。${pct}の確率で${st}を付与`, en: (pct,st) => `. ${pct} chance to inflict ${st}` },
     skill_buff_name: { ja: (stat,scope) => `${stat}アップ（${scope}）`, en: (stat,scope) => `${stat} Up (${scope})` },
-    skill_buff_desc: { ja: (who,stat,pct) => `${who}の${stat}を${pct}上げる（3ターン）`, en: (who,stat,pct) => `Raises ${who} ${stat} by ${pct} (3 turns)` },
+    skill_buff_desc: { ja: (who,stat,pct) => `${who}の${stat}を${pct}上げる（3ターン。使っても通常行動は続けて行う。同じ効果は重ならない）`, en: (who,stat,pct) => `Raises ${who} ${stat} by ${pct} (3 turns)` },
     skill_scope_self: { ja: '自分', en: 'self' },
     skill_scope_party: { ja: '味方全体', en: 'party' },
     skill_scope_party_long: { ja: '同じ部屋の仲間全員', en: "the party's" },
@@ -3303,7 +3303,7 @@ const MONSTER_SPECIES = [
     { key:'thunder_dragon',  name_ja:'サンダードラゴン',   emoji:'⚡🐲', role:'melee', line:'dragon', stage:3, branch:'thunder',
         ...tierStats(21,21,19,24),  active:[{ type:'dragonBreath', multiplier:1.5, statusType:'paralysis', chance:0.25 }] },
     { key:'white_dragon',    name_ja:'ホワイトドラゴン',   emoji:'❄️🐲', role:'melee', line:'dragon', stage:3, branch:'white',
-        ...tierStats(22,20,20,24),  active:[{ type:'dragonBreath', multiplier:1.5, statusType:'freeze', chance:1.0 }] },
+        ...tierStats(22,20,20,24),  active:[{ type:'dragonBreath', multiplier:1.5, statusType:'freeze', chance:0.5 }] },
     { key:'black_dragon',    name_ja:'ブラックドラゴン',   emoji:'🌑🐲', role:'melee', line:'dragon', stage:3, branch:'black',
         ...tierStats(23,21,19,23),  active:[{ type:'dragonBreath', multiplier:1.5, statusType:'confusion', chance:0.25 }] },
 ];
@@ -3447,16 +3447,20 @@ const STATUS_EFFECT_DURATION = { paralysis:1, confusion:2, freeze:2 }; // 毒・
 const PARALYSIS_CLEAR_CHANCE = 0.5; // 麻痺は固定ターン数ではなく、毎ターンこの確率で解除判定を行う（凍結との差別化）
 const STATUS_EFFECT_DAMAGE = { poison:4, burn:6 }; // 毒・火傷の基本ダメージ。重ねがけごとに基本値の半分ずつ増える（4→6→8→10／6→9→12→15…）
 const STACKING_STATUS_TYPES = ['poison','burn'];
+const STATUS_STACK_MAX = 5; // 毒・火傷の重ねがけ上限（毒は最大12、火傷は最大18ダメージ/ターン）
 const STATUS_EMOJI_MAP = { poison:'☠️', burn:'🔥', paralysis:'💫', confusion:'❓', freeze:'🧊' };
 function monsterDisplayName(m){
     return speciesInfo(m.speciesKey).name_ja;
 }
 // 状態異常を付与。毒・火傷は重ねがけ可能（回数に応じてダメージが増える）、それ以外は同種を重ねがけせず残りターン数を延長するだけ
+// 麻痺・凍結・混乱が解けた直後は、次の自分の手番＋敵の1巡ぶんは同じ状態異常にかからない（行動不能の連続を防ぐ）
+function markStatusImmune(unit, type){ unit.statusImmune = unit.statusImmune || {}; unit.statusImmune[type] = 2; }
 function applyStatus(unit, type, turns){
     if (!unit.statusEffects) unit.statusEffects = [];
+    if (!STACKING_STATUS_TYPES.includes(type) && unit.statusImmune && unit.statusImmune[type]>0) return;
     const existing = unit.statusEffects.find(se => se.type===type);
     if (STACKING_STATUS_TYPES.includes(type)){
-        if (existing) existing.stacks = (existing.stacks||1) + 1;
+        if (existing) existing.stacks = Math.min(STATUS_STACK_MAX, (existing.stacks||1) + 1);
         else unit.statusEffects.push({ type, stacks: 1 });
         return;
     }
@@ -3479,6 +3483,7 @@ function stackingStatusDamage(type, stacks){
 function tickStatusEffectsAndCheckSkip(unit, side){
     if (!unit.statusEffects) unit.statusEffects = [];
     let skipType = null;
+    if (unit.statusImmune) Object.keys(unit.statusImmune).forEach(k => { if (--unit.statusImmune[k] <= 0) delete unit.statusImmune[k]; });
     unit.statusEffects = unit.statusEffects.filter(se => {
         if (STACKING_STATUS_TYPES.includes(se.type)){
             if (unit.hp>0){
@@ -3491,11 +3496,15 @@ function tickStatusEffectsAndCheckSkip(unit, side){
         if (se.type==='paralysis'){
             // 麻痺は固定ターン数ではなく、毎ターン一定確率で解除されるかどうかを判定する（凍結との差別化）
             skipType = se.type;
-            return Math.random() >= PARALYSIS_CLEAR_CHANCE;
+            const keep = Math.random() >= PARALYSIS_CLEAR_CHANCE;
+            if (!keep) markStatusImmune(unit, se.type);
+            return keep;
         }
         if (se.type==='freeze') skipType = se.type;
         se.turnsLeft--;
-        return se.turnsLeft > 0;
+        const keep = se.turnsLeft > 0;
+        if (!keep) markStatusImmune(unit, se.type);
+        return keep;
     });
     if (skipType) logBattle(uif('battle_log_status_skip', unitLabel(side, unit), ui('status_'+skipType)));
     return !!skipType;
@@ -3510,7 +3519,7 @@ const BUFF_DURATION = 3;
 function applyBuff(unit, category, value, turns){
     if (!unit.buffs) unit.buffs = [];
     const existing = unit.buffs.find(b => b.category===category);
-    if (existing){ existing.turnsLeft = Math.max(existing.turnsLeft, turns); existing.value = value; }
+    if (existing){ existing.turnsLeft = Math.max(existing.turnsLeft, turns); existing.value = Math.max(existing.value, value); } // 同じ種類は重ねがけできない（効果は大きい方、残りターンは長い方）
     else unit.buffs.push({ category, value, turnsLeft: turns });
 }
 function buffValue(unit, category){
@@ -3591,9 +3600,9 @@ function rangeAtkMultiplier(unit){ return RANGE_ATK_MULT[unitRole(unit)] ?? 1.0;
 // ---- モンスターのパッシブ（戦闘中に効くもの）の計算 ----
 // 同じ部屋で生きている（HPが残っている）モンスターの一覧
 function aliveRoomMonsters(roomId){ return monsters.filter(o => o.roomId===roomId && o.hp>0); }
-// 部屋の味方が持つオーラ系パッシブ（鼓舞・加護）の効果量の合計（自分自身も含む）
+// 部屋の味方が持つオーラ系パッシブ（鼓舞・加護）の効果量（自分自身も含め、最も高い1つだけ）
 function roomAuraSum(unit, type){
-    return aliveRoomMonsters(unit.roomId).reduce((sum,o) => { const p = unitPassive(o, type); return sum + (p ? p.value : 0); }, 0);
+    return aliveRoomMonsters(unit.roomId).reduce((mx,o) => { const p = unitPassive(o, type); return Math.max(mx, p ? p.value : 0); }, 0); // 同じオーラは重ならず、部屋で最も高いものだけ適用
 }
 // 勇者に対する威嚇：同じ部屋にいる生きたモンスターの威嚇のうち最も大きい値だけ、勇者の攻撃力が下がる
 function roomIntimidate(roomId){
@@ -5505,7 +5514,7 @@ function startBattle(){
     demonLordUnit.chargeTurns = 0; // 魔法の溜めは戦闘ごとにリセットする
     // 戦闘中にモンスターが移動しても、建設フェーズに戻ったときは戦闘開始前の配置に戻す
     // （魔王も近接モンスターと同じ行動ロジックを使うため、対象を追って移動することがある）
-    monsters.forEach(m => { m.preBattleR = m.r; m.preBattleC = m.c; m.skillUseCounts = []; m.rageStacks = 0; m.confidenceStacks = 0; m.timidStacks = 0; }); // スキルの発動回数は戦闘ごとにリセットする
+    monsters.forEach(m => { m.preBattleR = m.r; m.preBattleC = m.c; m.skillUseCounts = []; m.rageStacks = 0; m.confidenceStacks = 0; m.timidStacks = 0; m.statusImmune = {}; }); // スキルの発動回数は戦闘ごとにリセットする
     demonLordUnit.preBattleR = demonLordUnit.r; demonLordUnit.preBattleC = demonLordUnit.c;
     selectedRoomId = null; selectedMonsterId = null; demonLordMoveSelected = false; highlightedMonsterId = null;
     document.getElementById('battle-stage-label').textContent = uif('battle_stage_label', stage);
@@ -6076,7 +6085,7 @@ function resolveHeroMagicAction(hero, room){
         if (!hitCells.has(`${m.r},${m.c}`)) return;
         if (rollEvasion(m)){ logBattle(uif('battle_log_evaded', uif('hero_label', hero.id), unitLabel('monster', m))); return; }
         const dmg = heroDamageToMonster(power, m, 'magic');
-        if (applyDamage('monster', m, dmg, hero)) demonLordJustDied = true;
+        if (applyDamage('monster', m, dmg)) demonLordJustDied = true; // 範囲攻撃は反射の対象外（攻撃者を渡さない）
         logBattle(uif('battle_log_attack', uif('hero_label', hero.id), unitLabel('monster', m), dmg));
         if (skillType==='burstStatus') tryApplyHeroStatus(m, skill);
     });
@@ -6100,7 +6109,10 @@ function resolveMonsterTurn(unit, room, role){
     const usable = actives.map((s,i)=>i).filter(i => (unit.skillUseCounts[i]||0) < ACTIVE_SKILL_MAX_USES);
     if (usable.length>0 && Math.random() < ACTIVE_SKILL_CHANCE[role]){
         const i = usable[Math.floor(Math.random()*usable.length)];
-        if (resolveMonsterActiveSkill(unit, sp, actives[i], room)){ unit.skillUseCounts[i] = (unit.skillUseCounts[i]||0) + 1; return false; }
+        if (resolveMonsterActiveSkill(unit, sp, actives[i], room)){
+            unit.skillUseCounts[i] = (unit.skillUseCounts[i]||0) + 1;
+            if (actives[i].type!=='buff') return false; // バフは手番を消費せず、使ったあとそのまま通常行動を行う（自分用のバフが「攻撃を1回捨てて2ターン強化」で損にならないように）
+        }
         // 射程外などで発動できなかった場合は回数を消費せず通常行動にフォールバックする
     }
     if (role==='ranged') resolveRangedMonsterAction(unit, room);
