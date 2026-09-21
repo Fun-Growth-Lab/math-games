@@ -2438,7 +2438,7 @@ function demonLordCardHtml(){
                     <b class="monster-detail-lv">Lv.${dl.level||1}</b>
                     ${rankBadgeHtml(dl)}
                 </div>
-                <div class="monster-detail-sub"><span class="unit-role ${roleTextClass('magic')}">${roleLabel('magic')}</span></div>
+                <div class="monster-detail-sub"><span class="unit-role ${roleTextClass('magic')}">${roleLabel('magic')}（複）</span></div>
                 <div class="monster-detail-hp-row">
                     <span>${ui('monster_stat_hp')}</span>
                     <div class="monster-detail-hpbar"><div class="monster-detail-hpbar-fill" style="width:${hpPct}%;"></div></div>
@@ -3502,7 +3502,7 @@ MONSTER_SPECIES.forEach(sp => (sp.active||[]).forEach(a => {
 }));
 // ---- 長距離弓（アンデッドレンジャー・ハンター）：間合いは「長距離」だが、魔法の範囲攻撃ではなく弓で単体を撃つ ----
 // 射程5マス・溜めなし。攻撃力補正は中距離(100%)と長距離魔法(75%)の中間の87.5%
-const LONGBOW_RANGE = 5, LONGBOW_ATK_MULT = 0.875;
+const LONGBOW_RANGE = 5, LONGBOW_ATK_MULT = 0.875, LONGBOW_SKILL_CHANCE = 0.25; // スキル発動確率は中距離30%と長距離魔法20%の中間
 ['undead_ranger','undead_hunter'].forEach(k => { const sp = MONSTER_SPECIES.find(x => x.key===k); sp.longBow = true; sp.rangeMult = LONGBOW_ATK_MULT; });
 function speciesInfo(key){ return MONSTER_SPECIES.find(s=>s.key===key); }
 const STAGE1_SPECIES = MONSTER_SPECIES.filter(s=>s.stage===1);
@@ -3514,6 +3514,10 @@ const EGG_STAGE1_SPECIES = MONSTER_SPECIES.filter(s=>s.stage===1 && EGG_LINES.in
 const SUMMON_STAGE1_SPECIES = MONSTER_SPECIES.filter(s=>s.stage===1 && SUMMON_LINES.includes(s.line));
 const SUMMON_STAGE2_SPECIES = MONSTER_SPECIES.filter(s=>s.stage===2 && SUMMON_LINES.includes(s.line));
 function roleLabel(role){ return ui('role_'+role); }
+// 種族の間合い表示。長距離だけ攻撃範囲の違いを（単）（複）で示す（単＝単体の弓、複＝魔法の範囲攻撃。将来の部屋全体の技は（全））
+function longRangeKind(sp){ return sp && sp.longBow ? '単' : '複'; }
+function speciesRoleLabel(sp){ return roleLabel(sp.role) + (sp.role==='magic' ? '（' + longRangeKind(sp) + '）' : ''); }
+function speciesRoleShortLabel(sp){ return roleShortLabel(sp.role) + (sp.role==='magic' ? '(' + longRangeKind(sp) + ')' : ''); }
 // 部屋詳細の1行表示など、幅が厳しい場所向けの1文字省略ラベル（近距離→近／中距離→中／長距離→長）
 function roleShortLabel(role){ return { melee:'近', ranged:'中', magic:'長' }[role] || ''; }
 function roleTextClass(role){ return 'role-text-'+role; }
@@ -4193,7 +4197,7 @@ function monsterCardHtml(m, opts){
         const roomText = stocked ? '' : `<span class="room-name-badge ${roomGem||''}">${escapeHtml(roomDisplayNameById(m.roomId))}</span>`;
         return `<div class="monster-detail-row detailed${selected?' selected':''}"${clickAttr} style="${opts.clickable?'cursor:pointer;':''}">
             <div class="monster-list-row">
-                <span class="monster-list-name">${monsterIconHtml(sp)} <span style="color:${monsterNameColor(sp)}; font-weight:700;">${escapeHtml(monsterDisplayName(m))}</span> <span class="${roleTextClass(sp.role)}">（${roleLabel(sp.role)}）</span>${inlineTag}</span>
+                <span class="monster-list-name">${monsterIconHtml(sp)} <span style="color:${monsterNameColor(sp)}; font-weight:700;">${escapeHtml(monsterDisplayName(m))}</span> <span class="${roleTextClass(sp.role)}">${speciesRoleLabel(sp)}</span>${inlineTag}</span>
                 <span class="monster-list-action">${actionHtml}</span>
                 <span class="monster-list-room">${roomText}</span>
                 <span class="monster-list-lv">Lv.${m.level||0}</span>
@@ -4207,7 +4211,7 @@ function monsterCardHtml(m, opts){
         <div class="monster-compact-line">
             ${monsterIconHtml(sp)}
             <span class="monster-compact-name" style="color:${monsterNameColor(sp)}; font-weight:700;">${escapeHtml(monsterDisplayName(m))}</span>
-            <span class="${roleTextClass(sp.role)}">${roleShortLabel(sp.role)}</span>
+            <span class="${roleTextClass(sp.role)}">${speciesRoleShortLabel(sp)}</span>
             <span style="color:var(--gold); font-weight:700;">Lv.${m.level||0}</span>
             ${rankBadgeHtml(m)}
             ${statusMark?`<span>${statusMark}</span>`:''}
@@ -4404,7 +4408,7 @@ function monsterDetailCoreHtml(m, opts){
                     <b class="monster-detail-lv">Lv.${m.level||0}</b>
                     ${rankBadgeHtml(m)}
                 </div>
-                <div class="monster-detail-sub"><span class="unit-role ${roleTextClass(sp.role)}">${roleLabel(sp.role)}${sp.longBow ? '（弓）' : ''}</span>${statusMark?'　'+statusMark:''}${downed?'　'+ui('monster_downed_tag'):''}</div>
+                <div class="monster-detail-sub"><span class="unit-role ${roleTextClass(sp.role)}">${speciesRoleLabel(sp)}</span>${statusMark?'　'+statusMark:''}${downed?'　'+ui('monster_downed_tag'):''}</div>
                 <div class="monster-detail-hp-row">
                     <span>${ui('monster_stat_hp')}</span>
                     <div class="monster-detail-hpbar"><div class="monster-detail-hpbar-fill" style="width:${hpPct}%;"></div></div>
@@ -6294,7 +6298,7 @@ function resolveMonsterTurn(unit, room, role){
     const actives = (sp && sp.active) || [];
     if (!unit.skillUseCounts) unit.skillUseCounts = [];
     const usable = actives.map((s,i)=>i).filter(i => (unit.skillUseCounts[i]||0) < ACTIVE_SKILL_MAX_USES);
-    if (usable.length>0 && Math.random() < ACTIVE_SKILL_CHANCE[role]){
+    if (usable.length>0 && Math.random() < ((sp && sp.longBow) ? LONGBOW_SKILL_CHANCE : ACTIVE_SKILL_CHANCE[role])){
         const i = usable[Math.floor(Math.random()*usable.length)];
         if (resolveMonsterActiveSkill(unit, sp, actives[i], room)){
             unit.skillUseCounts[i] = (unit.skillUseCounts[i]||0) + 1;
