@@ -5664,6 +5664,8 @@ const STAGE_FINAL = 7; // 最終侵攻。ここの勇者を倒すとゲームク
 // 部屋を増やすほど迷宮側の強さ（モンスター数・生産力）が複利的に伸びる一方、勇者数を一定の+2ずつにすると
 // 終盤に迷宮側との差が開きすぎるため、増分自体が後半ほど大きくなる式にしてある（案B）。
 // ステージ数nに対して 2n + round(0.5×(n-1)²) 人（ステージ1で2人、ステージ7で32人、7ステージ合計103人）
+const HEROES_PER_WAVE = 4;
+const WAVE_INTERVAL_TICKS = 12; // 次の4体が入ってくるまでのtick数（暫定値。1tickは行動1回分の間隔）
 function heroCountForStage(stageNum){ return 2*stageNum + Math.round(0.5*(stageNum-1)*(stageNum-1)); }
 // 勇者のクラス定義。
 // tierStart/tierEndは侵攻1・侵攻7でのステータス（1〜10ランク値、モンスターと同じtierStats換算を使う）。
@@ -5674,7 +5676,12 @@ function heroCountForStage(stageNum){ return 2*stageNum + Math.round(0.5*(stageN
 const HERO_HP_MULT = 2;
 const HERO_BASE_OFFENSE_MULT = 2;
 const HERO_BASELINE_COUNT = 4;
-function heroOffenseMult(stageNum){ return HERO_BASE_OFFENSE_MULT * (HERO_BASELINE_COUNT / heroCountForStage(stageNum)); }
+// ステージ1は勇者が2体しかいないため、上の反比例式だとoffenseMultが4倍まで跳ね上がり、
+// 生まれたてのLv1モンスター（HP平均22前後）を一撃で倒してしまっていた（実測：ダメージ約40〜46）。
+// ステージ2（勇者5体、反比例式で1.6倍）は問題ないとのフィードバックなので、ステージ1だけその水準まで
+// 頭打ちにする（ステージ2以降はこの上限に届かないため、今まで通り反比例式のまま変化しない）
+const HERO_OFFENSE_MULT_CAP = 1.6;
+function heroOffenseMult(stageNum){ return Math.min(HERO_OFFENSE_MULT_CAP, HERO_BASE_OFFENSE_MULT * (HERO_BASELINE_COUNT / heroCountForStage(stageNum))); }
 // tierStartはステージ1の勇者の強さを決める（侵攻1では線形補間の比率t=0でtierStartがそのまま使われるため）。下のHERO_START_STRENGTH_SCALEで一律に下げている。
 // ステージ1が少し強すぎるとのフィードバックを受け、各能力を1ランクずつ下げた（下限1）。tierEnd（最終侵攻7の強さ）は変更していない。
 // 【攻撃役3職（剣士・アーチャー・メイジ）の攻撃値の決め方】
