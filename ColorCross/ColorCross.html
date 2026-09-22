@@ -645,11 +645,22 @@ const ctx=cvs.getContext('2d');
   cvs.style.width=W+'px'; cvs.style.height=H+'px';
   ctx.scale(dpr,dpr);
 })();
+// 縦持ちスマホでも横長ゲームを大きく表示するため、縦持ち×スマホ幅のときは
+// CSSで90度回転させ、画面の縦幅を「横幅」として使うスケール計算に切り替える。
+// （回転中はtoXY()でのタップ/ドラッグ座標の変換も回転考慮の計算式に切り替わる）
+let isMobileRotated=false;
 function rescale(){
   const vw=window.visualViewport?window.visualViewport.width:document.documentElement.clientWidth;
   const vh=window.visualViewport?window.visualViewport.height:document.documentElement.clientHeight;
-  const sc=Math.min(vw/W,vh/H);
-  document.getElementById('container').style.transform=`scale(${sc})`;
+  const container=document.getElementById('container');
+  isMobileRotated = vw<vh && vw<=900;
+  if(isMobileRotated){
+    const sc=Math.min(vh/W,vw/H);
+    container.style.transform=`rotate(90deg) scale(${sc})`;
+  } else {
+    const sc=Math.min(vw/W,vh/H);
+    container.style.transform=`scale(${sc})`;
+  }
 }
 window.addEventListener('resize',rescale);
 if(window.visualViewport)window.visualViewport.addEventListener('resize',rescale);
@@ -1654,6 +1665,10 @@ function drawGame(){
 // ============================================================
 function toXY(e){
   const r=cvs.getBoundingClientRect();
+  if(isMobileRotated){
+    const px=e.clientX-r.left, py=e.clientY-r.top;
+    return {mx: py*(H/r.width), my: H - px*(W/r.height)};
+  }
   return {mx:(e.clientX-r.left)*W/r.width, my:(e.clientY-r.top)*H/r.height};
 }
 function toCell(mx,my){
