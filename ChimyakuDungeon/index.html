@@ -4043,16 +4043,21 @@ function closeDamageBreakdownModal(){
     lastAutoHealInfo = null;
     maybeOfferDemonLordSkillReward();
 }
-// Lvアップに必要な累積経験値は100の倍数（Lv.1=累計100、Lv.2=累計200…）
-// 必要経験値：Lv0→1は XP_PER_LEVEL、Lvが1上がるごとに次のLvまでの必要経験値が XP_LEVEL_STEP_GROWTH ずつ増える
-// （Lv L→L+1 に必要な経験値 = XP_PER_LEVEL + XP_LEVEL_STEP_GROWTH×L。Lv Lに必要な累計 = 100×L + (増加量÷2)×L×(L−1)）
+// 必要経験値：Lv1→2は XP_PER_LEVEL（=100）で、そこからLvが1つ上がるごとに次のLvまでの必要経験値が
+// XP_LEVEL_STEP_GROWTH ずつ増えていく（Lv1→2:100、Lv2→3:120、Lv3→4:140…）。
+// Lv L→L+1 に必要な経験値 = XP_PER_LEVEL + XP_LEVEL_STEP_GROWTH×(L−1)（L≧1）
+// Lv Lに必要な累計経験値 = XP_PER_LEVEL×L + (増加量÷2)×(L−1)×(L−2)（L≧1。L=0は0）
 const XP_PER_LEVEL = 100;
 const XP_LEVEL_STEP_GROWTH = 20;
-function xpForLevel(lv){ return XP_PER_LEVEL*lv + XP_LEVEL_STEP_GROWTH/2*lv*(lv-1); }
+function xpForLevel(lv){
+    if (lv<=0) return 0;
+    return XP_PER_LEVEL*lv + XP_LEVEL_STEP_GROWTH/2*(lv-1)*(lv-2);
+}
 function monsterLevel(xp){
     xp = Math.max(0, xp||0);
-    const g = XP_LEVEL_STEP_GROWTH, b = XP_PER_LEVEL - g/2;
-    let lv = g>0 ? Math.floor((-b + Math.sqrt(b*b + 2*g*xp)) / g) : Math.floor(xp / XP_PER_LEVEL);
+    // xpForLevel(lv) = (g/2)lv² + (100−1.5g)lv + g の解の公式で見当をつけてから、xpForLevel自体で1ずつ補正する（見当が外れても結果は必ず正しくなる）
+    const g = XP_LEVEL_STEP_GROWTH, a = g/2, b = XP_PER_LEVEL - 1.5*g, c = g - xp;
+    let lv = a>0 ? Math.floor((-b + Math.sqrt(Math.max(0, b*b - 4*a*c))) / (2*a)) : Math.floor(xp / XP_PER_LEVEL);
     while (xpForLevel(lv+1) <= xp) lv++;      // 浮動小数点の誤差を吸収する
     while (lv>0 && xpForLevel(lv) > xp) lv--;
     return lv;
