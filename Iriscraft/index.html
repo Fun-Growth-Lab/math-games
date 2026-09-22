@@ -1690,9 +1690,20 @@ function drawIllustration(ctx2, file, col, row) {
 // ================================================================
 let scale = 1;
 const cont = document.getElementById('container');
+// 縦持ちスマホでも横長ゲームを大きく表示するため、縦持ち×スマホ幅のときは
+// CSSで90度回転させ、画面の縦幅を「横幅」として使うスケール計算に切り替える。
+// （回転中はgetLogical()でのタップ座標の変換も回転考慮の計算式に切り替わる）
+let isMobileRotated = false;
 function fitContainer() {
-  scale = Math.min(window.innerWidth / 1400, window.innerHeight / 760);
-  cont.style.transform = `translate(-50%, -50%) scale(${scale})`;
+  const w = window.innerWidth, h = window.innerHeight;
+  isMobileRotated = w < h && w <= 900;
+  if (isMobileRotated) {
+    scale = Math.min(h / 1400, w / 760);
+    cont.style.transform = `translate(-50%, -50%) rotate(90deg) scale(${scale})`;
+  } else {
+    scale = Math.min(w / 1400, h / 760);
+    cont.style.transform = `translate(-50%, -50%) scale(${scale})`;
+  }
 }
 window.addEventListener('resize', fitContainer);
 fitContainer();
@@ -3225,6 +3236,10 @@ function resetFrame() {
 }
 function getLogical(e) {
   const t=e.touches?e.touches[0]:e, r=cont.getBoundingClientRect();
+  if (isMobileRotated) {
+    const px=t.clientX-r.left, py=t.clientY-r.top;
+    return { x: py/scale, y: 760 - px/scale };
+  }
   return { x:(t.clientX-r.left)/scale, y:(t.clientY-r.top)/scale };
 }
 function anyOverlayOpen() {

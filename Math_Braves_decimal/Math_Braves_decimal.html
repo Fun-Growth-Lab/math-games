@@ -598,12 +598,22 @@
 
     const FONT_FAMILY = "'M PLUS Rounded 1c', sans-serif";
 
+    // 縦持ちスマホでも横長ゲームを大きく表示するため、縦持ち×スマホ幅のときは
+    // CSSで90度回転させ、画面の縦幅を「横幅」として使うスケール計算に切り替える。
+    // （回転中はgetPointerPos()でのタップ座標の変換も回転考慮の計算式に切り替わる）
+    let isMobileRotated = false;
     function resizeWindow() {
         const vp = window.visualViewport;
     const winW = vp ? vp.width : window.innerWidth;
         const winH = vp ? vp.height : window.innerHeight;
-        currentScale = Math.min(winW / GAME_W, winH / GAME_H);
-        wrapper.style.transform = `translate(-50%, -50%) scale(${currentScale})`;
+        isMobileRotated = winW < winH && winW <= 900;
+        if (isMobileRotated) {
+            currentScale = Math.min(winH / GAME_W, winW / GAME_H);
+            wrapper.style.transform = `translate(-50%, -50%) rotate(90deg) scale(${currentScale})`;
+        } else {
+            currentScale = Math.min(winW / GAME_W, winH / GAME_H);
+            wrapper.style.transform = `translate(-50%, -50%) scale(${currentScale})`;
+        }
     }
     window.addEventListener('resize', resizeWindow);
     resizeWindow();
@@ -1662,6 +1672,10 @@
         const rect = canvas.getBoundingClientRect();
         let clientX = e.touches ? e.touches[0].clientX : e.clientX;
         let clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        if (isMobileRotated) {
+            const px = clientX - rect.left, py = clientY - rect.top;
+            return { x: py / currentScale, y: GAME_H - px / currentScale };
+        }
         return { x: (clientX - rect.left) / currentScale, y: (clientY - rect.top) / currentScale };
     }
 
