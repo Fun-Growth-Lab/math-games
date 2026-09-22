@@ -63,6 +63,10 @@
         }
 
         /* ==================== TITLE / GENERIC BOX ==================== */
+        #title-screen {
+            background-image: linear-gradient(rgba(12,8,5,0.35), rgba(12,8,5,0.6)), url('images/main.png');
+            background-size: cover; background-position: center;
+        }
         .title-box {
             background: rgba(36,26,19,0.82); border: 2px solid var(--card-bdr);
             padding: 40px 68px; border-radius: 28px; position: relative; z-index: 1;
@@ -6055,8 +6059,13 @@ function renderHeroList(){
 }
 
 // ---- 通路の選択：勇者1体ごとに深さ優先探索で進む ----
-// 通った通路に「訪れた順番」を記録し、まだ通っていない通路があればそれをランダムに選ぶ。
-// 全て通過済みならその中で最も昔に通った（記録の先頭に近い）通路を選ぶ＝行き止まりからの後戻りになる
+// 通った通路に「訪れた順番」を記録し、まだ通っていない通路があれば最優先（複数あればランダムに、先の部屋が
+// 満員のものは飛ばして他の未訪問候補を順に試す）。未訪問の通路が1つも残っていなければ、それまでに通った中で
+// 最も昔に通った通路（＝入ってきた道）を後戻りとして選ぶ。
+// 満員で選べる候補が1つもなければnullを返し、呼び出し側でその場を待機させる。
+// ここが重要：未訪問の候補が残っている限りは、満員でも後戻りへは絶対に逃げない。後戻り（＝古い通路）は
+// 「訪問済みの通路の中で一番古い」という一度きりの記録なので、満員を理由に後戻りしてしまうと、
+// まだ見ていない道が二度と選ばれなくなり、勇者が同じ2部屋を永久に往復し続けてしまう
 function pickNextCorridorForHero(hero, locationId){
     let options = corridors.filter(cd => cd.fromId===locationId || cd.toId===locationId);
     // 一度入口を出た後は、入口へ戻る通路（＝ダンジョン最初の通路）を選択肢から除外する。
@@ -6065,12 +6074,27 @@ function pickNextCorridorForHero(hero, locationId){
         options = options.filter(cd => cd.fromId!=='entrance' && cd.toId!=='entrance');
     }
     if (options.length===0) return null;
+    const corridorHasSpace = cd => {
+        const dest = otherRoomOf(cd, locationId);
+        if (dest==='entrance') return true; // 通路自体は選べる（heroDepartToNextRoom側で行き止まりとして扱う）
+        const room = rooms.find(r=>r.id===dest);
+        return room && roomHasFreeCell(room);
+    };
     const visited = hero.corridorVisitOrder;
     const unvisited = options.filter(cd=>!visited.includes(cd.id));
-    if (unvisited.length>0) return unvisited[Math.floor(Math.random()*unvisited.length)];
-    return options.slice().sort((a,b)=>visited.indexOf(a.id)-visited.indexOf(b.id))[0];
+    if (unvisited.length>0){
+        const shuffled = unvisited.slice();
+        for (let i=shuffled.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [shuffled[i],shuffled[j]]=[shuffled[j],shuffled[i]]; }
+        return shuffled.find(corridorHasSpace) || null; // 全部満員なら待機（後戻りはしない）
+    }
+    const oldest = options.slice().sort((a,b)=>visited.indexOf(a.id)-visited.indexOf(b.id))[0];
+    return corridorHasSpace(oldest) ? oldest : null; // 後戻り先すら満員なら待機
 }
 function otherRoomOf(corridor, locationId){ return corridor.fromId===locationId ? corridor.toId : corridor.fromId; }
+// 部屋の中に、勇者が新しく立てる空きマスが1つでもあるか（モンスター・勇者・魔王で埋まっていないか）
+function roomHasFreeCell(room){
+    return cellsOfRect(room).some(cell => !battleCellOccupied(room.id, cell.r, cell.c));
+}
 
 function getRoomMonsters(roomId){
     if (roomId===null) return [];
@@ -6127,6 +6151,7 @@ function startHeroCorridorTravel(hero, nextRoomId, corridorPath){
     hero.transitNextRoomId = nextRoomId;
     hero.state = 'transit';
     hero.roomId = null;
+    hero.behavior = null; // 'waiting'等の古い値が移動中に残らないようにする（到着時にheroArriveAtRoomが'stay'へ設定し直す）
 }
 // 移動中の勇者を1マス進める。到着したらheroArriveAtRoomへ
 function advanceHeroTransitStep(hero){
@@ -6142,7 +6167,8 @@ function advanceHeroTransitStep(hero){
     hero.transitPath = null; hero.transitNextRoomId = null; hero.transitStepIndex = 0;
     heroArriveAtRoom(hero, roomId);
 }
-// 勇者が部屋に到着した瞬間の処理：50%は部屋の魔物を全滅させるまで滞在、50%はすぐ別の部屋へ向かう
+// 勇者が部屋に到着した瞬間の処理：必ずその部屋の魔物（＋魔王）を全滅させるまで滞在する（せん滅型）。
+// 全滅させたらreleaseStayHeroesFromRoomから改めてheroDepartToNextRoomが呼ばれ、次の部屋へ向かう
 function heroArriveAtRoom(hero, roomId){
     hero.roomId = roomId;
     hero.state = 'inRoom';
@@ -6150,29 +6176,24 @@ function heroArriveAtRoom(hero, roomId){
     const room = rooms.find(r=>r.id===roomId);
     // 複数の勇者が同時に同じマスへ到着してしまった場合はワープで散らす（入場直後でも行動はそのまま続けられる）
     if (room && battleCellOccupied(roomId, hero.r, hero.c, hero)) warpHero(hero, room, roomId);
-    // 魔王がこの部屋にいれば必ず滞在して戦う（50%抽選はしない）。いなければ従来通り50%で滞在/移動を決める
-    const demonLordHere = demonLordUnit && demonLordUnit.alive && demonLordRoomId===roomId;
-    hero.behavior = demonLordHere ? 'stay' : (Math.random()<0.5 ? 'stay' : 'roam');
+    hero.behavior = 'stay';
     logBattle(uif('battle_log_enter', uif('hero_label', hero.id), roomDisplayNameById(roomId)));
-    if (hero.behavior==='roam') heroDepartToNextRoom(hero);
 }
-// 勇者1体を、次の部屋（DFS的に選んだ通路の先）へ向けて出発させる。行き先が見つからなければその場に留まって戦う
+// 勇者1体を、次の部屋（DFS的に選んだ通路の先）へ向けて出発させる。
+// 行ける部屋（空きマスのある部屋）が見つからなければ、その場で待機し、毎tickの再試行（battleStep側）で
+// 空きが出た瞬間に出発できるようにする
 function heroDepartToNextRoom(hero){
-    let fromLoc = hero.roomId===null ? 'entrance' : hero.roomId;
-    for (let guard=0; guard<6; guard++){
-        const cd = pickNextCorridorForHero(hero, fromLoc);
-        if (!cd){
-            hero.roomId = (fromLoc==='entrance') ? null : fromLoc;
-            hero.state = 'inRoom'; hero.behavior = 'stay';
-            return;
-        }
+    const fromLoc = hero.roomId===null ? 'entrance' : hero.roomId;
+    const cd = pickNextCorridorForHero(hero, fromLoc);
+    const nextLoc = cd ? otherRoomOf(cd, fromLoc) : null;
+    if (cd && nextLoc!=='entrance'){
         if (!hero.corridorVisitOrder.includes(cd.id)) hero.corridorVisitOrder.push(cd.id);
-        const nextLoc = otherRoomOf(cd, fromLoc);
-        if (nextLoc==='entrance'){ fromLoc = 'entrance'; continue; } // 入口は行き止まりなので、もう一度別の道を選び直す
         startHeroCorridorTravel(hero, nextLoc, orderedCorridorCells(cd, fromLoc));
         return;
     }
-    hero.state = 'inRoom'; hero.behavior = 'stay'; // 安全策：行き先が定まらなければその場で戦う
+    // 行き先が見つからなかった：今の場所（部屋 or 入口）で待機し、空きが出るのを待つ
+    hero.roomId = (fromLoc==='entrance') ? null : fromLoc;
+    hero.state = 'inRoom'; hero.behavior = 'waiting';
 }
 // 部屋の魔物を全滅させた「滞在」勇者たちを、次の部屋への移動に切り替える
 function releaseStayHeroesFromRoom(roomId){
@@ -6905,6 +6926,8 @@ function battleStep(){
     battleGlobalTick++;
 
     battleHeroes.filter(h=>h.state==='transit').forEach(advanceHeroTransitStep);
+    // 行き先が満員で待機している勇者は、毎tick空きが出ていないか再確認する（空けば即座に出発する）
+    battleHeroes.filter(h=>h.state==='inRoom' && h.behavior==='waiting' && h.alive).forEach(heroDepartToNextRoom);
     spawnNextWaveIfDue();
 
     const activeRoomIds = Array.from(new Set(
