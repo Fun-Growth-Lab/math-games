@@ -397,6 +397,9 @@
         .monster-detail-hp-row { display:flex; align-items:center; gap:8px; margin-bottom:12px; font-size:0.85rem; color: var(--ink); }
         .monster-detail-hpbar { flex:1; height:10px; background:rgba(0,0,0,0.45); border-radius:5px; overflow:hidden; border:1px solid rgba(255,255,255,0.15); }
         .monster-detail-hpbar-fill { height:100%; background: linear-gradient(90deg,#ff6b6b,#ffb84d); transition: width 0.3s; }
+        /* 経験値バーはHPバーと同じ形だが、混同しないよう青紫系の配色にする */
+        .xp-row { margin-top:2px; }
+        .xpbar-fill { background: linear-gradient(90deg,#5c8dff,#a55cff); }
         /* ステータス表示（パワプロ風）：左に「ステータス名｜G〜SSランク｜数値」を横並び、右にスキル・所持アイテム・進化の石。狭い右パネルでは縦1列に畳む */
         .unit-detail-head { display:flex; align-items:center; gap:14px; text-align:left; }
         .unit-detail-head .monster-detail-art { margin-bottom:0; flex:0 0 auto; }
@@ -404,6 +407,7 @@
         .unit-detail-head .monster-detail-title { justify-content:flex-start; }
         .unit-detail-head .monster-detail-sub { text-align:left; margin:2px 0 6px; }
         .unit-detail-head .monster-detail-hp-row { margin-bottom:0; }
+        .unit-detail-head .xp-row { margin-top:3px; margin-bottom:0; }
         .unit-detail-cols { display:grid; grid-template-columns: 1fr 1fr; gap:16px; text-align:left; margin-top:12px; align-items:stretch; }
         /* 左のステータス4行は、右のスキル欄と同じ高さまで縦に伸ばして揃える。右は枠の数を固定して高さがモンスターで変わらないようにする */
         .unit-stat-list { display:flex; flex-direction:column; gap:7px; }
@@ -1773,6 +1777,7 @@ const UI_TEXT = {
     demonlord_attack_name: { ja: '範囲魔法', en: 'Area Magic' },
     demonlord_attack_desc: { ja: '動かずに3ターン溜めてから、部屋の勇者を中心に範囲魔法を放つ（魔法攻撃力を参照）', en: 'Stays put, charges for 3 turns, then casts area magic around the heroes in the room' },
     monster_stat_hp: { ja: 'HP', en: 'HP' },
+    unit_xp_label: { ja: 'EXP', ja_easy: 'けいけんち', en: 'EXP' },
     monster_stat_atk: { ja: '攻', ja_easy: 'こう', en: 'ATK' },
     monster_stat_def: { ja: '防', ja_easy: 'ぼう', en: 'DEF' },
     monster_stat_magatk: { ja: '魔攻', ja_easy: 'まこう', en: 'Sp.ATK' },
@@ -2570,6 +2575,7 @@ function demonLordCardHtml(opts){
                     <div class="monster-detail-hpbar"><div class="monster-detail-hpbar-fill" style="width:${hpPct}%;"></div></div>
                     <b>${dl.hp}/${dl.maxHp}</b>
                 </div>
+                ${xpBarHtml(dl)}
             </div>
         </div>
         <div class="unit-detail-cols">
@@ -4553,6 +4559,18 @@ function unitStatRowHtml(labelKey, cls, u, statKey){
         ${statValueHtml(u, statKey)}
     </div>`;
 }
+// 経験値バー：現在のLvから次のLvまでの範囲での進み具合。最大Lv等の上限はないので常に「次まであとどれだけ」を示す
+function xpBarHtml(u){
+    const lv = u.level||0;
+    const curFloor = xpForLevel(lv), nextFloor = xpForLevel(lv+1);
+    const span = nextFloor - curFloor;
+    const pct = span>0 ? Math.max(0, Math.min(100, ((u.xp||0)-curFloor)/span*100)) : 100;
+    return `<div class="monster-detail-hp-row xp-row">
+        <span>${ui('unit_xp_label')}</span>
+        <div class="monster-detail-hpbar xpbar"><div class="monster-detail-hpbar-fill xpbar-fill" style="width:${pct}%;"></div></div>
+        <b>${Math.max(0, (u.xp||0)-curFloor)}/${span}</b>
+    </div>`;
+}
 function unitStatListHtml(u){
     return unitStatRowHtml('unit_stat_atk', 'stat-atk', u, 'atk') + unitStatRowHtml('unit_stat_def', 'stat-def', u, 'def')
          + unitStatRowHtml('unit_stat_magatk', 'stat-magatk', u, 'magAtk') + unitStatRowHtml('unit_stat_magdef', 'stat-magdef', u, 'magDef');
@@ -4593,6 +4611,7 @@ function monsterDetailCoreHtml(m, opts){
                     <div class="monster-detail-hpbar"><div class="monster-detail-hpbar-fill" style="width:${hpPct}%;"></div></div>
                     <b>${m.hp}/${m.maxHp}</b>
                 </div>
+                ${xpBarHtml(m)}
             </div>
         </div>
         <div class="unit-detail-cols">
