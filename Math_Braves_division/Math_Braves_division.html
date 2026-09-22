@@ -726,11 +726,23 @@ function forceResize() {
     canvas.height = state.height;
 }
 
+// 縦持ちスマホでも横長ゲームを大きく表示するため、縦持ち×スマホ幅のときは
+// CSSで90度回転させ、画面の縦幅を「横幅」として使うスケール計算に切り替える。
+// （回転中はgetPos()でのタップ座標の変換も回転考慮の計算式に切り替わる）
+let isMobileRotated = false;
 function resize() {
     const container = document.getElementById('container');
     const vp = window.visualViewport;
-    const scale = Math.min((vp ? vp.width : window.innerWidth) / 1280, (vp ? vp.height : window.innerHeight) / 720);
-    container.style.transform = `scale(${scale})`;
+    const winW = vp ? vp.width : window.innerWidth;
+    const winH = vp ? vp.height : window.innerHeight;
+    isMobileRotated = winW < winH && winW <= 900;
+    if (isMobileRotated) {
+        const scale = Math.min(winH / 1280, winW / 720);
+        container.style.transform = `rotate(90deg) scale(${scale})`;
+    } else {
+        const scale = Math.min(winW / 1280, winH / 720);
+        container.style.transform = `scale(${scale})`;
+    }
     if (state.width === 0) { forceResize(); }
 }
 window.addEventListener('resize', resize);
@@ -1268,6 +1280,10 @@ canvas.addEventListener('touchend', (e) => { e.preventDefault(); handleInputEnd(
 
 function getPos(e) {
     const rect = canvas.getBoundingClientRect();
+    if (isMobileRotated) {
+        const px = e.clientX - rect.left, py = e.clientY - rect.top;
+        return { x: py * (canvas.height / rect.width), y: canvas.height - px * (canvas.width / rect.height) };
+    }
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
     return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
