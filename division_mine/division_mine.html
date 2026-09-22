@@ -1208,8 +1208,19 @@ class Game {
     static resize() {
         const wrapper = document.getElementById('game-wrapper');
         const vp = window.visualViewport;
-        const scale = Math.min((vp ? vp.width : window.innerWidth) / DESIGN_W, (vp ? vp.height : window.innerHeight) / DESIGN_H);
-        wrapper.style.transform = `scale(${scale})`;
+        const winW = vp ? vp.width : window.innerWidth;
+        const winH = vp ? vp.height : window.innerHeight;
+        // 縦持ちスマホでも横長ゲームを大きく表示するため、縦持ち×スマホ幅のときは
+        // CSSで90度回転させ、画面の縦幅を「横幅」として使うスケール計算に切り替える。
+        // （回転中はgetLocalPos()でのタップ座標の変換も回転考慮の計算式に切り替わる）
+        this.isMobileRotated = winW < winH && winW <= 900;
+        if (this.isMobileRotated) {
+            const scale = Math.min(winH / DESIGN_W, winW / DESIGN_H);
+            wrapper.style.transform = `rotate(90deg) scale(${scale})`;
+        } else {
+            const scale = Math.min(winW / DESIGN_W, winH / DESIGN_H);
+            wrapper.style.transform = `scale(${scale})`;
+        }
     }
 
     static showTitle() {
@@ -1500,6 +1511,13 @@ class Game {
     static getLocalPos(e) {
         const canvas = this.canvas;
         const rect = canvas.getBoundingClientRect();
+        if (this.isMobileRotated) {
+            const px = e.clientX - rect.left, py = e.clientY - rect.top;
+            return {
+                x: py * (CANVAS_H / rect.width),
+                y: CANVAS_H - px * (CANVAS_W / rect.height)
+            };
+        }
         const scaleX = CANVAS_W / rect.width;
         const scaleY = CANVAS_H / rect.height;
         return {
