@@ -638,13 +638,28 @@ const Game = (function() {
         };
     }
     
+    // スマホを縦持ちしたまま横長ゲームを大きく表示するため、
+    // 縦持ち×スマホ幅のときはCSSで90度回転させて画面いっぱいに表示する。
+    // （回転中はクリック/タップ座標の変換もrotated分岐で行う。handleInputStart/Move参照）
+    let isMobileRotated = false;
     function resize() {
         const vp = window.visualViewport;
-        const scaleX = (vp ? vp.width : window.innerWidth) / BASE_WIDTH;
-        const scaleY = (vp ? vp.height : window.innerHeight) / BASE_HEIGHT;
-        const scale = Math.min(scaleX, scaleY);
+        const vw = vp ? vp.width : window.innerWidth;
+        const vh = vp ? vp.height : window.innerHeight;
         const container = document.getElementById('game-container');
-        container.style.transform = `translate(-50%, -50%) scale(${scale})`;
+
+        isMobileRotated = vw < vh && vw <= 900;
+
+        if (isMobileRotated) {
+            // 画面の縦幅を「横幅」、画面の横幅を「縦幅」として使い、90度回転して中央に配置
+            const scale = Math.min(vh / BASE_WIDTH, vw / BASE_HEIGHT);
+            container.style.transform = `translate(-50%, -50%) rotate(90deg) scale(${scale})`;
+        } else {
+            const scaleX = vw / BASE_WIDTH;
+            const scaleY = vh / BASE_HEIGHT;
+            const scale = Math.min(scaleX, scaleY);
+            container.style.transform = `translate(-50%, -50%) scale(${scale})`;
+        }
     }
 
     // ------------------ 確率・抽選ロジック ------------------
@@ -2012,12 +2027,29 @@ const Game = (function() {
     
     // ------------------ 入力処理 ------------------
     
-    function handleInputStart(e) {
+    // 画面座標(clientX,clientY)をキャンバスのローカル座標に変換する。
+    // 90度回転表示中は、rectの幅/高さが入れ替わっている上に軸も回転しているため、
+    // 単純な (clientX-rect.left)*scale では合わず、回転を打ち消す変換が必要。
+    function toCanvasLocal(clientX, clientY) {
         const rect = canvas.getBoundingClientRect();
-        const scaleX = canvas.width / rect.width;
-        const scaleY = canvas.height / rect.height;
-        inputState.x = ( (e.clientX || e.pageX) - rect.left) * scaleX;
-        inputState.y = ( (e.clientY || e.pageY) - rect.top) * scaleY;
+        if (isMobileRotated) {
+            const px = clientX - rect.left;
+            const py = clientY - rect.top;
+            return {
+                x: py * (canvas.height / rect.width),
+                y: canvas.height - px * (canvas.width / rect.height)
+            };
+        }
+        return {
+            x: (clientX - rect.left) * (canvas.width / rect.width),
+            y: (clientY - rect.top) * (canvas.height / rect.height)
+        };
+    }
+
+    function handleInputStart(e) {
+        const p = toCanvasLocal(e.clientX || e.pageX, e.clientY || e.pageY);
+        inputState.x = p.x;
+        inputState.y = p.y;
         inputState.isDown = true;
 
         if(isShowingHelp) return; // あそびかた表示中は盤面・ボタン操作を無効化（閉じるのはHTML側のボタン）
@@ -2033,11 +2065,9 @@ const Game = (function() {
     
     function handleInputMove(e) {
         if(!inputState.isDown) return;
-        const rect = canvas.getBoundingClientRect();
-        const scaleX = canvas.width / rect.width;
-        const scaleY = canvas.height / rect.height;
-        inputState.x = ( (e.clientX || e.pageX) - rect.left) * scaleX;
-        inputState.y = ( (e.clientY || e.pageY) - rect.top) * scaleY;
+        const p = toCanvasLocal(e.clientX || e.pageX, e.clientY || e.pageY);
+        inputState.x = p.x;
+        inputState.y = p.y;
         if(currentState === STATE.PLAYING && selectedCell) isDragging = true;
     }
     
