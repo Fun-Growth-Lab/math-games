@@ -92,12 +92,13 @@
         border:1px solid var(--card-bdr); border-radius:10px; padding:6px 14px; cursor:pointer;
     }
     #skip-btn:hover { border-color: var(--gold); color: var(--gold); }
-    /* ==== 表情テストパネル（本番では不要。動作確認用に表情を直接選べるようにする） ==== */
+    /* ==== 表情/キャラ テストパネル（本番では不要。動作確認用に直接選べるようにする） ==== */
     #dev-panel {
         position:absolute; top:60px; right:16px; z-index:5;
         background: rgba(0,0,0,0.55); border:1px solid var(--card-bdr); border-radius:12px;
-        padding:8px; display:flex; gap:6px;
+        padding:8px; display:flex; flex-direction:column; gap:6px; align-items:flex-end;
     }
+    #dev-panel .dev-row { display:flex; gap:6px; }
     #dev-panel button {
         font-family:inherit; font-size:0.72rem; font-weight:800; color: var(--ink);
         background:#1c140e; border:1px solid var(--card-bdr); border-radius:8px; padding:6px 10px; cursor:pointer;
@@ -120,7 +121,7 @@
         <img id="portrait" src="" alt="">
     </div>
 
-    <div id="name-plate"><span class="crown">👑</span><span class="txt" id="name-text">魔王</span></div>
+    <div id="name-plate"><span class="crown" id="name-crown">👑</span><span class="txt" id="name-text">魔王</span></div>
 
     <div id="msg-box" onclick="advance()">
         <div id="msg-text"></div>
@@ -129,21 +130,28 @@
 </div>
 
 <script>
-// ==== 表示する素材：images/kao/maou1_<表情>.png（normal/smile/angry/cry） ====
-const EXPR_FILES = {
-    normal: 'images/kao/maou1_normal.png',
-    smile:  'images/kao/maou1_smile.png',
-    angry:  'images/kao/maou1_angry.png',
-    cry:    'images/kao/maou1_cry.png',
+// ==== 登場キャラクター：images/kao/<ファイル接頭辞>_<表情>.png（normal/smile/angry/cry） ====
+const CHARACTERS = {
+    maou:       { label:'魔王',           prefix:'maou1' },
+    swordsman:  { label:'勇者（剣士・男）', prefix:'swordsman_m' },
+    priest:     { label:'僧侶（女）',      prefix:'priest_f' },
+    archer:     { label:'弓使い（男）',    prefix:'archer_m' },
+    ice_mage:   { label:'氷の魔導士（女）', prefix:'ice_mage_f' },
 };
 const EXPR_LABEL = { normal:'通常', smile:'笑顔', angry:'怒り', cry:'涙' };
+function exprFile(charKey, expr){ return `images/kao/${CHARACTERS[charKey].prefix}_${expr}.png`; }
 
 // ==== テスト用の台詞データ（本編では別ファイル・JSONなどに切り出す想定） ====
 const SCRIPT = [
-    { name:'魔王', expr:'normal', text:'……ようやく、この迷宮の主となる時が来たようだな。' },
-    { name:'魔王', expr:'smile',  text:'人間どもよ、精々足掻くがいい。私の可愛い配下たちが、お前たちを歓迎してくれる。' },
-    { name:'魔王', expr:'angry',  text:'ふん……まだ挑んでくるつもりか。身の程を知れ。' },
-    { name:'魔王', expr:'cry',    text:'……くっ、こんなところで、私が……。' },
+    { char:'maou',      expr:'normal', text:'……ようやく、この迷宮の主となる時が来たようだな。' },
+    { char:'maou',      expr:'smile',  text:'人間どもよ、精々足掻くがいい。私の可愛い配下たちが、お前たちを歓迎してくれる。' },
+    { char:'swordsman', expr:'normal', text:'この先に魔王がいるはずだ。気を引き締めていくぞ。' },
+    { char:'archer',    expr:'smile',  text:'任せてください！ 矢が尽きるまで援護します。' },
+    { char:'priest',    expr:'normal', text:'……何か、嫌な気配がします。みなさん、油断しないでくださいね。' },
+    { char:'ice_mage',  expr:'angry',  text:'冷たくしてあげる……覚悟しなさい。' },
+    { char:'maou',      expr:'angry',  text:'ふん……まだ挑んでくるつもりか。身の程を知れ。' },
+    { char:'swordsman', expr:'cry',    text:'くっ……まだ、まだ倒れるわけには……。' },
+    { char:'maou',      expr:'cry',    text:'……くっ、こんなところで、私が……。' },
 ];
 
 let idx = 0;
@@ -164,18 +172,19 @@ function typeText(full){
     }, 28);
 }
 function showLine(line){
-    nameEl.textContent = line.name;
-    const nextSrc = EXPR_FILES[line.expr];
-    if (portraitEl.getAttribute('data-expr') !== line.expr){
+    nameEl.textContent = CHARACTERS[line.char].label;
+    document.getElementById('name-crown').style.display = line.char==='maou' ? '' : 'none';
+    const nextSrc = exprFile(line.char, line.expr);
+    if (portraitEl.getAttribute('data-src') !== nextSrc){
         portraitEl.classList.remove('show');
         setTimeout(() => {
             portraitEl.src = nextSrc;
-            portraitEl.setAttribute('data-expr', line.expr);
+            portraitEl.setAttribute('data-src', nextSrc);
             portraitEl.classList.add('show');
         }, 120);
     }
     typeText(line.text);
-    highlightDevPanel(line.expr);
+    highlightDevPanel(line.char, line.expr);
 }
 function advance(){
     if (typing){ clearInterval(typing); typing = null; textEl.textContent = SCRIPT[idx].text; return; }
@@ -185,19 +194,28 @@ function advance(){
 }
 function skipToEnd(){ idx = SCRIPT.length - 1; showLine(SCRIPT[idx]); }
 
-// ==== 開発用パネル：表情を直接選んで見た目を確認できるようにする（本番の会話進行には使わない） ====
-function highlightDevPanel(expr){
-    document.querySelectorAll('#dev-panel button').forEach(b => b.classList.toggle('active', b.dataset.expr===expr));
+// ==== 開発用パネル：キャラ・表情を直接選んで見た目を確認できるようにする（本番の会話進行には使わない） ====
+function highlightDevPanel(charKey, expr){
+    document.querySelectorAll('#dev-panel [data-char]').forEach(b => b.classList.toggle('active', b.dataset.char===charKey));
+    document.querySelectorAll('#dev-panel [data-expr]').forEach(b => b.classList.toggle('active', b.dataset.expr===expr));
 }
 function buildDevPanel(){
     const wrap = document.getElementById('dev-panel');
-    wrap.innerHTML = Object.keys(EXPR_FILES).map(k =>
+    const charRow = Object.keys(CHARACTERS).map(k =>
+        `<button data-char="${k}" onclick="previewChar('${k}')">${CHARACTERS[k].label}</button>`
+    ).join('');
+    const exprRow = Object.keys(EXPR_LABEL).map(k =>
         `<button data-expr="${k}" onclick="previewExpr('${k}')">${EXPR_LABEL[k]}</button>`
     ).join('');
+    wrap.innerHTML = `<div class="dev-row">${charRow}</div><div class="dev-row">${exprRow}</div>`;
 }
 function previewExpr(expr){
     const line = SCRIPT[idx];
-    showLine({ name: line.name, expr, text: line.text });
+    showLine({ char: line.char, expr, text: line.text });
+}
+function previewChar(charKey){
+    const line = SCRIPT[idx];
+    showLine({ char: charKey, expr: line.expr, text: line.text });
 }
 
 buildDevPanel();
