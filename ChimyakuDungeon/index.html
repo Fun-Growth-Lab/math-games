@@ -208,6 +208,10 @@
         .modal-score-total { font-size: 1.6rem; font-weight: 800; color: var(--gold); margin: 14px 0; }
         .hatch-result-row { font-size: 1.0rem; font-weight:700; padding: 6px 0; color: var(--ink); }
         .hatch-result-row b { color: var(--gold); margin-left: 6px; }
+        .rare-hatch-title { color: var(--gold); }
+        .rare-hatch-row { display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:10px; background:rgba(255,201,92,0.08); border:1px solid rgba(255,201,92,0.35); margin-bottom:4px; }
+        .rare-hatch-equip { margin-left:auto; display:flex; align-items:center; gap:4px; font-size:0.8rem; font-weight:700; color:var(--teal); }
+        .rare-hatch-equip .item-img { width:18px; height:18px; }
         .toast {
             position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%);
             background: rgba(20,14,10,0.95); border: 2px solid var(--danger); color: #ffdcd8;
@@ -295,6 +299,9 @@
             transition: transform 0.2s;
         }
         .egg-icon.focus { transform: scale(1.28); }
+        /* レア卵：金色の光でひと目で分かるようにする（模様の見た目自体は8種類の画像側で差がつく） */
+        .rare-egg-wrap { filter: drop-shadow(0 0 4px rgba(255,201,92,0.9)) drop-shadow(0 0 8px rgba(255,201,92,0.6)); animation: rareEggGlow 1.4s ease-in-out infinite; }
+        @keyframes rareEggGlow { 0%,100% { filter: drop-shadow(0 0 4px rgba(255,201,92,0.9)) drop-shadow(0 0 8px rgba(255,201,92,0.6)); } 50% { filter: drop-shadow(0 0 7px rgba(255,201,92,1)) drop-shadow(0 0 14px rgba(255,201,92,0.85)); } }
         .skill-name-row { display:flex; align-items:baseline; gap:6px; }
         .skill-name-big { font-size:1.25rem; font-weight:800; color:var(--gold); text-shadow:0 1px 3px rgba(0,0,0,0.5); }
         .loot-section-title { font-size:0.95rem; font-weight:800; color:var(--gold); margin:10px 0 2px; padding-bottom:3px; border-bottom:2px solid var(--card-bdr); }
@@ -1520,6 +1527,7 @@ const UI_TEXT = {
 
     hatch_result_msg: { ja: n => `${n}体のモンスターが生まれました！`, ja_easy: n => `${n}たいの モンスターが うまれたよ！`, en: n => `${n} monster(s) were born!` },
     loot_found_title: { ja: '🎁 戦利品', ja_easy: '🎁 せんりひん', en: '🎁 Spoils' },
+    rare_egg_hatch_title: { ja: '✨ レア卵から誕生', ja_easy: '✨ レアな たまごから うまれたよ', en: '✨ Hatched from a Rare Egg' },
     loot_section_stone: { ja: '獲得したアイテム', ja_easy: 'てに いれた アイテム', en: 'Items Obtained' },
     loot_section_monster: { ja: '召喚された魔物', ja_easy: 'しょうかん された まもの', en: 'Summoned Monsters' },
     loot_section_equip: { ja: '発見した道具', ja_easy: 'みつけた どうぐ', en: 'Tools Found' },
@@ -2266,6 +2274,8 @@ function eggCountForBlock(){
     if (lo===hi) return lo;
     return Math.random() < (avg-lo) ? hi : lo;
 }
+// 卵のうち一定確率で「レア卵」にする（出現数自体は変えず、通常卵の一部をレアに差し替えるだけ）
+const RARE_EGG_CHANCE = 0.05;
 function placeEggsInBlocks(g){
     for (let br=ROOM_MIN_ROW; br<GRID_ROWS; br+=EGG_BLOCK_SIZE){
         for (let bc=0; bc<GRID_COLS; bc+=EGG_BLOCK_SIZE){
@@ -2275,7 +2285,7 @@ function placeEggsInBlocks(g){
             }
             for (let i=cells.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [cells[i],cells[j]]=[cells[j],cells[i]]; }
             const eggCount = Math.min(eggCountForBlock(), cells.length);
-            for (let i=0;i<eggCount;i++) g[cells[i].r][cells[i].c] = 'egg';
+            for (let i=0;i<eggCount;i++) g[cells[i].r][cells[i].c] = Math.random()<RARE_EGG_CHANCE ? 'egg_rare' : 'egg';
         }
     }
 }
@@ -2496,13 +2506,15 @@ function buildGridDom(g){
                 cell.classList.add('alt');
             }
             const key = g[r][c];
-            if (key==='egg'){
+            if (key==='egg' || key==='egg_rare'){
+                const isRare = key==='egg_rare';
                 const wrap = document.createElement('div');
-                wrap.className = 'gem-wrap special-wrap';
+                wrap.className = 'gem-wrap special-wrap' + (isRare ? ' rare-egg-wrap' : '');
                 const img = document.createElement('img');
                 img.className = 'egg-icon';
                 img.dataset.type = key;
-                img.src = 'images/egg.png';
+                // レア卵は見た目にバリエーションを持たせるため、8種の模様からランダムに1つを使う
+                img.src = isRare ? `images/egg/egg_rare${1+Math.floor(Math.random()*8)}.png` : 'images/egg.png';
                 img.alt = '';
                 wrap.appendChild(img);
                 cell.appendChild(wrap);
@@ -2943,13 +2955,14 @@ function clearGridCellVisual(r, c){
     const wrap = cellEl.querySelector('.gem-wrap');
     if (wrap) wrap.remove();
 }
-// 部屋の範囲内にある卵を数え、その場のマスからは取り除く（部屋に取り込まれるため）
+// 部屋の範囲内にある卵を数え、その場のマスからは取り除く（部屋に取り込まれるため）。通常卵とレア卵は別々に数える
 function tallyEggsAndClear(rect){
-    let eggs = 0;
+    let eggs = 0, rareEggs = 0;
     for (let r=rect.r0;r<=rect.r1;r++) for (let c=rect.c0;c<=rect.c1;c++){
         if (grid[r][c]==='egg'){ eggs++; grid[r][c] = null; clearGridCellVisual(r, c); }
+        else if (grid[r][c]==='egg_rare'){ rareEggs++; grid[r][c] = null; clearGridCellVisual(r, c); }
     }
-    return eggs;
+    return { eggs, rareEggs };
 }
 function markOccupied(cells){ cells.forEach(({r,c}) => { occupied[r][c] = true; }); }
 
@@ -2961,10 +2974,10 @@ function confirmBuild(){
     const w = pendingRect.c1-pendingRect.c0+1, h = pendingRect.r1-pendingRect.r0+1;
     const roomId = nextRoomId++;
     const elements = tallyElements(pendingRect);
-    const eggCount = tallyEggsAndClear(pendingRect);
+    const { eggs: eggCount, rareEggs: rareEggCount } = tallyEggsAndClear(pendingRect);
     const monsterCapacity = roomMonsterCapacity(area);
     const room = { id:roomId, r0:pendingRect.r0, c0:pendingRect.c0, r1:pendingRect.r1, c1:pendingRect.c1, w, h, area, elements, type:null, monsterCapacity,
-                   pendingEggs: eggCount };
+                   pendingEggs: eggCount, pendingRareEggs: rareEggCount };
     markOccupied(cellsOfRect(pendingRect));
     rooms.push(room);
     markOccupied(cCells);
@@ -4810,6 +4823,39 @@ function hatchEggsInRoom(room, count){
     }
     return born;
 }
+// ---- レア卵：マップの卵のうちRARE_EGG_CHANCEの確率で出現する特別な卵 ----
+// 進化段階：進化前(stage1)50%／1進化目(stage2)40%／2進化目(stage3)10%。卵の系統・召喚の系統どちらの種族も対象にする
+// （通常の卵はEGG_STAGE1_SPECIES＝進化前・卵系統のみだが、レア卵は範囲を広げて召喚系統や進化後の姿も出す）
+const RARE_EGG_STAGE_WEIGHTS = [0.50, 0.40, 0.10]; // 添字0=stage1, 1=stage2, 2=stage3
+const RARE_EGG_LEVEL_BONUS = 5; // 通常孵化(Math.max(1,stage-1))より、このレベル分だけ高い状態で生まれる
+const RARE_EGG_STAT_MOD_MIN = 1.2; // 個体差(0.71～1.50)の下限をここまで引き上げ、必ず得意寄りの個体にする
+const RARE_EGG_EQUIP_CHANCE = 0.5; // 装備を持った状態で生まれる確率
+function hatchRareEggsInRoom(room, count){
+    if (count<=0) return [];
+    const initialLevel = Math.max(1, stage-1) + RARE_EGG_LEVEL_BONUS;
+    const initialXp = xpForLevel(initialLevel);
+    const born = [];
+    for (let i=0;i<count;i++){
+        const targetStage = 1 + weightedRandomIndex(RARE_EGG_STAGE_WEIGHTS);
+        const pool = MONSTER_SPECIES.filter(s => s.stage===targetStage);
+        const sp = pool[Math.floor(Math.random()*pool.length)];
+        const m = { id: nextMonsterId++, roomId: null, r: 0, c: 0, speciesKey: sp.key,
+                    hp: 0, maxHp: 0, atk: 0, def: 0, magAtk: 0, magDef: 0, statMods: rollStatMods(RARE_EGG_STAT_MOD_MIN, STAT_MOD_MAX), chargeTurns: 0,
+                    activeCooldowns: [], statusEffects: [], buffs: [], xp: initialXp, level: monsterLevel(initialXp),
+                    equippedItem: null, origin: 'egg_rare' };
+        applyStatModsToMonster(m, sp);
+        m.hp = m.maxHp;
+        if (Math.random() < RARE_EGG_EQUIP_CHANCE){
+            const shape = ITEM_SHAPES[Math.floor(Math.random()*ITEM_SHAPES.length)];
+            const tierIdx = weightedRandomIndex(TOOL_TIER_WEIGHTS_AT_MAX); // 良い品質に偏らせる（掘削の最高品質と同じ重み）
+            m.equippedItem = { id: nextInventoryId++, itemKey: `${shape.key}_${tierIdx}` };
+        }
+        monsters.push(m);
+        placeMonsterInRoomOrStock(m, room);
+        born.push(m);
+    }
+    return born;
+}
 // 召喚モンスターの初期Lv：ステージ数n＋（召喚の素の数×召喚Lv×0.1）を計算し、小数部分はレベルが1つ上がる確率として扱う
 // （例：値が3.2なら80%でLv3、20%でLv4になる）。クオリティが高い部屋ほど、同じステージでも高いLvが出やすくなる
 function summonInitialLevel(room){
@@ -4839,13 +4885,25 @@ function createSummonMonster(room){
 // 部屋が確定した瞬間：範囲内で見つかった卵をすべて孵化させる（入りきらない分は自動でストックへ）
 function resolveRoomHatchAndLoot(room){
     const born = hatchEggsInRoom(room, room.pendingEggs||0);
-    room.pendingEggs = 0;
+    const rareBorn = hatchRareEggsInRoom(room, room.pendingRareEggs||0);
+    room.pendingEggs = 0; room.pendingRareEggs = 0;
     renderAll();
-    openHatchAndLootModal(room, born, []);
+    openHatchAndLootModal(room, born, [], rareBorn);
 }
-function openHatchAndLootModal(room, born, itemKeys){
-    const hasBorn = born.length>0, hasItems = (itemKeys||[]).length>0;
-    if (!hasBorn && !hasItems) return;
+// レア卵から生まれた1体分の行：個体ごとに進化段階・Lv・装備が違うので、通常孵化のような種族まとめではなく1体ずつ表示する
+function rareHatchRowHtml(m){
+    const sp = speciesInfo(m.speciesKey);
+    const eq = m.equippedItem ? itemInfo(m.equippedItem.itemKey) : null;
+    return `<div class="hatch-result-row rare-hatch-row">
+        ${monsterIconHtml(sp, 28)}
+        <span style="color:${monsterNameColor(sp)};">${escapeHtml(sp.name_ja)}</span>
+        <b>Lv.${m.level}</b>
+        ${eq ? `<span class="rare-hatch-equip">${itemImageHtml(eq)}${escapeHtml(eq.name_ja)}</span>` : ''}
+    </div>`;
+}
+function openHatchAndLootModal(room, born, itemKeys, rareBorn){
+    const hasBorn = born.length>0, hasItems = (itemKeys||[]).length>0, hasRare = (rareBorn||[]).length>0;
+    if (!hasBorn && !hasItems && !hasRare) return;
     let body = '';
     if (hasBorn){
         const counts = {};
@@ -4855,8 +4913,12 @@ function openHatchAndLootModal(room, born, itemKeys){
             return `<div class="hatch-result-row">${monsterIconHtml(sp, 24)} ${escapeHtml(sp.name_ja)} <b>×${counts[key]}</b></div>`;
         }).join('');
     }
+    if (hasRare){
+        body += `<div class="side-panel-title rare-hatch-title" style="margin-top:8px;">${ui('rare_egg_hatch_title')}</div>`;
+        body += rareBorn.map(rareHatchRowHtml).join('');
+    }
     if (hasItems){
-        if (hasBorn) body += `<div class="side-panel-title" style="margin-top:8px;">${ui('loot_found_title')}</div>`;
+        if (hasBorn || hasRare) body += `<div class="side-panel-title" style="margin-top:8px;">${ui('loot_found_title')}</div>`;
         const counts = {};
         itemKeys.forEach(k => { counts[k] = (counts[k]||0)+1; });
         body += Object.keys(counts).map(key => {
@@ -4864,7 +4926,8 @@ function openHatchAndLootModal(room, born, itemKeys){
             return `<div class="hatch-result-row">${it.icon} ${escapeHtml(it.name_ja)} <b>×${counts[key]}</b></div>`;
         }).join('');
     }
-    document.getElementById('hatch-result-title').textContent = hasBorn ? uif('hatch_result_msg', born.length) : ui('loot_found_title');
+    document.getElementById('hatch-result-title').textContent = hasBorn ? uif('hatch_result_msg', born.length)
+        : hasRare ? uif('hatch_result_msg', rareBorn.length) : ui('loot_found_title');
     document.getElementById('hatch-result-body').innerHTML = body;
     document.getElementById('hatch-result-modal').classList.remove('hidden');
 }
