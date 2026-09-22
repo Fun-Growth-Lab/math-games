@@ -2274,8 +2274,8 @@ function eggCountForBlock(){
     if (lo===hi) return lo;
     return Math.random() < (avg-lo) ? hi : lo;
 }
-// 卵のうち一定確率で「レア卵」にする（出現数自体は変えず、通常卵の一部をレアに差し替えるだけ）
-const RARE_EGG_CHANCE = 0.05;
+// 卵の初期配置はすべて通常卵にする（レア卵はここでは出さない。無制限リロードで狙い撃ちできてしまうため、
+// ステージが進むタイミングで、まだ部屋になっていない卵の一部を後から昇格させる＝rollRareEggUpgrades参照）
 function placeEggsInBlocks(g){
     for (let br=ROOM_MIN_ROW; br<GRID_ROWS; br+=EGG_BLOCK_SIZE){
         for (let bc=0; bc<GRID_COLS; bc+=EGG_BLOCK_SIZE){
@@ -2285,7 +2285,7 @@ function placeEggsInBlocks(g){
             }
             for (let i=cells.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [cells[i],cells[j]]=[cells[j],cells[i]]; }
             const eggCount = Math.min(eggCountForBlock(), cells.length);
-            for (let i=0;i<eggCount;i++) g[cells[i].r][cells[i].c] = Math.random()<RARE_EGG_CHANCE ? 'egg_rare' : 'egg';
+            for (let i=0;i<eggCount;i++) g[cells[i].r][cells[i].c] = 'egg';
         }
     }
 }
@@ -2296,7 +2296,7 @@ function buildRandomGrid(){
     placeEggsInBlocks(g);
     for (let r=ROOM_MIN_ROW;r<GRID_ROWS;r++){
         for (let c=0;c<GRID_COLS;c++){
-            if (g[r][c]!=='egg') g[r][c] = rollElementOnly();
+            if (g[r][c]===null) g[r][c] = rollElementOnly(); // 卵（レア卵含む）が既に置かれたマスは上書きしない
         }
     }
     return g;
@@ -2963,6 +2963,31 @@ function tallyEggsAndClear(rect){
         else if (grid[r][c]==='egg_rare'){ rareEggs++; grid[r][c] = null; clearGridCellVisual(r, c); }
     }
     return { eggs, rareEggs };
+}
+// マス目の卵アイコンを、既に組み立て済みのDOMの上でレア卵の見た目に差し替える（表情=模様は8種からランダムに1つ）
+function upgradeGridCellToRareEggVisual(r, c){
+    if (!gridEl) return;
+    const cellEl = gridEl.children[r*GRID_COLS + c];
+    if (!cellEl) return;
+    const img = cellEl.querySelector('.egg-icon');
+    const wrap = cellEl.querySelector('.gem-wrap');
+    if (!img || !wrap) return;
+    img.dataset.type = 'egg_rare';
+    img.src = `images/egg/egg_rare${1+Math.floor(Math.random()*8)}.png`;
+    wrap.classList.add('rare-egg-wrap');
+}
+// ステージが1つ進むたびに、まだ部屋になっていない卵の一部をレア卵へ昇格させる（無制限リロードで狙い撃ちされないよう、
+// 初期配置ではなくこのタイミングで決める。1個の卵につきRARE_EGG_UPGRADE_CHANCEの確率）
+const RARE_EGG_UPGRADE_CHANCE = 0.01;
+function rollRareEggUpgrades(){
+    for (let r=0;r<GRID_ROWS;r++){
+        for (let c=0;c<GRID_COLS;c++){
+            if (grid[r][c]==='egg' && Math.random()<RARE_EGG_UPGRADE_CHANCE){
+                grid[r][c] = 'egg_rare';
+                upgradeGridCellToRareEggVisual(r, c);
+            }
+        }
+    }
 }
 function markOccupied(cells){ cells.forEach(({r,c}) => { occupied[r][c] = true; }); }
 
@@ -7088,6 +7113,7 @@ function endBattle(outcome){
 function proceedNextStage(){
     document.getElementById('battle-result-modal').classList.add('hidden');
     gamePhase = 'build';
+    rollRareEggUpgrades(); // ステージが進むタイミングで、まだ部屋になっていない卵の一部をレア卵に昇格させる
     battleHeroes = []; demonLordUnit = null; roomBattleQueues = {};
     // 戦闘開始前の配置に戻す（HP0のモンスターもHP0のまま元の位置に復活する）
     monsters.forEach(m => { if (m.preBattleR!==undefined){ m.r = m.preBattleR; m.c = m.preBattleC; } });
