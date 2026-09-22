@@ -281,6 +281,21 @@
         .gcell.corridor-row { background: var(--bg-grad1); border: 1px dashed rgba(255,207,107,0.25); }
         .gcell.corridor-row.attach-cell { background: var(--bg-grad2); }
         .gcell.in-room .gem-wrap { opacity: 0.3; }
+        /* 建設不可の壁マス：確定済みの部屋・通路の周り1マスは、新しい部屋・通路が絶対に作れない
+           （err_spaceの判定と同じ「周囲1マスの余白が必要」というルール）。レンガ状の陰影で「壁」だと
+           一目で分かるようにする。既にそこにある素・卵は薄く沈んで見せ、「あるが手が届かない」ことを示す */
+        .gcell.wall-zone {
+            background-color: #1c130c;
+            background-image:
+                linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.3)),
+                repeating-linear-gradient(0deg, rgba(0,0,0,0.55) 0 2px, transparent 2px 13px),
+                repeating-linear-gradient(90deg, rgba(0,0,0,0.4) 0 2px, transparent 2px 19px),
+                repeating-linear-gradient(0deg, transparent 0 13px, rgba(0,0,0,0.4) 13px 15px);
+            border-color: #0e0a06;
+            box-shadow: inset 0 0 6px rgba(0,0,0,0.6);
+        }
+        .gcell.wall-zone.corridor-row { background-color: #150e08; }
+        .gcell.wall-zone .gem-wrap { opacity: 0.4; filter: grayscale(0.55) brightness(0.8); }
         .gem-wrap { position:relative; width:60%; height:60%; display:flex; align-items:center; justify-content:center; pointer-events:none; }
         .gem-wrap.special-wrap { width:78%; height:78%; }
         #grid.battle-mode .gem-wrap { display:none; }
@@ -2708,6 +2723,32 @@ function occupiedInRange(r0,r1,c0,c1){
     for (let r=r0;r<=r1;r++) for (let c=c0;c<=c1;c++) if (occupied[r][c]) return true;
     return false;
 }
+// そのマス自身は空いているが、周囲1マス（斜め含む8方向）に確定済みの部屋・通路があるため、
+// 今後どんな部屋を作ろうとしても（validateRoomRectと同じ「周囲1マスの余白が必要」というルールに阻まれて）
+// 絶対に部屋の一部にできないマス。壁の表示と、レア卵の抽選除外の両方で使う共通の判定
+function isBuildDeadZoneCell(r, c){
+    if (occupied[r][c]) return false;
+    for (let dr=-1; dr<=1; dr++){
+        for (let dc=-1; dc<=1; dc++){
+            if (dr===0 && dc===0) continue;
+            const nr=r+dr, nc=c+dc;
+            if (nr<0||nr>=GRID_ROWS||nc<0||nc>=GRID_COLS) continue;
+            if (occupied[nr][nc]) return true;
+        }
+    }
+    return false;
+}
+// マップ全体を調べて、壁マス（isBuildDeadZoneCell）の表示を最新の状態に合わせる。
+// 部屋・通路が確定するたびに周囲が変わるので、renderOverlaysから毎回呼び直す
+function renderWallZones(){
+    if (!gridEl) return;
+    for (let r=0;r<GRID_ROWS;r++){
+        for (let c=0;c<GRID_COLS;c++){
+            const cellEl = gridEl.children[r*GRID_COLS+c];
+            if (cellEl) cellEl.classList.toggle('wall-zone', isBuildDeadZoneCell(r,c));
+        }
+    }
+}
 function validateRoomRect(rect){
     const w = rect.c1-rect.c0+1, h = rect.r1-rect.r0+1;
     if (w<ROOM_MIN||h<ROOM_MIN) return uif('err_size', ROOM_MIN);
@@ -2982,7 +3023,9 @@ const RARE_EGG_UPGRADE_CHANCE = 0.01;
 function rollRareEggUpgrades(){
     for (let r=0;r<GRID_ROWS;r++){
         for (let c=0;c<GRID_COLS;c++){
-            if (grid[r][c]==='egg' && Math.random()<RARE_EGG_UPGRADE_CHANCE){
+            if (grid[r][c]!=='egg') continue;
+            if (isBuildDeadZoneCell(r, c)) continue; // 部屋の周りの壁マス＝二度と回収できない卵は対象外
+            if (Math.random()<RARE_EGG_UPGRADE_CHANCE){
                 grid[r][c] = 'egg_rare';
                 upgradeGridCellToRareEggVisual(r, c);
             }
@@ -7416,6 +7459,7 @@ function renderUnitIcons(){
 function renderOverlays(){
     gridEl.querySelectorAll('.overlay-room,.overlay-corridor,.overlay-preview,.overlay-candidate,.overlay-entrancepath,.overlay-trap,.overlay-trap-icon,.overlay-trap-preview,.precost-badge').forEach(el=>el.remove());
     gridEl.querySelectorAll('.gcell').forEach(el=>el.classList.remove('attach-cell','insufficient'));
+    renderWallZones();
 
     // 部屋の中に入った因子・素は薄く表示する（建設後はもう見る必要がないため）
     gridEl.querySelectorAll('.gcell.in-room').forEach(el=>el.classList.remove('in-room'));
