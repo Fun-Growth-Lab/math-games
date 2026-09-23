@@ -436,6 +436,7 @@
         .rank-row:nth-child(3) { color: #ffab91; font-weight: bold; }
 
     </style>
+    <script src="../tutorial-engine.js"></script>
 </head>
 <body>
 
@@ -449,6 +450,7 @@
         <div id="title-menu">
             <div id="current-player-display">プレーヤーをえらんでね</div>
             <button class="btn btn-success" id="start-btn-trigger" data-i18n="btn_start">はじめる</button>
+            <button class="btn" id="tutorial-btn-trigger" style="background:linear-gradient(to bottom,#ffca28,#ff8f00); border-color:#ffe082; color:#3e2723; box-shadow:0 6px 0 #b26a00, 0 8px 14px rgba(0,0,0,0.35);" onclick="startTutorial()" data-i18n="btn_tutorial">🔰 チュートリアル</button>
             <button class="btn" onclick="openPlayerModal()" data-i18n="btn_player_select">プレーヤーせんたく</button>
             <button class="btn btn-warning" onclick="showRanking()" data-i18n="btn_ranking">ランキング</button>
             <button class="btn" style="background:linear-gradient(to bottom,#5c6bc0,#3949ab); border-color:#7986cb; box-shadow:0 6px 0 #283593, 0 8px 14px rgba(0,0,0,0.35);" onclick="openSettings()" data-i18n="btn_settings">⚙ 設定</button>
@@ -592,7 +594,7 @@
     const STRINGS = {
         ja: {
             game_title: 'かけざんダンジョン', title_sub: '～地底からの脱出～',
-            btn_start: 'はじめる', btn_player_select: 'プレーヤーせんたく', btn_ranking: 'ランキング', btn_settings: '⚙ 設定', btn_index: 'INDEXへ',
+            btn_start: 'はじめる', btn_tutorial: '🔰 チュートリアル', btn_player_select: 'プレーヤーせんたく', btn_ranking: 'ランキング', btn_settings: '⚙ 設定', btn_index: 'INDEXへ',
             pm_title: 'プレーヤーを えらんでね（5にん まで）', pm_placeholder: '新しいおなまえ', btn_register: 'とうろく', btn_close: 'とじる',
             pm_none: 'プレーヤーがいません。とうろくしてね。', pm_placeholder_full: '5にん までです',
             btn_howto: 'あそびかた',
@@ -630,7 +632,7 @@
         },
         simple: {
             game_title: 'かけざんダンジョン', title_sub: '～ちていからの だっしゅつ～',
-            btn_start: 'はじめる', btn_player_select: 'プレーヤーせんたく', btn_ranking: 'ランキング', btn_settings: '⚙ せってい', btn_index: 'INDEXへ',
+            btn_start: 'はじめる', btn_tutorial: '🔰 チュートリアル', btn_player_select: 'プレーヤーせんたく', btn_ranking: 'ランキング', btn_settings: '⚙ せってい', btn_index: 'INDEXへ',
             pm_title: 'プレーヤーを えらんでね（5にん まで）', pm_placeholder: 'あたらしい おなまえ', btn_register: 'とうろく', btn_close: 'とじる',
             pm_none: 'プレーヤーが いません。とうろくしてね。', pm_placeholder_full: '5にん までです',
             btn_howto: 'あそびかた',
@@ -668,7 +670,7 @@
         },
         en: {
             game_title: 'Multiply Dungeon', title_sub: '- Escape from the Depths -',
-            btn_start: 'Start', btn_player_select: 'Select Player', btn_ranking: 'Ranking', btn_settings: '⚙ Settings', btn_index: 'To INDEX',
+            btn_start: 'Start', btn_tutorial: '🔰 Tutorial', btn_player_select: 'Select Player', btn_ranking: 'Ranking', btn_settings: '⚙ Settings', btn_index: 'To INDEX',
             pm_title: 'Choose a Player (up to 5)', pm_placeholder: 'New name', btn_register: 'Register', btn_close: 'Close',
             pm_none: 'No players yet. Register one!', pm_placeholder_full: 'Up to 5 players',
             btn_howto: 'How to Play',
@@ -1687,6 +1689,169 @@
         document.getElementById('difficulty-screen').classList.add('hidden');
         document.getElementById('title-screen').classList.remove('hidden');
         canvas.classList.add('hidden');
+    };
+
+    // ============================================================
+    // チュートリアル（練習プレイ）
+    // ============================================================
+    // 実際の画面で「カード2枚をかけ算→できた長方形を地図に置く→カギを集める／剣・つるはしを使う」を体験する。
+    // 書き込みはエンジンが止めるので、ランキング・記録は一切汚れない。
+    window.startTutorial = function() {
+        FGLTutorial.begin({ root: '#game-container', getLang: () => currentLang });
+        window.startGame('EASY');
+        // 手順どおりに進むよう、マップ・手札・アイテムを決めた値にする
+        mapData = Array(MAP_ROWS).fill(null).map(() => Array(MAP_COLS).fill(null));
+        mapObjects = [
+            { x: 3, y: 3, type: 'key' }, { x: 5, y: 4, type: 'key' }, { x: 4, y: 3, type: 'money' },
+            { x: 8, y: 3, type: 'monster' }, { x: 8, y: 6, type: 'rock' },
+            { x: 1, y: 1, type: 'key' }, { x: 1, y: 7, type: 'key' }, { x: 6, y: 8, type: 'key' }, { x: 9, y: 9, type: 'key' },
+            { x: 2, y: 5, type: 'card' }, { x: 6, y: 1, type: 'sword' }, { x: 1, y: 3, type: 'pickaxe' },
+            { x: 7, y: 8, type: 'money' }, { x: 5, y: 7, type: 'wand' }, { x: 0, y: 9, type: 'monster' }, { x: 9, y: 0, type: 'rock' }
+        ];
+        items = { sword: 2, pickaxe: 2, wand: 0, keys: 0 };
+        hand = [3, 2, 4, 5, 6];
+        currentDeck = 20; score = 0; level = 1;
+        resetCalc();
+        // てじゅんどおりの操作以外はできないようにする
+        let want = { card: null, item: null };
+        const guard = (e) => {
+            if (gameState !== 'PLAYING') return;
+            const pos = getMousePos(e);
+            if (want.card != null) {
+                for (let i = 0; i < hand.length; i++) {
+                    const hx = LAYOUT.handStartX + i * LAYOUT.cardGap, hy = LAYOUT.handY + 20;
+                    if (pos.x >= hx && pos.x <= hx + LAYOUT.cardW && pos.y >= hy && pos.y <= hy + LAYOUT.cardH) {
+                        if (hand[i] !== want.card) { e.stopPropagation(); e.preventDefault(); }
+                        return;
+                    }
+                }
+            }
+            if (want.item != null) {
+                const iY = 550, btnW = 150;
+                const inSword = pos.x > LAYOUT.mapX && pos.x < LAYOUT.mapX + btnW && pos.y > iY && pos.y < iY + 50;
+                const inPick = pos.x > LAYOUT.mapX + 160 && pos.x < LAYOUT.mapX + 160 + btnW && pos.y > iY && pos.y < iY + 50;
+                if ((inSword && want.item !== 'sword') || (inPick && want.item !== 'pickaxe')) { e.stopPropagation(); e.preventDefault(); }
+            }
+        };
+        window.addEventListener('mousedown', guard, true);
+        window.addEventListener('touchstart', guard, true);
+        // 長方形は、どこにドロップしても「カギがある場所」にそろえて置く
+        const origStartPlacing = startPlacing;
+        startPlacing = function(mx, my) {
+            origStartPlacing(mx, my);
+            if (placingState) {
+                const r = placingState.rect;
+                placingState.gx = 3; placingState.gy = 3;
+                placingState.pixelX = LAYOUT.mapX + 3 * GRID_SIZE + (r.w * GRID_SIZE) / 2;
+                placingState.pixelY = LAYOUT.mapY + 3 * GRID_SIZE + (r.h * GRID_SIZE) / 2;
+            }
+        };
+        const cv = (x, y, w, h) => ({ sel: '#gameCanvas', rect: [x, y, w, h], of: [1280, 720], pad: 6 });
+        const mapR = () => cv(LAYOUT.mapX, LAYOUT.mapY, MAP_COLS * GRID_SIZE, MAP_ROWS * GRID_SIZE);
+        const handR = () => cv(LAYOUT.handStartX, LAYOUT.handY + 20, 4 * LAYOUT.cardGap + LAYOUT.cardW, LAYOUT.cardH);
+        const deckR = () => cv(LAYOUT.deckX, LAYOUT.deckY + 20, LAYOUT.cardW + 20, LAYOUT.cardH + 40);
+        const calcR = () => cv(LAYOUT.calcX, LAYOUT.calcY, LAYOUT.calcW, LAYOUT.calcH);
+        const rotateR = () => cv(LAYOUT.rotateX, LAYOUT.rotateY, LAYOUT.rotateW, LAYOUT.rotateH);
+        const trashR = () => cv(LAYOUT.trashX, LAYOUT.trashY, LAYOUT.trashW, LAYOUT.trashH);
+        const swordR = () => cv(LAYOUT.mapX, 550, 150, 50);
+        const pickR = () => cv(LAYOUT.mapX + 160, 550, 150, 50);
+        const wandR = () => cv(LAYOUT.mapX + 320, 550, 150, 50);
+        const keysR = () => cv(LAYOUT.mapX, 625, 470, 60);
+        const scoreR = () => cv(10, 320, LAYOUT.sidebarW - 20, 110);
+        const okR = () => { const s = placingState; return s ? cv(s.pixelX + 10, s.pixelY - 20, 100, 40) : mapR(); };
+        const placeR = () => { const s = placingState; return s ? cv(LAYOUT.mapX + s.gx * GRID_SIZE, LAYOUT.mapY + s.gy * GRID_SIZE, s.rect.w * GRID_SIZE, s.rect.h * GRID_SIZE) : mapR(); };
+        const monsterR = () => cv(LAYOUT.mapX + 8 * GRID_SIZE, LAYOUT.mapY + 3 * GRID_SIZE, GRID_SIZE, GRID_SIZE);
+        const rockR = () => cv(LAYOUT.mapX + 8 * GRID_SIZE, LAYOUT.mapY + 6 * GRID_SIZE, GRID_SIZE, GRID_SIZE);
+        const idle = () => FGLTutorial.wait(() => gameState === 'PLAYING' && !isDragging && !placingState, 5000);
+        FGLTutorial.run([
+            { type: 'say', target: mapR, pos: 'bottom', text: {
+                ja: 'ここが地下の地図（10×10マス）。マスにはいろいろなものがあるよ。「🗝️カギ」を集めて、ステージから脱出するのが目的だ！',
+                easy: 'ここがちかのちず（10×10マス）。マスにはいろいろなものがあるよ。「🗝️カギ」をあつめて、ステージからだっしゅつするのがもくてきだ！',
+                en: 'This is the underground map (10×10). Collect the "🗝️ keys" to escape each stage — that\'s the goal!' } },
+            { type: 'say', target: mapR, pos: 'bottom', text: {
+                ja: '🗝️カギ／💰お金／⚔️剣／⛏️つるはし／🪄魔法の杖／カードは、上にタイルを置くと拾える。でも 👾モンスター と 🪨岩 の上にはタイルを置けないよ。',
+                easy: '🗝️カギ／💰おかね／⚔️つるぎ／⛏️つるはし／🪄まほうのつえ／カードは、うえにタイルをおくとひろえる。でも 👾モンスター と 🪨いわ のうえにはタイルをおけないよ。',
+                en: '🗝️ Keys, 💰 money, ⚔️ swords, ⛏️ pickaxes, 🪄 wands and cards are picked up by covering them with tiles. But you can\'t cover 👾 monsters or 🪨 rocks.' } },
+            { type: 'say', target: handR, pos: 'top', text: {
+                ja: 'これが手札の数字カード。2枚を「かけ算」して、長方形のタイルを作るよ。',
+                easy: 'これがてふだのすうじカード。2まいを「かけざん」して、ちょうほうけいのタイルをつくるよ。',
+                en: 'These are your number cards. Multiply two of them to make a rectangular tile.' } },
+            { type: 'say', target: deckR, pos: 'top', text: {
+                ja: 'これは「山札」。手札を使うと、ここから補充されるよ。山札も手札もなくなるとゲームオーバーだから、カードは大切に！',
+                easy: 'これは「やまふだ」。てふだをつかうと、ここからほじゅうされるよ。やまふだもてふだもなくなるとゲームオーバーだから、カードはたいせつに！',
+                en: 'This is the deck. It refills your hand as you play. When both the deck and your hand run out, it\'s game over, so use cards wisely!' } },
+            { type: 'run', fn: () => { want.card = 3; } },
+            { type: 'do', target: () => [handR(), calcR()], pos: 'top', until: () => term1 === 3, text: {
+                ja: 'まず「3」のカードを、右の大きな茶色いエリアにドラッグして入れよう！',
+                easy: 'まず「3」のカードを、みぎのおおきなちゃいろいエリアにドラッグしていれよう！',
+                en: 'First, drag the "3" card into the big brown area on the right!' } },
+            { type: 'run', fn: () => { want.card = 2; } },
+            { type: 'do', target: () => [handR(), calcR()], pos: 'top', until: () => !!generatedRect, text: {
+                ja: 'つぎに「2」のカードも、同じエリアに入れてみよう！',
+                easy: 'つぎに「2」のカードも、おなじエリアにいれてみよう！',
+                en: 'Now drag the "2" card into the same area!' } },
+            { type: 'run', fn: () => { want.card = null; } },
+            { type: 'say', target: calcR, pos: 'bottom', text: {
+                ja: '3 × 2 = 6！ よこ3マス・たて2マス、合わせて6マスぶんの長方形ができたよ。',
+                easy: '3 × 2 = 6！ よこ3マス・たて2マス、あわせて6マスぶんのちょうほうけいができたよ。',
+                en: '3 × 2 = 6! You made a rectangle 3 wide and 2 tall — 6 squares in all.' } },
+            { type: 'say', target: rotateR, pos: 'top', text: {
+                ja: 'この「かいてん」ボタンで、長方形を たて・よこ入れかえられるよ（3×2 → 2×3）。置く場所に合わせて使おう。今回はこのままでOK！',
+                easy: 'この「かいてん」ボタンで、ちょうほうけいを たて・よこいれかえられるよ（3×2 → 2×3）。おくばしょにあわせてつかおう。こんかいはこのままでOK！',
+                en: 'The "Rotate" button swaps the width and height (3×2 → 2×3). Use it to fit the space. We\'ll keep it as is this time!' } },
+            { type: 'say', target: trashR, pos: 'top', text: {
+                ja: 'いらないカードや、できた長方形は、この「すてる」に入れて捨てられるよ。',
+                easy: 'いらないカードや、できたちょうほうけいは、この「すてる」にいれてすてられるよ。',
+                en: 'Unwanted cards — or a rectangle you don\'t want — can be dropped into this "Trash".' } },
+            { type: 'do', target: () => [calcR(), mapR()], pos: 'top', until: () => !!placingState, text: {
+                ja: 'できた長方形を、ドラッグして地図の上に置いてみよう！ カギ🗝️のあるところがいいね。',
+                easy: 'できたちょうほうけいを、ドラッグしてちずのうえにおいてみよう！ カギ🗝️のあるところがいいね。',
+                en: 'Drag the rectangle onto the map! Aim for the spot with the keys 🗝️.' } },
+            { type: 'say', target: placeR, pos: 'bottom', text: {
+                ja: '黄色い枠が置く場所だよ。カギ2つとお金が入っているね！ 「はい」で決定、「いいえ」でやり直し。',
+                easy: 'きいろいわくがおくばしょだよ。カギ2つとおかねがはいっているね！ 「はい」でけってい、「いいえ」でやりなおし。',
+                en: 'The yellow frame shows where it will go — two keys and some money are inside! "Yes" confirms, "No" cancels.' } },
+            { type: 'do', target: okR, pos: 'top', until: () => score > 0 && !placingState, text: {
+                ja: '緑の「はい」ボタンをタップして、決定しよう！',
+                easy: 'みどりの「はい」ボタンをタップして、けっていしよう！',
+                en: 'Tap the green "Yes" button to confirm!' } },
+            { type: 'run', fn: idle },
+            { type: 'say', target: scoreR, pos: 'top', text: {
+                ja: 'タイルを置いたぶん、点数が入ったよ！ 点数は「面積 × 面積」。6マスなら 6×6 = 36点。大きな長方形ほど、ぐんと高得点！ 💰も +300点。',
+                easy: 'タイルをおいたぶん、てんすうがはいったよ！ てんすうは「めんせき × めんせき」。6マスなら 6×6 = 36てん。おおきなちょうほうけいほど、ぐんとこうとくてん！ 💰も +300てん。',
+                en: 'You scored for the tile! Score = area × area, so 6 squares gives 6×6 = 36. Bigger rectangles score much more! 💰 gives +300.' } },
+            { type: 'say', target: keysR, pos: 'top', text: {
+                ja: 'ここが集めたカギ。カギは5個（ステージ6以降はステージ数と同じ数）集めると「つぎのステージへ」ボタンが押せるようになるよ。全部で10ステージ！',
+                easy: 'ここがあつめたカギ。カギは5こ（ステージ6いこうはステージすうとおなじかず）あつめると「つぎのステージへ」ボタンがおせるようになるよ。ぜんぶで10ステージ！',
+                en: 'Here are your collected keys. Get 5 keys (as many as the stage number from stage 6) to unlock the "Next Stage" button. There are 10 stages in all!' } },
+            { type: 'say', target: monsterR, pos: 'bottom', text: {
+                ja: 'あっ、👾モンスターがいる！ 上にタイルは置けないけど、「⚔️剣」で倒せるよ。',
+                easy: 'あっ、👾モンスターがいる！ うえにタイルはおけないけど、「⚔️つるぎ」でたおせるよ。',
+                en: 'A 👾 monster! You can\'t place a tile on it, but a "⚔️ sword" can defeat it.' } },
+            { type: 'run', fn: () => { want.item = 'sword'; } },
+            { type: 'do', target: () => [swordR(), mapR()], pos: 'top', until: () => items.sword < 2, text: {
+                ja: '下の「⚔️」を、ドラッグしてモンスターの上に落としてみよう！ 倒すと +200点！',
+                easy: 'したの「⚔️」を、ドラッグしてモンスターのうえにおとしてみよう！ たおすと +200てん！',
+                en: 'Drag the "⚔️" at the bottom onto the monster! Defeating it gives +200!' } },
+            { type: 'say', target: rockR, pos: 'bottom', text: {
+                ja: 'こっちは🪨岩。「⛏️つるはし」でこわせるよ。',
+                easy: 'こっちは🪨いわ。「⛏️つるはし」でこわせるよ。',
+                en: 'And this is a 🪨 rock. A "⛏️ pickaxe" breaks it.' } },
+            { type: 'run', fn: () => { want.item = 'pickaxe'; } },
+            { type: 'do', target: () => [pickR(), mapR()], pos: 'top', until: () => items.pickaxe < 2, text: {
+                ja: '「⛏️」を、ドラッグして岩の上に落としてみよう！ こわすと +100点！',
+                easy: '「⛏️」を、ドラッグしていわのうえにおとしてみよう！ こわすと +100てん！',
+                en: 'Drag the "⛏️" onto the rock! Breaking it gives +100!' } },
+            { type: 'run', fn: () => { want.item = null; } },
+            { type: 'say', target: wandR, pos: 'top', text: {
+                ja: '🪄魔法の杖は、地図にいるモンスターと岩を、それぞれ1/2の確率でまとめて消せる。剣やつるはしが足りないときの切り札だよ。',
+                easy: '🪄まほうのつえは、ちずにいるモンスターといわを、それぞれ1/2のかくりつでまとめてけせる。つるぎやつるはしがたりないときのきりふだだよ。',
+                en: 'The 🪄 magic wand removes monsters and rocks on the map, each with a 50% chance — a trump card when you\'re short on swords or pickaxes.' } },
+            { type: 'say', target: mapR, pos: 'bottom', text: {
+                ja: 'カードのアイテムを拾うと、山札が1枚ふえるよ。かけ算で「ちょうどいい形」を作って、地下から脱出しよう！',
+                easy: 'カードのアイテムをひろうと、やまふだが1まいふえるよ。かけざんで「ちょうどいいかたち」をつくって、ちかからだっしゅつしよう！',
+                en: 'Picking up a card item adds one card to your deck. Make just the right shapes with multiplication and escape the dungeon!' } }
+        ]);
     };
 
     window.startGame = function(diffMode) {
