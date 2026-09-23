@@ -199,6 +199,7 @@
         .lang-btn.active { opacity: 1; box-shadow: 0 0 0 4px #00f0ff, 0 4px 15px rgba(118, 75, 162, 0.4); }
         .rank-date { font-size: 0.8rem; color: #a0aab5; margin-left: 8px; }
     </style>
+    <script src="../tutorial-engine.js"></script>
 </head>
 <body>
 
@@ -242,6 +243,7 @@
         <h1 class="neon-title" data-i18n="game_title">モジュロ ブリッツ</h1>
         <div>
             <button id="btn-title-start" class="btn btn-success btn-title-menu" data-i18n="btn_start">はじめる</button>
+            <button id="btn-title-tutorial" class="btn btn-title-menu" style="background:linear-gradient(135deg,#ffca28,#ff8f00); color:#3e2723; box-shadow:0 4px 15px rgba(255,160,0,0.4);" data-i18n="btn_tutorial">🔰 チュートリアル</button>
             <button id="btn-title-player" class="btn btn-warning btn-title-menu" data-i18n="btn_player_select">プレーヤー選択</button>
             <button id="btn-title-login" class="btn btn-auth btn-title-menu" style="display:none">Googleでログイン</button>
             <button id="btn-title-logout" class="btn btn-danger btn-title-menu hidden" style="display:none">ログアウト</button>
@@ -396,7 +398,7 @@ const STRINGS = {
         label_player: 'プレーヤー', label_level: 'レベル', label_round: 'ラウンド', label_score: 'スコア', label_match_count: 'そろえた回数',
         guide_on: 'ガイド機能: ON', guide_off: 'ガイド機能: OFF',
         label_ap: 'AP (のこり回数)', label_target: 'ターゲット', btn_use: 'つかう',
-        btn_start: 'はじめる', btn_player_select: 'プレーヤー選択', btn_ranking: 'ランキング', btn_settings: '⚙ 設定', btn_index: 'INDEXへ',
+        btn_start: 'はじめる', btn_tutorial: '🔰 チュートリアル', btn_player_select: 'プレーヤー選択', btn_ranking: 'ランキング', btn_settings: '⚙ 設定', btn_index: 'INDEXへ',
         label_current_player: '現在のプレーヤー: ',
         settings_title: '⚙ 設定', settings_sub: '言語 / Language', lang_simple: 'かんたんなにほんご', lang_ja: '日本語', lang_en: 'English', btn_close: 'とじる',
         diff_prompt: '難易度をえらんでね', diff_easy: 'かんたん', diff_normal: 'ふつう', diff_hard: 'むずかしい', btn_back: 'もどる',
@@ -428,7 +430,7 @@ const STRINGS = {
         label_player: 'プレーヤー', label_level: 'レベル', label_round: 'ラウンド', label_score: 'スコア', label_match_count: 'そろえた かいすう',
         guide_on: 'ガイドきのう: ON', guide_off: 'ガイドきのう: OFF',
         label_ap: 'AP (のこり かいすう)', label_target: 'ターゲット', btn_use: 'つかう',
-        btn_start: 'はじめる', btn_player_select: 'プレーヤーせんたく', btn_ranking: 'ランキング', btn_settings: '⚙ せってい', btn_index: 'INDEXへ',
+        btn_start: 'はじめる', btn_tutorial: '🔰 チュートリアル', btn_player_select: 'プレーヤーせんたく', btn_ranking: 'ランキング', btn_settings: '⚙ せってい', btn_index: 'INDEXへ',
         label_current_player: 'いまの プレーヤー: ',
         settings_title: '⚙ せってい', settings_sub: '言語 / Language', lang_simple: 'かんたんなにほんご', lang_ja: '日本語', lang_en: 'English', btn_close: 'とじる',
         diff_prompt: 'なんいどを えらんでね', diff_easy: 'かんたん', diff_normal: 'ふつう', diff_hard: 'むずかしい', btn_back: 'もどる',
@@ -460,7 +462,7 @@ const STRINGS = {
         label_player: 'Player', label_level: 'Level', label_round: 'Round', label_score: 'Score', label_match_count: 'Matches',
         guide_on: 'Guide: ON', guide_off: 'Guide: OFF',
         label_ap: 'AP (Remaining)', label_target: 'Target', btn_use: 'Use',
-        btn_start: 'Start', btn_player_select: 'Select Player', btn_ranking: 'Ranking', btn_settings: '⚙ Settings', btn_index: 'To INDEX',
+        btn_start: 'Start', btn_tutorial: '🔰 Tutorial', btn_player_select: 'Select Player', btn_ranking: 'Ranking', btn_settings: '⚙ Settings', btn_index: 'To INDEX',
         label_current_player: 'Current Player: ',
         settings_title: '⚙ Settings', settings_sub: '言語 / Language', lang_simple: 'かんたんなにほんご', lang_ja: '日本語', lang_en: 'English', btn_close: 'Close',
         diff_prompt: 'Choose a Difficulty', diff_easy: 'Easy', diff_normal: 'Normal', diff_hard: 'Hard', btn_back: 'Back',
@@ -1527,6 +1529,84 @@ async function loadRankingData() {
     }
 }
 
+// ============================================================
+// チュートリアル（練習プレイ）
+// ============================================================
+// 実際の盤面で「カードをおいて足し算(10をこえたら10をひく)し、同じ数字を3つ以上つなげて消す」を体験する。
+// 書き込みはエンジンが止めるので、ランキング・クリア回数は一切汚れない。
+function startTutorial() {
+    FGLTutorial.begin({ root: '#game-root', getLang: () => currentLang });
+    state.difficulty = 'EASY';
+    CONFIG = Object.assign({}, PRESET_EASY);
+    initGame();
+    const setBoard = (rows) => {
+        for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) {
+            const cell = state.board[r][c];
+            cell.value = rows[r][c]; cell.type = 'NORMAL'; cell.hp = 0; cell.isMatch = false; cell.drawOffsetY = 0;
+        }
+        state.targetNumbers = [3, 7];
+        updateUI();
+    };
+    const setHand = (vals) => vals.forEach((v, i) => { state.hand[i].value = v; });
+    // 手順どおりに進む盤面(最初は同じ数字がとなりあっていない)。2行目の「3・3・1」に 2 をおくと 1+2=3 でそろう
+    setBoard([[5,7,2,9,4],[8,6,5,1,7],[2,3,3,1,6],[9,4,8,2,5],[1,7,6,9,3]]);
+    setHand([2, 4, 6]);
+    const CV = '#gameCanvas';
+    const cv = (x, y, w, h) => ({ sel: CV, rect: [x, y, w, h], of: [canvas.width, canvas.height], pad: 6 });
+    const boardR = () => cv(390, 50, 500, 500);
+    const handR = () => cv(470, 570, 340, 120);
+    const playR = () => cv(380, 40, 520, 660);
+    const rowR = () => cv(390, 250, 500, 100);
+    let mc0 = 0;
+    const settle = () => FGLTutorial.wait(() => !state.isMatching && !state.inputLocked, 15000);
+    FGLTutorial.run([
+        { type: 'say', target: boardR, pos: 'top', text: {
+            ja: 'ここが 5×5 の盤面。数字のブロックが並んでいるよ。「同じ数字を、タテかヨコに3つ以上つなげる」と、そのブロックが消えるんだ！',
+            easy: 'ここが 5×5 のばんめん。すうじのブロックがならんでいるよ。「おなじすうじを、タテかヨコに3つ いじょうつなげる」と、そのブロックがきえるんだ！',
+            en: 'This is the 5×5 board. Connect 3 or more of the SAME number in a row or column and those blocks disappear!' } },
+        { type: 'say', target: handR, pos: 'top', text: {
+            ja: '下が手札。カードをドラッグして盤面のマスにおくと、そのマスの数字に足し算されるよ。ただし 10 をこえたら、10 をひいた数になる（例：7 + 6 = 13 → 3）。',
+            easy: 'したがてふだ。カードをドラッグしてばんめんのマスにおくと、そのマスのすうじにたしざんされるよ。ただし 10 をこえたら、10 をひいたかずになる（れい：7 + 6 = 13 → 3）。',
+            en: 'Your hand is below. Drag a card onto a square to ADD it to that number. If the sum goes over 10, 10 is subtracted (e.g. 7 + 6 = 13 → 3).' } },
+        { type: 'say', target: rowR, pos: 'bottom', text: {
+            ja: '3行目に「3・3」が並んでいて、そのとなりに「1」があるね。この「1」を「3」に変えれば、3が3つそろうよ！',
+            easy: '3ぎょうめに「3・3」がならんでいて、そのとなりに「1」があるね。この「1」を「3」にかえれば、3が3つそろうよ！',
+            en: 'The 3rd row has two 3s next to a "1". If we turn that 1 into a 3, three 3s line up!' } },
+        { type: 'do', target: playR, pos: 'top', until: () => state.matchCount >= 1, text: {
+            ja: '手札の「2」を、3行目の「1」のマスにドラッグしておいてみよう！ 1 + 2 = 3 になって、3が3つそろうよ。',
+            easy: 'てふだの「2」を、3ぎょうめの「1」のマスにドラッグしておいてみよう！ 1 + 2 = 3 になって、3が3つそろうよ。',
+            en: 'Drag the "2" from your hand onto the "1" in the 3rd row! 1 + 2 = 3, and three 3s line up.' } },
+        { type: 'run', fn: settle },
+        { type: 'say', target: '#hud-right', pos: 'bottom', text: {
+            ja: 'ブロックが消えて、スコアが入ったよ！ ここには「AP（のこり回数）」と「ターゲット」があるよ。カードを1まいおくたびにAPが1へるけど、そろえるとAPが1ふえる！ ターゲットの数字を消すと、スコアが2倍！',
+            easy: 'ブロックがきえて、スコアがはいったよ！ ここには「AP（のこりかいすう）」と「ターゲット」があるよ。カードを1まいおくたびにAPが1へるけど、そろえるとAPが1ふえる！ ターゲットのすうじをけすと、スコアが2ばい！',
+            en: 'The blocks vanished and you scored! Here you see your AP (remaining moves) and the targets. Each card costs 1 AP, but matching gives 1 back. Clearing a target number doubles the score!' } },
+        { type: 'run', fn: () => { setBoard([[5,7,2,9,4],[8,6,5,1,7],[2,3,3,7,6],[9,4,8,2,5],[1,7,6,9,3]]); setHand([6, 4, 2]); } },
+        { type: 'say', target: rowR, pos: 'bottom', text: {
+            ja: 'もう1問！ こんどは「3・3」のとなりが「7」だよ。手札の「6」を 7 に足すと、13 で 10 をこえるね。',
+            easy: 'もういちもん！ こんどは「3・3」のとなりが「7」だよ。てふだの「6」を 7 にたすと、13 で 10 をこえるね。',
+            en: 'One more! Now there\'s a "7" next to the two 3s. Adding the "6" makes 13, which is over 10.' } },
+        { type: 'run', fn: () => { mc0 = state.matchCount; } },
+        { type: 'do', target: playR, pos: 'top', until: () => state.matchCount > mc0, text: {
+            ja: '手札の「6」を、3行目の「7」のマスにおいてみよう！ 7 + 6 = 13 → 10 をひいて「3」になって、3が3つそろうよ。',
+            easy: 'てふだの「6」を、3ぎょうめの「7」のマスにおいてみよう！ 7 + 6 = 13 → 10 をひいて「3」になって、3が3つそろうよ。',
+            en: 'Drop the "6" onto the "7" in the 3rd row! 7 + 6 = 13 → minus 10 → 3, and three 3s line up.' } },
+        { type: 'run', fn: settle },
+        { type: 'say', target: boardR, pos: 'top', text: {
+            ja: 'ぜんぶ消えてブロックが上から落ちてきたね。落ちたあとに新しくそろうと「コンボ」！ 消したブロックの数が多いほど高得点だよ。',
+            easy: 'ぜんぶきえてブロックがうえからおちてきたね。おちたあとにあたらしくそろうと「コンボ」！ けしたブロックのかずがおおいほどこうとくてんだよ。',
+            en: 'Everything cleared and new blocks dropped in. If new matches form after the drop, that\'s a combo! The more blocks you clear, the higher the score.' } },
+        { type: 'say', target: boardR, pos: 'top', text: {
+            ja: '×は「おじゃま」ブロック（カードはおけない。となりで消すとこわれる）、⚡は「お助け」（となりで消すとタテヨコいっせいに爆発）、💎は「スペシャル」（となりで消すとゲット。つかうと好きな数字を1回だけ使える）だよ。',
+            easy: '×は「おじゃま」ブロック（カードはおけない。となりでけすとこわれる）、⚡は「おたすけ」（となりでけすとタテヨコいっせいにばくはつ）、💎は「スペシャル」（となりでけすとゲット。つかうとすきなすうじを1かいだけつかえる）だよ。',
+            en: '× is a jammer (you can\'t place cards on it; clear next to it to break it). ⚡ blasts a whole row and column when cleared next to. 💎 is collected when cleared next to, and lets you use any number once.' } },
+        { type: 'say', target: '#btn-guide-toggle-ingame', pos: 'top', text: {
+            ja: 'むずかしいときは「ガイド機能」をONにすると、そろえられるマスが光って教えてくれるよ（ONにするとランキングには載らないよ）。ボスも出てくるから、がんばってね！',
+            easy: 'むずかしいときは「ガイドきのう」をONにすると、そろえられるマスがひかっておしえてくれるよ（ONにするとランキングにはのらないよ）。ボスもでてくるから、がんばってね！',
+            en: 'If it\'s tough, turn on "Guide" and the squares that would match will glow (but then your score won\'t enter the ranking). Bosses appear later — good luck!' } }
+    ]);
+}
+document.getElementById('btn-title-tutorial').onclick = () => startTutorial();
 document.getElementById('btn-diff-easy').onclick = () => { state.difficulty='EASY'; CONFIG=Object.assign({},PRESET_EASY); hideModal('difficulty-modal'); fadeTransition(() => initGame()); };
 document.getElementById('btn-diff-normal').onclick = () => { state.difficulty='NORMAL'; CONFIG=Object.assign({},PRESET_NORMAL); hideModal('difficulty-modal'); fadeTransition(() => initGame()); };
 document.getElementById('btn-diff-hard').onclick = () => { state.difficulty='HARD'; CONFIG=Object.assign({},PRESET_HARD); hideModal('difficulty-modal'); fadeTransition(() => initGame()); };
