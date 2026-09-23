@@ -403,6 +403,7 @@
         }
         .pop-in { animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
     </style>
+    <script src="../tutorial-engine.js"></script>
 </head>
 <body>
 <div id="container">
@@ -513,6 +514,7 @@
 
                 <div id="title-main-menu" class="title-bottom-buttons">
                     <button id="btn-start-menu" class="btn btn-success" style="font-size:1.3rem;" data-i18n="btn_start">はじめる</button>
+                    <button id="btn-tutorial" class="btn" style="font-size:1.1rem; background:linear-gradient(to bottom,#ffca28,#ff8f00); border-color:#ffe082; color:#3e2723;" data-i18n="btn_tutorial">🔰 チュートリアル</button>
 
                     <button id="player-select-btn" class="btn btn-warning" title="プレーヤーをへんこうする" style="font-size:1rem;">
                         <span style="font-size:1.1rem; margin-right:5px;">👤</span>
@@ -800,7 +802,7 @@ const STRINGS = {
         btn_to_title: 'タイトルへもどる', door_confirm_title: 'ドアを あけますか？', door_confirm_body: 'つぎのフロアへ すすみます。',
         btn_yes: 'はい', btn_no: 'いいえ', panel_score: '🏆 スコア', label_max_score: 'MAXスコア', label_total_score: 'ごうけい',
         panel_dungeon_log: '📜 ダンジョンログ', btn_howto: '📖 あそびかた', btn_index: '🏠 INDEXへ',
-        title_subtitle: ' - かけざんダンジョン - ', btn_start: 'はじめる', btn_ranking: 'ランキング', btn_settings: '⚙ 設定',
+        title_subtitle: ' - かけざんダンジョン - ', btn_start: 'はじめる', btn_tutorial: '🔰 チュートリアル', btn_ranking: 'ランキング', btn_settings: '⚙ 設定',
         diff_prompt: 'なんいどを えらんでね', diff_easy: 'やさしい', diff_normal: 'ふつう', diff_hard: 'むずかしい', btn_back: 'もどる',
         settings_title: '⚙ 設定', settings_sub: '言語 / Language', lang_simple: 'かんたんなにほんご', lang_ja: '日本語', lang_en: 'English',
         btn_close: 'とじる', rank_tab_world: 'ワールド', rank_tab_local: 'ローカル',
@@ -872,7 +874,7 @@ const STRINGS = {
         btn_to_title: 'タイトルへ もどる', door_confirm_title: 'ドアを あけますか？', door_confirm_body: 'つぎの フロアへ すすみます。',
         btn_yes: 'はい', btn_no: 'いいえ', panel_score: '🏆 スコア', label_max_score: 'MAXスコア', label_total_score: 'ごうけい',
         panel_dungeon_log: '📜 ダンジョンの きろく', btn_howto: '📖 あそびかた', btn_index: '🏠 INDEXへ',
-        title_subtitle: ' - かけざんダンジョン - ', btn_start: 'はじめる', btn_ranking: 'ランキング', btn_settings: '⚙ せってい',
+        title_subtitle: ' - かけざんダンジョン - ', btn_start: 'はじめる', btn_tutorial: '🔰 チュートリアル', btn_ranking: 'ランキング', btn_settings: '⚙ せってい',
         diff_prompt: 'なんいどを えらんでね', diff_easy: 'やさしい', diff_normal: 'ふつう', diff_hard: 'むずかしい', btn_back: 'もどる',
         settings_title: '⚙ せってい', settings_sub: '言語 / Language', lang_simple: 'かんたんなにほんご', lang_ja: '日本語', lang_en: 'English',
         btn_close: 'とじる', rank_tab_world: 'ワールド', rank_tab_local: 'ローカル',
@@ -944,7 +946,7 @@ const STRINGS = {
         btn_to_title: 'Back to Title', door_confirm_title: 'Open the door?', door_confirm_body: 'You will proceed to the next floor.',
         btn_yes: 'Yes', btn_no: 'No', panel_score: '🏆 Score', label_max_score: 'Max Score', label_total_score: 'Total',
         panel_dungeon_log: '📜 Dungeon Log', btn_howto: '📖 How to Play', btn_index: '🏠 To INDEX',
-        title_subtitle: ' - Multiplication Dungeon - ', btn_start: 'Start', btn_ranking: 'Ranking', btn_settings: '⚙ Settings',
+        title_subtitle: ' - Multiplication Dungeon - ', btn_start: 'Start', btn_tutorial: '🔰 Tutorial', btn_ranking: 'Ranking', btn_settings: '⚙ Settings',
         diff_prompt: 'Choose a difficulty', diff_easy: 'Easy', diff_normal: 'Normal', diff_hard: 'Hard', btn_back: 'Back',
         settings_title: '⚙ Settings', settings_sub: '言語 / Language', lang_simple: 'かんたんなにほんご', lang_ja: '日本語', lang_en: 'English',
         btn_close: 'Close', rank_tab_world: 'World', rank_tab_local: 'Local',
@@ -3517,6 +3519,80 @@ bindBtn(ui.btnBackToMenu, () => {
 });
 
 bindBtn(ui.btnEasy, () => { state.difficulty = 'EASY'; CONFIG = Object.assign({}, PRESET_EASY); initGame(); });
+
+// ============================================================
+// チュートリアル（練習プレイ）
+// ============================================================
+// 実際のダンジョン画面で「カードを重ねて(かけ算して)数を作り、同じ数のパネルにぶつけて壊す」を体験する。
+// 書き込みはエンジンが止めるので、ランキング・クリア回数は一切汚れない。
+function startTutorial() {
+    FGLTutorial.begin({ root: '#container', getLang: () => currentLang });
+    state.difficulty = 'EASY';
+    CONFIG = Object.assign({}, PRESET_EASY);
+    initGame();
+    // 手順どおりに進むよう、手札とパネルを決めた値にする(最初に見えている十字の5マス)
+    [3, 4, 2, 2, 5].forEach((v, i) => { const c = state.cards[i]; c.value = v; c.isJoker = false; c.jokerChosen = false; c.stackCount = 1; c.multiplier = 1; });
+    state.grid.forEach(c => { c.item = null; });
+    const setPanel = (idx, value, gems) => { const c = state.grid[idx]; c.value = value; c.gemCount = gems; c.isEnemy = true; };
+    setPanel(12, 12, 3); state.grid[12].item = 'KEY';
+    setPanel(7, 6, 2); setPanel(11, 8, 2); setPanel(13, 9, 1); setPanel(17, 4, 2);
+    updateUI();
+    const CV = '#gameCanvas';
+    const cv = (x, y, w, h) => ({ sel: CV, rect: [x, y, w, h], of: [canvas.width, canvas.height], pad: 6 });
+    const cellR = (r, c) => { const g = getGridPos(r, c); return cv(g.x, g.y, g.w, g.h); };
+    const gridR = () => { const cw = state.boardW / GRID_COLS; return cv(state.boardX, state.gridAreaY, state.boardW, cw * 0.95 * GRID_ROWS); };
+    const handR = () => { const a = state.cards[0], b = state.cards[4]; return cv(a.baseX, a.baseY, b.baseX + b.width - a.baseX, a.height); };
+    const twoR = () => { const a = state.cards[0], b = state.cards[1]; return cv(a.baseX, a.baseY, b.baseX + b.width - a.baseX, a.height); };
+    const playR = () => { const g = getGridPos(2, 2), c = state.cards[1]; return cv(Math.min(g.x, c.baseX) - 10, g.y, Math.max(g.w, c.width) + 60, c.baseY + c.height - g.y); };
+    const trashR = () => { const t = state.trashRect; return cv(t.x, t.y, t.w, t.h); };
+    const settle = () => FGLTutorial.wait(() => !state.dragInfo && !state.inputLocked, 6000);
+    FGLTutorial.run([
+        { type: 'say', target: gridR, pos: 'bottom', text: {
+            ja: 'ここがダンジョン。5×5マスのパネルが並んでいるよ。パネルには「数字」と「⭐」があって、まだ見えていないマスはとなりのパネルを壊すと見えてくるよ。',
+            easy: 'ここがダンジョン。5×5マスのパネルがならんでいるよ。パネルには「すうじ」と「⭐」があって、まだみえていないマスはとなりのパネルをこわすとみえてくるよ。',
+            en: 'This is the dungeon: a 5×5 grid of panels. Each panel has a number and ⭐ stars. Hidden squares are revealed when you break a panel next to them.' } },
+        { type: 'say', target: () => cellR(2, 2), pos: 'bottom', text: {
+            ja: 'まん中のパネルは「12」。手札で「12」をぴったり作ってぶつけると、このパネルを壊せるよ！ 得点は「数字 × ⭐の数」。',
+            easy: 'まんなかのパネルは「12」。てふだで「12」をぴったりつくってぶつけると、このパネルをこわせるよ！ とくてんは「すうじ × ⭐のかず」。',
+            en: 'The center panel is "12". Make exactly 12 with your hand and hit it to break it! Score = number × ⭐ count.' } },
+        { type: 'say', target: handR, pos: 'top', text: {
+            ja: 'これが手札。カードをドラッグして、ほかのカードに重ねると「かけざん」になるよ。',
+            easy: 'これがてふだ。カードをドラッグして、ほかのカードにかさねると「かけざん」になるよ。',
+            en: 'These are your cards. Drag one onto another card and their numbers are multiplied.' } },
+        { type: 'do', target: twoR, pos: 'top', until: () => state.cards.some(c => c && c.value === 12 && c.stackCount === 2), text: {
+            ja: '12 を作ろう！ 左の 3 のカードを、となりの 4 のカードに重ねてみて。3 × 4 = 12 になるよ。',
+            easy: '12 をつくろう！ ひだりの 3 のカードを、となりの 4 のカードにかさねてみて。3 × 4 = 12 になるよ。',
+            en: 'Let\'s make 12! Drag the 3 card onto the 4 card next to it. 3 × 4 = 12.' } },
+        { type: 'run', fn: settle },
+        { type: 'say', target: () => { const c = state.cards.find(k => k && k.value === 12); return c ? cv(c.baseX, c.baseY, c.width, c.height) : handR(); }, pos: 'top', text: {
+            ja: '12 のカードができた！ カードを重ねると「のこりAP」が1へるよ。大きな数を作るには、少ない回数で重ねるのがコツ。',
+            easy: '12 のカードができた！ カードをかさねると「のこりAP」が1へるよ。おおきなかずをつくるには、すくないかいすうでかさねるのがコツ。',
+            en: 'You made 12! Stacking cards costs 1 AP, so build big numbers with as few stacks as you can.' } },
+        { type: 'do', target: playR, pos: 'top', until: () => state.panelsDestroyed > 0, text: {
+            ja: '12 のカードを、まん中の「12」のパネルにドラッグしてぶつけよう！',
+            easy: '12 のカードを、まんなかの「12」のパネルにドラッグしてぶつけよう！',
+            en: 'Drag your 12 card onto the "12" panel in the middle!' } },
+        { type: 'run', fn: () => FGLTutorial.wait(() => state.particles.length < 3, 3000) },
+        { type: 'say', target: '#left-panel', pos: 'top', text: {
+            ja: 'パネルが壊れて、得点が入ったよ！ 中にあった「カギ🗝️」もゲット。カギを集めてドアを開けると、次のフロアへ進めるよ（全部で5フロア、最後のフロアにはボスがいる）。',
+            easy: 'パネルがこわれて、とくてんがはいったよ！ なかにあった「カギ🗝️」もゲット。カギをあつめてドアをあけると、つぎのフロアへすすめるよ（ぜんぶで5フロア、さいごのフロアにはボスがいる）。',
+            en: 'The panel broke and you scored! You also got the key 🗝️ inside. Collect keys and open the door to reach the next floor (5 floors in all, with a boss on the last one).' } },
+        { type: 'say', target: '#disp-time', pos: 'top', text: {
+            ja: 'ここが「のこりAP」。カードを重ねたり捨てたりすると1へって、0になるとゲームオーバー。敵を倒したり、⏰アイテムを取ると回復するよ。',
+            easy: 'ここが「のこりAP」。カードをかさねたりすてたりすると1へって、0になるとゲームオーバー。てきをたおしたり、⏰アイテムをとるとかいふくするよ。',
+            en: 'This is your remaining AP. Stacking or discarding cards costs 1, and at 0 it\'s game over. Defeating enemies or picking up ⏰ items restores it.' } },
+        { type: 'say', target: trashR, pos: 'top', text: {
+            ja: 'いらないカードは、この「すてば」にドラッグして捨てられるよ（AP -1）。使えない数のカードを入れかえたいときに使おう。',
+            easy: 'いらないカードは、この「すてば」にドラッグしてすてられるよ（AP -1）。つかえないかずのカードをいれかえたいときにつかおう。',
+            en: 'Drag unwanted cards to this discard area (−1 AP) to swap out numbers you can\'t use.' } },
+        { type: 'say', target: '#item-list', pos: 'top', text: {
+            ja: 'パネルを壊すとアイテムが出ることがあるよ。ここに集まって、タップやドラッグで使えるよ（アイテムはAPを使わない）。レベルアップすると、ボーナスももらえる！',
+            easy: 'パネルをこわすとアイテムがでることがあるよ。ここにあつまって、タップやドラッグでつかえるよ（アイテムはAPをつかわない）。レベルアップすると、ボーナスももらえる！',
+            en: 'Breaking panels may drop items. They collect here and can be used by tap or drag (items cost no AP). Level up to earn bonuses too!' } }
+    ]);
+}
+document.getElementById('btn-tutorial').addEventListener('click', () => startTutorial());
+
 bindBtn(ui.btnNormal, () => { state.difficulty = 'NORMAL'; CONFIG = Object.assign({}, PRESET_NORMAL); initGame(); });
 bindBtn(ui.btnHard, () => { state.difficulty = 'HARD'; CONFIG = Object.assign({}, PRESET_HARD); initGame(); });
 bindBtn(ui.btnViewRanking, () => { state.rankingMode = (window.currentUser ? 'WORLD' : 'LOCAL'); showRankingScreen(); });
