@@ -311,6 +311,7 @@
         .instruction-box { background: #FFF3E0; padding: 15px; border-radius: 12px; margin-bottom: 10px; text-align: center; border: 2px solid #FFE0B2; }
 
     </style>
+    <script src="../tutorial-engine.js"></script>
 </head>
 <body>
 
@@ -372,6 +373,7 @@
 
                     <div style="display:flex; flex-direction:column; gap:12px; width: 250px;">
                         <button class="btn btn-easy" onclick="showLevelSelect()" data-i18n="btn.start">はじめる</button>
+                        <button class="btn btn-yellow" style="background-color:#FF9800; color:#fff; box-shadow:0 5px 0 #E65100; border-color:#FFB74D;" onclick="startTutorial()" data-i18n="btn.tutorial">🔰 チュートリアル</button>
                         <button class="btn btn-normal" onclick="showPlayerSelect()" data-i18n="btn.playerselect">プレーヤー選択</button>
                         <button class="btn btn-yellow" onclick="showFullRanking()" data-i18n="btn.ranking">ランキング</button>
                         <button class="btn btn-gray" onclick="openSettings()" data-i18n="btn.settings">⚙ 設定</button>
@@ -697,6 +699,7 @@
                 'skill.time3': '⏰ じかん +3',
                 'label.collection': 'コレクション',
                 'btn.start': 'はじめる',
+                'btn.tutorial': '🔰 チュートリアル',
                 'btn.playerselect': 'プレーヤーせんたく',
                 'btn.ranking': 'ランキング',
                 'btn.settings': '⚙ せってい',
@@ -797,6 +800,7 @@
                 'skill.time3': '⏰ 時間 +3',
                 'label.collection': 'コレクション',
                 'btn.start': 'はじめる',
+                'btn.tutorial': '🔰 チュートリアル',
                 'btn.playerselect': 'プレーヤー選択',
                 'btn.ranking': 'ランキング',
                 'btn.settings': '⚙ 設定',
@@ -897,6 +901,7 @@
                 'skill.time3': '⏰ Time +3',
                 'label.collection': 'Collection',
                 'btn.start': 'Start',
+                'btn.tutorial': '🔰 Tutorial',
                 'btn.playerselect': 'Choose Player',
                 'btn.ranking': 'Ranking',
                 'btn.settings': '⚙ Settings',
@@ -1400,6 +1405,97 @@
         }
         function showHowToPlay() {
             document.getElementById("how-to-play-screen").classList.remove("hidden");
+        }
+
+        // ============================================================
+        // チュートリアル（練習プレイ）
+        // ============================================================
+        // 実際の画面で「カードを式の□に入れて進み、マスの効果・ボーナス・ほうせきを使う」を体験する。
+        // 書き込みはエンジンが止めるので、ランキング・クリア回数は一切汚れない。
+        function startTutorial() {
+            FGLTutorial.begin({ root: '#game-root', getLang: () => currentLang });
+            document.getElementById('title-screen').classList.add('hidden');
+            startGame('easy');
+            // 手順どおりに進むよう、マスと手札を決めた値にする
+            mapData = new Array(GOAL_POS + 1).fill(0);
+            mapData[3] = 1;    // ⏰ じかん+3
+            mapData[5] = 4;    // 👻 おばけ
+            mapData[7] = 5;    // 💎 ほうせき
+            mapData[9] = 2;    // 🎁 ルーレット
+            mapData[12] = 100 + 7;   // アイテム
+            mapData[16] = 100 + 3;   // アイテム
+            hand = [3, 4, 6, 2, 5];
+            renderHand(); updateUI(); drawGame();
+            // てじゅんどおりのカード以外は使えないようにする
+            let want = null;
+            const origPlayCard = playCard;
+            playCard = function (index) {
+                if (want !== null && hand[index] !== want) return;
+                origPlayCard(index);
+            };
+            const cv = (x, y, w, h) => ({ sel: '#game-canvas', rect: [x, y, w, h], of: [canvas.width, canvas.height], pad: 6 });
+            const boardR = () => {
+                const tileW = canvas.width / 14, tileH = tileW * 1.3;
+                return cv((canvas.width - 10 * tileW) / 2, 160, 10 * tileW, 2 * tileH + 15);
+            };
+            const settle = () => FGLTutorial.wait(() => gameState === 'playing' && !isDisplayingMessage && !scrollAnim.active && messageQueue.length === 0, 20000);
+            FGLTutorial.run([
+                { type: 'say', target: boardR, pos: 'bottom', text: {
+                    ja: 'ここがすごろくの盤面。カードの数だけ進んで、「100」をこえればゴール！ マスには、いろいろな効果があるよ。',
+                    easy: 'ここがすごろくのばんめん。カードのかずだけすすんで、「100」をこえればゴール！ マスには、いろいろなこうかがあるよ。',
+                    en: 'This is the sugoroku board. Move forward by the card\'s number and pass "100" to reach the goal! Tiles have different effects.' } },
+                { type: 'say', target: '#top-timer-container', pos: 'bottom', text: {
+                    ja: 'これが「のこりじかん」。カードを1まいつかうたびに1へって、0になるとゲームオーバー。ぴったりのカードでムダなく進もう！',
+                    easy: 'これが「のこりじかん」。カードを1まいつかうたびに1へって、0になるとゲームオーバー。ぴったりのカードでムダなくすすもう！',
+                    en: 'This is your remaining time. Every card you play costs 1, and at 0 it\'s game over. Use cards wisely!' } },
+                { type: 'say', target: '#hand-area', pos: 'top', text: {
+                    ja: '下は手札としき。手札のカードを、しきの「□」に入れると、その数だけ進むよ（ドラッグして入れる。設定が「タップ」のときはタップ）。',
+                    easy: 'したはてふだとしき。てふだのカードを、しきの「□」にいれると、そのかずだけすすむよ（ドラッグしていれる。せっていが「タップ」のときはタップ）。',
+                    en: 'Below are your hand and the equation. Put a card into the "□" to move that many tiles (drag it in, or tap it if your setting is "Tap").' } },
+                { type: 'run', fn: () => { want = 3; } },
+                { type: 'do', target: '#hand-area', pos: 'top', until: () => currentPos === 3, text: {
+                    ja: 'まず「3」のカードを、しきの □ に入れてみよう！ 0 + 3 = 3 で、3マスすすむよ。',
+                    easy: 'まず「3」のカードを、しきの □ にいれてみよう！ 0 + 3 = 3 で、3マスすすむよ。',
+                    en: 'First, put the "3" card into the □! 0 + 3 = 3, so you move 3 tiles.' } },
+                { type: 'run', fn: settle },
+                { type: 'say', target: '#top-timer-container', pos: 'bottom', text: {
+                    ja: '3番マスは「⏰」！ じかんが +3 ふえたよ。いいマスだね。',
+                    easy: '3ばんマスは「⏰」！ じかんが +3 ふえたよ。いいマスだね。',
+                    en: 'Tile 3 was a "⏰" — time went up by 3! Nice tile.' } },
+                { type: 'run', fn: () => { want = 4; } },
+                { type: 'do', target: '#hand-area', pos: 'top', until: () => currentPos === 7, text: {
+                    ja: '次は「4」のカード！ 3 + 4 = 7 で、7番マスへ。「💎」のマスだよ。',
+                    easy: 'つぎは「4」のカード！ 3 + 4 = 7 で、7ばんマスへ。「💎」のマスだよ。',
+                    en: 'Next, the "4" card! 3 + 4 = 7 takes you to tile 7, a "💎" tile.' } },
+                { type: 'run', fn: settle },
+                { type: 'say', target: '#status-ability-area', pos: 'top', text: {
+                    ja: '「💎ほうせき」をゲット！ ほうせきは1つで、ここの「とくしゅのうりょく」が1回つかえるよ。「手札チェンジ」「すきな数すすむ」「じかん +3」の3つ。',
+                    easy: '「💎ほうせき」をゲット！ ほうせきは1つで、ここの「とくしゅのうりょく」が1かいつかえるよ。「てふだチェンジ」「すきなかずすすむ」「じかん +3」の3つ。',
+                    en: 'You got a 💎 gem! One gem lets you use one special ability here: "Change Hand", "Move Any Number" or "Time +3".' } },
+                { type: 'do', target: '#btn-time3', pos: 'top', until: () => gems === 0, text: {
+                    ja: '「⏰ じかん +3」のボタンを押して、ほうせきをつかってみよう！',
+                    easy: '「⏰ じかん +3」のボタンをおして、ほうせきをつかってみよう！',
+                    en: 'Press the "⏰ Time +3" button to spend your gem!' } },
+                { type: 'run', fn: settle },
+                { type: 'run', fn: () => { want = 6; } },
+                { type: 'do', target: '#hand-area', pos: 'top', until: () => currentPos === 13, text: {
+                    ja: 'こんどは「6」のカード！ 7 + 6 = 13。途中で「10」をこえるよ。',
+                    easy: 'こんどは「6」のカード！ 7 + 6 = 13。とちゅうで「10」をこえるよ。',
+                    en: 'Now the "6" card! 7 + 6 = 13. You\'ll pass 10 along the way.' } },
+                { type: 'run', fn: settle },
+                { type: 'say', target: '#point-display', pos: 'bottom', text: {
+                    ja: '10, 20, 30…と、きりのいいマスをこえると「+100ポイント」！ ぴったり止まると「+200ポイント」、ゴールぴったりは「+1000ポイント」だよ。',
+                    easy: '10, 20, 30…と、きりのいいマスをこえると「+100ポイント」！ ぴったりとまると「+200ポイント」、ゴールぴったりは「+1000ポイント」だよ。',
+                    en: 'Passing round tiles like 10, 20, 30… gives +100 points! Stopping exactly gives +200, and landing exactly on the goal gives +1000!' } },
+                { type: 'say', target: boardR, pos: 'bottom', text: {
+                    ja: 'ほかのマスも紹介するよ。「🎁」はルーレット（ポイント・じかん・ほうせきがもらえる）、「👻」はおばけ（じかんかポイントが へる！）。',
+                    easy: 'ほかのマスもしょうかいするよ。「🎁」はルーレット（ポイント・じかん・ほうせきがもらえる）、「👻」はおばけ（じかんかポイントが へる！）。',
+                    en: 'Other tiles: "🎁" is a roulette (win points, time or gems), and "👻" is a ghost (you lose time or points!).' } },
+                { type: 'say', target: '#collection-area', pos: 'top', text: {
+                    ja: 'マスにある乗りものなどの「アイテム」を拾うと、ここに集まるよ。全部で16しゅるい。ぜんぶ集めるとボーナスだ！ では、ゴールを目ざしてがんばってね！',
+                    easy: 'マスにあるのりものなどの「アイテム」をひろうと、ここにあつまるよ。ぜんぶで16しゅるい。ぜんぶあつめるとボーナスだ！ では、ゴールをめざしてがんばってね！',
+                    en: 'Pick up items like vehicles on the tiles and they collect here — 16 in all! Collect them all for a bonus. Now aim for the goal, good luck!' } }
+            ]);
         }
 
         function startGame(level) {
@@ -2328,6 +2424,7 @@
         window.showHowToPlay = showHowToPlay;
         window.registerPlayer = registerPlayer;
         window.startGame = startGame;
+        window.startTutorial = startTutorial;
         window.playCard = playCard;
         window.useAbility = useAbility;
         window.useNumber = useNumber;
