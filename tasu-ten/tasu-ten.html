@@ -205,6 +205,7 @@
         }
         .howto-foot .ui-btn { font-size: 22px; padding: 12px 44px; }
     </style>
+    <script src="../tutorial-engine.js"></script>
 </head>
 <body>
 
@@ -263,7 +264,7 @@
 const STRINGS = {
     ja: {
         game_title: 'たすてん', title_sub: "～Let's make 10～", label_player_prefix: 'プレーヤー: ', player_unselected: '未選択', guest_name: 'ゲスト',
-        btn_start: 'はじめる', btn_player_select: 'プレーヤーせんたく', btn_ranking: 'ランキング', btn_settings: '⚙ 設定', btn_index: 'INDEXへ',
+        btn_start: 'はじめる', btn_tutorial: '🔰 チュートリアル', btn_player_select: 'プレーヤーせんたく', btn_ranking: 'ランキング', btn_settings: '⚙ 設定', btn_index: 'INDEXへ',
         pm_title: 'プレーヤーをえらんでね', btn_add_player: '＋ あたらしいプレーヤー', btn_back: 'もどる',
         diff_prompt: 'なんいどをえらんでね', diff_easy: 'やさしい', diff_normal: 'ふつう', diff_hard: 'むずかしい', btn_cancel: 'やめる',
         btn_howto: '❓ あそびかた', label_player: 'プレーヤー', label_difficulty: '難易度', label_boss_defeated: 'BOSS撃破',
@@ -317,7 +318,7 @@ const STRINGS = {
     },
     simple: {
         game_title: 'たすてん', title_sub: "～Let's make 10～", label_player_prefix: 'プレーヤー: ', player_unselected: 'みせんたく', guest_name: 'ゲスト',
-        btn_start: 'はじめる', btn_player_select: 'プレーヤーせんたく', btn_ranking: 'ランキング', btn_settings: '⚙ せってい', btn_index: 'INDEXへ',
+        btn_start: 'はじめる', btn_tutorial: '🔰 チュートリアル', btn_player_select: 'プレーヤーせんたく', btn_ranking: 'ランキング', btn_settings: '⚙ せってい', btn_index: 'INDEXへ',
         pm_title: 'プレーヤーを えらんでね', btn_add_player: '＋ あたらしい プレーヤー', btn_back: 'もどる',
         diff_prompt: 'なんいどを えらんでね', diff_easy: 'やさしい', diff_normal: 'ふつう', diff_hard: 'むずかしい', btn_cancel: 'やめる',
         btn_howto: '❓ あそびかた', label_player: 'プレーヤー', label_difficulty: 'なんいど', label_boss_defeated: 'BOSSたおした',
@@ -371,7 +372,7 @@ const STRINGS = {
     },
     en: {
         game_title: 'Tasu-Ten', title_sub: "～Let's make 10～", label_player_prefix: 'Player: ', player_unselected: 'None', guest_name: 'Guest',
-        btn_start: 'Start', btn_player_select: 'Select Player', btn_ranking: 'Ranking', btn_settings: '⚙ Settings', btn_index: 'To INDEX',
+        btn_start: 'Start', btn_tutorial: '🔰 Tutorial', btn_player_select: 'Select Player', btn_ranking: 'Ranking', btn_settings: '⚙ Settings', btn_index: 'To INDEX',
         pm_title: 'Choose a Player', btn_add_player: '+ New Player', btn_back: 'Back',
         diff_prompt: 'Choose a Difficulty', diff_easy: 'Easy', diff_normal: 'Normal', diff_hard: 'Hard', btn_cancel: 'Cancel',
         btn_howto: '❓ How to Play', label_player: 'Player', label_difficulty: 'Difficulty', label_boss_defeated: 'Bosses Beaten',
@@ -760,6 +761,62 @@ const Game = (function() {
         currentState = STATE.PLAYING;
     }
     
+    // ------------------ チュートリアル（練習プレイ） ------------------
+    // 実際の盤面で「10を作って消す」を体験する。書き込みはエンジンが止めるので、
+    // スコア・ランキング・セーブデータは一切汚れない。
+    function tutorialBoard(cells) {
+        grid = Array(GRID_ROWS).fill(null).map(() => Array(GRID_COLS).fill(null));
+        cells.forEach(([r, c, v]) => { grid[r][c] = { type: 'number', val: v, id: Date.now() + Math.random() }; });
+    }
+    function startTutorial() {
+        FGLTutorial.begin({ root: '#game-container', getLang: () => currentLang });
+        startNewGame('easy');
+        // 決まった盤面(6と4のあいだが1マス空き)。他のパネルは足して10にならない並び
+        tutorialBoard([[2,0,6],[2,2,4],[0,1,2],[0,3,5],[4,4,8],[4,0,1],[3,3,7],[1,4,3]]);
+        const gx = GRID_OFFSET_X, gy = GRID_OFFSET_Y, cs = CELL_SIZE;
+        const CV = '#gameCanvas';
+        const rc = (x, y, w, h) => ({ sel: CV, rect: [x, y, w, h], of: [BASE_WIDTH, BASE_HEIGHT] });
+        const boardRect = rc(gx - 10, gy - 10, cs * GRID_COLS + 20, cs * GRID_ROWS + 20);
+        const idle = () => currentState === STATE.PLAYING && !selectedCell && !isDragging;
+        FGLTutorial.run([
+            { type: 'say', target: boardRect, pos: 'top', text: {
+                ja: 'ここが盤面。数字のパネルが並んでいるよ。パネルは、空いているマスへドラッグして動かせる！',
+                easy: 'ここがばんめん。すうじのパネルがならんでいるよ。パネルは、あいているマスへドラッグしてうごかせるよ！',
+                en: 'This is the board. Number panels sit on it. Drag a panel into any empty square to move it!' } },
+            { type: 'say', target: rc(gx, gy + cs * 2, cs * 3, cs), pos: 'top', text: {
+                ja: 'タテかヨコに隣り合う数字を足して、ちょうど「10」にするとパネルが消えるよ。ここでは 6 と 4 で、あいだが1マス空いているね。',
+                easy: 'タテかヨコにとなりあうすうじをたして、ちょうど「10」にするとパネルがきえるよ。ここでは 6 と 4 で、あいだが1マスあいているね。',
+                en: 'When adjacent numbers in a row or column add up to exactly 10, they disappear. Here we have 6 and 4 with one empty square between them.' } },
+            { type: 'do', target: rc(gx, gy + cs * 2, cs * 3, cs), pos: 'top', until: () => totalTens >= 1, text: {
+                ja: '6 のパネルを、右の空きマスへドラッグしてみよう！ 6 と 4 がとなり合って「10」になるよ。',
+                easy: '6 のパネルを、みぎのあきマスへドラッグしてみよう！ 6 と 4 がとなりあって「10」になるよ。',
+                en: 'Drag the 6 into the empty square on its right! The 6 and 4 will sit together and make 10.' } },
+            { type: 'run', fn: () => FGLTutorial.wait(idle, 8000) },
+            { type: 'say', target: rc(0, 330, 300, 190), pos: 'bottom', text: {
+                ja: '「10」が消えて、スコアと「10を作った回数」が増えたよ！ パネルを動かすたびに1ターン進んで、新しいパネルが増えるよ。',
+                easy: '「10」がきえて、スコアと「10をつくったかいすう」がふえたよ！ パネルをうごかすたびに1ターンすすんで、あたらしいパネルがふえるよ。',
+                en: 'The 10 vanished, and your score and "Tens Made" went up! Every move takes one turn, and new panels appear.' } },
+            { type: 'run', fn: () => { tutorialBoard([[3,0,2],[3,1,3],[3,3,5],[0,2,9],[1,4,4],[4,1,6],[4,4,3]]); } },
+            { type: 'do', target: rc(gx, gy + cs * 3, cs * 4, cs), pos: 'top', until: () => totalTens >= 2, text: {
+                ja: '3つ以上でもOK！ 2・3・5 を足すと10。5 のパネルを、あいだの空きマスへドラッグしてみよう。',
+                easy: '3まいいじょうでもOK！ 2・3・5 をたすと10。5 のパネルを、あいだのあきマスへドラッグしてみよう。',
+                en: 'Three or more panels work too! 2 + 3 + 5 = 10. Drag the 5 into the empty square between them.' } },
+            { type: 'run', fn: () => FGLTutorial.wait(idle, 8000) },
+            { type: 'say', target: rc(0, 500, 300, 60), pos: 'top', text: {
+                ja: '「10」をたくさん作ると、ボスが登場！ ボスの隣で「10」を消すとダメージを与えられるよ。ボスを全部倒せばゲームクリア！',
+                easy: '「10」をたくさんつくると、ボスがとうじょう！ ボスのとなりで「10」をけすとダメージをあたえられるよ。ボスをぜんぶたおせばゲームクリア！',
+                en: 'Make lots of 10s and a boss appears! Clear a 10 next to the boss to damage it. Defeat every boss to clear the game!' } },
+            { type: 'say', target: rc(980, 100, 300, 250), pos: 'top', text: {
+                ja: '🌠 流れ星は「10」を消して手に入れると、ここにストックされて、好きな数字のパネルを全部消せるよ。🪨岩などの障害物は、隣で「10」を消すとこわせる！',
+                easy: '🌠 ながれぼしは「10」をけしててにいれると、ここにストックされて、すきなすうじのパネルをぜんぶけせるよ。🪨いわなどのじゃまなものは、となりで「10」をけすとこわせるよ！',
+                en: '🌠 Shooting stars you collect by clearing a 10 are stocked here, and let you erase every panel of a number you choose. Obstacles like 🪨 rocks break when you clear a 10 next to them!' } },
+            { type: 'say', target: rc(0, 14, 300, 48), pos: 'bottom', text: {
+                ja: '困ったときは、ゲーム中でもここの「あそびかた」でルールを見られるよ。マスが全部うまるとゲームオーバー。こまめに10を作ろう！',
+                easy: 'こまったときは、ゲームちゅうでもここの「あそびかた」でルールをみられるよ。マスがぜんぶうまるとゲームオーバー。こまめに10をつくろう！',
+                en: "If you're stuck, \"How to Play\" here shows the rules even mid-game. If the board fills up it's game over — keep making 10s!" } }
+        ]);
+    }
+
     function spawnNumbers(count, isInitial) {
         let emptySpots = [];
         for(let r=0; r<GRID_ROWS; r++) {
@@ -1475,9 +1532,9 @@ const Game = (function() {
         ctx.fillStyle = "#EC407A"; // ピンク系
         ctx.fillText(T('title_sub'), BASE_WIDTH/2, 210);
 
-        // ボタン位置をさらに上に（340 -> 320）
-        const startY = 320;
-        const gap = 75;
+        // チュートリアルボタン追加で6ボタンになったため、間隔を詰める
+        const startY = 308;
+        const gap = 64;
 
         // プレーヤー名を表示、位置上げ、色変更
         ctx.fillStyle = "#00695C"; // 深緑
@@ -1487,14 +1544,15 @@ const Game = (function() {
 
         const buttons = [
             { text: T('btn_start'), y: startY, action: "start", color: "#FF9800" },
-            { text: T('btn_player_select'), y: startY + gap, action: "player", color: "#8D6E63" },
-            { text: T('btn_ranking'), y: startY + gap*2, action: "ranking", color: "#7CB342" },
-            { text: T('btn_settings'), y: startY + gap*3, action: "settings", color: "#5C6BC0" },
-            { text: T('btn_index'), y: startY + gap*4, action: "index", color: "#9E9E9E" }
+            { text: T('btn_tutorial'), y: startY + gap, action: "tutorial", color: "#FFB300" },
+            { text: T('btn_player_select'), y: startY + gap*2, action: "player", color: "#8D6E63" },
+            { text: T('btn_ranking'), y: startY + gap*3, action: "ranking", color: "#7CB342" },
+            { text: T('btn_settings'), y: startY + gap*4, action: "settings", color: "#5C6BC0" },
+            { text: T('btn_index'), y: startY + gap*5, action: "index", color: "#9E9E9E" }
         ];
 
         buttons.forEach(btn => {
-            drawButton(BASE_WIDTH/2, btn.y, 320, 60, btn.text, btn.color);
+            drawButton(BASE_WIDTH/2, btn.y, 320, 54, btn.text, btn.color);
         });
     }
     
@@ -2129,19 +2187,20 @@ const Game = (function() {
     }
     
     function checkTitleClick(x, y) {
-        const startY = 320;
-        const gap = 75;
-        if(isBtnClicked(x, y, BASE_WIDTH/2, startY, 320, 60)) {
+        const startY = 308;
+        const gap = 64;
+        if(isBtnClicked(x, y, BASE_WIDTH/2, startY, 320, 54)) {
             currentState = STATE.DIFFICULTY_SELECT;
         }
-        else if(isBtnClicked(x, y, BASE_WIDTH/2, startY+gap, 320, 60)) currentState = STATE.PLAYER_SELECT;
-        else if(isBtnClicked(x, y, BASE_WIDTH/2, startY+gap*2, 320, 60)) {
+        else if(isBtnClicked(x, y, BASE_WIDTH/2, startY+gap, 320, 54)) startTutorial();
+        else if(isBtnClicked(x, y, BASE_WIDTH/2, startY+gap*2, 320, 54)) currentState = STATE.PLAYER_SELECT;
+        else if(isBtnClicked(x, y, BASE_WIDTH/2, startY+gap*3, 320, 54)) {
             rankingScope = 'world'; rankingTab = 'easy'; updateRankingView(); currentState = STATE.RANKING;
         }
-        else if(isBtnClicked(x, y, BASE_WIDTH/2, startY+gap*3, 320, 60)) {
+        else if(isBtnClicked(x, y, BASE_WIDTH/2, startY+gap*4, 320, 54)) {
             currentState = STATE.SETTINGS;
         }
-        else if(isBtnClicked(x, y, BASE_WIDTH/2, startY+gap*4, 320, 60)) window.location.href = '../index.html';
+        else if(isBtnClicked(x, y, BASE_WIDTH/2, startY+gap*5, 320, 54)) window.location.href = '../index.html';
     }
     
     function checkPlayerSelectClick(x, y) {
