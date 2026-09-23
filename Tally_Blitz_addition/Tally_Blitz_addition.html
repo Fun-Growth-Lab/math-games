@@ -445,6 +445,7 @@
         .rank-date { font-size: 0.7rem; color: #aaa; margin-left: 6px; }
 
     </style>
+    <script src="../tutorial-engine.js"></script>
 </head>
 <body>
 
@@ -460,6 +461,7 @@
 
             <div id="main-menu-buttons">
                 <button id="btn-start-menu" class="btn btn-success btn-title" data-i18n="btn_start">はじめる</button>
+                <button id="btn-tutorial" class="btn btn-title" style="background:linear-gradient(135deg,#ffe082,#ffb300); color:#5d4037;" data-i18n="btn_tutorial">🔰 チュートリアル</button>
                 <button id="btn-player-name" class="btn btn-title" style="background:#fff; color:#555; border:2px solid #ff9a9e;">プレイヤー選択</button>
 
                 <button id="btn-login" class="btn btn-auth btn-title" style="margin: 8px auto; display:none;">
@@ -752,7 +754,7 @@
 // ============================================================
 const STRINGS = {
     ja: {
-        title_sub: '- たしざんパズル -', btn_start: 'はじめる', btn_ranking: 'ランキング', btn_settings: '⚙ 設定', btn_index: 'INDEXへ',
+        title_sub: '- たしざんパズル -', btn_start: 'はじめる', btn_tutorial: '🔰 チュートリアル', btn_ranking: 'ランキング', btn_settings: '⚙ 設定', btn_index: 'INDEXへ',
         diff_prompt: '難易度をえらんでね', diff_easy: 'しょきゅう', diff_normal: 'ちゅうきゅう', diff_hard: 'じょうきゅう', btn_back: 'もどる',
         settings_title: '⚙ 設定', settings_sub: '言語 / Language', lang_simple: 'かんたんなにほんご', lang_ja: '日本語', lang_en: 'English', btn_close: 'とじる',
         label_player: 'プレイヤー', label_player_colon: 'プレイヤー: {name}',
@@ -780,7 +782,7 @@ const STRINGS = {
         guest_name: '名無しさん',
     },
     simple: {
-        title_sub: '- たしざんパズル -', btn_start: 'はじめる', btn_ranking: 'ランキング', btn_settings: '⚙ せってい', btn_index: 'INDEXへ',
+        title_sub: '- たしざんパズル -', btn_start: 'はじめる', btn_tutorial: '🔰 チュートリアル', btn_ranking: 'ランキング', btn_settings: '⚙ せってい', btn_index: 'INDEXへ',
         diff_prompt: 'なんいどを えらんでね', diff_easy: 'しょきゅう', diff_normal: 'ちゅうきゅう', diff_hard: 'じょうきゅう', btn_back: 'もどる',
         settings_title: '⚙ せってい', settings_sub: '言語 / Language', lang_simple: 'かんたんなにほんご', lang_ja: '日本語', lang_en: 'English', btn_close: 'とじる',
         label_player: 'プレイヤー', label_player_colon: 'プレイヤー: {name}',
@@ -808,7 +810,7 @@ const STRINGS = {
         guest_name: '名無しさん',
     },
     en: {
-        title_sub: '- Addition Puzzle -', btn_start: 'Start', btn_ranking: 'Ranking', btn_settings: '⚙ Settings', btn_index: 'To INDEX',
+        title_sub: '- Addition Puzzle -', btn_start: 'Start', btn_tutorial: '🔰 Tutorial', btn_ranking: 'Ranking', btn_settings: '⚙ Settings', btn_index: 'To INDEX',
         diff_prompt: 'Choose a Difficulty', diff_easy: 'Easy', diff_normal: 'Normal', diff_hard: 'Hard', btn_back: 'Back',
         settings_title: '⚙ Settings', settings_sub: '言語 / Language', lang_simple: 'かんたんなにほんご', lang_ja: '日本語', lang_en: 'English', btn_close: 'Close',
         label_player: 'Player', label_player_colon: 'Player: {name}',
@@ -2344,6 +2346,109 @@ document.querySelectorAll('.diamond-num-btn').forEach(btn => {
 });
 
 bind(ui.btnToTitle, backToTitle);
+
+// ============================================================
+// チュートリアル（練習プレイ）
+// ============================================================
+// 実際の盤面で「数字ブロックを落として、下のブロックと たして10で消す」を体験する。
+// 書き込みはエンジンが止めるので、ランキング・クリア回数は一切汚れない。
+function startTutorial() {
+    FGLTutorial.begin({ root: '#container', getLang: () => currentLang });
+    state.difficulty = 'EASY';
+    currentConfig = CONFIGS.EASY;
+    startGame();
+    // 手順どおりに進むよう、盤面と落ちてくるブロックを決めた値にする
+    const setScene = (row9, vals, x, next) => {
+        initGrid();
+        const nr = ROWS - 1 - currentConfig.floorRows;
+        for (let c = 0; c < COLS; c++) state.grid[nr][c] = row9[c];
+        state.combo = 0; state.riseCounter = 0;
+        state.activeBlock = { x: x, y: EXTRA_ROWS, values: vals.slice(), rot: 0, offsetY: 0 };
+        state.nextBlockValues = next.slice();
+        state.fastDropping = false; state.inputLocked = false;
+        drawNextBlock(); updateUI(); draw();
+    };
+    setScene([6, 7, 5, 2, 8], [4, 3], 1, [2, 5]);
+    const CV = '#gameCanvas';
+    const cv = (x, y, w, h) => ({ sel: CV, rect: [x, y, w, h], of: [canvas.width, canvas.height], pad: 6 });
+    const boardR = () => cv(state.boardX, state.boardY, state.boardW, state.boardH);
+    const pieceR = () => cv(state.boardX, state.boardY - 4, state.boardW, state.blockSize + 4);
+    const rowR = (r) => cv(state.boardX, state.boardY + r * state.blockSize, state.boardW, state.blockSize);
+    const floorR = () => cv(state.boardX, state.boardY + 5 * state.blockSize, state.boardW, 3 * state.blockSize);
+    const settle = () => FGLTutorial.wait(() => !state.inputLocked && state.activeBlock && !state.fastDropping, 15000);
+    let t0 = 0;
+    FGLTutorial.run([
+        { type: 'say', target: boardR, pos: 'bottom', text: {
+            ja: 'ここが盤面。数字のブロックを積み上げて、たし算で「10」を作って消すパズルだよ。いちばん下の灰色は「おじゃまブロック」。',
+            easy: 'ここがばんめん。すうじのブロックをつみあげて、たしざんで「10」をつくってけすパズルだよ。いちばんしたのはいいろは「おじゃまブロック」。',
+            en: 'This is the board. Stack number blocks and make "10" by adding to clear them. The gray ones at the bottom are obstacle blocks.' } },
+        { type: 'say', target: pieceR, pos: 'bottom', text: {
+            ja: '上に、数字ブロックが出てきたよ。いまは「4」と「3」のペア。「↓」を押すまで動かないから、ゆっくり考えてね。ペアは、下にあるブロックの真上に落ちるよ。',
+            easy: 'うえに、すうじブロックがでてきたよ。いまは「4」と「3」のペア。「↓」をおすまでうごかないから、ゆっくりかんがえてね。ペアは、したにあるブロックのまうえにおちるよ。',
+            en: 'A pair of number blocks appeared: "4" and "3". It won\'t move until you press ↓, so take your time. Each block drops straight down onto the column below it.' } },
+        { type: 'say', target: '#next-block-area', pos: 'bottom', text: {
+            ja: 'ここは「つぎ」。次に出てくるブロックが見えるよ。先を読んで置こう！',
+            easy: 'ここは「つぎ」。つぎにでてくるブロックがみえるよ。さきをよんでおこう！',
+            en: 'This is NEXT: it shows the block coming up. Plan ahead!' } },
+        { type: 'say', target: () => rowR(5), pos: 'bottom', text: {
+            ja: '落ちたブロックは、真下のブロックと「たし算」するよ。「10」ぴったりになると消える。10より小さいと、くっついて大きな数字になる。',
+            easy: 'おちたブロックは、ましたのブロックと「たしざん」するよ。「10」ぴったりになるときえる。10よりちいさいと、くっついておおきなすうじになる。',
+            en: 'A dropped block is ADDED to the block right below it. Exactly 10 → both disappear. Less than 10 → they merge into a bigger number.' } },
+        { type: 'say', target: () => rowR(5), pos: 'bottom', text: {
+            ja: '見て！ 下の列は 6・7・5・2・8。「3」を「7」の上に、「4」を「5」の上に落とせたらいいね。でも今は「4」が左、「3」が右だよ…。',
+            easy: 'みて！ したのれつは 6・7・5・2・8。「3」を「7」のうえに、「4」を「5」のうえにおとせたらいいね。でもいまは「4」がひだり、「3」がみぎだよ…。',
+            en: 'Look! The bottom row is 6, 7, 5, 2, 8. We want "3" above the 7 and "4" above the 5. But right now "4" is on the left and "3" on the right…' } },
+        { type: 'do', target: '#btn-rotate', pos: 'top', until: () => state.activeBlock && state.activeBlock.values[0] === 3, text: {
+            ja: '「⇄」ボタンを押すと、ペアの数字が入れかわるよ。押してみよう！',
+            easy: '「⇄」ボタンをおすと、ペアのすうじがいれかわるよ。おしてみよう！',
+            en: 'Press the "⇄" button to swap the two numbers in the pair!' } },
+        { type: 'say', target: pieceR, pos: 'bottom', text: {
+            ja: '入れかわった！ 「3」が「7」の真上、「4」が「5」の真上に来たよ。3 + 7 = 10、4 + 5 = 9 になるはず！',
+            easy: 'いれかわった！ 「3」が「7」のまうえ、「4」が「5」のまうえにきたよ。3 + 7 = 10、4 + 5 = 9 になるはず！',
+            en: 'Swapped! "3" is above the 7 and "4" is above the 5. 3 + 7 = 10 and 4 + 5 = 9!' } },
+        { type: 'do', target: '#btn-drop', pos: 'top', until: () => state.totalTens >= 1, text: {
+            ja: '「↓」ボタンを押して、ブロックを落とそう！',
+            easy: '「↓」ボタンをおして、ブロックをおとそう！',
+            en: 'Press the "↓" button to drop the blocks!' } },
+        { type: 'run', fn: settle },
+        { type: 'say', target: boardR, pos: 'top', text: {
+            ja: '3 + 7 = 10 で消えた！ その下の灰色ブロックもこわれたよ。4 + 5 = 9 は 10 より小さいので、くっついて「9」になったね。',
+            easy: '3 + 7 = 10 できえた！ そのしたのはいいろブロックもこわれたよ。4 + 5 = 9 は 10 よりちいさいので、くっついて「9」になったね。',
+            en: '3 + 7 = 10 vanished, and the gray block below it broke too! 4 + 5 = 9 is less than 10, so they merged into a "9".' } },
+        { type: 'say', target: '#left-panel-stats', pos: 'bottom', text: {
+            ja: '左にはスコアとコンボ。「10」を作るたびにコンボがふえて、続けるほど高得点！ 「10」を決めた回数がたまると、ボスがあらわれるよ。',
+            easy: 'ひだりにはスコアとコンボ。「10」をつくるたびにコンボがふえて、つづけるほどこうとくてん！ 「10」をきめたかいすうがたまると、ボスがあらわれるよ。',
+            en: 'On the left are your score and combo. Every "10" raises the combo, and longer combos score more! Collect enough 10s and a boss appears.' } },
+        { type: 'run', fn: () => { setScene([6, 8, 3, 5, 2], [4, 2], 1, [3, 6]); } },
+        { type: 'say', target: boardR, pos: 'bottom', text: {
+            ja: 'もう1問！ 新しい盤面だよ。下の列は 6・8・3・5・2。「4」は「6」の上、「2」は「8」の上に落としたいね。',
+            easy: 'もういちもん！ あたらしいばんめんだよ。したのれつは 6・8・3・5・2。「4」は「6」のうえ、「2」は「8」のうえにおとしたいね。',
+            en: 'One more! New board. The bottom row is 6, 8, 3, 5, 2. We want "4" above the 6 and "2" above the 8.' } },
+        { type: 'do', target: '#btn-left', pos: 'top', until: () => state.activeBlock && state.activeBlock.x === 0, text: {
+            ja: 'いまペアは、左から2列目と3列目の上にいるよ。「◀」ボタンを1回押して、1列左へ動かそう！',
+            easy: 'いまペアは、ひだりから2れつめと3れつめのうえにいるよ。「◀」ボタンを1かいおして、1れつひだりへうごかそう！',
+            en: 'The pair is above columns 2 and 3. Press "◀" once to move it one column left!' } },
+        { type: 'run', fn: () => { t0 = state.totalTens; } },
+        { type: 'do', target: '#btn-drop', pos: 'top', until: () => state.totalTens >= t0 + 2, text: {
+            ja: 'ぴったり！ 4 + 6 = 10、2 + 8 = 10。「↓」ボタンで落とそう！',
+            easy: 'ぴったり！ 4 + 6 = 10、2 + 8 = 10。「↓」ボタンでおとそう！',
+            en: 'Perfect! 4 + 6 = 10 and 2 + 8 = 10. Press "↓" to drop!' } },
+        { type: 'run', fn: settle },
+        { type: 'say', target: boardR, pos: 'top', text: {
+            ja: '2つ同時に「10」！ コンボが2になって、ごほうびのポイントもたくさん入ったよ。',
+            easy: '2つどうじに「10」！ コンボが2になって、ごほうびのポイントもたくさんはいったよ。',
+            en: 'Two 10s at once! The combo hit 2 and you earned lots of bonus points.' } },
+        { type: 'say', target: boardR, pos: 'bottom', text: {
+            ja: '合計が「11以上」になると、下のブロックが「おじゃまブロック」に変わっちゃう（上のブロックには、あまりの数が残る）。気をつけよう！ 下から新しい列がせり上がってくるので、一番上まで積み上がるとゲームオーバー。',
+            easy: 'ごうけいが「11いじょう」になると、したのブロックが「おじゃまブロック」にかわっちゃう（うえのブロックには、あまりのかずがのこる）。きをつけよう！ したからあたらしいれつがせりあがってくるので、いちばんうえまでつみあがるとゲームオーバー。',
+            en: 'If the sum is 11 or more, the block below turns into an obstacle (the top one keeps the remainder). Careful! New rows rise from below, and if the stack reaches the top, it\'s game over.' } },
+        { type: 'say', target: '#diamond-info', pos: 'bottom', text: {
+            ja: '💎ダイヤブロックは、となりで「10」を作るとゲットできるよ。「💎をつかう」で、好きな数字のブロックをぜんぶ消せる！ ボスもいるから、がんばってね！',
+            easy: '💎ダイヤブロックは、となりで「10」をつくるとゲットできるよ。「💎をつかう」で、すきなすうじのブロックをぜんぶけせる！ ボスもいるから、がんばってね！',
+            en: 'Make a 10 next to a 💎 diamond block to collect it. "Use 💎" clears every block of a number you choose! Bosses await, so good luck!' } }
+    ]);
+}
+bind(document.getElementById('btn-tutorial'), () => startTutorial());
 
 bind(ui.btnEasy, () => handleStart('EASY'));
 bind(ui.btnNormal, () => handleStart('NORMAL'));
