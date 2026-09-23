@@ -105,6 +105,7 @@ canvas{position:absolute;top:0;left:0;touch-action:none;}
 .rank-date{color:var(--text-dim);font-size:0.78rem;white-space:nowrap;}
 .rank-empty{text-align:center;color:var(--text-dim);padding:20px 0;font-size:0.92rem;width:100%;}
 </style>
+    <script src="../tutorial-engine.js"></script>
 </head>
 <body>
 <div id="container">
@@ -119,6 +120,7 @@ canvas{position:absolute;top:0;left:0;touch-action:none;}
     <div class="title-box">
       <div id="title-main-menu" style="display:flex;flex-direction:column;align-items:center;width:100%;">
         <button id="btn-start-menu" class="btn3d btn3d-green" data-i18n="btn.play">▶ はじめる</button>
+        <button id="btn-tutorial" class="btn3d btn3d-gold" style="background:linear-gradient(180deg,#ffb74d,#f57c00);box-shadow:0 5px 0 #b45a00;" data-i18n="btn.tutorial">🔰 チュートリアル</button>
         <button id="player-select-btn" class="btn3d btn3d-blue">
           👤 <span id="current-player-name-display">ゲスト</span> <span data-i18n="player.changesuffix">(へんこう)</span>
         </button>
@@ -312,6 +314,7 @@ const STRINGS={
   ja:{
     'title.sub':'カラークロス',
     'btn.play':'▶ はじめる',
+    'btn.tutorial':'🔰 チュートリアル',
     'player.changesuffix':'(へんこう)',
     'btn.ranking':'🏆 ランキング',
     'btn.settings':'⚙ 設定',
@@ -448,6 +451,7 @@ const STRINGS={
   en:{
     'title.sub':'Color & Shape Puzzle',
     'btn.play':'▶ Start',
+    'btn.tutorial':'🔰 Tutorial',
     'player.changesuffix':'(change)',
     'btn.ranking':'🏆 Ranking',
     'btn.settings':'⚙ Settings',
@@ -1978,6 +1982,112 @@ function updPlayer(){document.getElementById('current-player-name-display').text
 document.getElementById('btn-start-menu').addEventListener('click',()=>{
   initGame();
 });
+// ============================================================
+//  チュートリアル（練習プレイ）
+// ============================================================
+// 実際の盤面で「カードを置いて数字ぴったりのマークを消す／マークを動かして合体させる」を体験する。
+// 書き込みはエンジンが止めるので、ランキング・記録は一切汚れない。
+function startTutorial(){
+  FGLTutorial.begin({ root:'#container', getLang:()=>currentLang });
+  initGame();
+  const mk=(r,c,color,type)=>{ G.board[idx(r,c)]={kind:'mark',color,type}; };
+  const card=(color,num)=>({kind:'card',color,num});
+  // 手順どおりに進むよう、盤面と手札を決めた値にする（色: 0=赤 1=青 2=緑 / 形: 0=△ 1=□ 2=⬠）
+  const setScene1=()=>{
+    G.board=new Array(GN*GN).fill(null);
+    mk(1,2,0,0); mk(2,3,0,0);            // 赤い△が2つ（まん中(2,2)のとなり）
+    mk(0,0,1,1); mk(0,4,2,0); mk(4,0,1,0); mk(4,3,2,2); mk(3,4,1,0); mk(0,2,2,1);
+    G.hand=[card(0,2),card(1,1),card(2,3)];
+    G.nextQueue=[{kind:'mark',color:1,type:0},{kind:'mark',color:2,type:0}];
+    G.selHand=-1; G.selMark=null; G.selBoardCard=null;
+  };
+  const setScene2=()=>{
+    G.board=new Array(GN*GN).fill(null);
+    mk(1,1,2,0); mk(1,3,2,0);            // 緑の△が2つ（まん中は おじゃまブロック）
+    G.board[idx(1,2)]={kind:'garbage'};
+    mk(3,0,0,2); mk(3,3,1,0); mk(4,1,0,0); mk(0,4,1,1);
+    G.hand=[card(1,3),card(0,1),card(2,2)];
+    G.nextQueue=[{kind:'mark',color:0,type:0},{kind:'mark',color:1,type:0}];
+    G.selHand=-1; G.selMark=null; G.selBoardCard=null;
+  };
+  setScene1();
+  const cv=(x,y,w,h)=>({ sel:'#cvs', rect:[x,y,w,h], of:[W,H], pad:6 });
+  const boardR=()=>cv(GX,GY,GN*CELL,GN*CELL);
+  const handR=()=>cv(DISCARD_X,HAND_Y,SLOT_ROW_W,SLOT_SIZE);
+  const bothR=()=>cv(GX,GY,GN*CELL,HAND_Y+SLOT_SIZE-GY);
+  const crossR=()=>cv(GX+1*CELL,GY+1*CELL,3*CELL,3*CELL);
+  const card0R=()=>cv(CARDS_X,HAND_Y,SLOT_SIZE,SLOT_SIZE);
+  const rowR=()=>cv(GX+1*CELL,GY+1*CELL,3*CELL,CELL);
+  const nextR=()=>cv(MID_X,20,MID_W,170);
+  const itemR=()=>cv(MID_X,214,MID_W,H-214-30);
+  const rightR=()=>cv(RIGHT_X,20,RIGHT_W,H-40);
+  const multR=()=>cv(RIGHT_X,210,RIGHT_W,242);
+  const idle=()=>FGLTutorial.wait(()=>!G.flow&&!G.pendingChoice&&G.starCounterDisplay>=G.starsClearedTotal,8000);
+  let t0=0;
+  FGLTutorial.run([
+    { type:'say', target:boardR, pos:'bottom', text:{
+      ja:'ここが 5×5 の盤面。色のついた形の「マーク」がならんでいるよ。カードを置いて、マークを消して点数をかせぐパズルだ！',
+      easy:'ここが 5×5 のばんめん。いろのついたかたちの「マーク」がならんでいるよ。カードをおいて、マークをけしててんすうをかせぐパズルだ！',
+      en:'This is the 5×5 board with colored shapes called "marks". Place cards to clear marks and score points!' } },
+    { type:'say', target:boardR, pos:'bottom', text:{
+      ja:'マークは 赤・青・緑 の3色。形は △ □ ⬠ ⬡ ☆ の順にランクが上がり、点数の倍率が △×2 □×3 ⬠×4 ⬡×5 ☆×10 とふえていくよ。',
+      easy:'マークは あか・あお・みどり の3しょく。かたちは △ □ ⬠ ⬡ ☆ のじゅんにランクがあがり、てんすうのばいりつが △×2 □×3 ⬠×4 ⬡×5 ☆×10 とふえていくよ。',
+      en:'Marks come in red, blue and green. Shapes rank up △ □ ⬠ ⬡ ☆, and the score multiplier grows: △×2 □×3 ⬠×4 ⬡×5 ☆×10.' } },
+    { type:'say', target:handR, pos:'top', text:{
+      ja:'下が手札。色と数字がついたカードだよ。カードは、あいているマスに置ける。左の「ゴミ箱」には、いらないカードを捨てられるよ。',
+      easy:'したがてふだ。いろとすうじがついたカードだよ。カードは、あいているマスにおける。ひだりの「ゴミばこ」には、いらないカードをすてられるよ。',
+      en:'Your hand is below: cards with a color and a number. Place one on an empty square. The trash can on the left discards a card.' } },
+    { type:'say', target:crossR, pos:'bottom', text:{
+      ja:'ルールはこれだけ！ カードのまわり（上下左右）に、同じ色・同じ形のマークが「カードの数」ぴったりあると、ぜんぶ消えて点数になる。まん中のマスを見て。赤い△が2つ、となりにあるね。',
+      easy:'ルールはこれだけ！ カードのまわり（うえしたひだりみぎ）に、おなじいろ・おなじかたちのマークが「カードのかず」ぴったりあると、ぜんぶきえててんすうになる。まんなかのマスをみて。あかい△が2つ、となりにあるね。',
+      en:'That\'s the whole rule! If the number of same-color, same-shape marks touching the card (up/down/left/right) equals the card\'s number, they all vanish for points. Look at the middle: two red △ are next to it.' } },
+    { type:'say', target:card0R, pos:'top', text:{
+      ja:'手札の左のカードは「赤の2」。赤い△が2つのところに置けば、ぴったり！',
+      easy:'てふだのひだりのカードは「あかの2」。あかい△が2つのところにおけば、ぴったり！',
+      en:'The left card is a "red 2". Put it where two red △ touch — a perfect match!' } },
+    { type:'do', target:bothR, pos:'top', until:()=>G.totalScore>0, text:{
+      ja:'「赤の2」のカードを、ドラッグして、まん中のマスに置いてみよう！',
+      easy:'「あかの2」のカードを、ドラッグして、まんなかのマスにおいてみよう！',
+      en:'Drag the "red 2" card onto the middle square!' } },
+    { type:'run', fn:idle },
+    { type:'say', target:rightR, pos:'bottom', text:{
+      ja:'赤い△2つとカードが消えて、点数が入ったよ！ 計算は「カードの数2 × △の倍率2 × △の倍率2 ＝ 8点」。右の「ログ」にも計算が出るよ。マークが多いほど、倍率が かけ算で大きくなる！',
+      easy:'あかい△2つとカードがきえて、てんすうがはいったよ！ けいさんは「カードのかず2 × △のばいりつ2 × △のばいりつ2 ＝ 8てん」。みぎの「ログ」にもけいさんがでるよ。マークがおおいほど、ばいりつがかけざんでおおきくなる！',
+      en:'The two red △ and the card vanished and you scored! The math: card number 2 × △ ×2 × △ ×2 = 8 points. It also shows in the log on the right. More marks means the multiplier multiplies up!' } },
+    { type:'run', fn:()=>{ setScene2(); } },
+    { type:'say', target:boardR, pos:'bottom', text:{
+      ja:'つぎの盤面！ こんどはカードで消せる場所がなさそう…。そんなときは、マークを動かして「合体」させよう。緑の△が2つあるね。まん中の灰色は「おじゃまブロック」で、動かせないし、上には置けないよ。',
+      easy:'つぎのばんめん！ こんどはカードでけせるばしょがなさそう…。そんなときは、マークをうごかして「がったい」させよう。みどりの△が2つあるね。まんなかのはいいろは「おじゃまブロック」で、うごかせないし、うえにはおけないよ。',
+      en:'A new board! Nothing to clear with a card here… So let\'s move marks and "merge" them. There are two green △. The gray block in the middle is an obstacle: it can\'t be moved or stepped on.' } },
+    { type:'run', fn:()=>{ t0=G.turns; } },
+    { type:'do', target:rowR, pos:'top', until:()=>G.turns>t0, text:{
+      ja:'緑の△を、もうひとつの緑の△の上にドラッグして重ねてみよう！',
+      easy:'みどりの△を、もうひとつのみどりの△のうえにドラッグしてかさねてみよう！',
+      en:'Drag one green △ on top of the other green △!' } },
+    { type:'run', fn:idle },
+    { type:'say', target:boardR, pos:'bottom', text:{
+      ja:'合体して、緑の「□」になったよ！ ランクが上がったので、倍率も ×2 から ×3 に。育てるほど高得点になるんだ。',
+      easy:'がったいして、みどりの「□」になったよ！ ランクがあがったので、ばいりつも ×2 から ×3 に。そだてるほどこうとくてんになるんだ。',
+      en:'They merged into a green "□"! Its rank went up, so the multiplier rose from ×2 to ×3. The more you grow marks, the higher you score.' } },
+    { type:'say', target:nextR, pos:'bottom', text:{
+      ja:'マークを動かしたり、カードを捨てたりすると「1ターン」経過。ターンがすすむと、この「NEXT」のマークが盤面に出てくるよ。先を読んで置き場所を考えよう！',
+      easy:'マークをうごかしたり、カードをすてたりすると「1ターン」たつ。ターンがすすむと、この「NEXT」のマークがばんめんにでてくるよ。さきをよんでおきばしょをかんがえよう！',
+      en:'Moving a mark or discarding a card takes "1 turn". Each turn, the mark shown in NEXT appears on the board. Plan ahead!' } },
+    { type:'say', target:multR, pos:'top', text:{
+      ja:'☆マークをたくさん消すと「👑」が盤面に出てくるよ。盤面の☆や👑がふえると、ここの「倍率」がアップして、得点がどんどん大きくなる！',
+      easy:'☆マークをたくさんけすと「👑」がばんめんにでてくるよ。ばんめんの☆や👑がふえると、ここの「ばいりつ」がアップして、とくてんがどんどんおおきくなる！',
+      en:'Clear lots of ☆ marks and 👑 crowns appear. As ☆ and 👑 on the board increase, your multiplier here goes up and scores get huge!' } },
+    { type:'say', target:itemR, pos:'top', text:{
+      ja:'ときどき「🎁宝箱」も出るよ。となりのマークを消して壊すと、必ずアイテムが手に入る。アイテムはここにたまって、いつでもタップして使えるよ！',
+      easy:'ときどき「🎁たからばこ」もでるよ。となりのマークをけしてこわすと、かならずアイテムがてにはいる。アイテムはここにたまって、いつでもタップしてつかえるよ！',
+      en:'Sometimes a "🎁 chest" appears. Clear a mark next to it to break it and you always get an item. Items collect here and can be used anytime by tapping!' } },
+    { type:'say', target:boardR, pos:'bottom', text:{
+      ja:'マークが置けなくなったらゲームオーバー。エンドレスで、どこまで高得点をのばせるかな？ がんばってね！',
+      easy:'マークがおけなくなったらゲームオーバー。エンドレスで、どこまでこうとくてんをのばせるかな？ がんばってね！',
+      en:'The game ends when there\'s no room for new marks. It\'s endless — see how high you can score! Good luck!' } }
+  ]);
+}
+document.getElementById('btn-tutorial').addEventListener('click',()=>startTutorial());
 document.getElementById('btn-view-ranking').addEventListener('click',showRanking);
 document.getElementById('btn-close-ranking').addEventListener('click',closeRanking);
 document.getElementById('player-select-btn').addEventListener('click',openPM);
