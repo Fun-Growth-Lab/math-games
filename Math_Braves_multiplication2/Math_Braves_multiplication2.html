@@ -807,6 +807,12 @@ class Game {
         this.designHeight = 720;
         this.resize();
         window.addEventListener('resize', () => this.resize());
+        // X(Twitter)等アプリ内ブラウザは起動直後にビューポート値が未確定のことがあり、
+        // その時点でscale計算をしてしまうと後からズレる。少し遅らせて再計算する。
+        setTimeout(() => this.resize(), 300);
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', () => this.resize());
+        }
 
         this.attachInputHandlers();
         this.setupAuth();
@@ -861,11 +867,19 @@ class Game {
         this.canvas.style.height = this.baseHeight + "px";
 
         const vp = window.visualViewport;
-        const scaleX = (vp ? vp.width : window.innerWidth) / this.designWidth;
-        const scaleY = (vp ? vp.height : window.innerHeight) / this.designHeight;
-        this.scaleRatio = Math.min(scaleX, scaleY);
-
-        this.scaler.style.transform = `scale(${this.scaleRatio})`;
+        const winW = vp ? vp.width : window.innerWidth;
+        const winH = vp ? vp.height : window.innerHeight;
+        // 縦持ちスマホでも横長ゲームを大きく表示するため、縦持ち×スマホ幅のときは
+        // CSSで90度回転させ、画面の縦幅を「横幅」として使うスケール計算に切り替える。
+        // （回転中はgetPos()でのタップ座標の変換も回転考慮の計算式に切り替わる）
+        this.isMobileRotated = winW < winH && winW <= 900;
+        if (this.isMobileRotated) {
+            this.scaleRatio = Math.min(winH / this.designWidth, winW / this.designHeight);
+            this.scaler.style.transform = `rotate(90deg) scale(${this.scaleRatio})`;
+        } else {
+            this.scaleRatio = Math.min(winW / this.designWidth, winH / this.designHeight);
+            this.scaler.style.transform = `scale(${this.scaleRatio})`;
+        }
     }
 
     loadPlayerSystem() {
@@ -1000,6 +1014,10 @@ class Game {
                 clientX = e.changedTouches[0].clientX; clientY = e.changedTouches[0].clientY;
             } else {
                 clientX = e.clientX; clientY = e.clientY;
+            }
+            if (this.isMobileRotated) {
+                const px = clientX - rect.left, py = clientY - rect.top;
+                return { x: py / this.scaleRatio, y: this.designHeight - px / this.scaleRatio };
             }
             return { x: (clientX - rect.left) / this.scaleRatio, y: (clientY - rect.top) / this.scaleRatio };
         };

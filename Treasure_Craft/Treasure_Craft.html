@@ -107,16 +107,32 @@ const ctx = cvs.getContext("2d");
 // ==========================================
 // 2. レスポンシブ
 // ==========================================
+// 縦持ちスマホでも横長ゲームを大きく表示するため、縦持ち×スマホ幅のときは
+// CSSで90度回転させ、画面の縦幅を「横幅」として使うスケール計算に切り替える。
+// （回転中はcanvasのクリック座標変換も回転考慮の計算式に切り替わる）
+let isMobileRotated = false;
 function resize() {
     const vp = window.visualViewport;
     const ww = vp ? vp.width : window.innerWidth;
     const wh = vp ? vp.height : window.innerHeight;
-    const aspect = 1280 / 720;
-    let scale = ww / wh < aspect ? ww / 1280 : wh / 720;
-    document.getElementById("gameContainer").style.transform = `scale(${scale})`;
+    const container = document.getElementById("gameContainer");
+    isMobileRotated = ww < wh && ww <= 900;
+    if (isMobileRotated) {
+        const aspect = 1280 / 720;
+        let scale = wh / ww < aspect ? wh / 1280 : ww / 720;
+        container.style.transform = `rotate(90deg) scale(${scale})`;
+    } else {
+        const aspect = 1280 / 720;
+        let scale = ww / wh < aspect ? ww / 1280 : wh / 720;
+        container.style.transform = `scale(${scale})`;
+    }
 }
 window.addEventListener("resize", resize);
 resize();
+// X(Twitter)等アプリ内ブラウザは起動直後にビューポート値が未確定のことがあり、
+// その時点でscale計算をしてしまうと後からズレる。少し遅らせて再計算する。
+setTimeout(resize, 300);
+if (window.visualViewport) window.visualViewport.addEventListener('resize', resize);
 
 // ==========================================
 // 3. 画像管理 (フォールバック対応)
@@ -2218,10 +2234,17 @@ function loop() {
 
 cvs.addEventListener("click", (e) => {
     const rect = cvs.getBoundingClientRect();
-    const scaleX = 1280 / rect.width;
-    const scaleY = 720 / rect.height;
-    const x = (e.clientX - rect.left) * scaleX;
-    const y = (e.clientY - rect.top) * scaleY;
+    let x, y;
+    if (isMobileRotated) {
+        const px = e.clientX - rect.left, py = e.clientY - rect.top;
+        x = py * (720 / rect.width);
+        y = 720 - px * (1280 / rect.height);
+    } else {
+        const scaleX = 1280 / rect.width;
+        const scaleY = 720 / rect.height;
+        x = (e.clientX - rect.left) * scaleX;
+        y = (e.clientY - rect.top) * scaleY;
+    }
     for (let i = clickZones.length - 1; i >= 0; i--) {
         let z = clickZones[i];
         if (x >= z.x && x <= z.x + z.w && y >= z.y && y <= z.y + z.h) { z.onClick(); autoSave(); break; }

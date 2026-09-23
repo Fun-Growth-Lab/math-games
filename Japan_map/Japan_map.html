@@ -537,22 +537,49 @@ titleImg.src = "images/title.png";
 function init() {
     window.addEventListener('resize', resize);
     resize();
+    // X(Twitter)等アプリ内ブラウザは起動直後にビューポート値が未確定のことがあり、
+    // その時点でscale計算をしてしまうと後からズレる。少し遅らせて再計算する。
+    setTimeout(resize, 300);
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', resize);
     canvas.addEventListener('mousedown', handleInput);
     window.addEventListener('keydown', handleInput);
     gameLoop();
 }
 
+// 縦持ちスマホでも横長ゲームを大きく表示するため、縦持ち×スマホ幅のときは
+// canvas自体をCSSで90度回転させ、画面の縦幅を「横幅」として使うスケール計算に切り替える。
+// （canvasの内部解像度はあくまで1600x900論理空間を描画したサイズのままで、
+//   見た目の回転はCSS transformのみで行う。回転中はhandleInput()のタップ座標変換も対応）
+let isMobileRotated = false;
 function resize() {
     const vp = window.visualViewport;
-    scale = Math.min(window.innerWidth / BASE_W, (vp ? vp.height : window.innerHeight) / BASE_H);
+    const winW = vp ? vp.width : window.innerWidth;
+    const winH = vp ? vp.height : window.innerHeight;
+    isMobileRotated = winW < winH && winW <= 900;
+    if (isMobileRotated) {
+        scale = Math.min(winH / BASE_W, winW / BASE_H);
+        canvas.style.transform = 'rotate(90deg)';
+    } else {
+        scale = Math.min(winW / BASE_W, winH / BASE_H);
+        canvas.style.transform = 'none';
+    }
     canvas.width = BASE_W * scale;
     canvas.height = BASE_H * scale;
 }
 
 function handleInput(e) {
     const rect = canvas.getBoundingClientRect();
-    const x = (e.type === 'mousedown') ? (e.clientX - rect.left) / scale : -1;
-    const y = (e.type === 'mousedown') ? (e.clientY - rect.top) / scale : -1;
+    let x = -1, y = -1;
+    if (e.type === 'mousedown') {
+        if (isMobileRotated) {
+            const px = e.clientX - rect.left, py = e.clientY - rect.top;
+            x = py / scale;
+            y = BASE_H - px / scale;
+        } else {
+            x = (e.clientX - rect.left) / scale;
+            y = (e.clientY - rect.top) / scale;
+        }
+    }
 
     if (gameState === 'title') {
         if (x > 550 && x < 1050) {
