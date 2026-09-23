@@ -117,6 +117,21 @@
     function resolveTarget(t, m) {
         if (typeof t === 'function') t = t();
         if (!t) return null;
+        if (Array.isArray(t)) {               // 複数の対象をまとめて囲む(ドラッグ元とドロップ先など)
+            let u = null;
+            t.forEach(function (one) {
+                if (typeof one === 'function') one = one();
+                if (typeof one === 'string') one = { sel: one };
+                else if (one instanceof Element) one = { el: one };
+                const r = resolveTarget(Object.assign({ pad: 0 }, one), m);
+                if (!r) return;
+                if (!u) { u = { x0: r.x, y0: r.y, x1: r.x + r.w, y1: r.y + r.h }; return; }
+                u.x0 = Math.min(u.x0, r.x); u.y0 = Math.min(u.y0, r.y);
+                u.x1 = Math.max(u.x1, r.x + r.w); u.y1 = Math.max(u.y1, r.y + r.h);
+            });
+            if (!u) return null;
+            t = { rect: [u.x0, u.y0, u.x1 - u.x0, u.y1 - u.y0] };
+        }
         if (typeof t === 'string') t = { sel: t };
         else if (t instanceof Element) t = { el: t };
         let rect = null;

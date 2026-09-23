@@ -388,6 +388,7 @@
     })();
     </script>
 
+    <script src="../tutorial-engine.js"></script>
 </head>
 <body>
 
@@ -489,6 +490,7 @@
             </div>
 
             <button class="btn btn-primary" onclick="Game.tryStartGame()" data-i18n="btn_start">はじめる</button>
+            <button class="btn btn-accent" style="background:linear-gradient(to bottom,#fff176,#fbc02d); border-color:#f9a825; color:#5d4037;" onclick="Game.startTutorial()" data-i18n="btn_tutorial">🔰 チュートリアル</button>
             <button class="btn btn-secondary" onclick="Game.toPlayerSelect()" data-i18n="btn_player_select">プレーヤーを えらぶ</button>
 
             <button class="btn btn-accent" onclick="Game.showRanking()" data-i18n="btn_ranking">ランキング</button>
@@ -592,7 +594,7 @@ const STRINGS = {
     ja: {
         title_logo: 'ナンバー\nブリック',
         pm_none_selected: 'プレーヤーを えらんでください', label_selected_player: 'せんたくちゅう: {name}',
-        btn_start: 'はじめる', btn_player_select: 'プレーヤーを えらぶ', btn_ranking: 'ランキング', btn_settings: '⚙ 設定', btn_index: 'INDEXへ',
+        btn_start: 'はじめる', btn_tutorial: '🔰 チュートリアル', btn_player_select: 'プレーヤーを えらぶ', btn_ranking: 'ランキング', btn_settings: '⚙ 設定', btn_index: 'INDEXへ',
         pm_title: 'あそぶひとの なまえ', pm_placeholder: 'ひらがな8もじ', btn_add: 'ついか', btn_confirm_back: 'けっていして もどる',
         err_hiragana_only: 'ひらがなと「ー」のみ', err_too_long: '8もじ いないで', err_duplicate: 'とうろくずみ です', err_max_players: '5にん までです',
         confirm_delete_player: '{name}さんを けしますか？',
@@ -628,7 +630,7 @@ const STRINGS = {
     simple: {
         title_logo: 'ナンバー\nブリック',
         pm_none_selected: 'プレーヤーを えらんでください', label_selected_player: 'せんたくちゅう: {name}',
-        btn_start: 'はじめる', btn_player_select: 'プレーヤーを えらぶ', btn_ranking: 'ランキング', btn_settings: '⚙ せってい', btn_index: 'INDEXへ',
+        btn_start: 'はじめる', btn_tutorial: '🔰 チュートリアル', btn_player_select: 'プレーヤーを えらぶ', btn_ranking: 'ランキング', btn_settings: '⚙ せってい', btn_index: 'INDEXへ',
         pm_title: 'あそぶひとの なまえ', pm_placeholder: 'ひらがな8もじ', btn_add: 'ついか', btn_confirm_back: 'けっていして もどる',
         err_hiragana_only: 'ひらがなと「ー」だけ', err_too_long: '8もじ いないで', err_duplicate: 'とうろくずみ です', err_max_players: '5にん までです',
         confirm_delete_player: '{name}さんを けしますか？',
@@ -664,7 +666,7 @@ const STRINGS = {
     en: {
         title_logo: 'Number\nBrick',
         pm_none_selected: 'Please select a player', label_selected_player: 'Selected: {name}',
-        btn_start: 'Start', btn_player_select: 'Select Player', btn_ranking: 'Ranking', btn_settings: '⚙ Settings', btn_index: 'To INDEX',
+        btn_start: 'Start', btn_tutorial: '🔰 Tutorial', btn_player_select: 'Select Player', btn_ranking: 'Ranking', btn_settings: '⚙ Settings', btn_index: 'To INDEX',
         pm_title: "Player's Name", pm_placeholder: 'Hiragana, up to 8', btn_add: 'Add', btn_confirm_back: 'Confirm & Back',
         err_hiragana_only: 'Hiragana and "ー" only', err_too_long: 'Up to 8 characters', err_duplicate: 'Already registered', err_max_players: 'Up to 5 players',
         confirm_delete_player: 'Delete {name}?',
@@ -1073,6 +1075,103 @@ const Game = {
     },
 
     // --- ゲーム準備・開始 ---
+    // ============================================================
+    // チュートリアル（練習プレイ）
+    // ============================================================
+    // 実際の画面で「2つくっついた数字ブロックを置いて、よこもたても合計を そろえる」を体験する。
+    // 書き込みはエンジンが止めるので、ランキング・記録は一切汚れない。
+    startTutorial() {
+        FGLTutorial.begin({ root: '#game-wrapper', getLang: () => currentLang });
+        const g = this;
+        this.readyGame('EASY');
+        // 手順どおりに進むよう、盤面とブロックを決めた値にする（すべての行と列の合計が6になる配置）
+        //   1 2 3      すでに置いてあるのは 1 _ _ / 3 1 _ / 2 3 _
+        //   3 1 2      ブロック①=「2・3」(よこ) を上の列へ、ブロック②=「2・1」を右の列へ(たてに回して)
+        //   2 3 1
+        this.grid = [[1, 0, 0], [3, 1, 0], [2, 3, 0]];
+        this.deck = [1, 2, 3, 2];
+        this.nextPieceData = this.createPieceFromDeck();
+        this.spawnPiece();
+        this.actualStart();
+        // 手順どおりの置き方以外はできないようにする（タップでの回転は自由）
+        let want = null;
+        const origEnd = this.handleInputEnd.bind(this);
+        this.handleInputEnd = function (e) {
+            if (!want || g.state !== 'DRAGGING') return origEnd(e);
+            let endX, endY;
+            if (e.changedTouches && e.changedTouches.length > 0) { endX = e.changedTouches[0].clientX; endY = e.changedTouches[0].clientY; }
+            else { endX = e.clientX; endY = e.clientY; }
+            const dist = Math.hypot(endX - g.dragStartPos.x, endY - g.dragStartPos.y);
+            if (dist < 10) return origEnd(e);       // タップ = 回転
+            const pc = g.currentPiece;
+            const gx = Math.round((pc.screenX - g.gridOffsetX) / g.cellSize);
+            const gy = Math.round((pc.screenY - g.gridOffsetY) / g.cellSize);
+            const sig = pc.cells.map(c => (gx + c.x) + ',' + (gy + c.y) + ':' + c.val).sort().join('|');
+            if (sig === want) return origEnd(e);
+            // まちがった置き方：置かずに手もちへ戻す
+            g.state = 'PLAYING'; pc.isDragging = false;
+            document.body.classList.remove('dragging-mode');
+            const domEl = document.getElementById('current-piece-dom');
+            if (domEl) domEl.style.opacity = '1';
+        };
+        const cv = (x, y, w, h) => ({ sel: '#gameCanvas', rect: [x, y, w, h], of: [1280, 720], pad: 6 });
+        const gridR = () => cv(g.gridOffsetX, g.gridOffsetY, g.gridCols * g.cellSize, g.gridRows * g.cellSize);
+        const rowR = (r) => cv(g.gridOffsetX, g.gridOffsetY + r * g.cellSize, g.gridCols * g.cellSize, g.cellSize);
+        const colR = (c) => cv(g.gridOffsetX + c * g.cellSize, g.gridOffsetY, g.cellSize, g.gridRows * g.cellSize);
+        const dragR = () => [gridR(), '#spawn-box-el'];
+        const ready = () => FGLTutorial.wait(() => g.state === 'PLAYING' && !!g.currentPiece, 5000);
+        FGLTutorial.run([
+            { type: 'say', target: '#quota-display', pos: 'bottom', text: {
+                ja: 'このゲームの目的は、「すべての行と列の合計を、同じ数（今回は 6）にする」こと！ できるだけ速く完成させよう。',
+                easy: 'このゲームのもくてきは、「すべてのぎょうとれつのごうけいを、おなじかず（こんかいは 6）にする」こと！ できるだけはやくかんせいさせよう。',
+                en: 'The goal: make every row and every column add up to the same number (6 this time)! Finish as fast as you can.' } },
+            { type: 'say', target: gridR, pos: 'bottom', text: {
+                ja: 'ここがマス目。すでに数字がいくつか置いてあるよ。たとえば、いちばん上の列は「1」だけ。あと「2」と「3」が入れば 1+2+3 = 6 だね！',
+                easy: 'ここがマスめ。すでにすうじがいくつかおいてあるよ。たとえば、いちばんうえのれつは「1」だけ。あと「2」と「3」がはいれば 1+2+3 = 6 だね！',
+                en: 'This is the grid; some numbers are already placed. The top row has only "1". If "2" and "3" go in, 1+2+3 = 6!' } },
+            { type: 'say', target: '#spawn-box-el', pos: 'bottom', text: {
+                ja: 'これが「てもち」。2つくっついた数字ブロックを、ドラッグしてマスに置くよ。いまは「2」と「3」がならんでいるね。',
+                easy: 'これが「てもち」。2つくっついたすうじブロックを、ドラッグしてマスにおくよ。いまは「2」と「3」がならんでいるね。',
+                en: 'This is your "hand": a block of two joined numbers that you drag onto the grid. Right now it\'s "2" and "3".' } },
+            { type: 'say', target: '#next-box-el', pos: 'bottom', text: {
+                ja: 'こっちは「つぎ」。次に出てくるブロックだよ。先を読んで置き場所を考えよう！',
+                easy: 'こっちは「つぎ」。つぎにでてくるブロックだよ。さきをよんでおきばしょをかんがえよう！',
+                en: 'This is "Next": the block coming after this one. Plan ahead!' } },
+            { type: 'run', fn: () => { want = '1,0:2|2,0:3'; } },
+            { type: 'do', target: dragR, pos: 'top', until: () => g.grid[0][1] === 2 && g.grid[0][2] === 3, text: {
+                ja: '「2・3」のブロックを、いちばん上の列のあいている2マスに、ドラッグして置いてみよう！',
+                easy: '「2・3」のブロックを、いちばんうえのれつのあいている2マスに、ドラッグしておいてみよう！',
+                en: 'Drag the "2·3" block onto the two empty squares in the top row!' } },
+            { type: 'run', fn: ready },
+            { type: 'say', target: () => rowR(0), pos: 'bottom', text: {
+                ja: '1 + 2 + 3 = 6！ 上の列が完成したよ。ほかの列や行も、まだ合計6になっていないところを見つけよう。',
+                easy: '1 + 2 + 3 = 6！ うえのれつがかんせいしたよ。ほかのれつやぎょうも、まだごうけい6になっていないところをみつけよう。',
+                en: '1 + 2 + 3 = 6! The top row is done. Now find the other rows and columns that don\'t total 6 yet.' } },
+            { type: 'say', target: () => colR(2), pos: 'bottom', text: {
+                ja: '右の列は「3」だけ。あと「2」と「1」が下に入れば 3+2+1 = 6 になるね！ でも、手もちのブロックは横向き…。',
+                easy: 'みぎのれつは「3」だけ。あと「2」と「1」がしたにはいれば 3+2+1 = 6 になるね！ でも、てもちのブロックはよこむき…。',
+                en: 'The right column has only "3". If "2" and "1" go below it, 3+2+1 = 6! But your block is lying sideways…' } },
+            { type: 'do', target: '#spawn-box-el', pos: 'top', until: () => !!g.currentPiece && g.currentPiece.cells.every(c => c.x === 0) && g.currentPiece.cells.some(c => c.val === 2 && c.y === 0), text: {
+                ja: '手もちのブロックを、ドラッグせずに「タップ（クリック）」してみよう。1回ごとに90°回転するよ！ 「2」が上、「1」が下のたて向きにしてね。',
+                easy: 'てもちのブロックを、ドラッグせずに「タップ（クリック）」してみよう。1かいごとに90°かいてんするよ！ 「2」がうえ、「1」がしたのたてむきにしてね。',
+                en: 'Tap (click) your block without dragging it: each tap rotates it 90°! Make it vertical with "2" on top and "1" below.' } },
+            { type: 'run', fn: () => { want = '2,1:2|2,2:1'; } },
+            { type: 'do', target: dragR, pos: 'top', until: () => g.grid[1][2] === 2 && g.grid[2][2] === 1, text: {
+                ja: 'たて向きになったよ！ そのブロックを、右の列の下2マスにドラッグして置こう！',
+                easy: 'たてむきになったよ！ そのブロックを、みぎのれつのした2マスにドラッグしておこう！',
+                en: 'It\'s vertical now! Drag it onto the bottom two squares of the right column!' } },
+            { type: 'run', fn: () => FGLTutorial.wait(() => document.getElementById('result-screen').style.display === 'flex', 6000) },
+            { type: 'say', target: '#result-screen .modal-content', pos: 'top', text: {
+                ja: 'ぜんぶの行と列が 6 になった！ ステージクリア！ タイムが表示されるよ。「つぎへ」で次のステージ、「おわる」で記録がのこるよ。',
+                easy: 'ぜんぶのぎょうとれつが 6 になった！ ステージクリア！ タイムがひょうじされるよ。「つぎへ」でつぎのステージ、「おわる」できろくがのこるよ。',
+                en: 'Every row and column is 6 — stage clear! Your time is shown. "Next" goes on to the next stage, and "End" saves your record.' } },
+            { type: 'say', target: '#result-screen .modal-content', pos: 'top', text: {
+                ja: 'ステージをたくさんクリアして、平均タイムを速くするのがランキングの決め手。「ふつう」は 4×4、「むずかしい」は 5×5 で、合計もふえるよ。がんばろう！',
+                easy: 'ステージをたくさんクリアして、へいきんタイムをはやくするのがランキングのきめて。「ふつう」は 4×4、「むずかしい」は 5×5 で、ごうけいもふえるよ。がんばろう！',
+                en: 'Clear as many stages as you can with a fast average time to climb the ranking. Normal is 4×4 and Hard is 5×5, with bigger totals. Good luck!' } }
+        ]);
+    },
+
     readyGame(diff) {
         this.hideAll();
         document.getElementById('ui-left').style.visibility = 'visible';
