@@ -33,7 +33,7 @@
     };
     window.fetchOnlineRanking = async (difficulty) => {
         try {
-            const q = new URLSearchParams({select:'player_name,point_score,stage_score,turns,created_at',game:'eq.treasure_craft',difficulty:`eq.${difficulty||'normal'}`,point_score:'gt.0',order:'point_score.desc',limit:'10'});
+            const q = new URLSearchParams({select:'player_name,point_score,stage_score,turns,created_at',game:'eq.treasure_craft',difficulty:`eq.${difficulty||'normal'}`,point_score:'gt.0',order:'point_score.desc',limit:'30'});
             const res = await fetch(`${_b}/rankings?${q}`,{headers:_rh});
             if(!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
@@ -750,6 +750,7 @@ let restEffect = { active: false, alpha: 0, phase: 'in' };
 
 let rankingTab = "WORLD";
 let rankingDataWorld = null;
+let rankPage = 0;
 let worldRankingFetching = false;
 
 // ==========================================
@@ -1172,7 +1173,7 @@ function renderTitle() {
     drawBtn(T('btn_settings'), rightX, row1Y, bW, bH, '#c39bd3', () => { GAME_STATE = "SETTINGS"; }, false, '#4a235a');
 
     drawBtn(T('btn_ranking'), leftX, row2Y, bW, bH, '#ffd8b1', () => {
-        rankingTab = "WORLD"; rankingDataWorld = null; GAME_STATE = "RANKING";
+        rankingTab = "WORLD"; rankingDataWorld = null; rankPage = 0; GAME_STATE = "RANKING";
         loadWorldRanking();
     }, false, '#7a4a10');
 
@@ -1912,7 +1913,7 @@ function finishGame(isClear) {
     localStorage.setItem('fgl_local_ranking', JSON.stringify(localRank));
 
     window.saveOnlineScore(currentPlayerName, assets, 'normal', {days: gameData.day, isClear: isClear})
-        .finally(() => setTimeout(() => { rankingTab="WORLD"; rankingDataWorld=null; GAME_STATE="RANKING"; loadWorldRanking(); }, 2000));
+        .finally(() => setTimeout(() => { rankingTab="WORLD"; rankingDataWorld=null; rankPage=0; GAME_STATE="RANKING"; loadWorldRanking(); }, 2000));
 }
 
 function renderResult() {
@@ -1930,9 +1931,10 @@ function renderRanking() {
 
     drawBtn(T('tab_world'), 440, 120, 150, 40, rankingTab==="WORLD" ? '#3498db' : '#bdc3c7', () => {
         rankingTab="WORLD";
+        rankPage = 0;
         loadWorldRanking();
     });
-    drawBtn(T('tab_local'), 690, 120, 150, 40, rankingTab==="LOCAL" ? '#e74c3c' : '#bdc3c7', () => rankingTab="LOCAL");
+    drawBtn(T('tab_local'), 690, 120, 150, 40, rankingTab==="LOCAL" ? '#e74c3c' : '#bdc3c7', () => { rankingTab="LOCAL"; rankPage = 0; });
 
     if (rankingTab === "WORLD") loadWorldRanking();
 
@@ -1943,40 +1945,50 @@ function renderRanking() {
         displayData = rankingDataWorld;
     }
 
-    let startY = 190;
+    let startY = 180;
     let tableX = 100, tableW = 1080;
+    const rankItemsPerPage = 10;
+    let rankMaxPage = Math.max(0, Math.ceil((displayData ? displayData.length : 0) / rankItemsPerPage) - 1);
+    if (rankPage > rankMaxPage) rankPage = rankMaxPage;
+    let pageData = (displayData || []).slice(rankPage * rankItemsPerPage, (rankPage + 1) * rankItemsPerPage);
 
     if(displayData && displayData.length > 0) {
-        ctx.fillStyle = '#34495e'; ctx.fillRect(tableX, startY, tableW, 40);
-        drawText(T('rank_h_rank'), tableX+50, startY+20, 20, '#fff', 'center');
-        drawText(T('rank_h_name'), tableX+130, startY+20, 20, '#fff', 'left');
-        drawText(T('rank_h_days'), tableX+520, startY+20, 20, '#fff', 'center');
-        drawText(T('rank_h_assets'), tableX+680, startY+20, 20, '#fff', 'right');
-        drawText(T('rank_h_result'), tableX+830, startY+20, 20, '#fff', 'center');
-        drawText(T('rank_h_date'), tableX+990, startY+20, 18, '#fff', 'center');
+        ctx.fillStyle = '#34495e'; ctx.fillRect(tableX, startY, tableW, 36);
+        drawText(T('rank_h_rank'), tableX+50, startY+18, 18, '#fff', 'center');
+        drawText(T('rank_h_name'), tableX+130, startY+18, 18, '#fff', 'left');
+        drawText(T('rank_h_days'), tableX+520, startY+18, 18, '#fff', 'center');
+        drawText(T('rank_h_assets'), tableX+680, startY+18, 18, '#fff', 'right');
+        drawText(T('rank_h_result'), tableX+830, startY+18, 18, '#fff', 'center');
+        drawText(T('rank_h_date'), tableX+990, startY+18, 16, '#fff', 'center');
 
-        let cy = startY + 60;
-        displayData.slice(0, 10).forEach((d, idx) => {
+        let cy = startY + 52;
+        pageData.forEach((d, idx) => {
             if(idx % 2 === 1) {
                 ctx.fillStyle = 'rgba(189, 195, 199, 0.3)';
-                ctx.fillRect(tableX, cy - 20, tableW, 40);
+                ctx.fillRect(tableX, cy - 17, tableW, 34);
             }
             let clr = d.isClear ? T('result_clear') : T('result_retire');
             let tColor = '#2c3e50';
-            drawText(T('rank_position', {n: idx+1}), tableX+50, cy, 20, tColor, 'center');
-            drawText(d.name, tableX+130, cy, 20, tColor, 'left');
-            drawText(T('rank_days_suffix', {n: d.days}), tableX+520, cy, 20, tColor, 'center');
-            drawText(`${d.assets} G`, tableX+680, cy, 20, '#f39c12', 'right');
-            drawText(clr, tableX+830, cy, 20, d.isClear ? '#e74c3c' : '#7f8c8d', 'center');
-            drawText(d.date || "-", tableX+990, cy, 16, '#7f8c8d', 'center');
+            drawText(T('rank_position', {n: rankPage*rankItemsPerPage + idx+1}), tableX+50, cy, 18, tColor, 'center');
+            drawText(d.name, tableX+130, cy, 18, tColor, 'left');
+            drawText(T('rank_days_suffix', {n: d.days}), tableX+520, cy, 18, tColor, 'center');
+            drawText(`${d.assets} G`, tableX+680, cy, 18, '#f39c12', 'right');
+            drawText(clr, tableX+830, cy, 18, d.isClear ? '#e74c3c' : '#7f8c8d', 'center');
+            drawText(d.date || "-", tableX+990, cy, 15, '#7f8c8d', 'center');
 
             ctx.strokeStyle = '#bdc3c7'; ctx.lineWidth = 1;
-            ctx.beginPath(); ctx.moveTo(tableX, cy+20); ctx.lineTo(tableX+tableW, cy+20); ctx.stroke();
-            cy += 40;
+            ctx.beginPath(); ctx.moveTo(tableX, cy+17); ctx.lineTo(tableX+tableW, cy+17); ctx.stroke();
+            cy += 34;
         });
 
         ctx.strokeStyle = '#34495e'; ctx.lineWidth = 2;
         ctx.strokeRect(tableX, startY, tableW, cy - startY);
+
+        if (rankMaxPage > 0) {
+            drawText(`${rankPage+1} / ${rankMaxPage+1}`, 640, cy + 26, 18, '#2c3e50', 'center');
+            if (rankPage > 0) drawBtn("＜", tableX+400, cy+8, 50, 32, '#34495e', () => { rankPage--; });
+            if (rankPage < rankMaxPage) drawBtn("＞", tableX+630, cy+8, 50, 32, '#34495e', () => { rankPage++; });
+        }
     } else {
         drawText(rankingTab==="WORLD" && !rankingDataWorld ? T('loading') : T('no_data'), 640, 300, 24, '#2c3e50', 'center');
     }
