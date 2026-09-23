@@ -245,6 +245,7 @@
         .lang-btn.active { opacity: 1; box-shadow: 0 0 0 4px #FFB74D, 0 5px 0 var(--btn-blue-hover); }
 
     </style>
+    <script src="../tutorial-engine.js"></script>
 </head>
 <body>
 
@@ -257,6 +258,7 @@
             <h2 class="subtitle" data-i18n="subtitle">～小数～</h2>
             <div id="current-player-display">現在のプレーヤー: ゲスト</div>
             <button class="menu-btn green" onclick="goToDifficulty()" data-i18n="btn_start">はじめる</button>
+            <button class="menu-btn yellow" onclick="startTutorial()" data-i18n="btn_tutorial">🔰 チュートリアル</button>
             <button class="menu-btn blue" onclick="showScreen('screen-player')" data-i18n="btn_player_select">プレーヤー選択</button>
             <button id="btn-google-login" class="menu-btn red" onclick="loginGoogle()" style="display:none">Googleでログイン</button>
             <button class="menu-btn yellow" onclick="showRanking()" data-i18n="btn_ranking">ランキング</button>
@@ -374,7 +376,7 @@
     const STRINGS = {
         ja: {
             subtitle: '～小数～', label_current_player: '現在のプレーヤー: {name}',
-            btn_start: 'はじめる', btn_player_select: 'プレーヤー選択', btn_ranking: 'ランキング', btn_settings: '⚙ 設定', btn_index: 'INDEXへ戻る',
+            btn_start: 'はじめる', btn_tutorial: '🔰 チュートリアル', btn_player_select: 'プレーヤー選択', btn_ranking: 'ランキング', btn_settings: '⚙ 設定', btn_index: 'INDEXへ戻る',
             settings_title: '⚙ 設定', settings_sub: '言語 / Language', lang_simple: 'かんたんなにほんご', lang_ja: '日本語', lang_en: 'English', btn_close: 'とじる',
             diff_prompt: '難易度選択', diff_easy: 'やさしい', diff_normal: 'ふつう', diff_hard: 'むずかしい', btn_back: '戻る',
             pm_title: 'プレーヤー選択', pm_register_title: '新規登録 (最大5名)', pm_hint: '※ひらがなと「ー」のみ、8文字まで',
@@ -426,7 +428,7 @@
         },
         simple: {
             subtitle: '～しょうすう～', label_current_player: 'いまの プレーヤー: {name}',
-            btn_start: 'はじめる', btn_player_select: 'プレーヤーせんたく', btn_ranking: 'ランキング', btn_settings: '⚙ せってい', btn_index: 'INDEXへ もどる',
+            btn_start: 'はじめる', btn_tutorial: '🔰 チュートリアル', btn_player_select: 'プレーヤーせんたく', btn_ranking: 'ランキング', btn_settings: '⚙ せってい', btn_index: 'INDEXへ もどる',
             settings_title: '⚙ せってい', settings_sub: '言語 / Language', lang_simple: 'かんたんなにほんご', lang_ja: '日本語', lang_en: 'English', btn_close: 'とじる',
             diff_prompt: 'なんいど せんたく', diff_easy: 'やさしい', diff_normal: 'ふつう', diff_hard: 'むずかしい', btn_back: 'もどる',
             pm_title: 'プレーヤーせんたく', pm_register_title: 'しんきとうろく (さいだい5にん)', pm_hint: '※ひらがなと「ー」だけ、8もじまで',
@@ -478,7 +480,7 @@
         },
         en: {
             subtitle: '- Decimals -', label_current_player: 'Current Player: {name}',
-            btn_start: 'Start', btn_player_select: 'Select Player', btn_ranking: 'Ranking', btn_settings: '⚙ Settings', btn_index: 'To INDEX',
+            btn_start: 'Start', btn_tutorial: '🔰 Tutorial', btn_player_select: 'Select Player', btn_ranking: 'Ranking', btn_settings: '⚙ Settings', btn_index: 'To INDEX',
             settings_title: '⚙ Settings', settings_sub: '言語 / Language', lang_simple: 'かんたんなにほんご', lang_ja: '日本語', lang_en: 'English', btn_close: 'Close',
             diff_prompt: 'Choose a Difficulty', diff_easy: 'Easy', diff_normal: 'Normal', diff_hard: 'Hard', btn_back: 'Back',
             pm_title: 'Select Player', pm_register_title: 'New Registration (Max 5)', pm_hint: '※Hiragana and "ー" only, up to 8 characters',
@@ -953,6 +955,80 @@
     function goToDifficulty() {
         if(!currentPlayer || currentPlayer === "ゲスト") systemAlert(T('msg_no_player'));
         showScreen('screen-difficulty');
+    }
+
+    /* =========================================
+       チュートリアル（練習プレイ）
+       実際の画面で「小数のカードを数直線(リボン)にたして、5.0ちょうどをめざす」を体験する。
+       書き込みはエンジンが止めるので、ランキング・実績は一切汚れない。
+    ========================================= */
+    function startTutorial() {
+        FGLTutorial.begin({ root: '#game-wrapper', getLang: () => currentLang });
+        startGame('やさしい');
+        // 手順どおりに進むよう、手札とイベントを決めた値にする
+        [1.2, 0.8, 2.0, 0.5, 1.5].forEach((v, i) => { gameState.cards[i].value = v; gameState.cards[i].isJoker = false; });
+        gameState.events = [
+            { type: 'gold',  subType: 'normal_gold',  icon: '🪙', start: 1.0, end: 1.4, triggered: false, cleared: false },
+            { type: 'enemy', subType: 'normal_enemy', icon: '👾', start: 3.0, end: 3.8, triggered: false, cleared: false },
+            { type: 'gem',   subType: '',             icon: '💎', start: 4.0, end: 4.4, triggered: false, cleared: false },
+            { type: 'snack', subType: '',             icon: '🍩', start: 4.6, end: 4.8, triggered: false, cleared: false }
+        ];
+        const CV = '#gameCanvas';
+        const cv = (x, y, w, h) => ({ sel: CV, rect: [x, y, w, h], of: [GAME_W, GAME_H], pad: 6 });
+        const ribbonR = () => cv(140, 110, 1000, 190);
+        const handR = () => cv(346, 530, 4 * 120 + 108, 144);
+        const msgR = () => cv(240, 180, 800, 260);
+        const numR = () => cv(500, 360, 280, 140);
+        const waitMsg = () => FGLTutorial.wait(() => gameMessage.active, 6000);
+        const tapMsg = (t) => ({ type: 'do', target: msgR, pos: 'bottom', skipAfter: 4000, until: () => !gameMessage.active && messageQueue.length === 0 && !gameState.isAnimating, text: t });
+        FGLTutorial.run([
+            { type: 'say', target: ribbonR, pos: 'bottom', text: {
+                ja: 'ここが「リボン」。0 から 5 までの数直線だよ。カードの小数をたしていって、ちょうど 5.0 をめざそう！',
+                easy: 'ここが「リボン」。0 から 5 までのすうちょくせんだよ。カードのしょうすうをたしていって、ちょうど 5.0 をめざそう！',
+                en: 'This is the ribbon, a number line from 0 to 5. Add the decimals on your cards and aim for exactly 5.0!' } },
+            { type: 'say', target: ribbonR, pos: 'bottom', text: {
+                ja: 'リボンの上の色のついた区間は「イベント」。🪙金貨・💎宝石・🍩おかしは良いこと、👾てきはカードを1まい封印してくる悪いことだよ。',
+                easy: 'リボンのうえのいろのついたくかんは「イベント」。🪙きんか・💎ほうせき・🍩おかしはいいこと、👾てきはカードを1まいふういんしてくるわるいことだよ。',
+                en: 'The colored sections on the ribbon are events. 🪙 coins, 💎 gems and 🍩 snacks are good; 👾 enemies seal one of your cards.' } },
+            { type: 'say', target: handR, pos: 'top', text: {
+                ja: 'これが手札。0.1〜2.0 の小数のカードだよ。ドラッグしてリボンにのせると、その数がたされていくよ。',
+                easy: 'これがてふだ。0.1〜2.0 のしょうすうのカードだよ。ドラッグしてリボンにのせると、そのかずがたされていくよ。',
+                en: 'These are your cards, decimals from 0.1 to 2.0. Drag one onto the ribbon and its number is added.' } },
+            { type: 'do', target: () => cv(140, 110, 1000, 570), pos: 'top', until: () => gameState.ribbonValue >= 1.2, text: {
+                ja: '「1.2」のカードを、リボンにドラッグしてのせてみよう！ 0 + 1.2 = 1.2 になって、🪙金貨のイベントに止まるよ。',
+                easy: '「1.2」のカードを、リボンにドラッグしてのせてみよう！ 0 + 1.2 = 1.2 になって、🪙きんかのイベントにとまるよ。',
+                en: 'Drag the "1.2" card onto the ribbon! 0 + 1.2 = 1.2, and you land on the 🪙 coin event.' } },
+            { type: 'run', fn: waitMsg },
+            tapMsg({
+                ja: '金貨をみつけた！ +500点。メッセージの部分をタップして進めよう。',
+                easy: 'きんかをみつけた！ +500てん。メッセージのぶぶんをタップしてすすめよう。',
+                en: 'You found a coin! +500 points. Tap the message to continue.' }),
+            { type: 'say', target: numR, pos: 'top', text: {
+                ja: '今のリボンの数は 1.2 だよ。次は 0.8 のカードで、ちょうど「2.0」にしてみよう！',
+                easy: 'いまのリボンのかずは 1.2 だよ。つぎは 0.8 のカードで、ちょうど「2.0」にしてみよう！',
+                en: 'The ribbon is at 1.2 now. Next, use the 0.8 card to hit exactly 2.0!' } },
+            { type: 'do', target: () => cv(140, 110, 1000, 570), pos: 'top', until: () => gameState.ribbonValue >= 2.0, text: {
+                ja: '「0.8」のカードをリボンにのせよう！ 1.2 + 0.8 = 2.0。整数ちょうどになると、ボーナス点がもらえるよ！',
+                easy: '「0.8」のカードをリボンにのせよう！ 1.2 + 0.8 = 2.0。せいすうちょうどになると、ボーナスてんがもらえるよ！',
+                en: 'Put the "0.8" card on the ribbon! 1.2 + 0.8 = 2.0. Landing exactly on a whole number gives bonus points!' } },
+            { type: 'run', fn: waitMsg },
+            tapMsg({
+                ja: 'ちょうど 2.0！ ボーナス +400点。メッセージをタップして進もう。',
+                easy: 'ちょうど 2.0！ ボーナス +400てん。メッセージをタップしてすすもう。',
+                en: 'Exactly 2.0! Bonus +400 points. Tap the message to continue.' }),
+            { type: 'say', target: cv(340, 15, 600, 60), pos: 'bottom', text: {
+                ja: '5.0 をこえると、こえた分だけ HP がへるよ。HP が 0 になるとゲームオーバー。ちょうど 5.0 なら大ボーナス！',
+                easy: '5.0 をこえると、こえたぶんだけ HP がへるよ。HP が 0 になるとゲームオーバー。ちょうど 5.0 ならだいボーナス！',
+                en: 'Going past 5.0 costs HP equal to the overshoot. At 0 HP it\'s game over. Exactly 5.0 gives a big bonus!' } },
+            { type: 'say', target: cv(30, 410, 300, 280), pos: 'top', text: {
+                ja: '💎宝石を集めると、ここの「チェンジ」で手札をぜんぶ引き直したり、リボンのイベントを作り直したりできるよ。',
+                easy: '💎ほうせきをあつめると、ここの「チェンジ」でてふだをぜんぶひきなおしたり、リボンのイベントをつくりなおしたりできるよ。',
+                en: 'Collect 💎 gems to use "Change" here: redraw your whole hand or reroll the ribbon\'s events.' } },
+            { type: 'say', target: cv(950, 410, 300, 280), pos: 'top', text: {
+                ja: '🍩おかしを12こ全部あつめるとコンプリート！ ステージは全部で7つ。がんばってね！',
+                easy: '🍩おかしを12こぜんぶあつめるとコンプリート！ ステージはぜんぶで7つ。がんばってね！',
+                en: 'Collect all 12 🍩 snacks to complete the set! There are 7 stages in total. Good luck!' } }
+        ]);
     }
 
     function startGame(diff) {
