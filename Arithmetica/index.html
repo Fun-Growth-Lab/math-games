@@ -5832,6 +5832,8 @@ function startGameWithClass(ci, diff, gender){
 // CSSで90度回転させ、画面の縦幅を「横幅」として使うスケール計算に切り替える。
 // （このゲームの操作はDOM要素のgetBoundingClientRectベースのドラッグ操作のため、
 //   回転してもブラウザが自動でヒットテストしてくれ、座標変換の追加対応は不要）
+let isMobileRotated=false;
+let currentScale=1;
 function scaleContainer(){
     const el=document.getElementById('container');
     const vp=window.visualViewport;
@@ -5841,11 +5843,14 @@ function scaleContainer(){
     // あるため、flexに頼らずJSでleft/topを絶対座標指定する(scale/rotateに依存しない)
     el.style.left = `${vw / 2 - 640}px`;
     el.style.top = `${vh / 2 - 360}px`;
-    if(vw<vh && vw<=900){
+    isMobileRotated = vw<vh && vw<=900;
+    if(isMobileRotated){
         const s=Math.min(vh/1280, vw/720);
+        currentScale=s;
         el.style.transform=`rotate(90deg) scale(${s})`;
     } else {
         const s=Math.min(vw/1280, vh/720);
+        currentScale=s;
         el.style.transform=`scale(${s})`;
     }
 }
@@ -5855,6 +5860,40 @@ scaleContainer();
 // その時点でscale計算をしてしまうと後からズレる。少し遅らせて再計算する。
 setTimeout(scaleContainer, 300);
 if (window.visualViewport) window.visualViewport.addEventListener('resize', scaleContainer);
+
+// 縦持ちスマホでの回転表示(rotate(90deg))中は、rank-box等のCSS
+// overflow-y:auto + touch-action:pan-yによるネイティブのタッチスクロールが
+// 正しく効かないブラウザがあるため、回転中だけタッチ位置の差分から
+// scrollTopを直接操作する簡易スクロールに切り替える
+// （回転していない時はネイティブのタッチスクロールに任せる）
+(function setupRotatedTouchScroll(){
+    const root = document.getElementById('container');
+    if(!root) return;
+    function findScrollable(el){
+        while(el && el!==root){
+            const cs = getComputedStyle(el);
+            if((cs.overflowY==='auto'||cs.overflowY==='scroll') && el.scrollHeight>el.clientHeight) return el;
+            el = el.parentElement;
+        }
+        return null;
+    }
+    let box=null, dragging=false, startX=0, startScrollTop=0;
+    root.addEventListener('touchstart', e=>{
+        if(!isMobileRotated || e.touches.length!==1) return;
+        box = findScrollable(e.target);
+        if(!box) return;
+        dragging=true; startX=e.touches[0].clientX; startScrollTop=box.scrollTop;
+    }, {passive:true});
+    root.addEventListener('touchmove', e=>{
+        if(!dragging || !box || !isMobileRotated) return;
+        e.preventDefault();
+        // rotate(90deg)（時計回り）により、コンテンツのローカル下方向(scrollTop増加)は
+        // 画面上では左方向に写像されるため、画面のX方向の指の移動量から変換する
+        const dx = e.touches[0].clientX - startX;
+        box.scrollTop = startScrollTop - dx / (currentScale || 1);
+    }, {passive:false});
+    root.addEventListener('touchend', ()=>{ dragging=false; box=null; });
+})();
 
 // ============================================================
 // TITLE BG IMAGE — random pick from title_1.png … title_10.png

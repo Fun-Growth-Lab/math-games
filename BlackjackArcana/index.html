@@ -5529,6 +5529,8 @@ function resetTutorialState(){
 // CSSで90度回転させ、画面の縦幅を「横幅」として使うスケール計算に切り替える。
 // （このゲームの操作はすべてDOM要素のため、回転してもブラウザが自動で
 //   ヒットテストしてくれ、座標変換の追加対応は不要）
+let isMobileRotated = false;
+let currentScale = 1;
 function scaleContainer(){
     const el = document.getElementById('container');
     const vp = window.visualViewport;
@@ -5539,11 +5541,14 @@ function scaleContainer(){
     // あるため、flexに頼らずJSでleft/topを絶対座標指定する(scale/rotateに依存しない)
     el.style.left = `${w / 2 - 640}px`;
     el.style.top = `${h / 2 - 360}px`;
-    if (w < h && w <= 900) {
+    isMobileRotated = w < h && w <= 900;
+    if (isMobileRotated) {
         const s = Math.min(h / 1280, w / 720);
+        currentScale = s;
         el.style.transform = `rotate(90deg) scale(${s})`;
     } else {
         const s = Math.min(w / 1280, h / 720);
+        currentScale = s;
         el.style.transform = `scale(${s})`;
     }
 }
@@ -5553,6 +5558,38 @@ scaleContainer();
 // X(Twitter)等アプリ内ブラウザは起動直後にビューポート値が未確定のことがあり、
 // その時点でscale計算をしてしまうと後からズレる。少し遅らせて再計算する。
 setTimeout(scaleContainer, 300);
+
+// 縦持ちスマホでの回転表示(rotate(90deg))中は、rank-box等のCSS
+// overflow-y:auto + touch-action:pan-yによるネイティブのタッチスクロールが
+// 正しく効かないブラウザがあるため、回転中だけタッチ位置の差分から
+// scrollTopを直接操作する簡易スクロールに切り替える
+// （回転していない時はネイティブのタッチスクロールに任せる）
+(function setupRotatedTouchScroll(){
+    const root = document.getElementById('container');
+    if(!root) return;
+    function findScrollable(el){
+        while(el && el!==root){
+            const cs = getComputedStyle(el);
+            if((cs.overflowY==='auto'||cs.overflowY==='scroll') && el.scrollHeight>el.clientHeight) return el;
+            el = el.parentElement;
+        }
+        return null;
+    }
+    let box=null, dragging=false, startX=0, startScrollTop=0;
+    root.addEventListener('touchstart', e=>{
+        if(!isMobileRotated || e.touches.length!==1) return;
+        box = findScrollable(e.target);
+        if(!box) return;
+        dragging=true; startX=e.touches[0].clientX; startScrollTop=box.scrollTop;
+    }, {passive:true});
+    root.addEventListener('touchmove', e=>{
+        if(!dragging || !box || !isMobileRotated) return;
+        e.preventDefault();
+        const dx = e.touches[0].clientX - startX;
+        box.scrollTop = startScrollTop - dx / (currentScale || 1);
+    }, {passive:false});
+    root.addEventListener('touchend', ()=>{ dragging=false; box=null; });
+})();
 if (window.visualViewport) window.visualViewport.addEventListener('resize', scaleContainer);
 // 「つぎへ」系のボタン（.js-enter-next）は、表示されているときEnterキーでも押せるようにする
 document.addEventListener('keydown', e => {

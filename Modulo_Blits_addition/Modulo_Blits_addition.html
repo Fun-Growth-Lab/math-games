@@ -646,17 +646,50 @@ const canvas = document.getElementById('gameCanvas'); const ctx = canvas.getCont
 // CSSで90度回転させ、画面の縦幅を「横幅」として使うスケール計算に切り替える。
 // （回転中はgetTouchPos()でのタップ座標の変換も回転考慮の計算式に切り替わる）
 let isMobileRotated = false;
+let currentScale = 1;
 function adjustLayout() {
     const root = document.getElementById('game-root'); const vp = window.visualViewport; const winW = vp ? vp.width : window.innerWidth; const winH = vp ? vp.height : window.innerHeight;
     isMobileRotated = winW < winH && winW <= 900;
     if (isMobileRotated) {
-        const scale = Math.min(winH / 1280, winW / 720); root.style.transform = `translate(-50%, -50%) rotate(90deg) scale(${scale})`;
+        const scale = Math.min(winH / 1280, winW / 720); currentScale = scale; root.style.transform = `translate(-50%, -50%) rotate(90deg) scale(${scale})`;
     } else {
-        const scale = Math.min(winW / 1280, winH / 720); root.style.transform = `translate(-50%, -50%) scale(${scale})`;
+        const scale = Math.min(winW / 1280, winH / 720); currentScale = scale; root.style.transform = `translate(-50%, -50%) scale(${scale})`;
     }
     resize();
 }
 function resize() { state.width = 1280; state.height = 720; canvas.width = state.width; canvas.height = state.height; }
+
+// 縦持ちスマホでの回転表示(rotate(90deg))中は、ランキング等のCSS
+// overflow-y:auto + touch-action:pan-yによるネイティブのタッチスクロールが
+// 正しく効かないブラウザがあるため、回転中だけタッチ位置の差分から
+// scrollTopを直接操作する簡易スクロールに切り替える
+// （回転していない時はネイティブのタッチスクロールに任せる）
+(function setupRotatedTouchScroll(){
+    const root = document.getElementById('game-root');
+    if(!root) return;
+    function findScrollable(el){
+        while(el && el!==root){
+            const cs = getComputedStyle(el);
+            if((cs.overflowY==='auto'||cs.overflowY==='scroll') && el.scrollHeight>el.clientHeight) return el;
+            el = el.parentElement;
+        }
+        return null;
+    }
+    let box=null, dragging=false, startX=0, startScrollTop=0;
+    root.addEventListener('touchstart', e=>{
+        if(!isMobileRotated || e.touches.length!==1) return;
+        box = findScrollable(e.target);
+        if(!box) return;
+        dragging=true; startX=e.touches[0].clientX; startScrollTop=box.scrollTop;
+    }, {passive:true});
+    root.addEventListener('touchmove', e=>{
+        if(!dragging || !box || !isMobileRotated) return;
+        e.preventDefault();
+        const dx = e.touches[0].clientX - startX;
+        box.scrollTop = startScrollTop - dx / (currentScale || 1);
+    }, {passive:false});
+    root.addEventListener('touchend', ()=>{ dragging=false; box=null; });
+})();
 
 window.addEventListener('resize', adjustLayout);
 window.onload = () => {

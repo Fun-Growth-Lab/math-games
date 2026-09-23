@@ -840,6 +840,39 @@ class Game {
             window.visualViewport.addEventListener('resize', () => this.resize());
         }
 
+        // 縦持ちスマホでの回転表示(rotate(90deg))中は、ランキング等のCSS
+        // overflow-y:auto + touch-action:pan-yによるネイティブのタッチスクロールが
+        // 正しく効かないブラウザがあるため、回転中だけタッチ位置の差分から
+        // scrollTopを直接操作する簡易スクロールに切り替える
+        // （回転していない時はネイティブのタッチスクロールに任せる）
+        (() => {
+            const root = this.scaler;
+            const self = this;
+            if(!root) return;
+            function findScrollable(el){
+                while(el && el!==root){
+                    const cs = getComputedStyle(el);
+                    if((cs.overflowY==='auto'||cs.overflowY==='scroll') && el.scrollHeight>el.clientHeight) return el;
+                    el = el.parentElement;
+                }
+                return null;
+            }
+            let box=null, dragging=false, startX=0, startScrollTop=0;
+            root.addEventListener('touchstart', e=>{
+                if(!self.isMobileRotated || e.touches.length!==1) return;
+                box = findScrollable(e.target);
+                if(!box) return;
+                dragging=true; startX=e.touches[0].clientX; startScrollTop=box.scrollTop;
+            }, {passive:true});
+            root.addEventListener('touchmove', e=>{
+                if(!dragging || !box || !self.isMobileRotated) return;
+                e.preventDefault();
+                const dx = e.touches[0].clientX - startX;
+                box.scrollTop = startScrollTop - dx / (self.scaleRatio || 1);
+            }, {passive:false});
+            root.addEventListener('touchend', ()=>{ dragging=false; box=null; });
+        })();
+
         this.attachInputHandlers();
         this.setupAuth();
 

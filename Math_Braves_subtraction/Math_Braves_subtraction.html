@@ -1148,6 +1148,7 @@ const ui = {
 // CSSで90度回転させ、画面の縦幅を「横幅」として使うスケール計算に切り替える。
 // （回転中はgetEventPos()でのタップ座標の変換も回転考慮の計算式に切り替わる）
 let isMobileRotated = false;
+let currentScale = 1;
 function resize() {
     const container = document.getElementById('container');
     const BASE_WIDTH = 1280;
@@ -1163,9 +1164,11 @@ function resize() {
     isMobileRotated = winW < winH && winW <= 900;
     if (isMobileRotated) {
         const scale = Math.min(winH / BASE_WIDTH, winW / BASE_HEIGHT);
+        currentScale = scale;
         container.style.transform = `rotate(90deg) scale(${scale})`;
     } else {
         const scale = Math.min(winW / BASE_WIDTH, winH / BASE_HEIGHT);
+        currentScale = scale;
         container.style.transform = `scale(${scale})`;
     }
 
@@ -1182,6 +1185,38 @@ resize();
 // その時点でscale計算をしてしまうと後からズレる。少し遅らせて再計算する。
 setTimeout(resize, 300);
 if (window.visualViewport) window.visualViewport.addEventListener('resize', resize);
+
+// 縦持ちスマホでの回転表示(rotate(90deg))中は、ランキング等のCSS
+// overflow-y:auto + touch-action:pan-yによるネイティブのタッチスクロールが
+// 正しく効かないブラウザがあるため、回転中だけタッチ位置の差分から
+// scrollTopを直接操作する簡易スクロールに切り替える
+// （回転していない時はネイティブのタッチスクロールに任せる）
+(function setupRotatedTouchScroll(){
+    const root = document.getElementById('container');
+    if(!root) return;
+    function findScrollable(el){
+        while(el && el!==root){
+            const cs = getComputedStyle(el);
+            if((cs.overflowY==='auto'||cs.overflowY==='scroll') && el.scrollHeight>el.clientHeight) return el;
+            el = el.parentElement;
+        }
+        return null;
+    }
+    let box=null, dragging=false, startX=0, startScrollTop=0;
+    root.addEventListener('touchstart', e=>{
+        if(!isMobileRotated || e.touches.length!==1) return;
+        box = findScrollable(e.target);
+        if(!box) return;
+        dragging=true; startX=e.touches[0].clientX; startScrollTop=box.scrollTop;
+    }, {passive:true});
+    root.addEventListener('touchmove', e=>{
+        if(!dragging || !box || !isMobileRotated) return;
+        e.preventDefault();
+        const dx = e.touches[0].clientX - startX;
+        box.scrollTop = startScrollTop - dx / (currentScale || 1);
+    }, {passive:false});
+    root.addEventListener('touchend', ()=>{ dragging=false; box=null; });
+})();
 
 function randomInt(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min;

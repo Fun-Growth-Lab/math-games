@@ -618,6 +618,37 @@
     window.addEventListener('resize', resizeWindow);
     resizeWindow();
 
+    // 縦持ちスマホでの回転表示(rotate(90deg))中は、モーダル等のCSS
+    // overflow-y:autoによるネイティブのタッチスクロールが正しく効かない
+    // ブラウザがあるため、回転中だけタッチ位置の差分からscrollTopを直接
+    // 操作する簡易スクロールに切り替える（回転していない時はネイティブに任せる）
+    (function setupRotatedTouchScroll(){
+        const root = wrapper;
+        if(!root) return;
+        function findScrollable(el){
+            while(el && el!==root){
+                const cs = getComputedStyle(el);
+                if((cs.overflowY==='auto'||cs.overflowY==='scroll') && el.scrollHeight>el.clientHeight) return el;
+                el = el.parentElement;
+            }
+            return null;
+        }
+        let box=null, dragging=false, startX=0, startScrollTop=0;
+        root.addEventListener('touchstart', e=>{
+            if(!isMobileRotated || e.touches.length!==1) return;
+            box = findScrollable(e.target);
+            if(!box) return;
+            dragging=true; startX=e.touches[0].clientX; startScrollTop=box.scrollTop;
+        }, {passive:true});
+        root.addEventListener('touchmove', e=>{
+            if(!dragging || !box || !isMobileRotated) return;
+            e.preventDefault();
+            const dx = e.touches[0].clientX - startX;
+            box.scrollTop = startScrollTop - dx / (currentScale || 1);
+        }, {passive:false});
+        root.addEventListener('touchend', ()=>{ dragging=false; box=null; });
+    })();
+
     /* =========================================
        Assets & Globals
     ========================================= */

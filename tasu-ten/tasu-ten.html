@@ -642,6 +642,7 @@ const Game = (function() {
     // 縦持ち×スマホ幅のときはCSSで90度回転させて画面いっぱいに表示する。
     // （回転中はクリック/タップ座標の変換もrotated分岐で行う。handleInputStart/Move参照）
     let isMobileRotated = false;
+    let currentScale = 1;
     function resize() {
         const vp = window.visualViewport;
         const vw = vp ? vp.width : window.innerWidth;
@@ -653,14 +654,47 @@ const Game = (function() {
         if (isMobileRotated) {
             // 画面の縦幅を「横幅」、画面の横幅を「縦幅」として使い、90度回転して中央に配置
             const scale = Math.min(vh / BASE_WIDTH, vw / BASE_HEIGHT);
+            currentScale = scale;
             container.style.transform = `translate(-50%, -50%) rotate(90deg) scale(${scale})`;
         } else {
             const scaleX = vw / BASE_WIDTH;
             const scaleY = vh / BASE_HEIGHT;
             const scale = Math.min(scaleX, scaleY);
+            currentScale = scale;
             container.style.transform = `translate(-50%, -50%) scale(${scale})`;
         }
     }
+
+    // 縦持ちスマホでの回転表示(rotate(90deg))中は、モーダル等のCSS
+    // overflow-y:autoによるネイティブのタッチスクロールが正しく効かない
+    // ブラウザがあるため、回転中だけタッチ位置の差分からscrollTopを直接
+    // 操作する簡易スクロールに切り替える（回転していない時はネイティブに任せる）
+    (function setupRotatedTouchScroll(){
+        const root = document.getElementById('game-container');
+        if(!root) return;
+        function findScrollable(el){
+            while(el && el!==root){
+                const cs = getComputedStyle(el);
+                if((cs.overflowY==='auto'||cs.overflowY==='scroll') && el.scrollHeight>el.clientHeight) return el;
+                el = el.parentElement;
+            }
+            return null;
+        }
+        let box=null, dragging=false, startX=0, startScrollTop=0;
+        root.addEventListener('touchstart', e=>{
+            if(!isMobileRotated || e.touches.length!==1) return;
+            box = findScrollable(e.target);
+            if(!box) return;
+            dragging=true; startX=e.touches[0].clientX; startScrollTop=box.scrollTop;
+        }, {passive:true});
+        root.addEventListener('touchmove', e=>{
+            if(!dragging || !box || !isMobileRotated) return;
+            e.preventDefault();
+            const dx = e.touches[0].clientX - startX;
+            box.scrollTop = startScrollTop - dx / (currentScale || 1);
+        }, {passive:false});
+        root.addEventListener('touchend', ()=>{ dragging=false; box=null; });
+    })();
 
     // ------------------ 確率・抽選ロジック ------------------
     
