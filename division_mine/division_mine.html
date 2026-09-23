@@ -511,6 +511,7 @@
         @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
 
     </style>
+    <script src="../tutorial-engine.js"></script>
 </head>
 <body>
 
@@ -573,6 +574,7 @@
             <div class="title-buttons">
                 <div id="title-menu-main" class="menu-container">
                     <button class="btn-green" onclick="Game.showLevelSelect()" style="width:100%" data-i18n="btn_start">はじめる</button>
+                    <button class="btn-gray" onclick="Game.startTutorial()" style="width:100%; background:linear-gradient(135deg,#ffca28,#ff8f00); border-color:#ffe082; color:#3e2723;" data-i18n="btn_tutorial">🔰 チュートリアル</button>
                     <button class="btn-blue" onclick="Game.showPlayerSelect()" style="width:100%" data-i18n="btn_player_select">プレーヤーをえらぶ</button>
                     <button class="btn-ranking" onclick="Ranking.show()" style="width:100%" data-i18n="btn_ranking">ランキング</button>
                     <button class="btn-gray" onclick="Game.showSettings()" style="width:100%; background:linear-gradient(135deg,#5c6bc0,#3949ab); border-color:#7986cb;" data-i18n="btn_settings">⚙ 設定</button>
@@ -702,7 +704,7 @@
 const STRINGS = {
     ja: {
         game_title: 'ザクザク発掘！<br>わりざん鉱山',
-        btn_start: 'はじめる', btn_player_select: 'プレーヤーをえらぶ', btn_ranking: 'ランキング', btn_settings: '⚙ 設定', btn_index: 'INDEXへ',
+        btn_start: 'はじめる', btn_tutorial: '🔰 チュートリアル', btn_player_select: 'プレーヤーをえらぶ', btn_ranking: 'ランキング', btn_settings: '⚙ 設定', btn_index: 'INDEXへ',
         settings_title: '⚙ 設定', settings_sub: '言語 / Language', lang_simple: 'かんたんなにほんご', lang_ja: '日本語', lang_en: 'English', btn_close: 'とじる',
         diff_prompt: 'なんいどをえらんでね', diff_easy: 'かんたん', diff_normal: 'ふつう', diff_hard: 'むずかしい', btn_back: 'もどる',
         btn_howto: 'あそびかた',
@@ -737,7 +739,7 @@ const STRINGS = {
     },
     simple: {
         game_title: 'ザクザク はっくつ！<br>わりざん こうざん',
-        btn_start: 'はじめる', btn_player_select: 'プレーヤーを えらぶ', btn_ranking: 'ランキング', btn_settings: '⚙ せってい', btn_index: 'INDEXへ',
+        btn_start: 'はじめる', btn_tutorial: '🔰 チュートリアル', btn_player_select: 'プレーヤーを えらぶ', btn_ranking: 'ランキング', btn_settings: '⚙ せってい', btn_index: 'INDEXへ',
         settings_title: '⚙ せってい', settings_sub: '言語 / Language', lang_simple: 'かんたんなにほんご', lang_ja: '日本語', lang_en: 'English', btn_close: 'とじる',
         diff_prompt: 'なんいどを えらんでね', diff_easy: 'かんたん', diff_normal: 'ふつう', diff_hard: 'むずかしい', btn_back: 'もどる',
         btn_howto: 'あそびかた',
@@ -772,7 +774,7 @@ const STRINGS = {
     },
     en: {
         game_title: 'Dig Deep!<br>Division Mine',
-        btn_start: 'Start', btn_player_select: 'Select Player', btn_ranking: 'Ranking', btn_settings: '⚙ Settings', btn_index: 'To INDEX',
+        btn_start: 'Start', btn_tutorial: '🔰 Tutorial', btn_player_select: 'Select Player', btn_ranking: 'Ranking', btn_settings: '⚙ Settings', btn_index: 'To INDEX',
         settings_title: '⚙ Settings', settings_sub: '言語 / Language', lang_simple: 'かんたんなにほんご', lang_ja: '日本語', lang_en: 'English', btn_close: 'Close',
         diff_prompt: 'Choose a Difficulty', diff_easy: 'Easy', diff_normal: 'Normal', diff_hard: 'Hard', btn_back: 'Back',
         btn_howto: 'How to Play',
@@ -1350,6 +1352,109 @@ class Game {
         document.getElementById('right-panel-game-info').style.display = 'block';
     }
     
+    // ============================================================
+    // チュートリアル（練習プレイ）
+    // ============================================================
+    // 実際の画面で「マスをなぞって わるかず ぶんずつ かこむ → ほうせきをとる → あまりがのこる」を体験する。
+    // 書き込みはエンジンが止めるので、ランキング・記録は一切汚れない。
+    static startTutorial() {
+        FGLTutorial.begin({ root: '#game-wrapper', getLang: () => currentLang });
+        const g = this;
+        this.startGame('EASY');
+        // 手順どおりに進むよう、マップと宝石を決めた値にする（11 ÷ 3 = 3 あまり 2）
+        //   たて3マスずつ 3列(A,B,C)をかこみ、いちばん右の2マス(D)があまり
+        //   A: ルビー / B: つるはし + トパーズ2こ / C: サファイア / D: モンスター(あまりなので かこまない)
+        this.stage = 2;
+        this.divisor = 3; this.dividend = 11;
+        this.groupsCollected = 0; this.selectedTiles = []; this.floatingTexts = [];
+        const G = GEMS;
+        const gem = { '0,0': G.RUBY, '0,1': G.TOPAZ, '1,1': G.DWARF, '2,1': G.TOPAZ, '0,2': G.SAPPHIRE, '0,3': G.MONSTER };
+        const cells = [];
+        for (let c = 0; c < 3; c++) for (let r = 0; r < 3; r++) cells.push([r, c]);
+        cells.push([0, 3], [1, 3]);
+        this.grid = cells.map(([r, c]) => ({ r, c, gem: gem[r + ',' + c] || G.NONE, collected: false, numOrder: 0, selected: false, groupId: null, groupOrder: null }));
+        this.gridOffset.x = (CANVAS_W - 4 * TILE_SIZE) / 2;
+        this.gridOffset.y = ((CANVAS_H - 100) - 3 * TILE_SIZE) / 2 + 100;
+        this.updateHUD();
+        // なぞれるマスを「いま かこむ列」だけにする／画面タップで次のステージへ進まないようにする
+        let allowed = null;
+        const origTry = this.trySelectTile.bind(this);
+        this.trySelectTile = function (tile) { if (allowed && !allowed.includes(tile)) return; origTry(tile); };
+        this.handleResultClick = function () {};
+        const col = (c) => g.grid.filter(t => t.c === c && t.r <= 2);
+        const cv = (x, y, w, h) => ({ sel: '#gameCanvas', rect: [x, y, w, h], of: [CANVAS_W, CANVAS_H], pad: 6 });
+        const tilesR = (ts) => {
+            const rs = ts.map(t => t.r), cs = ts.map(t => t.c);
+            const r0 = Math.min(...rs), r1 = Math.max(...rs), c0 = Math.min(...cs), c1 = Math.max(...cs);
+            return cv(g.gridOffset.x + c0 * TILE_SIZE, g.gridOffset.y + r0 * TILE_SIZE, (c1 - c0 + 1) * TILE_SIZE, (r1 - r0 + 1) * TILE_SIZE);
+        };
+        const gridR = () => tilesR(g.grid);
+        const tileR = (r, c) => tilesR([g.getTileByRC(r, c)]);
+        const cleared = (n) => () => g.groupsCollected >= n;
+        FGLTutorial.run([
+            { type: 'say', target: '#guide-text', pos: 'bottom', text: {
+                ja: 'このゲームは「わりざん」の宝探し！ 上に「11 を 3 でわろう」とあるね。11マスを、3マスずつのグループに分けるんだ。',
+                easy: 'このゲームは「わりざん」のたからさがし！ うえに「11 を 3 でわろう」とあるね。11マスを、3マスずつのグループにわけるんだ。',
+                en: 'This is a treasure hunt using division! The top says to divide 11 by 3. You split the 11 squares into groups of 3.' } },
+            { type: 'say', target: gridR, pos: 'bottom', text: {
+                ja: 'この茶色いマスが11コ。マスを指でなぞって、たて・よこにつながった「3マス」をかこもう。かこんだところは黒くなるよ。',
+                easy: 'このちゃいろいマスが11こ。マスをゆびでなぞって、たて・よこにつながった「3マス」をかこもう。かこんだところはくろくなるよ。',
+                en: 'These 11 brown squares are the field. Trace a path of 3 connected squares (up/down/left/right) to enclose them; enclosed squares turn dark.' } },
+            { type: 'say', target: '#left-panel', pos: 'bottom', text: {
+                ja: 'マスの中には宝石が隠れているよ。かこむと宝石がもらえて、左の表のとおり、ダイヤがいちばん高い！',
+                easy: 'マスのなかにはほうせきがかくれているよ。かこむとほうせきがもらえて、ひだりのひょうのとおり、ダイヤがいちばんたかい！',
+                en: 'Gems are hidden in the squares. Enclose them to collect them — diamonds are worth the most, as the table on the left shows!' } },
+            { type: 'say', target: () => tilesR(col(0)), pos: 'bottom', text: {
+                ja: 'いちばん左の列に「ルビー」があるね。この3マスをかこもう！',
+                easy: 'いちばんひだりのれつに「ルビー」があるね。この3マスをかこもう！',
+                en: 'There\'s a "ruby" in the leftmost column. Let\'s enclose these 3 squares!' } },
+            { type: 'run', fn: () => { allowed = col(0); } },
+            { type: 'do', target: () => tilesR(col(0)), pos: 'bottom', until: cleared(1), text: {
+                ja: '光っている3マスを、上から下へ、指（マウス）でなぞろう。なぞりおわって指をはなすとかこめるよ！',
+                easy: 'ひかっている3マスを、うえからしたへ、ゆび（マウス）でなぞろう。なぞりおわってゆびをはなすとかこめるよ！',
+                en: 'Trace the 3 glowing squares from top to bottom with your finger (mouse). Release at the end to enclose them!' } },
+            { type: 'say', target: '#right-panel-game-info', pos: 'bottom', text: {
+                ja: 'ルビーをゲット！ ここに集めた宝石の数が出るよ。ゲームの最後に、宝石の数×値段が「かせいだお金」になる！',
+                easy: 'ルビーをゲット！ ここにあつめたほうせきのかずがでるよ。ゲームのさいごに、ほうせきのかず×ねだんが「かせいだおかね」になる！',
+                en: 'You got a ruby! The number of collected gems shows here. At the end, gems × price becomes your money!' } },
+            { type: 'say', target: () => tileR(1, 1), pos: 'bottom', text: {
+                ja: 'つぎの列には「⛏️つるはし」があるよ。つるはしといっしょにかこむと、とれる宝石が2ばいになる！',
+                easy: 'つぎのれつには「⛏️つるはし」があるよ。つるはしといっしょにかこむと、とれるほうせきが2ばいになる！',
+                en: 'The next column has a "⛏️ pickaxe". Enclose it together with gems and you get double!' } },
+            { type: 'run', fn: () => { allowed = col(1); } },
+            { type: 'do', target: () => tilesR(col(1)), pos: 'bottom', until: cleared(2), text: {
+                ja: 'トパーズ2つと⛏️のあるこの列を、上から下へなぞってかこもう！',
+                easy: 'トパーズ2つと⛏️のあるこのれつを、うえからしたへなぞってかこもう！',
+                en: 'Trace this column with two topazes and the ⛏️ from top to bottom!' } },
+            { type: 'say', target: '#right-panel-game-info', pos: 'bottom', text: {
+                ja: 'トパーズ2つが、つるはしで2ばいになって「4こ」ふえたよ！',
+                easy: 'トパーズ2つが、つるはしで2ばいになって「4こ」ふえたよ！',
+                en: 'Two topazes doubled by the pickaxe — you gained 4!' } },
+            { type: 'say', target: () => tilesR(g.grid.filter(t => t.c === 3)), pos: 'bottom', text: {
+                ja: '右のはしの2マスには「👾モンスター」がいるね。モンスターといっしょにかこむと、そのグループの宝石をぜんぶ食べられちゃう！',
+                easy: 'みぎのはしの2マスには「👾モンスター」がいるね。モンスターといっしょにかこむと、そのグループのほうせきをぜんぶたべられちゃう！',
+                en: 'The two squares at the right edge hold a "👾 monster". If you enclose a monster, it eats all the gems in that group!' } },
+            { type: 'say', target: () => tilesR(g.grid.filter(t => t.c === 3)), pos: 'bottom', text: {
+                ja: 'でも 11 ÷ 3 = 3 あまり 2。あまりの2マスは、かこまなくていいんだ！ モンスターを「あまり」にするのが、わりざんパズルのコツだよ。',
+                easy: 'でも 11 ÷ 3 = 3 あまり 2。あまりの2マスは、かこまなくていいんだ！ モンスターを「あまり」にするのが、わりざんパズルのコツだよ。',
+                en: 'But 11 ÷ 3 = 3 remainder 2, so these last 2 squares don\'t need to be enclosed! Leaving the monster as the remainder is the trick of this puzzle.' } },
+            { type: 'run', fn: () => { allowed = col(2); } },
+            { type: 'do', target: () => tilesR(col(2)), pos: 'bottom', until: cleared(3), text: {
+                ja: '最後は、サファイアのある列！ 上から下へなぞってかこもう。',
+                easy: 'さいごは、サファイアのあるれつ！ うえからしたへなぞってかこもう。',
+                en: 'Last is the column with the sapphire! Trace it from top to bottom.' } },
+            { type: 'run', fn: () => FGLTutorial.wait(() => !document.getElementById('screen-result').classList.contains('hidden'), 6000) },
+            { type: 'say', target: '#guide-text', pos: 'bottom', text: {
+                ja: '3グループかこんで、のこりは あまりの2マス。「11 ÷ 3 ＝ 3 あまり 2」でステージクリア！ ふつうは画面をタップして次のステージへ進むよ。',
+                easy: '3グループかこんで、のこりは あまりの2マス。「11 ÷ 3 ＝ 3 あまり 2」でステージクリア！ ふつうはがめんをタップしてつぎのステージへすすむよ。',
+                en: 'You enclosed 3 groups, leaving 2 squares as the remainder: "11 ÷ 3 = 3 remainder 2" — stage clear! Normally you tap the screen to go to the next stage.' } },
+            { type: 'say', target: '#guide-text', pos: 'bottom', text: {
+                ja: 'ステージが進むほど、わるかずが大きくなるよ（全部で9ステージ）。ときどき出る「📦宝箱」は、開けるといいことがあるかも！ では、いっぱい掘りあてよう！',
+                easy: 'ステージがすすむほど、わるかずがおおきくなるよ（ぜんぶで9ステージ）。ときどきでる「📦たからばこ」は、あけるといいことがあるかも！ では、いっぱいほりあてよう！',
+                en: 'The divisor grows as stages advance (9 stages in all). Sometimes a "📦 chest" appears — open it for a surprise! Now go dig up lots of treasure!' } }
+        ]);
+    }
+
     static giveUp() {
         if (this.state !== 'PLAY') return;
         this.gameOver(T('reason_retire'));
