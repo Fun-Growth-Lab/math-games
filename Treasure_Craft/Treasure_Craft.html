@@ -71,6 +71,7 @@
             background: #fff; color: #2c3e50;
         }
     </style>
+    <script src="../tutorial-engine.js"></script>
 </head>
 <body>
 
@@ -240,6 +241,7 @@ const STRINGS = {
         title_main: "トレジャー＆クラフト",
         title_sub: "～7つの秘境と幻の竜～",
         btn_start: "はじめる",
+        btn_tutorial: "🔰 チュートリアル",
         btn_settings: "設定",
         btn_ranking: "ランキング",
         btn_index: "INDEXへ",
@@ -409,6 +411,7 @@ const STRINGS = {
         title_main: "トレジャー＆クラフト",
         title_sub: "～ななつの ひきょうと まぼろしの りゅう～",
         btn_start: "はじめる",
+        btn_tutorial: "🔰 チュートリアル",
         btn_settings: "せってい",
         btn_ranking: "ランキング",
         btn_index: "INDEXへ",
@@ -578,6 +581,7 @@ const STRINGS = {
         title_main: "Treasure & Craft",
         title_sub: "~ 7 Hidden Realms and the Phantom Dragon ~",
         btn_start: "Start",
+        btn_tutorial: "🔰 Tutorial",
         btn_settings: "Settings",
         btn_ranking: "Ranking",
         btn_index: "To Index",
@@ -1170,6 +1174,143 @@ function unequipItemByUid(uid) {
     }
 }
 
+// ==========================================
+// チュートリアル（練習プレイ）
+// ==========================================
+// 実際の画面で「お店で材料とレシピを買う → 合成して装備 → 探索でアイテムを集める」を体験する。
+// 書き込みはエンジンが止めるので、セーブデータ・ランキングは一切汚れない。
+function startTutorial() {
+    FGLTutorial.begin({ root: '#gameContainer', getLang: () => currentLang });
+    initializeGame();
+    gameData.gold = 500;
+    activePopup = null; showHelp = false;
+    currentInvTab = "ALL"; invPage = 0; craftTabLevel = 1; shopTab = "COMMON"; shopPage = 0;
+    const cv = (x, y, w, h) => ({ sel: '#gameCanvas', rect: [x, y, w, h], of: [1280, 720], pad: 6 });
+    const statusR = () => cv(20, 20, 330, 680);
+    const centerR = () => cv(370, 20, 410, 680);
+    const invR = () => cv(800, 20, 460, 680);
+    const msgR = () => cv(380, 255, 390, 255);
+    const apR = () => cv(30, 180, 310, 80);
+    const slotsR = () => cv(30, 370, 310, 250);
+    const menuBtnsR = () => cv(390, 530, 370, 140);
+    const exploreBtnR = () => cv(390, 530, 175, 60);
+    const shopBtnR = () => cv(585, 530, 175, 60);
+    const restBtnR = () => cv(390, 610, 175, 60);
+    const buyR = (i) => cv(700, 170 + 65 * i, 60, 35);
+    const shopTabR = () => cv(390, 100, 400, 30);
+    const shopBackR = () => cv(390, 650, 80, 40);
+    const lv1TabR = () => cv(445, 120, 40, 30);
+    const invTabsR = () => cv(820, 110, 430, 35);
+    const craftTabR = () => cv(895, 130, 70, 35);
+    const allTabR = () => cv(820, 130, 70, 35);
+    const craftListR = () => cv(810, 175, 440, 130);
+    const craftBtnR = () => cv(1150, 245, 80, 40);
+    const equipBtnR = () => cv(1120, 185, 60, 30);
+    const invListR = () => cv(810, 165, 440, 70);
+    const stageBtnR = () => cv(670, 85, 90, 40);
+    const advanceBtnR = () => cv(390, 580, 115, 60);
+    const skipBtnR = () => cv(515, 580, 115, 60);
+    const returnBtnR = () => cv(640, 580, 115, 60);
+    FGLTutorial.run([
+        { type: 'say', target: statusR, pos: 'bottom', text: {
+            ja: 'ここは「ステータス」。レベル・経験値・APと日数、攻撃・防御・魔力、そして身につけている装備が見られるよ。',
+            easy: 'ここは「ステータス」。レベル・けいけんち・APとにっすう、こうげき・ぼうぎょ・まりょく、そしてみにつけているそうびがみられるよ。',
+            en: 'This is the Status panel: level, EXP, AP and days, your attack/defense/magic, and the gear you\'re wearing.' } },
+        { type: 'say', target: apR, pos: 'bottom', text: {
+            ja: '「AP」は行動ポイント。ものを作る・探索するなどで1ずつ減って、0になると何もできないよ。「やすむ」と回復して日数が1日進む。',
+            easy: '「AP」はこうどうポイント。ものをつくる・たんけんするなどで1ずつへって、0になるとなにもできないよ。「やすむ」とかいふくしてにっすうが1にちすすむ。',
+            en: '"AP" is your action points. Crafting or exploring costs 1 each, and at 0 you can\'t act. "Rest" restores AP and advances a day.' } },
+        { type: 'say', target: invR, pos: 'bottom', text: {
+            ja: '右は「持ち物」。集めた素材や作った装備が入るよ。上のタブで「作る」「強化」画面にも切りかえられる。',
+            easy: 'みぎは「もちもの」。あつめたそざいやつくったそうびがはいるよ。うえのタブで「つくる」「きょうか」がめんにもきりかえられる。',
+            en: 'On the right is your Inventory: collected materials and crafted gear. The tabs at the top switch to the Craft and Enhance screens.' } },
+        { type: 'say', target: menuBtnsR, pos: 'top', text: {
+            ja: '中央のボタンで行動を選ぶよ。「探索」で素材を集め、「お店」で材料とレシピを買い、「休む」でAPを回復、「終了」でタイトルにもどる（自動セーブされるよ）。',
+            easy: 'ちゅうおうのボタンでこうどうをえらぶよ。「たんさく」でそざいをあつめ、「おみせ」でざいりょうとレシピをかい、「やすむ」でAPをかいふく、「おわる」でタイトルにもどる（じどうセーブされるよ）。',
+            en: 'The center buttons choose your action: Explore for materials, Shop for parts and recipes, Rest to restore AP, and End to return to the title (progress is auto-saved).' } },
+        { type: 'do', target: shopBtnR, pos: 'top', until: () => GAME_STATE === 'SHOP', text: {
+            ja: 'まずは「お店」に行ってみよう！ ボタンを押してね。',
+            easy: 'まずは「おみせ」にいってみよう！ ボタンをおしてね。',
+            en: 'Let\'s visit the Shop first! Press the button.' } },
+        { type: 'say', target: centerR, pos: 'bottom', text: {
+            ja: 'お店には、いつでも買える「共通パーツ」（棒・ひも・布…）と、装備の作り方が書かれた「レシピ」が売っているよ。所持金は 500G ある！',
+            easy: 'おみせには、いつでもかえる「きょうつうパーツ」（ぼう・ひも・ぬの…）と、そうびのつくりかたがかかれた「レシピ」がうっているよ。しょじきんは 500G ある！',
+            en: 'The shop sells common parts (stick, string, cloth…) and recipes that teach you how to craft gear. You have 500G!' } },
+        { type: 'do', target: () => buyR(1), pos: 'top', until: () => countItem(2) >= 1, text: {
+            ja: '「ひも」の「買う」ボタンを押して、ひもを1つ買おう！ （木の盾をつくる材料だよ）',
+            easy: '「ひも」の「かう」ボタンをおして、ひもを1つかおう！ （きのたてをつくるざいりょうだよ）',
+            en: 'Press "Buy" next to the string (ひも) to buy one! It\'s an ingredient for a wooden shield.' } },
+        { type: 'do', target: lv1TabR, pos: 'top', until: () => shopTab === 'LV1', text: {
+            ja: '次は「レシピ」。「Lv1」のタブを押して、はじまりの森のレシピを見てみよう！',
+            easy: 'つぎは「レシピ」。「Lv1」のタブをおして、はじまりのもりのレシピをみてみよう！',
+            en: 'Now recipes. Press the "Lv1" tab to see the recipes for the first area!' } },
+        { type: 'do', target: () => buyR(1), pos: 'top', until: () => gameData.unlockedRecipes.includes(145), text: {
+            ja: '上から2つ目の「木の盾のレシピ」の「買う」ボタンを押そう！ 一度買えば、作り方はずっと覚えているよ。',
+            easy: 'うえから2つめの「きのたてのレシピ」の「かう」ボタンをおそう！ いちどかえば、つくりかたはずっとおぼえているよ。',
+            en: 'Press "Buy" on the 2nd recipe, the Wooden Shield recipe (木の盾)! Once bought, you remember it forever.' } },
+        { type: 'do', target: shopBackR, pos: 'top', until: () => GAME_STATE === 'MAIN', text: {
+            ja: '材料とレシピがそろったね。「もどる」ボタンでメイン画面にもどろう！',
+            easy: 'ざいりょうとレシピがそろったね。「もどる」ボタンでメインがめんにもどろう！',
+            en: 'You have the parts and the recipe. Press "Back" to return to the main screen!' } },
+        { type: 'do', target: craftTabR, pos: 'bottom', until: () => currentInvTab === 'CRAFT', text: {
+            ja: '持ち物の上にある「作る」タブを押してみよう！',
+            easy: 'もちもののうえにある「つくる」タブをおしてみよう！',
+            en: 'Press the "Craft" tab above your inventory!' } },
+        { type: 'say', target: craftListR, pos: 'bottom', text: {
+            ja: '作れる装備が並んでいるよ。「木の盾」は「木」と「ひも」で作れる。どちらも持っているから、ボタンが青くなっているね！ 作るとAPを1つ使うよ。',
+            easy: 'つくれるそうびがならんでいるよ。「きのたて」は「き」と「ひも」でつくれる。どちらももっているから、ボタンがあおくなっているね！ つくるとAPを1つつかうよ。',
+            en: 'The gear you can craft is listed. A wooden shield needs wood and string — you have both, so the button is blue! Crafting costs 1 AP.' } },
+        { type: 'do', target: craftBtnR, pos: 'bottom', until: () => countItem(8) >= 1, text: {
+            ja: '「木の盾」の「作る」ボタンを押そう！',
+            easy: '「きのたて」の「つくる」ボタンをおそう！',
+            en: 'Press "Craft" on the wooden shield!' } },
+        { type: 'do', target: allTabR, pos: 'bottom', until: () => currentInvTab === 'ALL', text: {
+            ja: '木の盾ができた！ 「全部」のタブにもどって、持ち物を見てみよう。',
+            easy: 'きのたてができた！ 「ぜんぶ」のタブにもどって、もちものをみてみよう。',
+            en: 'You made a wooden shield! Go back to the "All" tab to look at your inventory.' } },
+        { type: 'say', target: invListR, pos: 'bottom', text: {
+            ja: '⭐の数は、その装備のできの良さ。同じ装備でも、強いものと弱いものがランダムで作られるよ。',
+            easy: '⭐のかずは、そのそうびのできのよさ。おなじそうびでも、つよいものとよわいものがランダムでつくられるよ。',
+            en: 'The number of ⭐ shows how good the gear turned out. The same item can come out stronger or weaker at random.' } },
+        { type: 'do', target: equipBtnR, pos: 'bottom', until: () => !!gameData.equipment.shield, text: {
+            ja: '木の盾の「装備」ボタンを押して、身につけよう！',
+            easy: 'きのたての「そうび」ボタンをおして、みにつけよう！',
+            en: 'Press "Equip" on the wooden shield to wear it!' } },
+        { type: 'say', target: slotsR, pos: 'bottom', text: {
+            ja: '装備した盾が、ステータスの下に表示されて、防御力があがったよ。武器・鎧・装飾品・薬もここに装備できる。',
+            easy: 'そうびしたたてが、ステータスのしたにひょうじされて、ぼうぎょりょくがあがったよ。ぶき・よろい・そうしょくひん・くすりもここにそうびできる。',
+            en: 'The shield now appears under Status and your defense went up. Weapons, armor, accessories and potions can be equipped here too.' } },
+        { type: 'do', target: exploreBtnR, pos: 'top', until: () => GAME_STATE === 'EXPLORE_SELECT', text: {
+            ja: 'つぎは冒険！ 「探索」ボタンを押そう。',
+            easy: 'つぎはぼうけん！ 「たんさく」ボタンをおそう。',
+            en: 'Now the adventure! Press the Explore button.' } },
+        { type: 'do', target: stageBtnR, pos: 'top', until: () => GAME_STATE === 'EXPLORING', text: {
+            ja: '行き先をえらぶよ。最初に行けるのは「はじまりの森」。「探索」ボタンを押そう！ 強くなると、先の場所へ行けるようになるよ。',
+            easy: 'いきさきをえらぶよ。さいしょにいけるのは「はじまりのもり」。「たんさく」ボタンをおそう！ つよくなると、さきのばしょへいけるようになるよ。',
+            en: 'Choose where to go. You can start at the "Beginning Forest". Press Explore! Places further on open up as you get stronger.' } },
+        { type: 'do', target: advanceBtnR, pos: 'top', until: () => exploreData.currentFloor >= 1, text: {
+            ja: '「進む」ボタンで、1階ずつ奥へすすむよ（APを1つ使う）。アイテムが手に入るかも！ 押してみよう！',
+            easy: '「すすむ」ボタンで、1かいずつおくへすすむよ（APを1つつかう）。アイテムがてにはいるかも！ おしてみよう！',
+            en: 'The "Advance" button goes one floor deeper (1 AP). You may find items! Give it a try!' } },
+        { type: 'say', target: msgR, pos: 'top', text: {
+            ja: 'メッセージ欄に、見つけたアイテムが出るよ。ふつうの拾い物は「売って」お金にして、素材はレシピと合わせて新しい装備作りに使おう。',
+            easy: 'メッセージらんに、みつけたアイテムがでるよ。ふつうのひろいものは「うって」おかねにして、そざいはレシピとあわせてあたらしいそうびづくりにつかおう。',
+            en: 'Items you find appear in the message box. Sell ordinary junk for money, and use materials with recipes to craft new gear.' } },
+        { type: 'say', target: skipBtnR, pos: 'top', text: {
+            ja: '「スキップ」は、行けるところまで一気にすすむボタン。APが足りなくなったり、強すぎる敵がいたりすると、そこで自動で帰ってくるよ。',
+            easy: '「スキップ」は、いけるところまでいっきにすすむボタン。APがたりなくなったり、つよすぎるてきがいたりすると、そこでじどうでかえってくるよ。',
+            en: '"Skip" advances as far as it can in one go. If you run out of AP or meet something too strong, you\'re brought back automatically.' } },
+        { type: 'do', target: returnBtnR, pos: 'top', until: () => GAME_STATE === 'MAIN', text: {
+            ja: '今日はここまで。「帰る」ボタンで町にもどろう！',
+            easy: 'きょうはここまで。「かえる」ボタンでまちにもどろう！',
+            en: 'That\'s enough for today. Press "Return" to go back to town!' } },
+        { type: 'say', target: restBtnR, pos: 'top', text: {
+            ja: 'APがなくなったら「休む」！ APが全回復して次の日になるよ。装備を強くして、7つの秘境を進み、最後の「竜の火口」を目指そう。はやくクリアするほどランキングの上位だよ！',
+            easy: 'APがなくなったら「やすむ」！ APがぜんかいふくしてつぎのひになるよ。そうびをつよくして、7つのひきょうをすすみ、さいごの「りゅうのかこう」をめざそう。はやくクリアするほどランキングのじょういだよ！',
+            en: 'When your AP runs out, "Rest"! AP is fully restored and a new day begins. Strengthen your gear, push through the 7 hidden lands, and reach the final Dragon Crater. The faster you clear it, the higher you rank!' } }
+    ]);
+}
+
 // --- タイトル画面 ---
 function renderTitle() {
     drawImageRect('title', 0, 0, 1280, 720);
@@ -1209,6 +1350,8 @@ function renderTitle() {
     }, false, '#7a4a10');
 
     drawBtn(T('btn_index'), rightX, row2Y, bW, bH, '#e2f0cb', () => { window.location.href = "../index.html"; }, false, '#3d5a1f');
+
+    drawBtn(T('btn_tutorial'), 640 - bW / 2, startY + (bH + gapY) * 2, bW, bH, '#fff59d', () => { startTutorial(); }, false, '#5d4037');
 }
 
 function loginWithGoogle() {}
