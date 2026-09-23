@@ -149,6 +149,7 @@ canvas{position:absolute;top:0;left:0;touch-action:none;}
 .ach-label{font-size:0.6rem;line-height:1.2;opacity:0.9;}
 .ach-date{font-size:0.52rem;opacity:0.7;line-height:1.1;}
 </style>
+    <script src="../tutorial-engine.js"></script>
 </head>
 <body>
 <div id="container">
@@ -163,6 +164,7 @@ canvas{position:absolute;top:0;left:0;touch-action:none;}
     <div class="title-box">
       <div id="title-main-menu" style="display:flex;flex-direction:column;align-items:center;width:100%;">
         <button id="btn-start-menu" class="btn btn-green" style="font-size:1.2rem;margin-bottom:10px;" data-i18n="btn.play">はじめる</button>
+        <button id="btn-tutorial" class="btn" style="background:linear-gradient(to bottom,#ffb74d,#f57c00);border-color:#ffd180;color:#3e2723;" data-i18n="btn.tutorial">🔰 チュートリアル</button>
         <button id="player-select-btn" class="btn-player">
           <span style="font-size:1.5rem;">👤</span>
           <span id="current-player-name-display">ゲスト</span>
@@ -323,6 +325,7 @@ const STRINGS={
   ja:{
     'title.sub':'トライスクエア',
     'btn.play':'▶ はじめる',
+    'btn.tutorial':'🔰 チュートリアル',
     'player.changesuffix':'(へんこう)',
     'btn.ranking':'🏆 ランキング',
     'btn.achievement':'🎖️ 実績',
@@ -377,6 +380,7 @@ const STRINGS={
   simple:{
     'title.sub':'トライスクエア',
     'btn.play':'▶ はじめる',
+    'btn.tutorial':'🔰 チュートリアル',
     'player.changesuffix':'(へんこう)',
     'btn.ranking':'🏆 ランキング',
     'btn.achievement':'🎖️ じっせき',
@@ -431,6 +435,7 @@ const STRINGS={
   en:{
     'title.sub':'Triangle & Square Puzzle',
     'btn.play':'▶ Start',
+    'btn.tutorial':'🔰 Tutorial',
     'player.changesuffix':'(change)',
     'btn.ranking':'🏆 Ranking',
     'btn.achievement':'🎖️ Achievements',
@@ -1797,6 +1802,103 @@ document.getElementById('btn-back-to-menu').addEventListener('click',()=>{
 ['easy','normal','hard'].forEach(d=>{
   document.getElementById('btn-'+d).addEventListener('click',()=>{G.difficulty=d; startGame();});
 });
+// ============================================================
+//  チュートリアル（練習プレイ）
+// ============================================================
+// 実際の盤面で「ブロックを回してぴったりはめ、全部うめてステージクリア」を体験する。
+// 書き込みはエンジンが止めるので、ランキング・実績は一切汚れない。
+function startTutorial(){
+  FGLTutorial.begin({ root:'#container', getLang:()=>currentLang });
+  G.difficulty='easy';
+  startGame();
+  // 手順どおりに進むよう、盤面と手札を決めた値にする（3×3。まん中と左下だけがあいている）
+  const fillCell=(r,c,cat)=>{ for(const t of [0,1]){ const i=gIdx(r,c,t); G.grid[i]=1; G.gridCat[i]=cat; } };
+  const cats=[[2,3,5],[4,0,1],[0,0,3]];
+  for(let r=0;r<GN;r++) for(let c=0;c<GN;c++){
+    if((r===1&&c===1)||(r===2&&c===0)) continue;
+    fillCell(r,c,cats[r][c]||1);
+  }
+  G.grid[gIdx(2,0,0)]=1; G.gridCat[gIdx(2,0,0)]=2;   // 左下のマスは、左上の三角だけうまっている
+  G.bonusCells=[{r:1,c:1,mp:3,dir:0}];                // まん中の上向き三角がボーナス×3
+  G.hand=[{defId:1,rot:0,flipped:false},{defId:0,rot:0,flipped:false},{defId:4,rot:0,flipped:false}];
+  G.placedSinceDiscard=[5,5,5];
+  // てじゅんどおりの置き方以外はできないようにする
+  let want=null;
+  const origPlace=place, origDiscard=discard;
+  place=function(hi,ar,ac){
+    if(want && !(want.hi===hi && want.r===ar && want.c===ac)) return;
+    origPlace(hi,ar,ac);
+  };
+  discard=function(hi){ if(want) return; origDiscard(hi); };
+  const cv=(x,y,w,h)=>({ sel:'#cvs', rect:[x,y,w,h], of:[W,H], pad:6 });
+  const gridR=()=>cv(GX-5,GY-5,GN*CELL+10,GN*CELL+10);
+  const cellR=(r,c)=>cv(GX+c*CELL,GY+r*CELL,CELL,CELL);
+  const infoR=()=>cv(PX,8,PW,148);
+  const handR=()=>cv(PX+4,CY,PW-8,CH);
+  const cardR=(i)=>cv(cardX(i),CY,CARD_W,CH);
+  const rotR=(i)=>{ const b=BR['r'+i]; return cv(b.x,b.y,b.w,b.h); };
+  const bothR=()=>cv(GX-5,GY-5,PX+PW-GX+5,CY+CH+6+46+6+44-GY+5);
+  const discardR=()=>cv(PX+4,CY+CH+6+46+6,PW-8,44);
+  const allR=()=>cv(0,0,W,H);
+  FGLTutorial.run([
+    { type:'say', target:gridR, pos:'bottom', text:{
+      ja:'ここが盤面。マスは、ななめの線で2つの「三角」に分かれているよ。ここにブロックを置いて、すべてのマスをうめるとステージクリア！ 今回はやさしい 3×3 だよ。',
+      easy:'ここがばんめん。マスは、ななめのせんで2つの「さんかく」にわかれているよ。ここにブロックをおいて、すべてのマスをうめるとステージクリア！ こんかいはやさしい 3×3 だよ。',
+      en:'This is the board. Each square is split by a diagonal into two triangles. Place blocks to fill every square and clear the stage! This is the easy 3×3 grid.' } },
+    { type:'say', target:handR, pos:'bottom', text:{
+      ja:'これが手札のブロック。三角や四角がくっついた、いろいろな形があるよ。ブロックの上の「◯pt」がそのブロックの得点。大きな形ほど高得点！',
+      easy:'これがてふだのブロック。さんかくやしかくがくっついた、いろいろなかたちがあるよ。ブロックのうえの「◯pt」がそのブロックのとくてん。おおきなかたちほどこうとくてん！',
+      en:'These are your hand blocks, made of triangles and squares. The "pt" above each block is its score — bigger shapes score more!' } },
+    { type:'say', target:()=>cellR(1,1), pos:'bottom', text:{
+      ja:'まん中のマスに、光る三角があるね。これは「ボーナス」！ ここをおおうようにブロックを置くと、得点が「×3」になるよ（×2〜×5がある）。',
+      easy:'まんなかのマスに、ひかるさんかくがあるね。これは「ボーナス」！ ここをおおうようにブロックをおくと、とくてんが「×3」になるよ（×2〜×5がある）。',
+      en:'See the glowing triangle in the middle square? That\'s a "bonus"! Cover it with a block and the score is multiplied ×3 (it can be ×2 to ×5).' } },
+    { type:'run', fn:()=>{ want={hi:0,r:1,c:1}; } },
+    { type:'do', target:bothR, pos:'top', until:()=>G.score>0, text:{
+      ja:'左の「四角」のブロックを、まん中のマスにドラッグして置いてみよう！',
+      easy:'ひだりの「しかく」のブロックを、まんなかのマスにドラッグしておいてみよう！',
+      en:'Drag the left "square" block onto the middle square!' } },
+    { type:'say', target:infoR, pos:'bottom', text:{
+      ja:'きまった！ 四角ブロックは 20pt。ボーナスをおおったので ×3 で「60pt」入ったよ。スコアは「置いたブロックの得点の合計」だよ。',
+      easy:'きまった！ しかくブロックは 20pt。ボーナスをおおったので ×3 で「60pt」はいったよ。スコアは「おいたブロックのとくてんのごうけい」だよ。',
+      en:'Nice! The square block is worth 20pt, and covering the bonus made it ×3 = 60pt. Your score is the total of all blocks you place.' } },
+    { type:'say', target:()=>cellR(2,0), pos:'top', text:{
+      ja:'のこりはあと1マス！ 左下のマスは、左上の三角だけうまっていて、右下の三角があいているね。ここに「三角」を1つ入れれば完成だ！',
+      easy:'のこりはあと1マス！ ひだりしたのマスは、ひだりうえのさんかくだけうまっていて、みぎしたのさんかくがあいているね。ここに「さんかく」を1ついれれば かんせいだ！',
+      en:'Just one square left! The bottom-left square has only its upper-left triangle filled; the lower-right is empty. Put one triangle there to finish!' } },
+    { type:'say', target:()=>cardR(1), pos:'bottom', text:{
+      ja:'まん中の手札が「三角」ブロック。でも向きが合っていないね（いまは左上向き）。そんなときは「回転」ボタンで向きを変えよう。',
+      easy:'まんなかのてふだが「さんかく」ブロック。でもむきがあっていないね（いまはひだりうえむき）。そんなときは「かいてん」ボタンでむきをかえよう。',
+      en:'The middle hand block is a triangle, but it faces the wrong way (upper-left). Use the rotate button to turn it.' } },
+    { type:'do', target:()=>rotR(1), pos:'top', until:()=>{ const q=G.hand[1]; return q && getPEls(q)[0].t===1; }, text:{
+      ja:'三角ブロックの下にある「↻」ボタンを押して、右下向き（◢）になるまで回そう！ 「↔」ボタンは左右反転だよ。',
+      easy:'さんかくブロックのしたにある「↻」ボタンをおして、みぎしたむき（◢）になるまでまわそう！ 「↔」ボタンはさゆうはんてんだよ。',
+      en:'Press the "↻" button under the triangle until it points to the lower right (◢)! The "↔" button flips it left-right.' } },
+    { type:'run', fn:()=>{ want={hi:1,r:2,c:0}; } },
+    { type:'do', target:bothR, pos:'top', until:()=>G.phase==='stage_clear', text:{
+      ja:'向きがそろったよ！ その三角ブロックを、左下のマスにドラッグして置こう！',
+      easy:'むきがそろったよ！ そのさんかくブロックを、ひだりしたのマスにドラッグしておこう！',
+      en:'It\'s facing the right way! Drag that triangle onto the bottom-left square!' } },
+    { type:'run', fn:()=>{ want=null; } },
+    { type:'say', target:allR, pos:'top', text:{
+      ja:'ぜんぶのマスがうまった！ ステージクリア！ ごほうびに、3つのブロックから1つえらべるよ。',
+      easy:'ぜんぶのマスがうまった！ ステージクリア！ ごほうびに、3つのブロックから1つえらべるよ。',
+      en:'Every square is filled — stage clear! As a reward you can pick one of three blocks.' } },
+    { type:'do', target:allR, pos:'top', until:()=>G.stage===2, text:{
+      ja:'すきなブロックを1つタップしよう！ えらんだブロックはレベルアップして「pt」が上がり、次のステージの手札にも入るよ。',
+      easy:'すきなブロックを1つタップしよう！ えらんだブロックはレベルアップして「pt」があがり、つぎのステージのてふだにもはいるよ。',
+      en:'Tap any block you like! It levels up (more pt) and also appears in your next stage\'s hand.' } },
+    { type:'say', target:discardR, pos:'top', text:{
+      ja:'ブロックを5回おくと、この「🗑️」が光って、手札を1つ捨てて入れかえられるよ。置けないときの助けになる！ 3つとも置けなくて捨てられないとゲームオーバー。',
+      easy:'ブロックを5かいおくと、この「🗑️」がひかって、てふだを1つすてていれかえられるよ。おけないときのたすけになる！ 3つともおけなくてすてられないとゲームオーバー。',
+      en:'After placing 5 blocks, this "🗑️" lights up and lets you discard one hand block. It helps when you\'re stuck! If none of the 3 fit and you can\'t discard, it\'s game over.' } },
+    { type:'say', target:infoR, pos:'bottom', text:{
+      ja:'ステージがすすむほど、ぜんぶうめるのはむずかしくなるよ。むずかしい難易度は、四すみが欠けた「八角形」の盤面！ では、どこまでステージをクリアできるかな？',
+      easy:'ステージがすすむほど、ぜんぶうめるのはむずかしくなるよ。むずかしいレベルは、よすみがかけた「はっかくけい」のばんめん！ では、どこまでステージをクリアできるかな？',
+      en:'The further you go, the harder it is to fill everything. Hard mode uses an octagon board with cut corners! How many stages can you clear?' } }
+  ]);
+}
+document.getElementById('btn-tutorial').addEventListener('click',()=>startTutorial());
 document.getElementById('btn-view-ranking').addEventListener('click',showRanking);
 document.getElementById('btn-close-ranking').addEventListener('click',closeRanking);
 document.getElementById('btn-view-achievement').addEventListener('click',openAchievements);
