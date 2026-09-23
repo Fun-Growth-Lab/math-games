@@ -294,6 +294,7 @@
         /* ── CHANGE CONFIRM ── */
         #change-confirm-overlay .overlay-box { max-width:440px; }
     </style>
+    <script src="../tutorial-engine.js"></script>
 </head>
 <body>
 <div id="container">
@@ -348,6 +349,7 @@
                 <span id="title-player-name" style="font-weight:bold; color:#4fc3f7; font-size:1.15rem;">ななしさん</span>
             </div>
             <button id="btn-start" class="btn btn-success title-btn">はじめる</button>
+            <button id="btn-tutorial" class="btn title-btn" style="background:linear-gradient(135deg,#ffb300,#ff8f00);">🔰 チュートリアル</button>
             <button id="btn-player-select" class="btn title-btn" style="background:linear-gradient(135deg,#01579b,#0277bd);">プレーヤー選択</button>
             <button id="btn-login" class="btn btn-danger title-btn">Googleでログイン</button>
             <button id="btn-logout" class="btn btn-gray hidden title-btn">ログアウト</button>
@@ -710,6 +712,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-start').onclick         = () => document.getElementById('difficulty-overlay').classList.remove('hidden');
     document.getElementById('btn-close-diff').onclick    = () => document.getElementById('difficulty-overlay').classList.add('hidden');
     document.getElementById('btn-easy').onclick          = () => startGame('EASY');
+    document.getElementById('btn-tutorial').onclick      = () => startTutorial();
     document.getElementById('btn-normal').onclick        = () => startGame('NORMAL');
     document.getElementById('btn-hard').onclick          = () => startGame('HARD');
     document.getElementById('btn-to-title').onclick      = backToTitle;
@@ -812,6 +815,42 @@ function startGame(diff) {
     document.getElementById('disp-difficulty').textContent = DIFF_LABEL[diff];
 
     nextRound(true);
+}
+
+// ══════════════════════════════
+// チュートリアル（練習プレイ）
+// 実際の画面で「カードを棒グラフにのせて引き算し、3本を同じ高さ(1〜9)にそろえる」を体験する。
+// 書き込みはエンジンが止めるので、ランキング・クリア回数は一切汚れない。
+// ══════════════════════════════
+function startTutorial() {
+    FGLTutorial.begin({ root: '#container', getLang: () => 'ja' });
+    startGame('EASY');
+    const g = window.game;
+    // 手順どおりに進むよう、棒と手札を決めた値にする(11,9,10 → すべて8にそろえる)
+    g.bars = [11, 9, 10];
+    g.hand = [3, 1, 2, 6, 4].map(v => ({ val: v, isJoker: false }));
+    renderHand(); updateBars(); updateBarMarkers(); updateFormulaZone(); updateHUD();
+    const roundShown = () => !document.getElementById('round-clear-overlay').classList.contains('hidden');
+    FGLTutorial.run([
+        { type: 'say', target: '#bars-area', pos: 'bottom', text:
+            '3本の棒グラフがあるよ。棒の中の数字が「高さ」。この3本を、ぜんぶ同じ高さ（1〜9）にそろえるのが目的だよ！' },
+        { type: 'say', target: '#hand-area', pos: 'top', text:
+            'これが手札。カードを棒にドラッグしてのせると、その数だけ「ひき算」されて、棒が低くなるよ。' },
+        { type: 'do', target: '#game-ui-layer', pos: 'top', until: () => g.bars[0] === 8, text:
+            'いま棒は 11・9・10。まず「3」のカードを、いちばん左の棒（11）にのせてみよう！ 11 − 3 = 8 になるよ。' },
+        { type: 'do', target: '#game-ui-layer', pos: 'top', until: () => g.bars[1] === 8, text:
+            'いいね！ 次は「1」のカードを、まん中の棒（9）にのせよう。9 − 1 = 8 だよ。' },
+        { type: 'do', target: '#game-ui-layer', pos: 'top', until: () => g.roundClearing, text:
+            '最後に「2」のカードを、右の棒（10）にのせよう。10 − 2 = 8。3本とも 8 でそろうよ！' },
+        { type: 'run', fn: () => FGLTutorial.wait(roundShown, 6000) },
+        { type: 'say', target: '#round-clear-overlay .overlay-box', pos: 'top',
+          after: () => document.getElementById('round-clear-overlay').classList.add('hidden'), text:
+            '3本がそろって ROUND CLEAR！ 点数は「基本点 × コンボ × 倍率」で決まるよ。カードを使った回数がコンボになるから、少ない回数でそろえるほど高得点！' },
+        { type: 'say', target: '#bars-area', pos: 'bottom', text:
+            '棒の横にある「◀×4」などは、その高さにそろえたときのボーナス倍率。どの高さが何倍になるかは、ラウンドごとに変わるよ。' },
+        { type: 'say', target: '#btn-change', pos: 'top', text:
+            '手札が合わないときは「チェンジ」で引きなおせるよ（回数に限りあり）。棒が 0 以下になるとゲームオーバーだから、ひきすぎに注意！ 全部で7ラウンド、がんばってね！' }
+    ]);
 }
 
 function nextRound(isFirst = false) {
