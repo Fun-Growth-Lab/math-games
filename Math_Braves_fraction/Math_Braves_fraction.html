@@ -469,6 +469,7 @@
         #custom-alert-msg { font-size: 1.1rem; margin-bottom: 20px; }
 
     </style>
+    <script src="../tutorial-engine.js"></script>
 </head>
 <body>
 
@@ -513,6 +514,7 @@
                 </div>
 
                 <button id="btn-start" class="btn btn-success title-btn" data-i18n="btn_start">はじめる</button>
+                <button id="btn-tutorial" class="btn title-btn" style="background-color: #ffb300;" data-i18n="btn_tutorial">🔰 チュートリアル</button>
                 <button id="btn-player-select" class="btn title-btn" style="background-color: #85c1e9;" data-i18n="btn_player_select">プレーヤー選択</button>
                 <button id="btn-login" class="btn btn-danger title-btn" style="display:none">Googleでログイン</button>
                 <button id="btn-logout" class="btn hidden title-btn" style="display:none">ログアウト</button>
@@ -735,7 +737,7 @@ const STRINGS = {
         howto_7: '7. <strong>きほんてんの けいさん</strong>は<br>「⭐の数 × 10 ＋ ターゲットのてんすう」<br>だよ！',
         btn_to_title: 'タイトルへ もどる',
         title_sub: '- ぶんすう -', label_player_title: 'プレーヤー:',
-        btn_start: 'はじめる', btn_player_select: 'プレーヤー選択', btn_ranking: '🏆 ランキング', btn_settings: '⚙ 設定', btn_index: '🏠 INDEXへ',
+        btn_start: 'はじめる', btn_tutorial: '🔰 チュートリアル', btn_player_select: 'プレーヤー選択', btn_ranking: '🏆 ランキング', btn_settings: '⚙ 設定', btn_index: '🏠 INDEXへ',
         settings_title: '⚙ 設定', settings_sub: '言語 / Language', lang_simple: 'かんたんなにほんご', lang_ja: '日本語', lang_en: 'English',
         diff_prompt: '難易度を選択', diff_easy: 'しょきゅう', diff_normal: 'ちゅうきゅう', diff_hard: 'じょうきゅう',
         clear_count: '{n}回クリア', btn_back: 'もどる',
@@ -762,7 +764,7 @@ const STRINGS = {
         howto_7: '7. <strong>きほんてんの けいさん</strong>は<br>「⭐の かず × 10 ＋ ターゲットの てんすう」<br>だよ！',
         btn_to_title: 'タイトルへ もどる',
         title_sub: '- ぶんすう -', label_player_title: 'プレーヤー:',
-        btn_start: 'はじめる', btn_player_select: 'プレーヤーせんたく', btn_ranking: '🏆 ランキング', btn_settings: '⚙ せってい', btn_index: '🏠 INDEXへ',
+        btn_start: 'はじめる', btn_tutorial: '🔰 チュートリアル', btn_player_select: 'プレーヤーせんたく', btn_ranking: '🏆 ランキング', btn_settings: '⚙ せってい', btn_index: '🏠 INDEXへ',
         settings_title: '⚙ せってい', settings_sub: '言語 / Language', lang_simple: 'かんたんなにほんご', lang_ja: '日本語', lang_en: 'English',
         diff_prompt: 'なんいどを せんたく', diff_easy: 'しょきゅう', diff_normal: 'ちゅうきゅう', diff_hard: 'じょうきゅう',
         clear_count: '{n}かい クリア', btn_back: 'もどる',
@@ -789,7 +791,7 @@ const STRINGS = {
         howto_7: '7. <strong>Base score</strong> is<br>"Stars × 10 + Target points"!',
         btn_to_title: 'Back to Title',
         title_sub: '- Fractions -', label_player_title: 'Player:',
-        btn_start: 'Start', btn_player_select: 'Select Player', btn_ranking: '🏆 Ranking', btn_settings: '⚙ Settings', btn_index: '🏠 To INDEX',
+        btn_start: 'Start', btn_tutorial: '🔰 Tutorial', btn_player_select: 'Select Player', btn_ranking: '🏆 Ranking', btn_settings: '⚙ Settings', btn_index: '🏠 To INDEX',
         settings_title: '⚙ Settings', settings_sub: '言語 / Language', lang_simple: 'かんたんなにほんご', lang_ja: '日本語', lang_en: 'English',
         diff_prompt: 'Choose a Difficulty', diff_easy: 'Easy', diff_normal: 'Normal', diff_hard: 'Hard',
         clear_count: '{n} clears', btn_back: 'Back',
@@ -915,6 +917,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-close-diff').onclick = () => document.getElementById('difficulty-overlay').classList.add('hidden');
     
     document.getElementById('btn-easy').onclick = () => startGame('EASY');
+    document.getElementById('btn-tutorial').onclick = () => startTutorial();
     document.getElementById('btn-normal').onclick = () => startGame('NORMAL');
     document.getElementById('btn-hard').onclick = () => startGame('HARD');
     document.getElementById('btn-to-title').onclick = backToTitle;
@@ -996,6 +999,53 @@ function backToTitle() {
     textParticles = [];
 
     updateTitleStats();
+}
+
+// ============================================================
+// チュートリアル（練習プレイ）
+// ============================================================
+// 実際の画面で「カードをケーキにのせて分数をたし、3つのケーキの大きさをそろえる」を体験する。
+// 書き込みはエンジンが止めるので、ランキング・クリア回数は一切汚れない。
+function startTutorial() {
+    FGLTutorial.begin({ root: '#container', getLang: () => currentLang });
+    startGame('EASY');
+    // 手順どおりに進むよう、ケーキと手札を決めた値にする(24分の値: 6=1/4, 12=1/2, 18=3/4)
+    window.game.cakes = [6, 12, 12];
+    window.game.hand = [{ val: 6, coinCount: 2 }, { val: 12, coinCount: 1 }, { val: 18, coinCount: 3 }];
+    renderHand(); updateCakes(); updateHUD();
+    const overlayShown = () => !document.getElementById('round-clear-overlay').classList.contains('hidden');
+    FGLTutorial.run([
+        { type: 'say', target: '.slot-machine-frame', pos: 'bottom', text: {
+            ja: '3つのケーキがあるよ。それぞれ大きさがちがうね（1/4、1/2 など）。この3つを「ぜんぶ同じ大きさ」にするのが目的だよ！',
+            easy: '3つのケーキがあるよ。それぞれおおきさがちがうね（1/4、1/2 など）。この3つを「ぜんぶおなじおおきさ」にするのがもくてきだよ！',
+            en: 'There are three cakes of different sizes (1/4, 1/2 …). Your goal is to make all three the SAME size!' } },
+        { type: 'say', target: '#hand-cards', pos: 'top', text: {
+            ja: 'これが手札の分数カード。カードをケーキにドラッグしてのせると、その分数がケーキに足されるよ。',
+            easy: 'これがてふだのぶんすうカード。カードをケーキにドラッグしてのせると、そのぶんすうがケーキにたされるよ。',
+            en: 'These are your fraction cards. Drag a card onto a cake to add that fraction to it.' } },
+        { type: 'do', target: '#game-ui-layer', pos: 'top', until: () => window.game.cakes[0] === 12, text: {
+            ja: '左のいちばん小さいケーキ（1/4）に、手札の「1/4」のカードをのせてみよう！ 1/4 + 1/4 = 1/2 で、3つとも同じ大きさになるよ。',
+            easy: 'ひだりのいちばんちいさいケーキ（1/4）に、てふだの「1/4」のカードをのせてみよう！ 1/4 + 1/4 = 1/2 で、3つともおなじおおきさになるよ。',
+            en: 'Drop the "1/4" card onto the smallest cake on the left! 1/4 + 1/4 = 1/2, so all three become the same size.' } },
+        { type: 'run', fn: () => FGLTutorial.wait(overlayShown, 6000) },
+        { type: 'say', target: '#round-clear-overlay .overlay-content', pos: 'top',
+          after: () => document.getElementById('round-clear-overlay').classList.add('hidden'), text: {
+            ja: '3つのケーキがそろったよ、ラウンドクリア！ ターゲットの大きさにそろえると高得点。連続でそろえるとコンボで倍率もアップ！',
+            easy: '3つのケーキがそろったよ、ラウンドクリア！ ターゲットのおおきさにそろえるとこうとくてん。れんぞくでそろえるとコンボでばいりつもアップ！',
+            en: 'All three cakes match — round clear! Matching the target size scores more, and chaining rounds raises your combo multiplier!' } },
+        { type: 'say', target: '.ap-display-container', pos: 'bottom', text: {
+            ja: 'カードを使うたびに「AP」が1へるよ。0になるとゲームオーバー！ ラウンドをクリアするとAPが回復するよ。',
+            easy: 'カードをつかうたびに「AP」が1へるよ。0になるとゲームオーバー！ ラウンドをクリアするとAPがかいふくするよ。',
+            en: 'Each card you use costs 1 AP. At 0 it\'s game over! Clearing a round restores some AP.' } },
+        { type: 'say', target: '.stats-row-container', pos: 'bottom', text: {
+            ja: '⭐がついたカードを使うと、クリア時の点数がふえるよ（1こ +10点）。「コンボ」は、ケーキをちょうど「1」にできた回数！',
+            easy: '⭐がついたカードをつかうと、クリアのときのてんすうがふえるよ（1こ +10てん）。「コンボ」は、ケーキをちょうど「1」にできたかいすう！',
+            en: 'Cards with ⭐ add bonus points on clear (+10 each). "Combo" counts how many times you made a cake exactly "1"!' } },
+        { type: 'say', target: '#hand-cards', pos: 'top', text: {
+            ja: '「1」をこえたときは、あまりの分だけが残るよ（例：3/4 + 1/2 = 5/4 → 1/4）。手札が合わないときは「チェンジ」で引き直せる（AP -1）。',
+            easy: '「1」をこえたときは、あまりのぶんだけがのこるよ（れい：3/4 + 1/2 = 5/4 → 1/4）。てふだがあわないときは「チェンジ」でひきなおせる（AP -1）。',
+            en: 'If a cake goes over "1", only the extra part stays (e.g. 3/4 + 1/2 = 5/4 → 1/4). If your hand doesn\'t fit, use "Change" to redraw (−1 AP).' } }
+    ]);
 }
 
 function startGame(difficulty) {

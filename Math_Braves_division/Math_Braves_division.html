@@ -270,6 +270,7 @@
         }
 
     </style>
+    <script src="../tutorial-engine.js"></script>
 </head>
 <body>
 
@@ -305,6 +306,7 @@
                 </div>
 
                 <button id="btn-start-game" class="btn btn-spla-green title-menu-btn" data-i18n="btn_start">はじめる</button>
+                <button id="btn-tutorial" class="btn btn-spla-yellow title-menu-btn" data-i18n="btn_tutorial">🔰 チュートリアル</button>
 
                 <button id="player-select-btn" class="btn btn-spla-pink title-menu-btn" title="プレーヤーをへんこうする">
                     <span>👤 <span id="current-player-name-display">ゲスト</span> <span style="font-size: 0.8rem;" data-i18n="player_change_suffix">(へんこう)</span></span>
@@ -448,7 +450,7 @@ const STRINGS = {
     ja: {
         btn_howto: 'あそびかた', btn_to_title: 'タイトルへ',
         label_player: 'プレーヤー', label_difficulty: '難易度', label_round: 'ラウンド', label_score: 'スコア', label_ap: 'のこりAP',
-        title_sub: '- わりざん パネル -', btn_start: 'はじめる', player_change_suffix: '(へんこう)',
+        title_sub: '- わりざん パネル -', btn_start: 'はじめる', btn_tutorial: '🔰 チュートリアル', player_change_suffix: '(へんこう)',
         btn_ranking: '🏆 ランキング', btn_settings: '⚙ 設定', btn_index: '🏠 INDEXへ',
         settings_title: '⚙ 設定', settings_sub: '言語 / Language', lang_simple: 'かんたんなにほんご', lang_ja: '日本語', lang_en: 'English',
         diff_prompt: '難易度をえらぶ', diff_easy: 'やさしい', diff_normal: 'ふつう', diff_hard: 'むずかしい', btn_back: 'もどる',
@@ -478,7 +480,7 @@ const STRINGS = {
     simple: {
         btn_howto: 'あそびかた', btn_to_title: 'タイトルへ',
         label_player: 'プレーヤー', label_difficulty: 'なんいど', label_round: 'ラウンド', label_score: 'スコア', label_ap: 'のこりAP',
-        title_sub: '- わりざん パネル -', btn_start: 'はじめる', player_change_suffix: '(へんこう)',
+        title_sub: '- わりざん パネル -', btn_start: 'はじめる', btn_tutorial: '🔰 チュートリアル', player_change_suffix: '(へんこう)',
         btn_ranking: '🏆 ランキング', btn_settings: '⚙ せってい', btn_index: '🏠 INDEXへ',
         settings_title: '⚙ せってい', settings_sub: '言語 / Language', lang_simple: 'かんたんなにほんご', lang_ja: '日本語', lang_en: 'English',
         diff_prompt: 'なんいどを えらぶ', diff_easy: 'やさしい', diff_normal: 'ふつう', diff_hard: 'むずかしい', btn_back: 'もどる',
@@ -508,7 +510,7 @@ const STRINGS = {
     en: {
         btn_howto: 'How to Play', btn_to_title: 'To Title',
         label_player: 'Player', label_difficulty: 'Difficulty', label_round: 'Round', label_score: 'Score', label_ap: 'AP Left',
-        title_sub: ' - Division Panels - ', btn_start: 'Start', player_change_suffix: '(change)',
+        title_sub: ' - Division Panels - ', btn_start: 'Start', btn_tutorial: '🔰 Tutorial', player_change_suffix: '(change)',
         btn_ranking: '🏆 Ranking', btn_settings: '⚙ Settings', btn_index: '🏠 To INDEX',
         settings_title: '⚙ Settings', settings_sub: '言語 / Language', lang_simple: 'かんたんなにほんご', lang_ja: '日本語', lang_en: 'English',
         diff_prompt: 'Choose a Difficulty', diff_easy: 'Easy', diff_normal: 'Normal', diff_hard: 'Hard', btn_back: 'Back',
@@ -1659,6 +1661,61 @@ ui.btnCloseDifficulty.addEventListener('click', () => {
 });
 
 ui.btnEasy.addEventListener('click', () => startGame('EASY'));
+// ============================================================
+// チュートリアル（練習プレイ）
+// ============================================================
+// 実際の画面で「手札(わる数)を場のカード(わられる数)に重ねて、商とあまりのパネルをHITさせる」を体験する。
+// 書き込みはエンジンが止めるので、ランキング・クリア回数は一切汚れない。
+function startTutorial() {
+    FGLTutorial.begin({ root: '#container', getLang: () => currentLang });
+    startGame('EASY');
+    // 手順どおりに進むよう、手札と場のカードを決めた値にする
+    [7, 3, 5, 2, 9].forEach((v, i) => { state.cards[i].value = v; });
+    [23, 19, 14].forEach((v, i) => { state.fieldCards[i].value = v; });
+    const CV = '#gameCanvas';
+    const cv = (x, y, w, h) => ({ sel: CV, rect: [x, y, w, h], of: [canvas.width, canvas.height], pad: 8 });
+    const fieldR = () => { const a = state.fieldCards[0], b = state.fieldCards[2]; return cv(a.x, a.y, b.x + b.w - a.x, a.h); };
+    const handR = () => { const a = state.cards[0], b = state.cards[4]; return cv(a.targetX, a.baseY, b.targetX + b.w - a.targetX, a.h); };
+    const playR = () => {
+        const a = state.fieldCards[0], c = state.cards[0];
+        return cv(Math.min(a.x, c.targetX) - 10, a.y, Math.max(a.w, c.w) + 40, c.baseY + c.h - a.y);
+    };
+    const panelsR = () => { const lay = getLayout(); return cv(lay.startX_Q - 10, lay.startY - 80, state.width - (lay.startX_Q - 10) * 2, 3 * lay.panelSize + 2 * lay.gap + 90); };
+    const settle = () => FGLTutorial.wait(() => !state.dragInfo && !state.inputLocked, 6000);
+    FGLTutorial.run([
+        { type: 'say', target: fieldR, pos: 'top', text: {
+            ja: '下の大きなカードは「わられる数」。ここに手札のカードを重ねて、わり算をするよ！',
+            easy: 'したのおおきなカードは「わられるかず」。ここにてふだのカードをかさねて、わりざんをするよ！',
+            en: 'The big cards below are the numbers to be divided. Drop a hand card onto one to do a division!' } },
+        { type: 'say', target: handR, pos: 'top', text: {
+            ja: 'いちばん下の手札(2〜10)は「わる数」だよ。ドラッグして、わられる数のカードに重ねてみよう。',
+            easy: 'いちばんしたのてふだ(2〜10)は「わるかず」だよ。ドラッグして、わられるかずのカードにかさねてみよう。',
+            en: 'The hand cards (2–10) at the bottom are the divisors. Drag one onto a big card.' } },
+        { type: 'say', target: panelsR, pos: 'bottom', text: {
+            ja: '左は「商」、右は「あまり」の 1〜9 のパネル。わり算の答えと同じ数字のパネルにHITすると、灰色になるよ！',
+            easy: 'ひだりは「しょう」、みぎは「あまり」の 1〜9 のパネル。わりざんのこたえとおなじすうじのパネルにHITすると、はいいろになるよ！',
+            en: 'The left grid is for the quotient, the right grid for the remainder (1–9). When your division answer matches a panel, it is HIT and turns gray!' } },
+        { type: 'do', target: playR, pos: 'bottom', until: () => state.score > 0, text: {
+            ja: '手札の 7 を、場の 23 のカードにドラッグして重ねてみよう！ 23 ÷ 7 を計算するよ。',
+            easy: 'てふだの 7 を、ばの 23 のカードにドラッグしてかさねてみよう！ 23 ÷ 7 をけいさんするよ。',
+            en: 'Drag the 7 from your hand onto the 23 card! That calculates 23 ÷ 7.' } },
+        { type: 'run', fn: settle },
+        { type: 'say', target: panelsR, pos: 'bottom', text: {
+            ja: '23 ÷ 7 ＝ 3 あまり 2。商の「3」とあまりの「2」のパネルがHIT！ 両方HITすると300点、片方だけなら100点だよ。',
+            easy: '23 ÷ 7 ＝ 3 あまり 2。しょうの「3」とあまりの「2」のパネルがHIT！ りょうほうHITすると300てん、かたほうだけなら100てんだよ。',
+            en: '23 ÷ 7 = 3 remainder 2. The quotient panel "3" and the remainder panel "2" are HIT! Both hits give 300 points, one hit gives 100.' } },
+        { type: 'say', target: panelsR, pos: 'bottom', text: {
+            ja: '光っているパネルは「ターゲット」。ターゲットにHITすると得点が2倍、商とあまりの両方なら4倍になるよ！ 縦・横・ななめに3つそろうとビンゴで500点のボーナス！',
+            easy: 'ひかっているパネルは「ターゲット」。ターゲットにHITするととくてんが2ばい、しょうとあまりのりょうほうなら4ばいになるよ！ たて・よこ・ななめに3つそろうとビンゴで500てんのボーナス！',
+            en: 'Glowing panels are "targets". Hitting a target doubles the points, and hitting both quotient and remainder targets makes it ×4! Three in a row (any direction) is a BINGO worth +500!' } },
+        { type: 'say', target: '#ap-display-container', pos: 'top', text: {
+            ja: 'カードを使うたびに「AP」が1へるよ。APが0になると負け。決められた数のパネルをHITさせれば、ラウンドクリア！',
+            easy: 'カードをつかうたびに「AP」が1へるよ。APが0になるとまけ。きめられたかずのパネルをHITさせれば、ラウンドクリア！',
+            en: 'Each card you use costs 1 AP. At 0 AP you lose. HIT the required number of panels to clear the round!' } }
+    ]);
+}
+document.getElementById('btn-tutorial').addEventListener('click', () => startTutorial());
+
 ui.btnNormal.addEventListener('click', () => startGame('NORMAL'));
 ui.btnHard.addEventListener('click', () => startGame('HARD'));
 ui.btnIndex.addEventListener('click', () => window.location.href = '../index.html');
