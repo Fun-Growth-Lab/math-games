@@ -84,6 +84,7 @@
     })();
     </script>
     <script src="data.js"></script>
+    <script src="../tutorial-engine.js"></script>
 </head>
 <body>
 
@@ -1251,6 +1252,7 @@ function drawTitle() {
         drawMcButton(330, btnStartY + btnGap*2, 140, 50, "ランキング", "#039be5", "#fff");
         drawMcButton(490, btnStartY + btnGap*2, 140, 50, "コレクション", "#795548", "#fff");
         drawMcButton(330, btnStartY + btnGap*3, 300, 50, "INDEXへ", "#607d8b", "#fff");
+        drawMcButton(330, btnStartY + btnGap*4, 300, 50, "🔰 チュートリアル", "#f9a825", "#3e2723");
 
         if (gameState.warningMsg) {
             drawMcWindowTransparent(280, 160, 400, 80);
@@ -2172,6 +2174,10 @@ canvas.addEventListener('mousedown', e => {
             if (x > 330 && x < 630 && y > btnStartY + btnGap*3 && y < btnStartY + btnGap*3 + 50) {
                 location.href = '../index.html';
             }
+            // チュートリアル
+            if (x > 330 && x < 630 && y > btnStartY + btnGap*4 && y < btnStartY + btnGap*4 + 50) {
+                startTutorial();
+            }
         } else if (gameState.titleState === 1) {
             // 難易度選択
             // ★修正: drawTitleの変更に合わせてクリック判定位置を変更
@@ -2602,6 +2608,77 @@ function handleShopClick(x, y) {
         }
     });
 }
+// ============================================================
+// チュートリアル（練習プレイ）
+// ============================================================
+// 実際の画面で「タイピングでお金をかせぐ → ショップで装備を買う → バトルで戦う」を体験する。
+// 書き込みはエンジンが止めるので、ランキング・コレクション・記録は一切汚れない。
+function startTutorial() {
+    FGLTutorial.begin({ root: '#game-container', getLang: () => 'ja', exitPos: 'left' });
+    startGame(0);
+    // 手順どおりに進むよう、最初のことばを決めた言葉にする
+    gameState.typing.wordDeck = ['すいか'];
+    typingEngine.nextWord();
+    // バトルに勝ったあとスペースキーを押しても、次の階層やイベントへ進まないようにする
+    checkEventTrigger = function () {};
+    const cv = (x, y, w, h) => ({ sel: '#gameCanvas', rect: [x, y, w, h], of: [960, 640], pad: 6 });
+    const barR = () => cv(0, 0, 960, 60);
+    const wordR = () => cv(100, 120, 760, 200);
+    const goldR = () => cv(690, 8, 260, 44);
+    const btnsR = () => cv(180, 340, 430, 40);
+    const weaponsR = () => cv(50, 76, 660, 4 * 55 + 14);
+    const armorsR = () => cv(50, 326, 660, 4 * 55 + 14);
+    const freeR = () => cv(740, 90, 160, 40);
+    const fruitsR = () => cv(740, 76, 160, 8 * 48);
+    const battleBtnR = () => cv(740, 90 + 8 * 48 + 20, 160, 60);
+    const statusR = () => cv(20, 560, 920, 70);
+    const allR = () => cv(140, 60, 820, 580);
+    FGLTutorial.run([
+        { type: 'say', target: barR, pos: 'bottom', text:
+            'タイピング・サーガは、「タイピング → ショップ → バトル」をくりかえして、10かいまで のぼっていくゲームだよ。上には、いまの「かい」と、もっている「おかね(G)」が出るよ。' },
+        { type: 'say', target: wordR, pos: 'bottom', text:
+            'まずは「タイピングのじかん」。ここに ひらがなの ことばが出るから、キーボードで「ローマ字」で うちこもう！ たとえば「すいか」なら s・u・i・k・a だよ。うてたら おかねが もらえる！' },
+        { type: 'do', target: wordR, pos: 'bottom', until: () => !gameState.typing.isWaitingForStart, text:
+            'キーボードの「スペースキー」をおして、スタートしよう！（じかんは30びょう）' },
+        { type: 'do', target: wordR, pos: 'bottom', until: () => gameState.typingScore > 0, text:
+            'ことばが出たね！ 「すいか」を、ローマ字で s ・ u ・ i ・ k ・ a とうってみよう！' },
+        { type: 'say', target: goldR, pos: 'bottom', text:
+            'おかねが ふえたよ！ ながい ことばを うつほど、たくさん もらえる。まちがえずに どんどん うとう！' },
+        { type: 'say', target: btnsR, pos: 'top', text:
+            '「ストップ」で いちじ ていし、「ローマ字表」で うちかたを みることが できるよ。わからないときは ひらいてみてね。' },
+        { type: 'run', fn: () => { gameState.typing.timeLeft = 0; finishTyping(); } },
+        { type: 'say', target: barR, pos: 'bottom', text:
+            'じかんになると「ショップ」へ！ タイピングでためた おかねで、そうびを かおう。' },
+        { type: 'say', target: weaponsR, pos: 'bottom', text:
+            '上の4つは「ぶき」。「攻」が こうげきの つよさ、「会」は かいしんの でやすさ、「命」は あたりやすさ。ねだんが たかいほど つよいよ。' },
+        { type: 'do', target: weaponsR, pos: 'bottom', until: () => gameState.player.weapon.name !== 'きのえだ', text:
+            'すきな「ぶき」を ひとつ タップして かってみよう！（うすくなっているものは おかねが たりないよ）' },
+        { type: 'say', target: armorsR, pos: 'top', text:
+            '下の4つは「ぼうぐ」。「防」が まもりの つよさ、「半」は ダメージが はんぶんに なる かくりつ、「完」は ダメージを ぜんぶ ふせぐ かくりつだよ。' },
+        { type: 'do', target: armorsR, pos: 'top', until: () => gameState.player.armor.name !== 'ふだんぎ', text:
+            'すきな「ぼうぐ」も ひとつ かってみよう！' },
+        { type: 'say', target: fruitsR, pos: 'bottom', text:
+            '右がわは「きょうか」。HPが ふえたり、こうげき・ぼうぎょが あがったりするよ。いちばん上の ひとつは「むりょう」！' },
+        { type: 'do', target: freeR, pos: 'bottom', until: () => gameState.shop.fruits[0].sold, text:
+            'いちばん上の「むりょう」の きょうかを タップして、もらおう！' },
+        { type: 'say', target: statusR, pos: 'top', text:
+            '下には、いまの つよさが出ているよ。「こうげき ＝ (基)きほんこうげき × (武)ぶきのちから」。かったものが きいているか たしかめよう！' },
+        { type: 'do', target: battleBtnR, pos: 'top', until: () => gameState.scene === SCENES.BATTLE, text:
+            'じゅんびが できたら「バトルへ！」を タップしよう！' },
+        { type: 'run', fn: () => {
+            // 練習用に、敵をよわくしておく
+            const e = gameState.enemy;
+            if (e) { e.hp = e.maxHp = 90; e.atk = 20; e.def = 10; }
+        } },
+        { type: 'do', target: allR, pos: 'bottom', until: () => gameState.battle.phase === 'winWait', text:
+            'バトルは じどうで すすむよ。じぶんと てきが こうごうに こうげき！ ダメージを あたえて、てきの HPを 0に しよう。(すすまないときは しばらく まってね)' },
+        { type: 'say', target: allR, pos: 'bottom', text:
+            'かった！ ふだんは、ここで スペースキーを おすと つぎの かいへ すすむよ。ときどき「せいすい」や「イベント」も おきるかも！' },
+        { type: 'say', target: allR, pos: 'bottom', text:
+            'かいが すすむほど てきは つよくなる。じょうずに タイピングして、つよい そうびを かって、てっぺんの ボスを たおそう！ がんばってね！' }
+    ]);
+}
+
 function loop() {
     update();
     draw();

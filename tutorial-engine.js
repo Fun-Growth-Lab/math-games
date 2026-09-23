@@ -178,6 +178,7 @@
         exitBtn = document.createElement('button'); exitBtn.className = 'fgl-tut-exit'; exitBtn.type = 'button';
         exitBtn.addEventListener('click', function () { T.exit(); });
         layer.appendChild(exitBtn);
+        if (cfg.exitPos === 'left') { exitBtn.style.right = 'auto'; exitBtn.style.left = '14px'; }
         rootEl.appendChild(layer);
         // 画面の向き・大きさが変わったら位置を取り直す
         window.addEventListener('resize', onResize);
@@ -294,7 +295,7 @@
     /* ---------- 公開API ---------- */
     // チュートリアル開始の準備(書き込みガード・root設定)
     T.begin = function (opts) {
-        cfg = { root: opts.root, getLang: opts.getLang || cfg.getLang };
+        cfg = { root: opts.root, getLang: opts.getLang || cfg.getLang, exitPos: opts.exitPos || 'right' };
         rootEl = (typeof opts.root === 'string') ? document.querySelector(opts.root) : opts.root;
         if (!rootEl) { console.error('FGLTutorial: root not found'); return; }
         injectCss();
