@@ -394,6 +394,7 @@
         }
 
     </style>
+    <script src="../tutorial-engine.js"></script>
 </head>
 <body>
 
@@ -486,6 +487,8 @@
 
                 <div style="display:flex; flex-direction:column; align-items:center;">
                     <button class="puz-btn btn-start" onclick="game.showDifficultySelect()" data-i18n="btn_start">はじめる</button>
+
+                    <button class="puz-btn btn-tutorial" style="background:linear-gradient(to bottom,#ffd54f,#ff9800);" onclick="game.startTutorial()" data-i18n="btn_tutorial">🔰 チュートリアル</button>
 
                     <button class="puz-btn btn-player" onclick="game.openPlayerModal()">
                         <span style="font-size:16px; margin-right:10px;" data-i18n="label_player">プレーヤー:</span>
@@ -683,7 +686,7 @@ const STRINGS = {
         btn_to_title: 'タイトルへ もどる', touch_to_continue: 'タッチして すすむ',
         btn_use: 'つかう', btn_cancel: 'やめる',
         label_level: 'レベル', label_score: 'スコア', label_item: 'アイテム',
-        title_sub: '- かけざん２ -', btn_start: 'はじめる', label_player: 'プレーヤー:',
+        title_sub: '- かけざん２ -', btn_start: 'はじめる', btn_tutorial: '🔰 チュートリアル', label_player: 'プレーヤー:',
         btn_ranking: 'ランキング', btn_settings: '⚙ 設定', btn_index: 'INDEXへ',
         diff_prompt: 'なんいどを えらぶ', diff_easy: 'しょきゅう', diff_normal: 'ちゅうきゅう', diff_hard: 'じょうきゅう', btn_back: 'もどる',
         pm_title: 'プレーヤー設定', pm_placeholder: 'なまえ (ひらがな)', btn_add: 'ついか', btn_close: 'とじる',
@@ -719,7 +722,7 @@ const STRINGS = {
         btn_to_title: 'タイトルへ もどる', touch_to_continue: 'タッチして すすむ',
         btn_use: 'つかう', btn_cancel: 'やめる',
         label_level: 'レベル', label_score: 'スコア', label_item: 'アイテム',
-        title_sub: '- かけざん２ -', btn_start: 'はじめる', label_player: 'プレーヤー:',
+        title_sub: '- かけざん２ -', btn_start: 'はじめる', btn_tutorial: '🔰 チュートリアル', label_player: 'プレーヤー:',
         btn_ranking: 'ランキング', btn_settings: '⚙ せってい', btn_index: 'INDEXへ',
         diff_prompt: 'なんいどを えらぶ', diff_easy: 'しょきゅう', diff_normal: 'ちゅうきゅう', diff_hard: 'じょうきゅう', btn_back: 'もどる',
         pm_title: 'プレーヤー せってい', pm_placeholder: 'なまえ (ひらがな)', btn_add: 'ついか', btn_close: 'とじる',
@@ -755,7 +758,7 @@ const STRINGS = {
         btn_to_title: 'Back to Title', touch_to_continue: 'Touch to continue',
         btn_use: 'Use', btn_cancel: 'Cancel',
         label_level: 'Level', label_score: 'Score', label_item: 'Items',
-        title_sub: ' - Multiplication 2 - ', btn_start: 'Start', label_player: 'Player:',
+        title_sub: ' - Multiplication 2 - ', btn_start: 'Start', btn_tutorial: '🔰 Tutorial', label_player: 'Player:',
         btn_ranking: 'Ranking', btn_settings: '⚙ Settings', btn_index: 'To INDEX',
         diff_prompt: 'Choose a Difficulty', diff_easy: 'Beginner', diff_normal: 'Intermediate', diff_hard: 'Advanced', btn_back: 'Back',
         pm_title: 'Player Settings', pm_placeholder: 'Name (Hiragana)', btn_add: 'Add', btn_close: 'Close',
@@ -1220,6 +1223,67 @@ class Game {
         });
         const desc = document.getElementById('mode-desc-text');
         if (desc) desc.innerText = descs[this.controlMode] || '';
+    }
+
+    // ============================================================
+    // チュートリアル（練習プレイ）
+    // ============================================================
+    // 実際のバトル画面で「手札を場のカードに重ねて かけざんし、101いじょうで こうげき」を体験する。
+    // 書き込みはエンジンが止めるので、ランキング・クリア回数は一切汚れない。
+    startTutorial() {
+        FGLTutorial.begin({ root: '#game-scaler', getLang: () => currentLang });
+        const g = this;
+        this.initGame('easy');
+        // 手順どおりに進むよう、手札と場のカードを決めた値にする(3 ×4 ×5 ×2 = 120 → 101いじょうで こうげき)
+        [4, 5, 3, 2, 6].forEach((v, i) => { this.handCards[i].value = v; });
+        this.fieldCard.value = 3;
+        const CV = '#gameCanvas';
+        const cv = (x, y, w, h) => ({ sel: CV, rect: [x, y, w, h], of: [this.canvas.width, this.canvas.height], pad: 8 });
+        const enemyR = () => cv(180, 130, 340, 200);
+        const actionR = () => cv(240, 10, 220, 105);
+        const fieldR = () => cv(g.fieldCard.x - 70, g.fieldCard.y - 90, 140, 180);
+        const handR = () => cv(70, 535, 560, 130);
+        const bothR = () => cv(60, 330, 580, 340);
+        const settle = () => FGLTutorial.wait(() => g.state === 'PLAYING', 8000);
+        FGLTutorial.run([
+            { type: 'say', target: enemyR, pos: 'bottom', text: {
+                ja: 'てきが登場！ HPバーを0にすればたおせるよ。こうげきの力は「カードをかけざんして大きな数を作る」ことだよ。',
+                easy: 'てきがとうじょう！ HPバーを0にすればたおせるよ。こうげきのちからは「カードをかけざんしておおきなかずをつくる」ことだよ。',
+                en: 'An enemy appears! Bring its HP bar to 0 to win. Your attack power comes from multiplying cards into a big number.' } },
+            { type: 'say', target: actionR, pos: 'bottom', text: {
+                ja: '「のこりアクション」。こうげきするたびに1へって、0になるとゲームオーバー。少ない回数で大きなダメージを与えよう！',
+                easy: '「のこりアクション」。こうげきするたびに1へって、0になるとゲームオーバー。すくないかいすうでおおきなダメージをあたえよう！',
+                en: 'Remaining actions. Each attack uses one, and at 0 it\'s game over. Deal big damage in as few attacks as you can!' } },
+            { type: 'say', target: fieldR, pos: 'top', text: {
+                ja: 'まん中の「ばのカード」が、こうげきの元になる数。いまは 3 だね。',
+                easy: 'まんなかの「ばのカード」が、こうげきのもとになるかず。いまは 3 だね。',
+                en: 'The card in the middle is the "field card", the base of your attack. It\'s 3 right now.' } },
+            { type: 'say', target: handR, pos: 'top', text: {
+                ja: '下のしろいカードが手札。ドラッグして、ばのカードに重ねると、数がかけざんされるよ！',
+                easy: 'したのしろいカードがてふだ。ドラッグして、ばのカードにかさねると、かずがかけざんされるよ！',
+                en: 'The white cards below are your hand. Drag one onto the field card and the numbers are multiplied!' } },
+            { type: 'do', target: bothR, pos: 'top', until: () => g.fieldCard.value === 12, text: {
+                ja: '手札の「4」を、ばのカードに重ねてみよう！ 3 × 4 = 12 になるよ。',
+                easy: 'てふだの「4」を、ばのカードにかさねてみよう！ 3 × 4 = 12 になるよ。',
+                en: 'Drag the "4" from your hand onto the field card! 3 × 4 = 12.' } },
+            { type: 'do', target: bothR, pos: 'top', until: () => g.fieldCard.value === 60, text: {
+                ja: 'いいね！ 次は「5」を重ねよう。12 × 5 = 60 だよ。',
+                easy: 'いいね！ つぎは「5」をかさねよう。12 × 5 = 60 だよ。',
+                en: 'Nice! Now stack the "5": 12 × 5 = 60.' } },
+            { type: 'say', target: fieldR, pos: 'top', text: {
+                ja: 'ばのカードが「101いじょう」になると、てきにこうげき！ ダメージは、ばのカードの数そのままだよ。あと少し、60 を 101 以上にしよう。',
+                easy: 'ばのカードが「101いじょう」になると、てきにこうげき！ ダメージは、ばのカードのかずそのままだよ。あとすこし、60 を 101 いじょうにしよう。',
+                en: 'When the field card reaches 101 or more, you attack! The damage equals the field card\'s number. Let\'s push 60 past 101.' } },
+            { type: 'do', target: bothR, pos: 'top', until: () => g.score > 0, text: {
+                ja: '「2」のカードを重ねよう！ 60 × 2 = 120 で、101を超えるからこうげきだ！',
+                easy: '「2」のカードをかさねよう！ 60 × 2 = 120 で、101をこえるからこうげきだ！',
+                en: 'Stack the "2"! 60 × 2 = 120, which is over 101, so you attack!' } },
+            { type: 'run', fn: settle },
+            { type: 'say', target: '#right-panel', pos: 'bottom', text: {
+                ja: 'ダメージ 120 が入ったよ！ 右にはラウンドとスコア。てきをたおすと、アイテムが1つもらえて、ここにたまるよ。アイテムを上手に使って、最後のボスをたおそう！',
+                easy: 'ダメージ 120 がはいったよ！ みぎにはラウンドとスコア。てきをたおすと、アイテムが1つもらえて、ここにたまるよ。アイテムをじょうずにつかって、さいごのボスをたおそう！',
+                en: '120 damage! On the right you see the round and score. Defeating an enemy gives an item that collects here. Use items wisely to beat the final boss!' } }
+        ]);
     }
 
     showDifficultySelect() {
