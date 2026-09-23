@@ -431,6 +431,7 @@
             width: 100%;
         }
     </style>
+    <script src="../tutorial-engine.js"></script>
 </head>
 <body>
 
@@ -527,6 +528,7 @@
         <div class="title-content-box">
             <div id="title-main-menu">
                 <button id="btn-start-menu" class="btn btn-success title-menu-btn" data-i18n="btn_start">はじめる</button>
+                <button id="btn-tutorial" class="btn title-menu-btn" style="background:#ffb300; border-color:#ffe082; box-shadow:0 4px 0 #ff8f00;" data-i18n="btn_tutorial">🔰 チュートリアル</button>
 
                 <button id="player-select-btn" title="プレーヤーをへんこうする">
                     <span style="font-size: 1.5rem;">👤</span>
@@ -751,7 +753,7 @@ const STRINGS = {
         howto_p5: '5. てきを たおすと <strong>のこり じかん</strong>が ふえるよ。',
         howto_p6: '6. <strong>ボス</strong>を たおすと ゲームクリアだ！',
         title_subtitle: '- ひきざんバトル -',
-        btn_start: 'はじめる',
+        btn_start: 'はじめる', btn_tutorial: '🔰 チュートリアル',
         player_change_suffix: '(へんこう)',
         player_change_title: 'プレーヤーをへんこうする',
         btn_ranking: '🏆 ランキング',
@@ -819,7 +821,7 @@ const STRINGS = {
         howto_p5: '5. てきを たおすと <strong>のこり じかん</strong>が ふえるよ。',
         howto_p6: '6. <strong>ボス</strong>を たおすと ゲームクリアだ！',
         title_subtitle: '- ひきざんバトル -',
-        btn_start: 'はじめる',
+        btn_start: 'はじめる', btn_tutorial: '🔰 チュートリアル',
         player_change_suffix: '(へんこう)',
         player_change_title: 'プレーヤーを へんこうする',
         btn_ranking: '🏆 ランキング',
@@ -887,7 +889,7 @@ const STRINGS = {
         howto_p5: '5. Defeating an enemy <strong>restores time</strong>.',
         howto_p6: '6. Defeat the <strong>boss</strong> to clear the game!',
         title_subtitle: '- Subtraction Battle -',
-        btn_start: 'Start',
+        btn_start: 'Start', btn_tutorial: '🔰 Tutorial',
         player_change_suffix: '(change)',
         player_change_title: 'Change player',
         btn_ranking: '🏆 Ranking',
@@ -2599,6 +2601,79 @@ bindBtn(ui.btnEasy, () => {
     CONFIG = Object.assign({}, PRESET_EASY);
     initGame();
 });
+
+
+// ============================================================
+// チュートリアル（練習プレイ）
+// ============================================================
+// 実際のバトル画面で「カードを重ねて(ひき算して)数を作り、黄色カードにぶつける」を体験する。
+// 書き込みはエンジンが止めるので、ランキング・クリア回数は一切汚れない。
+function startTutorial() {
+    FGLTutorial.begin({ root: '#container', getLang: () => currentLang });
+    state.difficulty = 'EASY';
+    CONFIG = Object.assign({}, PRESET_EASY);
+    initGame();
+    // 手順どおりに進むよう、手札とてきの黄色カードを決めた値にする
+    [9, 4, 2, 7, 1].forEach((v, i) => { state.cards[i].value = v; });
+    const en = state.enemies[0];
+    en.values = [5, 3, 8];
+    en.gemCounts = [2, 1, 3];
+    const CV = '#gameCanvas';
+    const cv = (x, y, w, h) => ({ sel: CV, rect: [x, y, w, h], of: [canvas.width, canvas.height], pad: 8 });
+    const enemyR = () => { const e = state.enemies[0]; return cv(e.x, e.y, e.width, e.height + 50); };
+    const yellowR = () => { const e = state.enemies[0]; const a = e.getCardRect(0), b = e.getCardRect(e.values.length - 1); return cv(a.x, a.y, b.x + b.w - a.x, a.h); };
+    const handR = () => { const a = state.cards[0], b = state.cards[4]; return cv(a.baseX, a.baseY, b.baseX + b.width - a.baseX, a.height); };
+    const twoCardsR = () => { const a = state.cards[0], b = state.cards[1]; return cv(a.baseX, a.baseY, b.baseX + b.width - a.baseX, a.height); };
+    const playR = () => {
+        const e = state.enemies[0], c = state.cards[1];
+        const y0 = e.y, y1 = c.baseY + c.height;
+        return cv(Math.min(e.x, c.baseX), y0, Math.max(e.width, c.width + 40), y1 - y0);
+    };
+    const timeR = () => cv(state.width / 2 - 80, 4, 160, 100);
+    const discardR = () => cv(0, state.height * 0.87, state.width, state.height * 0.13);
+    const settle = () => FGLTutorial.wait(() => !state.dragInfo && !state.flyingCards.length && !state.inputLocked, 6000);
+    FGLTutorial.run([
+        { type: 'say', target: enemyR, pos: 'bottom', text: {
+            ja: 'てきが登場した！ てきの下にある「黄色いカード」が、たおすためのカギだよ。カードの数字と⭐に注目！',
+            easy: 'てきがとうじょうした！ てきのしたにある「きいろいカード」が、たおすためのカギだよ。カードのすうじと⭐にちゅうもく！',
+            en: 'An enemy appears! The yellow cards under it are the key to beating it. Look at the numbers and the ⭐ stars!' } },
+        { type: 'say', target: yellowR, pos: 'top', text: {
+            ja: 'この黄色いカードと「おなじ数」を手札で作って、ぶつけるとダメージ！ ⭐が多いカードほど、ダメージが大きいよ。ただし、カードを1回以上重ねてからじゃないと攻撃できないよ。',
+            easy: 'このきいろいカードと「おなじかず」をてふだでつくって、ぶつけるとダメージ！ ⭐がおおいカードほど、ダメージがおおきいよ。ただし、カードを1かいいじょうかさねてからでないとこうげきできないよ。',
+            en: 'Make the SAME number with your hand cards and hit that yellow card to deal damage! The more ⭐, the bigger the damage. You must stack at least once before you can attack.' } },
+        { type: 'say', target: handR, pos: 'top', text: {
+            ja: 'これが手札。カードをドラッグして、ほかのカードに重ねると、数字が引き算されるよ。重ねた数だけ ⚔️ も増える！',
+            easy: 'これがてふだ。カードをドラッグして、ほかのカードにかさねると、すうじがひきざんされるよ。かさねたかずだけ ⚔️ もふえる！',
+            en: 'These are your hand cards. Drag a card onto another one and their numbers are subtracted. Each stacked card also adds a ⚔️!' } },
+        { type: 'do', target: twoCardsR, pos: 'top', until: () => state.cards.some(c => c && c.value === 5 && c.stackCount === 2), text: {
+            ja: '黄色カードの「5」を作ろう！ 左の 9 のカードを、となりの 4 のカードに重ねてみて。9-4=5 になるよ（大きい数から小さい数をひくよ）。',
+            easy: 'きいろカードの「5」をつくろう！ ひだりの 9 のカードを、となりの 4 のカードにかさねてみて。9-4=5 になるよ（おおきいかずからちいさいかずをひくよ）。',
+            en: 'Let\'s make the yellow "5"! Drag the 9 card onto the 4 card next to it. 9-4=5 (the smaller number is taken from the larger).' } },
+        { type: 'run', fn: settle },
+        { type: 'say', target: playR, pos: 'top', text: {
+            ja: '5ができた！ ⚔️×2 は「2枚重ねた」しるし。ダメージは「⚔️ × ⭐ × 10」で決まるよ。',
+            easy: '5ができた！ ⚔️×2 は「2まいかさねた」しるし。ダメージは「⚔️ × ⭐ × 10」できまるよ。',
+            en: 'You made 5! ⚔️×2 means two cards are stacked. Damage = ⚔️ × ⭐ × 10.' } },
+        { type: 'do', target: playR, pos: 'top', until: () => state.score > 0, text: {
+            ja: '5のカードを、黄色い「5」のカードにドラッグしてぶつけよう！',
+            easy: '5のカードを、きいろい「5」のカードにドラッグしてぶつけよう！',
+            en: 'Drag your 5 card onto the yellow "5" card!' } },
+        { type: 'run', fn: settle },
+        { type: 'say', target: timeR, pos: 'bottom', text: {
+            ja: '大ダメージ！ ここは「のこり時間」。カードを使うたびに1へって、0になるとゲームオーバー。てきをたおすと時間が回復するよ。',
+            easy: 'だいダメージ！ ここは「のこりじかん」。カードをつかうたびに1へって、0になるとゲームオーバー。てきをたおすとじかんがかいふくするよ。',
+            en: 'Big damage! This is the time left. Every card you use costs 1, and at 0 it\'s game over. Defeating an enemy restores time.' } },
+        { type: 'say', target: discardR, pos: 'top', text: {
+            ja: 'いらないカードは、下のグレーの場所にドラッグして捨てられるよ（時間は1へる）。手札を入れかえたいときに使おう。',
+            easy: 'いらないカードは、したのグレーのばしょにドラッグしてすてられるよ（じかんは1へる）。てふだをいれかえたいときにつかおう。',
+            en: 'Drag unwanted cards to the gray area at the bottom to discard them (costs 1 time). Use it to swap your hand.' } },
+        { type: 'say', target: '#left-panel', pos: 'bottom', text: {
+            ja: '左に「のこりのてき」が出ているよ。10体たおすと最後のボスが登場！ ボスをたおせばゲームクリアだ。がんばってね！',
+            easy: 'ひだりに「のこりのてき」がでているよ。10たいたおすとさいごのボスがとうじょう！ ボスをたおせばゲームクリアだ。がんばってね！',
+            en: 'The left panel shows the enemies remaining. Beat 10 enemies and the final boss appears. Defeat the boss to clear the game — good luck!' } }
+    ]);
+}
+bindBtn(document.getElementById('btn-tutorial'), () => startTutorial());
 
 bindBtn(ui.btnNormal, () => {
     state.difficulty = 'NORMAL';
