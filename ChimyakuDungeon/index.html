@@ -3810,14 +3810,6 @@ function statRank(m, statKey){
     idx = Math.max(0, Math.min(RANK_LEVELS.length-1, idx));
     return RANK_LEVELS[idx];
 }
-// そのステータスがちょうど指定ランク（G〜SS）に届く最小の値（装備なしの素の値）。魔王の魔法攻撃力の基準に使う
-function minStatForRank(statKey, rankLetter){
-    const target = RANK_LEVELS.indexOf(rankLetter);
-    let v = 1;
-    while (v < 100000 && RANK_LEVELS.indexOf(statRank({ [statKey]: v }, statKey)) < target) v++;
-    return v;
-}
-
 // ---- 状態異常・アクティブスキルの共通ルール（暫定値。詳細な数値は今後調整） ----
 // アクティブスキル（勇者・モンスター共通）：間合い別の発動確率と、1戦闘あたりの発動回数上限
 const ACTIVE_SKILL_CHANCE = { melee:0.4, ranged:0.3, magic:0.2 };
@@ -5844,17 +5836,20 @@ const GAME_PRESETS = [
 ];
 let currentGamePresetKey = 'game1'; // 現在選択中のゲームプリセット（今のところ1種類のみ）
 function currentGamePreset(){ return GAME_PRESETS.find(g=>g.key===currentGamePresetKey); }
-// 魔王専用の固定ステータス（暫定値）。通常モンスターより大幅に強いボス値
-// 魔王のLv1の基本値：最終形態（stage3）のモンスターの平均を基準にする。HPは平均の4倍と高めに、攻撃・防御系は平均の1.2倍（少し強い程度）
-// ただし魔法攻撃力だけは強すぎて魔王ばかりLvが上がってしまうため、ステータスのランクがちょうどD（G〜SSのうち下から4番目）に届く最小値にする
-const DEMON_LORD_HP_MULT = 4, DEMON_LORD_STAT_MULT = 1.2;
-const DEMON_LORD_MAGATK_RANK = 'D';
+// 魔王専用の固定ステータス（暫定値）。
+// HP：最終形態（stage3）のモンスターの平均×4倍と高めにする（ここは変更なし＝要望により高いまま維持）。
+// 攻撃・防御・魔攻・魔防：以前は「最終形態の平均×1.2倍」を基準にしていたが、手持ちモンスターの多くは
+// 未進化（stage1）のことが多く、Lv2の時点で「進化前モンスターをLv6まで上げた平均」の3.4倍もの差が出て
+// しまっていた（要調査・要修正のフィードバックあり）。基準を「全stage込みの平均」に下げ、倍率も1.2→1.0
+// に下げた（実測：新しい基礎値の4ステータス平均は28.0、旧の56.3から約半分。Lv2時点の比は3.44倍→1.71倍）
+const DEMON_LORD_HP_MULT = 4, DEMON_LORD_STAT_MULT = 1.0;
 const FINAL_FORM_SPECIES = MONSTER_SPECIES.filter(sp => sp.stage===3);
 const finalFormAvg = k => FINAL_FORM_SPECIES.reduce((sum,sp) => sum + sp[k], 0) / FINAL_FORM_SPECIES.length;
+const allSpeciesAvg = k => MONSTER_SPECIES.reduce((sum,sp) => sum + sp[k], 0) / MONSTER_SPECIES.length;
 const DEMON_LORD_STATS = {
     hp: Math.round(finalFormAvg('hp') * DEMON_LORD_HP_MULT),
-    atk: Math.round(finalFormAvg('atk') * DEMON_LORD_STAT_MULT), def: Math.round(finalFormAvg('def') * DEMON_LORD_STAT_MULT),
-    magAtk: minStatForRank('magAtk', DEMON_LORD_MAGATK_RANK), magDef: Math.round(finalFormAvg('magDef') * DEMON_LORD_STAT_MULT),
+    atk: Math.round(allSpeciesAvg('atk') * DEMON_LORD_STAT_MULT), def: Math.round(allSpeciesAvg('def') * DEMON_LORD_STAT_MULT),
+    magAtk: Math.round(allSpeciesAvg('magAtk') * DEMON_LORD_STAT_MULT), magDef: Math.round(allSpeciesAvg('magDef') * DEMON_LORD_STAT_MULT),
 };
 
 // ============================================================
