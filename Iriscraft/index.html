@@ -546,6 +546,7 @@
     }
     #legend-new-name.show { opacity:1; transform:translateY(0); }
   </style>
+    <script src="../tutorial-engine.js"></script>
 </head>
 <body>
 <div id="container">
@@ -562,6 +563,7 @@
     <p style="font-size:0.85rem;color:#c08060;font-weight:800;letter-spacing:2px;margin-top:-18px;margin-bottom:12px" data-i18n="title.dev">≪ 開発中 ≫</p>
     <p class="title-sub" data-i18n="title.sub">色と図形の世界へ</p>
     <button onclick="startGame()"    style="min-width:220px;font-size:1.2rem;padding:15px 40px;margin-top:0;border:none;border-radius:14px;font-family:inherit;font-weight:800;cursor:pointer;background:linear-gradient(180deg,#5ddb6e,#28a040);color:#fff;box-shadow:0 5px 0 #1a7030;transition:transform .08s,box-shadow .08s" onmousedown="this.style.transform='translateY(3px)';this.style.boxShadow='none'" onmouseup="this.style.transform='';this.style.boxShadow='0 5px 0 #1a7030'" data-i18n="btn.play">▶ あそぶ</button>
+    <button onclick="startTutorial()" style="min-width:220px;font-size:1.2rem;padding:15px 40px;margin-top:12px;border:none;border-radius:14px;font-family:inherit;font-weight:800;cursor:pointer;background:linear-gradient(180deg,#ffb74d,#f57c00);color:#fff;box-shadow:0 5px 0 #b45a00;transition:transform .08s,box-shadow .08s" onmousedown="this.style.transform='translateY(3px)';this.style.boxShadow='none'" onmouseup="this.style.transform='';this.style.boxShadow='0 5px 0 #b45a00'" data-i18n="btn.tutorial">🔰 チュートリアル</button>
     <button onclick="openRanking()"  style="min-width:220px;font-size:1.2rem;padding:15px 40px;margin-top:12px;border:none;border-radius:14px;font-family:inherit;font-weight:800;cursor:pointer;background:linear-gradient(180deg,#f5c842,#d4900a);color:#fff;box-shadow:0 5px 0 #9a6000;transition:transform .08s,box-shadow .08s" onmousedown="this.style.transform='translateY(3px)';this.style.boxShadow='none'" onmouseup="this.style.transform='';this.style.boxShadow='0 5px 0 #9a6000'" data-i18n="btn.ranking">🏆 ランキング</button>
     <button onclick="openAchieve()"  style="min-width:220px;font-size:1.2rem;padding:15px 40px;margin-top:12px;border:none;border-radius:14px;font-family:inherit;font-weight:800;cursor:pointer;background:linear-gradient(180deg,#b47de8,#7a40c0);color:#fff;box-shadow:0 5px 0 #4a2080;transition:transform .08s,box-shadow .08s" onmousedown="this.style.transform='translateY(3px)';this.style.boxShadow='none'" onmouseup="this.style.transform='';this.style.boxShadow='0 5px 0 #4a2080'" data-i18n="btn.collection">📖 コレクション</button>
     <button onclick="openSettings()" style="min-width:220px;font-size:1.2rem;padding:15px 40px;margin-top:12px;border:none;border-radius:14px;font-family:inherit;font-weight:800;cursor:pointer;background:linear-gradient(180deg,#7ab8e8,#3a78c0);color:#fff;box-shadow:0 5px 0 #1a4880;transition:transform .08s,box-shadow .08s" onmousedown="this.style.transform='translateY(3px)';this.style.boxShadow='none'" onmouseup="this.style.transform='';this.style.boxShadow='0 5px 0 #1a4880'" data-i18n="btn.settings">⚙ 設定</button>
@@ -1758,6 +1760,7 @@ const STRINGS = {
     'title.sub': '色と図形の世界へ',
     'title.dev': '≪ 開発中 ≫',
     'btn.play': '▶ あそぶ',
+    'btn.tutorial': '🔰 チュートリアル',
     'btn.ranking': '🏆 ランキング',
     'btn.collection': '📖 コレクション',
     'btn.settings': '⚙ 設定',
@@ -1932,6 +1935,7 @@ const STRINGS = {
     'title.sub': 'いろとずけいのせかいへ',
     'title.dev': '≪ かいはつちゅう ≫',
     'btn.play': '▶ あそぶ',
+    'btn.tutorial': '🔰 チュートリアル',
     'btn.ranking': '🏆 ランキング',
     'btn.collection': '📖 コレクション',
     'btn.settings': '⚙ せってい',
@@ -2106,6 +2110,7 @@ const STRINGS = {
     'title.sub': 'Into a world of colors and shapes',
     'title.dev': '≪ In Development ≫',
     'btn.play': '▶ Play',
+    'btn.tutorial': '🔰 Tutorial',
     'btn.ranking': '🏆 Ranking',
     'btn.collection': '📖 Collection',
     'btn.settings': '⚙ Settings',
@@ -2749,6 +2754,77 @@ function updateLangButtons() {
 }
 // ページ読み込み時に言語設定を復元
 applyLanguage(currentLanguage);
+
+// ================================================================
+//  チュートリアル（練習プレイ）
+// ================================================================
+// 実際の画面で「絵から範囲を選んで切り取り、カードを1まい作る」を体験する。
+// 書き込みはエンジンが止めるので、ランキング・コレクション・記録は一切汚れない。
+function startTutorial() {
+  FGLTutorial.begin({ root: '#container', getLang: () => currentLanguage });
+  startGame();
+  const startL = parseFloat(frame.style.left), startT = parseFloat(frame.style.top);
+  const movedFrame = () => !isDragging && (Math.abs(parseFloat(frame.style.left) - startL) + Math.abs(parseFloat(frame.style.top) - startT) > 30);
+  const shown = (id) => !document.getElementById(id).classList.contains('hidden');
+  FGLTutorial.run([
+    { type: 'say', target: null, text: {
+      ja: 'Iriscraft（イリスクラフト）へようこそ！ このゲームは、「絵の中の色と図形」から自分だけの「カード」を作って、そのカードで冒険にでるゲームだよ。',
+      easy: 'Iriscraft（イリスクラフト）へようこそ！ このゲームは、「えのなかのいろとずけい」からじぶんだけの「カード」をつくって、そのカードでぼうけんにでるゲームだよ。',
+      en: 'Welcome to Iriscraft! In this game you make your very own cards from the colors and shapes in a picture, then take them on an adventure.' } },
+    { type: 'say', target: '#canvas-area', pos: 'bottom', text: {
+      ja: 'これが、色や図形がちりばめられた「絵」。赤・青・緑・黄の色は「炎・氷・風・雷」の力、白は「HP」になるよ。図形（○△□⬡）は、カードの技や絵に関係するよ。',
+      easy: 'これが、いろやずけいがちりばめられた「え」。あか・あお・みどり・きのいろは「ほのお・こおり・かぜ・かみなり」のちから、しろは「HP」になるよ。ずけい（○△□⬡）は、カードのわざやえにかんけいするよ。',
+      en: 'This is the picture, dotted with colors and shapes. Red, blue, green and yellow become Fire, Ice, Wind and Thunder power, and white becomes HP. Shapes (○△□⬡) affect the card\'s moves and artwork.' } },
+    { type: 'say', target: '#side-bars', pos: 'bottom', text: {
+      ja: '右の「色の面積」は、いま枠の中にある色の割合。枠を動かすと、この数字がリアルタイムでかわるよ。割合が大きい色ほど、カードのその力が強くなる！',
+      easy: 'みぎの「いろのめんせき」は、いまわくのなかにあるいろのわりあい。わくをうごかすと、このすうじがリアルタイムでかわるよ。わりあいがおおきいいろほど、カードのそのちからがつよくなる！',
+      en: 'The "color area" on the right shows the share of each color inside the frame, updating live as you move it. The bigger a color\'s share, the stronger that power on your card!' } },
+    { type: 'do', target: '#canvas-area', pos: 'bottom', until: movedFrame, text: {
+      ja: '絵の上の「枠」をドラッグして、好きな場所に動かしてみよう！ 右の数字が変わるのを見てね。',
+      easy: 'えのうえの「わく」をドラッグして、すきなばしょにうごかしてみよう！ みぎのすうじがかわるのをみてね。',
+      en: 'Drag the frame over the picture to a place you like! Watch the numbers on the right change.' } },
+    { type: 'say', target: '#canvas-area', pos: 'bottom', text: {
+      ja: '絵の中には、ときどき光る「オーブ」（宝石）がかくれているよ。枠に入れると、その属性の力がボーナスでアップ！ 大きいオーブほど効果が高いよ。',
+      easy: 'えのなかには、ときどきひかる「オーブ」（ほうせき）がかくれているよ。わくにいれると、そのぞくせいのちからがボーナスでアップ！ おおきいオーブほどこうかがたかいよ。',
+      en: 'Sometimes glowing "orbs" (gems) are hidden in the picture. Put one in the frame to boost that element! Bigger orbs give bigger bonuses.' } },
+    { type: 'say', target: '#regen-btn', pos: 'top', text: {
+      ja: 'いい場所が見つからないときは「絵を変える」で、新しい絵にとりかえられるよ。',
+      easy: 'いいばしょがみつからないときは「えをかえる」で、あたらしいえにとりかえられるよ。',
+      en: 'If you can\'t find a good spot, "Change picture" swaps in a new picture.' } },
+    { type: 'do', target: '.btn-cut', pos: 'top', until: () => shown('confirm-overlay'), text: {
+      ja: '場所がきまったら「✂ 切り取る」ボタンを押そう！',
+      easy: 'ばしょがきまったら「✂ きりとる」ボタンをおそう！',
+      en: 'When you\'ve chosen a spot, press the "✂ Cut" button!' } },
+    { type: 'say', target: '#confirm-overlay .dialog-box', pos: 'top', text: {
+      ja: '切り取る範囲の最終確認。「やりなおす」で枠を選びなおせるよ。',
+      easy: 'きりとるはんいのさいしゅうかくにん。「やりなおす」でわくをえらびなおせるよ。',
+      en: 'A final check of the area to cut. "Redo" lets you pick the frame again.' } },
+    { type: 'do', target: '#confirm-overlay .btn-primary', pos: 'top', until: () => shown('result-overlay'), text: {
+      ja: '「切り取る！」を押して、カードの力を見てみよう！',
+      easy: '「きりとる！」をおして、カードのちからをみてみよう！',
+      en: 'Press "Cut it!" to see your card\'s powers!' } },
+    { type: 'say', target: '#result-overlay .dialog-box', pos: 'top', text: {
+      ja: '切り取り結果！ 4つの属性（炎・氷・風・雷）の大きさと、白の量から決まる「HP」が出たよ。図形の数やオーブのボーナスも、ここでわかる。',
+      easy: 'きりとりけっか！ 4つのぞくせい（ほのお・こおり・かぜ・かみなり）のおおきさと、しろのりょうからきまる「HP」がでたよ。ずけいのかずやオーブのボーナスも、ここでわかる。',
+      en: 'The result! You can see the size of the four elements (Fire, Ice, Wind, Thunder) and the HP determined by the amount of white — plus your shape count and orb bonuses.' } },
+    { type: 'do', target: '#result-make-btn', pos: 'top', until: () => cardStock.length >= 1, text: {
+      ja: '気に入ったら「カードを作る！」を押そう！',
+      easy: 'きにいったら「カードをつくる！」をおそう！',
+      en: 'If you like it, press "Make card!"' } },
+    { type: 'say', target: '#cards-overlay .dialog-box', pos: 'top', text: {
+      ja: 'カードが1まいできたよ！ 一番多い図形の種類で、キャラクターの絵も決まるんだ。カードは全部で3まい作るよ（右上の数字が、いま何まいか）。',
+      easy: 'カードが1まいできたよ！ いちばんおおいずけいのしゅるいで、キャラクターのえもきまるんだ。カードはぜんぶで3まいつくるよ（みぎうえのすうじが、いまなんまいか）。',
+      en: 'You made one card! The most common shape decides the character\'s artwork. You make 3 cards in all (the number at the top right shows how many you have).' } },
+    { type: 'say', target: null, text: {
+      ja: '3まいそろったら、むずかしさをえらんでダンジョンへ！ バトルでは、毎ターン出てくる「エネルギー」をカードにつけて、たまったエネルギーで「技」を出して敵をたおすよ。敵の弱点をつくとダメージUP！ 階をクリアするたびにカードも強くなる。',
+      easy: '3まいそろったら、むずかしさをえらんでダンジョンへ！ バトルでは、まいターンでてくる「エネルギー」をカードにつけて、たまったエネルギーで「わざ」をだしててきをたおすよ。てきのじゃくてんをつくとダメージUP！ かいをクリアするたびにカードもつよくなる。',
+      en: 'Once you have 3 cards, pick a difficulty and enter the dungeon! In battle, attach each turn\'s "energy" to your cards and use it to fire "moves" at enemies. Hit their weakness for extra damage! Your cards grow stronger with each floor you clear.' } },
+    { type: 'say', target: null, text: {
+      ja: 'ボスをたおせばクリア！ カードを上手に作って、すてきな冒険に出かけよう！',
+      easy: 'ボスをたおせばクリア！ カードをじょうずにつくって、すてきなぼうけんにでかけよう！',
+      en: 'Defeat the boss to win! Craft your cards well and set off on a great adventure!' } }
+  ]);
+}
 
 function startGame() {
   document.getElementById('title-screen').classList.add('hidden');
