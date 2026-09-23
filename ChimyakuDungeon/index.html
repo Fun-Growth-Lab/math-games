@@ -848,6 +848,7 @@
         .monster-picker-meta { display:flex; align-items:center; gap:6px; font-size:0.9rem; color:var(--ink-dim); font-weight:700; }
         .monster-picker-gain { font-size:0.95rem; font-weight:800; }
         .monster-picker-gain.up { color:#7fe6a0; } .monster-picker-gain.down { color:#ff8d7d; }
+        .monster-picker-equipped { font-size:0.78rem; color:var(--ink-dim); opacity:0.85; }
         /* 侵攻プレビュー用：クリック不可の表示専用カード（見た目は同じグリッドに揃える） */
         .monster-picker-btn.static { cursor:default; }
         .monster-picker-btn.static:hover { border-color: var(--card-bdr); }
@@ -1153,9 +1154,15 @@
     <div id="item-inventory-modal" class="modal-backdrop hidden">
         <div class="modal-box" style="width:620px; max-width:96%; max-height:96%; overflow-y:auto; padding:20px 30px;">
             <div class="modal-title" data-i18n="item_inventory_title" style="margin-bottom:8px;">🎒 アイテム</div>
-            <div class="side-panel-title" data-i18n="item_inventory_stones_title" style="text-align:left;">進化の石</div>
+            <div class="side-panel-title" style="text-align:left; display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                <span data-i18n="item_inventory_stones_title">進化の石</span>
+                <button class="btn btn-sm btn-purple" data-i18n="btn_auto_use_stones" onclick="autoUseAllStones()">🪄 一括使用</button>
+            </div>
             <div id="item-inventory-stones" class="item-slot-grid"></div>
-            <div class="side-panel-title" data-i18n="item_inventory_equip_title" style="text-align:left; margin-top:8px;">装備</div>
+            <div class="side-panel-title" style="text-align:left; margin-top:8px; display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                <span data-i18n="item_inventory_equip_title">装備</span>
+                <button class="btn btn-sm btn-purple" data-i18n="btn_auto_equip_items" onclick="autoEquipAllItems()">⚔️ 一括装備</button>
+            </div>
             <div id="item-inventory-equipment" class="item-slot-grid"></div>
             <button class="btn btn-sm" style="margin-top:10px; width:100%;" data-i18n="btn_close" onclick="closeItemInventoryModal()">とじる</button>
         </div>
@@ -1602,6 +1609,12 @@ const UI_TEXT = {
     item_target_picker_title: { ja: '対象を選んでください', ja_easy: 'たいしょうを えらんでね', en: 'Choose a target' },
     item_inventory_empty: { ja: '（アイテムがありません）', ja_easy: '（アイテムが ないよ）', en: '(No items)' },
     err_no_eligible_monster: { ja: '使えるモンスターがいません', ja_easy: 'つかえる モンスターが いないよ', en: 'No eligible monster' },
+    btn_auto_use_stones: { ja: '🪄 一括使用', ja_easy: '🪄 まとめて つかう', en: '🪄 Use All' },
+    btn_auto_equip_items: { ja: '⚔️ 一括装備', ja_easy: '⚔️ まとめて そうび', en: '⚔️ Equip All' },
+    status_auto_stone_done: { ja: n => `より強いモンスターを優先して、進化の石を${n}個使いました`, ja_easy: n => `つよい モンスターから じゅんばんに、しんかの いしを ${n}こ つかったよ`, en: n => `Used ${n} evolution stone(s), prioritizing the strongest monsters` },
+    status_auto_stone_none: { ja: '使える進化の石がありません', ja_easy: 'つかえる しんかの いしが ないよ', en: 'No evolution stones can be used' },
+    status_auto_equip_done: { ja: n => `効果が高い組み合わせを優先して、装備を${n}個つけました`, ja_easy: n => `こうかが たかい くみあわせから、そうびを ${n}こ つけたよ`, en: n => `Equipped ${n} item(s), prioritizing the biggest gains` },
+    status_auto_equip_none: { ja: 'いま装備した方が良いアイテムがありません', ja_easy: 'いま そうびした ほうが いい アイテムが ないよ', en: 'No item would currently be an upgrade' },
     skill_reward_title: { ja: '🎁 魔王スキルを1つ習得', ja_easy: '🎁 まおうスキルを 1つ おぼえる', en: '🎁 Learn a Demon Lord Skill' },
     skill_reward_new_label: { ja: 'NEW', ja_easy: 'NEW', en: 'NEW' },
     evolve_stone_name: { ja: name => `${name}の石`, ja_easy: name => `${name}の いし`, en: name => `${name} Stone` },
@@ -5128,21 +5141,46 @@ function stoneEmoji(stoneKey){
     return (sp && LINE_STONE_EMOJI[sp.line]) || '💎';
 }
 let stoneInventory = {}; // stoneKey -> 所持数
-// 進化の石を1個消費して、モンスターをその石が示す種族へ進化させる（対象外の石が渡された場合は何もしない）
-function evolveMonsterWithStone(monsterId, stoneKey){
+// 進化の石を1個消費して、モンスターをその石が示す種族へ進化させる本体処理（UI更新は呼び出し側の責任）。成功すればtrue
+function evolveMonsterWithStoneCore(monsterId, stoneKey){
     const m = monsters.find(x=>x.id===monsterId);
-    if (!m || !(stoneInventory[stoneKey]>0)) return;
+    if (!m || !(stoneInventory[stoneKey]>0)) return false;
     const targetKey = stoneTargetSpeciesKey(stoneKey);
     const next = nextStageCandidates(m.speciesKey).find(c=>c.key===targetKey);
-    if (!next) return;
+    if (!next) return false;
     stoneInventory[stoneKey]--;
     if (stoneInventory[stoneKey]<=0) delete stoneInventory[stoneKey];
     applyEvolution(m, next);
+    return true;
+}
+// 対象を1体選んで石を使う（ピッカーから呼ばれる。進化結果ポップアップを表示する）
+function evolveMonsterWithStone(monsterId, stoneKey){
+    if (!evolveMonsterWithStoneCore(monsterId, stoneKey)) return;
+    const m = monsters.find(x=>x.id===monsterId);
     renderRoomDetail();
     renderAll();
     closeItemTargetPicker();
     closeItemInventoryModal(); // 石を使ったらアイテムのポップアップは閉じ、進化結果だけを見せる
     openEvolutionResultModal(m);
+}
+// 進化の石を一括使用：所持している石それぞれについて「使える中でいちばん強い（総合戦闘力が高い）モンスター」に
+// 優先的に使い切る。同じ石が複数あれば、使うたびに次に強いモンスターへと順番に使っていく
+function autoUseAllStones(){
+    let count = 0;
+    Object.keys(stoneInventory).forEach(stoneKey => {
+        while (stoneInventory[stoneKey]>0){
+            const eligible = monstersEligibleForStone(stoneKey);
+            if (eligible.length===0) break;
+            const target = eligible.reduce((best,m) => powerScore(m)>powerScore(best) ? m : best);
+            if (!evolveMonsterWithStoneCore(target.id, stoneKey)) break;
+            count++;
+        }
+    });
+    renderItemInventoryModal();
+    renderMonsterListModal();
+    renderRoomDetail();
+    renderAll();
+    showToast(count>0 ? uif('status_auto_stone_done', count) : ui('status_auto_stone_none'));
 }
 // 進化の石を使った直後に、進化後の姿とステータスをまとめて見せる結果ポップアップ
 function openEvolutionResultModal(m){
@@ -5266,16 +5304,20 @@ function openItemTargetPicker(kind, keyOrId, candidateMonsters){
     const pickedItem = kind==='equip' ? inventory.find(i=>i.id===keyOrId) : null;
     document.getElementById('item-target-picker-body').innerHTML = list.map(m => {
         const sp = speciesInfo(m.speciesKey);
-        // 装備を渡す相手を選ぶときは、そのモンスターが得る能力の上がり幅（各能力の増加分の合計）も見せる
+        // 装備を渡す相手を選ぶときは、そのモンスターが得る能力の上がり幅（各能力の増加分の合計）と、いま何を装備しているかも見せる
         let gainHtml = '';
+        let equippedHtml = '';
         if (pickedItem){
             const gain = Math.round(equipGainAmount(m, pickedItem.itemKey));
             gainHtml = `<span class="monster-picker-gain ${gain>=0?'up':'down'}">${ui('eq_gain_label')} ${gain>=0?'▲+':'▼'}${gain}</span>`;
+            const curItem = m.equippedItem ? itemInfo(m.equippedItem.itemKey) : null;
+            equippedHtml = `<span class="monster-picker-equipped">${curItem ? escapeHtml(curItem.name_ja) : ui('eq_empty_slot')}</span>`;
         }
         return `<button class="monster-picker-btn" onclick="confirmItemTargetPick(${m.id})">
             ${monsterIconHtml(sp, 40)}
             <span class="monster-picker-name" style="color:${monsterNameColor(sp)};">${escapeHtml(monsterDisplayName(m))}</span>
             <span class="monster-picker-meta">Lv.${m.level||0} ${rankBadgeHtml(m)}</span>
+            ${equippedHtml}
             ${gainHtml}
         </button>`;
     }).join('');
@@ -5413,6 +5455,36 @@ function unequipMonster(monsterId){
     renderEquipModal();
     renderMonsterDetailModal();
     renderRoomDetail();
+}
+// 今の装備からの純増分（マイナスなら今のままの方が強い）。装備なしのモンスターにはequipGainAmountがそのまま純増分になる
+function equipNetGain(m, itemKey){
+    const curGain = m.equippedItem ? equipGainAmount(m, m.equippedItem.itemKey) : 0;
+    return equipGainAmount(m, itemKey) - curGain;
+}
+// 装備を一括最適化：倉庫にある未装備のアイテムぜんぶと、全モンスターの総当たりから「つけ替えると純増分が最も大きい
+// 組み合わせ」を優先して次々に決めていく（1つのアイテム・1体のモンスターは1回の一括操作につき1組み合わせだけ使う）。
+// 今つけている装備より弱くなる組み合わせ（純増分がマイナス）は対象にしない
+function autoEquipAllItems(){
+    const candidates = [];
+    inventory.forEach(inv => {
+        monsters.forEach(m => {
+            const netGain = equipNetGain(m, inv.itemKey);
+            if (netGain>0) candidates.push({ invId: inv.id, monsterId: m.id, netGain });
+        });
+    });
+    candidates.sort((a,b) => b.netGain - a.netGain);
+    const usedItems = new Set(), usedMonsters = new Set();
+    let count = 0;
+    candidates.forEach(cand => {
+        if (usedItems.has(cand.invId) || usedMonsters.has(cand.monsterId)) return;
+        equipItemToMonster(cand.monsterId, cand.invId);
+        usedItems.add(cand.invId); usedMonsters.add(cand.monsterId);
+        count++;
+    });
+    renderItemInventoryModal();
+    renderMonsterListModal();
+    renderRoomDetail();
+    showToast(count>0 ? uif('status_auto_equip_done', count) : ui('status_auto_equip_none'));
 }
 
 // ---- モンスター・魔王の移動（マップ作製フェーズのみ、同じ部屋の中でのみ移動可） ----
@@ -5738,28 +5810,38 @@ function trapAffectedCells(trap, room){
 // 戦闘フェーズ（風来のシレン風：1ターンずつ敵味方が自動で行動する）
 // ============================================================
 const STAGE_FINAL = 7; // 最終侵攻。ここの勇者を倒すとゲームクリア
-// ステージごとの勇者の総数（侵攻が進むほど増える）。1ターンに4体ずつ、この人数に達するまで入ってくる
-// 部屋を増やすほど迷宮側の強さ（モンスター数・生産力）が複利的に伸びる一方、勇者数を一定の+2ずつにすると
-// 終盤に迷宮側との差が開きすぎるため、増分自体が後半ほど大きくなる式にしてある（案B）。
-// ステージ数nに対して 2n + round(0.5×(n-1)²) 人（ステージ1で2人、ステージ7で32人、7ステージ合計103人）
+// ステージごとの勇者の総数。人数が多いほど戦闘の処理が重くなるため、MAX4体までしか増やさない
+// （ステージ1で2人→ステージ2で3人→ステージ3以降はずっと4人で頭打ち）。そのぶん終盤の強さは
+// heroOffenseMult側で1体あたりの攻撃力を大きく伸ばして補う
 const HEROES_PER_WAVE = 4;
 const WAVE_INTERVAL_TICKS = 12; // 次の4体が入ってくるまでのtick数（暫定値。1tickは行動1回分の間隔）
-function heroCountForStage(stageNum){ return 2*stageNum + Math.round(0.5*(stageNum-1)*(stageNum-1)); }
+function heroCountForStage(stageNum){ return Math.min(4, stageNum+1); }
 // 勇者のクラス定義。
 // tierStart/tierEndは侵攻1・侵攻7でのステータス（1〜10ランク値、モンスターと同じtierStats換算を使う）。
 // 中間の侵攻は線形補間する（lerpHeroTierを参照）。役割(role)は近接/中距離/遠距離の立ち回りを決める。
 // HPは人数に関わらず今まで通り2倍のまま（下げすぎて一撃死しないように）。
-// 攻撃系(攻撃力/防御力/魔力/魔法防御力)は「4体編成のときの2倍」を基準に、実際の人数に反比例させて下げる
-// （人数が増えるほど1体あたりの攻撃力は下がるが、パーティ全体の総攻撃力は侵攻1と大きく変わらない設計）
 const HERO_HP_MULT = 2;
 const HERO_BASE_OFFENSE_MULT = 2;
 const HERO_BASELINE_COUNT = 4;
-// ステージ1は勇者が2体しかいないため、上の反比例式だとoffenseMultが4倍まで跳ね上がり、
-// 生まれたてのLv1モンスター（HP平均22前後）を一撃で倒してしまっていた（実測：ダメージ約40〜46）。
-// ステージ2（勇者5体、反比例式で1.6倍）は問題ないとのフィードバックなので、ステージ1だけその水準まで
-// 頭打ちにする（ステージ2以降はこの上限に届かないため、今まで通り反比例式のまま変化しない）
+// ステージ1は勇者が2体しかいないため、素の反比例式（4体編成時を基準に人数に反比例）だとoffenseMultが
+// 4倍まで跳ね上がり、生まれたてのLv1モンスター（HP平均22前後）を一撃で倒してしまっていた（実測：ダメージ約40〜46）。
+// ステージ2（勇者3体、反比例式で2.67倍）も同様に危ないため、4体に達するまで（ステージ1・2）は
+// この上限で頭打ちにする
 const HERO_OFFENSE_MULT_CAP = 1.6;
-function heroOffenseMult(stageNum){ return Math.min(HERO_OFFENSE_MULT_CAP, HERO_BASE_OFFENSE_MULT * (HERO_BASELINE_COUNT / heroCountForStage(stageNum))); }
+// 4体に達したあと（ステージ3〜7）は人数がもう増えないため、代わりにステージが進むほど1体あたりの
+// 攻撃力そのものを大きく伸ばす（勇者の人数を絞った分の強さを、ここで肩代わりする設計）。
+// ステージ3で基準値2.0（＝BASE_OFFENSE_MULT×BASELINE_COUNT/4体）から始め、最終侵攻7で2.5倍の5.0まで線形に伸ばす
+const HERO_OFFENSE_GROWTH_STAGE_START = 3;
+const HERO_OFFENSE_MULT_AT_GROWTH_START = HERO_BASE_OFFENSE_MULT * (HERO_BASELINE_COUNT / 4);
+const HERO_OFFENSE_MULT_AT_FINAL = 5.0;
+function heroOffenseMult(stageNum){
+    const count = heroCountForStage(stageNum);
+    if (count < HERO_BASELINE_COUNT){
+        return Math.min(HERO_OFFENSE_MULT_CAP, HERO_BASE_OFFENSE_MULT * (HERO_BASELINE_COUNT / count));
+    }
+    const t = Math.max(0, (stageNum - HERO_OFFENSE_GROWTH_STAGE_START) / (STAGE_FINAL - HERO_OFFENSE_GROWTH_STAGE_START));
+    return HERO_OFFENSE_MULT_AT_GROWTH_START + t * (HERO_OFFENSE_MULT_AT_FINAL - HERO_OFFENSE_MULT_AT_GROWTH_START);
+}
 // tierStartはステージ1の勇者の強さを決める（侵攻1では線形補間の比率t=0でtierStartがそのまま使われるため）。下のHERO_START_STRENGTH_SCALEで一律に下げている。
 // ステージ1が少し強すぎるとのフィードバックを受け、各能力を1ランクずつ下げた（下限1）。tierEnd（最終侵攻7の強さ）は変更していない。
 // 【攻撃役3職（剣士・アーチャー・メイジ）の攻撃値の決め方】
@@ -6082,7 +6164,8 @@ function heroBattleStats(classKey, stageNum){
     const cls = heroClassInfo(classKey);
     const st = tierStats(...lerpHeroTier(cls, stageNum));
     const offenseMult = heroOffenseMult(stageNum);
-    return { hp: st.hp*HERO_HP_MULT, atk: st.atk*offenseMult, def: st.def*offenseMult, magAtk: st.magAtk*offenseMult, magDef: st.magDef*offenseMult };
+    // lerpHeroTierは比率を保つため小数のまま補間しているので、ここで整数に丸めてHP表示の小数点を防ぐ
+    return { hp: Math.round(st.hp*HERO_HP_MULT), atk: Math.round(st.atk*offenseMult), def: Math.round(st.def*offenseMult), magAtk: Math.round(st.magAtk*offenseMult), magDef: Math.round(st.magDef*offenseMult) };
 }
 // 勇者に本当のLvはないため、侵攻してくる勇者のLv表示にはステージ番号を使う（勇者1体の戦闘力は人数補正でステージによらずほぼ一定なので、戦闘力から換算するとLvが上がらず意味がない）
 function heroPreviewCardHtml(entry){
@@ -6199,13 +6282,13 @@ function renderHeroList(){
         <div class="hero-hp-row${h.alive?'':' dead'}">
             <span>${h.emoji} ${escapeHtml(uif('hero_label', h.id))}（${escapeHtml(heroClassInfo(h.heroClassKey).name_ja)}）</span>
             <div class="hero-hp-track"><div class="hero-hp-fill" style="width:${Math.max(0,h.hp/h.maxHp*100)}%"></div></div>
-            <span>${Math.max(0,h.hp)}/${h.maxHp}</span>
+            <span>${Math.max(0,Math.round(h.hp))}/${Math.round(h.maxHp)}</span>
         </div>
     `).join('') + (demonLordUnit ? `
         <div class="hero-hp-row${demonLordUnit.alive?'':' dead'}">
             <span><span class="monster-icon-thumb" style="background-image:url('images/mamono/demon_lord.png');"></span> ${ui('demonlord_label')}</span>
             <div class="hero-hp-track"><div class="hero-hp-fill" style="background:var(--danger); width:${Math.max(0,demonLordUnit.hp/demonLordUnit.maxHp*100)}%"></div></div>
-            <span>${Math.max(0,demonLordUnit.hp)}/${demonLordUnit.maxHp}</span>
+            <span>${Math.max(0,Math.round(demonLordUnit.hp))}/${Math.round(demonLordUnit.maxHp)}</span>
         </div>` : '');
 }
 
