@@ -158,6 +158,27 @@
     }
 
     /* ---------- 画面部品 ---------- */
+    // ゲーム側が window の touchend で preventDefault していると、タッチ後の click が
+    // 発生しなくなりボタンが押せない。そこでタッチは touchend で直接処理し、click は
+    // (マウス操作用に)残す。同じ操作で二重に動かないよう直後の click は無視する
+    function bindTap(btn, fn) {
+        let lastTouch = 0;
+        btn.addEventListener('touchend', function (e) {
+            e.preventDefault(); e.stopPropagation();
+            lastTouch = Date.now();
+            fn();
+        }, { passive: false });
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            if (Date.now() - lastTouch < 700) return;
+            fn();
+        });
+    }
+    function isolateTouch(el) {
+        ['touchstart', 'touchmove', 'touchend'].forEach(function (n) {
+            el.addEventListener(n, function (e) { e.stopPropagation(); }, { passive: true });
+        });
+    }
     function buildLayer() {
         if (layer) return;
         layer = document.createElement('div');
@@ -170,14 +191,16 @@
         capText = document.createElement('p'); capText.className = 'fgl-tut-text'; cap.appendChild(capText);
         const row = document.createElement('div'); row.className = 'fgl-tut-row';
         capBtn = document.createElement('button'); capBtn.className = 'fgl-tut-btn'; capBtn.type = 'button';
-        capBtn.addEventListener('click', function () { if (capBtn._cb) capBtn._cb(); });
+        bindTap(capBtn, function () { if (capBtn._cb) capBtn._cb(); });
         capSkip = document.createElement('button'); capSkip.className = 'fgl-tut-skip'; capSkip.type = 'button';
-        capSkip.addEventListener('click', function () { next(); });
+        bindTap(capSkip, function () { next(); });
         row.appendChild(capBtn); row.appendChild(capSkip); cap.appendChild(row);
         layer.appendChild(cap);
         exitBtn = document.createElement('button'); exitBtn.className = 'fgl-tut-exit'; exitBtn.type = 'button';
-        exitBtn.addEventListener('click', function () { T.exit(); });
+        bindTap(exitBtn, function () { T.exit(); });
         layer.appendChild(exitBtn);
+        // 説明ボックスや暗幕へのタッチを、ゲーム本体(window等のtouchstart/move/end)に渡さない
+        [cap, exitBtn].concat(blockers).forEach(isolateTouch);
         if (cfg.exitPos === 'left') { exitBtn.style.right = 'auto'; exitBtn.style.left = '14px'; }
         rootEl.appendChild(layer);
         // 画面の向き・大きさが変わったら位置を取り直す
