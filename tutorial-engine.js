@@ -23,7 +23,7 @@
     let cfg = { root: null, getLang: function () { return 'ja'; } };
     let rootEl = null;
     let layer = null, blockers = [], hole = null, dim = null, cap = null, capText = null,
-        capBtn = null, capSkip = null, capCount = null, exitBtn = null;
+        capBtn = null, capSkip = null, capCount = null, exitBtn = null, capWarn = null;
     let active = false;
     let steps = [], idx = 0, pollTimer = null, skipTimer = null, relayoutTimer = null;
     let origStorage = null, origFetch = null, origBeacon = null;
@@ -36,7 +36,10 @@
         doneBody: { ja: '遊び方はこれでバッチリ！さっそく本編に挑戦してみよう。',
                     easy: 'あそびかたはこれでバッチリ！さっそくほんぺんにちょうせんしてみよう。',
                     en: 'You\'ve got the basics down! Time to try the real game.' },
-        doneBtn:  { ja: 'タイトルへ戻る', easy: 'タイトルへもどる', en: 'Back to Title' }
+        doneBtn:  { ja: 'タイトルへ戻る', easy: 'タイトルへもどる', en: 'Back to Title' },
+        warn:     { ja: 'ちがうよ！ 説明のとおりに、光っているところを操作してみよう！',
+                    easy: 'ちがうよ！ せつめいのとおりに、ひかっているところをそうさしてみよう！',
+                    en: 'Not that one! Follow the instructions and try the glowing spot.' }
     };
 
     function langKey() {
@@ -73,6 +76,9 @@
             'color:#2a1a00;background:linear-gradient(180deg,#ffe27a,#ffb300);box-shadow:0 4px 0 #b37700;}',
             '.fgl-tut-btn:active{transform:translateY(2px);box-shadow:0 2px 0 #b37700;}',
             '.fgl-tut-skip{font-family:inherit;font-size:18px;font-weight:700;padding:6px 18px;border:2px solid #aaa;border-radius:999px;cursor:pointer;color:#ddd;background:transparent;}',
+            '.fgl-tut-warn{display:none;margin:0 0 10px;padding:8px 14px;border-radius:12px;background:#ff5a4a;color:#fff;font-size:22px;font-weight:800;line-height:1.4;}',
+            '.fgl-tut-warn.on{display:block;animation:fglTutShake .4s ease;}',
+            '@keyframes fglTutShake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}',
             '.fgl-tut-count{position:absolute;right:16px;top:8px;font-size:15px;color:#c9b27a;font-weight:700;}',
             '.fgl-tut-exit{position:absolute;right:14px;top:12px;pointer-events:auto;font-family:inherit;font-size:18px;font-weight:800;',
             'padding:6px 18px;border:2px solid #ffd24a;border-radius:999px;cursor:pointer;color:#ffd24a;background:rgba(24,18,10,0.92);z-index:5;}'
@@ -188,6 +194,7 @@
         for (let i = 0; i < 4; i++) { const b = document.createElement('div'); b.className = 'fgl-tut-b'; layer.appendChild(b); blockers.push(b); }
         cap = document.createElement('div'); cap.className = 'fgl-tut-cap';
         capCount = document.createElement('div'); capCount.className = 'fgl-tut-count'; cap.appendChild(capCount);
+        capWarn = document.createElement('div'); capWarn.className = 'fgl-tut-warn'; cap.appendChild(capWarn);
         capText = document.createElement('p'); capText.className = 'fgl-tut-text'; cap.appendChild(capText);
         const row = document.createElement('div'); row.className = 'fgl-tut-row';
         capBtn = document.createElement('button'); capBtn.className = 'fgl-tut-btn'; capBtn.type = 'button';
@@ -218,7 +225,17 @@
         if (!layer || !curStep) return;
         const s = curStep;
         const m = mapper();
-        const r = resolveTarget(s.target, m);
+        let r = resolveTarget(s.target, m);
+        // 手順どおりの操作(only)がある時は、押し始める場所(from)と離す場所(to)も必ず明るい穴に含める
+        if (r && s.only) {
+            const extra = rectsOf(s.only.from, m).concat(rectsOf(s.only.to, m));
+            let x0 = r.x, y0 = r.y, x1 = r.x + r.w, y1 = r.y + r.h;
+            extra.forEach(function (q) {
+                x0 = Math.min(x0, q.x - 6); y0 = Math.min(y0, q.y - 6);
+                x1 = Math.max(x1, q.x + q.w + 6); y1 = Math.max(y1, q.y + q.h + 6);
+            });
+            r = { x: Math.max(0, x0), y: Math.max(0, y0), w: Math.min(m.W, x1) - Math.max(0, x0), h: Math.min(m.H, y1) - Math.max(0, y0) };
+        }
         const modal = s.type === 'say' || s.block !== false;   // 'do'でも対象以外は触れないようにする
         // 暗幕・穴
         if (r) {
@@ -256,9 +273,157 @@
             atTop = (spaceBelow < capH + 24) && (spaceAbove > spaceBelow);
         }
         if (s.pos === 'top') atTop = true; else if (s.pos === 'bottom') atTop = false;
+        if (r) {   // 吹き出しが光っている所(触る場所)にかぶるなら、反対側へ逃がす
+            const overlaps = function (top) { const y0 = top ? 20 : m.H - 20 - capH; return r.y < y0 + capH && r.y + r.h > y0; };
+            if (overlaps(atTop) && !overlaps(!atTop)) atTop = !atTop;
+        }
         if (!r && s.pos !== 'top' && s.pos !== 'bottom') {   // 対象なしは中央付近
             cap.style.top = Math.max(20, (m.H - capH) / 2) + 'px';
         } else if (atTop) { cap.style.top = '20px'; } else { cap.style.bottom = '20px'; }
+    }
+
+
+    /* ---------- 「手順どおりの操作だけ」を許すガード ---------- */
+    // 'do' ステップに only:{ from, to, tap, hint } を書くと、
+    //   from : 押し始めてよい場所(ドラッグ元・押すボタンなど)。ここ以外を押しても無視して注意を出す。{any:[対象,対象…]} でどれか1つでもOK
+    //   to   : 離してよい場所(ドロップ先)。ここ以外で離すと、ゲームには「画面の外で離した」と伝えて取り消し、注意を出す
+    //   upOK : (pt)=>真偽。離した位置の判定をゲーム独自にしたいとき(カードの中心がマスに入っているか等)。toより優先
+    //   tap  : true なら「from を1回タップ→to を1回タップ」方式(fromとtoのどちらのタップも許す)
+    //   dir  : 'right'|'left'|'up'|'down'。from から押し始めて、その向きにスワイプ(ドラッグ)する操作だけ許す(矢印キーもその向きだけ)
+    //   keys : 許すキーの配列(例 ['ArrowUp'])。only のある do ステップでは、ここに無いキー操作(矢印・スペース・文字)は止める
+    //   hint : 注意の文(省略時は標準文)
+    // 座標は target と同じ書き方(セレクタ/Element/関数/{sel,rect,of}/{rect})。
+    let bypass = false, downAt = null, downTarget = null, warnTimer = null;
+    const DOWN_EV = ['mousedown', 'touchstart', 'pointerdown'];
+    const UP_EV = ['mouseup', 'touchend', 'pointerup'];
+    function evPoint(e) {
+        if (e.changedTouches && e.changedTouches.length) return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+        if (e.touches && e.touches.length) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        return { x: e.clientX, y: e.clientY };
+    }
+    // from/to の指定(セレクタ/Element/関数/{sel,rect,of}/{any:[..]})を、root内の論理矩形の配列にする
+    function rectsOf(t, m) {
+        if (typeof t === 'function') t = t();
+        if (!t) return [];
+        if (t.any) return [].concat.apply([], t.any.map(function (x) { return rectsOf(x, m); }));
+        if (typeof t === 'string') t = { sel: t };
+        else if (t instanceof Element) t = { el: t };
+        const r = resolveTarget(Object.assign({ pad: 0 }, t), m);
+        return r ? [r] : [];
+    }
+    function inTarget(tgt, pt) {
+        if (typeof tgt === 'function') tgt = tgt();
+        if (!tgt) return false;
+        if (tgt.any) return tgt.any.some(function (t) { return inTarget(t, pt); });   // どれか1つに入っていればOK
+        if (typeof tgt === 'string') tgt = { sel: tgt };
+        else if (tgt instanceof Element) tgt = { el: tgt };
+        tgt = Object.assign({ pad: 0 }, tgt);
+        const m = mapper();
+        const r = resolveTarget(tgt, m);
+        if (!r) return false;
+        const l = m.toLogical(pt.x, pt.y);
+        return l.x >= r.x && l.x <= r.x + r.w && l.y >= r.y && l.y <= r.y + r.h;
+    }
+    function warn(o) {
+        if (!capWarn) return;
+        capWarn.textContent = pick((o && o.hint) || UI.warn);
+        capWarn.classList.remove('on'); void capWarn.offsetWidth; capWarn.classList.add('on');
+        clearTimeout(warnTimer);
+        warnTimer = setTimeout(function () { capWarn.classList.remove('on'); }, 3200);
+        layout();
+    }
+    function block(e) {
+        e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+    }
+    // ゲームに「x,y で離した」と伝える。既定は画面のはるか外(=ドロップ先なしで取り消し)。
+    // 離す座標だけでなく、その前の移動位置で相手を決めるゲームもあるので、先に移動も送る
+    function releaseAt(e, x, y) {
+        if (x == null) { x = -5000; y = -5000; }
+        bypass = true;
+        try {
+            // 押し始めた要素に送る(暗幕の上で離しても、ゲーム側の canvas 等がちゃんと受け取れるように)
+            const tgt = (downTarget && downTarget.isConnected) ? downTarget : e.target, off = { clientX: x, clientY: y, screenX: x, screenY: y };
+            const evs = [];
+            if (e.type === 'touchend') {
+                const t0 = e.changedTouches[0];
+                const mk = function () { return new Touch({ identifier: t0.identifier, target: tgt, clientX: x, clientY: y, pageX: x, pageY: y, screenX: x, screenY: y }); };
+                evs.push(new TouchEvent('touchmove', { bubbles: true, cancelable: true, changedTouches: [mk()], touches: [mk()], targetTouches: [mk()] }));
+                evs.push(new TouchEvent('touchend', { bubbles: true, cancelable: true, changedTouches: [mk()], touches: [], targetTouches: [] }));
+            } else if (e.type === 'pointerup') {
+                const po = Object.assign({ bubbles: true, cancelable: true, pointerId: e.pointerId, pointerType: e.pointerType, isPrimary: e.isPrimary, button: e.button }, off);
+                evs.push(new PointerEvent('pointermove', po));
+                evs.push(new PointerEvent('pointerup', po));
+            } else {
+                const mo = Object.assign({ bubbles: true, cancelable: true, button: 0 }, off);
+                evs.push(new MouseEvent('mousemove', mo));
+                evs.push(new MouseEvent('mouseup', mo));
+            }
+            evs.forEach(function (ev) { tgt.dispatchEvent(ev); });
+        } catch (err) { console.error(err); }
+        bypass = false;
+    }
+    // 画面上の移動(dx,dy)を、root内の論理座標での向き(right/left/up/down)に直す(回転表示でも正しい)。短すぎれば null
+    function swipeDir(from, to) {
+        const m = mapper(), a = m.toLogical(from.x, from.y), b = m.toLogical(to.x, to.y);
+        const dx = b.x - a.x, dy = b.y - a.y;
+        if (Math.max(Math.abs(dx), Math.abs(dy)) < 16) return null;
+        return Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
+    }
+    // 離した後もしばらく(pointerup→touchend→mouseupと続けて届く分)は覚えておき、少ししたら忘れる
+    function endPress() { const tok = downAt; if (tok) setTimeout(function () { if (downAt === tok) downAt = null; }, 700); }
+    function guardEvent(e) {
+        if (bypass || !active || !curStep || curStep.type !== 'do') return;
+        const t = e.type, isDown = DOWN_EV.indexOf(t) >= 0, isUp = UP_EV.indexOf(t) >= 0;
+        const onBlocker = e.target && e.target.classList && e.target.classList.contains('fgl-tut-b');
+        const o = curStep.only, pt = evPoint(e);
+        if (layer && e.target instanceof Node && layer.contains(e.target) && !onBlocker) {
+            if (e.target.closest && e.target.closest('button')) return;     // OK/スキップ/やめるボタンは対象外
+            // 説明ボックスの上: 押すだけなら無視。ドラッグ中にここで離したら、暗い所で離したのと同じ(取り消し)
+            if (isUp && downAt) { block(e); releaseAt(e); warn(o); endPress(); }
+            else if (isDown) downAt = null;
+            return;
+        }
+        if (onBlocker) {                                          // 暗い部分の操作
+            if (isDown) { downAt = null; block(e); warn(o); return; }
+            if (isUp && downAt) { block(e); releaseAt(e); warn(o); endPress(); return; }   // 光っている所で押して、暗い所で離した → 取り消し
+            return;
+        }
+        if (!o) { if (isDown) { downAt = pt; downTarget = e.target; } else if (isUp) endPress(); return; }
+        const okFrom = !o.from || inTarget(o.from, pt);
+        const okTo = !o.to || inTarget(o.to, pt);
+        if (isDown) {
+            if (okFrom || (o.tap && okTo)) { downAt = pt; downTarget = e.target; return; }
+            downAt = null; block(e); warn(o);
+        } else if (t === 'click') {
+            if (okFrom || okTo) return;
+            block(e); warn(o);
+        } else if (isUp) {
+            if (!downAt) return;                                  // 押し始めが許されなかった操作の「離す」
+            if (o.dir) {                                          // スワイプ: 向きが違えば「動かさずに離した」ことにして取り消す
+                const d = swipeDir(downAt, pt);
+                if (d === null || d === o.dir) { endPress(); return; }
+                block(e); releaseAt(e, downAt.x, downAt.y); warn(o); endPress();
+                return;
+            }
+            const okUp = o.upOK ? !!o.upOK(pt) : okTo;             // upOK: ゲーム独自の判定(カードの中心が入っているか等)があればそれを優先
+            if (o.tap ? (okFrom || okUp) : okUp) { endPress(); return; }   // 正しい場所で離した
+            if (!o.to && !o.upOK && !o.tap) { endPress(); return; }
+            block(e); releaseAt(e); warn(o); endPress();
+        }
+    }
+    const ARROW_DIR = { ArrowRight: 'right', ArrowLeft: 'left', ArrowUp: 'up', ArrowDown: 'down' };
+    function guardKey(e) {
+        if (bypass || !active || !curStep || curStep.type !== 'do' || !curStep.only) return;
+        const o = curStep.only, k = e.key;
+        if (!(k === ' ' || k === 'Enter' || k.length === 1 || ARROW_DIR[k])) return;   // 修飾キーやF5などは触らない
+        const ok = o.keys ? o.keys.indexOf(k) >= 0 : (o.dir ? ARROW_DIR[k] === o.dir : false);
+        if (!ok) { block(e); warn(o); }
+    }
+    function installGuard() {
+        window.addEventListener('keydown', guardKey, { capture: true });
+        DOWN_EV.concat(UP_EV, ['click']).forEach(function (n) {
+            window.addEventListener(n, guardEvent, { capture: true, passive: false });
+        });
     }
 
     /* ---------- 進行 ---------- */
@@ -286,6 +451,7 @@
             layer.style.display = 'block';
             exitBtn.textContent = pick(UI.exit);
             capText.textContent = pick(s.text);
+            capWarn.classList.remove('on'); downAt = null;
             capCount.textContent = s.noCount ? '' : (s.no || '');
             if (s.type === 'say') {
                 capBtn.style.display = ''; capBtn.textContent = pick(s.btn || UI.ok);
@@ -338,6 +504,7 @@
         };
         if (navigator.sendBeacon) { origBeacon = navigator.sendBeacon; navigator.sendBeacon = function () { return true; }; }
         window.__fglTutorialActive = true;
+        installGuard();
     };
     T.isActive = function () { return active; };
     // ステップ列を実行する。opts.onFinish を渡すと、最後に標準の完了表示の代わりに呼ばれる。
@@ -383,6 +550,8 @@
             }, 100);
         });
     };
+    // ゲーム側の独自ガードから「ちがうよ」の注意を出したいとき用(hint省略で標準文)
+    T.warn = function (hint) { if (curStep && curStep.type === 'do') warn({ hint: hint || (curStep.only && curStep.only.hint) }); };
     T.relayout = layout;
     T.pick = pick;
 

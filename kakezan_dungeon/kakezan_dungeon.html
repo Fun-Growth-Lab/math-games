@@ -1747,6 +1747,13 @@
             }
         };
         const cv = (x, y, w, h) => ({ sel: '#gameCanvas', rect: [x, y, w, h], of: [1280, 720], pad: 6 });
+        // 手順どおりの操作だけ許すための、ぴったりの範囲(余白なし)
+        const rectP = (x, y, w, h) => ({ sel: '#gameCanvas', rect: [x, y, w, h], of: [1280, 720], pad: 0 });
+        const handCardP = (v) => () => { const i = hand.indexOf(v); return rectP(LAYOUT.handStartX + i * LAYOUT.cardGap, LAYOUT.handY + 20, LAYOUT.cardW, LAYOUT.cardH); };
+        const calcP = () => rectP(LAYOUT.calcX, LAYOUT.calcY, LAYOUT.calcW, LAYOUT.calcH);
+        const mapP = () => rectP(LAYOUT.mapX, LAYOUT.mapY, MAP_COLS * GRID_SIZE, MAP_ROWS * GRID_SIZE);
+        const tileP = (x, y) => () => rectP(LAYOUT.mapX + x * GRID_SIZE, LAYOUT.mapY + y * GRID_SIZE, GRID_SIZE, GRID_SIZE);
+        const itemP = (dx) => () => rectP(LAYOUT.mapX + dx, 550, 150, 50);
         const mapR = () => cv(LAYOUT.mapX, LAYOUT.mapY, MAP_COLS * GRID_SIZE, MAP_ROWS * GRID_SIZE);
         const handR = () => cv(LAYOUT.handStartX, LAYOUT.handY + 20, 4 * LAYOUT.cardGap + LAYOUT.cardW, LAYOUT.cardH);
         const deckR = () => cv(LAYOUT.deckX, LAYOUT.deckY + 20, LAYOUT.cardW + 20, LAYOUT.cardH + 40);
@@ -1781,12 +1788,20 @@
                 easy: 'これは「やまふだ」。てふだをつかうと、ここからほじゅうされるよ。やまふだもてふだもなくなるとゲームオーバーだから、カードはたいせつに！',
                 en: 'This is the deck. It refills your hand as you play. When both the deck and your hand run out, it\'s game over, so use cards wisely!' } },
             { type: 'run', fn: () => { want.card = 3; } },
-            { type: 'do', target: () => [handR(), calcR()], pos: 'top', until: () => term1 === 3, text: {
+            { type: 'do', target: () => [handR(), calcR()], pos: 'top', until: () => term1 === 3,
+          only: { from: handCardP(3), to: calcP, hint: {
+                ja: '「3」のカードを、右の大きな茶色いエリアにドラッグして入れよう！',
+                easy: '「3」のカードを、みぎのおおきなちゃいろいエリアにドラッグしていれよう！',
+                en: 'Drag the "3" card into the big brown area on the right!' } }, text: {
                 ja: 'まず「3」のカードを、右の大きな茶色いエリアにドラッグして入れよう！',
                 easy: 'まず「3」のカードを、みぎのおおきなちゃいろいエリアにドラッグしていれよう！',
                 en: 'First, drag the "3" card into the big brown area on the right!' } },
             { type: 'run', fn: () => { want.card = 2; } },
-            { type: 'do', target: () => [handR(), calcR()], pos: 'top', until: () => !!generatedRect, text: {
+            { type: 'do', target: () => [handR(), calcR()], pos: 'top', until: () => !!generatedRect,
+          only: { from: handCardP(2), to: calcP, hint: {
+                ja: '「2」のカードも、右の大きな茶色いエリアにドラッグして入れよう！',
+                easy: '「2」のカードも、みぎのおおきなちゃいろいエリアにドラッグしていれよう！',
+                en: 'Drag the "2" card into the big brown area as well!' } }, text: {
                 ja: 'つぎに「2」のカードも、同じエリアに入れてみよう！',
                 easy: 'つぎに「2」のカードも、おなじエリアにいれてみよう！',
                 en: 'Now drag the "2" card into the same area!' } },
@@ -1803,7 +1818,11 @@
                 ja: 'いらないカードや、できた長方形は、この「すてる」に入れて捨てられるよ。',
                 easy: 'いらないカードや、できたちょうほうけいは、この「すてる」にいれてすてられるよ。',
                 en: 'Unwanted cards — or a rectangle you don\'t want — can be dropped into this "Trash".' } },
-            { type: 'do', target: () => [calcR(), mapR()], pos: 'top', until: () => !!placingState, text: {
+            { type: 'do', target: () => [calcR(), mapR()], pos: 'top', until: () => !!placingState,
+          only: { from: calcP, to: mapP, hint: {
+                ja: 'できた長方形（茶色いエリア）を、ドラッグして地図の上に置こう！',
+                easy: 'できたちょうほうけい（ちゃいろいエリア）を、ドラッグしてちずのうえにおこう！',
+                en: 'Drag the rectangle (in the brown area) onto the map!' } }, text: {
                 ja: 'できた長方形を、ドラッグして地図の上に置いてみよう！ カギ🗝️のあるところがいいね。',
                 easy: 'できたちょうほうけいを、ドラッグしてちずのうえにおいてみよう！ カギ🗝️のあるところがいいね。',
                 en: 'Drag the rectangle onto the map! Aim for the spot with the keys 🗝️.' } },
@@ -1829,7 +1848,11 @@
                 easy: 'あっ、👾モンスターがいる！ うえにタイルはおけないけど、「⚔️つるぎ」でたおせるよ。',
                 en: 'A 👾 monster! You can\'t place a tile on it, but a "⚔️ sword" can defeat it.' } },
             { type: 'run', fn: () => { want.item = 'sword'; } },
-            { type: 'do', target: () => [swordR(), mapR()], pos: 'top', until: () => items.sword < 2, text: {
+            { type: 'do', target: () => [swordR(), mapR()], pos: 'top', until: () => items.sword < 2,
+          only: { from: itemP(0), to: tileP(8, 3), hint: {
+                ja: '下の「⚔️」を、ドラッグしてモンスター👾の上に落とそう！',
+                easy: 'したの「⚔️」を、ドラッグしてモンスター👾のうえにおとそう！',
+                en: 'Drag the "⚔️" at the bottom onto the monster 👾!' } }, text: {
                 ja: '下の「⚔️」を、ドラッグしてモンスターの上に落としてみよう！ 倒すと +200点！',
                 easy: 'したの「⚔️」を、ドラッグしてモンスターのうえにおとしてみよう！ たおすと +200てん！',
                 en: 'Drag the "⚔️" at the bottom onto the monster! Defeating it gives +200!' } },
@@ -1838,7 +1861,11 @@
                 easy: 'こっちは🪨いわ。「⛏️つるはし」でこわせるよ。',
                 en: 'And this is a 🪨 rock. A "⛏️ pickaxe" breaks it.' } },
             { type: 'run', fn: () => { want.item = 'pickaxe'; } },
-            { type: 'do', target: () => [pickR(), mapR()], pos: 'top', until: () => items.pickaxe < 2, text: {
+            { type: 'do', target: () => [pickR(), mapR()], pos: 'top', until: () => items.pickaxe < 2,
+          only: { from: itemP(160), to: tileP(8, 6), hint: {
+                ja: '「⛏️」を、ドラッグして岩🪨の上に落とそう！',
+                easy: '「⛏️」を、ドラッグしていわ🪨のうえにおとそう！',
+                en: 'Drag the "⛏️" onto the rock 🪨!' } }, text: {
                 ja: '「⛏️」を、ドラッグして岩の上に落としてみよう！ こわすと +100点！',
                 easy: '「⛏️」を、ドラッグしていわのうえにおとしてみよう！ こわすと +100てん！',
                 en: 'Drag the "⛏️" onto the rock! Breaking it gives +100!' } },

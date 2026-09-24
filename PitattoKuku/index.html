@@ -955,6 +955,8 @@ function startTutorial(){
     };
     // タイル位置(行r,列c)から#board内の矩形を作る
     const T = (r0, c0, r1, c1) => ({ sel: '#board', rect: [c0*(CELL+GAP), r0*(CELL+GAP), (c1-c0)*(CELL+GAP)+CELL, (r1-r0)*(CELL+GAP)+CELL], of: [630, 630], pad: 4 });
+    // 手順どおりの操作だけ許すための、マス1つぶんのぴったりの範囲
+    const C = (r, c) => ({ sel: '#board', rect: [c*(CELL+GAP), r*(CELL+GAP), CELL, CELL], of: [630, 630], pad: 0 });
     const settle = () => FGLTutorial.wait(() => !animating, 6000);
     setTiles([[2,0,3],[2,3,5],[0,4,7],[4,1,9]]);
     FGLTutorial.run([
@@ -970,7 +972,11 @@ function startTutorial(){
             ja: 'タイルがほかのタイルにぶつかると、2つの数字が足されるよ。答えが「2の段の答え（2の倍数）」なら、2つとも消えて、その式が完成する！',
             easy: 'タイルがほかのタイルにぶつかると、2つのすうじがたされるよ。こたえが「2のだんのこたえ（2のばいすう）」なら、2つともきえて、そのしきがかんせいするよ！',
             en: 'When a tile hits another, their numbers are added. If the sum is an answer of the 2 times table (a multiple of 2), both tiles vanish and that equation is done!' } },
-        { type: 'do', target: T(2,0,2,3), pos: 'bottom', until: () => achievedSet.has(4), text: {
+        { type: 'do', target: T(2,0,2,3), pos: 'bottom', until: () => achievedSet.has(4),
+          only: { from: C(2, 0), dir: 'right', hint: {
+            ja: '左はしの「3」のタイルを、右へドラッグ（スワイプ）してみよう！',
+            easy: 'ひだりはしの「3」のタイルを、みぎへドラッグ（スワイプ）してみよう！',
+            en: 'Drag (swipe) the "3" tile on the far left to the right!' } }, text: {
             ja: '3のタイルを右へドラッグ（スワイプ）してみよう！ 5にぶつかって 3+5=8 ＝ 2×4 になり、消えるよ。',
             easy: '3のタイルをみぎへドラッグ（スワイプ）してみよう！ 5にぶつかって 3+5=8 ＝ 2×4 になり、きえるよ。',
             en: 'Drag (swipe) the 3 to the right! It hits the 5, and 3+5=8 = 2×4, so they vanish.' } },
@@ -984,12 +990,20 @@ function startTutorial(){
             ja: '答えが2の倍数じゃないときは、足した数字がそのまま残って、大きなタイルになるよ。1と2をぶつけてみよう。',
             easy: 'こたえが2のばいすうじゃないときは、たしたすうじがそのままのこって、おおきなタイルになるよ。1と2をぶつけてみよう。',
             en: 'If the sum is NOT a multiple of 2, the tiles merge into one bigger tile. Let\'s bump the 1 into the 2.' } },
-        { type: 'do', target: T(4,0,4,2), pos: 'top', until: () => tiles.some(t => t.value === 3), text: {
+        { type: 'do', target: T(4,0,4,2), pos: 'top', until: () => tiles.some(t => t.value === 3),
+          only: { from: C(4, 0), dir: 'right', hint: {
+            ja: '左の「1」のタイルを、右へドラッグ（スワイプ）して「2」にぶつけよう！',
+            easy: 'ひだりの「1」のタイルを、みぎへドラッグ（スワイプ）して「2」にぶつけよう！',
+            en: 'Drag (swipe) the left "1" tile to the right into the "2"!' } }, text: {
             ja: '左のタイル 1 を右へすべらせて、2にぶつけよう。1+2=3 → 2の倍数じゃないので、3のタイルになるよ。',
             easy: 'ひだりのタイル 1 をみぎへすべらせて、2にぶつけよう。1+2=3 → 2のばいすうじゃないので、3のタイルになるよ。',
             en: 'Slide the left 1 to the right into the 2. 1+2=3 is not a multiple of 2, so it becomes a 3.' } },
         { type: 'run', fn: settle },
-        { type: 'do', target: T(4,2,4,4), pos: 'top', until: () => achievedSet.has(2), text: {
+        { type: 'do', target: T(4,2,4,4), pos: 'top', until: () => achievedSet.has(2),
+          only: { from: C(4, 4), dir: 'left', hint: {
+            ja: '右はしの「1」のタイルを、左へドラッグ（スワイプ）して「3」にぶつけよう！',
+            easy: 'みぎはしの「1」のタイルを、ひだりへドラッグ（スワイプ）して「3」にぶつけよう！',
+            en: 'Drag (swipe) the right "1" tile to the left into the "3"!' } }, text: {
             ja: '次は右の 1 を左へすべらせて、3にぶつけよう。3+1=4 ＝ 2×2 で、消えるよ！',
             easy: 'つぎはみぎの 1 をひだりへすべらせて、3にぶつけよう。3+1=4 ＝ 2×2 で、きえるよ！',
             en: 'Now slide the right 1 to the left into the 3. 3+1=4 = 2×2, so they vanish!' } },
@@ -1274,7 +1288,9 @@ window.addEventListener('pointerup', e => {
     if (!dragState) return;
     const { id, startX, startY } = dragState;
     dragState = null;
-    const dx = e.clientX - startX, dy = e.clientY - startY;
+    let dx = e.clientX - startX, dy = e.clientY - startY;
+    // 縦持ちスマホでは盤面が90度回転表示なので、画面上の動きを盤面の向きに直す(画面の下＝盤面の右)
+    if (isMobileRotated){ const sx = dx; dx = dy; dy = -sx; }
     const absX = Math.abs(dx), absY = Math.abs(dy);
     const TH = 16;
     if (Math.max(absX, absY) < TH){
