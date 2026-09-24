@@ -284,9 +284,27 @@
         @keyframes tileShake { 0%,100% { transform: translateX(0); } 30% { transform: translateX(-6px); } 60% { transform: translateX(6px); } }
         .score-float {
             position: absolute; font-weight: 800; font-size: 1.5rem; color: var(--accent-dk);
-            text-shadow: 0 2px 0 #fff; pointer-events: none; animation: floatUp 0.8s ease forwards; z-index: 5;
+            text-shadow: 0 2px 0 #fff; pointer-events: none; animation: floatUp 1.1s ease forwards; z-index: 6;
         }
-        @keyframes floatUp { 0% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(-46px); opacity: 0; } }
+        @keyframes floatUp { 0% { transform: translateY(0); opacity: 1; } 55% { opacity: 1; } 100% { transform: translateY(-46px); opacity: 0; } }
+        /* 合体して消えるとき、できた数をしばらく見せてから上へ動きながらフェードする */
+        .merge-ghost {
+            position: absolute; width: 118px; height: 118px; border-radius: 18px;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 800; color: #fff; text-shadow: 0 2px 3px rgba(0,0,0,0.15);
+            box-shadow: 0 5px 0 rgba(0,0,0,0.12), 0 8px 14px rgba(0,0,0,0.1);
+            font-size: 2.8rem; pointer-events: none; z-index: 4;
+            animation: mergeGhost 1.1s ease forwards;
+        }
+        .merge-ghost.len2 { font-size: 2.2rem; }
+        .merge-ghost.len3 { font-size: 1.7rem; }
+        @keyframes mergeGhost {
+            0%   { transform: translateY(0) scale(0.6); opacity: 0; }
+            12%  { transform: translateY(0) scale(1.12); opacity: 1; }
+            22%  { transform: translateY(0) scale(1); opacity: 1; }
+            55%  { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-70px) scale(1); opacity: 0; }
+        }
 
         /* ==================== MODAL / RESULT ==================== */
         .modal-backdrop {
@@ -481,21 +499,36 @@
         if (!res.ok) { const t = await res.text(); throw new Error(`HTTP ${res.status}: ${t}`); }
     };
 
+    // クリアした人を上位にする(次にスコア)。クリアかどうかは結果タグ(class_name)で判別する。
+    // タグは言語ごとの文字列なので、全言語ぶんを並べて判定する
+    const CLEAR_TAGS = ['クリア', 'Clear'];
     window.loadWorldRanking = async (difficulty) => {
         try {
-            const q = new URLSearchParams({
-                select:      'player_name,class_name,point_score,turns,created_at',
-                game:        'eq.pitatto_kuku',
-                difficulty:  `eq.${difficulty || 'dan2'}`,
-                point_score: 'gt.0',
-                order:       'point_score.desc,turns.asc,created_at.desc',
-                limit:       '30'
-            });
-            const res = await fetch(`${_base}/rankings?${q}`, {
-                headers: { 'apikey': _key, 'Authorization': 'Bearer ' + _key }
-            });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const data = await res.json();
+            const LIMIT = 30;
+            const fetchRows = async (extra, limit) => {
+                const q = new URLSearchParams({
+                    select:      'player_name,class_name,point_score,turns,created_at',
+                    game:        'eq.pitatto_kuku',
+                    difficulty:  `eq.${difficulty || 'dan2'}`,
+                    point_score: 'gt.0',
+                    order:       'point_score.desc,turns.asc,created_at.desc',
+                    limit:       String(limit),
+                    ...extra
+                });
+                const res = await fetch(`${_base}/rankings?${q}`, {
+                    headers: { 'apikey': _key, 'Authorization': 'Bearer ' + _key }
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return res.json();
+            };
+            const tagList = CLEAR_TAGS.map(t => `"${t}"`).join(',');
+            // まずクリアした人(スコア順)、足りなければクリアしていない人(スコア順)で埋める
+            const cleared = await fetchRows({ class_name: `in.(${tagList})` }, LIMIT);
+            let data = cleared;
+            if (cleared.length < LIMIT){
+                const others = await fetchRows({ or: `(class_name.is.null,class_name.not.in.(${tagList}))` }, LIMIT - cleared.length);
+                data = cleared.concat(others);
+            }
             return data.map(r => ({
                 name:  r.player_name,
                 tag:   r.class_name,
@@ -962,15 +995,15 @@ function startTutorial(){
             en: 'Now slide the right 1 to the left into the 3. 3+1=4 = 2×2, so they vanish!' } },
         { type: 'run', fn: settle },
         { type: 'say', target: '.play-side-left', pos: 'top', text: {
-            ja: '左には、ターン数とスコア。ターンには上限があるよ。少ない手数でクリアするほど、実績が増えていく！ 「やめる」や「あそびかた」もここにあるよ。',
-            easy: 'ひだりには、ターンすうとスコア。ターンにはじょうげんがあるよ。すくないてかずでクリアするほど、できたことがふえていくよ！ 「やめる」や「あそびかた」もここにあるよ。',
-            en: 'On the left are your turn count and score. Turns are limited, and clearing in fewer turns unlocks more achievements! "Quit" and "How to Play" are here too.' } }
+            ja: '左には、ターン数とスコア。ターンの上限は100だよ。100ターンまでに全部そろえよう！ 「やめる」や「あそびかた」もここにあるよ。',
+            easy: 'ひだりには、ターンすうとスコア。ターンのじょうげんは100だよ。100ターンまでにぜんぶそろえよう！ 「やめる」や「あそびかた」もここにあるよ。',
+            en: 'On the left are your turn count and score. The turn limit is 100, so complete every equation within 100 turns! "Quit" and "How to Play" are here too.' } }
     ]);
 }
 
 function setupBoardCells(){
     const board = document.getElementById('board');
-    board.querySelectorAll('.cell-bg').forEach(el => el.remove());
+    board.querySelectorAll('.cell-bg, .merge-ghost, .score-float').forEach(el => el.remove());
     // 前回のゲームのタイルDOMが残っていると、IDがリセットされる新ゲームのタイルと
     // id文字列が衝突して再利用されてしまい、fade-out等の古いクラス/スタイルを引き継いでしまうため
     // 新しいゲームを始めるたびに盤面上のタイルを必ずすべて作り直す
@@ -1081,9 +1114,23 @@ function spawnFloatingScore(text, row, col){
     span.className = 'score-float';
     span.textContent = '+' + text;
     span.style.left = (col*(CELL+GAP) + 14) + 'px';
-    span.style.top  = (row*(CELL+GAP) + 30) + 'px';
+    span.style.top  = (row*(CELL+GAP) - 8) + 'px';
     board.appendChild(span);
-    setTimeout(() => span.remove(), 820);
+    setTimeout(() => span.remove(), 1120);
+}
+// 合体で消えたタイルの「できた数」を、その場にしばらく残して上へフェードさせる
+function spawnMergeGhost(value, row, col){
+    const board = document.getElementById('board');
+    const el = document.createElement('div');
+    el.className = 'merge-ghost';
+    const tc = tileTextClass(value);
+    if (tc) el.classList.add(tc);
+    el.textContent = value;
+    el.style.background = tileColor(value);
+    el.style.left = (col*(CELL+GAP)) + 'px';
+    el.style.top  = (row*(CELL+GAP)) + 'px';
+    board.appendChild(el);
+    setTimeout(() => el.remove(), 1120);
 }
 
 const DIRS = { up:[-1,0], down:[1,0], left:[0,-1], right:[0,1] };
@@ -1130,6 +1177,7 @@ function performMove(id, dir){
                 const idx = sum / currentDan;
                 if (idx>=1 && idx<=9) achievedSet.add(idx);
                 checkMagnitudeAchievement(sum);
+                spawnMergeGhost(sum, target.row, target.col);
                 spawnFloatingScore(sum*sum*10, target.row, target.col);
                 renderBoard();
                 renderChips();
@@ -1302,14 +1350,19 @@ const RANK_STORAGE_PREFIX = 'pitattoKukuRanking_';
 function getLocalRanking(dan){
     try { return JSON.parse(localStorage.getItem(RANK_STORAGE_PREFIX + dan) || '[]'); } catch (e){ return []; }
 }
+// クリアした記録を上位に、次にスコア・少ないターン・新しい順
+const isClearTag = tag => tag === 'クリア' || tag === 'Clear';
+function compareRank(a, b){
+    const ca = isClearTag(a.tag) ? 1 : 0, cb = isClearTag(b.tag) ? 1 : 0;
+    if (ca !== cb) return cb - ca;
+    if (b.score !== a.score) return b.score - a.score;
+    if (a.turns !== b.turns) return a.turns - b.turns;
+    return (b.dateIso || '').localeCompare(a.dateIso || '');
+}
 function saveLocalScore(dan, entry){
     const list = getLocalRanking(dan);
     list.push(entry);
-    list.sort((a,b) => {
-        if (b.score !== a.score) return b.score - a.score;
-        if (a.turns !== b.turns) return a.turns - b.turns;
-        return (b.dateIso || '').localeCompare(a.dateIso || '');
-    });
+    list.sort(compareRank);
     try { localStorage.setItem(RANK_STORAGE_PREFIX + dan, JSON.stringify(list.slice(0,30))); } catch(e){}
 }
 const RESULT_TAG_KEY = { clear:'tag_clear', gameover:'tag_gameover', timeup:'tag_timeup' };
@@ -1386,7 +1439,7 @@ async function loadAndRenderRanking(){
     const loading = document.getElementById('rank-loading');
     const list = document.getElementById('rank-list');
     if (rankTab === 'local'){
-        renderRankList(getLocalRanking(rankDan).map(e => ({ name:e.name, tag:e.tag, score:e.score, turns:e.turns, date:e.date })));
+        renderRankList(getLocalRanking(rankDan).sort(compareRank).map(e => ({ name:e.name, tag:e.tag, score:e.score, turns:e.turns, date:e.date })));
         return;
     }
     loading.style.display = 'block';
