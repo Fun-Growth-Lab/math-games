@@ -342,7 +342,7 @@
     }
     // from/to の指定(セレクタ/Element/関数/{sel,rect,of}/{any:[..]})を、root内の論理矩形の配列にする
     function rectsOf(t, m) {
-        if (typeof t === 'function') t = t();
+        if (typeof t === 'function') { try { t = t(); } catch (e) { return []; } }
         if (!t) return [];
         if (t.any) return [].concat.apply([], t.any.map(function (x) { return rectsOf(x, m); }));
         if (typeof t === 'string') t = { sel: t };
@@ -351,7 +351,7 @@
         return r ? [r] : [];
     }
     function inTarget(tgt, pt) {
-        if (typeof tgt === 'function') tgt = tgt();
+        if (typeof tgt === 'function') { try { tgt = tgt(); } catch (e) { return false; } }
         if (!tgt) return false;
         if (tgt.any) return tgt.any.some(function (t) { return inTarget(t, pt); });   // どれか1つに入っていればOK
         if (typeof tgt === 'string') tgt = { sel: tgt };
