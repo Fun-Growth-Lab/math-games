@@ -24,6 +24,7 @@
     let rootEl = null;
     let layer = null, blockers = [], hole = null, dim = null, cap = null, capText = null,
         capBtn = null, capSkip = null, capCount = null, exitBtn = null, capWarn = null;
+    const rings = [];
     let active = false;
     let steps = [], idx = 0, pollTimer = null, skipTimer = null, relayoutTimer = null;
     let origStorage = null, origFetch = null, origBeacon = null;
@@ -79,6 +80,12 @@
             '.fgl-tut-warn{display:none;margin:0 0 10px;padding:8px 14px;border-radius:12px;background:#ff5a4a;color:#fff;font-size:22px;font-weight:800;line-height:1.4;}',
             '.fgl-tut-warn.on{display:block;animation:fglTutShake .4s ease;}',
             '@keyframes fglTutShake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}',
+            '.fgl-tut-cap.side{padding:14px 16px 12px;}',
+            '.fgl-tut-cap.side .fgl-tut-text{font-size:20px;line-height:1.5;}',
+            '.fgl-tut-cap.side .fgl-tut-warn{font-size:18px;}',
+            '.fgl-tut-ring{position:absolute;box-sizing:border-box;border-radius:12px;pointer-events:none;border:4px solid #ffd24a;box-shadow:0 0 14px 4px rgba(255,210,74,0.9);animation:fglTutRing 1s ease-in-out infinite;}',
+            '.fgl-tut-ring.to{border:4px dashed #ffffff;box-shadow:0 0 12px 3px rgba(255,255,255,0.8);animation:none;}',
+            '@keyframes fglTutRing{0%,100%{opacity:1}50%{opacity:.45}}',
             '.fgl-tut-count{position:absolute;right:16px;top:8px;font-size:15px;color:#c9b27a;font-weight:700;}',
             '.fgl-tut-exit{position:absolute;right:14px;top:12px;pointer-events:auto;font-family:inherit;font-size:18px;font-weight:800;',
             'padding:6px 18px;border:2px solid #ffd24a;border-radius:999px;cursor:pointer;color:#ffd24a;background:rgba(24,18,10,0.92);z-index:5;}'
@@ -227,8 +234,9 @@
         const m = mapper();
         let r = resolveTarget(s.target, m);
         // 手順どおりの操作(only)がある時は、押し始める場所(from)と離す場所(to)も必ず明るい穴に含める
-        if (r && s.only) {
-            const extra = rectsOf(s.only.from, m).concat(rectsOf(s.only.to, m));
+        if (r && (s.only || (s.type === 'do' && cfg.keepClear))) {
+            let extra = s.only ? rectsOf(s.only.from, m).concat(rectsOf(s.only.to, m)) : [];
+            if (s.type === 'do' && cfg.keepClear) extra = extra.concat(rectsOf(cfg.keepClear, m));   // 操作させる時も、盤面など見せておきたい所は暗くしない
             let x0 = r.x, y0 = r.y, x1 = r.x + r.w, y1 = r.y + r.h;
             extra.forEach(function (q) {
                 x0 = Math.min(x0, q.x - 6); y0 = Math.min(y0, q.y - 6);
@@ -264,8 +272,39 @@
                 else b.style.display = 'none';
             });
         }
+        // 操作する物(from)と置く先(to)に目印の枠を重ねる。光る範囲が広い(盤面も含む)時でも、どれを触るかが分かる
+        rings.forEach(function (e) { e.parentNode && e.parentNode.removeChild(e); });
+        rings.length = 0;
+        if (r && s.type === 'do' && s.only && (s.only.from || s.only.to)) {
+            const addRings = function (t, cls) {
+                rectsOf(t, m).slice(0, 8).forEach(function (q) {
+                    const e = document.createElement('div'); e.className = 'fgl-tut-ring' + (cls ? ' ' + cls : '');
+                    e.style.left = (q.x - 3) + 'px'; e.style.top = (q.y - 3) + 'px'; e.style.width = (q.w + 6) + 'px'; e.style.height = (q.h + 6) + 'px';
+                    layer.insertBefore(e, cap); rings.push(e);
+                });
+            };
+            addRings(s.only.from, ''); addRings(s.only.to, 'to');
+        }
         // 吹き出しの位置(対象と重ならない側に置く)
+        // pos:'side' は、対象の左右にあいている所へ細長く置く(盤面の上も下も見せたいゲーム向け)
         cap.style.top = 'auto'; cap.style.bottom = 'auto';
+        cap.style.left = '50%'; cap.style.right = 'auto'; cap.style.transform = 'translateX(-50%)'; cap.style.width = '';
+        cap.classList.remove('side');
+        if (s.pos === 'side' && r) {
+            // keepClear(ゲーム側指定)の範囲=いつも見せておきたい所(盤面など)も避けて、左右のあきを求める
+            let x0 = r.x, x1 = r.x + r.w;
+            if (cfg.keepClear) rectsOf(cfg.keepClear, m).forEach(function (q) { x0 = Math.min(x0, q.x); x1 = Math.max(x1, q.x + q.w); });
+            const freeL = x0, freeR = m.W - x1, MARGIN = 14;
+            const useLeft = freeL >= freeR, free = (useLeft ? freeL : freeR) - MARGIN * 2;
+            if (free >= 230) {
+                const w = Math.min(440, free);
+                cap.classList.add('side');
+                cap.style.transform = 'none'; cap.style.width = w + 'px';
+                if (useLeft) { cap.style.left = MARGIN + 'px'; } else { cap.style.left = 'auto'; cap.style.right = MARGIN + 'px'; }
+                cap.style.top = Math.max(60, (m.H - cap.offsetHeight) / 2) + 'px';   // 「やめる」ボタンを避けて縦中央
+                return;
+            }
+        }
         const capH = cap.offsetHeight || 150;
         let atTop = false;
         if (r) {
@@ -484,7 +523,7 @@
     /* ---------- 公開API ---------- */
     // チュートリアル開始の準備(書き込みガード・root設定)
     T.begin = function (opts) {
-        cfg = { root: opts.root, getLang: opts.getLang || cfg.getLang, exitPos: opts.exitPos || 'right' };
+        cfg = { root: opts.root, getLang: opts.getLang || cfg.getLang, exitPos: opts.exitPos || 'right', keepClear: opts.keepClear || null };
         rootEl = (typeof opts.root === 'string') ? document.querySelector(opts.root) : opts.root;
         if (!rootEl) { console.error('FGLTutorial: root not found'); return; }
         injectCss();
@@ -522,7 +561,7 @@
     T.say = function (text, target, cb) {
         T.run([{ type: 'say', target: target, text: text, after: cb }], { onFinish: function () { T.hide(); } });
     };
-    T.hide = function () { clearTimers(); curStep = null; if (layer) layer.style.display = 'none'; };
+    T.hide = function () { clearTimers(); curStep = null; rings.forEach(function (e) { e.style.display = 'none'; }); if (layer) layer.style.display = 'none'; };
     T.complete = function (msg) {
         clearTimers();
         buildLayer();
