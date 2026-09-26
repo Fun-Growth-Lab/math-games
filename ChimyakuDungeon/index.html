@@ -931,6 +931,22 @@
             background:#e0473c; color:#fff; border:2px solid #fff3d6; border-radius:12px;
             font-size:0.8rem; font-weight:800; line-height:1; box-shadow:0 2px 6px rgba(0,0,0,0.5);
         }
+        /* 右パネル最上段：いまの画面名と「もどる」（準備フェーズ中だけ表示。ホームでは「もどる」を隠す） */
+        .side-nav { display:flex; align-items:center; gap:10px; min-height:40px; }
+        .side-back-btn { flex-shrink:0; padding:8px 14px; font-size:0.9rem; font-weight:800; }
+        .side-screen-title { min-width:0; flex:1; font-size:1.1rem; font-weight:800; color:var(--gold); text-shadow:0 1px 3px rgba(0,0,0,0.5); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        /* 部屋づくりの進み具合（①範囲 › ②通路 › ③確認）。いまの段階だけ強調する */
+        .build-steps { display:flex; align-items:center; gap:6px; margin-bottom:6px; font-size:0.85rem; font-weight:800; color:var(--ink-dim); }
+        .build-steps i { font-style:normal; }
+        .build-steps span.on { color:#2a1a08; background:var(--gold); border-radius:8px; padding:2px 10px; }
+        /* フェーズ表示（準備フェーズ／迎撃フェーズ） */
+        .hud-phase-badge { border-radius:14px; padding:6px 14px; font-size:0.95rem; font-weight:800; white-space:nowrap; border:2px solid; align-self:center; }
+        .hud-phase-badge.prepare { color:#bdf5d0; border-color:var(--teal); background:rgba(40,110,90,0.25); }
+        .hud-phase-badge.battle { color:#ffb4a8; border-color:#c0564a; background:rgba(160,60,50,0.25); }
+        /* 部屋の詳細などを見ている間は、迎撃ボタンだけを細くして残す */
+        .bd-side-footer.slim > *:not(#btn-start-battle) { display:none !important; }
+        .bd-side-footer.slim .btn-start-battle-big { padding:10px 18px; font-size:1.1rem; }
+        .btn-build-room { width:100%; margin-bottom:8px; padding:9px 12px; font-size:0.95rem; }
     </style>
 </head>
 <body>
@@ -1007,6 +1023,7 @@
         <div class="bd-top">
             <div class="bd-hud">
                 <div class="hud-stage-badge" id="hud-stage-badge">STAGE 1</div>
+                <div class="hud-phase-badge prepare" id="hud-phase-badge"></div>
                 <div class="hud-chip"><span data-i18n="hud_vitality">💠 活力</span><b id="hud-vitality">0</b></div>
                 <div class="hud-chip"><span data-i18n="hud_mana">🔷 魔力</span><b id="hud-mana">0</b></div>
                 <div class="hud-chip"><span data-i18n="hud_monsters">👾 魔物の数</span><b id="hud-monstercount">0</b></div>
@@ -1030,8 +1047,11 @@
                 </div>
             </div>
             <div class="bd-side">
+                <div id="side-nav" class="side-nav">
+                    <button id="side-back-btn" class="btn btn-sm side-back-btn hidden" onclick="sideBack()" data-i18n="side_back">◀ もどる</button>
+                    <div id="side-screen-title" class="side-screen-title"></div>
+                </div>
                 <div id="build-panel-main" class="side-panel">
-                    <div class="side-panel-title" id="build-panel-title" data-i18n="build_panel_title">建設</div>
                     <div id="build-actions"></div>
                     <div id="build-status" class="status-text hidden"></div>
                 </div>
@@ -1476,7 +1496,19 @@ const UI_TEXT = {
     btn_record: { ja: '🏆 記録する', ja_easy: '🏆 きろくする', en: '🏆 Record' },
     btn_reset: { ja: '🔄 リセット', en: '🔄 Reset' },
 
-    hint_click_map: { ja: 'マップの空いている場所をクリックすると部屋を作れます', ja_easy: 'マップの あいている ばしょを クリックすると へやが つくれるよ', en: 'Click an open spot on the map to build a room' },
+    hint_click_map: { ja: 'マップの空いている場所を直接クリックしても、部屋づくりを始められます', ja_easy: 'マップの あいている ばしょを クリックしても、へやづくりが はじめられるよ', en: 'You can also click an open spot on the map to start building' },
+    hud_phase_prepare: { ja: '🛠 準備フェーズ', ja_easy: '🛠 じゅんびフェーズ', en: '🛠 Preparation' },
+    hud_phase_battle: { ja: '⚔ 迎撃フェーズ', ja_easy: '⚔ げいげきフェーズ', en: '⚔ Defense' },
+    side_back: { ja: '◀ もどる', ja_easy: '◀ もどる', en: '◀ Back' },
+    btn_build_room: { ja: '🔨 部屋をつくる', ja_easy: '🔨 へやを つくる', en: '🔨 Build a Room' },
+    screen_home: { ja: '迷宮の全体', ja_easy: 'めいきゅうの ぜんたい', en: 'Dungeon Overview' },
+    screen_room_build: { ja: '🔨 部屋づくり', ja_easy: '🔨 へやづくり', en: '🔨 Build a Room' },
+    screen_step_1: { ja: '①範囲', ja_easy: '①はんい', en: '①Area' },
+    screen_step_2: { ja: '②通路', ja_easy: '②つうろ', en: '②Corridor' },
+    screen_step_3: { ja: '③確認', ja_easy: '③かくにん', en: '③Confirm' },
+    screen_room_detail: { ja: '🏠 部屋の詳細', ja_easy: '🏠 へやの くわしい じょうほう', en: '🏠 Room Details' },
+    screen_monster_place: { ja: '👾 魔物の配置', ja_easy: '👾 まものの はいち', en: '👾 Place Monster' },
+    screen_trap: { ja: '🪤 罠の設置', ja_easy: '🪤 わなの せっち', en: '🪤 Place Trap' },
     btn_reroll_map: { ja: '🔄 素・因子の配置をやり直す', ja_easy: '🔄 もと・いんしの はいちを やりなおす', en: '🔄 Reroll Element Placement' },
     overview_title: { ja: 'ダンジョン全体', ja_easy: 'ダンジョン ぜんたい', en: 'Dungeon Overview' },
     overview_room_count: { ja: '部屋の数', ja_easy: 'へやの かず', en: 'Rooms' },
@@ -2655,9 +2687,8 @@ function cancelMoveSelection(){
     updateSidePanelVisibility();
 }
 function renderBuildActions(){
+    updateSideNav();
     const wrap = document.getElementById('build-actions');
-    // モンスター・魔王・罠を選択中は、外側の「建設」見出しを隠す（選択をキャンセルしない限り建設できないため）
-    document.getElementById('build-panel-title').classList.toggle('hidden', !!(trapPlaceMode || selectedMonsterId!==null || demonLordMoveSelected || demonLordMenuOpen));
     if (trapPlaceMode){
         const meta = trapKindMeta(trapPlaceMode.kind);
         const isLine = meta.shape==='line-h' || meta.shape==='line-v';
@@ -2669,43 +2700,36 @@ function renderBuildActions(){
         wrap.innerHTML = `<div class="side-panel-title">${ui('move_info_title_trap')}</div>`
             + `<div style="font-weight:800; margin-bottom:6px;">${label}</div>`
             + (isLine ? orientRow : '')
-            + `<div class="status-text" style="margin-bottom:8px;">${escapeHtml(ui('status_pick_trap_cell'))}</div>`
-            + `<button class="btn btn-sm" style="width:100%;" onclick="cancelTrapPlacement()">${ui('btn_cancel')}</button>`;
+            + `<div class="status-text" style="margin-bottom:8px;">${escapeHtml(ui('status_pick_trap_cell'))}</div>`;
         return;
     }
     if (selectedMonsterId!==null){
         const m = monsters.find(x=>x.id===selectedMonsterId);
         wrap.innerHTML = `<div class="side-panel-title">${ui('move_info_title')}</div>`
-            + (m ? monsterDetailCoreHtml(m, { artClick: `openMonsterDetailModal(${m.id})` }) : '')
-            + `<button class="btn btn-sm" style="width:100%; margin-top:6px;" onclick="cancelMoveSelection()">${ui('btn_cancel')}</button>`;
+            + (m ? monsterDetailCoreHtml(m, { artClick: `openMonsterDetailModal(${m.id})` }) : '');
         return;
     }
     if (demonLordMoveSelected){
         wrap.innerHTML = `<div class="side-panel-title">${ui('move_info_title_demonlord')}</div>`
-            + demonLordCardHtml({ artClick: 'openDemonLordDetailModal()' })
-            + `<button class="btn btn-sm" style="width:100%; margin-top:6px;" onclick="cancelMoveSelection()">${ui('btn_cancel')}</button>`;
+            + demonLordCardHtml({ artClick: 'openDemonLordDetailModal()' });
         return;
     }
     if (demonLordMenuOpen){
-        wrap.innerHTML = `<div class="side-panel-title">${ui('demonlord_menu_title')}</div>`
-            + `<button class="dl-menu-btn" ${rooms.length===0 ? 'disabled' : ''} onclick="demonLordMenuPlace()">
+        wrap.innerHTML = `<button class="dl-menu-btn" ${rooms.length===0 ? 'disabled' : ''} onclick="demonLordMenuPlace()">
                    <span class="dl-menu-icon">📍</span>
                    <span class="dl-menu-text"><b>${ui('dl_menu_place')}</b><small>${ui('dl_menu_place_desc')}</small></span>
                </button>`
             + `<button class="dl-menu-btn" ${demonLordCell ? '' : 'disabled'} onclick="demonLordMenuStatus()">
                    <span class="dl-menu-icon">📊</span>
                    <span class="dl-menu-text"><b>${ui('dl_menu_status')}</b><small>${ui('dl_menu_status_desc')}</small></span>
-               </button>`
-            + `<button class="btn btn-sm" style="width:100%; margin-top:6px;" onclick="closeDemonLordMenu()">${ui('btn_cancel')}</button>`;
+               </button>`;
         return;
     }
     if (mode === 'select-demonlord'){
-        wrap.innerHTML = `<div class="side-panel-title">${ui('demonlord_place_title')}</div>`
-            + `<span id="demonlord-drag-source" class="demonlord-drag-source" draggable="true"
+        wrap.innerHTML = `<span id="demonlord-drag-source" class="demonlord-drag-source" draggable="true"
                     ondragstart="onDemonLordButtonDragStart(event)" ondragend="onDemonLordButtonDragEnd(event)"
                     style="background-image:url('images/mamono/demon_lord.png');"></span>`
-            + `<div class="status-text">${escapeHtml(ui('status_pick_demonlord'))}</div>`
-            + `<button class="btn btn-sm" style="width:100%; margin-top:6px;" onclick="cancelBuild()">${ui('btn_cancel')}</button>`;
+            + `<div class="status-text">${escapeHtml(ui('status_pick_demonlord'))}</div>`;
         // HTMLの onpointerdown 属性はブラウザによって認識されないことがあるため、確実にプロパティで登録する
         const dragIcon = document.getElementById('demonlord-drag-source');
         dragIcon.onpointerdown = (ev) => onUnitPointerDown(ev, dragIcon, 'demonlord-initial');
@@ -2715,10 +2739,67 @@ function renderBuildActions(){
         return;
     }
     if (mode === 'idle'){
-        wrap.innerHTML = dungeonOverviewHtml() + `<div class="status-text" style="color:var(--ink-dim); font-weight:700;">${ui('hint_click_map')}</div>`;
+        wrap.innerHTML = `<button class="btn btn-primary btn-build-room" onclick="beginRoomPlacement()">${ui('btn_build_room')}</button>`
+            + dungeonOverviewHtml() + (rooms.length===0 ? `<div class="status-text" style="color:var(--ink-dim); font-weight:700;">${ui('hint_click_map')}</div>` : '');
     } else {
-        wrap.innerHTML = `<button class="btn btn-sm" style="width:100%;" onclick="cancelBuild()">${ui('btn_cancel')}</button>`;
+        // 部屋づくり中：①範囲 › ②通路 › ③確認 のどこにいるかを見せる（戻るは右パネル最上段の「もどる」）
+        const step = roomBuildStep();
+        wrap.innerHTML = `<div class="build-steps">${[1,2,3].map(n => `<span class="${n===step?'on':''}">${ui('screen_step_'+n)}</span>`).join('<i>›</i>')}</div>`;
     }
+}
+// 部屋づくりの段階：1=範囲(角の指定) 2=通路 3=確認
+function roomBuildStep(){
+    if (mode==='confirm') return 3;
+    if (mode==='await-entrance-connector' || mode==='await-connector') return 2;
+    return 1;
+}
+// ---- 右パネル最上段：いまの画面名と「もどる」 ----
+// 「もどる」は常に1段階だけ戻る（部屋づくりなら③→②→①→ホーム、それ以外は選択・メニューを解除してホームへ）
+function sideScreenInfo(){
+    if (trapPlaceMode) return { title: ui('screen_trap'), back: cancelTrapPlacement };
+    if (selectedMonsterId!==null) return { title: ui('screen_monster_place'), back: cancelMoveSelection };
+    if (demonLordMoveSelected) return { title: ui('demonlord_place_title'), back: cancelMoveSelection };
+    if (demonLordMenuOpen) return { title: ui('demonlord_menu_title'), back: closeDemonLordMenu };
+    if (mode==='select-demonlord') return { title: ui('demonlord_place_title'), back: cancelBuild };
+    if (mode==='placing-rect' || mode==='await-entrance-connector' || mode==='await-connector' || mode==='confirm'){
+        return { title: ui('screen_room_build')+' '+ui('screen_step_'+roomBuildStep()), back: roomBuildStepBack };
+    }
+    if (selectedRoomId!==null){
+        const rm = rooms.find(r=>r.id===selectedRoomId);
+        if (rm) return { title: ui('screen_room_detail'), back: deselectRoom };
+    }
+    return { title: ui('screen_home'), back: null };
+}
+function updateSideNav(){
+    const nav = document.getElementById('side-nav');
+    if (!nav) return;
+    const inBuild = gamePhase==='build';
+    nav.classList.toggle('hidden', !inBuild);
+    if (!inBuild) return;
+    const info = sideScreenInfo();
+    document.getElementById('side-screen-title').textContent = info.title;
+    document.getElementById('side-back-btn').classList.toggle('hidden', !info.back);
+}
+function sideBack(){
+    if (gamePhase!=='build') return;
+    const info = sideScreenInfo();
+    if (info.back) info.back();
+}
+function roomBuildStepBack(){
+    if (mode==='confirm'){
+        document.getElementById('cost-confirm-modal').classList.add('hidden');
+        if (rooms.length===0){ pendingEntranceCol = null; pendingCorridorCells = null; mode = 'await-entrance-connector'; updateStatus(ui('status_pick_entrance')); }
+        else { pendingConnector = null; mode = 'await-connector'; updateStatus(ui('status_pick_connector')); }
+    } else if (mode==='await-entrance-connector' || mode==='await-connector'){
+        pendingRect = null; anchorCell = null; mode = 'placing-rect'; updateStatus(ui('status_pick_corner1'));
+    } else if (mode==='placing-rect' && anchorCell){
+        anchorCell = null; updateStatus(ui('status_pick_corner1'));
+    } else {
+        cancelBuild();
+        return;
+    }
+    renderBuildActions();
+    renderOverlays();
 }
 function beginRoomPlacement(){
     resetPendingState();
@@ -3000,7 +3081,7 @@ function renderCostPanel(){
         <div class="cost-row"><span>${ui('cost_corridor')}</span><b>${corridorCost}</b></div>
         <div class="cost-total"><span>${ui('cost_total')}</span><span>${total}</span></div>
         <div class="btn-row">
-            <button class="btn btn-sm" onclick="cancelBuild()">${ui('btn_cancel')}</button>
+            <button class="btn btn-sm" onclick="roomBuildStepBack()">${ui('side_back')}</button>
             <button class="btn btn-primary btn-sm" id="cost-confirm-btn" ${enough?'':'disabled'} onclick="confirmBuild()">${ui('btn_confirm_build')}</button>
         </div>
         ${enough ? '' : `<div class="status-text" style="margin-top:8px;">${ui('err_vitality')}</div>`}
@@ -3452,7 +3533,7 @@ function dungeonOverviewHtml(){
         const prod = computeRoomProduction(room, room.type);
         vitTotal += prod.vit; manaTotal += prod.mana;
     });
-    return `<div class="side-panel-title">${ui('overview_title')}</div><div class="stat-panel">
+    return `<div class="stat-panel">
         <div class="room-detail-row"><span>${ui('overview_room_count')}</span><b style="margin-left:auto;">${rooms.length}</b></div>
         <div class="room-detail-row"><span>${ui('overview_monster_count')}</span><b style="margin-left:auto;">${monsters.length}</b></div>
         <div class="room-detail-row"><span class="gem-chip-sq gem-citrine"></span><span>${ui('overview_vit_income')}</span><b style="margin-left:auto;">${vitTotal}</b></div>
@@ -6270,7 +6351,11 @@ function updateSidePanelVisibility(){
     const moveSelecting = !battling && (selectedMonsterId!==null || demonLordMoveSelected || trapPlaceMode!==null);
     const roomSelected = !battling && !moveSelecting && selectedRoomId!==null;
     document.getElementById('build-panel-main').classList.toggle('hidden', battling || roomSelected);
-    document.getElementById('bd-side-footer').classList.toggle('hidden', battling || roomSelected || moveSelecting);
+    // 戦闘中以外は下部の操作群を出しておく。部屋の詳細・選択中は迎撃ボタンだけを細く残す（どの画面からでも迎撃できるように）
+    const footer = document.getElementById('bd-side-footer');
+    footer.classList.toggle('hidden', battling);
+    footer.classList.toggle('slim', roomSelected || moveSelecting);
+    updateSideNav();
     document.getElementById('room-detail-panel').classList.toggle('solo', roomSelected);
     document.getElementById('room-detail-panel').classList.toggle('force-hidden', moveSelecting);
 }
@@ -7642,6 +7727,10 @@ function downloadBalanceReport(){
 function px(v){ return v*CELL; }
 function renderAll(){
     document.getElementById('hud-stage-badge').textContent = uif('hud_stage_label', stage);
+    const phaseBadge = document.getElementById('hud-phase-badge');
+    phaseBadge.textContent = ui(gamePhase==='build' ? 'hud_phase_prepare' : 'hud_phase_battle');
+    phaseBadge.classList.toggle('prepare', gamePhase==='build');
+    phaseBadge.classList.toggle('battle', gamePhase!=='build');
     document.getElementById('hud-vitality').textContent = vitality;
     document.getElementById('hud-mana').textContent = mana;
     document.getElementById('hud-monstercount').textContent = monsters.length;
@@ -7816,6 +7905,7 @@ function renderUnitIcons(){
 }
 
 function renderOverlays(){
+    updateSideNav();
     gridEl.querySelectorAll('.overlay-room,.overlay-corridor,.overlay-preview,.overlay-candidate,.overlay-entrancepath,.overlay-trap,.overlay-trap-icon,.overlay-trap-preview,.precost-badge').forEach(el=>el.remove());
     gridEl.querySelectorAll('.gcell').forEach(el=>el.classList.remove('attach-cell','insufficient'));
     renderWallZones();
@@ -8192,6 +8282,20 @@ document.getElementById('build-screen').addEventListener('click', (ev) => {
 ].forEach(([id, closeFn]) => {
     const backdrop = document.getElementById(id);
     backdrop.addEventListener('click', (ev) => { if (ev.target===backdrop) closeFn(); });
+});
+// Escキー・右クリック：「もどる」と同じ（ポップアップが開いているときは何もしない）
+document.addEventListener('keydown', (ev) => {
+    if (ev.key !== 'Escape' || gamePhase!=='build') return;
+    // 部屋づくりの③確認ポップアップは、Escで②に戻る（他のポップアップが開いているときは何もしない）
+    if (!document.getElementById('cost-confirm-modal').classList.contains('hidden')){ ev.preventDefault(); roomBuildStepBack(); return; }
+    if (document.querySelector('.modal-backdrop:not(.hidden)')) return;
+    ev.preventDefault();
+    sideBack();
+});
+document.getElementById('grid').addEventListener('contextmenu', (ev) => {
+    if (gamePhase!=='build' || !sideScreenInfo().back) return;
+    ev.preventDefault();
+    sideBack();
 });
 document.addEventListener('keydown', (ev) => {
     if (ev.key !== 'Enter') return;
