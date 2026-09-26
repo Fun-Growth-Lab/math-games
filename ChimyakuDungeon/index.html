@@ -1668,7 +1668,6 @@ const UI_TEXT = {
     battle_stage_label: { ja: n => `⚔️ ステージ${n}`, ja_easy: n => `⚔️ ステージ${n}`, en: n => `⚔️ Stage ${n}` },
     hud_stage_label: { ja: n => `ステージ ${n}`, ja_easy: n => `ステージ ${n}`, en: n => `Stage ${n}` },
     battle_log_enter: { ja: (heroLabel,name) => `${heroLabel}が${name}に突入！`, ja_easy: (heroLabel,name) => `${heroLabel}が ${name}に とつにゅう！`, en: (heroLabel,name) => `${heroLabel} entered ${name}!` },
-    battle_log_wave_enter: { ja: n => `勇者${n}体が入口から侵入してきた！`, ja_easy: n => `ゆうしゃ${n}たいが いりぐちから しんにゅうしてきた！`, en: n => `${n} heroes entered from the entrance!` },
     battle_log_room_clear: { ja: name => `${name}の魔物を全滅させた！`, ja_easy: name => `${name}の まものを ぜんめつさせた！`, en: name => `Cleared all monsters in ${name}!` },
     battle_log_attack: { ja: (a,b,dmg) => `${a}の攻撃！${b}に${dmg}のダメージ`, ja_easy: (a,b,dmg) => `${a}の こうげき！${b}に ${dmg}の ダメージ`, en: (a,b,dmg) => `${a} attacks! ${dmg} damage to ${b}` },
     battle_log_defeated: { ja: name => `${name}を倒した！`, ja_easy: name => `${name}を たおした！`, en: name => `${name} was defeated!` },
@@ -5704,14 +5703,14 @@ function beginDemonLordSelect(){
     renderBuildActions();
     renderOverlays();
 }
-// 魔王のLv：モンスターと同じ経験値ルール（勇者1体撃破で+100XP＝+1Lv）。Lv1を基本値とし、1Lvごとに基本値の+25%
+// 魔王のLv：モンスターと同じ経験値ルール（勇者1体撃破で+100XP＝+1Lv）。ステータスはdemonLordStatAtLevelの成長曲線で決まる
 function applyDemonLordLevel(dl){
-    const lvMult = 1 + 0.25*((dl.level||1)-1);
-    dl.maxHp = Math.max(1, Math.round(DEMON_LORD_STATS.hp * lvMult));
-    dl.atk = Math.round(DEMON_LORD_STATS.atk * lvMult);
-    dl.def = Math.round(DEMON_LORD_STATS.def * lvMult);
-    dl.magAtk = Math.round(DEMON_LORD_STATS.magAtk * lvMult);
-    dl.magDef = Math.round(DEMON_LORD_STATS.magDef * lvMult);
+    const lv = dl.level||1;
+    dl.maxHp = Math.max(1, Math.round(demonLordStatAtLevel('hp', lv)));
+    dl.atk = Math.max(1, Math.round(demonLordStatAtLevel('atk', lv)));
+    dl.def = Math.max(1, Math.round(demonLordStatAtLevel('def', lv)));
+    dl.magAtk = Math.max(1, Math.round(demonLordStatAtLevel('magAtk', lv)));
+    dl.magDef = Math.max(1, Math.round(demonLordStatAtLevel('magDef', lv)));
 }
 function setDemonLord(roomId, r, c){
     demonLordRoomId = roomId;
@@ -5813,8 +5812,6 @@ const STAGE_FINAL = 7; // 最終侵攻。ここの勇者を倒すとゲームク
 // ステージごとの勇者の総数。人数が多いほど戦闘の処理が重くなるため、MAX4体までしか増やさない
 // （ステージ1で2人→ステージ2で3人→ステージ3以降はずっと4人で頭打ち）。そのぶん終盤の強さは
 // heroOffenseMult側で1体あたりの攻撃力を大きく伸ばして補う
-const HEROES_PER_WAVE = 4;
-const WAVE_INTERVAL_TICKS = 12; // 次の4体が入ってくるまでのtick数（暫定値。1tickは行動1回分の間隔）
 function heroCountForStage(stageNum){ return Math.min(4, stageNum+1); }
 // 勇者のクラス定義。
 // tierStart/tierEndは侵攻1・侵攻7でのステータス（1〜10ランク値、モンスターと同じtierStats換算を使う）。
@@ -5918,21 +5915,28 @@ const GAME_PRESETS = [
 ];
 let currentGamePresetKey = 'game1'; // 現在選択中のゲームプリセット（今のところ1種類のみ）
 function currentGamePreset(){ return GAME_PRESETS.find(g=>g.key===currentGamePresetKey); }
-// 魔王専用の固定ステータス（暫定値）。
-// HP：最終形態（stage3）のモンスターの平均×4倍と高めにする（ここは変更なし＝要望により高いまま維持）。
-// 攻撃・防御・魔攻・魔防：以前は「最終形態の平均×1.2倍」を基準にしていたが、手持ちモンスターの多くは
-// 未進化（stage1）のことが多く、Lv2の時点で「進化前モンスターをLv6まで上げた平均」の3.4倍もの差が出て
-// しまっていた（要調査・要修正のフィードバックあり）。基準を「全stage込みの平均」に下げ、倍率も1.2→1.0
-// に下げた（実測：新しい基礎値の4ステータス平均は28.0、旧の56.3から約半分。Lv2時点の比は3.44倍→1.71倍）
-const DEMON_LORD_HP_MULT = 4, DEMON_LORD_STAT_MULT = 1.0;
-const FINAL_FORM_SPECIES = MONSTER_SPECIES.filter(sp => sp.stage===3);
-const finalFormAvg = k => FINAL_FORM_SPECIES.reduce((sum,sp) => sum + sp[k], 0) / FINAL_FORM_SPECIES.length;
-const allSpeciesAvg = k => MONSTER_SPECIES.reduce((sum,sp) => sum + sp[k], 0) / MONSTER_SPECIES.length;
-const DEMON_LORD_STATS = {
-    hp: Math.round(finalFormAvg('hp') * DEMON_LORD_HP_MULT),
-    atk: Math.round(allSpeciesAvg('atk') * DEMON_LORD_STAT_MULT), def: Math.round(allSpeciesAvg('def') * DEMON_LORD_STAT_MULT),
-    magAtk: Math.round(allSpeciesAvg('magAtk') * DEMON_LORD_STAT_MULT), magDef: Math.round(allSpeciesAvg('magDef') * DEMON_LORD_STAT_MULT),
-};
+// 魔王のステータス：Lv1では、序盤の手持ち（卵から出るstage1）のモンスターより「ちょい強い」程度から始め、
+// 全ステージクリア時の想定Lv（DEMON_LORD_EXPECTED_FINAL_LEVEL）で「召喚系stage3の種族基礎値の平均」に届くよう、
+// 伸ばす。伸び方は序盤ゆるやか・終盤急になる曲線（進み具合t=(Lv−1)/(想定Lv−1)を1.5乗して、Lv1の値から到達値まで補間）。
+// 直線だとLv2〜3で卵モンスターとの差が急に開いてしまい、魔王だけがレベルアップしてしまうため、序盤を抑えている。
+// Lv1の値：モンスターはLv1で基礎値の1.25倍なので、その1.25倍した卵stage1の平均を基準にする。
+// HPは卵stage1の平均×2、攻防魔攻魔防は同×1.2
+const DEMON_LORD_EXPECTED_FINAL_LEVEL = 10;
+const DEMON_LORD_GROWTH_EXPONENT = 1.5;
+const DEMON_LORD_START_HP_MULT = 2, DEMON_LORD_START_STAT_MULT = 1.2;
+const MONSTER_LV1_MULT = 1 + 0.25*1; // applyStatModsToMonsterのlvMultにLv1を入れた値
+const DEMON_LORD_STAT_KEYS = ['hp','atk','def','magAtk','magDef'];
+const DEMON_LORD_FINAL_SPECIES = MONSTER_SPECIES.filter(sp => sp.stage===3 && SUMMON_LINES.includes(sp.line));
+const speciesAvg = (list, k) => list.reduce((sum,sp) => sum + sp[k], 0) / list.length;
+const DEMON_LORD_START = {}, DEMON_LORD_TARGET = {};
+DEMON_LORD_STAT_KEYS.forEach(k => {
+    DEMON_LORD_START[k] = speciesAvg(EGG_STAGE1_SPECIES, k) * MONSTER_LV1_MULT * (k==='hp' ? DEMON_LORD_START_HP_MULT : DEMON_LORD_START_STAT_MULT);
+    DEMON_LORD_TARGET[k] = speciesAvg(DEMON_LORD_FINAL_SPECIES, k);
+});
+function demonLordStatAtLevel(k, lv){
+    const t = Math.pow((lv - 1) / (DEMON_LORD_EXPECTED_FINAL_LEVEL - 1), DEMON_LORD_GROWTH_EXPONENT);
+    return DEMON_LORD_START[k] + (DEMON_LORD_TARGET[k] - DEMON_LORD_START[k]) * t;
+}
 
 // ============================================================
 // 魔王の戦闘中スキル（コスト無し・1戦闘につき3回まで・同じスキルは1戦闘1回まで）
@@ -6133,7 +6137,7 @@ function chooseSkillReward(key){
 let battleHeroes = [];
 let roomBattleQueues = {}; // roomId -> このtickで消化する行動キュー（部屋ごとに独立して同時進行させる）
 let battleGlobalTick = -1; // battleStep()が呼ばれるたびに+1。0,12,24...で次の波が湧く
-let nextWaveIndex = 0; // 次に送り出す勇者の波（0始まり）
+let nextHeroSpawnIndex = 0; // 次に入口から送り出す勇者（battleHeroesの添字。1tickに1体ずつ）
 let battleTimer = null;
 let demonLordUnit = null;
 let battleSpeed = 1;
@@ -6210,12 +6214,12 @@ function startBattle(){
     battleSpeed = 1; battlePaused = false;
     roomBattleQueues = {};
     battleGlobalTick = -1;
-    nextWaveIndex = 0;
+    nextHeroSpawnIndex = 0;
     demonLordSkillUsesThisBattle = 0; demonLordSkillUsedKeysThisBattle = []; pendingDemonLordSkill = null;
     battleStageItemDrops = [];
     battleDamageStats = freshDamageStats();
     // 侵攻してくる勇者の並び（クラス・性別）は、迎撃確認ポップアップで見せたプレビューと必ず一致させる
-    // （人数はheroCountForStage、攻撃系ステータスはheroOffenseMultで人数に応じて調整）
+    // （人数はheroCountForStage、攻撃系ステータスはheroOffenseMultで調整）
     const heroCount = heroCountForStage(stage);
     const heroPreview = pendingBattleHeroPreview.length===heroCount ? pendingBattleHeroPreview : buildBattleHeroPreview();
     battleHeroes = [];
@@ -6228,7 +6232,7 @@ function startBattle(){
             alive:true, r:-1, c:-1, emoji:cls.emoji, statusEffects:[], buffs:[], skillUses:0, shotTarget:null, chargeTurns:0,
             state:'pending', roomId:null, behavior:null,
             transitPath:null, transitStepIndex:0, transitNextRoomId:null,
-            corridorVisitOrder:[], spawnWave: Math.floor(i/HEROES_PER_WAVE) });
+            corridorVisitOrder:[] });
     }
     // demonLordCellと同じオブジェクトを参照する。位置・HPが建設フェーズ側にもそのまま引き継がれる
     demonLordUnit = demonLordCell;
@@ -6392,10 +6396,21 @@ function advanceHeroTransitStep(hero){
     const path = hero.transitPath;
     if (!path) return;
     const cell = path[Math.min(hero.transitStepIndex, path.length-1)];
-    hero.r = cell.r; hero.c = cell.c;
     if (hero.transitStepIndex < path.length-1){
+        hero.r = cell.r; hero.c = cell.c;
         hero.transitStepIndex++;
         return;
+    }
+    // 部屋に入る瞬間：入口のマスに前の勇者が立ち往生していれば、部屋のどこかの空きマスへワープして入る。
+    // 部屋のどこにも空きがなければ入らずに（通路で）待機し、次のtickに改めて試す
+    const enterRoom = rooms.find(r=>r.id===hero.transitNextRoomId);
+    if (enterRoom && battleCellOccupied(enterRoom.id, cell.r, cell.c, hero)){
+        const dest = shuffledCellsOfRoom(enterRoom).find(cl => !battleCellOccupied(enterRoom.id, cl.r, cl.c, hero));
+        if (!dest) return;
+        hero.r = dest.r; hero.c = dest.c;
+        logBattle(uif('battle_log_hero_warp', uif('hero_label', hero.id)));
+    } else {
+        hero.r = cell.r; hero.c = cell.c;
     }
     const roomId = hero.transitNextRoomId;
     hero.transitPath = null; hero.transitNextRoomId = null; hero.transitStepIndex = 0;
@@ -6407,9 +6422,6 @@ function heroArriveAtRoom(hero, roomId){
     hero.roomId = roomId;
     hero.state = 'inRoom';
     clearStackingStatusEffects(hero); // 毒・火傷はその部屋の戦闘終了までなので、部屋に入るタイミングで解除する
-    const room = rooms.find(r=>r.id===roomId);
-    // 複数の勇者が同時に同じマスへ到着してしまった場合はワープで散らす（入場直後でも行動はそのまま続けられる）
-    if (room && battleCellOccupied(roomId, hero.r, hero.c, hero)) warpHero(hero, room, roomId);
     hero.behavior = 'stay';
     logBattle(uif('battle_log_enter', uif('hero_label', hero.id), roomDisplayNameById(roomId)));
 }
@@ -6437,17 +6449,12 @@ function releaseStayHeroesFromRoom(roomId){
     });
     delete roomBattleQueues[roomId];
 }
-// 次の波（4体）を入口から送り出す
-function spawnNextWaveIfDue(){
-    const totalWaves = Math.ceil(battleHeroes.length / HEROES_PER_WAVE);
-    if (nextWaveIndex>=totalWaves) return;
-    if (battleGlobalTick % WAVE_INTERVAL_TICKS !== 0) return;
-    const wave = battleHeroes.filter(h=>h.spawnWave===nextWaveIndex);
-    if (wave.length>0){
-        logBattle(uif('battle_log_wave_enter', wave.length));
-        wave.forEach(h => { h.roomId = null; h.state = 'transit'; heroDepartToNextRoom(h); });
-    }
-    nextWaveIndex++;
+// 勇者を1tickにつき1体ずつ入口から送り出す
+function spawnNextHeroIfDue(){
+    if (nextHeroSpawnIndex>=battleHeroes.length) return;
+    const h = battleHeroes[nextHeroSpawnIndex++];
+    h.roomId = null; h.state = 'transit';
+    heroDepartToNextRoom(h);
 }
 
 function scheduleBattleStep(delay){
@@ -7167,7 +7174,7 @@ function battleStep(){
     battleHeroes.filter(h=>h.state==='transit').forEach(advanceHeroTransitStep);
     // 行き先が満員で待機している勇者は、毎tick空きが出ていないか再確認する（空けば即座に出発する）
     battleHeroes.filter(h=>h.state==='inRoom' && h.behavior==='waiting' && h.alive).forEach(heroDepartToNextRoom);
-    spawnNextWaveIfDue();
+    spawnNextHeroIfDue();
 
     const activeRoomIds = Array.from(new Set(
         battleHeroes.filter(h=>h.state==='inRoom' && h.behavior==='stay' && h.alive).map(h=>h.roomId)
