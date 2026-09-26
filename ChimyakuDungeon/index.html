@@ -1566,7 +1566,7 @@ const UI_TEXT = {
     roomtype_hint_attack: { ja: '戦闘中、部屋にいる勇者全員に定期的に攻撃する', ja_easy: 'せんとうちゅう、へやに いる ゆうしゃ ぜんいんに ていきてきに こうげきする', en: 'Periodically attacks every hero in the room during battle' },
     roomtype_hint_tool: { ja: 'ステージクリアごとに、素の数と部屋レベルに応じた数の装備品を掘削する', ja_easy: 'ステージクリアごとに、もとの かずと へやレベルに あわせた かずの そうびひんを くっさくする', en: 'Excavates equipment after every stage clear (count depends on element count and room level)' },
     roomtype_confirm_msg: { ja: 'これでいいですか？', ja_easy: 'これで いい？', en: 'Is this OK?' },
-    room_output_count_label: { ja: n => `${n}個`, ja_easy: n => `${n}こ`, en: n => `×${n}` },
+    room_output_count_label: { ja: n => `平均${n}個`, ja_easy: n => `へいきん ${n}こ`, en: n => `avg ×${n}` },
     stat_vit_prod: { ja: '活力生産', ja_easy: 'かつりょく せいさん', en: 'Vitality Production' },
     stat_mana_prod: { ja: '魔力生産', ja_easy: 'まりょく せいさん', en: 'Mana Production' },
     stat_summon_prod: { ja: '魔物召喚', ja_easy: 'まもの しょうかん', en: 'Monster Summoning' },
@@ -3324,22 +3324,28 @@ function toolQuality(room, lvOverride){
     const lv = lvOverride!==undefined ? lvOverride : roomAbilityLv(room, 'tool');
     return count * lv;
 }
-// 召喚・掘削の「1ステージあたりに生産される数」。以前は部屋レベルだけで決まっていたため、
-// 小さい部屋をたくさん作った方が（レベル1を量産できるので）有利になってしまっていた。
-// 素の数と部屋レベルを1つの指標にまとめ、ROOM_OUTPUT_THRESHOLDを超えるたびに+1個という形に変えることで、
-// 同じ量の素・レベルを1部屋にまとめた方が、分散させるより得になるようにする
-// score = (A + 素の数 + 部屋レベル×B) × C
-// Aは0にしてある：Aが正の値だと「部屋を作るだけでもらえる固定ボーナス」になり、小部屋を量産するほど
-// （A×部屋の数ぶん）有利になってしまい、狙いと逆効果になる（実測で確認済み）
-const ROOM_OUTPUT_SCORE_A = 0, ROOM_OUTPUT_SCORE_B = 14, ROOM_OUTPUT_SCORE_C = 5, ROOM_OUTPUT_THRESHOLD = 100;
-function roomOutputScore(room, abilityType, lvOverride){
+// 召喚・掘削の「1ステージあたりに生産される数」は確率で決まる。
+// 期待値 = 実質素数 ÷ ROOM_OUTPUT_ELEMENTS_PER_ITEM × (1 + ROOM_OUTPUT_LV_GROWTH × (Lv−1))
+// 例：素3つ・Lv1で期待値1.0、素6つ・Lv1で2.0、素3つ・Lv5で4.0。
+// 実際の生産数は「期待値の整数部分は確定、小数部分はその確率でもう1つ」（例：0.8なら80%で1つ、2.6なら2つは確定で3つ目は60%）。
+// 素の数に比例する形にしてあるので、素を小さい部屋に分散しても1部屋にまとめても、Lv1の生産量は同じ（小部屋の量産が有利にならない）。
+// Lvを上げる効果は素が多い部屋ほど大きく、1部屋に素を集めてレベルを上げるほど得になる
+const ROOM_OUTPUT_ELEMENTS_PER_ITEM = 3, ROOM_OUTPUT_LV_GROWTH = 0.75;
+function roomOutputExpected(room, abilityType, lvOverride){
     const lv = lvOverride!==undefined ? lvOverride : roomAbilityLv(room, abilityType);
     if (lv<=0) return 0;
     const count = effectiveElementCount(room, abilityType);
-    return (ROOM_OUTPUT_SCORE_A + count + lv*ROOM_OUTPUT_SCORE_B) * ROOM_OUTPUT_SCORE_C;
+    return count / ROOM_OUTPUT_ELEMENTS_PER_ITEM * (1 + ROOM_OUTPUT_LV_GROWTH*(lv-1));
 }
+// 実際に今回生産する個数（整数部分は確定、小数部分は確率で+1）
 function roomOutputCount(room, abilityType, lvOverride){
-    return Math.floor(roomOutputScore(room, abilityType, lvOverride) / ROOM_OUTPUT_THRESHOLD);
+    const expected = roomOutputExpected(room, abilityType, lvOverride);
+    const whole = Math.floor(expected);
+    return whole + (Math.random() < expected - whole ? 1 : 0);
+}
+// 画面表示用：期待値を小数第1位までにした文字列
+function roomOutputExpectedText(room, abilityType, lvOverride){
+    return (Math.round(roomOutputExpected(room, abilityType, lvOverride)*10)/10).toFixed(1);
 }
 // 召喚部屋：召喚のクオリティで「2進化目のモンスターが出る確率」が上がる。
 // クオリティ1で0%、クオリティ30で100%になるよう線形補間し、30以上は頭打ち（道具の質と同じ考え方）
@@ -3370,8 +3376,8 @@ function abilityRowMeta(abilityType){
 // 部屋にいるモンスターだけに効くバフ効果。同じ種類の効果は加算される（例：攻撃力+10%と攻撃力+30%で+40%）
 // ============================================================
 const ROOM_SPECIAL_ABILITY_TYPES = ['atk','def','magAtk','magDef','hpRegen','melee','ranged','magic'];
-// スロットが解放されるLv→そのスロットの効果量。Lv1で+10%、Lv3で+20%、Lv5で+30%
-const ROOM_SPECIAL_ABILITY_SLOTS = { 1:0.10, 3:0.20, 5:0.30 };
+// スロットが解放されるLv→そのスロットの効果量。Lv1・Lv3・Lv5のどれも共通で+20%
+const ROOM_SPECIAL_ABILITY_SLOTS = { 1:0.20, 3:0.20, 5:0.20 };
 function roomSpecialAbilityLabel(type){
     return { atk:ui('room_special_label_atk'), def:ui('room_special_label_def'), magAtk:ui('room_special_label_magatk'), magDef:ui('room_special_label_magdef'),
         hpRegen:ui('room_special_hpregen'), melee:ui('room_special_label_melee'), ranged:ui('room_special_label_ranged'), magic:ui('room_special_label_magic') }[type];
@@ -3440,8 +3446,8 @@ function requestUpgradeRoomAbility(roomId, abilityType){
     const meta = abilityRowMeta(abilityType);
     // 召喚・道具は内部的な確率を見せても分かりづらいだけなので、Lv表示だけにする
     const isChanceType = (abilityType==='summon' || abilityType==='tool');
-    const beforeText = isChanceType ? uif('room_output_count_label', roomOutputCount(room, abilityType, curLv)) : abilityEffectText(abilityType, abilityEffectAtLv(room, abilityType, curLv));
-    const afterText = isChanceType ? uif('room_output_count_label', roomOutputCount(room, abilityType, nextLv)) : abilityEffectText(abilityType, abilityEffectAtLv(room, abilityType, nextLv));
+    const beforeText = isChanceType ? uif('room_output_count_label', roomOutputExpectedText(room, abilityType, curLv)) : abilityEffectText(abilityType, abilityEffectAtLv(room, abilityType, curLv));
+    const afterText = isChanceType ? uif('room_output_count_label', roomOutputExpectedText(room, abilityType, nextLv)) : abilityEffectText(abilityType, abilityEffectAtLv(room, abilityType, nextLv));
     openAbilityUpgradeModal(meta.label, beforeText, afterText, cost);
 }
 // 罠1つの威力レベルを1つ上げる（部屋共有ではなく罠ごとに個別のレベルを持つ）
@@ -8118,7 +8124,7 @@ function renderRoomDetail(){
             // 召喚・道具は内部的な確率(%)を見せても分かりづらいだけなので、実際に生産される数を見せる
             // （素の数と部屋レベルの両方で決まるため、Lvだけでは実際の数が分からない）
             const isChanceType = (abilityType==='summon' || abilityType==='tool');
-            const valueText = isChanceType ? uif('room_output_count_label', roomOutputCount(rm, abilityType)) : roomAbilityMultiplier(rm, abilityType).toFixed(1) + ui('label_times_suffix');
+            const valueText = isChanceType ? uif('room_output_count_label', roomOutputExpectedText(rm, abilityType)) : roomAbilityMultiplier(rm, abilityType).toFixed(1) + ui('label_times_suffix');
             let blk = `<div class="ability-block">
                 <div class="ability-block-row">
                     <span style="color:${ABILITY_LABEL_COLOR[abilityType]}; font-weight:800; font-size:0.86rem;">${meta.label}${ui('label_ability_suffix')}</span>
