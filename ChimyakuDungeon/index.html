@@ -946,6 +946,7 @@
         /* 部屋の詳細などを見ている間は、迎撃ボタンだけを細くして残す */
         .bd-side-footer.slim > *:not(#btn-start-battle) { display:none !important; }
         .bd-side-footer.slim .btn-start-battle-big { padding:10px 18px; font-size:1.1rem; }
+        .delta-up { color:#7fe6a0; font-weight:800; } .delta-down { color:#ff8d7d; font-weight:800; } .delta-zero { color:var(--ink-dim); }
         .btn-build-room { width:100%; margin-bottom:8px; padding:9px 12px; font-size:0.95rem; }
     </style>
 </head>
@@ -1455,7 +1456,6 @@ const UI_TEXT = {
                  en: 'Vitality Essence (yellow), Mana Essence (blue), Summon Factor (purple), and Attack Factor (red) are scattered randomly underground. Click anywhere on the map that isn\'t a room or corridor to start building a room. ① Click to choose the area of your first room, ② choose where the corridor connects to the surface along the room\'s top edge. From then on, picking a new room\'s area shows candidate straight corridors to existing rooms directly on the map — click one to choose. Building costs Vitality. This prototype only covers the building phase (summoning and defense will be added later).' },
     btn_close: { ja: 'とじる', en: 'Close' },
     stage_clear_title: { ja: n => `🎉 防衛成功！ ステージ${n}クリア`, ja_easy: n => `🎉 ぼうえい せいこう！ ステージ${n} クリア`, en: n => `🎉 Victory! Stage ${n} cleared` },
-    stage_income_heal_off: { ja: '0（自動回復OFF）', ja_easy: '0（じどうかいふく OFF）', en: '0 (auto-heal OFF)' },
     stage_income_heal_label: { ja: '回復に使った魔力', ja_easy: 'かいふくに つかった まりょく', en: 'Mana Spent on Healing' },
     btn_balance_report: { ja: '📊 テストデータ', ja_easy: '📊 テストデータ', en: '📊 Test Data' },
     btn_copy: { ja: '📋 コピー', ja_easy: '📋 コピー', en: '📋 Copy' },
@@ -7461,11 +7461,14 @@ function stageLootHtml(){
 // 勝利後の1つのポップアップ：勝利の告知・活力/魔力の増加・回復に使った魔力・レベルアップ・戦利品をまとめて見せる
 function openStageIncomeModal(vitGain, manaGain, levelUpList){
     document.getElementById('stage-clear-title').textContent = uif('stage_clear_title', stage-1);
-    document.getElementById('stage-income-vit').textContent = vitGain;
-    document.getElementById('stage-income-mana').textContent = manaGain;
+    // 増えた分は緑の「▲＋」、減った分（回復に使った魔力）は赤の「▼−」で、増減がひと目で分かるようにする（0はくすんだ色）
+    const deltaHtml = (n, up) => n<=0 ? `<span class="delta-zero">0</span>` : `<span class="${up?'delta-up':'delta-down'}">${up?'▲ ＋':'▼ −'}${n}</span>`;
+    document.getElementById('stage-income-vit').innerHTML = deltaHtml(vitGain, true);
+    document.getElementById('stage-income-mana').innerHTML = deltaHtml(manaGain, true);
     const healed = lastAutoHealInfo ? lastAutoHealInfo.healed : 0;
-    // 回復に使った魔力は0でも常に表示する（自動回復がOFFのときはその旨も添える）
-    document.getElementById('stage-income-heal').textContent = (healed<=0 && !autoHealEnabled) ? ui('stage_income_heal_off') : healed;
+    // 回復に使った魔力の行は、自動回復がONのときだけ出す
+    document.getElementById('stage-income-heal-row').classList.toggle('hidden', !autoHealEnabled);
+    document.getElementById('stage-income-heal').innerHTML = deltaHtml(healed, false);
     const list = document.getElementById('stage-income-ranked-list');
     if (levelUpList.length===0){
         list.innerHTML = `<div style="color:var(--ink-dim); font-size:0.82rem;">${ui('stage_income_none_ranked')}</div>`;
