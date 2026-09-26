@@ -921,6 +921,16 @@
         .bd-side-footer .btn-teal:hover { box-shadow: 0 1px 0 rgba(0,0,0,0.5); }
         .bd-side-footer .btn-green { background: linear-gradient(180deg, #3e6b45, #274a2f); border-color: #16301c; color:#e4f3e6; }
         .bd-side-footer .btn-green:hover { box-shadow: 0 1px 0 rgba(0,0,0,0.5); }
+        /* アイテムボタン：未装備の装備品／使える進化の石があるときの目印（金色の脈動する枠＋個数バッジ） */
+        #btn-open-items { position:relative; }
+        #btn-open-items.has-alert { border-color: var(--gold); animation: itemGlowPulse 1.2s ease-in-out infinite; }
+        #btn-open-items.has-alert::after {
+            content: attr(data-alert);
+            position:absolute; top:-9px; right:-9px; min-width:24px; height:24px; padding:0 6px; box-sizing:border-box;
+            display:flex; align-items:center; justify-content:center;
+            background:#e0473c; color:#fff; border:2px solid #fff3d6; border-radius:12px;
+            font-size:0.8rem; font-weight:800; line-height:1; box-shadow:0 2px 6px rgba(0,0,0,0.5);
+        }
     </style>
 </head>
 <body>
@@ -1064,7 +1074,7 @@
 
     <!-- ==================== BATTLE RESULT ==================== -->
     <div id="battle-result-modal" class="modal-backdrop hidden">
-        <div class="modal-box" style="min-width:360px;">
+        <div class="modal-box" style="min-width:560px; max-width:96%;">
             <div class="modal-title" id="battle-result-title"></div>
             <p class="modal-msg" id="battle-result-msg" style="text-align:center;"></p>
             <div id="battle-result-actions" class="btn-row"></div>
@@ -1077,24 +1087,6 @@
             <div class="modal-title" id="hatch-result-title">🥚→👾</div>
             <div id="hatch-result-body" style="max-height:50vh; overflow-y:auto; text-align:left;"></div>
             <button class="btn btn-primary btn-sm" style="margin-top:14px;" data-i18n="btn_close" onclick="closeHatchResultModal()">とじる</button>
-        </div>
-    </div>
-
-    <!-- ==================== STAGE ITEM DROP (post-battle) ==================== -->
-    <div id="stage-itemdrop-modal" class="modal-backdrop hidden">
-        <div class="modal-box" style="min-width:320px;">
-            <div class="modal-title" data-i18n="loot_found_title">🎁 アイテムを発見！</div>
-            <div id="stage-itemdrop-body" style="max-height:50vh; overflow-y:auto; text-align:left;"></div>
-            <button class="btn btn-primary btn-sm" style="margin-top:14px;" data-i18n="btn_close" onclick="closeStageItemDropModal()">とじる</button>
-        </div>
-    </div>
-
-    <!-- ==================== DAMAGE BREAKDOWN (post-battle) ==================== -->
-    <div id="damage-breakdown-modal" class="modal-backdrop hidden">
-        <div class="modal-box" style="min-width:340px; max-width:440px;">
-            <div class="modal-title" data-i18n="dmg_breakdown_title">🗡️ ダメージ内訳</div>
-            <div id="damage-breakdown-body"></div>
-            <button class="btn btn-primary btn-sm" style="margin-top:14px; width:100%;" data-i18n="btn_close" onclick="closeDamageBreakdownModal()">とじる</button>
         </div>
     </div>
 
@@ -1199,15 +1191,31 @@
         </div>
     </div>
 
-    <!-- ==================== STAGE INCOME SUMMARY ==================== -->
+    <!-- ==================== STAGE CLEAR (勝利結果・収入・回復・レベルアップ・戦利品を1つにまとめたポップアップ) ==================== -->
     <div id="stage-income-modal" class="modal-backdrop hidden">
-        <div class="modal-box" style="min-width:320px;">
-            <div class="modal-title" data-i18n="stage_income_title">🛡️ このターンの成果</div>
+        <div class="modal-box" style="min-width:340px; max-width:520px; max-height:92vh; overflow-y:auto;">
+            <div class="modal-title" id="stage-clear-title"></div>
             <div class="modal-score-row"><span><span class="gem-chip-sq gem-citrine"></span><span data-i18n="stage_income_vit_label">活力の増加量</span></span><b id="stage-income-vit">0</b></div>
             <div class="modal-score-row"><span><span class="gem-chip-sq gem-sapphire"></span><span data-i18n="stage_income_mana_label">魔力の増加量</span></span><b id="stage-income-mana">0</b></div>
-            <div class="side-panel-title" style="margin-top:12px;" data-i18n="stage_income_ranked_title">進化した魔物</div>
-            <div id="stage-income-ranked-list" style="max-height:40vh; overflow-y:auto; text-align:left;"></div>
-            <button class="btn btn-primary btn-sm" style="margin-top:14px; width:100%;" data-i18n="btn_close" onclick="closeStageIncomeModal()">とじる</button>
+            <div class="modal-score-row" id="stage-income-heal-row"><span>💊 <span data-i18n="stage_income_heal_label">回復に使った魔力</span></span><b id="stage-income-heal">0</b></div>
+            <div class="side-panel-title" style="margin-top:12px;" data-i18n="stage_income_ranked_title">レベルアップ</div>
+            <div id="stage-income-ranked-list" style="max-height:30vh; overflow-y:auto; text-align:left;"></div>
+            <div id="stage-loot-body" style="margin-top:8px; text-align:left;"></div>
+            <button class="btn btn-primary btn-sm" style="margin-top:14px; width:100%;" data-i18n="btn_next_stage" onclick="closeStageIncomeModal()">次のステージへ</button>
+        </div>
+    </div>
+
+    <!-- ==================== BALANCE REPORT (テストプレイデータ) ==================== -->
+    <div id="balance-report-modal" class="modal-backdrop hidden">
+        <div class="modal-box" style="width:780px; max-width:96%; max-height:94vh;">
+            <div class="modal-title" data-i18n="balance_report_title">📊 テストプレイデータ</div>
+            <p class="modal-msg" style="font-size:0.85rem;" data-i18n="balance_report_hint">このデータをコピーして、バランス調整の担当（Claude）に貼り付けて渡してください。</p>
+            <textarea id="balance-report-text" readonly style="width:100%; height:48vh; box-sizing:border-box; font-family:Consolas,monospace; font-size:0.72rem; background:#120c07; color:#e6d9c4; border:1px solid var(--card-bdr); border-radius:8px; padding:8px; resize:none;"></textarea>
+            <div class="btn-row">
+                <button class="btn btn-gold btn-sm" style="flex:1;" data-i18n="btn_copy" onclick="copyBalanceReport()">📋 コピー</button>
+                <button class="btn btn-sm" style="flex:1;" data-i18n="btn_download" onclick="downloadBalanceReport()">💾 ファイルで保存</button>
+                <button class="btn btn-sm" style="flex:1;" data-i18n="btn_close" onclick="closeBalanceReportModal()">とじる</button>
+            </div>
         </div>
     </div>
 
@@ -1426,12 +1434,18 @@ const UI_TEXT = {
                  ja_easy: 'ちかには「かつりょくのもと（きいろ）」「まりょくのもと（あお）」「きょうかのもと（むらさき）」「こうげきのもと（あか）」が ランダムに ねむっているよ。マップの へやや つうろ いがいの ばしょを クリックすると へやづくりが はじまるよ。①さいしょの へやの はんいを クリックで えらんで、②へやの うえがわから ちじょうへの つうろの いちを えらぼう。そのあとは あたらしい へやの はんいを えらぶと、いまある へやと まっすぐ つなげられる つうろの こうほが ちずの うえに でてくるので、クリックして えらんでね。けんせつには かつりょくを つかうよ。このしさくばんでは けんせつパートだけ あそべるよ（しょうかんや ぼうえいは これから ついかするよ）。',
                  en: 'Vitality Essence (yellow), Mana Essence (blue), Summon Factor (purple), and Attack Factor (red) are scattered randomly underground. Click anywhere on the map that isn\'t a room or corridor to start building a room. ① Click to choose the area of your first room, ② choose where the corridor connects to the surface along the room\'s top edge. From then on, picking a new room\'s area shows candidate straight corridors to existing rooms directly on the map — click one to choose. Building costs Vitality. This prototype only covers the building phase (summoning and defense will be added later).' },
     btn_close: { ja: 'とじる', en: 'Close' },
-    stage_income_title: { ja: '🛡️ 今回の成果', ja_easy: '🛡️ こんかいの せいか', en: '🛡️ This Turn\'s Results' },
+    stage_clear_title: { ja: n => `🎉 防衛成功！ ステージ${n}クリア`, ja_easy: n => `🎉 ぼうえい せいこう！ ステージ${n} クリア`, en: n => `🎉 Victory! Stage ${n} cleared` },
+    stage_income_heal_label: { ja: '回復に使った魔力', ja_easy: 'かいふくに つかった まりょく', en: 'Mana Spent on Healing' },
+    btn_balance_report: { ja: '📊 テストデータ', ja_easy: '📊 テストデータ', en: '📊 Test Data' },
+    btn_copy: { ja: '📋 コピー', ja_easy: '📋 コピー', en: '📋 Copy' },
+    btn_download: { ja: '💾 ファイルで保存', ja_easy: '💾 ファイルで ほぞん', en: '💾 Save as File' },
+    balance_report_title: { ja: '📊 テストプレイデータ', ja_easy: '📊 テストプレイデータ', en: '📊 Test-play Data' },
+    balance_report_hint: { ja: 'このデータをコピーして、バランス調整の担当（Claude）に貼り付けて渡してください。', ja_easy: 'このデータを コピーして わたしてね', en: 'Copy this data and paste it to the balance-tuning assistant.' },
+    balance_report_copied: { ja: 'コピーしました', ja_easy: 'コピーしたよ', en: 'Copied' },
+    balance_report_copy_failed: { ja: 'コピーできませんでした。テキストを選択して手動でコピーするか、ファイル保存を使ってください', ja_easy: 'コピーできなかったよ', en: 'Copy failed. Select the text manually or save as a file.' },
     stage_income_vit_label: { ja: '活力の増加量', ja_easy: 'かつりょくの ふえた りょう', en: 'Vitality Gained' },
     stage_income_mana_label: { ja: '魔力の増加量', ja_easy: 'まりょくの ふえた りょう', en: 'Mana Gained' },
     stage_income_ranked_title: { ja: 'レベルアップ', ja_easy: 'レベルアップ', en: 'Level Up' },
-    dmg_breakdown_title: { ja: '🗡️ ダメージ内訳', ja_easy: '🗡️ ダメージの ないわけ', en: '🗡️ Damage Breakdown' },
-    auto_heal_summary_label: { ja: (before,after,healed) => `💊 自動回復でHPを${healed}回復しました（魔力 ${before}→${after}）`, ja_easy: (before,after,healed) => `💊 じどうかいふくで HPを ${healed} かいふくしたよ（まりょく ${before}→${after}）`, en: (before,after,healed) => `💊 Auto-heal restored ${healed} HP (Mana ${before}→${after})` },
     dmg_melee_physical: { ja: '物理近距離', ja_easy: 'ぶつり・きんきょり', en: 'Physical Melee' },
     dmg_ranged_physical: { ja: '物理中距離', ja_easy: 'ぶつり・ちゅうきょり', en: 'Physical Ranged' },
     dmg_magicrole_physical: { ja: '物理遠距離', ja_easy: 'ぶつり・えんきょり', en: 'Physical Long-range' },
@@ -2485,6 +2499,7 @@ function startNewDungeon(){
     inventory = []; nextInventoryId = 1; equipModalMonsterId = null; stoneInventory = {};
     demonLordSkillLevels = {}; demonLordSkillUsesThisBattle = 0; demonLordSkillUsedKeysThisBattle = []; pendingDemonLordSkill = null;
     battleStageItemDrops = []; battleDamageStats = freshDamageStats();
+    startRunReport(); // テストプレイデータの記録も新しくする
     nextRoomId = 1; nextCorridorId = 1; nextMonsterId = 1; nextTrapId = 1; selectedRoomId = null; selectedMonsterId = null; demonLordMoveSelected = false;
     highlightedMonsterId = null; monsterSortKey = 'type'; highlightedTrapId = null;
     healIndividualOpen = false;
@@ -3034,6 +3049,7 @@ function upgradeGridCellToRareEggVisual(r, c){
 // 初期配置ではなくこのタイミングで決める。1個の卵につきRARE_EGG_UPGRADE_CHANCEの確率）
 const RARE_EGG_UPGRADE_CHANCE = 0.01;
 function rollRareEggUpgrades(){
+    let upgraded = 0;
     for (let r=0;r<GRID_ROWS;r++){
         for (let c=0;c<GRID_COLS;c++){
             if (grid[r][c]!=='egg') continue;
@@ -3041,9 +3057,11 @@ function rollRareEggUpgrades(){
             if (Math.random()<RARE_EGG_UPGRADE_CHANCE){
                 grid[r][c] = 'egg_rare';
                 upgradeGridCellToRareEggVisual(r, c);
+                upgraded++;
             }
         }
     }
+    return upgraded;
 }
 function markOccupied(cells){ cells.forEach(({r,c}) => { occupied[r][c] = true; }); }
 
@@ -4108,48 +4126,9 @@ function attemptAttackMonster(attackerUnit, monsterUnit, atkMult){
 const KILL_XP_BASE = 100;
 const HERO_ITEM_DROP_CHANCE = 0.2; // 勇者を倒すたびにこの確率で装備品がドロップする（ステージクリア後にまとめて表示）
 let battleStageItemDrops = []; // このステージの戦闘中にドロップしたアイテムkeyの一覧（ステージクリア後のポップアップ表示用）
-// このステージでモンスターが勇者に与えたダメージの内訳（役割×攻撃タイプ別）。バランス確認用にステージクリア後表示する
+// このステージでモンスターが勇者に与えたダメージの内訳（役割×攻撃タイプ別）。テストプレイデータの出力用に集計する
 function freshDamageStats(){ return { melee:{physical:0,magic:0}, ranged:{physical:0,magic:0}, magic:{physical:0,magic:0} }; }
 let battleDamageStats = freshDamageStats();
-// バランス確認用：役割×攻撃タイプ別のダメージ内訳をステージクリア後に表示する（収入・アイテム入手ポップアップの次）
-function openDamageBreakdownModal(){
-    const s = battleDamageStats;
-    const physTotal = s.melee.physical + s.ranged.physical + s.magic.physical;
-    const magTotal = s.melee.magic + s.ranged.magic + s.magic.magic;
-    const grandTotal = physTotal + magTotal;
-    const rowDef = (labelKey, value, summary) => ({ labelKey, value, summary });
-    const rows = [
-        rowDef('dmg_melee_physical', s.melee.physical, false),
-        rowDef('dmg_ranged_physical', s.ranged.physical, false),
-        rowDef('dmg_magicrole_physical', s.magic.physical, false),
-        rowDef('dmg_melee_magic', s.melee.magic, false),
-        rowDef('dmg_ranged_magic', s.ranged.magic, false),
-        rowDef('dmg_magicrole_magic', s.magic.magic, false),
-    ];
-    const summaryRows = [
-        rowDef('dmg_total_physical', physTotal, true),
-        rowDef('dmg_total_magic', magTotal, true),
-    ];
-    function rowHtml(row){
-        const pct = grandTotal>0 ? Math.round(row.value/grandTotal*100) : 0;
-        return `<div class="dmg-breakdown-row${row.summary?' dmg-breakdown-summary':''}">
-            <div class="dmg-breakdown-label">${ui(row.labelKey)}</div>
-            <div class="dmg-breakdown-bar-track"><div class="dmg-breakdown-bar-fill" style="width:${pct}%;"></div></div>
-            <div class="dmg-breakdown-value">${row.value}（${pct}%）</div>
-        </div>`;
-    }
-    let html = rows.map(rowHtml).join('') + `<div class="dmg-breakdown-divider"></div>` + summaryRows.map(rowHtml).join('');
-    if (lastAutoHealInfo){
-        html += `<div class="dmg-breakdown-divider"></div><div class="auto-heal-summary-row">${uif('auto_heal_summary_label', lastAutoHealInfo.before, lastAutoHealInfo.after, lastAutoHealInfo.healed)}</div>`;
-    }
-    document.getElementById('damage-breakdown-body').innerHTML = html;
-    document.getElementById('damage-breakdown-modal').classList.remove('hidden');
-}
-function closeDamageBreakdownModal(){
-    document.getElementById('damage-breakdown-modal').classList.add('hidden');
-    lastAutoHealInfo = null;
-    maybeOfferDemonLordSkillReward();
-}
 // 必要経験値：Lv1→2は XP_PER_LEVEL（=100）で、そこからLvが1つ上がるごとに次のLvまでの必要経験値が
 // XP_LEVEL_STEP_GROWTH ずつ増えていく（Lv1→2:100、Lv2→3:120、Lv3→4:140…）。
 // Lv L→L+1 に必要な経験値 = XP_PER_LEVEL + XP_LEVEL_STEP_GROWTH×(L−1)（L≧1）
@@ -4904,7 +4883,7 @@ function hatchEggsInRoom(room, count){
         const m = { id: nextMonsterId++, roomId: null, r: 0, c: 0, speciesKey: sp.key,
                     hp: 0, maxHp: 0, atk: 0, def: 0, magAtk: 0, magDef: 0, statMods: rollStatMods(), chargeTurns: 0,
                     activeCooldowns: [], statusEffects: [], buffs: [], xp: initialXp, level: monsterLevel(initialXp),
-                    equippedItem: null, origin: 'egg' };
+                    equippedItem: null, origin: 'egg', bornStage: stage, bornLv: monsterLevel(initialXp) };
         applyStatModsToMonster(m, sp);
         m.hp = m.maxHp;
         monsters.push(m);
@@ -4917,9 +4896,8 @@ function hatchEggsInRoom(room, count){
 // 進化段階：進化前(stage1)50%／1進化目(stage2)40%／2進化目(stage3)10%。卵の系統・召喚の系統どちらの種族も対象にする
 // （通常の卵はEGG_STAGE1_SPECIES＝進化前・卵系統のみだが、レア卵は範囲を広げて召喚系統や進化後の姿も出す）
 const RARE_EGG_STAGE_WEIGHTS = [0.50, 0.40, 0.10]; // 添字0=stage1, 1=stage2, 2=stage3
-const RARE_EGG_LEVEL_BONUS = 5; // 通常孵化(Math.max(1,stage-1))より、このレベル分だけ高い状態で生まれる
+const RARE_EGG_LEVEL_BONUS = 1; // 通常孵化(Math.max(1,stage-1))より、このレベル分だけ高い状態で生まれる
 const RARE_EGG_STAT_MOD_MIN = 1.2; // 個体差(0.71～1.50)の下限をここまで引き上げ、必ず得意寄りの個体にする
-const RARE_EGG_EQUIP_CHANCE = 0.5; // 装備を持った状態で生まれる確率
 function hatchRareEggsInRoom(room, count){
     if (count<=0) return [];
     const initialLevel = Math.max(1, stage-1) + RARE_EGG_LEVEL_BONUS;
@@ -4932,14 +4910,9 @@ function hatchRareEggsInRoom(room, count){
         const m = { id: nextMonsterId++, roomId: null, r: 0, c: 0, speciesKey: sp.key,
                     hp: 0, maxHp: 0, atk: 0, def: 0, magAtk: 0, magDef: 0, statMods: rollStatMods(RARE_EGG_STAT_MOD_MIN, STAT_MOD_MAX), chargeTurns: 0,
                     activeCooldowns: [], statusEffects: [], buffs: [], xp: initialXp, level: monsterLevel(initialXp),
-                    equippedItem: null, origin: 'egg_rare' };
+                    equippedItem: null, origin: 'egg_rare', bornStage: stage, bornLv: monsterLevel(initialXp) };
         applyStatModsToMonster(m, sp);
         m.hp = m.maxHp;
-        if (Math.random() < RARE_EGG_EQUIP_CHANCE){
-            const shape = ITEM_SHAPES[Math.floor(Math.random()*ITEM_SHAPES.length)];
-            const tierIdx = weightedRandomIndex(TOOL_TIER_WEIGHTS_AT_MAX); // 良い品質に偏らせる（掘削の最高品質と同じ重み）
-            m.equippedItem = { id: nextInventoryId++, itemKey: `${shape.key}_${tierIdx}` };
-        }
         monsters.push(m);
         placeMonsterInRoomOrStock(m, room);
         born.push(m);
@@ -4966,7 +4939,7 @@ function createSummonMonster(room){
                 hp: 0, maxHp: 0, atk: 0, def: 0, magAtk: 0, magDef: 0,
                 statMods: rollStatMods(), chargeTurns: 0,
                 activeCooldowns: [], statusEffects: [], buffs: [], xp: initialXp, level: monsterLevel(initialXp),
-                equippedItem: null, origin: 'summon' };
+                equippedItem: null, origin: 'summon', bornStage: stage, bornLv: monsterLevel(initialXp) };
     applyStatModsToMonster(m, sp);
     m.hp = m.maxHp;
     monsters.push(m);
@@ -5150,6 +5123,7 @@ function evolveMonsterWithStoneCore(monsterId, stoneKey){
     stoneInventory[stoneKey]--;
     if (stoneInventory[stoneKey]<=0) delete stoneInventory[stoneKey];
     applyEvolution(m, next);
+    updateItemButtonAlert();
     return true;
 }
 // 対象を1体選んで石を使う（ピッカーから呼ばれる。進化結果ポップアップを表示する）
@@ -5241,7 +5215,20 @@ function openItemInventoryModal(){
     document.getElementById('item-inventory-modal').classList.remove('hidden');
 }
 function closeItemInventoryModal(){ document.getElementById('item-inventory-modal').classList.add('hidden'); }
+// アイテムボタンの目印：倉庫に未装備の装備品がある、または使える進化の石（対象のモンスターがいる石）があるとき点灯し、その合計個数をバッジで出す
+function updateItemButtonAlert(){
+    const btn = document.getElementById('btn-open-items');
+    if (!btn) return;
+    const usableStones = Object.keys(stoneInventory)
+        .filter(sk => monstersEligibleForStone(sk).length>0)
+        .reduce((n, sk) => n + stoneInventory[sk], 0);
+    const total = inventory.length + usableStones;
+    btn.classList.toggle('has-alert', total>0);
+    if (total>0) btn.setAttribute('data-alert', total>99 ? '99+' : String(total));
+    else btn.removeAttribute('data-alert');
+}
 function renderItemInventoryModal(){
+    updateItemButtonAlert();
     const stoneKeys = Object.keys(stoneInventory);
     const stonesEl = document.getElementById('item-inventory-stones');
     stonesEl.innerHTML = stoneKeys.length===0 ? `<div class="room-detail-row">${ui('item_inventory_empty')}</div>` :
@@ -5442,6 +5429,7 @@ function equipItemToMonster(monsterId, invId){
     if (m.equippedItem) inventory.push(m.equippedItem);
     m.equippedItem = invItem;
     equipSelectedKey = null;
+    updateItemButtonAlert();
     renderEquipModal();
     renderMonsterDetailModal();
     renderRoomDetail();
@@ -5451,6 +5439,7 @@ function unequipMonster(monsterId){
     if (!m || !m.equippedItem) return;
     inventory.push(m.equippedItem);
     m.equippedItem = null;
+    updateItemButtonAlert();
     renderEquipModal();
     renderMonsterDetailModal();
     renderRoomDetail();
@@ -5896,7 +5885,9 @@ function heroClassInfo(key){ return HERO_CLASSES.find(c=>c.key===key); }
 function heroSkillTriggers(hero){
     const cls = heroClassInfo(hero.heroClassKey);
     if (!cls || !cls.skill || (hero.skillUses||0) >= ACTIVE_SKILL_MAX_USES) return false;
-    return Math.random() < ACTIVE_SKILL_CHANCE[cls.role];
+    const triggered = Math.random() < ACTIVE_SKILL_CHANCE[cls.role];
+    if (triggered) recordSkillUse('H:'+cls.key+':'+cls.skill.type);
+    return triggered;
 }
 // 侵攻(ステージ)番号に応じてtierStart～tierEndを線形補間する（侵攻1〜7、7段階で補間）
 // 序盤の強さを比率で下げているため、整数に丸めず小数（2桁）のまま補間する（丸めると比率が崩れる）
@@ -5999,13 +5990,16 @@ function demonLordSkillDescription(sk){
 // スキルを実際に発動する（対象は事前に確定済みの勇者配列）。使用回数・使用済みフラグもここで消費する
 function resolveDemonLordSkill(sk, targets){
     if (!targets || targets.length===0) return;
+    recordSkillUse('DL:'+sk.key);
     if (sk.dmgType){
         const power = demonLordSkillDamage(sk);
+        repSourceOverride = 'DLskill:'+sk.key; // テストプレイデータ上で、魔王の通常攻撃と区別して集計する
         targets.forEach(h => {
             const dmg = damageToMonster(power, h, sk.dmgType);
             applyDamage('hero', h, dmg, demonLordUnit);
             logBattle(uif('battle_log_demonlord_skill_dmg', sk.name_ja, uif('hero_label', h.id), dmg));
         });
+        repSourceOverride = null;
     } else if (sk.status==='poison'){
         targets.forEach(h => applyStatus(h, 'poison', 0));
         logBattle(uif('battle_log_demonlord_skill', sk.name_ja));
@@ -6246,6 +6240,7 @@ function startBattle(){
     demonLordUnit.preBattleR = demonLordUnit.r; demonLordUnit.preBattleC = demonLordUnit.c;
     selectedRoomId = null; selectedMonsterId = null; demonLordMoveSelected = false; highlightedMonsterId = null;
     document.getElementById('battle-stage-label').textContent = uif('battle_stage_label', stage);
+    repBeginBattle(); // テストプレイデータ：出撃前の状態を記録
     updatePhaseUI();
     renderAll(); // 部屋・通路・罠などの静的な表示はここで一度だけ確定させ、以降のターン更新は軽量なrenderBattleTick()に任せる
     scheduleBattleStep(200);
@@ -6568,7 +6563,7 @@ function showFloatingDamage(side, target, dmg){
     spawnFloatingText(target, Math.round(dmg), floatingDamageClass(ratio));
 }
 // 勇者スキルの回復量（緑）・スキル名（水色）も同じ浮かぶ文字で見せる
-function showFloatingHeal(target, amount){ spawnFloatingText(target, '+'+amount, 'floating-damage dmg-heal'); }
+function showFloatingHeal(target, amount){ recordHealStat(target, amount); spawnFloatingText(target, '+'+amount, 'floating-damage dmg-heal'); }
 function showSkillCallout(unit, text){ spawnFloatingText(unit, text, 'floating-damage dmg-skill'); }
 function spawnFloatingText(target, text, className){
     if (!gridEl) return;
@@ -6589,6 +6584,7 @@ function spawnFloatingText(target, text, className){
     }
 }
 function applyDamage(side, target, dmg, attackerUnit){
+    const repSrcKey = recordDamageStat(side, target, dmg, attackerUnit); // テストプレイデータの集計（HP減算前に呼ぶ）
     target.hp -= dmg;
     triggerHitEffect(side, target);
     showFloatingDamage(side, target, dmg);
@@ -6617,6 +6613,7 @@ function applyDamage(side, target, dmg, attackerUnit){
         target.hp = 0;
         if (side==='hero'){
             target.alive = false;
+            recordDownStat(target, repSrcKey);
             logBattle(uif('battle_log_hero_down', uif('hero_label', target.id)));
             // 勇者を倒したのが実際のモンスター（魔王・罠は対象外）であれば経験値を付与する。
             // ただし範囲攻撃で複数の勇者を同時に倒しても経験値は1tickにつき1回分だけにする
@@ -6634,6 +6631,7 @@ function applyDamage(side, target, dmg, attackerUnit){
             }
         } else if (target.isDemonLord){
             target.alive = false;
+            recordDownStat(target, repSrcKey);
             logBattle(uif('battle_log_defeated', ui('demonlord_label')));
             return true;
         } else if (rollRevival(target)){
@@ -6642,6 +6640,7 @@ function applyDamage(side, target, dmg, attackerUnit){
             logBattle(uif('battle_log_revival', speciesInfo(target.speciesKey).name_ja));
         } else {
             // HP0でも一覧からは消さず、マップ上に「戦闘不能」として残す（後で回復可能にするため）
+            recordDownStat(target, repSrcKey);
             onMonsterDowned(target);
             logBattle(uif('battle_log_monster_down', speciesInfo(target.speciesKey).name_ja));
         }
@@ -6866,6 +6865,7 @@ function resolveMonsterTurn(unit, room, role){
         const i = usable[Math.floor(Math.random()*usable.length)];
         if (resolveMonsterActiveSkill(unit, sp, actives[i], room)){
             unit.skillUseCounts[i] = (unit.skillUseCounts[i]||0) + 1;
+            recordSkillUse('M:'+sp.key+':'+(actives[i].type||i));
             return false; // アクティブスキルは必ず1手番を使う（バフも同じ）
         }
         // 射程外などで発動できなかった場合は回数を消費せず通常行動にフォールバックする
@@ -7208,12 +7208,14 @@ function battleStep(){
         if (action.side==='hero' && isHeroBoxedIn(action.unit, room, roomId)) warpHero(action.unit, room, roomId);
 
         let died = false;
+        battleCurrentActor = action.unit; // テストプレイデータ用：このダメージの攻撃元を特定するため
         if (action.side==='hero'){
             died = resolveHeroAction(action.unit, room);
         } else {
             const role = action.unit.isDemonLord ? 'magic' : speciesInfo(action.unit.speciesKey).role; // 魔王は動かずに3ターン溜めて範囲魔法を放つ
             died = resolveMonsterTurn(action.unit, room, role);
         }
+        battleCurrentActor = null;
         if (died) demonLordJustDied = true;
         if (getRoomMonsters(roomId).length===0){
             logBattle(uif('battle_log_room_clear', roomDisplayNameById(roomId)));
@@ -7231,6 +7233,8 @@ function battleStep(){
 
 function endBattle(outcome){
     clearTimeout(battleTimer);
+    battleCurrentActor = null;
+    repEndBattle(outcome); // テストプレイデータ：ユニットごとの成績を確定（stageを進める前に呼ぶ）
     gamePhase = 'result';
     const titleEl = document.getElementById('battle-result-title');
     const msgEl = document.getElementById('battle-result-msg');
@@ -7240,21 +7244,23 @@ function endBattle(outcome){
         titleEl.textContent = ui('battle_result_gameclear_title');
         msgEl.textContent = ui('battle_result_gameclear_msg');
         actionsEl.innerHTML = `
+            <button class="btn btn-gold btn-sm" onclick="openBalanceReportModal()">${ui('btn_balance_report')}</button>
             <button class="btn btn-primary btn-sm" onclick="closeBattleResultAndRestart()">${ui('btn_restart_dungeon')}</button>
             <button class="btn btn-sm" onclick="closeBattleResultToTitle()">${ui('btn_back_title2')}</button>
         `;
         document.getElementById('battle-result-modal').classList.remove('hidden');
         return;
     }
-    if (outcome==='victory') stage++;
     if (outcome==='victory'){
-        titleEl.textContent = ui('battle_result_victory_title');
-        msgEl.textContent = uif('battle_result_victory_msg', stage);
-        actionsEl.innerHTML = `<button class="btn btn-primary btn-sm" onclick="proceedNextStage()">${ui('btn_next_stage')}</button>`;
+        // 勝利の告知と収入・戦利品のポップアップは1つにまとめる（ボタン操作を減らすため）。すぐに次のステージの準備処理へ進む
+        stage++;
+        proceedNextStage();
+        return;
     } else {
         titleEl.textContent = ui('battle_result_defeat_title');
         msgEl.textContent = ui('battle_result_defeat_msg');
         actionsEl.innerHTML = `
+            <button class="btn btn-gold btn-sm" onclick="openBalanceReportModal()">${ui('btn_balance_report')}</button>
             <button class="btn btn-danger btn-sm" onclick="closeBattleResultAndRestart()">${ui('btn_restart_dungeon')}</button>
             <button class="btn btn-sm" onclick="closeBattleResultToTitle()">${ui('btn_back_title2')}</button>
         `;
@@ -7264,7 +7270,7 @@ function endBattle(outcome){
 function proceedNextStage(){
     document.getElementById('battle-result-modal').classList.add('hidden');
     gamePhase = 'build';
-    rollRareEggUpgrades(); // ステージが進むタイミングで、まだ部屋になっていない卵の一部をレア卵に昇格させる
+    const rareUpgraded = rollRareEggUpgrades(); // ステージが進むタイミングで、まだ部屋になっていない卵の一部をレア卵に昇格させる
     battleHeroes = []; demonLordUnit = null; roomBattleQueues = {};
     // 戦闘開始前の配置に戻す（HP0のモンスターもHP0のまま元の位置に復活する）
     monsters.forEach(m => { if (m.preBattleR!==undefined){ m.r = m.preBattleR; m.c = m.preBattleC; } });
@@ -7309,30 +7315,15 @@ function proceedNextStage(){
     pendingStageIncome = { vit: vitGain, mana: manaGain };
     battleEvolutions = []; battleLevelUps = [];
     runLevelUpPass();
+    const dropKeys = kind => battleStageItemDrops.filter(d => d.kind===kind).map(d => d.key);
+    repAttachAfterBattle({ vitGain, manaGain, healSpent: lastAutoHealInfo ? lastAutoHealInfo.healed : 0, vitAfter: vitality, manaAfter: mana,
+        rareEggUpgraded: rareUpgraded, monstersNow: monsters.length,
+        levelUps: battleLevelUps.map(({m, fromLevel, toLevel}) => `${m.isDemonLord ? 'DL' : m.speciesKey+'#'+m.id}:${fromLevel}->${toLevel}`),
+        drops: { stone: dropKeys('stone'), monster: dropKeys('monster'), equip: dropKeys('equip') } });
     processNextRankUp();
 }
-function openStageIncomeModal(vitGain, manaGain, levelUpList){
-    document.getElementById('stage-income-vit').textContent = vitGain;
-    document.getElementById('stage-income-mana').textContent = manaGain;
-    const list = document.getElementById('stage-income-ranked-list');
-    if (levelUpList.length===0){
-        list.innerHTML = `<div style="color:var(--ink-dim); font-size:0.82rem;">${ui('stage_income_none_ranked')}</div>`;
-    } else {
-        list.innerHTML = levelUpList.map(({m, fromLevel, toLevel}) => {
-            const icon = m.isDemonLord ? `<span class="monster-icon-thumb" style="background-image:url('images/mamono/demon_lord.png');"></span>` : monsterIconHtml(speciesInfo(m.speciesKey));
-            const name = m.isDemonLord ? ui('demonlord_label') : monsterDisplayName(m);
-            return `<div class="modal-score-row"><span>${icon} ${escapeHtml(name)} ${uif('levelup_arrow_label', fromLevel, toLevel)}</span></div>`;
-        }).join('');
-    }
-    document.getElementById('stage-income-modal').classList.remove('hidden');
-}
-function closeStageIncomeModal(){
-    document.getElementById('stage-income-modal').classList.add('hidden');
-    if (battleStageItemDrops.length>0){ openStageItemDropModal(); }
-    else { openDamageBreakdownModal(); }
-}
 // 戦利品は「獲得したアイテム（進化の石）」「召喚された魔物」「発見した道具（装備）」の3つの見出しに分けて一度に表示する（該当がない見出しは出さない）
-function openStageItemDropModal(){
+function stageLootHtml(){
     const counts = {};
     battleStageItemDrops.forEach(drop => { const k = drop.kind+':'+drop.key; counts[k] = (counts[k]||0) + 1; });
     const rowsByKind = { stone:[], monster:[], equip:[] };
@@ -7368,16 +7359,37 @@ function openStageItemDropModal(){
         { kind:'monster', titleKey:'loot_section_monster' },
         { kind:'equip',   titleKey:'loot_section_equip' },
     ];
-    document.getElementById('stage-itemdrop-body').innerHTML = sections
+    return sections
         .filter(sec => rowsByKind[sec.kind].length>0)
         .map(sec => `<div class="loot-section-title">${ui(sec.titleKey)}</div>${rowsByKind[sec.kind].join('')}`)
         .join('');
-    document.getElementById('stage-itemdrop-modal').classList.remove('hidden');
 }
-function closeStageItemDropModal(){
-    document.getElementById('stage-itemdrop-modal').classList.add('hidden');
+// 勝利後の1つのポップアップ：勝利の告知・活力/魔力の増加・回復に使った魔力・レベルアップ・戦利品をまとめて見せる
+function openStageIncomeModal(vitGain, manaGain, levelUpList){
+    document.getElementById('stage-clear-title').textContent = uif('stage_clear_title', stage-1);
+    document.getElementById('stage-income-vit').textContent = vitGain;
+    document.getElementById('stage-income-mana').textContent = manaGain;
+    const healed = lastAutoHealInfo ? lastAutoHealInfo.healed : 0;
+    document.getElementById('stage-income-heal-row').classList.toggle('hidden', healed<=0);
+    document.getElementById('stage-income-heal').textContent = healed;
+    const list = document.getElementById('stage-income-ranked-list');
+    if (levelUpList.length===0){
+        list.innerHTML = `<div style="color:var(--ink-dim); font-size:0.82rem;">${ui('stage_income_none_ranked')}</div>`;
+    } else {
+        list.innerHTML = levelUpList.map(({m, fromLevel, toLevel}) => {
+            const icon = m.isDemonLord ? `<span class="monster-icon-thumb" style="background-image:url('images/mamono/demon_lord.png');"></span>` : monsterIconHtml(speciesInfo(m.speciesKey));
+            const name = m.isDemonLord ? ui('demonlord_label') : monsterDisplayName(m);
+            return `<div class="modal-score-row"><span>${icon} ${escapeHtml(name)} ${uif('levelup_arrow_label', fromLevel, toLevel)}</span></div>`;
+        }).join('');
+    }
+    document.getElementById('stage-loot-body').innerHTML = stageLootHtml();
+    document.getElementById('stage-income-modal').classList.remove('hidden');
+}
+function closeStageIncomeModal(){
+    document.getElementById('stage-income-modal').classList.add('hidden');
     battleStageItemDrops = [];
-    openDamageBreakdownModal();
+    lastAutoHealInfo = null;
+    maybeOfferDemonLordSkillReward();
 }
 function closeBattleResultAndRestart(){
     document.getElementById('battle-result-modal').classList.add('hidden');
@@ -7386,6 +7398,242 @@ function closeBattleResultAndRestart(){
 function closeBattleResultToTitle(){
     document.getElementById('battle-result-modal').classList.add('hidden');
     goToTitle();
+}
+
+// ============================================================
+// テストプレイ用データ収集（バランス調整用）
+// クリア／ゲームオーバー時に、ステージごとの戦闘結果・全ユニットの成績・経済・入手物をまとめて出力する
+// （出力したテキストを開発担当へ渡して、バランス調整の分析に使う）
+// ============================================================
+const BALANCE_REPORT_VERSION = 1;
+let runReport = null;           // 1回のプレイ（新しいダンジョン開始〜クリア/ゲームオーバー）全体の記録
+let curBattleRep = null;        // いま戦闘中（または直前）のステージの記録。runReport.battlesの最後の要素と同じオブジェクト
+let battleCurrentActor = null;  // いま手番のユニット（ダメージの攻撃元の特定に使う）
+let repSourceOverride = null;   // 魔王スキルなど、攻撃元を明示したいときに一時的にセットする
+function startRunReport(){
+    runReport = { startedAt: Date.now(), preset: currentGamePresetKey, battles: [], outcome: 'in_progress' };
+    curBattleRep = null;
+}
+function repKey(u){
+    if (!u) return 'TRAP';
+    if (u.isDemonLord) return 'DL';
+    if (u.heroClassKey) return 'H'+u.id;
+    if (u.speciesKey) return 'M'+u.id;
+    return 'TRAP';
+}
+function repTally(key){
+    if (!curBattleRep) return null;
+    return curBattleRep.units[key] || (curBattleRep.units[key] = { dealt:0, dealtPhys:0, dealtMagic:0, taken:0, kills:0, heal:0, healed:0, downTick:null });
+}
+// ダメージ1回分を記録して、攻撃元のキーを返す（applyDamageのHP減算より前に呼ぶ）
+function recordDamageStat(side, target, dmg, attackerUnit){
+    if (!curBattleRep) return null;
+    let src = attackerUnit || null, srcKey = null;
+    if (repSourceOverride) srcKey = repSourceOverride;
+    else if (!src && battleCurrentActor){
+        const a = battleCurrentActor;
+        if (a===target) srcKey = 'STATUS'; // 自分の手番に自分が受けた＝毒・火傷などの継続ダメージ
+        else if (!!a.heroClassKey !== (side==='hero')) src = a; // 対象と反対の陣営の手番ユニットが攻撃元
+    }
+    if (!srcKey) srcKey = src ? repKey(src) : 'TRAP';
+    const eff = Math.max(0, Math.min(dmg, target.hp)); // 死んだ分の余剰ダメージ（オーバーキル）は数えない
+    const s = repTally(srcKey);
+    s.dealt += eff;
+    if (src && !repSourceOverride){ if (unitDmgType(src)==='magic') s.dealtMagic += eff; else s.dealtPhys += eff; }
+    repTally(repKey(target)).taken += eff;
+    return srcKey;
+}
+function recordDownStat(target, srcKey){
+    if (!curBattleRep) return;
+    const t = repTally(repKey(target));
+    t.downTick = battleGlobalTick; t.downRoom = (target.roomId===undefined ? null : target.roomId);
+    if (srcKey && srcKey!=='STATUS' && srcKey!=='TRAP') repTally(srcKey).kills++;
+}
+function recordHealStat(target, amount){
+    if (!curBattleRep || amount<=0) return;
+    repTally(repKey(target)).healed += amount;
+    if (battleCurrentActor) repTally(repKey(battleCurrentActor)).heal += amount;
+}
+function recordSkillUse(name){
+    if (!curBattleRep) return;
+    curBattleRep.skills[name] = (curBattleRep.skills[name]||0) + 1;
+}
+function repPower(m){ return ['atk','def','magAtk','magDef'].reduce((s,k) => s + effectiveStatValue(m,k), 0); }
+// 戦闘開始時：出撃前の状態（勇者・魔王・全モンスター・部屋・経済）を記録する
+function repBeginBattle(){
+    if (!runReport) startRunReport();
+    const roomType = id => { const r = rooms.find(x=>x.id===id); return r ? (r.type||'none') : null; };
+    curBattleRep = { stage, vitBefore: vitality, manaBefore: mana, units:{}, skills:{},
+        heroes: battleHeroes.map(h => ({ k:'H'+h.id, cls:h.heroClassKey, hp:h.maxHp, atk:h.atk, def:h.def, mAtk:h.magAtk, mDef:h.magDef })),
+        dl: { lv: demonLordUnit.level||1, hp: demonLordUnit.maxHp, hp0: demonLordUnit.hp, atk: demonLordUnit.atk, def: demonLordUnit.def, mAtk: demonLordUnit.magAtk, mDef: demonLordUnit.magDef, xp0: demonLordUnit.xp||0 },
+        monsters: monsters.map(m => {
+            const sp = speciesInfo(m.speciesKey), mods = m.statMods || {};
+            const q = ['hp','atk','def','magAtk','magDef'].reduce((s,k) => s + (mods[k]||1), 0) / 5;
+            return { k:'M'+m.id, sp:m.speciesKey, stg:sp.stage, line:sp.line, role:sp.role, dt:unitDmgType(m), origin:m.origin||'?',
+                bornStage:m.bornStage||null, bornLv:(m.bornLv===undefined?null:m.bornLv), lv:m.level||0, q:Math.round(q*100)/100,
+                hp:m.maxHp, hp0:m.hp, atk:effectiveStatValue(m,'atk'), def:effectiveStatValue(m,'def'), mAtk:effectiveStatValue(m,'magAtk'), mDef:effectiveStatValue(m,'magDef'),
+                pw:repPower(m), eq:m.equippedItem ? m.equippedItem.itemKey : null, room:m.roomId, rt:(m.roomId===null ? null : roomType(m.roomId)) };
+        }),
+        rooms: rooms.map(r => ({ id:r.id, type:r.type||null, area:r.area, cap:r.monsterCapacity, mons:roomMonsterCount(r.id),
+            lv: r.type ? roomAbilityLv(r, r.type) : 0, sp:(r.specialAbilities||[]).map(a => a.type+'+'+Math.round(a.pct*100)+'%'), el:r.elements })),
+        traps: traps.length, dlSkills: Object.assign({}, demonLordSkillLevels) };
+}
+// 戦闘終了時：ユニットごとの成績を確定して、プレイ全体の記録に追加する
+function repEndBattle(outcome){
+    const b = curBattleRep;
+    if (!b || b.outcome) return;
+    b.outcome = outcome; b.ticks = battleGlobalTick + 1;
+    const T = key => b.units[key] || {};
+    const pick = t => ({ dealt:t.dealt||0, dP:t.dealtPhys||0, dM:t.dealtMagic||0, taken:t.taken||0, kills:t.kills||0, heal:t.heal||0, healed:t.healed||0, down:(t.downTick===undefined ? null : t.downTick) });
+    b.heroes.forEach(h => { Object.assign(h, pick(T(h.k))); const u = battleHeroes.find(x => 'H'+x.id===h.k); h.alive = !!(u && u.alive); });
+    b.monsters.forEach(m => { Object.assign(m, pick(T(m.k))); const u = monsters.find(x => 'M'+x.id===m.k); m.hpEnd = u ? u.hp : null; });
+    Object.assign(b.dl, pick(T('DL')), { hpEnd: demonLordUnit ? demonLordUnit.hp : null, alive: !!(demonLordUnit && demonLordUnit.alive), xp1: demonLordUnit ? (demonLordUnit.xp||0) : null });
+    b.env = { STATUS: T('STATUS').dealt||0, TRAP: T('TRAP').dealt||0 };
+    b.dlSkillDmg = {};
+    Object.keys(b.units).filter(k => k.startsWith('DLskill:')).forEach(k => { b.dlSkillDmg[k.slice(8)] = b.units[k].dealt; });
+    b.dmgRoleType = JSON.parse(JSON.stringify(battleDamageStats));
+    b.after = null;
+    runReport.battles.push(b);
+    if (outcome==='defeat'){ runReport.outcome = 'gameover'; runReport.endedAt = Date.now(); }
+    else if (stage>=STAGE_FINAL){ runReport.outcome = 'clear'; runReport.endedAt = Date.now(); }
+}
+// 勝利後の処理結果（収入・回復・レベルアップ・入手物）を、直前の戦闘の記録に追記する
+function repAttachAfterBattle(info){
+    if (curBattleRep) curBattleRep.after = info;
+}
+
+// ---- 出力テキストの組み立て ----
+function buildBalanceReportText(){
+    const R = runReport;
+    if (!R || R.battles.length===0) return '（記録された戦闘がありません）';
+    const out = [];
+    const r1 = n => Math.round(n*10)/10;
+    const sum = a => a.reduce((s,x) => s+x, 0);
+    const avg = a => a.length ? sum(a)/a.length : 0;
+    const pct = (n, d) => d>0 ? Math.round(n/d*100)+'%' : '-';
+    const table = (headers, rows) => {
+        const t = ['| '+headers.join(' | ')+' |', '|'+headers.map(() => '---').join('|')+'|'];
+        rows.forEach(r => t.push('| '+r.join(' | ')+' |'));
+        return t.join('\n');
+    };
+    const isDown = m => m.hpEnd!==null && m.hpEnd<=0;
+    const last = R.battles[R.battles.length-1];
+    const label = { clear:'ゲームクリア', gameover:'ゲームオーバー', in_progress:'（途中）' }[R.outcome] || R.outcome;
+    const mins = Math.round(((R.endedAt||Date.now()) - R.startedAt)/6000)/10;
+    out.push(`# 地下迷宮ビルダーズ テストプレイデータ v${BALANCE_REPORT_VERSION}`);
+    out.push(`結果: ${label} / 最終ステージ: ${last.stage} / 戦闘回数: ${R.battles.length} / プレイ時間: 約${mins}分 / 開始: ${new Date(R.startedAt).toLocaleString('ja-JP')} / preset: ${R.preset}`);
+    out.push('略語: dealt=与ダメージ(オーバーキル除く) taken=被ダメージ dP/dM=物理/魔法で与えた分 pw=攻防魔攻魔防の装備込み合計 q=個体差倍率の平均(1.0が標準) lv=レベル stg=進化段階 rt=部屋タイプ(null=ストック) down=戦闘不能になったtick(nullは最後まで生存) hp0/hpEnd=戦闘前/後のHP bornStage/bornLv=生まれたステージ/そのときのLv');
+
+    // 1. ステージ別サマリー
+    out.push('\n## 1. ステージ別サマリー');
+    out.push(table(['ST','結果','tick','勇者(生存/全)','魔王Lv','魔王HP(終/最大)','出撃魔物','ストック','戦闘不能','魔物→勇者','勇者→魔物','魔王→勇者','魔王スキル','状態異常','罠','活力(戦前)','魔力(戦前)','活力収入','魔力収入','回復に使った魔力','Lvアップ数','入手(石/召喚/装備)'],
+        R.battles.map(b => {
+            const placed = b.monsters.filter(m => m.room!==null);
+            const a = b.after || {};
+            const d = a.drops || { stone:[], monster:[], equip:[] };
+            return [b.stage, b.outcome==='victory' ? '勝' : '負', b.ticks, `${b.heroes.filter(h=>h.alive).length}/${b.heroes.length}`, b.dl.lv, `${b.dl.hpEnd}/${b.dl.hp}`,
+                placed.length, b.monsters.length-placed.length, placed.filter(isDown).length,
+                sum(b.monsters.map(m=>m.dealt)), sum(b.heroes.map(h=>h.dealt)), b.dl.dealt, sum(Object.values(b.dlSkillDmg||{})), b.env.STATUS, b.env.TRAP,
+                b.vitBefore, b.manaBefore, a.vitGain===undefined?'-':a.vitGain, a.manaGain===undefined?'-':a.manaGain, a.healSpent===undefined?'-':a.healSpent,
+                a.levelUps ? a.levelUps.length : '-', `${d.stone.length}/${d.monster.length}/${d.equip.length}`];
+        })));
+
+    // 2. モンスター起源別（出撃した個体のみ）
+    out.push('\n## 2. モンスター起源別（出撃した個体。egg=通常卵 / egg_rare=レア卵 / summon=召喚）');
+    const originRows = [];
+    R.battles.forEach(b => {
+        const groups = {};
+        b.monsters.filter(m => m.room!==null).forEach(m => { (groups[m.origin] = groups[m.origin]||[]).push(m); });
+        Object.keys(groups).sort().forEach(o => {
+            const g = groups[o];
+            originRows.push([b.stage, o, g.length, r1(avg(g.map(m=>m.lv))), r1(avg(g.map(m=>m.pw))), r1(avg(g.map(m=>m.hp))), r1(avg(g.map(m=>m.q))),
+                r1(avg(g.map(m=>m.dealt))), r1(avg(g.map(m=>m.kills))), pct(g.filter(isDown).length, g.length), pct(g.filter(m=>m.eq).length, g.length)]);
+        });
+    });
+    out.push(table(['ST','起源','体数','平均Lv','平均pw','平均HP','平均q','平均dealt','平均kills','戦闘不能率','装備率'], originRows));
+
+    // 3. 種族別（全ステージ合算・出撃した個体）
+    out.push('\n## 3. 種族別（全ステージ合算。出撃した延べ体数あたりの平均。平均dealtの大きい順）');
+    const spGroups = {};
+    R.battles.forEach(b => b.monsters.filter(m => m.room!==null).forEach(m => { (spGroups[m.sp] = spGroups[m.sp]||[]).push(m); }));
+    out.push(table(['種族','stg','role','dmgType','延べ体数','平均Lv','平均pw','平均dealt','平均kills','平均taken','戦闘不能率'],
+        Object.keys(spGroups).map(sp => {
+            const g = spGroups[sp];
+            return [sp, g[0].stg, g[0].role, g[0].dt, g.length, r1(avg(g.map(m=>m.lv))), r1(avg(g.map(m=>m.pw))), r1(avg(g.map(m=>m.dealt))), r1(avg(g.map(m=>m.kills))), r1(avg(g.map(m=>m.taken))), pct(g.filter(isDown).length, g.length)];
+        }).sort((a,b) => b[7]-a[7])));
+
+    // 4. 役割×攻撃タイプ別の与ダメージ（モンスターが勇者に与えた分）
+    out.push('\n## 4. 役割×攻撃タイプ別の与ダメージ（モンスター→勇者。ステージ別）');
+    out.push(table(['ST','近距離・物理','近距離・魔法','中距離・物理','中距離・魔法','遠距離・物理','遠距離・魔法','魔王(通常)','魔王スキル','状態異常','罠'],
+        R.battles.map(b => {
+            const v = (role, k) => sum(b.monsters.filter(m => m.role===role).map(m => m[k]));
+            return [b.stage, v('melee','dP'), v('melee','dM'), v('ranged','dP'), v('ranged','dM'), v('magic','dP'), v('magic','dM'), b.dl.dealt, sum(Object.values(b.dlSkillDmg||{})), b.env.STATUS, b.env.TRAP];
+        })));
+
+    // 5. 勇者クラス別
+    out.push('\n## 5. 勇者クラス別（全ステージ合算・1体あたりの平均）');
+    const clsGroups = {};
+    R.battles.forEach(b => b.heroes.forEach(h => { (clsGroups[h.cls] = clsGroups[h.cls]||[]).push(Object.assign({ ticks: b.ticks }, h)); }));
+    out.push(table(['クラス','延べ体数','平均HP','平均dealt','平均taken','平均kills','平均生存tick(倒れなければ戦闘tick)','撃破された率'],
+        Object.keys(clsGroups).map(c => {
+            const g = clsGroups[c];
+            return [c, g.length, r1(avg(g.map(h=>h.hp))), r1(avg(g.map(h=>h.dealt))), r1(avg(g.map(h=>h.taken))), r1(avg(g.map(h=>h.kills))), r1(avg(g.map(h => h.down!==null ? h.down : h.ticks))), pct(g.filter(h=>!h.alive).length, g.length)];
+        })));
+
+    // 6. 魔王
+    out.push('\n## 6. 魔王（ステージ別）');
+    out.push(table(['ST','Lv','HP','攻','防','魔攻','魔防','dealt','スキルdmg','taken','kills','HP戦前→戦後','XP戦前→戦後'],
+        R.battles.map(b => [b.stage, b.dl.lv, b.dl.hp, b.dl.atk, b.dl.def, b.dl.mAtk, b.dl.mDef, b.dl.dealt, sum(Object.values(b.dlSkillDmg||{})), b.dl.taken, b.dl.kills, `${b.dl.hp0}→${b.dl.hpEnd}`, `${b.dl.xp0}→${b.dl.xp1}`])));
+
+    // 7. スキル使用回数
+    out.push('\n## 7. スキル使用回数（全ステージ合算。H=勇者 / M=モンスター / DL=魔王スキル）');
+    const skillTotals = {};
+    R.battles.forEach(b => Object.keys(b.skills).forEach(k => { skillTotals[k] = (skillTotals[k]||0) + b.skills[k]; }));
+    out.push(Object.keys(skillTotals).sort((a,b) => skillTotals[b]-skillTotals[a]).map(k => `${k}: ${skillTotals[k]}`).join(' / ') || '（なし）');
+
+    // 8. 詳細（1行=1件。モンスター・勇者は列の順番が決まった配列＝サイズを抑えるため）
+    out.push('\n## 8. 詳細データ（ステージごとに：HEADER→DL→勇者(H)→モンスター(M)の順。H/Mは下の列順の配列）');
+    const M_COLS = ['id','sp','origin','bornStage','bornLv','lv','q','hp','atk','def','mAtk','mDef','eq','rt','dealt','dP','dM','taken','kills','heal','healed','down','hpEnd','hp0'];
+    const H_COLS = ['cls','hp','atk','def','mAtk','mDef','dealt','dP','dM','taken','kills','heal','healed','down','alive(1/0)'];
+    out.push('M列: '+M_COLS.join(','));
+    out.push('H列: '+H_COLS.join(','));
+    R.battles.forEach(b => {
+        out.push(`\n### STAGE ${b.stage}`);
+        out.push('HEADER '+JSON.stringify({ stage:b.stage, outcome:b.outcome, ticks:b.ticks, vitBefore:b.vitBefore, manaBefore:b.manaBefore, rooms:b.rooms, traps:b.traps, dlSkills:b.dlSkills,
+            skills:b.skills, env:b.env, dlSkillDmg:b.dlSkillDmg, dmgRoleType:b.dmgRoleType, after:b.after }));
+        out.push('DL '+JSON.stringify(b.dl));
+        b.heroes.forEach(h => out.push('H '+JSON.stringify([h.cls,h.hp,h.atk,h.def,h.mAtk,h.mDef,h.dealt,h.dP,h.dM,h.taken,h.kills,h.heal,h.healed,h.down,h.alive?1:0])));
+        b.monsters.forEach(m => out.push('M '+JSON.stringify([Number(m.k.slice(1)),m.sp,m.origin,m.bornStage,m.bornLv,m.lv,m.q,m.hp,m.atk,m.def,m.mAtk,m.mDef,m.eq,m.rt,m.dealt,m.dP,m.dM,m.taken,m.kills,m.heal,m.healed,m.down,m.hpEnd,m.hp0])));
+    });
+    return out.join('\n');
+}
+
+// ---- 出力画面（クリア／ゲームオーバーのポップアップから開く） ----
+function openBalanceReportModal(){
+    const text = buildBalanceReportText();
+    document.getElementById('balance-report-text').value = text;
+    document.getElementById('balance-report-modal').classList.remove('hidden');
+    try { localStorage.setItem('chimyaku_last_balance_report', text); } catch(e) {}
+    copyBalanceReport(true); // 開いた時点で自動コピーも試みる（クリック操作の直後なので通常は成功する）
+}
+function closeBalanceReportModal(){ document.getElementById('balance-report-modal').classList.add('hidden'); }
+function copyBalanceReport(silent){
+    const ta = document.getElementById('balance-report-text');
+    const done = ok => { if (!silent || ok) showToast(ok ? ui('balance_report_copied') : ui('balance_report_copy_failed')); };
+    const fallback = () => { ta.select(); let ok = false; try { ok = document.execCommand('copy'); } catch(e) {} done(ok); };
+    if (navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(ta.value).then(() => done(true), fallback);
+    } else {
+        fallback();
+    }
+}
+function downloadBalanceReport(){
+    const blob = new Blob([document.getElementById('balance-report-text').value], { type:'text/plain;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `chimyaku_testplay_${new Date().toISOString().replace(/[:.]/g,'-')}.txt`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
 // ---- 描画 ----
@@ -7397,6 +7645,7 @@ function renderAll(){
     document.getElementById('hud-monstercount').textContent = monsters.length;
     document.getElementById('btn-reroll-map').classList.toggle('hidden', rooms.length>0 || gamePhase!=='build');
     renderAutoHealButton();
+    updateItemButtonAlert();
     renderHealIndividualPanel();
     renderBuildActions();
     renderOverlays();
@@ -7966,8 +8215,7 @@ document.addEventListener('keydown', (ev) => {
     if (isOpen('evolution-result-modal')){ ev.preventDefault(); closeEvolutionResultModal(); return; }
     if (isOpen('skill-select-modal')){ ev.preventDefault(); closeDemonLordSkillMenu(); return; }
     if (isOpen('stage-income-modal')){ ev.preventDefault(); closeStageIncomeModal(); return; }
-    if (isOpen('stage-itemdrop-modal')){ ev.preventDefault(); closeStageItemDropModal(); return; }
-    if (isOpen('damage-breakdown-modal')){ ev.preventDefault(); closeDamageBreakdownModal(); return; }
+    if (isOpen('balance-report-modal')){ ev.preventDefault(); closeBalanceReportModal(); return; }
     if (isOpen('record-modal')){ ev.preventDefault(); closeRecordModal(); return; }
     if (isOpen('battle-result-modal')){
         const btns = document.querySelectorAll('#battle-result-actions button');
