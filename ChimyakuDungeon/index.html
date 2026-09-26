@@ -2646,9 +2646,16 @@ function normalizeRect(a,b){
 
 // ---- 建設ボタン（初期状態） ----
 // 魔王の詳細（モンスターと同じパワプロ風レイアウト）。魔王は動かずに3ターン溜めて範囲魔法を放つ遠距離の魔法攻撃役で、パッシブ・所持アイテムは持たない
+// 魔王のステータス表示用：配置前でも見られるように、まだ置かれていないときはLv1の魔王の見本(仮のデータ)を返す
+function demonLordForDisplay(){
+    if (demonLordCell) return demonLordCell;
+    const preview = { isDemonLord:true, level:1, xp: xpForLevel(1), hp:0, maxHp:0, atk:0, def:0, magAtk:0, magDef:0 };
+    applyDemonLordLevel(preview);
+    preview.hp = preview.maxHp;
+    return preview;
+}
 function demonLordCardHtml(opts){
-    const dl = demonLordCell;
-    if (!dl) return '';
+    const dl = demonLordForDisplay();
     const artClick = opts && opts.artClick;
     const hpPct = dl.maxHp>0 ? Math.max(0, Math.min(100, dl.hp/dl.maxHp*100)) : 0;
     const attackRow = skillRowHtml({ name: ui('demonlord_attack_name'), desc: ui('demonlord_attack_desc') }, "openSkillHelp('demonlord')");
@@ -2720,7 +2727,7 @@ function renderBuildActions(){
                    <span class="dl-menu-icon">📍</span>
                    <span class="dl-menu-text"><b>${ui('dl_menu_place')}</b><small>${ui('dl_menu_place_desc')}</small></span>
                </button>`
-            + `<button class="dl-menu-btn" ${demonLordCell ? '' : 'disabled'} onclick="demonLordMenuStatus()">
+            + `<button class="dl-menu-btn" onclick="demonLordMenuStatus()">
                    <span class="dl-menu-icon">📊</span>
                    <span class="dl-menu-text"><b>${ui('dl_menu_status')}</b><small>${ui('dl_menu_status_desc')}</small></span>
                </button>`;
@@ -4645,7 +4652,6 @@ function openMonsterDetailModal(id){
 }
 // 魔王の詳細：モンスター詳細と同じポップアップに、魔王のカードを表示する（魔王は装備・進化がないので操作ボタンはない）
 function openDemonLordDetailModal(){
-    if (!demonLordCell) return;
     monsterDetailModalId = null;
     document.getElementById('monster-detail-body').innerHTML = demonLordCardHtml();
     document.getElementById('monster-detail-modal').classList.remove('hidden');
@@ -5906,10 +5912,11 @@ const HERO_BASELINE_COUNT = 4;
 const HERO_OFFENSE_MULT_CAP = 1.6;
 // 4体に達したあと（ステージ3〜7）は人数がもう増えないため、代わりにステージが進むほど1体あたりの
 // 攻撃力そのものを大きく伸ばす（勇者の人数を絞った分の強さを、ここで肩代わりする設計）。
-// ステージ3で基準値2.0（＝BASE_OFFENSE_MULT×BASELINE_COUNT/4体）から始め、最終侵攻7で2.5倍の5.0まで線形に伸ばす
+// テストプレイでステージ3を超えられないとのフィードバックを受け、当初の「ステージ3で2.0倍→最終侵攻7で5.0倍」から
+// 「ステージ3で1.6倍（ステージ1・2と同じ）→最終侵攻7で4.0倍」に弱めた（各ステージの攻撃力が約2割下がる）
 const HERO_OFFENSE_GROWTH_STAGE_START = 3;
-const HERO_OFFENSE_MULT_AT_GROWTH_START = HERO_BASE_OFFENSE_MULT * (HERO_BASELINE_COUNT / 4);
-const HERO_OFFENSE_MULT_AT_FINAL = 5.0;
+const HERO_OFFENSE_MULT_AT_GROWTH_START = HERO_OFFENSE_MULT_CAP;
+const HERO_OFFENSE_MULT_AT_FINAL = 4.0;
 function heroOffenseMult(stageNum){
     const count = heroCountForStage(stageNum);
     if (count < HERO_BASELINE_COUNT){
