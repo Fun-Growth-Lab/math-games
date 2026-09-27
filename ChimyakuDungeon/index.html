@@ -3797,6 +3797,27 @@ const MONSTER_SPECIES = [
     { key:'black_dragon',    name_ja:'ブラックドラゴン',   emoji:'🌑🐲', role:'melee', line:'dragon', stage:3, branch:'black',
         ...tierStats(23,21,19,23),  active:[{ type:'dragonBreath', multiplier:0.7, statusType:'confusion', chance:0.25 }] },
 ];
+// 進化段階ごとの基礎値の伸びを一律補正する。テストプレイで「進化後が強すぎる」との指摘があり、
+// 実測すると進化前→1進化目が×2.09、1進化目→2進化目が×2.76（総合力の平均比）と、
+// 意図していた目安の「1進化あたり×1.75」より大きくなっていたため、平均でちょうど×1.75ずつになるよう
+// 一律の係数で縮める（各種族内でのステータス配分の比率は変えず、全体の大きさだけ揃える）
+(function scaleEvolvedSpeciesStats(){
+    const statKeys = ['hp','atk','def','magAtk','magDef'];
+    const powerOf = sp => statKeys.reduce((sum,k) => sum + sp[k]/STAT_TIER_UNIT[k], 0);
+    const avgPowerAtStage = stage => {
+        const list = MONSTER_SPECIES.filter(sp => sp.stage===stage);
+        return list.reduce((sum,sp) => sum + powerOf(sp), 0) / list.length;
+    };
+    const EVOLUTION_STAGE_GROWTH_TARGET = 1.75;
+    const stage1Avg = avgPowerAtStage(1);
+    [2, 3].forEach(stage => {
+        const targetAvg = stage1Avg * Math.pow(EVOLUTION_STAGE_GROWTH_TARGET, stage-1);
+        const mult = targetAvg / avgPowerAtStage(stage);
+        MONSTER_SPECIES.filter(sp => sp.stage===stage).forEach(sp => {
+            statKeys.forEach(k => { sp[k] = Math.max(1, Math.round(sp[k]*mult)); });
+        });
+    });
+})();
 // ---- モンスターのパッシブスキル（1種族につき1つ。ここを書き換えれば全体に反映される。暫定の割り振り） ----
 // physicalResist/magicResist/magicAmplify/regen は value（割合）、extraAttack/evasion/revival は chance（確率）
 const MONSTER_PASSIVE_TABLE = {
@@ -5018,7 +5039,8 @@ function hatchEggsInRoom(room, count){
 // （通常の卵はEGG_STAGE1_SPECIES＝進化前・卵系統のみだが、レア卵は範囲を広げて召喚系統や進化後の姿も出す）
 const RARE_EGG_STAGE_WEIGHTS = [0.50, 0.40, 0.10]; // 添字0=stage1, 1=stage2, 2=stage3
 const RARE_EGG_LEVEL_BONUS = 1; // 通常孵化(Math.max(1,stage-1))より、このレベル分だけ高い状態で生まれる
-const RARE_EGG_STAT_MOD_MIN = 1.2; // 個体差(0.71～1.50)の下限をここまで引き上げ、必ず得意寄りの個体にする
+// 個体差の下限保証(旧1.2倍)は廃止した。進化段階を飛ばせること自体がすでに十分な報酬なので、
+// 個体値まで確定で得意寄りにする必要はないと判断（通常孵化と同じ0.71〜1.50の範囲を使う）
 function hatchRareEggsInRoom(room, count){
     if (count<=0) return [];
     const initialLevel = Math.max(1, stage-1) + RARE_EGG_LEVEL_BONUS;
@@ -5029,7 +5051,7 @@ function hatchRareEggsInRoom(room, count){
         const pool = MONSTER_SPECIES.filter(s => s.stage===targetStage);
         const sp = pool[Math.floor(Math.random()*pool.length)];
         const m = { id: nextMonsterId++, roomId: null, r: 0, c: 0, speciesKey: sp.key,
-                    hp: 0, maxHp: 0, atk: 0, def: 0, magAtk: 0, magDef: 0, statMods: rollStatMods(RARE_EGG_STAT_MOD_MIN, STAT_MOD_MAX), chargeTurns: 0,
+                    hp: 0, maxHp: 0, atk: 0, def: 0, magAtk: 0, magDef: 0, statMods: rollStatMods(), chargeTurns: 0,
                     activeCooldowns: [], statusEffects: [], buffs: [], xp: initialXp, level: monsterLevel(initialXp),
                     equippedItem: null, origin: 'egg_rare', bornStage: stage, bornLv: monsterLevel(initialXp) };
         applyStatModsToMonster(m, sp);
