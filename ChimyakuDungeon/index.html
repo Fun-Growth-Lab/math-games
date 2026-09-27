@@ -517,6 +517,22 @@
         .side-panel .unit-skill-name { font-size:0.72rem; }
         .side-panel .unit-evolve-chip { font-size:0.7rem; padding:3px 7px; }
         #skill-help-modal { z-index:400; }
+        /* ==================== STORY SCENE（各ステージ突入時の会話劇） ==================== */
+        #story-overlay { position:absolute; inset:0; z-index:500; cursor:pointer; overflow:hidden; }
+        .story-bg { position:absolute; inset:0; background-size:cover; background-position:center; }
+        .story-scrim { position:absolute; inset:0; background:linear-gradient(rgba(0,0,0,0) 50%, rgba(0,0,0,0.78) 100%); }
+        .story-skip-btn { position:absolute; top:14px; right:14px; z-index:2; opacity:0.85; }
+        .story-box { position:absolute; left:0; right:0; bottom:0; z-index:1; display:flex; align-items:flex-end; padding:0 24px 20px; }
+        .story-face { width:150px; height:150px; object-fit:contain; margin-right:-12px; flex-shrink:0; filter: drop-shadow(0 8px 14px rgba(0,0,0,0.6)); }
+        .story-textbox {
+            flex:1; min-width:0; background:rgba(15,10,8,0.85); border:2px solid var(--card-bdr); border-radius:16px;
+            padding:16px 22px; min-height:88px; box-shadow:0 10px 30px rgba(0,0,0,0.5);
+        }
+        .story-name { font-size:0.95rem; font-weight:800; color:var(--gold); margin-bottom:6px; }
+        .story-text { font-size:1.05rem; font-weight:700; color:#fff; line-height:1.7; white-space:pre-wrap; }
+        .story-next-hint { text-align:right; font-size:1.1rem; color:var(--gold); margin-top:2px; animation: storyNextBlink 1.2s ease-in-out infinite; }
+        @keyframes storyNextBlink { 0%,100% { opacity:0.25; } 50% { opacity:1; } }
+        .hud-stage-type { font-size:0.6rem; font-weight:700; color:var(--ink-dim); margin-top:2px; text-shadow:none; letter-spacing:0; white-space:nowrap; }
         #skill-help-modal .modal-box { color:var(--ink); }
         .skill-help-short { font-size:1rem; font-weight:800; color:var(--gold); margin-bottom:10px; }
         .skill-help-item { display:flex; align-items:baseline; gap:10px; margin-bottom:8px; }
@@ -998,6 +1014,21 @@
 </head>
 <body>
 <div id="container">
+
+    <!-- ==================== STORY SCENE（会話劇） ==================== -->
+    <div id="story-overlay" class="hidden" onclick="advanceStory()">
+        <div id="story-overlay-bg" class="story-bg"></div>
+        <div class="story-scrim"></div>
+        <button class="btn btn-sm story-skip-btn" onclick="event.stopPropagation(); skipStoryScene()">▶▶ <span data-i18n="story_btn_skip">スキップ</span></button>
+        <div class="story-box">
+            <img id="story-face" class="story-face" src="" alt="">
+            <div class="story-textbox">
+                <div id="story-name" class="story-name"></div>
+                <div id="story-text" class="story-text"></div>
+                <div id="story-next-hint" class="story-next-hint">▼</div>
+            </div>
+        </div>
+    </div>
 
     <!-- ==================== TITLE ==================== -->
     <div id="title-screen" class="screen">
@@ -1800,6 +1831,8 @@ const UI_TEXT = {
     battle_confirm_stage_title: { ja: n => `ステージ ${n}`, ja_easy: n => `ステージ ${n}`, en: n => `Stage ${n}` },
     battle_stage_label: { ja: n => `⚔️ ステージ${n}`, ja_easy: n => `⚔️ ステージ${n}`, en: n => `⚔️ Stage ${n}` },
     hud_stage_label: { ja: n => `ステージ ${n}`, ja_easy: n => `ステージ ${n}`, en: n => `Stage ${n}` },
+    story_btn_skip: { ja: 'スキップ', ja_easy: 'スキップ', en: 'Skip' },
+    story_speaker_maou: { ja: '魔王', ja_easy: 'まおう', en: 'Demon Lord' },
     battle_log_enter: { ja: (heroLabel,name) => `${heroLabel}が${name}に突入！`, ja_easy: (heroLabel,name) => `${heroLabel}が ${name}に とつにゅう！`, en: (heroLabel,name) => `${heroLabel} entered ${name}!` },
     battle_log_room_clear: { ja: name => `${name}の魔物を全滅させた！`, ja_easy: name => `${name}の まものを ぜんめつさせた！`, en: name => `Cleared all monsters in ${name}!` },
     battle_log_attack: { ja: (a,b,dmg) => `${a}の攻撃！${b}に${dmg}のダメージ`, ja_easy: (a,b,dmg) => `${a}の こうげき！${b}に ${dmg}の ダメージ`, en: (a,b,dmg) => `${a} attacks! ${dmg} damage to ${b}` },
@@ -2518,7 +2551,8 @@ const ROOM_CAPACITY_COEF = 0.85;
 function roomBuildCost(w, h){
     const area = w*h;
     const base = ROOM_COST.perCell*area + (area > ROOM_COST.linearUntilArea ? ROOM_COST.curve*Math.pow(area - ROOM_COST.linearUntilArea, 2) : 0);
-    return Math.round(base * (1 + ROOM_COST.thinPenalty*Math.abs(w-h)));
+    // ステージ属性による建設費補正（現在は「城」ステージの1.25倍のみ。stageTypeForはSTAGE_TYPES参照、この関数より後ろで定義される）
+    return Math.round(base * (1 + ROOM_COST.thinPenalty*Math.abs(w-h)) * stageTypeFor(stage).roomCostMult);
 }
 function roomMonsterCapacity(area){ return Math.max(1, Math.round(ROOM_CAPACITY_COEF*Math.sqrt(area))); }
 const CORRIDOR_COST_PER_CELL = 5;  // 暫定値
@@ -2608,6 +2642,7 @@ let pendingCorridorCells = null;
 function goToBuild(){
     goTo('build-screen');
     startNewDungeon();
+    startStoryScene(1);
 }
 function startNewDungeon(){
     generateMap();
@@ -3425,7 +3460,8 @@ function roomOutputExpected(room, abilityType, lvOverride){
     const lv = lvOverride!==undefined ? lvOverride : roomAbilityLv(room, abilityType);
     if (lv<=0) return 0;
     const count = effectiveElementCount(room, abilityType);
-    return count / ROOM_OUTPUT_ELEMENTS_PER_ITEM * (1 + ROOM_OUTPUT_LV_GROWTH*(lv-1));
+    const stageMult = abilityType==='tool' ? stageTypeFor(stage).toolMult : abilityType==='summon' ? stageTypeFor(stage).summonMult : 1;
+    return count / ROOM_OUTPUT_ELEMENTS_PER_ITEM * (1 + ROOM_OUTPUT_LV_GROWTH*(lv-1)) * stageMult;
 }
 // 実際に今回生産する個数（整数部分は確定、小数部分は確率で+1）
 function roomOutputCount(room, abilityType, lvOverride){
@@ -3615,8 +3651,9 @@ function upgradeRoomAbility(roomId, abilityType){
     renderAll();
 }
 function computeRoomProduction(room, type){
-    const vit  = Math.round(effectiveElementCount(room, 'vitality') * BASE_PRODUCTION_PER_ELEMENT * roomAbilityMultiplier(room, 'vitality', type));
-    const mana = Math.round(effectiveElementCount(room, 'mana')     * BASE_PRODUCTION_PER_ELEMENT * roomAbilityMultiplier(room, 'mana', type));
+    const st = stageTypeFor(stage);
+    const vit  = Math.round(effectiveElementCount(room, 'vitality') * BASE_PRODUCTION_PER_ELEMENT * roomAbilityMultiplier(room, 'vitality', type) * st.vitMult);
+    const mana = Math.round(effectiveElementCount(room, 'mana')     * BASE_PRODUCTION_PER_ELEMENT * roomAbilityMultiplier(room, 'mana', type) * st.manaMult);
     const summon = room.elements.summon||0;
     const attack = room.elements.attack||0;
     return { vit, mana, summon, attack };
@@ -6035,6 +6072,134 @@ function trapAffectedCells(trap, room){
 }
 
 // ============================================================
+// ストーリーモード：ステージ属性・勇者ロースター・会話劇
+// ============================================================
+// 魔王が留守にしていた間に人間に奪われた魔界を、6つのエリア（洞窟・森・泉・山・街・城）の順に取り戻していく物語。
+// エリアごとに生産・生産数・建設費のいずれか1つだけに軽い特徴を持たせてある。最終ステージ(7=魔王城)は総力戦で特別な補正はなし
+const STAGE_TYPES = [
+    { key:'cave',     name_ja:'洞窟',   icon:'⛰️', effectDesc:'活力+12%',   mapImage:'images/map/map1.jfif',
+      vitMult:1.12, manaMult:1,    toolMult:1,   summonMult:1,   roomCostMult:1 },
+    { key:'forest',   name_ja:'森',     icon:'🌲', effectDesc:'魔力+12%',   mapImage:'images/map/map2.jfif',
+      vitMult:1,    manaMult:1.12, toolMult:1,   summonMult:1,   roomCostMult:1 },
+    { key:'spring',   name_ja:'泉',     icon:'💧', effectDesc:'通常',       mapImage:'images/map/map3.jfif',
+      vitMult:1,    manaMult:1,    toolMult:1,   summonMult:1,   roomCostMult:1 },
+    { key:'mountain', name_ja:'山',     icon:'🏔️', effectDesc:'掘削半減',   mapImage:'images/map/map4.jfif',
+      vitMult:1,    manaMult:1,    toolMult:0.5, summonMult:1,   roomCostMult:1 },
+    { key:'town',     name_ja:'街',     icon:'🏘️', effectDesc:'召喚半減',   mapImage:'images/map/map5.jfif',
+      vitMult:1,    manaMult:1,    toolMult:1,   summonMult:0.5, roomCostMult:1 },
+    { key:'castle',   name_ja:'城',     icon:'🏰', effectDesc:'建設費+25%', mapImage:'images/map/map6.jfif',
+      vitMult:1,    manaMult:1,    toolMult:1,   summonMult:1,   roomCostMult:1.25 },
+    { key:'final',    name_ja:'魔王城', icon:'👑', effectDesc:'最終決戦',   mapImage:'images/map/map7.jfif',
+      vitMult:1,    manaMult:1,    toolMult:1,   summonMult:1,   roomCostMult:1 },
+];
+function stageTypeFor(stageNum){
+    const idx = Math.min(Math.max(stageNum,1), STAGE_TYPES.length) - 1;
+    return STAGE_TYPES[idx];
+}
+
+// ステージが進むごとに、侵攻してくる勇者の職業構成が増えていく（新しいエリアに来るたびに新顔の勇者が加わるイメージ）。
+// 4職(剣士・アーチャー・メイジ・プリースト)から始まり、最終ステージでは11職すべてが登場する総力戦になる
+const HERO_STAGE_ROSTER = [
+    ['swordsman','archer','mage','priest'],
+    ['swordsman','archer','mage','priest','ninja','bard'],
+    ['swordsman','archer','mage','priest','ninja','bard','ice_mage'],
+    ['swordsman','archer','mage','priest','ninja','bard','ice_mage','fire_mage','thunder_knight'],
+    ['swordsman','archer','mage','priest','ninja','bard','ice_mage','fire_mage','thunder_knight','shield_knight'],
+    ['swordsman','archer','mage','priest','ninja','bard','ice_mage','fire_mage','thunder_knight','shield_knight','dark_mage'],
+    ['swordsman','archer','mage','priest','ninja','bard','ice_mage','fire_mage','thunder_knight','shield_knight','dark_mage'],
+];
+function heroRosterForStage(stageNum){
+    const idx = Math.min(Math.max(stageNum,1), HERO_STAGE_ROSTER.length) - 1;
+    return HERO_STAGE_ROSTER[idx];
+}
+
+// 各ステージ突入時の会話劇（魔王のひとり語り。下書き案なので後で差し替えOK）。
+// startStoryScene(stageNum)で表示し、最後の1行を読み終えるとダンジョン作成フェーズに戻る
+const STORY_SCRIPT = {
+    1: [
+        { face:'surprise', text:'……あれ？　結界が薄い？' },
+        { face:'panic',    text:'まさか……留守にしてた間に、魔界が人間どもに獲られてる！？' },
+        { face:'angry',    text:'くっ……のんびり洞窟キャンプなんてしてる場合じゃなかったわね' },
+        { face:'grin',     text:'上等よ。地下にダンジョンを作って、迎え撃ってやるわ。まずはこの洞窟から始めましょう' },
+    ],
+    2: [
+        { face:'smile',  text:'洞窟の勇者どもは片付けた。まずは一勝ね' },
+        { face:'normal', text:'次は……森。緑が深い分、活力の素がよく採れそうだわ' },
+        { face:'grin',   text:'森の勇者たちよ、遠慮なくおびき寄せさせてもらうわよ' },
+    ],
+    3: [
+        { face:'smile',  text:'森も取り戻した。……思ったより、順調じゃない' },
+        { face:'normal', text:'この先は泉ね。澄んだ水は、魔力の通りがいいはず' },
+        { face:'normal', text:'油断は禁物よ。次の勇者たちも、気を抜かず倒すわ' },
+    ],
+    4: [
+        { face:'normal', text:'泉も落とした。魔界の色が、少しずつ戻ってきてる' },
+        { face:'panic',  text:'けど山は一苦労ね……岩が硬くて、掘削の効率が落ちちゃいそう' },
+        { face:'grin',   text:'それでも進むしかないわ。険しい山ほど、乗り越えたときの景色は綺麗よ' },
+    ],
+    5: [
+        { face:'smile',  text:'山を越えた……！　あとちょっとで、魔王城が見えてくるわね' },
+        { face:'normal', text:'次は街。人が多い分、召喚した仲間を隠す場所も少ないから……湧きは抑えめにいくしかなさそう' },
+        { face:'angry',  text:'でも、数で押されるくらいなら、質で圧倒してやるわ' },
+    ],
+    6: [
+        { face:'surprise', text:'……見えた。あれが、人間どもに獲られた魔王城よ' },
+        { face:'angry',    text:'よくも私の城を、あんな趣味の悪い旗だらけにしてくれたわね' },
+        { face:'grin',     text:'城壁は硬くて、部屋を作るのにも骨が折れそうだけど……最後まで気は抜かないわ' },
+    ],
+    7: [
+        { face:'smile',  text:'城は取り戻した。……ただいま、我が家' },
+        { face:'normal', text:'けど、まだ終わりじゃない。人間たちの最後の大軍が、ここに向かってきてる' },
+        { face:'grin',   text:'上等よ。ここで、ぜんぶ決めましょう' },
+    ],
+};
+// ゲームクリア（最終ステージ勝利）後だけに表示するエピローグ。背景は最終ステージと同じmap7を使い回す
+const STORY_ENDING = [
+    { face:'surprise', text:'……終わった、の？' },
+    { face:'smile',    text:'魔界は、ぜんぶ取り戻した。私の城も、この手に' },
+    { face:'grin',     text:'留守にしてた分は……これから、ゆっくり取り返すとしましょうか' },
+];
+
+// ---- 会話劇エンジン（1行ずつクリックで進める。SKIPで即終了できる） ----
+let storyLines = [];
+let storyLineIndex = 0;
+let storyOnComplete = null;
+function storyFaceUrl(face){ return `images/kao/maou1_${face}.png`; }
+function startStoryScene(stageNum, onComplete){
+    const lines = STORY_SCRIPT[stageNum];
+    if (!lines || lines.length===0){ if (onComplete) onComplete(); return; } // 台本がないステージ番号はそのまま素通り
+    openStoryOverlay(stageTypeFor(stageNum).mapImage, lines, onComplete);
+}
+function startStoryEnding(onComplete){
+    openStoryOverlay(stageTypeFor(STAGE_FINAL).mapImage, STORY_ENDING, onComplete);
+}
+function openStoryOverlay(mapImage, lines, onComplete){
+    document.getElementById('story-overlay-bg').style.backgroundImage = `url('${mapImage}')`;
+    storyLines = lines;
+    storyLineIndex = 0;
+    storyOnComplete = onComplete || null;
+    document.getElementById('story-overlay').classList.remove('hidden');
+    renderStoryLine();
+}
+function renderStoryLine(){
+    const line = storyLines[storyLineIndex];
+    document.getElementById('story-face').src = storyFaceUrl(line.face);
+    document.getElementById('story-name').textContent = ui('story_speaker_maou');
+    document.getElementById('story-text').textContent = line.text;
+    document.getElementById('story-next-hint').classList.toggle('hidden', storyLineIndex >= storyLines.length-1);
+}
+function advanceStory(){
+    if (storyLineIndex < storyLines.length-1){ storyLineIndex++; renderStoryLine(); return; }
+    finishStoryScene();
+}
+function skipStoryScene(){ finishStoryScene(); }
+function finishStoryScene(){
+    document.getElementById('story-overlay').classList.add('hidden');
+    const cb = storyOnComplete; storyOnComplete = null;
+    if (cb) cb();
+}
+
+// ============================================================
 // 戦闘フェーズ（風来のシレン風：1ターンずつ敵味方が自動で行動する）
 // ============================================================
 const STAGE_FINAL = 7; // 最終侵攻。ここの勇者を倒すとゲームクリア
@@ -6396,11 +6561,14 @@ let battlePendingDelay = 300;
 // startBattle()側でもこの並びをそのまま使うので、確認ポップアップに出したプレビューと実際の侵攻が必ず一致する
 let pendingBattleHeroPreview = [];
 function buildBattleHeroPreview(){
-    const preset = currentGamePreset();
+    // heroCountForStageは最大4体で頭打ちのため、ロースターが増えても先頭4職だけが毎回出ないよう、
+    // ロースターをシャッフルしてから先頭heroCount件を採用する（heroCount<=ロースター人数なので職の重複はしない）
+    const roster = heroRosterForStage(stage).slice();
+    for (let i=roster.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [roster[i],roster[j]]=[roster[j],roster[i]]; }
     const heroCount = heroCountForStage(stage);
     const list = [];
     for (let i=0;i<heroCount;i++){
-        const classKey = preset.heroClassKeys[i % preset.heroClassKeys.length];
+        const classKey = roster[i % roster.length];
         list.push({ classKey, gender: Math.random()<0.5?'m':'f' });
     }
     return list;
@@ -7507,7 +7675,7 @@ function endBattle(outcome){
             <button class="btn btn-primary btn-sm" onclick="closeBattleResultAndRestart()">${ui('btn_restart_dungeon')}</button>
             <button class="btn btn-sm" onclick="closeBattleResultToTitle()">${ui('btn_back_title2')}</button>
         `;
-        document.getElementById('battle-result-modal').classList.remove('hidden');
+        startStoryEnding(() => document.getElementById('battle-result-modal').classList.remove('hidden'));
         return;
     }
     if (outcome==='victory'){
@@ -7644,6 +7812,7 @@ function closeStageIncomeModal(){
     battleStageItemDrops = [];
     lastAutoHealInfo = null;
     maybeOfferDemonLordSkillReward();
+    startStoryScene(stage);
 }
 function closeBattleResultAndRestart(){
     document.getElementById('battle-result-modal').classList.add('hidden');
@@ -7942,7 +8111,8 @@ function downloadBalanceReport(){
 // ---- 描画 ----
 function px(v){ return v*CELL; }
 function renderAll(){
-    document.getElementById('hud-stage-badge').textContent = uif('hud_stage_label', stage);
+    const curStageType = stageTypeFor(stage);
+    document.getElementById('hud-stage-badge').innerHTML = `${uif('hud_stage_label', stage)}<div class="hud-stage-type">${curStageType.icon} ${escapeHtml(curStageType.name_ja)}：${escapeHtml(curStageType.effectDesc)}</div>`;
     const phaseBadge = document.getElementById('hud-phase-badge');
     phaseBadge.textContent = ui(gamePhase==='build' ? 'hud_phase_prepare' : 'hud_phase_battle');
     phaseBadge.classList.toggle('prepare', gamePhase==='build');
