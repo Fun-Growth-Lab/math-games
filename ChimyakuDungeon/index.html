@@ -4269,8 +4269,11 @@ function attemptAttackMonster(attackerUnit, monsterUnit, atkMult){
 }
 
 // ---- 経験値・レベル・ランクアップ ----
-// 勇者を倒した瞬間に付与される経験値（倒した本人のみ。部屋の強化倍率つき）
+// 勇者を倒した瞬間に付与される経験値。勇者のLv（侵攻してくるステージ番号をそのままLvとして使う）が高いほど多く、
+// Lv1で100、Lv1上がるごとに+20（Lv2で120、Lv3で140…）。XP_LEVEL_STEP_GROWTHはモンスター自身の必要経験値の
+// 増分と同じ値を流用している（値の意味は違うが、たまたま同じ「1段階あたり+20」という設計にしたため）
 const KILL_XP_BASE = 100;
+function heroKillXp(){ return KILL_XP_BASE + XP_LEVEL_STEP_GROWTH*(stage-1); }
 // 勇者を倒すたびにこの確率で進化の石がドロップする（ステージクリア後にまとめて表示）。
 // 勇者の総数が103体→25体に減ったので、以前の20%から引き上げた（80%だと高すぎたため50%。ゲーム全体で25×0.5≒12.5個）
 const HERO_ITEM_DROP_CHANCE = 0.5;
@@ -4349,11 +4352,12 @@ let battleLevelUps = []; // 今回のステージでLvが上がったモンス�
 // 魔王は分け与えを受けない（自分が倒した分だけ）。魔王が倒した場合の「同じ部屋」は魔王のいる部屋
 const KILL_XP_SHARE_ROOM = 0.2, KILL_XP_SHARE_MAP = 0.1;
 function grantKillXp(killerUnit){
-    killerUnit.xp = (killerUnit.xp||0) + KILL_XP_BASE; // 魔王も同じ（勇者を倒すとXPが入る）
+    const xpAmount = heroKillXp();
+    killerUnit.xp = (killerUnit.xp||0) + xpAmount; // 魔王も同じ（勇者を倒すとXPが入る）
     const killerRoomId = killerUnit.isDemonLord ? demonLordRoomId : killerUnit.roomId;
     monsters.forEach(m => {
         if (m===killerUnit || m.roomId===null) return;
-        m.xp = (m.xp||0) + Math.round(KILL_XP_BASE * (m.roomId===killerRoomId ? KILL_XP_SHARE_ROOM : KILL_XP_SHARE_MAP));
+        m.xp = (m.xp||0) + Math.round(xpAmount * (m.roomId===killerRoomId ? KILL_XP_SHARE_ROOM : KILL_XP_SHARE_MAP));
     });
 }
 // モンスターの見た目・ステータスを進化先のものに差し替える（ランクアップ確定時に呼ぶ）
@@ -5910,6 +5914,12 @@ function trapAffectedCells(trap, room){
 // 戦闘フェーズ（風来のシレン風：1ターンずつ敵味方が自動で行動する）
 // ============================================================
 const STAGE_FINAL = 7; // 最終侵攻。ここの勇者を倒すとゲームクリア
+// 勇者の表示Lv：侵攻ステージ番号をそのままLvにすると素朴すぎるので、ステージ数の2乗（n次関数）を使う。
+// （1,4,9,16,25,36,49）。ダンジョン経営がうまくいくと終盤が楽勝になりがちだったため、ステータス自体は
+// このLvに対して線形に伸ばす形に変え、序盤（Lvの伸びがまだ緩やかな区間）は今までより弱く、
+// 終盤（Lvが一気に跳ね上がる区間）は今までより強くなるようにして、後半の歯応えを出す
+const HERO_DISPLAY_LEVEL_EXPONENT = 2;
+function heroDisplayLevel(stageNum){ return Math.pow(stageNum, HERO_DISPLAY_LEVEL_EXPONENT); }
 // ステージごとの勇者の総数。人数が多いほど戦闘の処理が重くなるため、MAX4体までしか増やさない
 // （ステージ1で2人→ステージ2で3人→ステージ3以降はずっと4人で頭打ち）。そのぶん終盤の強さは
 // heroOffenseMult側で1体あたりの攻撃力を大きく伸ばして補う
@@ -5933,12 +5943,16 @@ const HERO_OFFENSE_MULT_CAP = 1.6;
 const HERO_OFFENSE_GROWTH_STAGE_START = 3;
 const HERO_OFFENSE_MULT_AT_GROWTH_START = HERO_OFFENSE_MULT_CAP;
 const HERO_OFFENSE_MULT_AT_FINAL = 4.0;
+// 表示Lvに対して線形になるよう、区間の進み具合もLv基準で測る（stageNumそのものではなく）。
+// Lv(3)=9〜Lv(7)=49の間を線形補間するので、序盤（Lvがまだ小さい）は今までよりゆっくり、
+// 終盤（Lvが急に伸びる区間）は今までより急に強くなる
 function heroOffenseMult(stageNum){
     const count = heroCountForStage(stageNum);
     if (count < HERO_BASELINE_COUNT){
         return Math.min(HERO_OFFENSE_MULT_CAP, HERO_BASE_OFFENSE_MULT * (HERO_BASELINE_COUNT / count));
     }
-    const t = Math.max(0, (stageNum - HERO_OFFENSE_GROWTH_STAGE_START) / (STAGE_FINAL - HERO_OFFENSE_GROWTH_STAGE_START));
+    const lv = heroDisplayLevel(stageNum), lvStart = heroDisplayLevel(HERO_OFFENSE_GROWTH_STAGE_START), lvFinal = heroDisplayLevel(STAGE_FINAL);
+    const t = Math.max(0, (lv - lvStart) / (lvFinal - lvStart));
     return HERO_OFFENSE_MULT_AT_GROWTH_START + t * (HERO_OFFENSE_MULT_AT_FINAL - HERO_OFFENSE_MULT_AT_GROWTH_START);
 }
 // tierStartはステージ1の勇者の強さを決める（侵攻1では線形補間の比率t=0でtierStartがそのまま使われるため）。下のHERO_START_STRENGTH_SCALEで一律に下げている。
@@ -6002,10 +6016,13 @@ function heroSkillTriggers(hero){
     if (triggered) recordSkillUse('H:'+cls.key+':'+cls.skill.type);
     return triggered;
 }
-// 侵攻(ステージ)番号に応じてtierStart～tierEndを線形補間する（侵攻1〜7、7段階で補間）
+// 勇者の表示Lv（heroDisplayLevel）に応じてtierStart～tierEndを線形補間する。
+// 「そのかわり勇者のステータスはレベルによって線形に上がるように」という方針で、
+// stageNumそのものではなく、Lv(1)=1〜Lv(7)=49の間を線形補間する（結果としてstageベースでは非線形になる）
 // 序盤の強さを比率で下げているため、整数に丸めず小数（2桁）のまま補間する（丸めると比率が崩れる）
 function lerpHeroTier(cls, stageNum){
-    const t = Math.max(0, Math.min(1, (stageNum-1) / (STAGE_FINAL-1)));
+    const lv = heroDisplayLevel(stageNum), lvStart = heroDisplayLevel(1), lvFinal = heroDisplayLevel(STAGE_FINAL);
+    const t = Math.max(0, Math.min(1, (lv-lvStart) / (lvFinal-lvStart)));
     return cls.tierStart.map((s,i) => {
         const v = s + (cls.tierEnd[i]-s)*t;
         return Math.max(1, Math.min(10, Math.round(v*100)/100));
@@ -6278,13 +6295,13 @@ function heroBattleStats(classKey, stageNum){
     // lerpHeroTierは比率を保つため小数のまま補間しているので、ここで整数に丸めてHP表示の小数点を防ぐ
     return { hp: Math.round(st.hp*HERO_HP_MULT), atk: Math.round(st.atk*offenseMult), def: Math.round(st.def*offenseMult), magAtk: Math.round(st.magAtk*offenseMult), magDef: Math.round(st.magDef*offenseMult) };
 }
-// 勇者に本当のLvはないため、侵攻してくる勇者のLv表示にはステージ番号を使う（勇者1体の戦闘力は人数補正でステージによらずほぼ一定なので、戦闘力から換算するとLvが上がらず意味がない）
+// 勇者に本当のLvはないため、侵攻してくる勇者のLv表示にはheroDisplayLevel（侵攻ステージ番号の2乗）を使う
 function heroPreviewCardHtml(entry){
     const cls = heroClassInfo(entry.classKey);
     return `<div class="monster-picker-btn static">
         ${heroPreviewSpriteHtml(entry.classKey, entry.gender, cls.emoji)}
         <span class="monster-picker-name">${escapeHtml(cls.name_ja)}</span>
-        <span class="monster-picker-meta"><b class="hero-preview-lv">Lv.${stage}</b></span>
+        <span class="monster-picker-meta"><b class="hero-preview-lv">Lv.${heroDisplayLevel(stage)}</b></span>
     </div>`;
 }
 function requestStartBattle(){
