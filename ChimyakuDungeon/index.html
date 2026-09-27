@@ -961,6 +961,29 @@
         .bd-side-footer.slim > *:not(#btn-start-battle) { display:none !important; }
         .bd-side-footer.slim .btn-start-battle-big { padding:10px 18px; font-size:1.1rem; }
         .delta-up { color:#7fe6a0; font-weight:800; } .delta-down { color:#ff8d7d; font-weight:800; } .delta-zero { color:var(--ink-dim); }
+        /* ステージクリアポップアップ：横幅を活かし、増加量は横1列のチップ、レベルアップ・戦利品は種類ごとのカードを
+           グリッドで並べる（縦積みだと項目が増えるほど際限なく縦に伸び、二重スクロールも起きていたため） */
+        .stage-clear-stats { display:flex; gap:8px; margin:10px 0 14px; }
+        .stage-clear-stat {
+            flex:1; min-width:0; display:flex; flex-direction:column; align-items:center; gap:3px;
+            background:rgba(255,255,255,0.04); border:1px solid var(--card-bdr); border-radius:10px; padding:8px 6px;
+        }
+        .stage-clear-stat .sc-stat-label { font-size:0.72rem; color:var(--ink-dim); font-weight:700; display:flex; align-items:center; gap:4px; }
+        .stage-clear-stat b { font-size:1.05rem; }
+        .stage-clear-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:10px; align-items:start; }
+        .sc-card { background:rgba(255,255,255,0.03); border:1px solid var(--card-bdr); border-radius:10px; padding:8px 10px; text-align:left; }
+        .sc-card-title { font-size:0.85rem; font-weight:800; color:var(--gold); margin-bottom:8px; padding-bottom:4px; border-bottom:2px solid var(--card-bdr); }
+        .sc-chip-grid { display:flex; flex-wrap:wrap; gap:8px; }
+        .sc-chip { position:relative; display:flex; flex-direction:column; align-items:center; width:58px; text-align:center; }
+        .sc-chip-icon { width:36px; height:36px; display:flex; align-items:center; justify-content:center; font-size:1.5rem; }
+        .sc-chip-icon .item-img { width:36px; height:36px; }
+        .sc-chip-label { font-size:0.64rem; font-weight:700; color:var(--ink-dim); line-height:1.2; width:100%; overflow-wrap:break-word; }
+        .sc-chip-label b { color:var(--ink); display:block; }
+        .sc-chip-badge {
+            position:absolute; top:-5px; right:0; min-width:16px; padding:0 4px; background:#e0473c; color:#fff;
+            font-size:0.62rem; font-weight:800; border-radius:8px; line-height:1.4; box-shadow:0 1px 3px rgba(0,0,0,0.5);
+        }
+        .stage-clear-empty { grid-column:1/-1; text-align:center; color:var(--ink-dim); font-size:0.85rem; padding:6px 0; }
         .btn-build-room { width:100%; margin-bottom:8px; padding:9px 12px; font-size:0.95rem; }
     </style>
 </head>
@@ -1226,14 +1249,14 @@
 
     <!-- ==================== STAGE CLEAR (勝利結果・収入・回復・レベルアップ・戦利品を1つにまとめたポップアップ) ==================== -->
     <div id="stage-income-modal" class="modal-backdrop hidden">
-        <div class="modal-box" style="min-width:340px; max-width:520px; max-height:92vh; overflow-y:auto;">
+        <div class="modal-box" style="width:680px; max-width:96vw; max-height:92vh; overflow-y:auto;">
             <div class="modal-title" id="stage-clear-title"></div>
-            <div class="modal-score-row"><span><span class="gem-chip-sq gem-citrine"></span><span data-i18n="stage_income_vit_label">活力の増加量</span></span><b id="stage-income-vit">0</b></div>
-            <div class="modal-score-row"><span><span class="gem-chip-sq gem-sapphire"></span><span data-i18n="stage_income_mana_label">魔力の増加量</span></span><b id="stage-income-mana">0</b></div>
-            <div class="modal-score-row" id="stage-income-heal-row"><span>💊 <span data-i18n="stage_income_heal_label">回復に使った魔力</span></span><b id="stage-income-heal">0</b></div>
-            <div class="side-panel-title" style="margin-top:12px;" data-i18n="stage_income_ranked_title">レベルアップ</div>
-            <div id="stage-income-ranked-list" style="max-height:30vh; overflow-y:auto; text-align:left;"></div>
-            <div id="stage-loot-body" style="margin-top:8px; text-align:left;"></div>
+            <div class="stage-clear-stats">
+                <div class="stage-clear-stat"><span class="sc-stat-label"><span class="gem-chip-sq gem-citrine"></span><span data-i18n="stage_income_vit_label">活力の増加量</span></span><b id="stage-income-vit">0</b></div>
+                <div class="stage-clear-stat"><span class="sc-stat-label"><span class="gem-chip-sq gem-sapphire"></span><span data-i18n="stage_income_mana_label">魔力の増加量</span></span><b id="stage-income-mana">0</b></div>
+                <div class="stage-clear-stat" id="stage-income-heal-row"><span class="sc-stat-label">💊 <span data-i18n="stage_income_heal_label">回復に使った魔力</span></span><b id="stage-income-heal">0</b></div>
+            </div>
+            <div id="stage-clear-grid" class="stage-clear-grid"></div>
             <button class="btn btn-primary btn-sm" style="margin-top:14px; width:100%;" data-i18n="btn_next_stage" onclick="closeStageIncomeModal()">次のステージへ</button>
         </div>
     </div>
@@ -1487,7 +1510,7 @@ const UI_TEXT = {
     dmg_magicrole_magic: { ja: '魔法遠距離', ja_easy: 'まほう・えんきょり', en: 'Magic Long-range' },
     dmg_total_physical: { ja: '物理全て', ja_easy: 'ぶつり ぜんぶ', en: 'All Physical' },
     dmg_total_magic: { ja: '魔法全て', ja_easy: 'まほう ぜんぶ', en: 'All Magic' },
-    stage_income_none_ranked: { ja: '今回、Lvが上がった魔物はいません', ja_easy: 'こんかい、Lvが あがった まものは いないよ', en: 'No monsters leveled up this time' },
+    stage_income_none_ranked: { ja: '今回は特に変化はありませんでした', ja_easy: 'こんかいは とくに へんかは なかったよ', en: 'Nothing happened this time' },
     evolve_arrow_label: { ja: (from,to) => `${from} → ${to}`, ja_easy: (from,to) => `${from} → ${to}`, en: (from,to) => `${from} → ${to}` },
     levelup_arrow_label: { ja: (from,to) => `Lv.${from}➡Lv.${to}`, ja_easy: (from,to) => `Lv.${from}➡Lv.${to}`, en: (from,to) => `Lv.${from}➡Lv.${to}` },
     battle_log_evolved: { ja: (from,to) => `${from}が${to}にランクアップした！`, ja_easy: (from,to) => `${from}が ${to}に ランクアップした！`, en: (from,to) => `${from} ranked up into ${to}!` },
@@ -1529,7 +1552,6 @@ const UI_TEXT = {
     overview_vit_income: { ja: '活力総生産量', ja_easy: 'かつりょくの せいさんりょう ごうけい', en: 'Total Vitality Production' },
     overview_mana_income: { ja: '魔力総生産量', ja_easy: 'まりょくの せいさんりょう ごうけい', en: 'Total Mana Production' },
     overview_training_count: { ja: '強化装置内の魔物', ja_easy: 'きょうかそうちの なかの まもの', en: 'Monsters Training' },
-    overview_trap_count: { ja: '設置している罠', ja_easy: 'せっちしている わな', en: 'Traps Placed' },
     btn_cancel: { ja: 'キャンセル', en: 'Cancel' },
     btn_confirm_build: { ja: 'この内容で建設する', ja_easy: 'この ないようで けんせつする', en: 'Confirm Build' },
 
@@ -3554,7 +3576,6 @@ function dungeonOverviewHtml(){
         <div class="room-detail-row"><span>${ui('overview_monster_count')}</span><b style="margin-left:auto;">${monsters.length}</b></div>
         <div class="room-detail-row"><span class="gem-chip-sq gem-citrine"></span><span>${ui('overview_vit_income')}</span><b style="margin-left:auto;">${vitTotal}</b></div>
         <div class="room-detail-row"><span class="gem-chip-sq gem-sapphire"></span><span>${ui('overview_mana_income')}</span><b style="margin-left:auto;">${manaTotal}</b></div>
-        <div class="room-detail-row"><span class="gem-chip-sq gem-ruby"></span><span>${ui('overview_trap_count')}</span><b style="margin-left:auto;">${traps.length}</b></div>
     </div>`;
 }
 let pendingTypeRoomId = null;
@@ -7385,49 +7406,48 @@ function proceedNextStage(){
         drops: { stone: dropKeys('stone'), monster: dropKeys('monster'), equip: dropKeys('equip') } });
     processNextRankUp();
 }
-// 戦利品は「獲得したアイテム（進化の石）」「召喚された魔物」「発見した道具（装備）」の3つの見出しに分けて一度に表示する（該当がない見出しは出さない）
-function stageLootHtml(){
+// 種類ごとのカード1枚分（アイコン＋名前＋個数バッジを小さなチップとして並べる）
+function scCardHtml(titleKey, chipsHtml){
+    if (!chipsHtml) return '';
+    return `<div class="sc-card"><div class="sc-card-title">${ui(titleKey)}</div><div class="sc-chip-grid">${chipsHtml}</div></div>`;
+}
+function scChipHtml(iconHtml, labelHtml, count){
+    const badge = count>1 ? `<span class="sc-chip-badge">×${count}</span>` : '';
+    return `<div class="sc-chip">${badge}<div class="sc-chip-icon">${iconHtml}</div><div class="sc-chip-label">${labelHtml}</div></div>`;
+}
+// 戦利品は「獲得した進化の石」「召喚された魔物」「発見した道具」の3種類。種類ごとに1つのカードにまとめ、
+// カードの中はアイコン主体の小さなチップを並べる（名前を書いた横長の行を積み上げると、数が増えるほど際限なく縦に伸びるため）
+function stageLootCardsHtml(){
     const counts = {};
     battleStageItemDrops.forEach(drop => { const k = drop.kind+':'+drop.key; counts[k] = (counts[k]||0) + 1; });
-    const rowsByKind = { stone:[], monster:[], equip:[] };
+    const chipsByKind = { stone:[], monster:[], equip:[] };
     Object.keys(counts).forEach(combinedKey => {
         const [kind, key] = combinedKey.split(':');
         const n = counts[combinedKey];
-        const countHtml = n>1 ? `<b class="item-drop-count">×${n}</b>` : '';
         if (kind==='stone'){
-            rowsByKind.stone.push(`<div class="item-drop-row">
-                <span class="item-drop-icon">${stoneEmoji(key)}</span>
-                <span class="item-drop-name">${escapeHtml(stoneName(key))}</span>
-                ${countHtml}
-            </div>`);
+            chipsByKind.stone.push(scChipHtml(stoneEmoji(key), escapeHtml(stoneName(key)), n));
         } else if (kind==='monster'){
             const sp = speciesInfo(key);
-            rowsByKind.monster.push(`<div class="item-drop-row">
-                <span class="item-drop-icon">${monsterIconHtml(sp, 28)}</span>
-                <span class="item-drop-name">${escapeHtml(sp.name_ja)}</span>
-                ${countHtml}
-            </div>`);
+            chipsByKind.monster.push(scChipHtml(monsterIconHtml(sp, 36), escapeHtml(sp.name_ja), n));
         } else {
             const it = itemInfo(key);
-            rowsByKind.equip.push(`<div class="item-drop-row">
-                <span class="item-drop-icon">${itemImageHtml(it)}</span>
-                <span class="item-drop-name">${escapeHtml(it.name_ja)}</span>
-                <span class="item-drop-effect">${itemBonusLabel(it)}</span>
-                ${countHtml}
-            </div>`);
+            chipsByKind.equip.push(scChipHtml(itemImageHtml(it), escapeHtml(it.name_ja), n));
         }
     });
-    const sections = [
-        { kind:'stone',   titleKey:'loot_section_stone' },
-        { kind:'monster', titleKey:'loot_section_monster' },
-        { kind:'equip',   titleKey:'loot_section_equip' },
-    ];
-    return sections
-        .filter(sec => rowsByKind[sec.kind].length>0)
-        .map(sec => `<div class="loot-section-title">${ui(sec.titleKey)}</div>${rowsByKind[sec.kind].join('')}`)
-        .join('');
+    return scCardHtml('loot_section_stone', chipsByKind.stone.join(''))
+        + scCardHtml('loot_section_monster', chipsByKind.monster.join(''))
+        + scCardHtml('loot_section_equip', chipsByKind.equip.join(''));
 }
-// 勝利後の1つのポップアップ：勝利の告知・活力/魔力の増加・回復に使った魔力・レベルアップ・戦利品をまとめて見せる
+// レベルアップも同じ考え方でカード化する（アイコン＋Lv1→2のチップを並べる）
+function levelUpCardHtml(levelUpList){
+    if (levelUpList.length===0) return '';
+    const chips = levelUpList.map(({m, fromLevel, toLevel}) => {
+        const icon = m.isDemonLord ? `<span class="monster-icon-thumb" style="background-image:url('images/mamono/demon_lord.png');"></span>` : monsterIconHtml(speciesInfo(m.speciesKey), 36);
+        const name = m.isDemonLord ? ui('demonlord_label') : monsterDisplayName(m);
+        return scChipHtml(icon, `${escapeHtml(name)}<b>${uif('levelup_arrow_label', fromLevel, toLevel)}</b>`);
+    }).join('');
+    return scCardHtml('stage_income_ranked_title', chips);
+}
 function openStageIncomeModal(vitGain, manaGain, levelUpList){
     document.getElementById('stage-clear-title').textContent = uif('stage_clear_title', stage-1);
     // 増えた分は緑の「▲＋」、減った分（回復に使った魔力）は赤の「▼−」で、増減がひと目で分かるようにする（0はくすんだ色）
@@ -7438,17 +7458,8 @@ function openStageIncomeModal(vitGain, manaGain, levelUpList){
     // 回復に使った魔力の行は、自動回復がONのときだけ出す
     document.getElementById('stage-income-heal-row').classList.toggle('hidden', !autoHealEnabled);
     document.getElementById('stage-income-heal').innerHTML = deltaHtml(healed, false);
-    const list = document.getElementById('stage-income-ranked-list');
-    if (levelUpList.length===0){
-        list.innerHTML = `<div style="color:var(--ink-dim); font-size:0.82rem;">${ui('stage_income_none_ranked')}</div>`;
-    } else {
-        list.innerHTML = levelUpList.map(({m, fromLevel, toLevel}) => {
-            const icon = m.isDemonLord ? `<span class="monster-icon-thumb" style="background-image:url('images/mamono/demon_lord.png');"></span>` : monsterIconHtml(speciesInfo(m.speciesKey));
-            const name = m.isDemonLord ? ui('demonlord_label') : monsterDisplayName(m);
-            return `<div class="modal-score-row"><span>${icon} ${escapeHtml(name)} ${uif('levelup_arrow_label', fromLevel, toLevel)}</span></div>`;
-        }).join('');
-    }
-    document.getElementById('stage-loot-body').innerHTML = stageLootHtml();
+    const cardsHtml = levelUpCardHtml(levelUpList) + stageLootCardsHtml();
+    document.getElementById('stage-clear-grid').innerHTML = cardsHtml || `<div class="stage-clear-empty">${ui('stage_income_none_ranked')}</div>`;
     document.getElementById('stage-income-modal').classList.remove('hidden');
 }
 function closeStageIncomeModal(){
