@@ -1194,6 +1194,18 @@
         </div>
     </div>
 
+    <!-- ==================== BATCH RESULT (一括使用/一括装備を1体ずつ見せる) ==================== -->
+    <div id="batch-result-modal" class="modal-backdrop hidden">
+        <div class="modal-box" style="width:520px; max-width:96%; max-height:92%; overflow-y:auto;">
+            <div class="modal-title" id="batch-result-title"></div>
+            <div id="batch-result-body"></div>
+            <div class="btn-row">
+                <button class="btn btn-sm" id="batch-result-skip-btn" style="flex:1;" onclick="skipBatchResults()"></button>
+                <button class="btn btn-primary btn-sm" id="batch-result-next-btn" style="flex:1;" onclick="showNextBatchResult()"></button>
+            </div>
+        </div>
+    </div>
+
     <!-- ==================== EQUIP ITEM ==================== -->
     <div id="equip-modal" class="modal-backdrop hidden">
         <div class="modal-box eq-modal-box">
@@ -1712,6 +1724,10 @@ const UI_TEXT = {
     skill_reward_new_label: { ja: 'NEW', ja_easy: 'NEW', en: 'NEW' },
     evolve_stone_name: { ja: name => `${name}の石`, ja_easy: name => `${name}の いし`, en: name => `${name} Stone` },
     evolution_result_title: { ja: name => `✨ ${name}に進化した！`, ja_easy: name => `✨ ${name}に しんかした！`, en: name => `✨ Evolved into ${name}!` },
+    batch_equip_result_title: { ja: n => `⚔️ ${n}を装備した！`, ja_easy: n => `⚔️ ${n}を そうびした！`, en: n => `⚔️ Equipped ${n}!` },
+    batch_result_next: { ja: (done,total) => `次へ（${done}/${total}）`, ja_easy: (done,total) => `つぎへ（${done}/${total}）`, en: (done,total) => `Next (${done}/${total})` },
+    batch_result_finish: { ja: '✔ おわる', ja_easy: '✔ おわる', en: '✔ Finish' },
+    batch_result_skip: { ja: n => `SKIP（残り${n}件）`, ja_easy: n => `SKIP（のこり${n}けん）`, en: n => `SKIP (${n} left)` },
     evolve_stone_effect_label: { ja: '進化に使う石', ja_easy: 'しんかに つかう いし', en: 'Evolution stone' },
     label_summoned_monster: { ja: '召喚で仲間になった', ja_easy: 'しょうかんで なかまに なった', en: 'Summoned as an ally' },
     evolve_section_title: { ja: '進化', ja_easy: 'しんか', en: 'Evolution' },
@@ -5297,23 +5313,25 @@ function evolveMonsterWithStone(monsterId, stoneKey){
     openEvolutionResultModal(m);
 }
 // 進化の石を一括使用：所持している石それぞれについて「使える中でいちばん強い（総合戦闘力が高い）モンスター」に
-// 優先的に使い切る。同じ石が複数あれば、使うたびに次に強いモンスターへと順番に使っていく
+// 優先的に使い切る。同じ石が複数あれば、使うたびに次に強いモンスターへと順番に使っていく。
+// 進化そのものはこの場でまとめて行い、結果は1体ずつポップアップで見せる（startBatchResults参照）
 function autoUseAllStones(){
-    let count = 0;
+    const queue = [];
     Object.keys(stoneInventory).forEach(stoneKey => {
         while (stoneInventory[stoneKey]>0){
             const eligible = monstersEligibleForStone(stoneKey);
             if (eligible.length===0) break;
             const target = eligible.reduce((best,m) => powerScore(m)>powerScore(best) ? m : best);
+            const fromName = speciesInfo(target.speciesKey).name_ja;
             if (!evolveMonsterWithStoneCore(target.id, stoneKey)) break;
-            count++;
+            queue.push({ kind:'stone', monsterId: target.id, fromName });
         }
     });
-    renderItemInventoryModal();
-    renderMonsterListModal();
+    closeItemInventoryModal();
     renderRoomDetail();
     renderAll();
-    showToast(count>0 ? uif('status_auto_stone_done', count) : ui('status_auto_stone_none'));
+    if (queue.length===0){ showToast(ui('status_auto_stone_none')); return; }
+    startBatchResults(queue);
 }
 // 進化の石を使った直後に、進化後の姿とステータスをまとめて見せる結果ポップアップ
 function openEvolutionResultModal(m){
@@ -5637,17 +5655,72 @@ function autoEquipAllItems(){
     });
     candidates.sort((a,b) => b.netGain - a.netGain);
     const usedItems = new Set(), usedMonsters = new Set();
-    let count = 0;
+    const queue = [];
     candidates.forEach(cand => {
         if (usedItems.has(cand.invId) || usedMonsters.has(cand.monsterId)) return;
+        const m = monsters.find(x=>x.id===cand.monsterId);
+        const invItem = inventory.find(i=>i.id===cand.invId);
+        const itemKey = invItem.itemKey;
+        const before = EQ_STAT_KEYS.map(([k]) => effectiveStatValue(m, k));
         equipItemToMonster(cand.monsterId, cand.invId);
+        const after = EQ_STAT_KEYS.map(([k]) => effectiveStatValue(m, k));
+        queue.push({ kind:'equip', monsterId: cand.monsterId, itemKey, before, after });
         usedItems.add(cand.invId); usedMonsters.add(cand.monsterId);
-        count++;
     });
+    closeItemInventoryModal();
+    renderRoomDetail();
+    if (queue.length===0){ showToast(ui('status_auto_equip_none')); return; }
+    startBatchResults(queue);
+}
+// ---- 一括使用/一括装備の結果を1体ずつ見せるポップアップ ----
+// 実際の進化・装備はすでに終わっている（上のautoUseAllStones/autoEquipAllItemsで即座に適用済み）。
+// ここでは「何が起きたか」を1件ずつ確認できるように、キューを順番に表示するだけ。
+// SKIPを押すと残りは一切表示せず、そのまま確定した状態で閉じる（適用自体は取り消さない）
+let batchResultQueue = [];
+let batchResultTotal = 0;
+function startBatchResults(queue){
+    batchResultQueue = queue;
+    batchResultTotal = queue.length;
+    document.getElementById('batch-result-modal').classList.remove('hidden');
+    showNextBatchResult();
+}
+function showNextBatchResult(){
+    if (batchResultQueue.length===0){ closeBatchResultModal(); return; }
+    const item = batchResultQueue.shift();
+    const doneCount = batchResultTotal - batchResultQueue.length;
+    const m = monsters.find(x=>x.id===item.monsterId);
+    if (!m){ showNextBatchResult(); return; } // 何らかの理由で対象が消えていたら飛ばす
+    if (item.kind==='stone'){
+        const sp = speciesInfo(m.speciesKey);
+        document.getElementById('batch-result-title').textContent = uif('evolution_result_title', sp.name_ja);
+        document.getElementById('batch-result-body').innerHTML = monsterDetailCoreHtml(m);
+    } else {
+        const it = itemInfo(item.itemKey);
+        document.getElementById('batch-result-title').textContent = uif('batch_equip_result_title', it.name_ja);
+        const statRows = EQ_STAT_KEYS.map(([k,lk,cls], i) => {
+            const before = item.before[i], after = item.after[i], d = after-before;
+            return `<div class="eq-stat-row"><span class="unit-stat-label ${cls}">${ui(lk)}</span><span>${before}</span><span class="eq-arrow">▶</span><span class="eq-after">${after}</span><span class="eq-delta ${d>0?'up':d<0?'down':'same'}">${d>0?'▲+'+d:d<0?'▼'+d:'±0'}</span></div>`;
+        }).join('');
+        document.getElementById('batch-result-body').innerHTML =
+            `<div style="text-align:center; margin:4px 0 10px;">${monsterIconHtml(speciesInfo(m.speciesKey), 48)}<br>${escapeHtml(monsterDisplayName(m))}</div>`
+            + equipCardHtml(it, m) + statRows;
+    }
+    document.getElementById('batch-result-next-btn').textContent = batchResultQueue.length>0 ? uif('batch_result_next', doneCount, batchResultTotal) : ui('batch_result_finish');
+    const skipBtn = document.getElementById('batch-result-skip-btn');
+    skipBtn.textContent = uif('batch_result_skip', batchResultQueue.length);
+    skipBtn.classList.toggle('hidden', batchResultQueue.length===0);
+}
+function skipBatchResults(){
+    batchResultQueue = [];
+    closeBatchResultModal();
+}
+function closeBatchResultModal(){
+    document.getElementById('batch-result-modal').classList.add('hidden');
+    batchResultQueue = [];
     renderItemInventoryModal();
     renderMonsterListModal();
     renderRoomDetail();
-    showToast(count>0 ? uif('status_auto_equip_done', count) : ui('status_auto_equip_none'));
+    renderAll();
 }
 
 // ---- モンスター・魔王の移動（マップ作製フェーズのみ、同じ部屋の中でのみ移動可） ----
@@ -8340,7 +8413,8 @@ document.getElementById('build-screen').addEventListener('click', (ev) => {
 // ポップアップの外側（暗い背景部分）をクリックしたら、「とじる」を押したのと同じ動作で閉じる
 [['monster-list-modal', () => closeMonsterListModal()], ['item-inventory-modal', () => closeItemInventoryModal()],
  ['item-target-picker-modal', () => closeItemTargetPicker()], ['monster-detail-modal', () => closeMonsterDetailModal()],
- ['evolution-result-modal', () => closeEvolutionResultModal()], ['equip-modal', () => closeEquipModal()], ['skill-help-modal', () => closeSkillHelp()]
+ ['evolution-result-modal', () => closeEvolutionResultModal()], ['equip-modal', () => closeEquipModal()], ['skill-help-modal', () => closeSkillHelp()],
+ ['batch-result-modal', () => skipBatchResults()]
 ].forEach(([id, closeFn]) => {
     const backdrop = document.getElementById(id);
     backdrop.addEventListener('click', (ev) => { if (ev.target===backdrop) closeFn(); });
@@ -8381,6 +8455,7 @@ document.addEventListener('keydown', (ev) => {
     if (isOpen('skill-help-modal')){ ev.preventDefault(); closeSkillHelp(); return; }
     if (isOpen('monster-detail-modal')){ ev.preventDefault(); closeMonsterDetailModal(); return; }
     if (isOpen('evolution-result-modal')){ ev.preventDefault(); closeEvolutionResultModal(); return; }
+    if (isOpen('batch-result-modal')){ ev.preventDefault(); showNextBatchResult(); return; }
     if (isOpen('skill-select-modal')){ ev.preventDefault(); closeDemonLordSkillMenu(); return; }
     if (isOpen('stage-income-modal')){ ev.preventDefault(); closeStageIncomeModal(); return; }
     if (isOpen('balance-report-modal')){ ev.preventDefault(); closeBalanceReportModal(); return; }
