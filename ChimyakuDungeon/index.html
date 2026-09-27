@@ -987,6 +987,12 @@
             font-size:0.62rem; font-weight:800; border-radius:8px; line-height:1.4; box-shadow:0 1px 3px rgba(0,0,0,0.5);
         }
         .stage-clear-empty { grid-column:1/-1; text-align:center; color:var(--ink-dim); font-size:0.85rem; padding:6px 0; }
+        /* 成績(スコア)ポップアップ：項目ごとに「素の値×係数」を見せ、最後に合計を目立たせる */
+        .score-item-row { display:flex; align-items:center; gap:10px; padding:7px 4px; border-bottom:1px dashed var(--card-bdr); font-size:0.9rem; }
+        .score-item-row > span:first-child { flex:1; color:var(--ink); font-weight:700; }
+        .score-item-calc { font-size:0.76rem; color:var(--ink-dim); white-space:nowrap; }
+        .score-item-row b { min-width:56px; text-align:right; color:var(--gold); }
+        .score-total-row { display:flex; justify-content:space-between; align-items:center; margin-top:10px; padding-top:10px; border-top:2px solid var(--gold); font-size:1.25rem; font-weight:800; color:var(--gold); }
         .btn-build-room { width:100%; margin-bottom:8px; padding:9px 12px; font-size:0.95rem; }
     </style>
 </head>
@@ -1278,6 +1284,15 @@
             </div>
             <div id="stage-clear-grid" class="stage-clear-grid"></div>
             <button class="btn btn-primary btn-sm" style="margin-top:14px; width:100%;" data-i18n="btn_next_stage" onclick="closeStageIncomeModal()">次のステージへ</button>
+        </div>
+    </div>
+
+    <!-- ==================== SCORE (クリア/ゲームオーバー時の成績) ==================== -->
+    <div id="score-modal" class="modal-backdrop hidden">
+        <div class="modal-box" style="width:560px; max-width:96%; max-height:92%; overflow-y:auto;">
+            <div class="modal-title" data-i18n="score_modal_title">📊 成績</div>
+            <div id="score-modal-body"></div>
+            <button class="btn btn-sm" style="margin-top:14px; width:100%;" data-i18n="btn_close" onclick="closeScoreModal()">とじる</button>
         </div>
     </div>
 
@@ -1724,6 +1739,20 @@ const UI_TEXT = {
     skill_reward_new_label: { ja: 'NEW', ja_easy: 'NEW', en: 'NEW' },
     evolve_stone_name: { ja: name => `${name}の石`, ja_easy: name => `${name}の いし`, en: name => `${name} Stone` },
     evolution_result_title: { ja: name => `✨ ${name}に進化した！`, ja_easy: name => `✨ ${name}に しんかした！`, en: name => `✨ Evolved into ${name}!` },
+    btn_score: { ja: '🏆 成績', ja_easy: '🏆 せいせき', en: '🏆 Score' },
+    score_modal_title: { ja: '📊 成績', ja_easy: '📊 せいせき', en: '📊 Score' },
+    score_monster_count: { ja: 'モンスターの数', ja_easy: 'モンスターの かず', en: 'Monster Count' },
+    score_avg_level: { ja: 'モンスターの平均レベル', ja_easy: 'モンスターの へいきん レベル', en: 'Average Monster Level' },
+    score_equip_count: { ja: '装備の数', ja_easy: 'そうびの かず', en: 'Equipment Count' },
+    score_max_damage: { ja: '最大ダメージ', ja_easy: 'さいだい ダメージ', en: 'Max Damage' },
+    score_vit_production: { ja: '活力生産量', ja_easy: 'かつりょく せいさんりょう', en: 'Vitality Production' },
+    score_mana_production: { ja: '魔力生産量', ja_easy: 'まりょく せいさんりょう', en: 'Mana Production' },
+    score_summon_capacity: { ja: '召喚能力', ja_easy: 'しょうかん のうりょく', en: 'Summon Capacity' },
+    score_tool_capacity: { ja: '掘削能力', ja_easy: 'くっさく のうりょく', en: 'Excavation Capacity' },
+    score_demon_lord_level: { ja: '魔王のレベル', ja_easy: 'まおうの レベル', en: 'Demon Lord Level' },
+    score_room_count: { ja: '部屋の数', ja_easy: 'へやの かず', en: 'Room Count' },
+    score_stage_reached: { ja: '到達ステージ', ja_easy: 'とうたつ ステージ', en: 'Stage Reached' },
+    score_total_label: { ja: '合計スコア', ja_easy: 'ごうけい スコア', en: 'Total Score' },
     batch_equip_result_title: { ja: n => `⚔️ ${n}を装備した！`, ja_easy: n => `⚔️ ${n}を そうびした！`, en: n => `⚔️ Equipped ${n}!` },
     batch_result_next: { ja: (done,total) => `次へ（${done}/${total}）`, ja_easy: (done,total) => `つぎへ（${done}/${total}）`, en: (done,total) => `Next (${done}/${total})` },
     batch_result_finish: { ja: '✔ おわる', ja_easy: '✔ おわる', en: '✔ Finish' },
@@ -2588,7 +2617,7 @@ function startNewDungeon(){
     gamePhase = 'build'; stage = 1;
     inventory = []; nextInventoryId = 1; equipModalMonsterId = null; stoneInventory = {};
     demonLordSkillLevels = {}; demonLordSkillUsesThisBattle = 0; demonLordSkillUsedKeysThisBattle = []; pendingDemonLordSkill = null;
-    battleStageItemDrops = []; battleDamageStats = freshDamageStats();
+    battleStageItemDrops = []; battleDamageStats = freshDamageStats(); maxDamageDealtEver = 0;
     startRunReport(); // テストプレイデータの記録も新しくする
     nextRoomId = 1; nextCorridorId = 1; nextMonsterId = 1; nextTrapId = 1; selectedRoomId = null; selectedMonsterId = null; demonLordMoveSelected = false;
     highlightedMonsterId = null; monsterSortKey = 'type'; highlightedTrapId = null;
@@ -4303,6 +4332,7 @@ let battleStageItemDrops = []; // このステージの戦闘中にドロップ�
 // このステージでモンスターが勇者に与えたダメージの内訳（役割×攻撃タイプ別）。テストプレイデータの出力用に集計する
 function freshDamageStats(){ return { melee:{physical:0,magic:0}, ranged:{physical:0,magic:0}, magic:{physical:0,magic:0} }; }
 let battleDamageStats = freshDamageStats();
+let maxDamageDealtEver = 0; // このダンジョン(1周)を通じて、迷宮側が勇者に与えた1回の攻撃での最大ダメージ（クリア時の成績に使う）
 // 必要経験値：Lv1→2は XP_PER_LEVEL（=100）で、そこからLvが1つ上がるごとに次のLvまでの必要経験値が
 // XP_LEVEL_STEP_GROWTH ずつ増えていく（Lv1→2:100、Lv2→3:120、Lv3→4:140…）。
 // Lv L→L+1 に必要な経験値 = XP_PER_LEVEL + XP_LEVEL_STEP_GROWTH×(L−1)（L≧1）
@@ -6835,6 +6865,8 @@ function applyDamage(side, target, dmg, attackerUnit){
             battleDamageStats[asp.role][dt] = (battleDamageStats[asp.role][dt]||0) + dmg;
         }
     }
+    // クリア時の成績用：迷宮側(モンスター・魔王・罠)が勇者に与えた1回の攻撃の最大ダメージを記録する
+    if (side==='hero' && dmg>maxDamageDealtEver) maxDamageDealtEver = dmg;
     if (target.hp<=0){
         target.hp = 0;
         if (side==='hero'){
@@ -7470,6 +7502,7 @@ function endBattle(outcome){
         titleEl.textContent = ui('battle_result_gameclear_title');
         msgEl.textContent = ui('battle_result_gameclear_msg');
         actionsEl.innerHTML = `
+            <button class="btn btn-gold btn-sm" onclick="openScoreModal()">${ui('btn_score')}</button>
             <button class="btn btn-gold btn-sm" onclick="openBalanceReportModal()">${ui('btn_balance_report')}</button>
             <button class="btn btn-primary btn-sm" onclick="closeBattleResultAndRestart()">${ui('btn_restart_dungeon')}</button>
             <button class="btn btn-sm" onclick="closeBattleResultToTitle()">${ui('btn_back_title2')}</button>
@@ -7486,6 +7519,7 @@ function endBattle(outcome){
         titleEl.textContent = ui('battle_result_defeat_title');
         msgEl.textContent = ui('battle_result_defeat_msg');
         actionsEl.innerHTML = `
+            <button class="btn btn-gold btn-sm" onclick="openScoreModal()">${ui('btn_score')}</button>
             <button class="btn btn-gold btn-sm" onclick="openBalanceReportModal()">${ui('btn_balance_report')}</button>
             <button class="btn btn-danger btn-sm" onclick="closeBattleResultAndRestart()">${ui('btn_restart_dungeon')}</button>
             <button class="btn btn-sm" onclick="closeBattleResultToTitle()">${ui('btn_back_title2')}</button>
@@ -7827,6 +7861,55 @@ function buildBalanceReportText(){
     });
     return out.join('\n');
 }
+
+// ============================================================
+// 成績（スコア）：クリア／ゲームオーバー時点のダンジョンの状態を、いくつかの指標×係数の合計で数値化する。
+// 将来ランキングを作る前提の数値なので、係数は「終盤の一般的な値どうしが大体同じくらいの重みになる」ように
+// ざっくり合わせてある（正式なバランス調整の対象ではなく、まずは比較できる1つの数字を出すための暫定値）
+// ============================================================
+const SCORE_COEF = {
+    monsterCount: 10, avgLevel: 50, equipCount: 20, maxDamage: 2,
+    vitProduction: 0.5, manaProduction: 0.5, summonCapacity: 50, toolCapacity: 50,
+    demonLordLevel: 100, roomCount: 50, stageReached: 200,
+};
+function computeClearScore(){
+    const monsterCount = monsters.length;
+    const avgLevel = monsterCount>0 ? monsters.reduce((s,m) => s+(m.level||0), 0)/monsterCount : 0;
+    const equipCount = inventory.length + monsters.filter(m=>m.equippedItem).length;
+    let vitProduction = 0, manaProduction = 0, summonCapacity = 0, toolCapacity = 0;
+    rooms.forEach(room => {
+        if (!room.type) return;
+        const prod = computeRoomProduction(room, room.type);
+        vitProduction += prod.vit; manaProduction += prod.mana;
+        summonCapacity += roomOutputExpected(room, 'summon');
+        toolCapacity += roomOutputExpected(room, 'tool');
+    });
+    const demonLordLevel = demonLordCell ? (demonLordCell.level||1) : 0;
+    const stageReached = Math.min(stage, STAGE_FINAL);
+    const items = [
+        { labelKey:'score_monster_count', raw: monsterCount, coef: SCORE_COEF.monsterCount },
+        { labelKey:'score_avg_level', raw: Math.round(avgLevel*10)/10, coef: SCORE_COEF.avgLevel },
+        { labelKey:'score_equip_count', raw: equipCount, coef: SCORE_COEF.equipCount },
+        { labelKey:'score_max_damage', raw: maxDamageDealtEver, coef: SCORE_COEF.maxDamage },
+        { labelKey:'score_vit_production', raw: vitProduction, coef: SCORE_COEF.vitProduction },
+        { labelKey:'score_mana_production', raw: manaProduction, coef: SCORE_COEF.manaProduction },
+        { labelKey:'score_summon_capacity', raw: Math.round(summonCapacity*10)/10, coef: SCORE_COEF.summonCapacity },
+        { labelKey:'score_tool_capacity', raw: Math.round(toolCapacity*10)/10, coef: SCORE_COEF.toolCapacity },
+        { labelKey:'score_demon_lord_level', raw: demonLordLevel, coef: SCORE_COEF.demonLordLevel },
+        { labelKey:'score_room_count', raw: rooms.length, coef: SCORE_COEF.roomCount },
+        { labelKey:'score_stage_reached', raw: stageReached, coef: SCORE_COEF.stageReached },
+    ];
+    items.forEach(it => { it.points = Math.round(it.raw*it.coef); });
+    const total = items.reduce((sum,it) => sum+it.points, 0);
+    return { items, total };
+}
+function openScoreModal(){
+    const { items, total } = computeClearScore();
+    const rows = items.map(it => `<div class="score-item-row"><span>${ui(it.labelKey)}</span><span class="score-item-calc">${it.raw} × ${it.coef}</span><b>${it.points}</b></div>`).join('');
+    document.getElementById('score-modal-body').innerHTML = rows + `<div class="score-total-row"><span>${ui('score_total_label')}</span><b>${total}</b></div>`;
+    document.getElementById('score-modal').classList.remove('hidden');
+}
+function closeScoreModal(){ document.getElementById('score-modal').classList.add('hidden'); }
 
 // ---- 出力画面（クリア／ゲームオーバーのポップアップから開く） ----
 function openBalanceReportModal(){
@@ -8414,7 +8497,7 @@ document.getElementById('build-screen').addEventListener('click', (ev) => {
 [['monster-list-modal', () => closeMonsterListModal()], ['item-inventory-modal', () => closeItemInventoryModal()],
  ['item-target-picker-modal', () => closeItemTargetPicker()], ['monster-detail-modal', () => closeMonsterDetailModal()],
  ['evolution-result-modal', () => closeEvolutionResultModal()], ['equip-modal', () => closeEquipModal()], ['skill-help-modal', () => closeSkillHelp()],
- ['batch-result-modal', () => skipBatchResults()]
+ ['batch-result-modal', () => skipBatchResults()], ['score-modal', () => closeScoreModal()]
 ].forEach(([id, closeFn]) => {
     const backdrop = document.getElementById(id);
     backdrop.addEventListener('click', (ev) => { if (ev.target===backdrop) closeFn(); });
@@ -8456,6 +8539,7 @@ document.addEventListener('keydown', (ev) => {
     if (isOpen('monster-detail-modal')){ ev.preventDefault(); closeMonsterDetailModal(); return; }
     if (isOpen('evolution-result-modal')){ ev.preventDefault(); closeEvolutionResultModal(); return; }
     if (isOpen('batch-result-modal')){ ev.preventDefault(); showNextBatchResult(); return; }
+    if (isOpen('score-modal')){ ev.preventDefault(); closeScoreModal(); return; }
     if (isOpen('skill-select-modal')){ ev.preventDefault(); closeDemonLordSkillMenu(); return; }
     if (isOpen('stage-income-modal')){ ev.preventDefault(); closeStageIncomeModal(); return; }
     if (isOpen('balance-report-modal')){ ev.preventDefault(); closeBalanceReportModal(); return; }
