@@ -533,6 +533,7 @@
         .story-name { font-size:0.95rem; font-weight:800; color:var(--gold); margin-bottom:6px; }
         .story-text { font-size:1.05rem; font-weight:700; color:#fff; line-height:1.7; white-space:pre-wrap; }
         .story-next-hint { text-align:right; font-size:1.1rem; color:var(--gold); margin-top:2px; animation: storyNextBlink 1.2s ease-in-out infinite; }
+        .story-narration-text { text-align:center; font-style:italic; color:var(--ink-dim); }
         @keyframes storyNextBlink { 0%,100% { opacity:0.25; } 50% { opacity:1; } }
         .hud-stage-type { font-size:0.6rem; font-weight:700; color:var(--ink-dim); margin-top:2px; text-shadow:none; letter-spacing:0; white-space:nowrap; }
         .title-story-status { font-size:0.8rem; font-weight:700; color:var(--ink-dim); margin:-6px 0 10px; }
@@ -6314,51 +6315,110 @@ function heroRosterForStage(stageNum){
 
 // 各エリア突入時の会話劇（幼い魔王のひとり語り。一人称は「ワシ」、口調はやや古めかしい”えらそうな子供”。下書き案）。
 // startStoryScene(areaIdx)で表示し、最後の1行を読み終えるとダンジョン作成フェーズに戻る
+// 登場人物：魔王（ワシ／子供だが尊大）、ダークエルフ（魔王のお世話係。丁寧だがちょっと抜けている）、
+// 勇者パーティ（剣士・アーチャーが中心。時々プリーストも）。顔グラはimages/kao/<faceDir>_<face>.pngを使う
+const STORY_SPEAKERS = {
+    maou:      { name_ja:'魔王',         faceDir:'images/kao/maou1_' },
+    darkelf:   { name_ja:'ダークエルフ', faceDir:'images/kao/darkelf_' },
+    swordsman: { name_ja:'剣士',         faceDir:'images/kao/swordsman_m_' },
+    archer:    { name_ja:'アーチャー',   faceDir:'images/kao/archer_m_' },
+    priest:    { name_ja:'プリースト',   faceDir:'images/kao/priest_f_' },
+};
+// 各エリア突入時の会話劇。前半＝魔王とダークエルフ（迷宮づくりの経緯）、後半＝勇者パート（魔王を追う側の会話）の2部構成。
+// 後半はnarration行（speaker:'narration'。顔グラなしの地の文）で場面転換してから始まる
 const STORY_SCRIPT = {
     1: [
-        { face:'surprise', text:'……む？　結界が薄いのう' },
-        { face:'panic',    text:'まさか……ワシが目を離しとる間に、魔界が人間どもに乗っ取られとるんか！？' },
-        { face:'angry',    text:'くっ……のんびり洞窟キャンプしとる場合じゃなかったわい' },
-        { face:'grin',     text:'よし、地下にダンジョンを作って迎え撃ってやろうぞ。まずはこの洞窟からじゃ！' },
+        { speaker:'maou',      face:'surprise', text:'ただいま戻ったぞ……って、あれ？　なんか静かじゃのう' },
+        { speaker:'maou',      face:'normal',   text:'おーい、ダークエルフ！　ワシが冥界にキャンプに行っとる間に、何があったんじゃ？' },
+        { speaker:'darkelf',   face:'shy',      text:'お、おかえりなさいませ、魔王様……。実は、その……' },
+        { speaker:'darkelf',   face:'panic',    text:'魔王様のキャンプがあまりに長引いたものですから……勇者たちが魔界をすっかり平和な楽園に変えてしまいまして' },
+        { speaker:'maou',      face:'panic',    text:'はぁ！？　ワシがちょっと羽を伸ばしとっただけで、そんなことになっとるのか！？' },
+        { speaker:'maou',      face:'angry',    text:'よぉし、こうなったら勇者の城に単身乗り込んでやるわ！' },
+        { speaker:'darkelf',   face:'panic',    text:'お待ちください、魔王様！　城には勇者が大勢いるんですのよ' },
+        { speaker:'darkelf',   face:'normal',   text:'まずは近くの洞窟に迷宮を作って、勇者たちをおびき寄せながら少しずつ数を減らしていきましょう' },
+        { speaker:'maou',      face:'grin',     text:'……ふん、まあいいじゃろう。ワシの寛大さに感謝するのじゃな！' },
+        { speaker:'narration', text:'一方、その頃――魔王城にて' },
+        { speaker:'swordsman', face:'grin',     text:'はっはっは！　魔王城を落とすのは拍子抜けするほど楽勝だったな！' },
+        { speaker:'archer',    face:'normal',   text:'魔王の姿はどこにも見当たりません。長らく留守にしていたようですね' },
+        { speaker:'swordsman', face:'angry',    text:'くっ、肝心の魔王がおらんとは。……おい、捜索のほうはどうなっとる？' },
+        { speaker:'archer',    face:'surprise', text:'はい。城の裏手にある洞窟から、不自然な魔力の反応が出ています' },
+        { speaker:'swordsman', face:'grin',     text:'この洞窟が怪しいぞ！' },
     ],
     2: [
-        { face:'smile',  text:'洞窟の勇者どもは片付けたわい。幸先はええな' },
-        { face:'normal', text:'次は森か……緑が深い分、活力の素がよう採れそうじゃ' },
-        { face:'grin',   text:'森の勇者ども、遠慮なくおびき寄せてやるぞ！' },
+        { speaker:'maou',      face:'smile',    text:'洞窟の勇者どもは片付けたわい。幸先はええな' },
+        { speaker:'darkelf',   face:'smile',    text:'お見事です、魔王様。少しずつ魔界の力が戻ってきていますわ' },
+        { speaker:'maou',      face:'normal',   text:'次はどこじゃ？' },
+        { speaker:'darkelf',   face:'normal',   text:'地図によれば、この先は深い森。緑が濃い分、活力の気配が強いはずです' },
+        { speaker:'maou',      face:'grin',     text:'よし、森の勇者どもも根こそぎおびき寄せてやろうぞ！' },
+        { speaker:'narration', text:'一方、洞窟へ向かった捜索隊は――' },
+        { speaker:'swordsman', face:'panic',    text:'おい、洞窟に送った捜索隊から連絡が途絶えとるぞ' },
+        { speaker:'archer',    face:'normal',   text:'おそらく、そこに何かがあったということでしょう' },
+        { speaker:'archer',    face:'surprise', text:'捜索隊の最後の報告によれば、洞窟の奥から森へ続く反応があったと' },
+        { speaker:'swordsman', face:'grin',     text:'よし、次は森だ。手掛かりを追うぞ！' },
     ],
     3: [
-        { face:'smile',  text:'森も取り戻したわい。……思うたより順調じゃな' },
-        { face:'normal', text:'この先は泉か。澄んだ水は、魔力の通りがようなるはずじゃ' },
-        { face:'normal', text:'油断は禁物じゃぞ。次の勇者どもも、気ぃ抜かず倒すのじゃ' },
+        { speaker:'maou',      face:'smile',    text:'森も取り戻したわい。……思うたより順調じゃな' },
+        { speaker:'darkelf',   face:'normal',   text:'魔王様の手腕のおかげですわ。次は泉のあたりを調べてみましょう' },
+        { speaker:'maou',      face:'normal',   text:'泉、か。特に変わったところはないんじゃろ？' },
+        { speaker:'darkelf',   face:'shy',      text:'ええ、そこは普段通りです。……油断せず、丁寧に攻略しましょうね' },
+        { speaker:'maou',      face:'grin',     text:'わかっとるわい。次の勇者どもも、しっかり片付けてやろうぞ' },
+        { speaker:'narration', text:'森を失った勇者たちは――' },
+        { speaker:'archer',    face:'angry',    text:'まさか、森の部隊まで全滅させられるとは……' },
+        { speaker:'priest',    face:'cry',      text:'魔王は本当にこの近くにいるのでしょうか……' },
+        { speaker:'swordsman', face:'angry',    text:'弱気になるな。森の先には泉があったはずだ' },
+        { speaker:'swordsman', face:'grin',     text:'泉が怪しいぞ！　部隊を再編して向かうぞ！' },
     ],
     4: [
-        { face:'normal', text:'泉も落としたわい。魔界の色が、少しずつ戻ってきとるのう' },
-        { face:'panic',  text:'じゃが山は一苦労じゃ……岩が硬うて、掘るのに骨が折れそうじゃ' },
-        { face:'grin',   text:'それでも進むしかないわい。険しい山ほど、越えた先の景色はええもんじゃぞ' },
+        { speaker:'maou',      face:'normal',   text:'泉も落としたわい。魔界の色が、少しずつ戻ってきとるのう' },
+        { speaker:'darkelf',   face:'panic',    text:'魔王様、次は山です。ただ、岩が硬くて掘削の効率が落ちてしまうかもしれません' },
+        { speaker:'maou',      face:'panic',    text:'なにぃ！？　それは一苦労じゃな……' },
+        { speaker:'darkelf',   face:'smile',    text:'ふふ、でも険しい山を越えた先には、きっと良い景色が待っていますわ' },
+        { speaker:'maou',      face:'grin',     text:'よし、根性で乗り越えてやろうぞ！' },
+        { speaker:'narration', text:'泉の異変を確かめに来た勇者たちは――' },
+        { speaker:'swordsman', face:'cry',      text:'泉の部隊まで……いったいどれだけの手勢を隠し持っておるんだ' },
+        { speaker:'archer',    face:'normal',   text:'落ち着いてください。地形からして、次は山で間違いないでしょう' },
+        { speaker:'archer',    face:'grin',     text:'総力を挙げて、山へ向かいましょう！' },
     ],
     5: [
-        { face:'smile',  text:'山を越えたぞ……！　あとちょっとで魔王城が見えてくるわい' },
-        { face:'normal', text:'次は街か。人が多い分、呼び出した仲間を隠す場所も少ないから……湧きは抑えめになりそうじゃな' },
-        { face:'angry',  text:'じゃが、数で押されるくらいなら質で圧倒してくれるわ！' },
+        { speaker:'maou',      face:'smile',    text:'山を越えたぞ……！　あとちょっとで魔王城が見えてくるわい' },
+        { speaker:'darkelf',   face:'normal',   text:'次は街ですね。人が多い分、召喚した仲間を隠す場所が少ないのが難点です' },
+        { speaker:'maou',      face:'angry',    text:'数で押されるくらいなら、質で圧倒してくれるわ！' },
+        { speaker:'darkelf',   face:'grin',     text:'その意気ですわ、魔王様' },
+        { speaker:'narration', text:'山での大敗を受けて――' },
+        { speaker:'priest',    face:'panic',    text:'山の兵まで……もう、まともに戦える部隊が残っていません' },
+        { speaker:'swordsman', face:'angry',    text:'くそ、それでも城の目前まで来ているはずだ。街まで下がって迎え撃つぞ' },
+        { speaker:'archer',    face:'surprise', text:'街の方角から、強い魔力反応が近づいてきています' },
+        { speaker:'swordsman', face:'grin',     text:'街が怪しい……いや、もう間違いない。総力戦だ！' },
     ],
     6: [
-        { face:'surprise', text:'……見えたわい。あれが、人間どもに獲られたワシの城じゃ' },
-        { face:'angry',    text:'よくもワシの城を、あんな趣味の悪い旗だらけにしてくれたのう' },
-        { face:'grin',     text:'城壁は硬うて、部屋を作るのにも手こずりそうじゃが……最後まで気は抜かんぞ' },
+        { speaker:'maou',      face:'surprise', text:'……見えたわい。あれが、人間どもに獲られたワシの城じゃ' },
+        { speaker:'darkelf',   face:'angry',    text:'よくも魔王様の城を、あんな趣味の悪い旗だらけにしてくれましたわね' },
+        { speaker:'maou',      face:'grin',     text:'城壁は硬うて部屋を作るのにも手こずりそうじゃが……最後まで気は抜かんぞ' },
+        { speaker:'darkelf',   face:'smile',    text:'ここまで来れば、あと一息です。全力でお支えいたしますわ' },
+        { speaker:'narration', text:'街の敗残兵から報告を受けた勇者本隊は――' },
+        { speaker:'swordsman', face:'angry',    text:'まさか、ここまで削られるとはな……。だが、こっちにはまだ本隊が残っている' },
+        { speaker:'priest',    face:'cry',      text:'残った戦力を、すべて城に集結させましょう……' },
+        { speaker:'archer',    face:'normal',   text:'魔王が来るなら、この城で迎え撃つほかありません' },
+        { speaker:'swordsman', face:'grin',     text:'上等だ。ここが最後の戦場だ！' },
     ],
 };
 // ストーリーモードで最後のエリア（城）をクリアした後だけに表示するエピローグ。背景はSTORY_ENDING_MAP_IMAGE(map7)を使う
 const STORY_ENDING = [
-    { face:'surprise', text:'……終わった、んか？' },
-    { face:'smile',    text:'魔界は、ぜんぶ取り戻したわい。ワシの城も、この手にな' },
-    { face:'grin',     text:'留守にしとった分は……これからゆっくり取り返すとしようかのう' },
+    { speaker:'maou',    face:'surprise', text:'……終わった、んか？' },
+    { speaker:'darkelf', face:'cry',      text:'はい……魔界は、すべて取り戻しましたわ' },
+    { speaker:'maou',    face:'smile',    text:'ワシの城も、この手に戻ってきたな' },
+    { speaker:'darkelf', face:'smile',    text:'留守にしていた分は、これからゆっくり取り返していきましょうね、魔王様' },
+    { speaker:'maou',    face:'grin',     text:'おう！　まずはキャンプの続きからじゃな！' },
 ];
 
 // ---- 会話劇エンジン（1行ずつクリックで進める。SKIPで即終了できる） ----
 let storyLines = [];
 let storyLineIndex = 0;
 let storyOnComplete = null;
-function storyFaceUrl(face){ return `images/kao/maou1_${face}.png`; }
+function storyFaceUrl(speaker, face){
+    const sp = STORY_SPEAKERS[speaker];
+    return sp ? `${sp.faceDir}${face}.png` : '';
+}
 function startStoryScene(areaIdx, onComplete){
     const lines = STORY_SCRIPT[areaIdx];
     if (!lines || lines.length===0){ if (onComplete) onComplete(); return; } // 台本がないエリア番号はそのまま素通り
@@ -6377,9 +6437,13 @@ function openStoryOverlay(mapImage, lines, onComplete){
 }
 function renderStoryLine(){
     const line = storyLines[storyLineIndex];
-    document.getElementById('story-face').src = storyFaceUrl(line.face);
-    document.getElementById('story-name').textContent = ui('story_speaker_maou');
+    const faceEl = document.getElementById('story-face');
+    const isNarration = line.speaker==='narration'; // 地の文（場面転換用）は顔グラなし・名前なしで中央寄せ表示にする
+    faceEl.style.visibility = isNarration ? 'hidden' : 'visible';
+    if (!isNarration) faceEl.src = storyFaceUrl(line.speaker, line.face);
+    document.getElementById('story-name').textContent = isNarration ? '' : STORY_SPEAKERS[line.speaker].name_ja;
     document.getElementById('story-text').textContent = line.text;
+    document.getElementById('story-text').classList.toggle('story-narration-text', isNarration);
     document.getElementById('story-next-hint').classList.toggle('hidden', storyLineIndex >= storyLines.length-1);
 }
 function advanceStory(){
