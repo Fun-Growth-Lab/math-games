@@ -55,7 +55,12 @@
             position: absolute; top:0; left:0; width:100%; height:100%;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
             z-index: 100;
+            opacity: 1; transition: opacity 0.25s ease;
         }
+        /* 画面切り替えをフェードにするため、.screenに限っては「隠す」をdisplay:noneではなく
+           opacity:0＋pointer-events:noneにする（.screen.hiddenの方が詳細度が高いので上のdisplay:noneより優先される）。
+           絶対配置なのでdisplay:flexのままでもレイアウトへの影響はない */
+        .screen.hidden { display: flex !important; opacity: 0; pointer-events: none; }
         .screen::before {
             content:''; position:absolute; top:0; left:0; width:100%; height:100%;
             background-image: radial-gradient(rgba(255,255,255,0.06) 2px, transparent 2px);
@@ -522,7 +527,12 @@
         /* ==================== STORY SCENE（各ステージ突入時の会話劇） ==================== */
         /* background-colorは、地図画像の読み込みが一瞬間に合わず.story-bgが透けたときに、
            後ろの建設画面（作りたてのダンジョン）がちらっと見えてしまうのを防ぐための土台 */
-        #story-overlay { position:absolute; inset:0; z-index:500; cursor:pointer; overflow:hidden; background-color:var(--bg-page); }
+        #story-overlay {
+            position:absolute; inset:0; z-index:500; cursor:pointer; overflow:hidden; background-color:var(--bg-page);
+            opacity:1; transition:opacity 0.3s ease;
+        }
+        /* こちらもフェードのため、隠す時はdisplay:noneではなくopacity:0＋pointer-events:noneにする */
+        #story-overlay.hidden { display:block !important; opacity:0; pointer-events:none; }
         .story-bg { position:absolute; inset:0; background-size:cover; background-position:center; }
         .story-scrim { position:absolute; inset:0; background:linear-gradient(rgba(0,0,0,0) 50%, rgba(0,0,0,0.78) 100%); }
         .story-skip-btn { position:absolute; top:14px; right:14px; z-index:2; opacity:0.85; }
@@ -6311,11 +6321,11 @@ function heroRosterForStage(stageNum){
 
 // 各エリア突入時の会話劇（幼い魔王のひとり語り。一人称は「ワシ」、口調はやや古めかしい”えらそうな子供”。下書き案）。
 // startStoryScene(areaIdx)で表示し、最後の1行を読み終えるとダンジョン作成フェーズに戻る
-// 登場人物：魔王（ワシ／子供だが尊大）、ダークエルフ（魔王のお世話係。丁寧だがちょっと抜けている）、
+// 登場人物：魔王（ワシ／子供だが尊大）、ヴィオラ（ダークエルフ。魔王のお世話係。丁寧だがちょっと抜けている）、
 // 勇者パーティ（剣士・アーチャーが中心。時々プリーストも）。顔グラはimages/kao/<faceDir>_<face>.pngを使う
 const STORY_SPEAKERS = {
     maou:      { name_ja:'魔王',         faceDir:'images/kao/maou1_' },
-    darkelf:   { name_ja:'ダークエルフ', faceDir:'images/kao/darkelf_' },
+    darkelf:   { name_ja:'ヴィオラ',     faceDir:'images/kao/darkelf_' },
     swordsman: { name_ja:'剣士',         faceDir:'images/kao/swordsman_m_' },
     archer:    { name_ja:'アーチャー',   faceDir:'images/kao/archer_m_' },
     priest:    { name_ja:'プリースト',   faceDir:'images/kao/priest_f_' },
@@ -6325,12 +6335,12 @@ const STORY_SPEAKERS = {
 const STORY_SCRIPT = {
     1: [
         { speaker:'maou',      face:'surprise', text:'ただいま戻ったぞ……って、あれ？　なんか静かじゃのう' },
-        { speaker:'maou',      face:'normal',   text:'おーい、ダークエルフ！　ワシが冥界にキャンプに行っとる間に、何があったんじゃ？' },
+        { speaker:'maou',      face:'normal',   text:'おーい、ヴィオラ！　ワシが冥界にキャンプに行っとる間に、何があったんじゃ？' },
         { speaker:'darkelf',   face:'shy',      text:'お、おかえりなさいませ、魔王様……。実は、その……' },
         { speaker:'darkelf',   face:'panic',    text:'魔王様のキャンプがあまりに長引いたものですから……勇者たちが魔界をすっかり平和な楽園に変えてしまいまして' },
         { speaker:'maou',      face:'panic',    text:'はぁ！？　ワシがちょっと羽を伸ばしとっただけで、そんなことになっとるのか！？' },
         { speaker:'maou',      face:'angry',    text:'よぉし、こうなったら勇者の城に単身乗り込んでやるわ！' },
-        { speaker:'darkelf',   face:'panic',    text:'お待ちください、魔王様！　城には勇者が大勢いるんですのよ' },
+        { speaker:'darkelf',   face:'panic',    text:'お待ちください、魔王様！　城には勇者が大勢いますわ' },
         { speaker:'darkelf',   face:'normal',   text:'まずは近くの洞窟に迷宮を作って、勇者たちをおびき寄せながら少しずつ数を減らしていきましょう' },
         { speaker:'maou',      face:'grin',     text:'……ふん、まあいいじゃろう。ワシの寛大さに感謝するのじゃな！' },
         { speaker:'narration', text:'一方、その頃――魔王城にて' },
@@ -6382,7 +6392,7 @@ const STORY_SCRIPT = {
         { speaker:'darkelf',   face:'grin',     text:'その意気ですわ、魔王様' },
         { speaker:'narration', text:'山での大敗を受けて――' },
         { speaker:'priest',    face:'panic',    text:'山の兵まで……もう、まともに戦える部隊が残っていません' },
-        { speaker:'swordsman', face:'angry',    text:'くそ、それでも城の目前まで来ているはずだ。街まで下がって迎え撃つぞ' },
+        { speaker:'swordsman', face:'angry',    text:'くそ、このままでは城まで攻め込まれる。街まで下がって迎え撃つぞ' },
         { speaker:'archer',    face:'surprise', text:'街の方角から、強い魔力反応が近づいてきています' },
         { speaker:'swordsman', face:'grin',     text:'街が怪しい……いや、もう間違いない。総力戦だ！' },
     ],
