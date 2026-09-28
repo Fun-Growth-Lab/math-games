@@ -536,17 +536,38 @@
         .story-bg { position:absolute; inset:0; background-size:cover; background-position:center; }
         .story-scrim { position:absolute; inset:0; background:linear-gradient(rgba(0,0,0,0) 50%, rgba(0,0,0,0.78) 100%); }
         .story-skip-btn { position:absolute; top:14px; right:14px; z-index:2; opacity:0.85; }
-        .story-box { position:absolute; left:0; right:0; bottom:0; z-index:1; display:flex; align-items:flex-end; padding:0 24px 16px; }
-        .story-face { width:380px; height:380px; object-fit:contain; object-position:bottom; margin-right:-20px; flex-shrink:0; filter: drop-shadow(0 10px 18px rgba(0,0,0,0.65)); }
-        .story-textbox {
-            flex:1; min-width:0; background:rgba(15,10,8,0.85); border:2px solid var(--card-bdr); border-radius:16px;
-            padding:16px 22px; min-height:88px; box-shadow:0 10px 30px rgba(0,0,0,0.5);
+        .story-box { position:absolute; left:0; right:0; bottom:0; z-index:1; display:flex; align-items:stretch; padding:0 24px 16px; }
+        /* 顔グラは専用の黒い箱(story-face-wrap)に入れる。話者が変わるとき、中のimgだけを
+           opacity:0にフェードしてから差し替えることで、地の色である黒へフェード→フェードで戻る演出になる */
+        .story-face-wrap {
+            width:380px; flex-shrink:0; margin-right:-20px; background:#000; border-radius:14px; overflow:hidden;
+            filter: drop-shadow(0 10px 18px rgba(0,0,0,0.65));
         }
-        .story-name { font-size:0.95rem; font-weight:800; color:var(--gold); margin-bottom:6px; }
-        .story-text { font-size:1.05rem; font-weight:700; color:#fff; line-height:1.7; white-space:pre-wrap; }
-        .story-next-hint { text-align:right; font-size:1.1rem; color:var(--gold); margin-top:2px; animation: storyNextBlink 1.2s ease-in-out infinite; }
-        .story-narration-text { text-align:center; font-style:italic; color:var(--ink-dim); }
+        .story-face { width:100%; height:100%; object-fit:contain; object-position:bottom; display:block; opacity:1; transition:opacity 0.18s ease; }
+        .story-textbox {
+            flex:1; min-width:0; min-height:360px; background:rgba(15,10,8,0.85); border:2px solid var(--card-bdr); border-radius:16px;
+            padding:22px 28px; box-shadow:0 10px 30px rgba(0,0,0,0.5);
+            display:flex; flex-direction:column;
+        }
+        .story-name { font-size:1.15rem; font-weight:800; color:var(--gold); margin-bottom:10px; }
+        .story-text {
+            flex:1; display:flex; align-items:center;
+            font-size:1.4rem; font-weight:700; color:#fff; line-height:1.85; white-space:pre-wrap;
+        }
+        /* セリフ中の<b>で、力の入った言葉・大声の部分だけ一段大きく金色で目立たせる */
+        .story-text b { font-size:1.22em; color:var(--gold); white-space:nowrap; }
+        .story-next-hint { text-align:right; font-size:1.2rem; color:var(--gold); margin-top:6px; animation: storyNextBlink 1.2s ease-in-out infinite; }
+        .story-narration-text { text-align:center; font-style:italic; color:var(--ink-dim); font-size:1.25rem; }
         @keyframes storyNextBlink { 0%,100% { opacity:0.25; } 50% { opacity:1; } }
+        /* ==================== STAGE TITLE CARD（会話劇の締め→ダンジョン画面へのつなぎ） ==================== */
+        #stage-title-overlay {
+            position:absolute; inset:0; z-index:600; background:#000; cursor:pointer;
+            display:flex; flex-direction:column; align-items:center; justify-content:center;
+            opacity:1; transition:opacity 0.5s ease;
+        }
+        #stage-title-overlay.hidden { display:flex !important; opacity:0; pointer-events:none; }
+        .stage-title-num { font-size:1.3rem; color:var(--gold); letter-spacing:0.5em; font-weight:800; margin-bottom:14px; margin-left:0.5em; }
+        .stage-title-name { font-size:3.2rem; color:#fff; font-weight:900; letter-spacing:0.06em; text-shadow:0 4px 18px rgba(0,0,0,0.8); }
         .hud-stage-type { font-size:0.6rem; font-weight:700; color:var(--ink-dim); margin-top:2px; text-shadow:none; letter-spacing:0; white-space:nowrap; }
         .stageselect-list { display:flex; flex-direction:column; gap:8px; margin:14px 0; }
         .stageselect-btn { display:flex; align-items:center; gap:10px; padding:10px 16px; text-align:left; width:100%; }
@@ -1041,13 +1062,19 @@
         <div class="story-scrim"></div>
         <button class="btn btn-sm story-skip-btn" onclick="event.stopPropagation(); skipStoryScene()">▶▶ <span data-i18n="story_btn_skip">スキップ</span></button>
         <div class="story-box">
-            <img id="story-face" class="story-face" src="" alt="">
+            <div id="story-face-wrap" class="story-face-wrap"><img id="story-face" class="story-face" src="" alt=""></div>
             <div class="story-textbox">
                 <div id="story-name" class="story-name"></div>
                 <div id="story-text" class="story-text"></div>
                 <div id="story-next-hint" class="story-next-hint">▼</div>
             </div>
         </div>
+    </div>
+
+    <!-- ==================== STAGE TITLE CARD（会話劇からダンジョン画面へのつなぎ） ==================== -->
+    <div id="stage-title-overlay" class="hidden" onclick="finishStageTitleCard()">
+        <div class="stage-title-num" id="stage-title-num"></div>
+        <div class="stage-title-name" id="stage-title-name"></div>
     </div>
 
     <!-- ==================== TITLE ==================== -->
@@ -1884,6 +1911,8 @@ const UI_TEXT = {
     battle_stage_label: { ja: n => `⚔️ ステージ${n}`, ja_easy: n => `⚔️ ステージ${n}`, en: n => `⚔️ Stage ${n}` },
     hud_stage_label: { ja: n => `ステージ ${n}`, ja_easy: n => `ステージ ${n}`, en: n => `Stage ${n}` },
     story_btn_skip: { ja: 'スキップ', ja_easy: 'スキップ', en: 'Skip' },
+    stage_title_num_label: { ja: n => `ステージ${n}`, ja_easy: n => `ステージ${n}`, en: n => `Stage ${n}` },
+    stage_title_name_label: { ja: name => `${name}の迷宮`, ja_easy: name => `${name}の めいきゅう`, en: name => `${name} Labyrinth` },
     story_speaker_maou: { ja: '魔王', ja_easy: 'まおう', en: 'Demon Lord' },
     battle_log_enter: { ja: (heroLabel,name) => `${heroLabel}が${name}に突入！`, ja_easy: (heroLabel,name) => `${heroLabel}が ${name}に とつにゅう！`, en: (heroLabel,name) => `${heroLabel} entered ${name}!` },
     battle_log_room_clear: { ja: name => `${name}の魔物を全滅させた！`, ja_easy: name => `${name}の まものを ぜんめつさせた！`, en: name => `Cleared all monsters in ${name}!` },
@@ -6334,30 +6363,31 @@ const STORY_SPEAKERS = {
 // 後半はnarration行（speaker:'narration'。顔グラなしの地の文）で場面転換してから始まる
 const STORY_SCRIPT = {
     1: [
-        { speaker:'maou',      face:'surprise', text:'ただいま戻ったぞ……って、あれ？　なんか静かじゃのう' },
-        { speaker:'maou',      face:'normal',   text:'おーい、ヴィオラ！　ワシが冥界にキャンプに行っとる間に、何があったんじゃ？' },
+        { speaker:'maou',      face:'surprise', text:'ただいま戻ったぞ……って、あれ？　なんか穏やかな雰囲気じゃのう' },
+        { speaker:'maou',      face:'normal',   text:'おーい、ヴィオラ！　ワシが冥界に<b>バカンス</b>に行っとる間に、何があったんじゃ？' },
         { speaker:'darkelf',   face:'shy',      text:'お、おかえりなさいませ、魔王様……。実は、その……' },
-        { speaker:'darkelf',   face:'panic',    text:'魔王様のキャンプがあまりに長引いたものですから……勇者たちが魔界をすっかり平和な楽園に変えてしまいまして' },
+        { speaker:'darkelf',   face:'panic',    text:'魔王様の<b>バカンス</b>があまりに長引いたものですから……勇者たちが魔界をすっかり平和な楽園に変えてしまいまして' },
         { speaker:'maou',      face:'panic',    text:'はぁ！？　ワシがちょっと羽を伸ばしとっただけで、そんなことになっとるのか！？' },
-        { speaker:'maou',      face:'angry',    text:'よぉし、こうなったら勇者の城に単身乗り込んでやるわ！' },
-        { speaker:'darkelf',   face:'panic',    text:'お待ちください、魔王様！　城には勇者が大勢いますわ' },
+        { speaker:'maou',      face:'angry',    text:'……うぬぬぬ……' },
+        { speaker:'maou',      face:'angry',    text:'よぉし、こうなったら<b>勇者の城に単身乗り込んでやるわ</b>！' },
+        { speaker:'darkelf',   face:'panic',    text:'お待ちください、魔王様！　城には勇者が大勢います' },
         { speaker:'darkelf',   face:'normal',   text:'まずは近くの洞窟に迷宮を作って、勇者たちをおびき寄せながら少しずつ数を減らしていきましょう' },
-        { speaker:'maou',      face:'grin',     text:'……ふん、まあいいじゃろう。ワシの寛大さに感謝するのじゃな！' },
+        { speaker:'maou',      face:'grin',     text:'……ふん、まあいいじゃろう。<b>ワシの寛大さに感謝するのじゃな</b>！' },
         { speaker:'narration', text:'一方、その頃――魔王城にて' },
-        { speaker:'swordsman', face:'grin',     text:'はっはっは！　魔王城を落とすのは拍子抜けするほど楽勝だったな！' },
+        { speaker:'swordsman', face:'grin',     text:'はっはっは！　魔王城を落とすのは<b>拍子抜けするほど楽勝</b>だったな！' },
         { speaker:'archer',    face:'normal',   text:'魔王の姿はどこにも見当たりません。長らく留守にしていたようですね' },
         { speaker:'swordsman', face:'angry',    text:'くっ、肝心の魔王がおらんとは。……おい、捜索のほうはどうなっとる？' },
-        { speaker:'archer',    face:'surprise', text:'はい。城の裏手にある洞窟から、不自然な魔力の反応が出ています' },
-        { speaker:'swordsman', face:'grin',     text:'この洞窟が怪しいぞ！' },
+        { speaker:'archer',    face:'surprise', text:'はい。城の裏手にある洞窟から、<b>不自然な魔力の反応</b>が出ています' },
+        { speaker:'swordsman', face:'grin',     text:'<b>この洞窟が怪しいぞ</b>！' },
     ],
     2: [
         { speaker:'maou',      face:'smile',    text:'洞窟の勇者どもは片付けたわい。幸先がいいのう' },
         { speaker:'darkelf',   face:'smile',    text:'お見事です、魔王様。少しずつ魔界の力が戻ってきていますわ' },
         { speaker:'maou',      face:'normal',   text:'次はどこじゃ？' },
         { speaker:'darkelf',   face:'normal',   text:'地図によれば、この先は深い森。緑が濃い分、活力の気配が強いはずです' },
-        { speaker:'maou',      face:'grin',     text:'よし、森の勇者どもも根こそぎおびき寄せてやろうぞ！' },
+        { speaker:'maou',      face:'grin',     text:'よし、森の勇者どもも<b>根こそぎ</b>おびき寄せてやろうぞ！' },
         { speaker:'narration', text:'一方、洞窟へ向かった捜索隊は――' },
-        { speaker:'swordsman', face:'panic',    text:'おい、洞窟に送った捜索隊から連絡が途絶えとるぞ' },
+        { speaker:'swordsman', face:'panic',    text:'おい、洞窟に送った捜索隊から<b>連絡が途絶えとる</b>ぞ' },
         { speaker:'archer',    face:'normal',   text:'おそらく、そこに何かがあったということでしょう' },
         { speaker:'archer',    face:'surprise', text:'捜索隊の最後の報告によれば、洞窟の奥から森へ続く反応があったと' },
         { speaker:'swordsman', face:'grin',     text:'よし、次は森だ。手掛かりを追うぞ！' },
@@ -6369,43 +6399,43 @@ const STORY_SCRIPT = {
         { speaker:'darkelf',   face:'shy',      text:'ええ、そこは普段通りです。……油断せず、丁寧に攻略しましょうね' },
         { speaker:'maou',      face:'grin',     text:'わかっとるわい。次の勇者どもも、しっかり片付けてやろうぞ' },
         { speaker:'narration', text:'森を失った勇者たちは――' },
-        { speaker:'archer',    face:'angry',    text:'まさか、森の部隊まで全滅させられるとは……' },
+        { speaker:'archer',    face:'angry',    text:'まさか、<b>森の部隊まで全滅</b>させられるとは……' },
         { speaker:'priest',    face:'cry',      text:'魔王は本当にこの近くにいるのでしょうか……' },
         { speaker:'swordsman', face:'angry',    text:'弱気になるな。森の先には泉があったはずだ' },
-        { speaker:'swordsman', face:'grin',     text:'泉が怪しいぞ！　部隊を再編して向かうぞ！' },
+        { speaker:'swordsman', face:'grin',     text:'<b>泉が怪しいぞ</b>！　部隊を再編して向かうぞ！' },
     ],
     4: [
         { speaker:'maou',      face:'normal',   text:'泉も落としたわい。魔界の色が、少しずつ戻ってきとるのう' },
         { speaker:'darkelf',   face:'panic',    text:'魔王様、次は山です。ただ、岩が硬くて掘削の効率が落ちてしまうかもしれません' },
         { speaker:'maou',      face:'panic',    text:'なにぃ！？　それは一苦労じゃな……' },
         { speaker:'darkelf',   face:'smile',    text:'ふふ、でも険しい山を越えた先には、きっと良い景色が待っていますわ' },
-        { speaker:'maou',      face:'grin',     text:'よし、根性で乗り越えてやろうぞ！' },
+        { speaker:'maou',      face:'grin',     text:'よし、<b>根性</b>で乗り越えてやろうぞ！' },
         { speaker:'narration', text:'泉の異変を確かめに来た勇者たちは――' },
-        { speaker:'swordsman', face:'cry',      text:'泉の部隊まで……いったいどれだけの手勢を隠し持っておるんだ' },
+        { speaker:'swordsman', face:'cry',      text:'泉の部隊まで……<b>いったいどれだけの手勢</b>を隠し持っておるんだ' },
         { speaker:'archer',    face:'normal',   text:'落ち着いてください。地形からして、次は山で間違いないでしょう' },
         { speaker:'archer',    face:'grin',     text:'総力を挙げて、山へ向かいましょう！' },
     ],
     5: [
         { speaker:'maou',      face:'smile',    text:'山を越えたぞ……！　あとちょっとで魔王城が見えてくるわい' },
         { speaker:'darkelf',   face:'normal',   text:'次は街ですね。人が多い分、召喚した仲間を隠す場所が少ないのが難点です' },
-        { speaker:'maou',      face:'angry',    text:'数で押されるくらいなら、質で圧倒してくれるわ！' },
+        { speaker:'maou',      face:'angry',    text:'数で押されるくらいなら、<b>質で圧倒</b>してくれるわ！' },
         { speaker:'darkelf',   face:'grin',     text:'その意気ですわ、魔王様' },
         { speaker:'narration', text:'山での大敗を受けて――' },
         { speaker:'priest',    face:'panic',    text:'山の兵まで……もう、まともに戦える部隊が残っていません' },
         { speaker:'swordsman', face:'angry',    text:'くそ、このままでは城まで攻め込まれる。街まで下がって迎え撃つぞ' },
-        { speaker:'archer',    face:'surprise', text:'街の方角から、強い魔力反応が近づいてきています' },
-        { speaker:'swordsman', face:'grin',     text:'街が怪しい……いや、もう間違いない。総力戦だ！' },
+        { speaker:'archer',    face:'surprise', text:'街の方角から、<b>強い魔力反応</b>が近づいてきています' },
+        { speaker:'swordsman', face:'grin',     text:'街が怪しい……いや、もう間違いない。<b>総力戦だ</b>！' },
     ],
     6: [
         { speaker:'maou',      face:'surprise', text:'……見えたわい。あれが、人間どもに獲られたワシの城じゃ' },
         { speaker:'darkelf',   face:'angry',    text:'よくも魔王様の城を、あんな趣味の悪い旗だらけにしてくれましたわね' },
-        { speaker:'maou',      face:'grin',     text:'城壁は硬うて部屋を作るのにも手こずりそうじゃが……最後まで気は抜かんぞ' },
+        { speaker:'maou',      face:'grin',     text:'城壁は硬うて部屋を作るのにも手こずりそうじゃが……<b>最後まで気は抜かんぞ</b>' },
         { speaker:'darkelf',   face:'smile',    text:'ここまで来れば、あと一息です。全力でお支えいたしますわ' },
         { speaker:'narration', text:'街の敗残兵から報告を受けた勇者本隊は――' },
         { speaker:'swordsman', face:'angry',    text:'まさか、ここまで削られるとはな……。だが、こっちにはまだ本隊が残っている' },
         { speaker:'priest',    face:'cry',      text:'残った戦力を、すべて城に集結させましょう……' },
         { speaker:'archer',    face:'normal',   text:'魔王が来るなら、この城で迎え撃つほかありません' },
-        { speaker:'swordsman', face:'grin',     text:'上等だ。ここが最後の戦場だ！' },
+        { speaker:'swordsman', face:'grin',     text:'上等だ。<b>ここが最後の戦場だ</b>！' },
     ],
 };
 // ストーリーモードで最後のエリア（城）をクリアした後だけに表示するエピローグ。背景はSTORY_ENDING_MAP_IMAGE(map7)を使う
@@ -6414,7 +6444,7 @@ const STORY_ENDING = [
     { speaker:'darkelf', face:'cry',      text:'はい……魔界は、すべて取り戻しましたわ' },
     { speaker:'maou',    face:'smile',    text:'ワシの城も、この手に戻ってきたな' },
     { speaker:'darkelf', face:'smile',    text:'留守にしていた分は、これからゆっくり取り返していきましょうね、魔王様' },
-    { speaker:'maou',    face:'grin',     text:'おう！　まずはキャンプの続きからじゃな！' },
+    { speaker:'maou',    face:'grin',     text:'おう！　まずは<b>バカンス</b>の続きからじゃな！' },
 ];
 
 // ---- 会話劇エンジン（1行ずつクリックで進める。SKIPで即終了できる） ----
@@ -6425,10 +6455,12 @@ function storyFaceUrl(speaker, face){
     const sp = STORY_SPEAKERS[speaker];
     return sp ? `${sp.faceDir}${face}.png` : '';
 }
+// エリア開始の会話劇は、最後の1行を読み終えたら素通りせず、一度「ステージタイトルカード」（暗転＋大きな見出し）を
+// 挟んでから建設画面へ進む。ゲームクリア後のエピローグ(startStoryEnding)は次のステージへ進むわけではないので挟まない
 function startStoryScene(areaIdx, onComplete){
     const lines = STORY_SCRIPT[areaIdx];
     if (!lines || lines.length===0){ if (onComplete) onComplete(); return; } // 台本がないエリア番号はそのまま素通り
-    openStoryOverlay(areaTypeAt(areaIdx).mapImage, lines, onComplete);
+    openStoryOverlay(areaTypeAt(areaIdx).mapImage, lines, () => showStageTitleCard(areaIdx, onComplete));
 }
 function startStoryEnding(onComplete){
     openStoryOverlay(STORY_ENDING_MAP_IMAGE, STORY_ENDING, onComplete);
@@ -6439,18 +6471,27 @@ function openStoryOverlay(mapImage, lines, onComplete){
     storyLineIndex = 0;
     storyOnComplete = onComplete || null;
     document.getElementById('story-overlay').classList.remove('hidden');
-    renderStoryLine();
+    renderStoryLine(true);
 }
-function renderStoryLine(){
+// immediate=trueなら即座に描画（会話劇を開いた直後の1行目）。それ以外は顔グラを一度フェードで暗転させてから
+// 次の絵に差し替えて、フェードで戻す（話者が変わっても残像のように前の絵が見え続けていた問題への対応）
+function renderStoryLine(immediate){
     const line = storyLines[storyLineIndex];
+    const wrapEl = document.getElementById('story-face-wrap');
     const faceEl = document.getElementById('story-face');
-    const isNarration = line.speaker==='narration'; // 地の文（場面転換用）は顔グラなし・名前なしで中央寄せ表示にする
-    faceEl.style.visibility = isNarration ? 'hidden' : 'visible';
-    if (!isNarration) faceEl.src = storyFaceUrl(line.speaker, line.face);
-    document.getElementById('story-name').textContent = isNarration ? '' : STORY_SPEAKERS[line.speaker].name_ja;
-    document.getElementById('story-text').textContent = line.text;
-    document.getElementById('story-text').classList.toggle('story-narration-text', isNarration);
-    document.getElementById('story-next-hint').classList.toggle('hidden', storyLineIndex >= storyLines.length-1);
+    const apply = () => {
+        const isNarration = line.speaker==='narration'; // 地の文（場面転換用）は顔グラなし・名前なしで中央寄せ表示にする
+        wrapEl.style.visibility = isNarration ? 'hidden' : 'visible';
+        if (!isNarration) faceEl.src = storyFaceUrl(line.speaker, line.face);
+        document.getElementById('story-name').textContent = isNarration ? '' : STORY_SPEAKERS[line.speaker].name_ja;
+        document.getElementById('story-text').innerHTML = line.text; // セリフ中の<b>で強調語を大きく表示するためinnerHTML
+        document.getElementById('story-text').classList.toggle('story-narration-text', isNarration);
+        document.getElementById('story-next-hint').classList.toggle('hidden', storyLineIndex >= storyLines.length-1);
+        requestAnimationFrame(() => { faceEl.style.opacity = '1'; });
+    };
+    if (immediate){ apply(); return; }
+    faceEl.style.opacity = '0';
+    setTimeout(apply, 200); // .story-faceのtransition(0.18s)が終わるのを待ってから差し替える
 }
 function advanceStory(){
     if (storyLineIndex < storyLines.length-1){ storyLineIndex++; renderStoryLine(); return; }
@@ -6460,6 +6501,25 @@ function skipStoryScene(){ finishStoryScene(); }
 function finishStoryScene(){
     document.getElementById('story-overlay').classList.add('hidden');
     const cb = storyOnComplete; storyOnComplete = null;
+    if (cb) cb();
+}
+// ---- ステージタイトルカード：会話劇の最後（勇者パートの決め台詞など）からダンジョン画面へ、
+// 一度暗転して「ステージX『○○の迷宮』」を大きく見せてから繋ぐ演出 ----
+let stageTitleTimer = null;
+let stageTitleOnComplete = null;
+function showStageTitleCard(areaIdx, onComplete){
+    const area = areaTypeAt(areaIdx);
+    document.getElementById('stage-title-num').textContent = uif('stage_title_num_label', areaIdx);
+    document.getElementById('stage-title-name').textContent = uif('stage_title_name_label', area.name_ja);
+    stageTitleOnComplete = onComplete || null;
+    document.getElementById('stage-title-overlay').classList.remove('hidden');
+    clearTimeout(stageTitleTimer);
+    stageTitleTimer = setTimeout(finishStageTitleCard, 1800); // クリック/Enterで早められる。何もしなくても自動で進む
+}
+function finishStageTitleCard(){
+    clearTimeout(stageTitleTimer);
+    document.getElementById('stage-title-overlay').classList.add('hidden');
+    const cb = stageTitleOnComplete; stageTitleOnComplete = null;
     if (cb) cb();
 }
 
@@ -8993,6 +9053,8 @@ document.getElementById('grid').addEventListener('contextmenu', (ev) => {
 document.addEventListener('keydown', (ev) => {
     if (ev.key !== 'Enter') return;
     const isOpen = (id) => !document.getElementById(id).classList.contains('hidden');
+    if (isOpen('story-overlay')){ ev.preventDefault(); advanceStory(); return; }
+    if (isOpen('stage-title-overlay')){ ev.preventDefault(); finishStageTitleCard(); return; }
     if (isOpen('roomtype-modal')){
         if (!document.getElementById('roomtype-preview').classList.contains('hidden')){ ev.preventDefault(); roomTypeConfirm(); }
         return;
