@@ -1043,7 +1043,8 @@
         <div class="title-box">
             <h1 class="title-h1">地下迷宮ビルダーズ</h1>
             <div class="title-sub" data-i18n="title_sub">CHIMYAKU DUNGEON ― 試作版：ダンジョン建設</div>
-            <button class="btn btn-primary" data-i18n="btn_game_start" onclick="startStoryMode()">ストーリーモード</button>
+            <button id="btn-continue" class="btn btn-primary hidden" onclick="continueGameFromSave()" data-i18n="btn_continue">▶ つづきから</button>
+            <button class="btn btn-primary" id="btn-game-start-btn" onclick="handleStartButtonClick()"><span id="btn-game-start-label" data-i18n="btn_game_start">ストーリーモード</span></button>
             <div id="title-story-status" class="title-story-status"></div>
             <button id="btn-stage-select" class="btn hidden" data-i18n="btn_stage_select" onclick="openStageSelect()">🗺️ ステージ選択</button>
             <button id="btn-name-register" class="btn" onclick="openNameRegister()">👤 名前の登録</button>
@@ -1380,10 +1381,19 @@
         </div>
     </div>
 
+    <!-- ==================== START OVER CONFIRM（タイトルの「はじめから」） ==================== -->
+    <div id="start-over-modal" class="modal-backdrop hidden">
+        <div class="modal-box">
+            <p class="modal-msg" data-i18n="confirm_start_over_msg">はじめから始めますか？　保存されている続きのデータは消えます。</p>
+            <button class="btn btn-danger btn-sm" data-i18n="btn_start_over" onclick="confirmStartOver()">はじめから</button>
+            <button class="btn btn-sm" data-i18n="btn_no" onclick="closeStartOverModal()">いいえ</button>
+        </div>
+    </div>
+
     <!-- ==================== RETURN TITLE CONFIRM ==================== -->
     <div id="totitle-modal" class="modal-backdrop hidden">
         <div class="modal-box">
-            <p class="modal-msg" data-i18n="confirm_totitle_msg">タイトルへ戻りますか？（現在のダンジョンは失われます）</p>
+            <p class="modal-msg" data-i18n="confirm_totitle_msg">タイトルへ戻りますか？（ここまでの内容は自動で保存されます）</p>
             <button class="btn btn-danger btn-sm" data-i18n="btn_yes" onclick="confirmReturnTitle()">戻る</button>
             <button class="btn btn-sm" data-i18n="btn_no" onclick="closeTotitleModal()">いいえ</button>
         </div>
@@ -1535,9 +1545,12 @@ const UI_TEXT = {
     title_sub: { ja: 'UNDERGROUND LABYRINTH BUILDERS ― 試作版', ja_easy: 'ちかめいきゅうビルダーズ ― しさくばん', en: 'UNDERGROUND LABYRINTH BUILDERS ― Prototype' },
     btn_game_start: { ja: '▶ ストーリーモード', ja_easy: '▶ ストーリーモード', en: '▶ Story Mode' },
     btn_stage_select: { ja: '🗺️ ステージ選択', ja_easy: '🗺️ ステージせんたく', en: '🗺️ Stage Select' },
+    btn_continue: { ja: '▶ つづきから', ja_easy: '▶ つづきから', en: '▶ Continue' },
+    btn_start_over: { ja: 'はじめから', ja_easy: 'はじめから', en: 'Start Over' },
+    confirm_start_over_msg: { ja: 'はじめから始めますか？　保存されている続きのデータは消えます。', ja_easy: 'はじめから はじめますか？　ほぞんされている つづきのデータは きえます。', en: 'Start over? Your saved continue data will be deleted.' },
     stageselect_title: { ja: '🗺️ ステージ選択', ja_easy: '🗺️ ステージせんたく', en: '🗺️ Stage Select' },
     stageselect_desc: { ja: 'クリアしたエリアを個別に遊べます', ja_easy: 'クリアした エリアを こべつに あそべます', en: 'Replay any area you have cleared' },
-    title_story_status_new: { ja: 'はじめから', ja_easy: 'はじめから', en: 'New Game' },
+    title_story_status_new: { ja: '洞窟から冒険スタート', ja_easy: 'どうくつから ぼうけんスタート', en: 'Start from the Cave' },
     title_story_status_continue: { ja: name => `つづき：${name}から`, ja_easy: name => `つづき：${name}から`, en: name => `Continue: ${name}` },
     title_story_status_cleared: { ja: '✅ ストーリークリア済み', ja_easy: '✅ ストーリー クリアずみ', en: '✅ Story Cleared' },
     btn_next_area: { ja: '▶ 次のエリアへ', ja_easy: '▶ つぎの エリアへ', en: '▶ Next Area' },
@@ -2131,7 +2144,7 @@ const UI_TEXT = {
     battle_log_trap_flare: { ja: (roomName, heroName, dmg) => `${roomName}のフレアの罠が発動！${heroName}に${dmg}のダメージ`, ja_easy: (roomName, heroName, dmg) => `${roomName}の フレアの わなが はつどう！${heroName}に ${dmg}の ダメージ`, en: (roomName, heroName, dmg) => `${roomName}'s flare trap fires! ${dmg} damage to ${heroName}` },
 
     confirm_reset_msg: { ja: 'ダンジョンをリセットして最初からやり直しますか？（素・因子の配置も変わります）', ja_easy: 'ダンジョンを リセットして さいしょから やりなおす？（もと・いんしの ばしょも かわるよ）', en: 'Reset the dungeon and start over? (Element positions will change too)' },
-    confirm_totitle_msg: { ja: 'タイトルへ戻りますか？（現在のダンジョンは失われます）', ja_easy: 'タイトルへ もどる？（いまの ダンジョンは きえちゃうよ）', en: 'Return to title? (Your current dungeon will be lost)' },
+    confirm_totitle_msg: { ja: 'タイトルへ戻りますか？（ここまでの内容は自動で保存されます）', ja_easy: 'タイトルへ もどる？（いまの ダンジョンは きえちゃうよ）', en: 'Return to title? (Your current dungeon will be lost)' },
     btn_yes: { ja: 'はい', en: 'Yes' },
     btn_no: { ja: 'いいえ', en: 'No' },
 
@@ -2164,6 +2177,7 @@ function applyI18n(){
     document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = ui(el.getAttribute('data-i18n')); });
     document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { el.setAttribute('placeholder', ui(el.getAttribute('data-i18n-placeholder'))); });
     document.documentElement.lang = (currentLang === 'en') ? 'en' : 'ja';
+    renderTitleStoryStatus(); // data-i18nの一括上書きの後に、開始ボタンの文言（はじめから/ストーリーモード）を正しい方へ戻す
 }
 
 const LANG_OPTION_LABELS = { ja: '日本語', ja_easy: 'かんたんなにほんご', en: 'English' };
@@ -2195,6 +2209,21 @@ function renderTitleStoryStatus(){
         statusEl.textContent = ui('title_story_status_new');
     }
     document.getElementById('btn-stage-select').classList.toggle('hidden', !storyCleared);
+    // 保存された続きのダンジョンがあれば「つづきから」を出し、通常の開始ボタンは「はじめから」表記にする
+    const hasSave = hasContinueSave();
+    document.getElementById('btn-continue').classList.toggle('hidden', !hasSave);
+    document.getElementById('btn-game-start-label').textContent = ui(hasSave ? 'btn_start_over' : 'btn_game_start');
+}
+// 開始ボタン：保存データがあれば確認を挟んでから始める（無ければそのままストーリーモードへ）
+function handleStartButtonClick(){
+    if (hasContinueSave()) requestStartOver();
+    else startStoryMode();
+}
+function requestStartOver(){ document.getElementById('start-over-modal').classList.remove('hidden'); }
+function closeStartOverModal(){ document.getElementById('start-over-modal').classList.add('hidden'); }
+function confirmStartOver(){
+    closeStartOverModal();
+    startStoryMode(); // startNewDungeon()の中でclearGameSave()される
 }
 // ステージ選択：クリア済みの6エリアを一覧表示し、選ぶとそのエリアを個別に練習プレイできる
 function openStageSelect(){
@@ -2712,16 +2741,48 @@ function startPracticeArea(areaIdx){
     startStoryScene(currentAreaIndex);
 }
 function startNewDungeon(){
+    clearGameSave(); // 新しく始める＝これまでのセーブは無効（この後の各種操作で改めて保存される）
     generateMap();
-    rooms = []; corridors = []; monsters = []; traps = []; trapPlaceMode = null; entranceCol = null; demonLordRoomId = null; demonLordCell = null;
+    rooms = []; corridors = []; monsters = []; traps = []; entranceCol = null; demonLordRoomId = null; demonLordCell = null;
     vitality = STARTING_VITALITY;
     mana = STARTING_MANA;
-    gamePhase = 'build'; stage = 1;
-    inventory = []; nextInventoryId = 1; equipModalMonsterId = null; stoneInventory = {};
-    demonLordSkillLevels = {}; demonLordSkillUsesThisBattle = 0; demonLordSkillUsedKeysThisBattle = []; pendingDemonLordSkill = null;
+    stage = 1;
+    inventory = []; nextInventoryId = 1; stoneInventory = {};
+    demonLordSkillLevels = {};
+    nextRoomId = 1; nextCorridorId = 1; nextMonsterId = 1; nextTrapId = 1;
+    enterBuildScreen();
+}
+// セーブから復元した状態で建設画面に入る（部屋・モンスターなどの「コア状態」は呼び出し側で先にセット済み）
+function continueGameFromSave(){
+    const data = loadGameSave();
+    if (!data){ startStoryMode(); return; } // 万一セーブが壊れていたら通常の新規開始にフォールバック
+    playMode = data.playMode || 'story';
+    currentAreaIndex = data.currentAreaIndex || 1;
+    grid = data.grid || []; occupied = data.occupied || [];
+    rooms = data.rooms || []; corridors = data.corridors || []; traps = data.traps || [];
+    monsters = data.monsters || [];
+    entranceCol = data.entranceCol!==undefined ? data.entranceCol : null;
+    demonLordRoomId = data.demonLordRoomId!==undefined ? data.demonLordRoomId : null;
+    demonLordCell = data.demonLordCell || null;
+    vitality = data.vitality!==undefined ? data.vitality : STARTING_VITALITY;
+    mana = data.mana!==undefined ? data.mana : STARTING_MANA;
+    stage = data.stage || 1;
+    inventory = data.inventory || []; nextInventoryId = data.nextInventoryId || 1; stoneInventory = data.stoneInventory || {};
+    nextRoomId = data.nextRoomId || 1; nextCorridorId = data.nextCorridorId || 1;
+    nextMonsterId = data.nextMonsterId || 1; nextTrapId = data.nextTrapId || 1;
+    demonLordSkillLevels = data.demonLordSkillLevels || {};
+    goTo('build-screen');
+    enterBuildScreen();
+}
+// 建設画面に入るときの共通処理（新規ダンジョン／セーブからの復元のどちらでも同じ）。
+// 「コア状態」（部屋・モンスター・資源など）は呼び出し側で先にセットしておくこと
+function enterBuildScreen(){
+    gamePhase = 'build';
+    trapPlaceMode = null; equipModalMonsterId = null;
+    demonLordSkillUsesThisBattle = 0; demonLordSkillUsedKeysThisBattle = []; pendingDemonLordSkill = null;
     battleStageItemDrops = []; battleDamageStats = freshDamageStats(); maxDamageDealtEver = 0;
-    startRunReport(); // テストプレイデータの記録も新しくする
-    nextRoomId = 1; nextCorridorId = 1; nextMonsterId = 1; nextTrapId = 1; selectedRoomId = null; selectedMonsterId = null; demonLordMoveSelected = false;
+    startRunReport(); // テストプレイデータの記録も新しくする（復元時は今回の再開以降のみ記録される）
+    selectedRoomId = null; selectedMonsterId = null; demonLordMoveSelected = false;
     highlightedMonsterId = null; monsterSortKey = 'type'; highlightedTrapId = null;
     healIndividualOpen = false;
     document.getElementById('heal-ind-panel').classList.add('hidden');
@@ -2731,6 +2792,41 @@ function startNewDungeon(){
     updatePhaseUI();
     renderAll();
     scheduleMapPregen(); // リロードボタンが押される前から、次のマップを裏で用意しておく
+}
+
+// ============================================================
+// こまめセーブ：部屋を作る・装備を変える・進化させる・配置を変える・迎撃するなど、
+// 建設フェーズでの主要な操作のたびに現在のダンジョン全体をlocalStorageへ保存する。
+// タイトルの「つづきから」で、閉じる直前の状態にそのまま戻れるようにするための仕組み
+// ============================================================
+const DUNGEON_SAVE_KEY = 'chimyaku_dungeon_save_v1';
+function hasContinueSave(){
+    try { return !!localStorage.getItem(DUNGEON_SAVE_KEY); } catch(e){ return false; }
+}
+// 建設フェーズの間だけ保存する（戦闘中・結果表示中の状態は保存しない＝復元後は必ず「迎撃前」の建設画面に戻る）
+function saveGameState(){
+    if (gamePhase!=='build') return;
+    try {
+        const data = {
+            version: 1, savedAt: Date.now(),
+            playMode, currentAreaIndex, stage, vitality, mana,
+            grid, occupied, rooms, corridors, traps, monsters,
+            entranceCol, demonLordRoomId, demonLordCell,
+            inventory, nextInventoryId, stoneInventory,
+            nextRoomId, nextCorridorId, nextMonsterId, nextTrapId,
+            demonLordSkillLevels,
+        };
+        localStorage.setItem(DUNGEON_SAVE_KEY, JSON.stringify(data));
+    } catch(e){ /* 保存容量オーバーなどは静かに諦める（ゲーム進行自体は止めない） */ }
+}
+function loadGameSave(){
+    try {
+        const raw = localStorage.getItem(DUNGEON_SAVE_KEY);
+        return raw ? JSON.parse(raw) : null;
+    } catch(e){ return null; }
+}
+function clearGameSave(){
+    try { localStorage.removeItem(DUNGEON_SAVE_KEY); } catch(e){}
 }
 function resetPendingState(){
     mode = 'idle'; anchorCell = null; hoverCell = null; pendingRect = null;
@@ -3803,6 +3899,7 @@ function roomTypeConfirm(){
     renderRoomDetail();
     renderOverlays();
     resolveRoomHatchAndLoot(room);
+    saveGameState(); // 部屋を作ったとき
 }
 
 // ============================================================
@@ -5434,6 +5531,7 @@ function evolveMonsterWithStoneCore(monsterId, stoneKey){
     if (stoneInventory[stoneKey]<=0) delete stoneInventory[stoneKey];
     applyEvolution(m, next);
     updateItemButtonAlert();
+    saveGameState(); // 進化させたとき
     return true;
 }
 // 対象を1体選んで石を使う（ピッカーから呼ばれる。進化結果ポップアップを表示する）
@@ -5745,6 +5843,7 @@ function equipItemToMonster(monsterId, invId){
     renderEquipModal();
     renderMonsterDetailModal();
     renderRoomDetail();
+    saveGameState(); // 装備を変えたとき
 }
 function unequipMonster(monsterId){
     const m = monsters.find(x=>x.id===monsterId);
@@ -5755,6 +5854,7 @@ function unequipMonster(monsterId){
     renderEquipModal();
     renderMonsterDetailModal();
     renderRoomDetail();
+    saveGameState(); // 装備を変えたとき
 }
 // 装備を一括解除：全員の装備を外して倉庫に戻す（全部外してから付け直したいという要望向け）
 function unequipAllMonsters(){
@@ -5770,6 +5870,7 @@ function unequipAllMonsters(){
     renderMonsterListModal();
     renderRoomDetail();
     showToast(count>0 ? uif('status_unequip_all_done', count) : ui('status_unequip_all_none'));
+    if (count>0) saveGameState(); // 装備を変えたとき（一括解除）
 }
 // 今の装備からの純増分（マイナスなら今のままの方が強い）。装備なしのモンスターにはequipGainAmountがそのまま純増分になる
 function equipNetGain(m, itemKey){
@@ -5883,15 +5984,18 @@ function moveMonsterTo(mv, destRoom, r, c){
         const oldRoomId = mv.roomId, oldR = mv.r, oldC = mv.c;
         mv.roomId = destRoom.id; mv.r = r; mv.c = c;
         otherHere.roomId = oldRoomId; otherHere.r = oldR; otherHere.c = oldC;
+        saveGameState(); // 配置を変えたとき
         return;
     }
     if (mv.roomId === destRoom.id){
         mv.r = r; mv.c = c;
+        saveGameState(); // 配置を変えたとき
         return;
     }
     const full = roomMonsterCount(destRoom.id) >= destRoom.monsterCapacity;
     if (full){ showToast(ui('err_room_full_need_trade')); return; }
     mv.roomId = destRoom.id; mv.r = r; mv.c = c;
+    saveGameState(); // 配置を変えたとき
 }
 // 魔王は定員の制約を受けず、どの部屋のどの空きマスへも自由に移動できる
 function moveDemonLordTo(destRoomId, r, c){
@@ -5900,6 +6004,7 @@ function moveDemonLordTo(destRoomId, r, c){
     if (cellOccupiedBuild(destRoomId, r, c, 'demonlord')){ showToast(ui('err_cell_occupied')); return; }
     demonLordRoomId = destRoomId;
     demonLordCell.r = r; demonLordCell.c = c;
+    saveGameState(); // 配置を変えたとき
 }
 // ---- モンスター・魔王のドラッグ＆ドロップ移動（クリックでの選択→移動と同じ処理を、ドラッグでも呼べるようにする） ----
 function onDemonLordButtonDragStart(ev){
@@ -6057,6 +6162,7 @@ function setDemonLord(roomId, r, c){
     updateStatus('');
     renderBuildActions();
     renderAll();
+    saveGameState(); // 配置を変えたとき（魔王の初回配置）
 }
 
 // ---- 罠の設置。スロット（1～4番目、種類は部屋確定時に決定済み）を埋めていく形式 ----
@@ -6696,6 +6802,7 @@ function requestStartBattle(){
 }
 function closeBattleConfirm(){ document.getElementById('battle-confirm-modal').classList.add('hidden'); }
 function confirmStartBattle(){
+    saveGameState(); // 迎撃ボタンを押したとき（建設フェーズ最後の状態を保存。復元時はここに戻る）
     closeBattleConfirm();
     startBattle();
 }
@@ -7925,6 +8032,7 @@ function closeStageIncomeModal(){
     battleStageItemDrops = [];
     lastAutoHealInfo = null;
     maybeOfferDemonLordSkillReward();
+    saveGameState(); // ステージクリア後、建設フェーズに戻ったとき
 }
 function closeBattleResultAndRestart(){
     document.getElementById('battle-result-modal').classList.add('hidden');
