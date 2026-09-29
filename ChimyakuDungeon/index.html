@@ -584,8 +584,9 @@
             opacity:1; transition:opacity 0.5s ease;
         }
         #stage-title-overlay.hidden { display:flex !important; opacity:0; pointer-events:none; }
-        .stage-title-num { font-size:1.3rem; color:var(--gold); letter-spacing:0.5em; font-weight:800; margin-bottom:14px; margin-left:0.5em; }
-        .stage-title-name { font-size:3.2rem; color:#fff; font-weight:900; letter-spacing:0.06em; text-shadow:0 4px 18px rgba(0,0,0,0.8); }
+        .stage-title-num { font-size:1.3rem; color:var(--gold); letter-spacing:0.5em; font-weight:800; margin-bottom:14px; margin-left:0.5em; opacity:1; transition:opacity 0.7s ease; }
+        .stage-title-num.pre, .stage-title-name.pre { opacity:0; }
+        .stage-title-name { font-size:3.2rem; color:#fff; font-weight:900; letter-spacing:0.06em; text-shadow:0 4px 18px rgba(0,0,0,0.8); opacity:1; transition:opacity 0.7s ease; }
         .hud-stage-type { font-size:0.6rem; font-weight:700; color:var(--ink-dim); margin-top:2px; text-shadow:none; letter-spacing:0; white-space:nowrap; }
         .stageselect-list { display:flex; flex-direction:column; gap:8px; margin:14px 0; }
         .stageselect-btn { display:flex; align-items:center; gap:10px; padding:10px 16px; text-align:left; width:100%; }
@@ -1080,8 +1081,7 @@
         <div class="story-scrim"></div>
         <div id="story-fade" class="story-fade"></div>
         <button class="btn btn-sm story-skip-btn" onclick="event.stopPropagation(); skipStoryScene()">▶▶ <span data-i18n="story_btn_skip">スキップ</span></button>
-        <img id="story-sprite-left" class="story-sprite left off" src="" alt="">
-        <img id="story-sprite-right" class="story-sprite right off" src="" alt="">
+        <div id="story-sprites"></div>
         <div class="story-window">
             <div id="story-name" class="story-name"></div>
             <div class="story-text-center"><div id="story-text" class="story-text"></div></div>
@@ -6478,20 +6478,21 @@ function storyFaceUrl(speaker, face){
 function startStoryScene(areaIdx, onComplete){
     const lines = STORY_SCRIPT[areaIdx];
     if (!lines || lines.length===0){ if (onComplete) onComplete(); return; } // 台本がないエリア番号はそのまま素通り
-    openStoryOverlay(areaTypeAt(areaIdx).mapImage, lines, () => showStageTitleCard(areaIdx, onComplete));
+    openStoryOverlay(areaTypeAt(areaIdx).mapImage, lines, () => showStageTitleCard(areaIdx, onComplete), true);
 }
 function startStoryEnding(onComplete){
     openStoryOverlay(STORY_ENDING_MAP_IMAGE, STORY_ENDING, onComplete);
 }
-function openStoryOverlay(mapImage, lines, onComplete){
+function openStoryOverlay(mapImage, lines, onComplete, fadeOutAtEnd){
     document.getElementById('story-overlay-bg').style.backgroundImage = `url('${mapImage}')`;
     storyLines = lines;
     storyLineIndex = 0;
     storyOnComplete = onComplete || null;
+    storyFadeOutAtEnd = !!fadeOutAtEnd;
     storySceneToken++; storySceneFading = false;
     document.getElementById('story-fade').classList.remove('on');
     storySlots = { left:null, right:null };
-    ['left','right'].forEach(side => document.getElementById('story-sprite-'+side).classList.add('off'));
+    Object.keys(storySpriteEls).forEach(u => storySpriteEls[u].el.classList.add('off'));
     document.getElementById('story-name').textContent = ''; document.getElementById('story-text').innerHTML = '';
     document.getElementById('story-overlay').classList.remove('hidden');
     renderStoryLine();
@@ -6501,32 +6502,44 @@ function openStoryOverlay(mapImage, lines, onComplete){
 let storyRenderSeq = 0;
 let storySlots = { left:null, right:null };
 const storyFaceDecode = {}; // url -> decode完了のPromise
-function decodeStoryFace(url){
-    if (!storyFaceDecode[url]){ const im = new Image(); im.src = url; storyFaceDecode[url] = im.decode().catch(() => {}); }
-    return storyFaceDecode[url];
+// 立ち絵は「絵1枚につきimg要素1つ」を先に作っておき、切り替えはクラス(off/dim)の付け外しだけにする。
+// （1つのimgのsrcを差し替える方式だと、「暗い→明るい」のクラス変更は即座に効くのに新しい絵の描画は
+// 次のフレームになり、一瞬だけ前の絵が明るくなってから切り替わって見えていた）
+const storySpriteEls = {}; // url -> { el, side }
+function ensureStorySprite(speaker, face){
+    const url = storyFaceUrl(speaker, face);
+    if (!storySpriteEls[url]){
+        const el = document.createElement('img');
+        el.className = 'story-sprite off ' + STORY_SPEAKERS[speaker].side;
+        el.decoding = 'sync'; el.alt = ''; el.src = url;
+        document.getElementById('story-sprites').appendChild(el);
+        storySpriteEls[url] = { el, side: STORY_SPEAKERS[speaker].side };
+        const im = new Image(); im.src = url; storyFaceDecode[url] = im.decode().catch(() => {});
+    }
+    return url;
 }
-// 会話劇で使う立ち絵を、画面に出す前にまとめて読み込み・デコードしておく
+// 会話劇で使う立ち絵を、画面に出す前にまとめて用意しておく
 // （直前に読み込むと、セリフが先に出てから立ち絵が遅れて出る）
 function preloadStoryFaces(){
-    const urls = new Set();
-    Object.values(STORY_SCRIPT).concat([STORY_ENDING]).forEach(lines => lines.forEach(l => { if (l.speaker!=='narration') urls.add(storyFaceUrl(l.speaker, l.face)); }));
-    urls.forEach(decodeStoryFace);
+    Object.values(STORY_SCRIPT).concat([STORY_ENDING]).forEach(lines => lines.forEach(l => { if (l.speaker!=='narration') ensureStorySprite(l.speaker, l.face); }));
 }
 function renderStoryLine(){
     const line = storyLines[storyLineIndex];
     const seq = ++storyRenderSeq;
     const isNarration = line.speaker==='narration'; // 地の文（場面転換用）は名前なし・立ち絵なしで中央寄せ表示にする
+    const url = isNarration ? null : ensureStorySprite(line.speaker, line.face);
     // 立ち位置の記録は同期的に更新する（連打で行を素早く進めても、途中の話者が立ち位置から抜け落ちないように）
     if (isNarration){ storySlots = { left:null, right:null }; }
-    else { storySlots[STORY_SPEAKERS[line.speaker].side] = { url: storyFaceUrl(line.speaker, line.face) }; }
+    else { storySlots[STORY_SPEAKERS[line.speaker].side] = { url }; }
     const speakerSide = isNarration ? null : STORY_SPEAKERS[line.speaker].side;
     const paint = () => {
         if (seq!==storyRenderSeq) return; // 素早く進めたときに古い描画で上書きしない
-        ['left','right'].forEach(side => {
-            const el = document.getElementById('story-sprite-'+side), slot = storySlots[side];
-            el.classList.toggle('off', !slot);
-            if (slot && el.getAttribute('src')!==slot.url) el.src = slot.url;
-            el.classList.toggle('dim', !!slot && side!==speakerSide);
+        // 立ち絵の出し入れ・暗さの切り替え・名前・セリフを、すべて同じタイミング（同じフレーム）で行う
+        Object.keys(storySpriteEls).forEach(u => {
+            const { el, side } = storySpriteEls[u], slot = storySlots[side];
+            const on = !!slot && slot.url===u;
+            el.classList.toggle('off', !on);
+            el.classList.toggle('dim', on && side!==speakerSide);
         });
         const nameEl = document.getElementById('story-name');
         nameEl.textContent = isNarration ? '' : STORY_SPEAKERS[line.speaker].name_ja;
@@ -6535,14 +6548,14 @@ function renderStoryLine(){
         document.getElementById('story-text').classList.toggle('story-narration-text', isNarration);
         document.getElementById('story-next-hint').classList.toggle('hidden', storyLineIndex >= storyLines.length-1);
     };
-    // 立ち絵のデコードが済んでから、名前・セリフ・立ち絵を同じタイミングで切り替える
-    // ※デコードが何らかの理由で進まなくても会話が止まらないよう、最大300msで打ち切って描画する
+    // 立ち絵のデコードが済んでから描画する。※デコードが何らかの理由で進まなくても会話が止まらないよう、最大300msで打ち切る
     if (isNarration) paint();
-    else Promise.race([decodeStoryFace(storyFaceUrl(line.speaker, line.face)), new Promise(res => setTimeout(res, 300))]).then(paint);
+    else Promise.race([storyFaceDecode[url], new Promise(res => setTimeout(res, 300))]).then(paint);
 }
 // 場面転換（次の行がnarration＝「一方、その頃――」など）のときだけ、画面全体を黒くフェードしてから切り替え、
 // フェードで戻す。暗転中の連打で行が飛ばないよう、storySceneFadingの間は入力を受け付けない
 let storySceneFading = false;
+let storyFadeOutAtEnd = false; // trueなら、最後の行のあと画面を黒くフェードしてから会話劇を終える（題名カードへつなぐ会話劇用）
 let storySceneToken = 0; // 暗転中にスキップされた／別の会話劇が開いたときに、古いタイマーが行を進めないための世代番号
 const STORY_SCENE_FADE_MS = 400;
 function advanceStory(){
@@ -6564,6 +6577,14 @@ function advanceStory(){
         }
         storyLineIndex++; renderStoryLine(); return;
     }
+    if (storyFadeOutAtEnd){
+        // 最後の一言のあと、いきなり題名を出さず、まず画面を黒くフェードして一拍置く
+        storySceneFading = true;
+        const token = storySceneToken;
+        document.getElementById('story-fade').classList.add('on');
+        setTimeout(() => { if (token===storySceneToken) finishStoryScene(); }, STORY_SCENE_FADE_MS);
+        return;
+    }
     finishStoryScene();
 }
 function skipStoryScene(){ finishStoryScene(); }
@@ -6577,18 +6598,31 @@ function finishStoryScene(){
 // ---- ステージタイトルカード：会話劇の最後（勇者パートの決め台詞など）からダンジョン画面へ、
 // 一度暗転して「ステージX『○○の迷宮』」を大きく見せてから繋ぐ演出 ----
 let stageTitleTimer = null;
+let stageTitleToken = 0;
+const STAGE_TITLE_BLANK_MS = 700;  // 真っ暗なまま待つ「余白」
+const STAGE_TITLE_HOLD_MS = 1900;  // 題名を見せておく時間
 let stageTitleOnComplete = null;
 function showStageTitleCard(areaIdx, onComplete){
     const area = areaTypeAt(areaIdx);
     document.getElementById('stage-title-num').textContent = uif('stage_title_num_label', areaIdx);
     document.getElementById('stage-title-name').textContent = uif('stage_title_name_label', area.name_ja);
     stageTitleOnComplete = onComplete || null;
-    document.getElementById('stage-title-overlay').classList.remove('hidden');
+    const card = document.getElementById('stage-title-overlay');
+    const numEl = document.getElementById('stage-title-num'), nameEl = document.getElementById('stage-title-name');
+    // 黒いカードは一瞬で全面に出す（すでに黒くなっているので違和感がなく、裏の建設画面がフェード中に透けない）。
+    // 文字は最初は隠しておき、少し間を置いてからフェードで出す
+    numEl.classList.add('pre'); nameEl.classList.add('pre');
+    card.style.transition = 'none';
+    card.classList.remove('hidden');
+    void card.offsetWidth;
+    card.style.transition = '';
     clearTimeout(stageTitleTimer);
-    stageTitleTimer = setTimeout(finishStageTitleCard, 1800); // クリック/Enterで早められる。何もしなくても自動で進む
+    const token = ++stageTitleToken;
+    setTimeout(() => { if (token===stageTitleToken){ numEl.classList.remove('pre'); nameEl.classList.remove('pre'); } }, STAGE_TITLE_BLANK_MS);
+    stageTitleTimer = setTimeout(finishStageTitleCard, STAGE_TITLE_BLANK_MS + STAGE_TITLE_HOLD_MS); // クリック/Enterで早められる。何もしなくても自動で進む
 }
 function finishStageTitleCard(){
-    clearTimeout(stageTitleTimer);
+    clearTimeout(stageTitleTimer); stageTitleToken++;
     document.getElementById('stage-title-overlay').classList.add('hidden');
     const cb = stageTitleOnComplete; stageTitleOnComplete = null;
     if (cb) cb();
