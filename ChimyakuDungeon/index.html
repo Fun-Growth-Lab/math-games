@@ -1039,14 +1039,19 @@
         .delta-up { color:#7fe6a0; font-weight:800; } .delta-down { color:#ff8d7d; font-weight:800; } .delta-zero { color:var(--ink-dim); }
         /* ステージクリアポップアップ：横幅を活かし、増加量は横1列のチップ、レベルアップ・戦利品は種類ごとのカードを
            グリッドで並べる（縦積みだと項目が増えるほど際限なく縦に伸び、二重スクロールも起きていたため） */
-        .stage-clear-stats { display:flex; gap:8px; margin:10px 0 14px; }
+        /* 幅を広げて（1060px）レベルアップのチップを1行に10個以上並べ、縦に伸びにくくする。
+           それでも収まらない量のときは、見出し・増加量・「次のステージへ」ボタンは固定のまま、中身(グリッド)だけがスクロールする */
+        .stage-clear-box { width:1060px; max-width:96vw; max-height:92vh; display:flex; flex-direction:column; overflow:hidden; }
+        .stage-clear-box .stage-clear-grid { flex:1 1 auto; min-height:0; overflow-y:auto; padding-right:2px; }
+        .stage-clear-stats { display:flex; gap:8px; margin:6px 0 12px; flex:0 0 auto; }
         .stage-clear-stat {
             flex:1; min-width:0; display:flex; flex-direction:column; align-items:center; gap:3px;
             background:rgba(255,255,255,0.04); border:1px solid var(--card-bdr); border-radius:10px; padding:8px 6px;
         }
         .stage-clear-stat .sc-stat-label { font-size:0.72rem; color:var(--ink-dim); font-weight:700; display:flex; align-items:center; gap:4px; }
         .stage-clear-stat b { font-size:1.05rem; }
-        .stage-clear-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:10px; align-items:start; }
+        .stage-clear-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:10px; align-items:start; }
+        .sc-card-wide { grid-column:1/-1; }
         .sc-card { background:rgba(255,255,255,0.03); border:1px solid var(--card-bdr); border-radius:10px; padding:8px 10px; text-align:left; }
         .sc-card-title { font-size:0.85rem; font-weight:800; color:var(--gold); margin-bottom:8px; padding-bottom:4px; border-bottom:2px solid var(--card-bdr); }
         .sc-chip-grid { display:flex; flex-wrap:wrap; gap:8px; }
@@ -1382,7 +1387,7 @@
 
     <!-- ==================== STAGE CLEAR (勝利結果・収入・回復・レベルアップ・戦利品を1つにまとめたポップアップ) ==================== -->
     <div id="stage-income-modal" class="modal-backdrop hidden">
-        <div class="modal-box" style="width:680px; max-width:96vw; max-height:92vh; overflow-y:auto;">
+        <div class="modal-box stage-clear-box">
             <div class="modal-title" id="stage-clear-title"></div>
             <div class="stage-clear-stats">
                 <div class="stage-clear-stat"><span class="sc-stat-label"><span class="gem-chip-sq gem-citrine"></span><span data-i18n="stage_income_vit_label">活力の増加量</span></span><b id="stage-income-vit">0</b></div>
@@ -1390,7 +1395,7 @@
                 <div class="stage-clear-stat" id="stage-income-heal-row"><span class="sc-stat-label">💊 <span data-i18n="stage_income_heal_label">回復に使った魔力</span></span><b id="stage-income-heal">0</b></div>
             </div>
             <div id="stage-clear-grid" class="stage-clear-grid"></div>
-            <button class="btn btn-primary btn-sm" style="margin-top:14px; width:100%;" data-i18n="btn_next_stage" onclick="closeStageIncomeModal()">次のステージへ</button>
+            <button class="btn btn-primary btn-sm" style="margin-top:12px; width:100%; flex:0 0 auto;" data-i18n="btn_next_stage" onclick="closeStageIncomeModal()">次のステージへ</button>
         </div>
     </div>
 
@@ -2825,6 +2830,7 @@ function continueGameFromSave(){
     nextRoomId = data.nextRoomId || 1; nextCorridorId = data.nextCorridorId || 1;
     nextMonsterId = data.nextMonsterId || 1; nextTrapId = data.nextTrapId || 1;
     demonLordSkillLevels = data.demonLordSkillLevels || {};
+    rooms.forEach(ensureRoomSpecialAbilities); // 特殊能力スロットの仕様変更（Lv1/2/3/4）に旧セーブを合わせる
     goTo('build-screen');
     enterBuildScreen();
 }
@@ -3592,7 +3598,7 @@ const ROOM_TYPES = [
 ];
 const ROOM_TYPES_SELECTABLE = ROOM_TYPES;
 // ---- 部屋の能力レベル（活力増加Lv・魔力増加Lv・召喚Lv・掘削Lv）----
-// 部屋の能力：自分の部屋タイプと一致する能力は該当する素を1つ以上持っていれば自動でLv1。上限は4能力とも共通でLv5。
+// 部屋の能力：自分の部屋タイプと一致する能力は該当する素を1つ以上持っていれば自動でLv1。上限は4能力とも共通でLv4。
 // 他タイプの能力は自動付与なし・上限0（自室のタイプでしか能力アップできない）。
 // 部屋どうしを通路でつなぐメリットは、能力Lvではなく素の数そのものを底上げする形で表現する（effectiveElementCount参照）
 function connectedRoomTypeCounts(roomId){
@@ -3641,10 +3647,10 @@ function roomAbilityLv(room, abilityType, effectiveType){
     const baseline = roomAbilityBaseline(room, abilityType, effectiveType);
     room.abilityLv = room.abilityLv || {};
     const stored = room.abilityLv[abilityType];
-    return stored!==undefined ? Math.max(stored, baseline) : baseline;
+    return stored!==undefined ? Math.min(ABILITY_MAX_LV, Math.max(stored, baseline)) : baseline; // 旧セーブのLv5は上限Lv4に丸める
 }
-// 4能力とも最大Lv5（部屋接続による恩恵は、能力Lvの底上げではなく素の数の底上げ(effectiveElementCount)で表現する）
-const ABILITY_MAX_LV = 5;
+// 4能力とも最大Lv4（現実的に到達できるのは3〜4止まりのため。部屋接続による恩恵は、能力Lvの底上げではなく素の数の底上げ(effectiveElementCount)で表現する）
+const ABILITY_MAX_LV = 4;
 function roomAbilityMaxLv(room, abilityType, effectiveType){
     const et = effectiveType!==undefined ? effectiveType : room.type;
     if (!roomAbilityUnlocked(room, abilityType)) return 0;
@@ -3668,7 +3674,7 @@ function toolQuality(room, lvOverride){
 }
 // 召喚・掘削の「1ステージあたりに生産される数」は確率で決まる。
 // 期待値 = 実質素数 ÷ ROOM_OUTPUT_ELEMENTS_PER_ITEM × (1 + ROOM_OUTPUT_LV_GROWTH × (Lv−1))
-// 例：素3つ・Lv1で期待値1.0、素6つ・Lv1で2.0、素3つ・Lv5で4.0。
+// 例：素3つ・Lv1で期待値1.0、素6つ・Lv1で2.0、素3つ・Lv4で3.25。
 // 実際の生産数は「期待値の整数部分は確定、小数部分はその確率でもう1つ」（例：0.8なら80%で1つ、2.6なら2つは確定で3つ目は60%）。
 // 素の数に比例する形にしてあるので、素を小さい部屋に分散しても1部屋にまとめても、Lv1の生産量は同じ（小部屋の量産が有利にならない）。
 // Lvを上げる効果は素が多い部屋ほど大きく、1部屋に素を集めてレベルを上げるほど得になる
@@ -3699,7 +3705,7 @@ function monsterSummonStage2Chance(room, lvOverride){
 }
 function roomAbilityMultiplier(room, abilityType, effectiveType){
     const lv = roomAbilityLv(room, abilityType, effectiveType);
-    // 活力・魔力はLvごとに2倍・4倍・8倍・16倍・32倍と伸びが大きくなるようにする（以前の1+Lvだと伸び幅が小さすぎた）
+    // 活力・魔力はLvごとに2倍・4倍・8倍・16倍と伸びが大きくなるようにする（以前の1+Lvだと伸び幅が小さすぎた）
     if (abilityType==='vitality' || abilityType==='mana') return Math.pow(2, lv);
     if (abilityType==='attack'){ const count = room.elements.attack||0; return 1 + ABILITY_MULT_COEF.attack*count*lv; }
     return 1; // 召喚・道具は倍率ではなく確率で表現するため、ここでは意味を持たない
@@ -3715,12 +3721,12 @@ function abilityRowMeta(abilityType){
 }
 
 // ============================================================
-// 部屋の特殊能力（部屋のレベル＝自分のタイプの能力Lvが1/3/5に達するたびに、8種類の中からランダムで1つ獲得する）
+// 部屋の特殊能力（部屋のレベル＝自分のタイプの能力Lvが1/2/3/4に達するたびに、8種類の中からランダムで1つ獲得する。最大4つ）
 // 部屋にいるモンスターだけに効くバフ効果。同じ種類の効果は加算される（例：攻撃力+10%と攻撃力+30%で+40%）
 // ============================================================
 const ROOM_SPECIAL_ABILITY_TYPES = ['atk','def','magAtk','magDef','hpRegen','melee','ranged','magic'];
-// スロットが解放されるLv→そのスロットの効果量。Lv1・Lv3・Lv5のどれも共通で+20%
-const ROOM_SPECIAL_ABILITY_SLOTS = { 1:0.20, 3:0.20, 5:0.20 };
+// スロットが解放されるLv→そのスロットの効果量。Lv1・2・3・4のどれも共通で+20%
+const ROOM_SPECIAL_ABILITY_SLOTS = { 1:0.20, 2:0.20, 3:0.20, 4:0.20 };
 function roomSpecialAbilityLabel(type){
     return { atk:ui('room_special_label_atk'), def:ui('room_special_label_def'), magAtk:ui('room_special_label_magatk'), magDef:ui('room_special_label_magdef'),
         hpRegen:ui('room_special_hpregen'), melee:ui('room_special_label_melee'), ranged:ui('room_special_label_ranged'), magic:ui('room_special_label_magic') }[type];
@@ -3729,7 +3735,8 @@ function roomSpecialAbilityLabel(type){
 // 既に確定済みのスロットは再抽選しない（一度決まった特殊能力はそのまま維持される）
 function ensureRoomSpecialAbilities(room){
     if (!room.type) return;
-    room.specialAbilities = room.specialAbilities || [];
+    // 旧仕様（Lv5スロットなど）の特殊能力が残っていたら取り除く（旧セーブ対策）
+    room.specialAbilities = (room.specialAbilities || []).filter(a => ROOM_SPECIAL_ABILITY_SLOTS[a.slotLv]!==undefined);
     const lv = roomAbilityLv(room, room.type);
     Object.keys(ROOM_SPECIAL_ABILITY_SLOTS).map(Number).forEach(slotLv => {
         if (lv < slotLv) return;
@@ -3845,8 +3852,8 @@ function costSpanHtml(vit, mana, insufficient){
     return parts.join(' ／ ');
 }
 // 活力・召喚能力のアップは魔力を、魔力・掘削能力のアップは活力を消費する。
-// 4能力とも最大Lv5・同じ固定コスト表（段階ごとに倍増）に統一
-const ABILITY_UPGRADE_COST = [null, 200, 400, 800, 1600, 3200]; // 添字＝目標Lv(1〜5)
+// 4能力とも最大Lv4・同じ固定コスト表（段階ごとに倍増）に統一
+const ABILITY_UPGRADE_COST = [null, 200, 400, 800, 1600]; // 添字＝目標Lv(1〜4)
 function abilityUpgradeCost(abilityType, targetLv){
     const amount = ABILITY_UPGRADE_COST[targetLv];
     if (abilityType==='vitality' || abilityType==='summon') return { vit:0, mana:amount };
@@ -8211,9 +8218,9 @@ function proceedNextStage(){
     processNextRankUp();
 }
 // 種類ごとのカード1枚分（アイコン＋名前＋個数バッジを小さなチップとして並べる）
-function scCardHtml(titleKey, chipsHtml){
+function scCardHtml(titleKey, chipsHtml, wide){
     if (!chipsHtml) return '';
-    return `<div class="sc-card"><div class="sc-card-title">${ui(titleKey)}</div><div class="sc-chip-grid">${chipsHtml}</div></div>`;
+    return `<div class="sc-card${wide?' sc-card-wide':''}"><div class="sc-card-title">${ui(titleKey)}</div><div class="sc-chip-grid">${chipsHtml}</div></div>`;
 }
 function scChipHtml(iconHtml, labelHtml, count, topLabel){
     const badge = count>1 ? `<span class="sc-chip-badge">×${count}</span>` : '';
@@ -8251,7 +8258,7 @@ function levelUpCardHtml(levelUpList){
         const name = m.isDemonLord ? ui('demonlord_label') : monsterDisplayName(m);
         return scChipHtml(icon, escapeHtml(name), 0, uif('levelup_arrow_label', fromLevel, toLevel));
     }).join('');
-    return scCardHtml('stage_income_ranked_title', chips);
+    return scCardHtml('stage_income_ranked_title', chips, true); // レベルアップは数が多くなりがちなので全幅で並べる
 }
 function openStageIncomeModal(vitGain, manaGain, levelUpList){
     document.getElementById('stage-clear-title').textContent = uif('stage_clear_title', stage-1);
@@ -9033,7 +9040,7 @@ function renderRoomDetail(){
                 });
             }
         }
-        // 「部屋の能力」（Lvアップ）と「部屋の特殊能力」（Lv1/3/5でランダム獲得するバフ）は見出しを1つに統一する
+        // 「部屋の能力」（Lvアップ）と「部屋の特殊能力」（Lv1/2/3/4でランダム獲得するバフ）は見出しを1つに統一する
         if (skillRows || (rm.specialAbilities||[]).length>0){
             html += `<div class="side-panel-title" style="margin-top:10px;">${ui('section_ability_title')}</div>`;
         }
