@@ -7042,14 +7042,17 @@ function buildBattleHeroPreview(){
     const list = [];
     for (let i=0;i<heroCount;i++){
         const classKey = roster[i % roster.length];
-        // 勇者ごとにLvへ個体差をつける（標準Lv×0.8〜1.2の一様乱数＝±20%以内。標準のちょうどがずらっと並ぶのを避ける）。
-        // Lvは強さ（ステータス）にもそのまま反映される
-        const lvMult = HERO_LV_VARIATION_MIN + Math.random()*(HERO_LV_VARIATION_MAX-HERO_LV_VARIATION_MIN);
+        // 勇者ごとにLvへ個体差をつける（標準Lvからの差を一様乱数で決める。標準のちょうどがずらっと並ぶのを避ける）。
+        // 差の最大は「標準Lvの±20%」か「±5Lv」の小さい方（標準Lvが大きい終盤で差が開きすぎないように）。
+        // 差の幅は、上限で頭打ちにして縁に偏らないよう、そもそもの乱数の幅を上限に合わせて決める。Lvは強さ（ステータス）にもそのまま反映される
+        const baseLv = heroDisplayLevel(stage);
+        const maxDev = Math.min(HERO_LV_VARIATION_RATE*baseLv, HERO_LV_VARIATION_MAX_LEVELS);
+        const lvMult = 1 + (Math.random()*2-1) * maxDev / baseLv;
         list.push({ classKey, gender: Math.random()<0.5?'m':'f', lvMult });
     }
     return list;
 }
-const HERO_LV_VARIATION_MIN = 0.8, HERO_LV_VARIATION_MAX = 1.2;
+const HERO_LV_VARIATION_RATE = 0.20, HERO_LV_VARIATION_MAX_LEVELS = 5;
 // 勇者1人の表示Lv（そのステージの標準Lv×個体差。最低1）
 function heroLevelOf(stageNum, lvMult){ return Math.max(1, Math.round(heroDisplayLevel(stageNum) * (lvMult===undefined ? 1 : lvMult))); }
 // 4方向シートのイラストがある職は絵柄で表示する（絵がない職を追加した場合はここのリストから外すと絵文字で代用表示になる）
@@ -7083,10 +7086,10 @@ function heroTeamPower(stats){
     });
     return hp * off;
 }
-// 目標戦力のステージ別の追加補正。テストプレイで、ステージ2（手持ちが4体→10体に増える節目）の勇者が弱すぎる、
-// 続くステージ3も同様に楽すぎたため、ステージ2は戦力2倍（HP・攻撃が各約1.41倍）、ステージ3は1.6倍（各約1.26倍）に引き上げる。
-// ステージ1は「ひとまず良い」とのことなので据え置き、ステージ4以降は元の曲線（ステージ間で約1.8〜1.9倍ずつ増える）のまま
-const HERO_TEAM_POWER_STAGE_BOOST = { 2:2.0, 3:1.6 };
+// 目標戦力のステージ別の追加補正。ステージ3は楽すぎたため戦力1.6倍（HP・攻撃が各約1.26倍）に引き上げる。
+// ステージ2も一度2倍（各約1.41倍）にしたが、テストプレイで「やられまくった」ため、元の曲線（補正なし）に戻した。
+// ステージ1は補正の対象外、ステージ4以降は元の曲線（ステージ間で約1.8〜1.9倍ずつ増える）のまま
+const HERO_TEAM_POWER_STAGE_BOOST = { 3:1.6 };
 const heroTeamPowerTargetCache = {};
 function heroTeamPowerTarget(stageNum){
     if (heroTeamPowerTargetCache[stageNum]!==undefined) return heroTeamPowerTargetCache[stageNum];
