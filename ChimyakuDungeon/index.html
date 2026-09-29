@@ -535,37 +535,46 @@
         #story-overlay.hidden { display:block !important; opacity:0; pointer-events:none; }
         .story-bg { position:absolute; inset:0; background-size:cover; background-position:center; }
         .story-scrim { position:absolute; inset:0; background:linear-gradient(rgba(0,0,0,0) 50%, rgba(0,0,0,0.78) 100%); }
-        /* 背景の世界地図には約26px（左右は約21px）の額縁が描き込まれているので、
-           スキップボタン・顔グラ枠・セリフ枠はどれも額縁の内側に収める（額縁＋少し余白ぶん内側へ寄せる） */
-        /* 場面転換用の黒幕。.onで黒くフェードイン、外すとフェードで戻る（skipボタンより上に出す） */
-        .story-fade { position:absolute; inset:0; background:#000; opacity:0; pointer-events:none; z-index:3; transition:opacity 0.4s ease; }
+        /* 会話パートの構成（ノベルゲームの定石に沿う）：①メッセージ窓は画面下部の低め・半透明、②名前は窓の上に
+           タブとして左右どちらかに寄せる（話者の立ち位置側）、③立ち絵は左右に立たせて窓の上端に少し重ね、
+           しゃべっていない側は暗くして誰が話しているか分かるようにする。
+           背景の世界地図には約26px（左右は約21px）の額縁が描き込まれているので、窓・立ち絵・スキップボタンは
+           額縁＋少しの余白ぶん内側へ寄せる */
+        /* 場面転換用の黒幕。.onで黒くフェードイン、外すとフェードで戻る */
+        .story-fade { position:absolute; inset:0; background:#000; opacity:0; pointer-events:none; z-index:5; transition:opacity 0.4s ease; }
         .story-fade.on { opacity:1; }
-        .story-skip-btn { position:absolute; top:38px; right:44px; z-index:2; opacity:0.85; }
-        /* 顔グラ枠とセリフ枠は「対」に見えるよう、同じ高さ(.story-boxの高さに揃える)・同じ見た目（暗い半透明パネル＋枠線）にする */
-        .story-box { position:absolute; left:44px; right:44px; bottom:40px; height:330px; z-index:1; display:flex; align-items:stretch; gap:12px; }
-        /* 話者が変わるとき、中のimgだけをopacity:0にフェードしてから差し替える。パネルの地色（暗い色）まで
-           フェードして戻る演出になる */
-        .story-face-wrap {
-            position:relative; width:330px; flex-shrink:0; overflow:hidden;
-            background:rgba(15,10,8,0.85); border:2px solid var(--card-bdr); border-radius:16px; box-shadow:0 10px 30px rgba(0,0,0,0.5);
+        .story-skip-btn { position:absolute; top:38px; right:44px; z-index:4; opacity:0.85; }
+        .story-sprite {
+            position:absolute; bottom:146px; width:380px; height:380px; object-fit:contain; object-position:bottom; z-index:1;
+            filter: drop-shadow(0 6px 14px rgba(0,0,0,0.55));
         }
-        .story-face { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; object-position:bottom; display:block; }
-        .story-textbox {
-            flex:1; min-width:0; background:rgba(15,10,8,0.85); border:2px solid var(--card-bdr); border-radius:16px;
-            padding:20px 28px; box-shadow:0 10px 30px rgba(0,0,0,0.5);
+        .story-sprite.left { left:44px; }
+        .story-sprite.right { right:44px; }
+        .story-sprite.dim { filter: brightness(0.5) drop-shadow(0 6px 14px rgba(0,0,0,0.55)); }
+        .story-sprite.off { visibility:hidden; }
+        .story-window {
+            position:absolute; left:44px; right:44px; bottom:40px; min-height:176px; z-index:2;
+            background:rgba(15,10,8,0.86); border:2px solid var(--card-bdr); border-radius:16px;
+            padding:26px 36px 20px; box-shadow:0 10px 30px rgba(0,0,0,0.5);
             display:flex; flex-direction:column;
         }
-        .story-name { font-size:1.15rem; font-weight:800; color:var(--gold); margin-bottom:10px; }
+        .story-name {
+            position:absolute; top:-20px; left:28px; padding:5px 22px; z-index:3;
+            background:linear-gradient(to bottom,#3c2a1a,#22160e); border:2px solid var(--gold); border-radius:12px;
+            font-size:1.15rem; font-weight:800; color:var(--gold); letter-spacing:0.08em;
+        }
+        .story-name.right { left:auto; right:28px; }
+        .story-name:empty { display:none; }
         /* story-textの中身は<b>タグ混じりのinnerHTMLなので、この要素自体はflexにしない（flexにすると
            テキストノードと<b>がそれぞれ別のflexアイテム扱いになり、行の途中で不自然に折り返される）。
            縦中央寄せは1つ外側のラッパー(story-text-center)だけに掛ける */
         .story-text-center { flex:1; display:flex; flex-direction:column; justify-content:center; }
         .story-text {
-            font-size:1.4rem; font-weight:700; color:#fff; line-height:1.85; white-space:pre-wrap;
+            font-size:1.4rem; font-weight:700; color:#fff; line-height:1.75; white-space:pre-wrap;
         }
         /* セリフ中の<b>で、力の入った言葉・大声の部分だけ一段大きく金色で目立たせる */
         .story-text b { font-size:1.22em; color:var(--gold); white-space:nowrap; }
-        .story-next-hint { text-align:right; font-size:1.2rem; color:var(--gold); margin-top:6px; animation: storyNextBlink 1.2s ease-in-out infinite; }
+        .story-next-hint { text-align:right; font-size:1.2rem; color:var(--gold); margin-top:2px; animation: storyNextBlink 1.2s ease-in-out infinite; }
         .story-narration-text { text-align:center; font-style:italic; color:var(--ink-dim); font-size:1.25rem; }
         @keyframes storyNextBlink { 0%,100% { opacity:0.25; } 50% { opacity:1; } }
         /* ==================== STAGE TITLE CARD（会話劇の締め→ダンジョン画面へのつなぎ） ==================== */
@@ -1071,13 +1080,12 @@
         <div class="story-scrim"></div>
         <div id="story-fade" class="story-fade"></div>
         <button class="btn btn-sm story-skip-btn" onclick="event.stopPropagation(); skipStoryScene()">▶▶ <span data-i18n="story_btn_skip">スキップ</span></button>
-        <div class="story-box">
-            <div id="story-face-wrap" class="story-face-wrap"><img id="story-face" class="story-face" src="" alt=""></div>
-            <div class="story-textbox">
-                <div id="story-name" class="story-name"></div>
-                <div class="story-text-center"><div id="story-text" class="story-text"></div></div>
-                <div id="story-next-hint" class="story-next-hint">▼</div>
-            </div>
+        <img id="story-sprite-left" class="story-sprite left off" src="" alt="">
+        <img id="story-sprite-right" class="story-sprite right off" src="" alt="">
+        <div class="story-window">
+            <div id="story-name" class="story-name"></div>
+            <div class="story-text-center"><div id="story-text" class="story-text"></div></div>
+            <div id="story-next-hint" class="story-next-hint">▼</div>
         </div>
     </div>
 
@@ -6363,11 +6371,11 @@ function heroRosterForStage(stageNum){
 // 登場人物：魔王（ワシ／子供だが尊大）、ヴィオラ（ダークエルフ。魔王のお世話係。丁寧だがちょっと抜けている）、
 // 勇者パーティ（剣士・アーチャーが中心。時々プリーストも）。顔グラはimages/kao/<faceDir>_<face>.pngを使う
 const STORY_SPEAKERS = {
-    maou:      { name_ja:'魔王',         faceDir:'images/kao/maou1_' },
-    darkelf:   { name_ja:'ヴィオラ',     faceDir:'images/kao/darkelf_' },
-    swordsman: { name_ja:'剣士',         faceDir:'images/kao/swordsman_m_' },
-    archer:    { name_ja:'アーチャー',   faceDir:'images/kao/archer_m_' },
-    priest:    { name_ja:'プリースト',   faceDir:'images/kao/priest_f_' },
+    maou:      { name_ja:'魔王',         side:'left',  faceDir:'images/kao/maou1_' },
+    darkelf:   { name_ja:'ヴィオラ',     side:'right', faceDir:'images/kao/darkelf_' },
+    swordsman: { name_ja:'剣士',         side:'left',  faceDir:'images/kao/swordsman_m_' },
+    archer:    { name_ja:'アーチャー',   side:'right', faceDir:'images/kao/archer_m_' },
+    priest:    { name_ja:'プリースト',   side:'right', faceDir:'images/kao/priest_f_' },
 };
 // 各エリア突入時の会話劇。前半＝魔王とダークエルフ（迷宮づくりの経緯）、後半＝勇者パート（魔王を追う側の会話）の2部構成。
 // 後半はnarration行（speaker:'narration'。顔グラなしの地の文）で場面転換してから始まる
@@ -6482,19 +6490,55 @@ function openStoryOverlay(mapImage, lines, onComplete){
     storyOnComplete = onComplete || null;
     storySceneToken++; storySceneFading = false;
     document.getElementById('story-fade').classList.remove('on');
+    storySlots = { left:null, right:null };
+    ['left','right'].forEach(side => document.getElementById('story-sprite-'+side).classList.add('off'));
+    document.getElementById('story-name').textContent = ''; document.getElementById('story-text').innerHTML = '';
     document.getElementById('story-overlay').classList.remove('hidden');
     renderStoryLine();
 }
-// 1行ぶんを即座に描画する（話者・表情が変わってもフェードは挟まない。挟むとラグに見えるため）
+// 立ち絵は「左」「右」の2つの立ち位置（STORY_SPEAKERSのside）。しゃべった人はその側に立ち、次の場面転換まで
+// 立ったまま残る。今しゃべっていない側は暗くする。地の文(narration)では両方とも下がる
+let storyRenderSeq = 0;
+let storySlots = { left:null, right:null };
+const storyFaceDecode = {}; // url -> decode完了のPromise
+function decodeStoryFace(url){
+    if (!storyFaceDecode[url]){ const im = new Image(); im.src = url; storyFaceDecode[url] = im.decode().catch(() => {}); }
+    return storyFaceDecode[url];
+}
+// 会話劇で使う立ち絵を、画面に出す前にまとめて読み込み・デコードしておく
+// （直前に読み込むと、セリフが先に出てから立ち絵が遅れて出る）
+function preloadStoryFaces(){
+    const urls = new Set();
+    Object.values(STORY_SCRIPT).concat([STORY_ENDING]).forEach(lines => lines.forEach(l => { if (l.speaker!=='narration') urls.add(storyFaceUrl(l.speaker, l.face)); }));
+    urls.forEach(decodeStoryFace);
+}
 function renderStoryLine(){
     const line = storyLines[storyLineIndex];
-    const isNarration = line.speaker==='narration'; // 地の文（場面転換用）は顔グラなし・名前なしで中央寄せ表示にする
-    document.getElementById('story-face-wrap').style.visibility = isNarration ? 'hidden' : 'visible';
-    if (!isNarration) document.getElementById('story-face').src = storyFaceUrl(line.speaker, line.face);
-    document.getElementById('story-name').textContent = isNarration ? '' : STORY_SPEAKERS[line.speaker].name_ja;
-    document.getElementById('story-text').innerHTML = line.text; // セリフ中の<b>で強調語を大きく表示するためinnerHTML
-    document.getElementById('story-text').classList.toggle('story-narration-text', isNarration);
-    document.getElementById('story-next-hint').classList.toggle('hidden', storyLineIndex >= storyLines.length-1);
+    const seq = ++storyRenderSeq;
+    const isNarration = line.speaker==='narration'; // 地の文（場面転換用）は名前なし・立ち絵なしで中央寄せ表示にする
+    // 立ち位置の記録は同期的に更新する（連打で行を素早く進めても、途中の話者が立ち位置から抜け落ちないように）
+    if (isNarration){ storySlots = { left:null, right:null }; }
+    else { storySlots[STORY_SPEAKERS[line.speaker].side] = { url: storyFaceUrl(line.speaker, line.face) }; }
+    const speakerSide = isNarration ? null : STORY_SPEAKERS[line.speaker].side;
+    const paint = () => {
+        if (seq!==storyRenderSeq) return; // 素早く進めたときに古い描画で上書きしない
+        ['left','right'].forEach(side => {
+            const el = document.getElementById('story-sprite-'+side), slot = storySlots[side];
+            el.classList.toggle('off', !slot);
+            if (slot && el.getAttribute('src')!==slot.url) el.src = slot.url;
+            el.classList.toggle('dim', !!slot && side!==speakerSide);
+        });
+        const nameEl = document.getElementById('story-name');
+        nameEl.textContent = isNarration ? '' : STORY_SPEAKERS[line.speaker].name_ja;
+        nameEl.classList.toggle('right', speakerSide==='right');
+        document.getElementById('story-text').innerHTML = line.text; // セリフ中の<b>で強調語を大きく表示するためinnerHTML
+        document.getElementById('story-text').classList.toggle('story-narration-text', isNarration);
+        document.getElementById('story-next-hint').classList.toggle('hidden', storyLineIndex >= storyLines.length-1);
+    };
+    // 立ち絵のデコードが済んでから、名前・セリフ・立ち絵を同じタイミングで切り替える
+    // ※デコードが何らかの理由で進まなくても会話が止まらないよう、最大300msで打ち切って描画する
+    if (isNarration) paint();
+    else Promise.race([decodeStoryFace(storyFaceUrl(line.speaker, line.face)), new Promise(res => setTimeout(res, 300))]).then(paint);
 }
 // 場面転換（次の行がnarration＝「一方、その頃――」など）のときだけ、画面全体を黒くフェードしてから切り替え、
 // フェードで戻す。暗転中の連打で行が飛ばないよう、storySceneFadingの間は入力を受け付けない
@@ -9045,6 +9089,7 @@ renderElemLegend();
 // 会話劇の背景（世界地図7枚）をあらかじめブラウザに読み込ませておく。
 // 表示直前に読み込むと、大きな画像の読み込み中だけ後ろの建設画面が一瞬見えてしまうため
 AREA_TYPES.map(a => a.mapImage).concat([STORY_ENDING_MAP_IMAGE]).forEach(src => { const img = new Image(); img.src = src; });
+preloadStoryFaces();
 // マップ外（グリッドにも右パネルにも属さない場所）をクリックしたら部屋の選択を解除する
 // captureフェーズで登録：ボタンのonclick内でinnerHTMLが差し替わり要素が消える前に
 // ev.targetを判定できるようにするため（bubbleフェーズだと要素が消えてclosest()が失敗する）
