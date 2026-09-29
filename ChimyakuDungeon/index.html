@@ -1105,7 +1105,7 @@
         <div class="title-box">
             <h1 class="title-h1">地下迷宮ビルダーズ</h1>
             <div class="title-sub" data-i18n="title_sub">CHIMYAKU DUNGEON ― 試作版：ダンジョン建設</div>
-            <button id="btn-continue" class="btn btn-primary hidden" onclick="continueGameFromSave()" data-i18n="btn_continue">▶ つづきから</button>
+            <button id="btn-continue" class="btn btn-primary hidden" onclick="continueStory()" data-i18n="btn_continue">▶ つづきから</button>
             <button class="btn btn-primary" id="btn-game-start-btn" onclick="handleStartButtonClick()"><span id="btn-game-start-label" data-i18n="btn_game_start">ストーリーモード</span></button>
             <button id="btn-stage-select" class="btn hidden" data-i18n="btn_stage_select" onclick="openStageSelect()">🗺️ ステージ選択</button>
             <button id="btn-name-register" class="btn" onclick="openNameRegister()">👤 名前の登録</button>
@@ -2265,14 +2265,25 @@ function renderTitleStoryStatus(){
     document.getElementById('btn-stage-select').classList.toggle('hidden', !storyCleared);
     // 保存された続きのダンジョンがあれば「つづきから」を主役のボタンにして、通常の開始ボタンは
     // 「はじめから」表記の控えめなボタンに格下げする（両方が同じ見た目だと紛らわしいため）
-    const hasSave = hasContinueSave();
+    const hasSave = hasStoryProgress();
     document.getElementById('btn-continue').classList.toggle('hidden', !hasSave);
     document.getElementById('btn-game-start-label').textContent = ui(hasSave ? 'btn_start_over' : 'btn_game_start');
     document.getElementById('btn-game-start-btn').classList.toggle('btn-primary', !hasSave);
 }
-// 開始ボタン：保存データがあれば確認を挟んでから始める（無ければそのままストーリーモードへ）
+// 「つづき」があるか：迷宮の途中セーブがある、または物語がエリア2以降まで進んでいる。
+// エリアをクリアして次のエリアに入った直後は迷宮のセーブがまだ無い（新しい迷宮を作り始めるとセーブされる）が、
+// その状態でも「つづきから／はじめから」を選べるようにする
+function hasStoryProgress(){
+    return hasContinueSave() || storyAreaIndex>1 || storyCleared;
+}
+// 「つづきから」：迷宮の途中セーブがあればそこから、なければ進行中のエリアの最初（導入の会話劇）から
+function continueStory(){
+    if (hasContinueSave()) continueGameFromSave();
+    else startStoryMode();
+}
+// 開始ボタン：つづきがあれば確認を挟んでから始める（無ければそのままストーリーモードへ）
 function handleStartButtonClick(){
-    if (hasContinueSave()) requestStartOver();
+    if (hasStoryProgress()) requestStartOver();
     else startStoryMode();
 }
 function requestStartOver(){ document.getElementById('start-over-modal').classList.remove('hidden'); }
@@ -6383,6 +6394,7 @@ const STORY_SPEAKERS = {
     swordsman: { name_ja:'剣士',         side:'left',  faceDir:'images/kao/swordsman_m_' },
     archer:    { name_ja:'アーチャー',   side:'right', faceDir:'images/kao/archer_m_' },
     priest:    { name_ja:'プリースト',   side:'right', faceDir:'images/kao/priest_f_' },
+    icemage:   { name_ja:'氷の魔導士',   side:'left',  faceDir:'images/kao/ice_mage_f_' },
 };
 // 各エリア突入時の会話劇。前半＝魔王とダークエルフ（迷宮づくりの経緯）、後半＝勇者パート（魔王を追う側の会話）の2部構成。
 // 後半はnarration行（speaker:'narration'。顔グラなしの地の文）で場面転換してから始まる
@@ -6409,13 +6421,17 @@ const STORY_SCRIPT = {
         { speaker:'maou',      face:'smile',    text:'洞窟の勇者どもは片付けたわい。幸先がいいのう' },
         { speaker:'darkelf',   face:'smile',    text:'お見事です、魔王様。少しずつ魔界の力が戻ってきていますわ' },
         { speaker:'maou',      face:'normal',   text:'次はどこじゃ？' },
-        { speaker:'darkelf',   face:'normal',   text:'地図によれば、この先は深い森。緑が濃い分、活力の気配が強いはずです' },
+        { speaker:'darkelf',   face:'normal',   text:'地図によれば、この先は深い森。緑が濃い分、魔力の気配が強いはずです' },
         { speaker:'maou',      face:'grin',     text:'よし、森の勇者どもも根こそぎおびき寄せてやろうぞ！' },
         { speaker:'narration', text:'一方、洞窟へ向かった捜索隊は――' },
         { speaker:'swordsman', face:'panic',    text:'おい、洞窟に送った捜索隊から連絡が途絶えとるぞ' },
-        { speaker:'archer',    face:'normal',   text:'おそらく、そこに何かがあったということでしょう' },
-        { speaker:'archer',    face:'surprise', text:'捜索隊の最後の報告によれば、洞窟の奥から森へ続く反応があったと' },
-        { speaker:'swordsman', face:'grin',     text:'よし、次は森だ。手掛かりを追うぞ！' },
+        { speaker:'archer',    face:'normal',   text:'おそらく、そこで何かに遭遇したのでしょう。……それと剣士殿、負傷者の手当てのために援軍を呼んでおきました' },
+        { speaker:'priest',    face:'smile',    text:'はじめまして、皆さん。プリーストと申します。微力ながら、傷ついた方々を癒やしにまいりました' },
+        { speaker:'swordsman', face:'grin',     text:'おお、待っておったぞ！　回復役がおると心強い！' },
+        { speaker:'priest',    face:'shy',      text:'あの……洞窟に行った皆さんは、ご無事なのでしょうか……' },
+        { speaker:'archer',    face:'surprise', text:'最後の報告によれば、洞窟の奥から森へ続く反応があったそうです' },
+        { speaker:'swordsman', face:'grin',     text:'森が怪しいぞ！　追うぞ！' },
+        { speaker:'archer',    face:'normal',   text:'……洞窟のときも、それを言っていませんでしたか？' },
     ],
     3: [
         { speaker:'maou',      face:'smile',    text:'森も取り戻したわい。……思うたより順調じゃな' },
@@ -6425,9 +6441,14 @@ const STORY_SCRIPT = {
         { speaker:'maou',      face:'grin',     text:'わかっとるわい。次の勇者どもも、しっかり片付けてやろうぞ' },
         { speaker:'narration', text:'森を失った勇者たちは――' },
         { speaker:'archer',    face:'angry',    text:'まさか、森の部隊まで全滅させられるとは……' },
-        { speaker:'priest',    face:'cry',      text:'魔王は本当にこの近くにいるのでしょうか……' },
+        { speaker:'priest',    face:'cry',      text:'魔王は本当にこの近くにいるのでしょうか……皆さん、無事に帰れるのでしょうか……' },
         { speaker:'swordsman', face:'angry',    text:'弱気になるな。森の先には泉があったはずだ' },
-        { speaker:'swordsman', face:'grin',     text:'泉が怪しいぞ！　部隊を再編して向かうぞ！' },
+        { speaker:'icemage',   face:'normal',   text:'……泉なら、私が案内します。水辺の調査は、氷の魔導士の得意分野ですから' },
+        { speaker:'priest',    face:'surprise', text:'まあ！　王都から来てくださったのですね。心強いです' },
+        { speaker:'icemage',   face:'smile',    text:'魔王の魔力は、水に痕跡が残ります。……大丈夫、寒いのは得意ですから' },
+        { speaker:'swordsman', face:'grin',     text:'よし、泉が怪しいぞ！　部隊を再編して向かうぞ！' },
+        { speaker:'icemage',   face:'normal',   text:'……さっきから「怪しい」しか言っていませんね' },
+        { speaker:'archer',    face:'smile',    text:'ええ。ずっとです' },
     ],
     4: [
         { speaker:'maou',      face:'normal',   text:'泉も落としたわい。魔界の色が、少しずつ戻ってきとるのう' },
@@ -6438,7 +6459,11 @@ const STORY_SCRIPT = {
         { speaker:'narration', text:'泉の異変を確かめに来た勇者たちは――' },
         { speaker:'swordsman', face:'cry',      text:'泉の部隊まで……いったいどれだけの手勢を隠し持っておるんだ' },
         { speaker:'archer',    face:'normal',   text:'落ち着いてください。地形からして、次は山で間違いないでしょう' },
-        { speaker:'archer',    face:'grin',     text:'総力を挙げて、山へ向かいましょう！' },
+        { speaker:'priest',    face:'shy',      text:'山は冷えるそうです。皆さん、温かい格好をしてくださいね' },
+        { speaker:'icemage',   face:'normal',   text:'私は寒さには慣れています。……ただ、山の魔力の流れが乱れているのが気になります' },
+        { speaker:'swordsman', face:'surprise', text:'なに？　魔王の仕業か！' },
+        { speaker:'icemage',   face:'normal',   text:'おそらく。迷宮が岩盤を掘り進める振動で、山の地脈がざわついているのでしょう' },
+        { speaker:'archer',    face:'grin',     text:'ならば、総力を挙げて山へ向かいましょう！' },
     ],
     5: [
         { speaker:'maou',      face:'smile',    text:'山を越えたぞ……！　あとちょっとで魔王城が見えてくるわい' },
@@ -6448,7 +6473,9 @@ const STORY_SCRIPT = {
         { speaker:'narration', text:'山での大敗を受けて――' },
         { speaker:'priest',    face:'panic',    text:'山の兵まで……もう、まともに戦える部隊が残っていません' },
         { speaker:'swordsman', face:'angry',    text:'くそ、このままでは城まで攻め込まれる。街まで下がって迎え撃つぞ' },
-        { speaker:'archer',    face:'surprise', text:'街の方角から、強い魔力反応が近づいてきています' },
+        { speaker:'icemage',   face:'surprise', text:'街の方角から、強い魔力反応が近づいてきています' },
+        { speaker:'archer',    face:'normal',   text:'住民の避難は済ませました。あとは迎え撃つだけです' },
+        { speaker:'priest',    face:'smile',    text:'私は最後まで、皆さんの傷を癒やします。だから……絶対に諦めないでくださいね' },
         { speaker:'swordsman', face:'grin',     text:'街が怪しい……いや、もう間違いない。総力戦だ！' },
     ],
     6: [
@@ -6459,7 +6486,9 @@ const STORY_SCRIPT = {
         { speaker:'narration', text:'街の敗残兵から報告を受けた勇者本隊は――' },
         { speaker:'swordsman', face:'angry',    text:'まさか、ここまで削られるとはな……。だが、こっちにはまだ本隊が残っている' },
         { speaker:'priest',    face:'cry',      text:'残った戦力を、すべて城に集結させましょう……' },
+        { speaker:'icemage',   face:'normal',   text:'魔王は間もなく城に着きます。……凍らせてでも、止めてみせます' },
         { speaker:'archer',    face:'normal',   text:'魔王が来るなら、この城で迎え撃つほかありません' },
+        { speaker:'priest',    face:'smile',    text:'皆さん、最後まで一緒です。誰も欠けずに、帰りましょうね' },
         { speaker:'swordsman', face:'grin',     text:'上等だ。ここが最後の戦場だ！' },
     ],
 };
@@ -6750,12 +6779,15 @@ function heroSkillTriggers(hero){
 // 「そのかわり勇者のステータスはレベルによって線形に上がるように」という方針で、
 // stageNumそのものではなく、Lv(1)=1〜Lv(7)=49の間を線形補間する（結果としてstageベースでは非線形になる）
 // 序盤の強さを比率で下げているため、整数に丸めず小数（2桁）のまま補間する（丸めると比率が崩れる）
-function lerpHeroTier(cls, stageNum){
-    const lv = heroDisplayLevel(stageNum), lvStart = heroDisplayLevel(1), lvFinal = heroDisplayLevel(STAGE_FINAL);
-    const t = Math.max(0, Math.min(1, (lv-lvStart) / (lvFinal-lvStart)));
+// lvMultは勇者1人ごとのLvの個体差（1.0＝そのステージの標準Lv。buildBattleHeroPreviewで抽選）
+function lerpHeroTier(cls, stageNum, lvMult){
+    const lv = heroDisplayLevel(stageNum) * (lvMult===undefined ? 1 : lvMult), lvStart = heroDisplayLevel(1), lvFinal = heroDisplayLevel(STAGE_FINAL);
+    // 標準Lvのときは0〜1の範囲。最終ステージで標準より高いLvの個体は、直線の延長で最大1.25まで伸ばす（頭打ちにするとLv表示だけ高くて強さが同じになるため）。
+    // ランク値の上限10は、標準Lvの範囲(t<=1)ではtierEndが10以下なので効かず、延長部分だけ外れる
+    const t = Math.max(0, Math.min(1.25, (lv-lvStart) / (lvFinal-lvStart)));
     return cls.tierStart.map((s,i) => {
         const v = s + (cls.tierEnd[i]-s)*t;
-        return Math.max(1, Math.min(10, Math.round(v*100)/100));
+        return Math.max(1, Math.round(v*100)/100);
     });
 }
 // ゲームプリセット：4人の勇者クラスの組み合わせ。複数パターン用意していく想定で配列にしてある
@@ -7010,10 +7042,16 @@ function buildBattleHeroPreview(){
     const list = [];
     for (let i=0;i<heroCount;i++){
         const classKey = roster[i % roster.length];
-        list.push({ classKey, gender: Math.random()<0.5?'m':'f' });
+        // 勇者ごとにLvへ個体差をつける（標準Lv×0.8〜1.2の一様乱数＝±20%以内。標準のちょうどがずらっと並ぶのを避ける）。
+        // Lvは強さ（ステータス）にもそのまま反映される
+        const lvMult = HERO_LV_VARIATION_MIN + Math.random()*(HERO_LV_VARIATION_MAX-HERO_LV_VARIATION_MIN);
+        list.push({ classKey, gender: Math.random()<0.5?'m':'f', lvMult });
     }
     return list;
 }
+const HERO_LV_VARIATION_MIN = 0.8, HERO_LV_VARIATION_MAX = 1.2;
+// 勇者1人の表示Lv（そのステージの標準Lv×個体差。最低1）
+function heroLevelOf(stageNum, lvMult){ return Math.max(1, Math.round(heroDisplayLevel(stageNum) * (lvMult===undefined ? 1 : lvMult))); }
 // 4方向シートのイラストがある職は絵柄で表示する（絵がない職を追加した場合はここのリストから外すと絵文字で代用表示になる）
 const HERO_IMAGE_CLASS_KEYS = HERO_CLASSES.map(c => c.key); // 全職に4方向シートのイラストがある
 function heroPreviewSpriteHtml(classKey, gender, emoji){
@@ -7021,9 +7059,9 @@ function heroPreviewSpriteHtml(classKey, gender, emoji){
     return `<span class="hero-preview-sprite" style="background-image:url('images/yuusya/${classKey}_${gender}.png');"></span>`;
 }
 // 勇者の戦闘開始時のステータス（HPは2倍、攻撃系は人数に反比例する補正。ステージ・職ごとに決まる）
-function heroBattleStats(classKey, stageNum){
+function heroBattleStats(classKey, stageNum, lvMult){
     const cls = heroClassInfo(classKey);
-    const st = tierStats(...lerpHeroTier(cls, stageNum));
+    const st = tierStats(...lerpHeroTier(cls, stageNum, lvMult));
     const offenseMult = heroOffenseMult(stageNum);
     // lerpHeroTierは比率を保つため小数のまま補間しているので、ここで整数に丸めてHP表示の小数点を防ぐ
     return { hp: Math.round(st.hp*HERO_HP_MULT), atk: Math.round(st.atk*offenseMult), def: Math.round(st.def*offenseMult), magAtk: Math.round(st.magAtk*offenseMult), magDef: Math.round(st.magDef*offenseMult) };
@@ -7064,8 +7102,12 @@ function heroTeamPowerTarget(stageNum){
     return heroTeamPowerTargetCache[stageNum] = (sum/n) * (HERO_TEAM_POWER_STAGE_BOOST[stageNum] || 1);
 }
 // 実際に侵攻してくる編成（classKeyの配列）の戦闘開始時ステータス。戦力が目標に一致するようHPと攻撃(攻撃力・魔法攻撃力)を補正する
-function heroTeamBattleStats(classKeys, stageNum){
-    const list = classKeys.map(k => ({ classKey:k, st:heroBattleStats(k, stageNum) }));
+// lvMults：勇者ごとのLv個体差（省略時は全員1.0）。個体差はチームの中での強弱として残り、チーム全体の強さだけが目標にそろう
+// ステージ1は補正しない（テストプレイで、補正後にステージ1の勇者が強くなりすぎたため、補正導入前の素のステータスに戻した）
+const HERO_TEAM_NORMALIZE_FROM_STAGE = 2;
+function heroTeamBattleStats(classKeys, stageNum, lvMults){
+    const list = classKeys.map((k, i) => ({ classKey:k, st:heroBattleStats(k, stageNum, lvMults ? lvMults[i] : undefined) }));
+    if (stageNum < HERO_TEAM_NORMALIZE_FROM_STAGE) return list.map(({ st }) => st);
     const f = Math.sqrt(heroTeamPowerTarget(stageNum) / heroTeamPower(list));
     return list.map(({ st }) => ({ hp: Math.round(st.hp*f), atk: Math.round(st.atk*f), def: st.def, magAtk: Math.round(st.magAtk*f), magDef: st.magDef }));
 }
@@ -7075,7 +7117,7 @@ function heroPreviewCardHtml(entry){
     return `<div class="monster-picker-btn static">
         ${heroPreviewSpriteHtml(entry.classKey, entry.gender, cls.emoji)}
         <span class="monster-picker-name">${escapeHtml(cls.name_ja)}</span>
-        <span class="monster-picker-meta"><b class="hero-preview-lv">Lv.${heroDisplayLevel(stage)}</b></span>
+        <span class="monster-picker-meta"><b class="hero-preview-lv">Lv.${heroLevelOf(stage, entry.lvMult)}</b></span>
     </div>`;
 }
 function requestStartBattle(){
@@ -7122,7 +7164,7 @@ function startBattle(){
     const heroCount = heroCountForStage(stage);
     const heroPreview = pendingBattleHeroPreview.length===heroCount ? pendingBattleHeroPreview : buildBattleHeroPreview();
     battleHeroes = [];
-    const teamStats = heroTeamBattleStats(heroPreview.slice(0, heroCount).map(e => e.classKey), stage); // 編成ごとの強さのブレを補正済み
+    const teamStats = heroTeamBattleStats(heroPreview.slice(0, heroCount).map(e => e.classKey), stage, heroPreview.slice(0, heroCount).map(e => e.lvMult)); // 編成ごとの強さのブレを補正済み
     for (let i=0;i<heroCount;i++){
         const classKey = heroPreview[i].classKey;
         const cls = heroClassInfo(classKey);
