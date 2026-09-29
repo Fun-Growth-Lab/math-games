@@ -7326,6 +7326,7 @@ function heroArriveAtRoom(hero, roomId){
     hero.state = 'inRoom';
     clearStackingStatusEffects(hero); // 毒・火傷はその部屋の戦闘終了までなので、部屋に入るタイミングで解除する
     hero.behavior = 'stay';
+    recordRoomArrival(hero, roomId);
     logBattle(uif('battle_log_enter', uif('hero_label', hero.id), roomDisplayNameById(roomId)));
 }
 // 勇者1体を、次の部屋（DFS的に選んだ通路の先）へ向けて出発させる。
@@ -7346,6 +7347,7 @@ function heroDepartToNextRoom(hero){
 }
 // 部屋の魔物を全滅させた「滞在」勇者たちを、次の部屋への移動に切り替える
 function releaseStayHeroesFromRoom(roomId){
+    recordRoomClear(roomId);
     battleHeroes.filter(h=>h.roomId===roomId && h.state==='inRoom' && h.alive).forEach(h => {
         h.behavior = 'roam';
         heroDepartToNextRoom(h);
@@ -8344,7 +8346,7 @@ function closeBattleResultToTitle(){
 // クリア／ゲームオーバー時に、ステージごとの戦闘結果・全ユニットの成績・経済・入手物をまとめて出力する
 // （出力したテキストを開発担当へ渡して、バランス調整の分析に使う）
 // ============================================================
-const BALANCE_REPORT_VERSION = 1;
+const BALANCE_REPORT_VERSION = 2;
 let runReport = null;           // 1回のプレイ（新しいダンジョン開始〜クリア/ゲームオーバー）全体の記録
 let curBattleRep = null;        // いま戦闘中（または直前）のステージの記録。runReport.battlesの最後の要素と同じオブジェクト
 let battleCurrentActor = null;  // いま手番のユニット（ダメージの攻撃元の特定に使う）
@@ -8393,6 +8395,20 @@ function recordHealStat(target, amount){
     repTally(repKey(target)).healed += amount;
     if (battleCurrentActor) repTally(repKey(battleCurrentActor)).heal += amount;
 }
+// 部屋ごとの攻略の流れ（勇者が最初にその部屋へ着いたtickと、そのとき生き残っていた勇者のHP合計／部屋を制圧したtickと、そのときのHP合計）。
+// 勇者は部屋の魔物を全滅させてから次の部屋へ進む（せん滅型）ので、どの部屋で勇者の体力が削られ、どこで止まったかが分かる
+function aliveHeroHpTotal(){ return battleHeroes.filter(h => h.alive).reduce((sum,h) => sum + Math.max(0,h.hp), 0); }
+function recordRoomArrival(hero, roomId){
+    if (!curBattleRep) return;
+    const flow = curBattleRep.flow || (curBattleRep.flow = { arrive:[], clear:[] });
+    flow.arrive.push([battleGlobalTick, hero.id, roomId, hero.hp, aliveHeroHpTotal()]); // [tick, 勇者id, 部屋id, その勇者のHP, 生存勇者のHP合計]
+}
+function recordRoomClear(roomId){
+    if (!curBattleRep) return;
+    const flow = curBattleRep.flow || (curBattleRep.flow = { arrive:[], clear:[] });
+    if (flow.clear.some(c => c[1]===roomId)) return; // 同じ部屋の制圧は最初の1回だけ
+    flow.clear.push([battleGlobalTick, roomId, aliveHeroHpTotal(), battleHeroes.filter(h => h.alive).length]); // [tick, 部屋id, 生存勇者のHP合計, 生存勇者数]
+}
 function recordSkillUse(name){
     if (!curBattleRep) return;
     curBattleRep.skills[name] = (curBattleRep.skills[name]||0) + 1;
@@ -8424,7 +8440,7 @@ function repEndBattle(outcome){
     b.outcome = outcome; b.ticks = battleGlobalTick + 1;
     const T = key => b.units[key] || {};
     const pick = t => ({ dealt:t.dealt||0, dP:t.dealtPhys||0, dM:t.dealtMagic||0, taken:t.taken||0, kills:t.kills||0, heal:t.heal||0, healed:t.healed||0, down:(t.downTick===undefined ? null : t.downTick) });
-    b.heroes.forEach(h => { Object.assign(h, pick(T(h.k))); const u = battleHeroes.find(x => 'H'+x.id===h.k); h.alive = !!(u && u.alive); });
+    b.heroes.forEach(h => { Object.assign(h, pick(T(h.k)), { dRoom: (T(h.k).downRoom===undefined ? null : T(h.k).downRoom) }); const u = battleHeroes.find(x => 'H'+x.id===h.k); h.alive = !!(u && u.alive); });
     b.monsters.forEach(m => { Object.assign(m, pick(T(m.k))); const u = monsters.find(x => 'M'+x.id===m.k); m.hpEnd = u ? u.hp : null; });
     Object.assign(b.dl, pick(T('DL')), { hpEnd: demonLordUnit ? demonLordUnit.hp : null, alive: !!(demonLordUnit && demonLordUnit.alive), xp1: demonLordUnit ? (demonLordUnit.xp||0) : null });
     b.env = { STATUS: T('STATUS').dealt||0, TRAP: T('TRAP').dealt||0 };
@@ -8530,18 +8546,37 @@ function buildBalanceReportText(){
     R.battles.forEach(b => Object.keys(b.skills).forEach(k => { skillTotals[k] = (skillTotals[k]||0) + b.skills[k]; }));
     out.push(Object.keys(skillTotals).sort((a,b) => skillTotals[b]-skillTotals[a]).map(k => `${k}: ${skillTotals[k]}`).join(' / ') || '（なし）');
 
-    // 8. 詳細（1行=1件。モンスター・勇者は列の順番が決まった配列＝サイズを抑えるため）
-    out.push('\n## 8. 詳細データ（ステージごとに：HEADER→DL→勇者(H)→モンスター(M)の順。H/Mは下の列順の配列）');
+    // 8. 部屋の攻略状況（勇者がどの部屋まで届き、各部屋でどれだけ体力が削られたか）
+    out.push('\n## 8. 部屋の攻略状況（部屋ごと。到達時HP／制圧時HPは、そのときの生存勇者のHP合計。勇者全体の初期HPは1.のサマリー参照）');
+    const roomRows = [];
+    R.battles.forEach(b => {
+        const fl = b.flow || { arrive:[], clear:[] };
+        const heroHp0 = sum(b.heroes.map(h => h.hp));
+        b.rooms.forEach(rm => {
+            const arrivals = fl.arrive.filter(a => a[2]===rm.id);
+            const clr = fl.clear.find(c => c[1]===rm.id);
+            const mons = b.monsters.filter(m => m.room===rm.id);
+            const downs = mons.filter(isDown).length;
+            const first = arrivals[0];
+            roomRows.push([b.stage, rm.id, rm.type||'-', rm.lv, mons.length, first ? first[0] : '未到達', first ? `${first[4]}/${heroHp0}` : '-', clr ? clr[0] : (first ? '未制圧' : '-'), clr ? `${clr[2]}/${heroHp0}(${clr[3]}人)` : '-', downs, sum(mons.map(m => m.dealt||0)), sum(mons.map(m => m.taken||0))]);
+        });
+    });
+    out.push(table(['ST','部屋','タイプ','Lv','魔物数(開始時)','初到達tick','到達時勇者HP','制圧tick','制圧時勇者HP','倒れた魔物','魔物→勇者dmg','勇者→魔物dmg'], roomRows));
+
+    // 9. 詳細（1行=1件。モンスター・勇者は列の順番が決まった配列＝サイズを抑えるため）
+    out.push('\n## 9. 詳細データ（ステージごとに：HEADER→DL→勇者(H)→モンスター(M)の順。H/Mは下の列順の配列）');
     const M_COLS = ['id','sp','origin','bornStage','bornLv','lv','q','hp','atk','def','mAtk','mDef','eq','rt','dealt','dP','dM','taken','kills','heal','healed','down','hpEnd','hp0'];
-    const H_COLS = ['cls','hp','atk','def','mAtk','mDef','dealt','dP','dM','taken','kills','heal','healed','down','alive(1/0)'];
+    const H_COLS = ['cls','hp','atk','def','mAtk','mDef','dealt','dP','dM','taken','kills','heal','healed','down','alive(1/0)','downRoom'];
     out.push('M列: '+M_COLS.join(','));
     out.push('H列: '+H_COLS.join(','));
+    out.push('FLOW: arrive=[tick,勇者id,部屋id,その勇者のHP,生存勇者のHP合計]（勇者が部屋に入るたび） / clear=[tick,部屋id,生存勇者のHP合計,生存勇者数]（部屋の魔物を全滅させた時）');
     R.battles.forEach(b => {
         out.push(`\n### STAGE ${b.stage}`);
         out.push('HEADER '+JSON.stringify({ stage:b.stage, outcome:b.outcome, ticks:b.ticks, vitBefore:b.vitBefore, manaBefore:b.manaBefore, rooms:b.rooms, traps:b.traps, dlSkills:b.dlSkills,
             skills:b.skills, env:b.env, dlSkillDmg:b.dlSkillDmg, dmgRoleType:b.dmgRoleType, after:b.after }));
         out.push('DL '+JSON.stringify(b.dl));
-        b.heroes.forEach(h => out.push('H '+JSON.stringify([h.cls,h.hp,h.atk,h.def,h.mAtk,h.mDef,h.dealt,h.dP,h.dM,h.taken,h.kills,h.heal,h.healed,h.down,h.alive?1:0])));
+        out.push('FLOW '+JSON.stringify(b.flow || { arrive:[], clear:[] }));
+        b.heroes.forEach(h => out.push('H '+JSON.stringify([h.cls,h.hp,h.atk,h.def,h.mAtk,h.mDef,h.dealt,h.dP,h.dM,h.taken,h.kills,h.heal,h.healed,h.down,h.alive?1:0,h.dRoom])));
         b.monsters.forEach(m => out.push('M '+JSON.stringify([Number(m.k.slice(1)),m.sp,m.origin,m.bornStage,m.bornLv,m.lv,m.q,m.hp,m.atk,m.def,m.mAtk,m.mDef,m.eq,m.rt,m.dealt,m.dP,m.dM,m.taken,m.kills,m.heal,m.healed,m.down,m.hpEnd,m.hp0])));
     });
     return out.join('\n');
