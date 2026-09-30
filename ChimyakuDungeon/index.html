@@ -6392,9 +6392,10 @@ function heroRosterForStage(stageNum){
 // 各エリア突入時の会話劇（幼い魔王のひとり語り。一人称は「ワシ」、口調はやや古めかしい”えらそうな子供”。下書き案）。
 // startStoryScene(areaIdx)で表示し、最後の1行を読み終えるとダンジョン作成フェーズに戻る
 // 登場人物：魔王（ワシ／子供だが尊大）、ヴィオラ（ダークエルフ。魔王のお世話係。丁寧だがちょっと抜けている）、
-// 勇者パーティ10人（下のSTORY_PARTYで、エリアごとに戦う4人が決まっている）。顔グラはimages/kao/<faceDir>_<face>.pngを使う
+// 勇者パーティ12人（下のSTORY_PARTYで、エリアごとに戦う4人が決まっている）。顔グラはimages/kao/<faceDir>_<face>.pngを使う
 // heroを持つ話者は、戦闘に出る勇者でもある（classKey＝戦闘での職、gender＝戦闘マップの見た目('m'/'f')）。
-// 左右の立ち位置(side)：左＝剣士・勇者・氷の魔導士・雷の騎士・くのいち／右＝アーチャー・女アーチャー・プリースト・炎の魔導士・吟遊詩人
+// 盾騎士・黒魔導士は顔グラがない（noFace）ため会話劇には出ず、戦闘にだけ登場する（セリフの中で名前だけ触れる）。
+// 左右の立ち位置(side)：左＝剣士・勇者・氷の魔導士・吟遊詩人／右＝アーチャー・女アーチャー・プリースト・炎の魔導士・くのいち・雷の騎士
 const STORY_SPEAKERS = {
     maou:      { name_ja:'魔王',         side:'left',  faceDir:'images/kao/maou1_' },
     darkelf:   { name_ja:'ヴィオラ',     side:'right', faceDir:'images/kao/darkelf_' },
@@ -6405,20 +6406,23 @@ const STORY_SPEAKERS = {
     swordsman_f: { name_ja:'勇者',       side:'left',  faceDir:'images/kao/swordsman_f_', hero:{ classKey:'swordsman', gender:'f' } }, // 物語上の「勇者」本人（女性の剣士職）
     archer_f:  { name_ja:'女アーチャー', side:'right', faceDir:'images/kao/archer_f_',    hero:{ classKey:'archer',    gender:'f' } },
     firemage:  { name_ja:'炎の魔導士',   side:'right', faceDir:'images/kao/fire_mage_f_', hero:{ classKey:'fire_mage', gender:'f' } },
-    ninja:     { name_ja:'くのいち',     side:'left',  faceDir:'images/kao/ninja_f_',     hero:{ classKey:'ninja',     gender:'f' } },
-    thunder:   { name_ja:'雷の騎士',     side:'left',  faceDir:'images/kao/thunder_knight_f_', hero:{ classKey:'thunder_knight', gender:'f' } },
-    bard:      { name_ja:'吟遊詩人',     side:'right', faceDir:'images/kao/bard_m_',      hero:{ classKey:'bard',      gender:'m' } },
+    ninja:     { name_ja:'くのいち',     side:'right', faceDir:'images/kao/ninja_f_',     hero:{ classKey:'ninja',     gender:'f' } },
+    thunder:   { name_ja:'雷の騎士',     side:'right', faceDir:'images/kao/thunder_knight_f_', hero:{ classKey:'thunder_knight', gender:'f' } },
+    bard:      { name_ja:'吟遊詩人',     side:'left',  faceDir:'images/kao/bard_m_',      hero:{ classKey:'bard',      gender:'m' } },
+    shield:    { name_ja:'盾騎士',       side:'left',  noFace:true, hero:{ classKey:'shield_knight', gender:'m' } },
+    darkmage:  { name_ja:'黒魔導士',     side:'right', noFace:true, hero:{ classKey:'dark_mage',     gender:'f' } },
 };
-// ストーリー連動：各エリアで実際に侵攻してくる勇者（＝そのエリアの会話劇に出てくる4人）。ランダムではなく固定。
+// ストーリー連動：各エリアで実際に侵攻してくる勇者（＝そのエリアの会話劇に出てくる仲間）。ランダムではなく固定。
 // 1ステージ目は先頭の2人、2ステージ目は先頭の3人、3ステージ目以降は4人全員（heroCountForStage）。
-// 新しく登場する仲間を先頭に置く。ストーリーモードのエリア進行でも、ステージ選択からの個別プレイでも、そのエリアの並びが使われる
+// どのエリアも先頭の2人は「男剣士」と「男アーチャー」（1ステージ目は基本の兵）。3・4人目にそのエリアの新しい仲間を置く。
+// くのいち・雷の騎士は終盤のエリア（街・城）から登場させる。ストーリーモードのエリア進行でも、ステージ選択からの個別プレイでも、そのエリアの並びが使われる
 const STORY_PARTY = {
-    1: ['swordsman', 'archer', 'priest', 'ninja'],              // 洞窟：剣士・アーチャー＋プリースト・くのいち
-    2: ['archer_f', 'swordsman', 'bard', 'ninja'],              // 森：女アーチャー・吟遊詩人が加入
-    3: ['icemage', 'archer', 'swordsman', 'priest'],            // 泉：氷の魔導士が加入
-    4: ['thunder', 'firemage', 'swordsman', 'archer_f'],        // 山：雷の騎士・炎の魔導士が加入
-    5: ['swordsman_f', 'icemage', 'bard', 'archer_f'],          // 街：勇者が加入
-    6: ['swordsman_f', 'firemage', 'thunder', 'priest'],        // 城：勇者本隊
+    1: ['swordsman', 'archer', 'priest',   'shield'],     // 洞窟：プリースト・盾騎士（盾騎士は名前だけ登場）
+    2: ['swordsman', 'archer', 'archer_f', 'bard'],       // 森：女アーチャー・吟遊詩人が加入
+    3: ['swordsman', 'archer', 'icemage',  'priest'],     // 泉：氷の魔導士が加入
+    4: ['swordsman', 'archer', 'firemage', 'darkmage'],   // 山：炎の魔導士が加入（黒魔導士は名前だけ登場）
+    5: ['swordsman', 'archer', 'swordsman_f', 'ninja'],   // 街：勇者・くのいちが加入
+    6: ['swordsman', 'archer', 'swordsman_f', 'thunder'], // 城：雷の騎士が加入、勇者本隊
 };
 // 各エリア突入時の会話劇。前半＝魔王とダークエルフ（迷宮づくりの経緯）、後半＝勇者パート（魔王を追う側の会話）の2部構成。
 // 後半はnarration行（speaker:'narration'。顔グラなしの地の文）で場面転換してから始まる
@@ -6439,10 +6443,9 @@ const STORY_SCRIPT = {
         { speaker:'archer',    face:'normal',   text:'魔王の姿はどこにも見当たりません。長らく留守にしていたようですね' },
         { speaker:'swordsman', face:'angry',    text:'くっ、肝心の魔王がおらんとは。……おい、捜索のほうはどうなっとる？' },
         { speaker:'archer',    face:'surprise', text:'はい。城の裏手にある洞窟から、<b>不自然な魔力の反応</b>が出ています' },
-        { speaker:'ninja',     face:'smile',    text:'ニンニン♪　その洞窟なら、さっき先回りして見てきたよ。奥のほうが、なんだか不気味だったんだ' },
-        { speaker:'swordsman', face:'surprise', text:'なに、もう偵察済みか！　さすがくのいち、仕事が早い！' },
         { speaker:'priest',    face:'shy',      text:'あの……洞窟は暗くて、足元が危なそうです。皆さん、怪我には気をつけてくださいね' },
-        { speaker:'archer',    face:'normal',   text:'怪我をしても、プリーストが治してくれます。……では剣士殿、参りましょうか' },
+        { speaker:'swordsman', face:'surprise', text:'おお、プリーストか！　回復役がおると心強い！' },
+        { speaker:'archer',    face:'normal',   text:'洞窟の入り口は、盾騎士殿が固めてくれています。落石の心配は少なそうです' },
         { speaker:'swordsman', face:'grin',     text:'この洞窟が怪しいぞ！' },
     ],
     2: [
@@ -6453,17 +6456,16 @@ const STORY_SCRIPT = {
         { speaker:'maou',      face:'grin',     text:'よし、森の勇者どもも根こそぎおびき寄せてやろうぞ！' },
         { speaker:'narration', text:'一方、洞窟へ向かった捜索隊は――' },
         { speaker:'swordsman', face:'panic',    text:'おい、洞窟に送った捜索隊から連絡が途絶えとるぞ' },
-        { speaker:'ninja',     face:'normal',   text:'洞窟の入り口に、戦った跡が残っていたよ。……奥から森のほうへ、魔力の道が伸びてる' },
-        { speaker:'swordsman', face:'surprise', text:'なんと。アーチャーとプリーストはどうした？' },
-        { speaker:'ninja',     face:'shy',      text:'ふたりは負傷者の手当てで本隊に残ってるよ。代わりに、援軍を呼んでおいたんだ' },
+        { speaker:'archer',    face:'normal',   text:'洞窟の入り口に、戦った跡が残っていました。……奥から森のほうへ、魔力の道が伸びています' },
         { speaker:'archer_f',  face:'smile',    text:'お待たせしました！　森林警備隊の女アーチャーです。森の道なら、目をつぶっても歩けますよ！' },
+        { speaker:'archer',    face:'surprise', text:'エルフの弓の名手と聞いています。地の利は、彼女のほうが上ですね' },
         { speaker:'bard',      face:'smile',    text:'そして僕は吟遊詩人！　旅の途中で居合わせたので、勝手についてきちゃいました♪' },
         { speaker:'swordsman', face:'grin',     text:'なんだか賑やかになったのう……！　だが、心強い！' },
         { speaker:'bard',      face:'grin',     text:'戦いの合間は、僕の歌で士気を上げますよ！　それでは一曲——' },
-        { speaker:'ninja',     face:'angry',    text:'しーっ！　敵に見つかるでしょ！' },
+        { speaker:'archer_f',  face:'angry',    text:'しーっ！　敵に見つかっちゃいます！' },
         { speaker:'bard',      face:'shy',      text:'す、すみません……' },
         { speaker:'swordsman', face:'grin',     text:'森が怪しいぞ！　追うぞ！' },
-        { speaker:'ninja',     face:'normal',   text:'……洞窟のときも、それ言ってたよね' },
+        { speaker:'archer',    face:'normal',   text:'……洞窟のときも、それを言っていませんでしたか？' },
     ],
     3: [
         { speaker:'maou',      face:'smile',    text:'森も取り戻したわい。……思うたより順調じゃな' },
@@ -6490,15 +6492,13 @@ const STORY_SCRIPT = {
         { speaker:'maou',      face:'grin',     text:'よし、根性で乗り越えてやろうぞ！' },
         { speaker:'narration', text:'泉の異変を確かめに来た勇者たちは――' },
         { speaker:'swordsman', face:'cry',      text:'泉の部隊まで……いったいどれだけの手勢を隠し持っておるんだ' },
-        { speaker:'archer_f',  face:'normal',   text:'落ち着いてください。地形からして、次は山で間違いありません。山道は私が案内します！' },
-        { speaker:'thunder',   face:'normal',   text:'待たせたな。王都・雷騎士団の雷の騎士だ。山の魔物は、我々が引き受けよう' },
-        { speaker:'swordsman', face:'surprise', text:'おお、王都の騎士団まで！　これは心強い！' },
-        { speaker:'thunder',   face:'angry',    text:'ただ、山の地脈が乱れている。……迷宮が岩盤を掘り進める振動のせいだろう' },
+        { speaker:'archer',    face:'normal',   text:'落ち着いてください。地形からして、次は山で間違いないでしょう' },
+        { speaker:'archer',    face:'surprise', text:'ただ、山の魔力の流れが乱れているのが気になります。迷宮が岩盤を掘り進める振動のせいかもしれません' },
         { speaker:'swordsman', face:'surprise', text:'なに？　魔王の仕業か！' },
         { speaker:'firemage',  face:'smile',    text:'私も来たよ！　山は寒いって聞いたから、魔物をまとめて燃やして暖まろうと思って！' },
-        { speaker:'archer_f',  face:'panic',    text:'も、燃やすのは魔物だけにしてくださいね！　山火事は困ります！' },
+        { speaker:'archer',    face:'panic',    text:'も、燃やすのは魔物だけにしてくださいね！　山火事は困ります！' },
         { speaker:'firemage',  face:'shy',      text:'わ、わかってるよ！　……たぶん' },
-        { speaker:'thunder',   face:'normal',   text:'……手綱は私が握っておく。安心してくれ' },
+        { speaker:'firemage',  face:'normal',   text:'あ、紹介するね。こっちは黒魔導士。無口だけど、闇の魔法の腕は確かなんだ！' },
         { speaker:'swordsman', face:'grin',     text:'よし、総力を挙げて山へ向かうぞ！' },
     ],
     5: [
@@ -6507,15 +6507,16 @@ const STORY_SCRIPT = {
         { speaker:'maou',      face:'angry',    text:'数で押されるくらいなら、質で圧倒してくれるわ！' },
         { speaker:'darkelf',   face:'grin',     text:'その意気ですわ、魔王様' },
         { speaker:'narration', text:'山での大敗を受けて――' },
-        { speaker:'archer_f',  face:'panic',    text:'山の部隊まで……もう、まともに戦える兵が残っていません' },
-        { speaker:'bard',      face:'cry',      text:'街の皆さんも、すっかり怯えています。僕の歌も、なかなか届かなくて……' },
-        { speaker:'icemage',   face:'surprise', text:'街の方角から、強い魔力反応が近づいてきています' },
+        { speaker:'archer',    face:'panic',    text:'山の部隊まで……もう、まともに戦える兵が残っていません' },
+        { speaker:'swordsman', face:'angry',    text:'くそ、このままでは城まで攻め込まれる。街まで下がって迎え撃つぞ' },
+        { speaker:'ninja',     face:'smile',    text:'ニンニン♪　王都の忍び、くのいちです。街の周りを偵察してきたよ' },
+        { speaker:'ninja',     face:'normal',   text:'街の方角から、強い魔力反応が近づいてきてる。……たぶん、魔王本人' },
         { speaker:'swordsman_f', face:'normal', text:'間に合ったようね。王都から、急いで駆けつけたわ' },
-        { speaker:'archer_f',  face:'surprise', text:'ゆ、勇者様！　まさか、ご自身でお出ましに！' },
-        { speaker:'bard',      face:'grin',     text:'勇者様が来たなら百人力だ！　これは最高の英雄譚になりますよ！' },
+        { speaker:'swordsman', face:'surprise', text:'ゆ、勇者殿！　まさか、あなた自らお出ましに！' },
         { speaker:'swordsman_f', face:'angry',  text:'魔王が近づいていると聞いたの。これ以上、誰も傷つけさせない' },
-        { speaker:'icemage',   face:'smile',    text:'……頼もしいです。凍らせがいがあります' },
-        { speaker:'swordsman_f', face:'smile',  text:'「街が怪しい」なんて、剣士なら言うところね。……さあ、総力戦よ！' },
+        { speaker:'archer',    face:'smile',    text:'勇者殿が来てくださったなら、百人力です' },
+        { speaker:'swordsman', face:'grin',     text:'街が怪しいぞ！　総力戦だ！' },
+        { speaker:'swordsman_f', face:'smile',  text:'……本当に言ったわね。さあ、総力戦よ！' },
     ],
     6: [
         { speaker:'maou',      face:'surprise', text:'……見えたわい。あれが、人間どもに獲られたワシの城じゃ' },
@@ -6523,13 +6524,12 @@ const STORY_SCRIPT = {
         { speaker:'maou',      face:'grin',     text:'城壁は硬うて部屋を作るのにも手こずりそうじゃが……最後まで気は抜かんぞ' },
         { speaker:'darkelf',   face:'smile',    text:'ここまで来れば、あと一息です。全力でお支えいたしますわ' },
         { speaker:'narration', text:'街の敗残兵から報告を受けた勇者本隊は――' },
-        { speaker:'swordsman_f', face:'angry',  text:'まさか、ここまで削られるなんて……。でも、まだ私たち本隊が残っているわ' },
-        { speaker:'thunder',   face:'normal',   text:'城の守りは、私が引き受ける。王都の騎士の誇りにかけて' },
-        { speaker:'firemage',  face:'grin',     text:'魔王が来るなら、お城ごと燃やしちゃうくらいの気持ちでいくよ！' },
-        { speaker:'priest',    face:'shy',      text:'お、お城は燃やさないでくださいね……！　私は最後まで、皆さんの傷を癒やします' },
-        { speaker:'firemage',  face:'panic',    text:'じょ、冗談だよ！　……半分くらい' },
-        { speaker:'swordsman_f', face:'normal', text:'剣士とアーチャーは城門を、氷の魔導士たちは城壁を守ってくれている。……あとは、私たちがここで迎え撃つだけ' },
-        { speaker:'priest',    face:'smile',    text:'皆さん、最後まで一緒です。誰も欠けずに、帰りましょうね' },
+        { speaker:'swordsman', face:'angry',    text:'まさか、ここまで削られるとはな……。だが、こっちにはまだ本隊が残っている' },
+        { speaker:'thunder',   face:'normal',   text:'遅れてすまない。王都・雷騎士団の雷の騎士だ。城の守りは、私が引き受けよう' },
+        { speaker:'swordsman', face:'surprise', text:'おお、雷騎士団まで！　これで役者がそろったわい' },
+        { speaker:'archer',    face:'normal',   text:'魔王が来るなら、この城で迎え撃つほかありません' },
+        { speaker:'swordsman_f', face:'normal', text:'氷の魔導士たちは城壁を、プリーストたちは負傷者の手当てを守ってくれている。……あとは、私たちがここで迎え撃つだけ' },
+        { speaker:'thunder',   face:'angry',    text:'ならば私は最前線に立とう。……誰も欠けさせはしない' },
         { speaker:'swordsman_f', face:'smile',  text:'ええ、約束よ。……みんなで、帰りましょう' },
         { speaker:'swordsman_f', face:'grin',   text:'ここが最後の戦場よ。……行くわよ！' },
     ],
@@ -6549,7 +6549,7 @@ let storyLineIndex = 0;
 let storyOnComplete = null;
 function storyFaceUrl(speaker, face){
     const sp = STORY_SPEAKERS[speaker];
-    return sp ? `${sp.faceDir}${face}.png` : '';
+    return (sp && sp.faceDir) ? `${sp.faceDir}${face}.png` : '';
 }
 // エリア開始の会話劇は、最後の1行を読み終えたら素通りせず、一度「ステージタイトルカード」（暗転＋大きな見出し）を
 // 挟んでから建設画面へ進む。ゲームクリア後のエピローグ(startStoryEnding)は次のステージへ進むわけではないので挟まない
@@ -7137,8 +7137,8 @@ const HERO_CLASS_STRENGTH_FACTOR = { // [ステージ2の倍率, ステージ7�
     bard: [0.98, 0.99],
     ice_mage: [1.50, 1.22],
     fire_mage: [1.42, 1.22],
-    thunder_knight: [0.84, 1.21],
-    shield_knight: [0.83, 0.60],
+    thunder_knight: [0.90, 1.21],
+    shield_knight: [0.72, 0.60], // 盾騎士・雷の騎士は、ストーリーでステージ3から出るため、全11職の編成でステージ3〜7を再測定して微調整した
     dark_mage: [1.88, 1.29],
 };
 // 上の当てはめ曲線で補正すると、ステージごとの全体の難しさ（平均戦績）が補正前から数%ずれたため、そのぶんを全職共通の倍率で戻す
@@ -7159,11 +7159,27 @@ function heroBattleStats(classKey, stageNum, lvMult){
     // lerpHeroTierは比率を保つため小数のまま補間しているので、ここで整数に丸めてHP表示の小数点を防ぐ
     return { hp: Math.round(st.hp*HERO_HP_MULT*f), atk: Math.round(st.atk*offenseMult*f), def: Math.round(st.def*offenseMult*f), magAtk: Math.round(st.magAtk*offenseMult*f), magDef: Math.round(st.magDef*offenseMult*f) };
 }
-// 実際に侵攻してくる編成（classKeyの配列）の戦闘開始時ステータス。lvMults：勇者ごとのLv個体差（省略時は全員1.0）
+// ストーリー連動で編成が固定になったため、パーティごとの組み合わせの相性で、エリアによって強さがずれる（職ごとの補正では拾えない分）。
+// 6つの固定パーティを実戦シミュレーションで測り、「パーティの平均戦績」−「ランダム編成の平均戦績」の差Δから、
+// 全ステータスにかける倍率 c＝exp(−Δ÷1.6) を求めた（全職の倍率を1%上げると平均戦績が約0.016上がるため）。ステージ3〜7だけ（1・2は編成が2〜3人で誤差が大きく補正しない）。
+// 例：洞窟(1)はステージ6・7で勇者側が弱め(Δ≈−0.1)だったため約1.06〜1.07倍
+const STORY_PARTY_TRIM = {
+    1: { 3:0.97, 4:1.02, 5:1.02, 6:1.06, 7:1.07 },
+    2: { 3:0.99, 4:0.97, 5:0.98, 6:1.02, 7:1.01 },
+    3: { 3:0.99, 4:1.00, 5:0.99, 6:1.02, 7:1.00 },
+    4: { 3:1.03, 4:1.03, 5:1.02, 6:1.06, 7:1.05 },
+    5: { 3:1.00, 4:0.96, 5:0.98, 6:1.00, 7:1.03 },
+    6: { 3:1.00, 4:0.97, 5:0.97, 6:1.00, 7:0.99 },
+};
+// 実際に侵攻してくる編成（classKeyの配列）の戦闘開始時ステータス。lvMults：勇者ごとのLv個体差（省略時は全員1.0）。areaIdx：エリア番号（省略時は補正なし）
 // ※以前はここで「編成全体の戦力(HP合計×攻撃合計)を一定にそろえる」補正をしていたが、その指標では魔法系の遠距離職や
 // 回復・盾の実際の強さを測れず、職による偏りを直せなかったため、職ごとの実測補正(heroBattleStats)に置き換えた
-function heroTeamBattleStats(classKeys, stageNum, lvMults){
-    return classKeys.map((k, i) => heroBattleStats(k, stageNum, lvMults ? lvMults[i] : undefined));
+function heroTeamBattleStats(classKeys, stageNum, lvMults, areaIdx){
+    const c = ((STORY_PARTY_TRIM[areaIdx] || {})[stageNum]) || 1;
+    return classKeys.map((k, i) => {
+        const b = heroBattleStats(k, stageNum, lvMults ? lvMults[i] : undefined);
+        return c===1 ? b : { hp: Math.round(b.hp*c), atk: Math.round(b.atk*c), def: Math.round(b.def*c), magAtk: Math.round(b.magAtk*c), magDef: Math.round(b.magDef*c) };
+    });
 }
 // 勇者に本当のLvはないため、侵攻してくる勇者のLv表示にはheroDisplayLevel（侵攻ステージ番号の2乗）を使う
 function heroPreviewCardHtml(entry){
@@ -7218,7 +7234,7 @@ function startBattle(){
     const heroCount = heroCountForStage(stage);
     const heroPreview = pendingBattleHeroPreview.length===heroCount ? pendingBattleHeroPreview : buildBattleHeroPreview();
     battleHeroes = [];
-    const teamStats = heroTeamBattleStats(heroPreview.slice(0, heroCount).map(e => e.classKey), stage, heroPreview.slice(0, heroCount).map(e => e.lvMult)); // 編成ごとの強さのブレを補正済み
+    const teamStats = heroTeamBattleStats(heroPreview.slice(0, heroCount).map(e => e.classKey), stage, heroPreview.slice(0, heroCount).map(e => e.lvMult), currentAreaIndex); // 編成ごとの強さのブレを補正済み
     for (let i=0;i<heroCount;i++){
         const classKey = heroPreview[i].classKey;
         const cls = heroClassInfo(classKey);
