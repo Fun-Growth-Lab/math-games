@@ -7066,58 +7066,54 @@ function heroPreviewSpriteHtml(classKey, gender, emoji){
     if (!HERO_IMAGE_CLASS_KEYS.includes(classKey)) return `<span class="hero-preview-sprite hero-preview-emoji">${emoji}</span>`;
     return `<span class="hero-preview-sprite" style="background-image:url('images/yuusya/${classKey}_${gender}.png');"></span>`;
 }
-// 勇者の戦闘開始時のステータス（HPは2倍、攻撃系は人数に反比例する補正。ステージ・職ごとに決まる）
+// ---- 職ごとの強さのそろえ（実測補正）----
+// 同じLv（＝同じステージ）でも、職によって実際の強さに大きな偏りがあった（防衛の実戦を再現する検証で測定）。
+// 例：盾騎士（挑発＋高い防御）とプリースト（回復）は、同じ勇者を1人入れたときにチームの戦績が最も上がり、
+// 魔法系（メイジ・炎/氷/闇の魔導士）は最も下がった。あの職が出たらきつすぎる／楽すぎる、という運ゲーを避けるため、
+// 職ごとに「全ステータス(HP・攻撃・魔攻・防御・魔防)にかける倍率」で、職による強さの偏りが小さくなるように補正する。
+// 【測定方法】1部屋（勇者チームvs魔物の一群）を本物の戦闘処理で何千回も回し、ステージごとに「勝率がおよそ5割」になる魔物数
+// （ステージ2〜7で6/7/9/12/15/18体。魔物はテストプレイの実データから抽出）で、勇者チームの戦績
+// （勝てば残りHP割合／負ければ−倒せなかった魔物のHP割合）を測る。「その職を含む編成の平均戦績」−「全編成の平均戦績」を職の効果とし、
+// これが全職で0（±0.03以内）になるよう倍率を反復して求めた。倍率全体の水準は、補正前の平均戦績と一致するよう保ってある（＝ステージ全体の難しさは変えない）。
+// 職ごとの倍率はステージが進むにつれてほぼ滑らかに変わる（盾・回復は序盤より終盤のほうが相対的に強く、物理アタッカーはその逆）ため、
+// 測定値をステージ2〜7で一次式(対数)に当てはめ、ステージ2の値とステージ7の値のあいだを対数補間して使う。
+// その職がまだ登場しないステージの値は使われない（外挿）。ステージ1は補正しない（従来のまま）
+const HERO_CLASS_STRENGTH_FACTOR = { // [ステージ2の倍率, ステージ7の倍率]
+    swordsman: [0.91, 1.18],
+    archer: [0.93, 1.19],
+    mage: [1.41, 1.03],
+    priest: [0.85, 0.63],
+    ninja: [0.86, 0.98],
+    bard: [0.98, 0.99],
+    ice_mage: [1.50, 1.22],
+    fire_mage: [1.42, 1.22],
+    thunder_knight: [0.84, 1.21],
+    shield_knight: [0.83, 0.60],
+    dark_mage: [1.88, 1.29],
+};
+// 上の当てはめ曲線で補正すると、ステージごとの全体の難しさ（平均戦績）が補正前から数%ずれたため、そのぶんを全職共通の倍率で戻す
+// （ステージ全体の難しさは変えない）。ずれ＝補正前後の平均戦績の差÷1.6（実測：全職の倍率を1%上げると平均戦績が約0.016上がる）
+const HERO_STAGE_STRENGTH_TRIM = { 2:1.03, 3:0.98, 4:0.97, 5:1.03, 6:1.00, 7:1.01 };
+function heroClassStrengthFactor(classKey, stageNum){
+    const f = HERO_CLASS_STRENGTH_FACTOR[classKey];
+    if (!f || stageNum < 2) return 1;
+    const t = Math.min(1, (stageNum-2) / (STAGE_FINAL-2));
+    return Math.exp(Math.log(f[0]) + (Math.log(f[1])-Math.log(f[0])) * t) * (HERO_STAGE_STRENGTH_TRIM[stageNum] || 1);
+}
+// 勇者の戦闘開始時のステータス（HPは2倍、攻撃系は人数に反比例する補正。ステージ・職ごとに決まる）。上の職ごとの強さのそろえを掛けた値
 function heroBattleStats(classKey, stageNum, lvMult){
     const cls = heroClassInfo(classKey);
     const st = tierStats(...lerpHeroTier(cls, stageNum, lvMult));
     const offenseMult = heroOffenseMult(stageNum);
+    const f = heroClassStrengthFactor(classKey, stageNum);
     // lerpHeroTierは比率を保つため小数のまま補間しているので、ここで整数に丸めてHP表示の小数点を防ぐ
-    return { hp: Math.round(st.hp*HERO_HP_MULT), atk: Math.round(st.atk*offenseMult), def: Math.round(st.def*offenseMult), magAtk: Math.round(st.magAtk*offenseMult), magDef: Math.round(st.magDef*offenseMult) };
+    return { hp: Math.round(st.hp*HERO_HP_MULT*f), atk: Math.round(st.atk*offenseMult*f), def: Math.round(st.def*offenseMult*f), magAtk: Math.round(st.magAtk*offenseMult*f), magDef: Math.round(st.magDef*offenseMult*f) };
 }
-// ---- 勇者チームの「戦力」（数値化）とステージごとの目標戦力 ----
-// 戦力 ＝ チームのHP合計 × チームの攻撃合計。攻撃合計は各勇者の「攻撃として参照する値（物理は攻撃力・魔法は魔法攻撃力）×間合い補正」の和。
-// （こちらが倒れるまでの長さ×相手を倒す速さ、を掛け合わせた形で、HPと攻撃が同じ比率で増えれば戦力は比率の2乗で増える）
-// 勇者の職はランダムに選ばれるため、そのままだと回復・盾のいない編成（HPが低い）などの引き次第で、同じステージでも
-// 戦力が±2割前後ブレていた（実測：ステージ7で下位1割の編成を引き、想定より楽になった）。
-// そこで、そのステージで「あり得る全編成の戦力の平均」を目標戦力とし、実際に引いた編成の戦力がそれに一致するよう、
-// チーム全員のHPと攻撃を同じ倍率fで補正する（f＝√(目標戦力÷引いた編成の戦力)。HPと攻撃の両方にfを掛けるので戦力はf²倍になる）。
-// 職ごとの持ち味（誰が硬い・誰が攻撃的か）は変わらず、チーム全体の強さだけがそろう。防御は補正しない
-function heroTeamPower(stats){
-    let hp = 0, off = 0;
-    stats.forEach(({ classKey, st }) => {
-        const c = heroClassInfo(classKey);
-        hp += st.hp;
-        off += (c.dmgType==='magic' ? st.magAtk : st.atk) * RANGE_ATK_MULT[c.role];
-    });
-    return hp * off;
-}
-// 目標戦力のステージ別の追加補正（ステージ番号→倍率。未指定は1倍）。現在は補正なし。
-// ステージ2（2倍）・ステージ3（1.6倍）を一度引き上げたが、テストプレイで強すぎたため、どちらも元の曲線に戻した。
-// 元の曲線はステージ間で約1.8〜1.9倍ずつ増える
-const HERO_TEAM_POWER_STAGE_BOOST = {};
-const heroTeamPowerTargetCache = {};
-function heroTeamPowerTarget(stageNum){
-    if (heroTeamPowerTargetCache[stageNum]!==undefined) return heroTeamPowerTargetCache[stageNum];
-    const roster = heroRosterForStage(stageNum), count = heroCountForStage(stageNum);
-    const raw = {}; roster.forEach(k => { raw[k] = { classKey:k, st:heroBattleStats(k, stageNum) }; });
-    // rosterからcount人を選ぶ全組み合わせ（最大でも330通り）の戦力の平均
-    let sum = 0, n = 0;
-    const walk = (start, picked) => {
-        if (picked.length===count){ sum += heroTeamPower(picked.map(k => raw[k])); n++; return; }
-        for (let i=start;i<roster.length;i++) walk(i+1, picked.concat(roster[i]));
-    };
-    walk(0, []);
-    return heroTeamPowerTargetCache[stageNum] = (sum/n) * (HERO_TEAM_POWER_STAGE_BOOST[stageNum] || 1);
-}
-// 実際に侵攻してくる編成（classKeyの配列）の戦闘開始時ステータス。戦力が目標に一致するようHPと攻撃(攻撃力・魔法攻撃力)を補正する
-// lvMults：勇者ごとのLv個体差（省略時は全員1.0）。個体差はチームの中での強弱として残り、チーム全体の強さだけが目標にそろう
-// ステージ1は補正しない（テストプレイで、補正後にステージ1の勇者が強くなりすぎたため、補正導入前の素のステータスに戻した）
-const HERO_TEAM_NORMALIZE_FROM_STAGE = 2;
+// 実際に侵攻してくる編成（classKeyの配列）の戦闘開始時ステータス。lvMults：勇者ごとのLv個体差（省略時は全員1.0）
+// ※以前はここで「編成全体の戦力(HP合計×攻撃合計)を一定にそろえる」補正をしていたが、その指標では魔法系の遠距離職や
+// 回復・盾の実際の強さを測れず、職による偏りを直せなかったため、職ごとの実測補正(heroBattleStats)に置き換えた
 function heroTeamBattleStats(classKeys, stageNum, lvMults){
-    const list = classKeys.map((k, i) => ({ classKey:k, st:heroBattleStats(k, stageNum, lvMults ? lvMults[i] : undefined) }));
-    if (stageNum < HERO_TEAM_NORMALIZE_FROM_STAGE) return list.map(({ st }) => st);
-    const f = Math.sqrt(heroTeamPowerTarget(stageNum) / heroTeamPower(list));
-    return list.map(({ st }) => ({ hp: Math.round(st.hp*f), atk: Math.round(st.atk*f), def: st.def, magAtk: Math.round(st.magAtk*f), magDef: st.magDef }));
+    return classKeys.map((k, i) => heroBattleStats(k, stageNum, lvMults ? lvMults[i] : undefined));
 }
 // 勇者に本当のLvはないため、侵攻してくる勇者のLv表示にはheroDisplayLevel（侵攻ステージ番号の2乗）を使う
 function heroPreviewCardHtml(entry){
