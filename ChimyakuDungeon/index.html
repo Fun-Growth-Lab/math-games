@@ -4675,12 +4675,17 @@ let battleLevelUps = []; // 今回のステージでLvが上がったモンス�
 // 強化部屋の効果は経験値ではなく「能力上昇」（攻撃力/防御力/魔攻/魔防）に変わったため、経験値は部屋の影響を受けない固定値
 // 倒した本人は減らずに満額（KILL_XP_BASE）をもらい、それとは別にマップに配置中のモンスターへ分け与える：
 // 倒した本人と同じ部屋の仲間には20%、他の部屋のモンスターには10%（ストック中は対象外。戦闘不能の個体は対象）。
-// 魔王は分け与えを受けない（自分が倒した分だけ）。魔王が倒した場合の「同じ部屋」は魔王のいる部屋
+// 魔王も同じ割合で分け前を受け取る（魔王が倒した場合は満額）。魔王が勇者を倒せる機会はほとんど無い（最奥にいて、
+// たどり着かれた時点で負けに近い）ため、以前は分け前がなく、全ステージLv1のまま（HP50）でたどり着いた勇者に一撃で倒されていた。
+// 魔王が倒した場合の「同じ部屋」は魔王のいる部屋
 const KILL_XP_SHARE_ROOM = 0.2, KILL_XP_SHARE_MAP = 0.1;
 function grantKillXp(killerUnit){
     const xpAmount = heroKillXp();
     killerUnit.xp = (killerUnit.xp||0) + xpAmount; // 魔王も同じ（勇者を倒すとXPが入る）
     const killerRoomId = killerUnit.isDemonLord ? demonLordRoomId : killerUnit.roomId;
+    if (demonLordCell && demonLordCell!==killerUnit){
+        demonLordCell.xp = (demonLordCell.xp||0) + Math.round(xpAmount * (demonLordRoomId===killerRoomId ? KILL_XP_SHARE_ROOM : KILL_XP_SHARE_MAP));
+    }
     monsters.forEach(m => {
         if (m===killerUnit || m.roomId===null) return;
         m.xp = (m.xp||0) + Math.round(xpAmount * (m.roomId===killerRoomId ? KILL_XP_SHARE_ROOM : KILL_XP_SHARE_MAP));
