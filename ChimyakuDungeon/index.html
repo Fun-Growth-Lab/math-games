@@ -474,6 +474,7 @@
         /* 進化候補が1つだけの時に2列グリッドの片側だけ埋まって横幅が半分になり、石の名前が折り返していたのを、
            候補数に応じて列数が自動で変わる形にして解消（1つなら全幅、2つ以上なら並ぶ） */
         .unit-evolve-list { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:4px; min-height:32px; align-content:start; }
+        .stone-icon { display:inline-block; vertical-align:middle; flex:0 0 auto; }
         .unit-evolve-chip { padding:4px 8px; border-radius:9px; background:rgba(255,255,255,0.05); font-size:0.74rem; font-weight:800; color:var(--ink); }
         .unit-skill-row { color:var(--ink); }
         .unit-skill-name { font-size:0.82rem; font-weight:800; color:var(--ink); }
@@ -4657,13 +4658,13 @@ function monsterEvolveSectionHtml(m, sp, interactive){
     const candidates = nextStageCandidates(m.speciesKey);
     const title = ui('unit_evolve_title');
     if (candidates.length===0) return `<div class="unit-skill-block"><div class="unit-skill-title">${title}</div><div class="unit-evolve-list"><div class="unit-skill-none" style="grid-column:1 / -1;">${ui('evolve_max_stage_label')}</div></div></div>`;
-    let rows = `<div class="unit-evolve-list">` + candidates.map(c => `<span class="unit-evolve-chip">${stoneEmoji(c.key+'_stone')} ${escapeHtml(stoneName(c.key+'_stone'))}</span>`).join('') + `</div>`;
+    let rows = `<div class="unit-evolve-list">` + candidates.map(c => `<span class="unit-evolve-chip">${stoneIconHtml(c.key+'_stone', 16)} ${escapeHtml(stoneName(c.key+'_stone'))}</span>`).join('') + `</div>`;
     if (interactive){
         candidates.forEach(c => {
             const stoneKey = c.key+'_stone';
             const owned = stoneInventory[stoneKey]||0;
             if (owned>0){
-                rows += `<button class="btn btn-sm" style="width:100%; margin-top:4px;" onclick="evolveMonsterWithStone(${m.id}, '${stoneKey}')">${stoneEmoji(stoneKey)} ${uif('btn_evolve_with_stone', escapeHtml(stoneName(stoneKey)))}（×${owned}）</button>`;
+                rows += `<button class="btn btn-sm" style="width:100%; margin-top:4px;" onclick="evolveMonsterWithStone(${m.id}, '${stoneKey}')">${stoneIconHtml(stoneKey, 20)} ${uif('btn_evolve_with_stone', escapeHtml(stoneName(stoneKey)))}（×${owned}）</button>`;
             }
         });
     }
@@ -5590,14 +5591,60 @@ function stoneName(stoneKey){
     const sp = speciesInfo(stoneTargetSpeciesKey(stoneKey));
     return sp ? uif('evolve_stone_name', sp.name_ja) : stoneKey;
 }
-// 進化の石は全部💎だと見分けがつかないので、対象の系統(line)ごとに絵文字を変える
-const LINE_STONE_EMOJI = {
-    golem:'🟤', minotaur:'🔴', slime:'🟢', werewolf:'⚫', griffon:'🔵', spirit:'⚪',
-    goblin:'🟠', pixie:'🟣', dark_elf:'🟪', undead:'🟫', elf:'🟩', dragon:'🔶'
+// ---- 進化の石の見た目（コードで描く仮デザインのSVG。絵が用意できたら画像に差し替える）----
+// 3つの要素を重ねて、38種類の石を描き分ける：
+//  ①色＝系統（12色）  ②枠と輝き＝進化の段階（2進化目は銀の細い輪、3進化目は金の輪＋きらめき）
+//  ③中の模様＝分岐（騎士/ロード＝剣、メイジ/ウィザード＝杖、レンジャー/ハンター＝弓、属性ドラゴン＝炎・雷・雪・月）
+// 16×16のマス目で描き、にじまない(crispEdges)ようにしてドット絵風に見せる
+const LINE_STONE_PALETTE = { // [明, 中, 暗, 輪郭]
+    golem:    ['#c9a074', '#8d6a45', '#5a4129', '#2e2013'],
+    minotaur: ['#ff8a7a', '#d83a3a', '#8f1f26', '#4a0d12'],
+    slime:    ['#b8f27a', '#5fcf4a', '#2f8a35', '#124a1c'],
+    werewolf: ['#b9c0d0', '#6b7388', '#3a3f52', '#181b27'],
+    griffon:  ['#8fd0ff', '#3d8fe0', '#1f55a8', '#0d2a5c'],
+    spirit:   ['#ffffff', '#cfe9ff', '#8fb5d9', '#3b5a7a'],
+    goblin:   ['#ffc27a', '#f08a24', '#a5530f', '#55290a'],
+    pixie:    ['#ffb3e6', '#e463c8', '#9a2a8c', '#4d1048'],
+    dark_elf: ['#b79cff', '#6c4bd0', '#3c2584', '#1c1042'],
+    undead:   ['#d9dcb0', '#98a07a', '#5c6448', '#2a301f'],
+    elf:      ['#9af2c0', '#2fbf7a', '#17804e', '#0a3f27'],
+    dragon:   ['#ffe27a', '#f2b01f', '#b36d0a', '#5c3205'],
 };
-function stoneEmoji(stoneKey){
-    const sp = speciesInfo(stoneTargetSpeciesKey(stoneKey));
-    return (sp && LINE_STONE_EMOJI[sp.line]) || '💎';
+// 石が示す進化先の「分岐の模様」。種族キーの末尾（_knight/_lord=剣、_mage/_wizard=杖、_ranger/_hunter=弓、属性ドラゴン）で決める
+function stoneEmblemOf(speciesKey){
+    if (/_(knight|lord)$/.test(speciesKey)) return 'sword';
+    if (/_(mage|wizard)$/.test(speciesKey)) return 'staff';
+    if (/_(ranger|hunter)$/.test(speciesKey)) return 'bow';
+    return { fire_dragon:'flame', thunder_dragon:'bolt', white_dragon:'snow', black_dragon:'moon' }[speciesKey] || null;
+}
+const STONE_EMBLEM_SVG = {
+    sword: '<polygon points="8,4.4 9.1,5.7 9.1,9 6.9,9 6.9,5.7" fill="#fff"/><rect x="5.6" y="9" width="4.8" height="1.1" fill="#fff"/><rect x="7.4" y="10.1" width="1.2" height="1.3" fill="#fff"/>',
+    staff: '<rect x="7.4" y="7.2" width="1.2" height="4.6" fill="#fff"/><circle cx="8" cy="5.7" r="1.8" fill="#fff"/><circle cx="8" cy="5.7" r="0.7" fill="currentColor"/>',
+    bow:   '<path d="M9.8 4.6 Q4.6 8 9.8 11.4" fill="none" stroke="#fff" stroke-width="1.1"/><path d="M9.8 4.6 L9.8 11.4" stroke="#fff" stroke-width="0.45"/>',
+    flame: '<path d="M8 4.8 C9.6 6.6 10.4 7.8 8 10.8 C5.6 7.8 6.4 6.6 8 4.8z" fill="#fff"/>',
+    bolt:  '<polygon points="8.9,4.8 6.6,8.2 8.1,8.2 7.2,11 9.7,7.2 8.2,7.2" fill="#fff"/>',
+    snow:  '<path d="M8 5.2V10.8M5.2 8H10.8M6 6L10 10M10 6L6 10" stroke="#fff" stroke-width="0.6" fill="none"/>',
+    moon:  '<path d="M9.4 5.2 A3 3 0 1 0 9.4 10.8 A2.4 2.4 0 1 1 9.4 5.2z" fill="#fff"/>',
+};
+// 石1個ぶんのアイコン（HTML文字列）。sizeはpx
+function stoneIconHtml(stoneKey, size){
+    const key = stoneTargetSpeciesKey(stoneKey), sp = speciesInfo(key);
+    const pal = (sp && LINE_STONE_PALETTE[sp.line]) || ['#ffffff', '#9ad', '#468', '#123'];
+    const [lt, md, dk, ol] = pal;
+    const stage3 = !!(sp && sp.stage>=3);
+    const emblem = stoneEmblemOf(key);
+    const ring = stage3
+        ? '<circle cx="8" cy="8" r="7.6" fill="none" stroke="#f2c84b" stroke-width="0.9"/><circle cx="8" cy="8" r="6.9" fill="#f2c84b" fill-opacity="0.12"/>'
+        : '<circle cx="8" cy="8" r="7.4" fill="none" stroke="#c8d0d8" stroke-width="0.6" stroke-opacity="0.85"/>';
+    const sparkle = stage3
+        ? '<path d="M13.6 2.2V4.6M12.4 3.4H14.8" stroke="#fff4b0" stroke-width="0.6"/><path d="M2.6 11V12.8M1.7 11.9H3.5" stroke="#fff4b0" stroke-width="0.5"/>'
+        : '';
+    const gem = `<polygon points="2.4,6 5.2,2.6 10.8,2.6 13.6,6 8,13.6" fill="${md}"/>`
+        + `<polygon points="2.4,6 5.2,2.6 8,6" fill="${lt}"/><polygon points="5.2,2.6 10.8,2.6 8,6" fill="#fff" fill-opacity="0.55"/>`
+        + `<polygon points="10.8,2.6 13.6,6 8,6" fill="${md}"/><polygon points="8,6 13.6,6 8,13.6" fill="${dk}"/>`
+        + `<polygon points="2.4,6 5.2,2.6 10.8,2.6 13.6,6 8,13.6" fill="none" stroke="${ol}" stroke-width="0.7" stroke-linejoin="miter"/>`;
+    const emb = emblem ? `<g stroke="${ol}" stroke-width="0.4" stroke-opacity="0.9" style="color:${ol}">${STONE_EMBLEM_SVG[emblem]}</g>` : '';
+    return `<svg class="stone-icon" width="${size}" height="${size}" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">${ring}${sparkle}${gem}${emb}</svg>`;
 }
 let stoneInventory = {}; // stoneKey -> 所持数
 // 進化の石を1個消費して、モンスターをその石が示す種族へ進化させる本体処理（UI更新は呼び出し側の責任）。成功すればtrue
@@ -5725,7 +5772,7 @@ function renderItemInventoryModal(){
         stoneKeys.map(sk => {
             const usable = monstersEligibleForStone(sk).length>0;
             return `<button class="item-grid-btn${usable?' usable-glow':''}" onclick="pickStoneFromInventory('${sk}')">
-                <span class="item-slot-icon-emoji">${stoneEmoji(sk)}</span>
+                <span class="item-slot-icon-emoji">${stoneIconHtml(sk, 44)}</span>
                 <span class="item-slot-name">${escapeHtml(stoneName(sk))}</span>
                 <span class="item-slot-count">×${stoneInventory[sk]}</span>
             </button>`;
@@ -8393,7 +8440,7 @@ function stageLootCardsHtml(){
         const [kind, key] = combinedKey.split(':');
         const n = counts[combinedKey];
         if (kind==='stone'){
-            chipsByKind.stone.push(scChipHtml(stoneEmoji(key), escapeHtml(stoneName(key)), n));
+            chipsByKind.stone.push(scChipHtml(stoneIconHtml(key, 34), escapeHtml(stoneName(key)), n));
         } else if (kind==='monster'){
             const sp = speciesInfo(key);
             chipsByKind.monster.push(scChipHtml(monsterIconHtml(sp, 36), escapeHtml(sp.name_ja), n));
