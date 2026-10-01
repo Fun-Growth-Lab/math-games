@@ -1112,6 +1112,7 @@
             <button id="btn-name-register" class="btn" onclick="openNameRegister()">👤 名前の登録</button>
             <button class="btn" data-i18n="btn_ranking" onclick="openRanking()">🏆 ランキング</button>
             <button class="btn" data-i18n="btn_settings" onclick="openSettings()">⚙️ 設定</button>
+            <button class="btn" onclick="openStoryTest()">📖 ストーリーテスト（開発用）</button>
             <button class="btn" data-i18n="btn_index" onclick="location.href='../index.html'">🏠 INDEXへ</button>
         </div>
     </div>
@@ -1123,6 +1124,16 @@
             <p class="settings-desc" data-i18n="stageselect_desc">クリアしたエリアを個別に遊べます</p>
             <div id="stageselect-list" class="stageselect-list"></div>
             <button class="btn" data-i18n="btn_back_title" onclick="closeStageSelect()">◀ タイトルへ戻る</button>
+        </div>
+    </div>
+
+    <!-- ==================== STORY TEST（会話パートだけを見るテストモード・開発用） ==================== -->
+    <div id="storytest-screen" class="screen hidden">
+        <div class="title-box" style="max-width:560px;">
+            <h1 class="settings-title">📖 ストーリーテスト</h1>
+            <p class="settings-desc">戦闘や迷宮作りを飛ばして、会話パートだけを見られます（開発用）。エリアを選ぶと、導入の会話劇→ステージ題名カードまで流れます。</p>
+            <div id="storytest-list" class="stageselect-list"></div>
+            <button class="btn" onclick="closeStoryTest()">◀ タイトルへ戻る</button>
         </div>
     </div>
 
@@ -2308,6 +2319,40 @@ function openStageSelect(){
     goTo('stageselect-screen');
 }
 function closeStageSelect(){ goToTitle(); }
+
+// ---- ストーリーテスト（開発用）：会話パートだけを、進行状況やセーブに関係なく見る ----
+// 台本に出てくる話者を登場順に並べた文字列（地の文を除く）。どのキャラが出てくるかを一覧で確認するための表示
+function storyCastText(lines){
+    const names = [];
+    lines.forEach(l => { if (l.speaker!=='narration'){ const n = STORY_SPEAKERS[l.speaker].name_ja; if (!names.includes(n)) names.push(n); } });
+    return names.join('・');
+}
+function openStoryTest(){ renderStoryTestList(); goTo('storytest-screen'); }
+function closeStoryTest(){ goToTitle(); }
+function renderStoryTestList(){
+    const wrap = document.getElementById('storytest-list');
+    const item = (onclick, icon, name, lines) => `
+        <button class="btn stageselect-btn" onclick="${onclick}">
+            <span class="stageselect-icon">${icon}</span>
+            <span class="stageselect-name">${escapeHtml(name)}<br><span class="stageselect-effect">${lines.length}行　${escapeHtml(storyCastText(lines))}</span></span>
+        </button>`;
+    wrap.innerHTML = AREA_TYPES.map((a, i) => item(`playStoryTest(${i+1})`, a.icon, `${i+1}. ${a.name_ja}`, STORY_SCRIPT[i+1] || [])).join('')
+        + item(`playStoryTest('ending')`, '🏁', 'エピローグ（城クリア後）', STORY_ENDING)
+        + `<button class="btn btn-primary stageselect-btn" onclick="playStoryTestAll()"><span class="stageselect-icon">▶</span><span class="stageselect-name">最初から最後まで通して見る</span></button>`;
+}
+// 1つの場面を再生し、終わったら（スキップした場合も）一覧へ戻る
+function playStoryTest(key, onDone){
+    const back = onDone || (() => goTo('storytest-screen'));
+    if (key==='ending') startStoryEnding(back);
+    else startStoryScene(key, back);
+}
+// エリア1〜6の導入→エピローグを順に通して再生する
+function playStoryTestAll(){
+    const keys = AREA_TYPES.map((_, i) => i+1).concat(['ending']);
+    let i = 0;
+    const next = () => { if (i>=keys.length){ goTo('storytest-screen'); return; } playStoryTest(keys[i++], next); };
+    next();
+}
 
 // ============================================================
 // モンスター表示テスト（開発用）
