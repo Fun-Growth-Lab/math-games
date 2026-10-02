@@ -69,7 +69,8 @@
 
         /* ==================== TITLE / GENERIC BOX ==================== */
         #title-screen {
-            background-image: linear-gradient(rgba(12,8,5,0.35), rgba(12,8,5,0.6)), url('images/main.png');
+            /* 背景画像は、JS(rotateTitleBg)がimages/title/のイラストからランダムに選んで設定する */
+            background-image: linear-gradient(rgba(12,8,5,0.35), rgba(12,8,5,0.6));
             background-size: cover; background-position: center;
         }
         .title-box {
@@ -2278,7 +2279,26 @@ function renderSettingsScreen(){
 // ============================================================
 // 画面切り替え
 // ============================================================
+// ---- タイトル背景：images/title/ のイラストからランダムに1枚（タイトルへ戻るたびに別のものへ変わる） ----
+// イラストを増やしたら、このリストにファイル名を足す
+const TITLE_BG_IMAGES = ['main.png', 'title_beach.png', 'title_cookies.png', 'title_sleep.png', 'title_heroes.png', 'title_forest.png'];
+const TITLE_BG_OVERLAY = 'linear-gradient(rgba(12,8,5,0.35), rgba(12,8,5,0.6))';
+let titleBgCurrent = null, titleBgNext = null;
+// 直前に出したもの以外からランダムに選び、先にブラウザへ読み込ませておく（表示の瞬間に画像が遅れて出ないように）
+function chooseTitleBg(exclude){
+    const pool = TITLE_BG_IMAGES.filter(f => f!==exclude);
+    const f = pool[Math.floor(Math.random()*pool.length)];
+    new Image().src = 'images/title/' + f;
+    return f;
+}
+function rotateTitleBg(){
+    titleBgCurrent = titleBgNext || chooseTitleBg(titleBgCurrent);
+    document.getElementById('title-screen').style.backgroundImage = `${TITLE_BG_OVERLAY}, url('images/title/${titleBgCurrent}')`;
+    titleBgNext = chooseTitleBg(titleBgCurrent);
+}
 function goTo(id){
+    // タイトル画面を開くたびに、背景を別のイラストへ替える（画面が隠れているうちに差し替える）
+    if (id==='title-screen' && document.getElementById('title-screen').classList.contains('hidden')) rotateTitleBg();
     document.querySelectorAll('.screen').forEach(el => el.classList.add('hidden'));
     document.getElementById(id).classList.remove('hidden');
 }
@@ -6552,20 +6572,23 @@ const STORY_SCRIPT = {
         { speaker:'darkelf', face:'smile', text:'まずは近くの洞窟に迷宮を作り、おびき寄せて追い返しましょう' },
         { speaker:'maou', face:'grin', text:'おお、それは名案じゃ！　よし、迷宮づくりの始まりじゃ！' },
         { speaker:'narration', text:'そのころ、人間たちは――' },
-        { speaker:'swordsman', face:'grin',     text:'はっはっは！　魔王城を取るなんて、かんたんだったな！' },
-        { speaker:'archer',    face:'normal',   text:'ですが、肝心の魔王がいません。留守にしているようです' },
+        { speaker:'swordsman', face:'grin', text:'はっはっは！　魔王城を取るなんて、かんたんだったな！' },
+        { speaker:'archer', face:'normal', text:'剣士殿、さっそく調子に乗っていますね' },
+        { speaker:'archer', face:'normal', text:'ですが、肝心の魔王がいません' },
+        { speaker:'archer', face:'normal', text:'留守にしているようです' },
         { speaker:'swordsman', face:'surprise', text:'なに？　じゃあ、魔王はどこにいるんだ？' },
-        { speaker:'archer',    face:'surprise', text:'城のうらの洞窟に、見たことのない迷宮ができています。魔王が帰ってきたのかもしれません' },
-        { speaker:'swordsman', face:'grin',     text:'向こうから出てきてくれたか！　よし、洞窟へ行くぞ！' },
-        { speaker:'archer',    face:'normal',   text:'油断は禁物ですよ、剣士殿。相手は魔王です' },
-        { speaker:'swordsman', face:'angry',    text:'わかってる！　魔王を倒して、世界を平和にするんだ！' },
+        { speaker:'archer', face:'surprise', text:'城のうらの洞窟に、見たことのない迷宮ができています' },
+        { speaker:'archer', face:'normal', text:'魔王が帰ってきたのかもしれません' },
+        { speaker:'swordsman', face:'grin', text:'向こうから出てきてくれたか！　よし、洞窟へ行くぞ！' },
+        { speaker:'archer', face:'normal', text:'油断は禁物ですよ、剣士殿。相手は魔王です' },
+        { speaker:'swordsman', face:'angry', text:'わかってる！　魔王を倒して、世界を平和にするんだ！' },
     ],
     2: [ // 森：妖精ミントとの出会い（魔王側）／子うさぎを親うさぎへ返す女アーチャーと出会う勇者側
         { speaker:'maou', face:'smile', text:'洞窟の人間どもは追い返したぞ！' },
         { speaker:'darkelf', face:'smile', text:'お見事です、魔王様' },
         { speaker:'maou', face:'grin', text:'ふふーん、このくらい、へでもないわ！' },
         { speaker:'darkelf', face:'normal', text:'魔王様、次はあそこにある森に、迷宮を作ってはいかがでしょうか？' },
-        { speaker:'maou', face:'normal', text:'ほう、あの森か。魔力が豊富にありそうじゃのう' },
+        { speaker:'maou', face:'normal', text:'ほう、あの森か。魔力がたっぷりありそうじゃのう' },
         { speaker:'fairy', face:'surprise', text:'あーっ！　いいにおい！　クッキーだぁ！' },
         { speaker:'darkelf', face:'panic', text:'きゃっ！？　私のおやつが！' },
         { speaker:'maou', face:'surprise', text:'なんじゃこの羽虫は！　ヴィオラのクッキーを返さんか！' },
@@ -6578,17 +6601,25 @@ const STORY_SCRIPT = {
         { speaker:'fairy', face:'smile', text:'悪い人じゃないと思うな' },
         { speaker:'maou', face:'normal', text:'ふん、いい人のふりをしておるだけじゃ' },
         { speaker:'narration', text:'そのころ、人間たちは――' },
-        { speaker:'swordsman', face:'angry',    text:'くそっ、洞窟では負けてしまった。次こそ勝つぞ！' },
-        { speaker:'archer',    face:'normal',   text:'ですが、この森は広くて、道がわかりません' },
+        { speaker:'swordsman', face:'angry', text:'くそっ、洞窟では負けてしまった' },
+        { speaker:'swordsman', face:'angry', text:'次こそ勝つぞ！' },
+        { speaker:'archer', face:'normal', text:'剣士殿、まずは落ち着いてください' },
+        { speaker:'archer', face:'normal', text:'この森は広くて、道がわかりません' },
         { speaker:'swordsman', face:'surprise', text:'ん？　あそこで誰かが、しゃがみこんでいるぞ' },
-        { speaker:'archer_f',  face:'smile',    text:'ほら、お母さんのところへお帰り。もう迷子になっちゃだめよ' },
-        { speaker:'archer',    face:'normal',   text:'子うさぎを、親うさぎのもとへ返していたようですね' },
-        { speaker:'archer_f',  face:'surprise', text:'あら、旅の方ですか？　私は、この森を守る森林警備隊の者です' },
-        { speaker:'swordsman', face:'normal',   text:'俺たちは魔王を倒しに来たんだが、森が広くて道に迷っていてな' },
-        { speaker:'archer_f',  face:'smile',    text:'それなら、私が案内します。この森のことなら、お任せください' },
-        { speaker:'swordsman', face:'grin',     text:'ちょうどいい！　頼む！' },
-        { speaker:'archer_f',  face:'normal',   text:'……あれ？　今日は森の魔力が、いつもより元気です' },
-        { speaker:'archer',    face:'surprise', text:'魔王の迷宮のせいかもしれません。気をつけて進みましょう' },
+        { speaker:'archer_f', face:'smile', text:'ほら、お母さんのところへお帰り' },
+        { speaker:'archer_f', face:'smile', text:'もう迷子になっちゃだめよ' },
+        { speaker:'archer', face:'normal', text:'子うさぎを、親うさぎのもとへ返していたようですね' },
+        { speaker:'archer_f', face:'surprise', text:'あら、旅の方ですか？' },
+        { speaker:'archer_f', face:'normal', text:'私は、この森を守る森林警備隊の者です' },
+        { speaker:'swordsman', face:'smile', text:'うさぎにやさしいんだな、あんた' },
+        { speaker:'archer_f', face:'shy', text:'えへへ……森の仲間ですから' },
+        { speaker:'swordsman', face:'normal', text:'俺たちは魔王を倒しに来たんだ' },
+        { speaker:'swordsman', face:'normal', text:'……だが、森が広くて道に迷ってしまってな' },
+        { speaker:'archer_f', face:'smile', text:'それなら、私が案内します' },
+        { speaker:'archer_f', face:'smile', text:'この森のことなら、お任せください' },
+        { speaker:'swordsman', face:'grin', text:'ちょうどいい！　頼む！' },
+        { speaker:'archer_f', face:'normal', text:'……あれ？　今日は森の魔力が、いつもより元気です' },
+        { speaker:'archer', face:'surprise', text:'魔王の迷宮のせいかもしれません。気をつけて進みましょう' },
     ],
     3: [ // 泉：ヴィオラののどのかわき（魔王とヴィオラの絆）と後悔（魔王側）／魔王が子どもだと気づく勇者側
         { speaker:'maou', face:'smile', text:'森も取り戻したぞ。ミント、ありがとうな' },
@@ -6603,20 +6634,25 @@ const STORY_SCRIPT = {
         { speaker:'fairy', face:'smile', text:'ほら、着いたよ！　きれいでしょ！' },
         { speaker:'darkelf', face:'smile', text:'まあ……本当に、きれいな泉ですね' },
         { speaker:'maou', face:'surprise', text:'水面に映ったワシの顔、ずいぶん疲れておるのう' },
-        { speaker:'darkelf', face:'shy', text:'……魔王様はお疲れでしたから、<b>バカンス</b>をおすすめしたのですが' },
-        { speaker:'darkelf', face:'cry', text:'こんなことになって、ごめんなさい' },
+        { speaker:'darkelf', face:'shy', text:'……やはり、お疲れだったのですね' },
+        { speaker:'darkelf', face:'shy', text:'<b>バカンス</b>をおすすめしたのですが、こんなことになって……' },
+        { speaker:'darkelf', face:'cry', text:'ごめんなさい、魔王様' },
         { speaker:'maou', face:'normal', text:'ばかもの。行くと決めたのはワシじゃ。お主のせいではない' },
         { speaker:'maou', face:'smile', text:'それにな、ワシは魔王じゃ。自分の城は、自分で取り返す！' },
         { speaker:'fairy', face:'smile', text:'わたしもお手伝いする！' },
         { speaker:'darkelf', face:'smile', text:'……はい。どこまでもお供いたします、魔王様' },
         { speaker:'narration', text:'そのころ、人間たちは――' },
-        { speaker:'archer',    face:'angry',    text:'森の部隊も負けてしまいました。氷の魔導士殿、迷宮のことは何かわかりましたか？' },
-        { speaker:'icemage',   face:'normal',   text:'はい。迷宮の魔力を調べました。……ずいぶん、明るくて、まっすぐな魔力です' },
-        { speaker:'icemage',   face:'normal',   text:'悪だくみをする人の魔力は、もっと重くて、にごっています' },
-        { speaker:'icemage',   face:'smile',    text:'この迷宮を作ったのは……子どもではないでしょうか' },
+        { speaker:'archer', face:'angry', text:'森の部隊も、負けてしまいました' },
+        { speaker:'swordsman', face:'angry', text:'ぐぬぬ……魔王め、なかなかやるな' },
+        { speaker:'icemage', face:'normal', text:'失礼します。迷宮の魔力を、調べ終わりました' },
+        { speaker:'archer', face:'surprise', text:'氷の魔導士殿。それで、何かわかりましたか？' },
+        { speaker:'icemage', face:'normal', text:'はい。ずいぶん、明るくて、まっすぐな魔力です' },
+        { speaker:'icemage', face:'normal', text:'悪だくみをする人の魔力は、もっと重くて、にごっています' },
+        { speaker:'icemage', face:'smile', text:'この迷宮を作ったのは……子どもではないでしょうか' },
         { speaker:'swordsman', face:'surprise', text:'子ども！？　魔王が子どもだって！？' },
-        { speaker:'swordsman', face:'angry',    text:'まさか！　魔王だぞ！　わざと明るく見せているんだ！' },
-        { speaker:'archer',    face:'normal',   text:'どちらにしても、泉へ行けばわかります。行きましょう' },
+        { speaker:'swordsman', face:'angry', text:'うーむ、信じられん！' },
+        { speaker:'swordsman', face:'normal', text:'だが、氷の魔導士が言うなら、ありえるのか……' },
+        { speaker:'archer', face:'normal', text:'確かめましょう。泉に行けば、わかるはずです' },
     ],
     4: [ // 山：魔王の不安（魔王側）／寒がる剣士と、魔王を気にし始める勇者側
         { speaker:'maou', face:'normal', text:'泉も取り戻したぞ' },
@@ -6634,16 +6670,23 @@ const STORY_SCRIPT = {
         { speaker:'fairy', face:'smile', text:'してるしてるー！' },
         { speaker:'maou', face:'grin', text:'ええい、うるさい！　進むぞ！' },
         { speaker:'narration', text:'そのころ、人間たちは――' },
-        { speaker:'swordsman', face:'cry',      text:'ぶるぶる……さ、寒い……' },
-        { speaker:'firemage',  face:'smile',    text:'だいじょうぶ！　私があったかくしてあげる！　えいっ！' },
-        { speaker:'swordsman', face:'panic',    text:'あちちち！　熱い！　あったかいじゃなくて、熱い！' },
-        { speaker:'darkmage',  face:'normal',   text:'……やりすぎだ' },
-        { speaker:'archer',    face:'normal',   text:'それより、気になることがあります。負けた仲間は、みんな、迷宮の外に出されていました' },
-        { speaker:'firemage',  face:'surprise', text:'そういえば、わたしも気がついたら入口で寝てた！　ケガもなかったよ' },
-        { speaker:'archer',    face:'normal',   text:'魔王が、倒した私たちを外へ運んだのかもしれません' },
+        { speaker:'swordsman', face:'cry', text:'ぶるぶる……さ、寒い……' },
+        { speaker:'firemage', face:'smile', text:'剣士さん、寒いの？　私があったかくしてあげる！' },
+        { speaker:'firemage', face:'smile', text:'えいっ！' },
+        { speaker:'swordsman', face:'panic', text:'あちちち！　熱い！' },
+        { speaker:'swordsman', face:'panic', text:'あったかいじゃなくて、熱い！' },
+        { speaker:'darkmage', face:'normal', text:'……やりすぎだ' },
+        { speaker:'firemage', face:'cry', text:'えー、ちょうどいいと思ったのに……' },
+        { speaker:'archer', face:'normal', text:'炎の魔導士殿は、もう少し手かげんを覚えてください' },
+        { speaker:'archer', face:'normal', text:'それより、気になることがあります' },
+        { speaker:'archer', face:'normal', text:'負けた仲間が、みんな迷宮の外に出されていました' },
+        { speaker:'firemage', face:'surprise', text:'そういえば、わたしも気がついたら入口で寝てた！' },
+        { speaker:'firemage', face:'surprise', text:'ケガもなかったよ' },
+        { speaker:'darkmage', face:'normal', text:'……俺もだ' },
+        { speaker:'archer', face:'normal', text:'魔王が、倒した私たちを外へ運んだのかもしれません' },
         { speaker:'swordsman', face:'surprise', text:'なに！？　魔王が、そんなことを……？' },
-        { speaker:'firemage',  face:'smile',    text:'ねえ、魔王って、本当は悪い人じゃないんじゃない？' },
-        { speaker:'swordsman', face:'angry',    text:'そ、それでも魔王は魔王だ！　城は渡さん！' },
+        { speaker:'firemage', face:'smile', text:'ねえ、魔王って、本当は悪い人じゃないんじゃない？' },
+        { speaker:'swordsman', face:'angry', text:'そ、それでも魔王は魔王だ！　油断するな！' },
     ],
     5: [ // 街：魔界の民の街（魔王側）／魔王の正体を知って、話をしたいと思う勇者の合流（勇者側）
         { speaker:'maou', face:'smile', text:'山を越えたぞ！　城はもう目の前じゃ！' },
@@ -6656,17 +6699,25 @@ const STORY_SCRIPT = {
         { speaker:'maou', face:'angry', text:'街の民を、戦いにまきこんではならん。ワシが取り返したいのは、城だけじゃ' },
         { speaker:'darkelf', face:'smile', text:'……それでこそ、魔王様です' },
         { speaker:'narration', text:'そのころ、人間たちは――' },
-        { speaker:'swordsman', face:'angry',    text:'くそっ、山でも負けたか……。街まで下がって、守りをかためるぞ' },
-        { speaker:'ninja',     face:'smile',    text:'ただいまー！　迷宮の奥まで、こっそり見てきたよ！' },
-        { speaker:'archer',    face:'surprise', text:'奥まで！？　それで、魔王はどんな相手でしたか？' },
-        { speaker:'ninja',     face:'normal',   text:'ほんとに子どもだった！　お世話係のお姉さんと妖精さんと、クッキー食べてたよ' },
+        { speaker:'swordsman', face:'angry', text:'くそっ、山でも負けたか……' },
+        { speaker:'swordsman', face:'normal', text:'街まで下がって、守りをかためるぞ' },
+        { speaker:'ninja', face:'smile', text:'ただいまー！' },
+        { speaker:'ninja', face:'smile', text:'迷宮の奥まで、こっそり見てきたよ！' },
+        { speaker:'archer', face:'surprise', text:'奥まで！？　……無茶をしますね' },
+        { speaker:'archer', face:'normal', text:'それで、魔王はどんな相手でしたか？' },
+        { speaker:'ninja', face:'normal', text:'ほんとに子どもだった！' },
+        { speaker:'ninja', face:'smile', text:'お世話係のお姉さんと妖精さんと、クッキー食べてたよ' },
         { speaker:'swordsman', face:'surprise', text:'クッキー……？' },
         { speaker:'swordsman_f', face:'normal', text:'……やっぱり、そうだったのね' },
-        { speaker:'archer',    face:'surprise', text:'勇者殿！　王都におられたはずでは？' },
-        { speaker:'swordsman_f', face:'normal', text:'この街の人たちが、教えてくれたの。「魔王さまは、小さいけれど、やさしい子だ」って' },
+        { speaker:'swordsman', face:'panic', text:'ゆ、勇者殿！？　いつからそこに！？' },
+        { speaker:'swordsman_f', face:'smile', text:'ついさっきよ。みんな、おつかれさま' },
+        { speaker:'archer', face:'surprise', text:'王都におられたはずでは？' },
+        { speaker:'swordsman_f', face:'normal', text:'この街の人たちが、教えてくれたの' },
+        { speaker:'swordsman_f', face:'normal', text:'「魔王さまは、小さいけれど、やさしい子だ」って' },
         { speaker:'swordsman', face:'surprise', text:'やさしい子……？　魔王が？' },
-        { speaker:'swordsman_f', face:'angry',  text:'魔王が子どもでも、街が戦いになるのはいや。ここは守ります。……話をするのは、そのあとよ' },
-        { speaker:'swordsman', face:'grin',     text:'おう！　街は俺たちが守る！' },
+        { speaker:'swordsman_f', face:'angry', text:'魔王が子どもでも、街が戦いになるのはいや' },
+        { speaker:'swordsman_f', face:'angry', text:'ここは守ります。……話をするのは、そのあとよ' },
+        { speaker:'swordsman', face:'grin', text:'おう！　街は俺たちが守る！' },
     ],
     6: [ // 城：魔王の決意と、お城での楽しみ（魔王側）／魔王と話をすると決める勇者側
         { speaker:'maou', face:'surprise', text:'……見えたぞ。あれが、ワシの城じゃ' },
@@ -6680,18 +6731,25 @@ const STORY_SCRIPT = {
         { speaker:'darkelf', face:'smile', text:'ふふ。では、お城でも<b>バカンス</b>が楽しめるように、海と砂浜をつくりましょう！' },
         { speaker:'maou', face:'panic', text:'いやいや、それはやりすぎじゃ！' },
         { speaker:'fairy', face:'cry', text:'えー、わたしもバカンスしたいー' },
-        { speaker:'darkelf', face:'smile', text:'ふふ。魔王様のためですから、がんばってつくりますよ' },
+        { speaker:'darkelf', face:'smile', text:'では、小さめの海にしましょうか' },
         { speaker:'maou', face:'shy', text:'……まあ、ちょっとだけならよいぞ' },
         { speaker:'fairy', face:'grin', text:'やったー！　海だー！　いっぱい泳ぐー！' },
         { speaker:'maou', face:'grin', text:'よし！　そのためにも、まずは城を取り戻すぞ！' },
         { speaker:'narration', text:'そのころ、人間たちは――' },
-        { speaker:'thunder',   face:'angry',    text:'勇者殿、相手は魔王です。子どもでも、油断してはいけません' },
+        { speaker:'thunder', face:'angry', text:'勇者殿、相手は魔王です' },
+        { speaker:'thunder', face:'angry', text:'子どもでも、油断してはいけません' },
         { speaker:'swordsman_f', face:'normal', text:'わかってる。でも、まずは魔王と話がしたいの' },
-        { speaker:'swordsman', face:'normal',   text:'……俺も、そう思う。魔王は悪いやつだと決めつけて、攻めこんでいた気がするんだ' },
-        { speaker:'archer',    face:'normal',   text:'ええ。負けた私たちを、魔王は外へ運んでくれていました。悪い者は、そんなことをしません' },
-        { speaker:'thunder',   face:'normal',   text:'……わかりました。魔王のもとへの道は、私が開きます' },
-        { speaker:'swordsman_f', face:'smile',  text:'ありがとう。迷宮を抜けて、魔王に会いに行きましょう' },
-        { speaker:'swordsman', face:'grin',     text:'よし、最後の迷宮だ！　全力でぶつかるぞ！' },
+        { speaker:'swordsman', face:'normal', text:'……俺も、そう思う' },
+        { speaker:'swordsman', face:'normal', text:'魔王は悪いやつだと決めつけて、攻めこんでいた気がするんだ' },
+        { speaker:'archer', face:'surprise', text:'剣士殿が、そんなことを言うとは……' },
+        { speaker:'swordsman', face:'angry', text:'どういう意味だ！' },
+        { speaker:'archer', face:'smile', text:'ふふ、いい意味ですよ' },
+        { speaker:'archer', face:'normal', text:'それに、負けた私たちを、魔王は外へ運んでくれていました' },
+        { speaker:'archer', face:'normal', text:'悪い者は、そんなことをしません' },
+        { speaker:'thunder', face:'normal', text:'……わかりました' },
+        { speaker:'thunder', face:'normal', text:'魔王のもとへの道は、私が開きます' },
+        { speaker:'swordsman_f', face:'smile', text:'ありがとう。迷宮を抜けて、魔王に会いに行きましょう' },
+        { speaker:'swordsman', face:'grin', text:'よし、最後の迷宮だ！　全力でぶつかるぞ！' },
     ],
 };
 // ストーリーモードで最後のエリア（城）をクリアした後だけに表示するエピローグ。背景はSTORY_ENDING_MAP_IMAGE(map7)を使う。
@@ -6707,7 +6765,7 @@ const STORY_ENDING = [
     { speaker:'maou',      face:'normal',   text:'……城は、返してもらうぞ。ここは魔界じゃ。人間界へ帰るがよい' },
     { speaker:'swordsman_f', side:'right', face:'normal', text:'ええ、約束するわ。魔界の人たちにも、もう迷惑はかけない' },
     { speaker:'swordsman_f', side:'right', face:'smile', text:'魔界の人たちが言っていた通りね。あなたは、やさしい魔王だわ' },
-    { speaker:'maou',      face:'panic',    text:'や、やさしいなどと言うな！　ワシは魔王じゃぞ！' },
+    { speaker:'maou',      face:'panic',    text:'や、やさしいなどと言うな！' },
     // ②魔王軍と人間の戦士たち
     { speaker:'swordsman', side:'right', face:'grin',   text:'いやあ、いい迷宮だったぞ！　何度も負けて、悔しかったがな！' },
     { speaker:'maou',      face:'grin',     text:'当たり前じゃ！　ワシが作ったのじゃからな！' },
@@ -6723,10 +6781,12 @@ const STORY_ENDING = [
     { speaker:'archer',    side:'left', face:'normal',  text:'ヴィオラ殿。このクッキーの作り方を、教えていただけませんか' },
     { speaker:'darkelf',   face:'smile',    text:'もちろんです。ひみつの材料は、愛情ですよ' },
     { speaker:'archer',    side:'left', face:'surprise', text:'愛情……。なるほど、勉強になります' },
-    { speaker:'thunder',   face:'normal',   text:'魔王殿。「子どもだと油断するな」と言ったこと、取り消します。見事な迷宮でした' },
+    { speaker:'thunder', face:'normal', text:'魔王殿。子どもだと油断するなと言ったこと、取り消します' },
+    { speaker:'thunder', face:'smile', text:'見事な迷宮でした' },
     { speaker:'maou',      face:'shy',      text:'そ、そうかのう……。ま、まあ、ワシの迷宮じゃからな' },
     // ③戦士たちが人間界へ帰る
-    { speaker:'swordsman_f', side:'right', face:'smile', text:'さあ、そろそろ帰りましょう。魔王、ありがとう。クッキーも、おいしかったわ' },
+    { speaker:'swordsman_f', side:'right', face:'smile', text:'さあ、そろそろ帰りましょう' },
+    { speaker:'swordsman_f', side:'right', face:'smile', text:'クッキー、ごちそうさま。ありがとう、魔王' },
     { speaker:'maou',      face:'smile',    text:'うむ。……また、遊びに来るがよい' },
     { speaker:'narration', text:'人間の戦士たちは手をふって、人間界へ帰っていった――' },
     { speaker:'maou',      face:'normal',   text:'……行ってしもうたのう' },
@@ -6741,7 +6801,8 @@ const STORY_ENDING = [
     { speaker:'maou',      face:'panic',    text:'なにぃ！？　まだ来るのか！？　ワシは、<b>バカンス</b>の続きがしたいのに！' },
     { speaker:'darkelf',   face:'normal',   text:'魔王様。人間の国は、ひとつではないのです' },
     { speaker:'maou',      face:'angry',    text:'……ええい、仕方ない！　また迷宮づくりじゃ！' },
-    { speaker:'maou',      face:'grin',     text:'今度は、もっと強い戦士が来るかもしれん。じゃが、ワシの迷宮で、ぜんぶ追い返してやるわ！' },
+    { speaker:'darkelf', face:'normal', text:'今度は、もっと強い戦士が来るかもしれません' },
+    { speaker:'maou', face:'grin', text:'ふん、望むところじゃ！　ワシの迷宮で、ぜんぶ追い返してやるわ！' },
     { speaker:'darkelf',   face:'smile',    text:'どこまでもお供いたします、魔王様' },
     { speaker:'fairy',     face:'grin',     text:'わたしも！　クッキーのためなら、がんばる！' },
     { speaker:'narration', text:'魔王の戦いは、まだ終わらない――' },
@@ -9525,6 +9586,7 @@ window.addEventListener('load', scaleContainer);
 scaleContainer();
 requestAnimationFrame(scaleContainer);
 setTimeout(scaleContainer, 100);
+rotateTitleBg(); // 最初のタイトル背景
 applyI18n();
 updateNameRegisterBtn();
 renderTitleStoryStatus();
