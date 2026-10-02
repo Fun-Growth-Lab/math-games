@@ -587,7 +587,9 @@
         }
         #stage-title-overlay.hidden { display:flex !important; opacity:0; pointer-events:none; }
         .stage-title-num { font-size:1.3rem; color:var(--gold); letter-spacing:0.5em; font-weight:800; margin-bottom:14px; margin-left:0.5em; opacity:1; transition:opacity 0.7s ease; }
-        .stage-title-num.pre, .stage-title-name.pre { opacity:0; }
+        .stage-title-num.pre, .stage-title-name.pre, .stage-title-feature.pre { opacity:0; }
+        /* そのステージの特徴の一言。題名のあと、少し遅れて中央に大きめに出す */
+        .stage-title-feature { margin-top:44px; font-size:2.1rem; font-weight:800; color:var(--gold); letter-spacing:0.06em; text-align:center; text-shadow:0 3px 14px rgba(0,0,0,0.8); opacity:1; transition:opacity 0.7s ease; }
         .stage-title-name { font-size:3.2rem; color:#fff; font-weight:900; letter-spacing:0.06em; text-shadow:0 4px 18px rgba(0,0,0,0.8); opacity:1; transition:opacity 0.7s ease; }
         .hud-stage-type { font-size:0.6rem; font-weight:700; color:var(--ink-dim); margin-top:2px; text-shadow:none; letter-spacing:0; white-space:nowrap; }
         .stageselect-list { display:flex; flex-direction:column; gap:8px; margin:14px 0; }
@@ -1108,6 +1110,7 @@
     <div id="stage-title-overlay" class="hidden" onclick="finishStageTitleCard()">
         <div class="stage-title-num" id="stage-title-num"></div>
         <div class="stage-title-name" id="stage-title-name"></div>
+        <div class="stage-title-feature" id="stage-title-feature"></div>
     </div>
 
     <!-- ==================== TITLE ==================== -->
@@ -6431,18 +6434,19 @@ function trapAffectedCells(trap, room){
 // 「洞窟→森→泉→山→街→城」の6エリアが、それぞれ独立した1ゲーム（ステージ1〜7）。
 // 6つのゲームを順にクリアしていくと物語が完結する。エリアごとに生産・生産数・建設費のいずれか1つだけに
 // 軽い特徴を持たせてある。特徴はそのエリアの7ステージを通してずっと効く
+// featureDescは、ステージ題名カードに大きく出す特徴の一言（数値は出さず、定性的に言うだけ）
 const AREA_TYPES = [
-    { key:'cave',     name_ja:'洞窟', icon:'⛰️', effectDesc:'活力+12%',   mapImage:'images/map/map1.jfif',
+    { key:'cave',     name_ja:'洞窟', icon:'⛰️', effectDesc:'活力+12%', featureDesc:'このステージでは、活力の素が多い',   mapImage:'images/map/map1.jfif',
       vitMult:1.12, manaMult:1,    toolMult:1,   summonMult:1,   roomCostMult:1 },
-    { key:'forest',   name_ja:'森',   icon:'🌲', effectDesc:'魔力+12%',   mapImage:'images/map/map2.jfif',
+    { key:'forest',   name_ja:'森',   icon:'🌲', effectDesc:'魔力+12%', featureDesc:'このステージでは、魔力の素が多い',   mapImage:'images/map/map2.jfif',
       vitMult:1,    manaMult:1.12, toolMult:1,   summonMult:1,   roomCostMult:1 },
-    { key:'spring',   name_ja:'泉',   icon:'💧', effectDesc:'通常',       mapImage:'images/map/map3.jfif',
+    { key:'spring',   name_ja:'泉',   icon:'💧', effectDesc:'通常', featureDesc:'このステージでは、特別な変化はない',       mapImage:'images/map/map3.jfif',
       vitMult:1,    manaMult:1,    toolMult:1,   summonMult:1,   roomCostMult:1 },
-    { key:'mountain', name_ja:'山',   icon:'🏔️', effectDesc:'掘削半減',   mapImage:'images/map/map4.jfif',
+    { key:'mountain', name_ja:'山',   icon:'🏔️', effectDesc:'掘削半減', featureDesc:'このステージでは、道具の素が少ない',   mapImage:'images/map/map4.jfif',
       vitMult:1,    manaMult:1,    toolMult:0.5, summonMult:1,   roomCostMult:1 },
-    { key:'town',     name_ja:'街',   icon:'🏘️', effectDesc:'召喚半減',   mapImage:'images/map/map5.jfif',
+    { key:'town',     name_ja:'街',   icon:'🏘️', effectDesc:'召喚半減', featureDesc:'このステージでは、召喚の素が少ない',   mapImage:'images/map/map5.jfif',
       vitMult:1,    manaMult:1,    toolMult:1,   summonMult:0.5, roomCostMult:1 },
-    { key:'castle',   name_ja:'城',   icon:'🏰', effectDesc:'建設費+25%', mapImage:'images/map/map6.jfif',
+    { key:'castle',   name_ja:'城',   icon:'🏰', effectDesc:'建設費+25%', featureDesc:'このステージでは、部屋づくりに活力がよけいにかかる', mapImage:'images/map/map6.jfif',
       vitMult:1,    manaMult:1,    toolMult:1,   summonMult:1,   roomCostMult:1.25 },
 ];
 const STORY_ENDING_MAP_IMAGE = 'images/map/map7.jfif'; // 城クリア後のエピローグ専用（全エリア制圧後の魔王城の絵）
@@ -6536,36 +6540,43 @@ const STORY_SCRIPT = {
     // 魔王も、街の民（魔界の住人）を戦いにまきこまないよう「城だけを取り返す」と決める。最後は戦いを止めて、話し合って仲直りする。
     // エピローグでは戦士たちが人間界へ帰ったあと、別の国の人間の軍隊が攻めてくる場面で終わり、さらに過酷なモードへつなげる。
     1: [ // 洞窟：魔王の帰還と、勇者側の油断（勇者側は剣士とアーチャーだけ。ほかの仲間は出さない）
-        { speaker:'maou',      face:'surprise', text:'ただいま戻ったぞ！　……ん？　なんだか、城のようすが変じゃのう' },
-        { speaker:'maou',      face:'normal',   text:'ヴィオラ、ワシが<b>バカンス</b>に行っとる間に、何があったんじゃ？' },
-        { speaker:'darkelf',   face:'shy',      text:'お、おかえりなさいませ、魔王様。じつは……' },
-        { speaker:'darkelf',   face:'panic',    text:'お留守の間に、人間の戦士たちが魔王城を乗っ取ってしまったのです！' },
-        { speaker:'maou',      face:'panic',    text:'なんじゃとーっ！？　ワシの城を！？' },
-        { speaker:'darkelf',   face:'shy',      text:'……<b>バカンス</b>が、ちょっと長すぎました' },
-        { speaker:'maou',      face:'angry',    text:'うぬぬぬ……！　よし、ワシが行って取り返してやる！' },
-        { speaker:'darkelf',   face:'normal',   text:'お城には、人間の戦士がたくさんいます。まずは近くの洞窟に迷宮を作り、戦士たちをおびき寄せて追い返しましょう' },
-        { speaker:'maou',      face:'grin',     text:'おお、それは名案じゃ！　よし、迷宮づくりの始まりじゃ！' },
+        { speaker:'maou', face:'surprise', text:'ただいま戻ったぞ！' },
+        { speaker:'maou', face:'normal', text:'……ん？　なんだか、城のようすが変じゃのう' },
+        { speaker:'maou', face:'normal', text:'ヴィオラ、ワシが<b>バカンス</b>に行っとる間に、何があったんじゃ？' },
+        { speaker:'darkelf', face:'shy', text:'お、おかえりなさいませ、魔王様。じつは……' },
+        { speaker:'darkelf', face:'panic', text:'お留守の間に、人間の戦士たちが魔王城を乗っ取ってしまったのです！' },
+        { speaker:'maou', face:'panic', text:'なんじゃとーっ！？　ワシの城を！？' },
+        { speaker:'darkelf', face:'shy', text:'……<b>バカンス</b>が、ちょっと長すぎました' },
+        { speaker:'maou', face:'angry', text:'うぬぬぬ……！　よし、ワシが行って取り返してやる！' },
+        { speaker:'darkelf', face:'normal', text:'お城には、人間の戦士がたくさんいるようです' },
+        { speaker:'darkelf', face:'smile', text:'まずは近くの洞窟に迷宮を作り、おびき寄せて追い返しましょう' },
+        { speaker:'maou', face:'grin', text:'おお、それは名案じゃ！　よし、迷宮づくりの始まりじゃ！' },
         { speaker:'narration', text:'そのころ、人間たちは――' },
         { speaker:'swordsman', face:'grin',     text:'はっはっは！　魔王城を取るなんて、かんたんだったな！' },
-        { speaker:'archer',    face:'normal',   text:'ですが、肝心の魔王がいません。ずっと留守にしていたようです' },
+        { speaker:'archer',    face:'normal',   text:'ですが、肝心の魔王がいません。留守にしているようです' },
         { speaker:'swordsman', face:'surprise', text:'なに？　じゃあ、魔王はどこにいるんだ？' },
         { speaker:'archer',    face:'surprise', text:'城のうらの洞窟に、見たことのない迷宮ができています。魔王が帰ってきたのかもしれません' },
         { speaker:'swordsman', face:'grin',     text:'向こうから出てきてくれたか！　よし、洞窟へ行くぞ！' },
         { speaker:'archer',    face:'normal',   text:'油断は禁物ですよ、剣士殿。相手は魔王です' },
         { speaker:'swordsman', face:'angry',    text:'わかってる！　魔王を倒して、世界を平和にするんだ！' },
     ],
-    2: [ // 森：妖精ミントとの出会い（魔王側）／迷子のうさぎを助けた女アーチャーと出会う勇者側
-        { speaker:'maou',      face:'smile',    text:'洞窟の人間どもは追い返したぞ！　この調子じゃ！' },
-        { speaker:'darkelf',   face:'smile',    text:'お見事です、魔王様。次は森に迷宮を作りましょう' },
-        { speaker:'fairy',     face:'surprise', text:'あーっ！　いいにおい！　クッキーだぁ！' },
-        { speaker:'darkelf',   face:'panic',    text:'きゃっ！？　私のおやつが！' },
-        { speaker:'maou',      face:'surprise', text:'なんじゃこの羽虫は！　ヴィオラのクッキーを返さんか！' },
-        { speaker:'fairy',     face:'angry',    text:'羽虫じゃないもん！　森の妖精の、ミントだよ！' },
-        { speaker:'fairy',     face:'smile',    text:'クッキーおいしかった！　お礼に、森のことを教えてあげる！' },
-        { speaker:'fairy',     face:'cry',      text:'最近ね、人間の兵隊さんがたくさん来て、森がさわがしいの' },
-        { speaker:'maou',      face:'grin',     text:'ほう、人間どもか。ワシらの敵じゃな。道案内を許してやろう！' },
-        { speaker:'fairy',     face:'normal',   text:'でもね、あの人たち、迷子のうさぎを助けてくれたよ。悪い人じゃないと思う' },
-        { speaker:'maou',      face:'normal',   text:'ふん、いい人のふりをしておるだけじゃ' },
+    2: [ // 森：妖精ミントとの出会い（魔王側）／子うさぎを親うさぎへ返す女アーチャーと出会う勇者側
+        { speaker:'maou', face:'smile', text:'洞窟の人間どもは追い返したぞ！' },
+        { speaker:'darkelf', face:'smile', text:'お見事です、魔王様' },
+        { speaker:'maou', face:'grin', text:'ふふーん、このくらい、へでもないわ！' },
+        { speaker:'darkelf', face:'normal', text:'魔王様、次はあそこにある森に、迷宮を作ってはいかがでしょうか？' },
+        { speaker:'maou', face:'normal', text:'ほう、あの森か。魔力が豊富にありそうじゃのう' },
+        { speaker:'fairy', face:'surprise', text:'あーっ！　いいにおい！　クッキーだぁ！' },
+        { speaker:'darkelf', face:'panic', text:'きゃっ！？　私のおやつが！' },
+        { speaker:'maou', face:'surprise', text:'なんじゃこの羽虫は！　ヴィオラのクッキーを返さんか！' },
+        { speaker:'fairy', face:'angry', text:'羽虫じゃないもん！　森の妖精の、ミントだよ！' },
+        { speaker:'fairy', face:'smile', text:'クッキーおいしかった！　お礼に、森のことを教えてあげる！' },
+        { speaker:'fairy', face:'cry', text:'最近ね、人間の兵隊さんがたくさん来て、森がさわがしいの' },
+        { speaker:'maou', face:'normal', text:'ほう、人間どもが来ておるのか' },
+        { speaker:'maou', face:'grin', text:'森のことを教えてくれるなら、道案内を許してやろう！' },
+        { speaker:'fairy', face:'normal', text:'でもね、あの人たち、迷子のうさぎを助けてくれたよ' },
+        { speaker:'fairy', face:'smile', text:'悪い人じゃないと思うな' },
+        { speaker:'maou', face:'normal', text:'ふん、いい人のふりをしておるだけじゃ' },
         { speaker:'narration', text:'そのころ、人間たちは――' },
         { speaker:'swordsman', face:'angry',    text:'くそっ、洞窟では負けてしまった。次こそ勝つぞ！' },
         { speaker:'archer',    face:'normal',   text:'ですが、この森は広くて、道がわかりません' },
@@ -6579,15 +6590,25 @@ const STORY_SCRIPT = {
         { speaker:'archer_f',  face:'normal',   text:'……あれ？　今日は森の魔力が、いつもより元気です' },
         { speaker:'archer',    face:'surprise', text:'魔王の迷宮のせいかもしれません。気をつけて進みましょう' },
     ],
-    3: [ // 泉：ヴィオラの打ち明け話と魔王の決意（魔王側）／魔王が子どもだと気づく勇者側
-        { speaker:'maou',      face:'normal',   text:'森も取り戻したぞ。ミント、案内ごくろうじゃった' },
-        { speaker:'fairy',     face:'smile',    text:'えへへ！　次は泉だよ！　お水がきれいで、お魚もおいしいんだ！' },
-        { speaker:'maou',      face:'surprise', text:'水面に映ったワシの顔、ずいぶん疲れておるのう' },
-        { speaker:'darkelf',   face:'cry',      text:'魔王様はお疲れでしたから、<b>バカンス</b>をおすすめしたのですが……。こんなことになって、ごめんなさい' },
-        { speaker:'maou',      face:'normal',   text:'ばかもの。行くと決めたのはワシじゃ。お主のせいではない' },
-        { speaker:'maou',      face:'smile',    text:'それにな、ワシは魔王じゃ。自分の城は、自分で取り返す！' },
-        { speaker:'fairy',     face:'smile',    text:'わたしもお手伝いする！' },
-        { speaker:'darkelf',   face:'smile',    text:'……はい。どこまでもお供いたします、魔王様' },
+    3: [ // 泉：ヴィオラののどのかわき（魔王とヴィオラの絆）と後悔（魔王側）／魔王が子どもだと気づく勇者側
+        { speaker:'maou', face:'smile', text:'森も取り戻したぞ。ミント、ありがとうな' },
+        { speaker:'fairy', face:'smile', text:'えへへ！　どういたしまして！' },
+        { speaker:'darkelf', face:'shy', text:'魔王様！' },
+        { speaker:'maou', face:'normal', text:'なんじゃ？' },
+        { speaker:'darkelf', face:'shy', text:'私、のどがかわきました' },
+        { speaker:'maou', face:'surprise', text:'ほう、お主が自分から言うとは、めずらしいのう' },
+        { speaker:'maou', face:'normal', text:'……ずっと働きづめじゃったからな' },
+        { speaker:'fairy', face:'smile', text:'それなら、あっちにキレイな泉があるよ！' },
+        { speaker:'maou', face:'grin', text:'よし、次は泉に迷宮を作ってやる！　行くぞ、ヴィオラ！' },
+        { speaker:'fairy', face:'smile', text:'ほら、着いたよ！　きれいでしょ！' },
+        { speaker:'darkelf', face:'smile', text:'まあ……本当に、きれいな泉ですね' },
+        { speaker:'maou', face:'surprise', text:'水面に映ったワシの顔、ずいぶん疲れておるのう' },
+        { speaker:'darkelf', face:'shy', text:'……魔王様はお疲れでしたから、<b>バカンス</b>をおすすめしたのですが' },
+        { speaker:'darkelf', face:'cry', text:'こんなことになって、ごめんなさい' },
+        { speaker:'maou', face:'normal', text:'ばかもの。行くと決めたのはワシじゃ。お主のせいではない' },
+        { speaker:'maou', face:'smile', text:'それにな、ワシは魔王じゃ。自分の城は、自分で取り返す！' },
+        { speaker:'fairy', face:'smile', text:'わたしもお手伝いする！' },
+        { speaker:'darkelf', face:'smile', text:'……はい。どこまでもお供いたします、魔王様' },
         { speaker:'narration', text:'そのころ、人間たちは――' },
         { speaker:'archer',    face:'angry',    text:'森の部隊も負けてしまいました。氷の魔導士殿、迷宮のことは何かわかりましたか？' },
         { speaker:'icemage',   face:'normal',   text:'はい。迷宮の魔力を調べました。……ずいぶん、明るくて、まっすぐな魔力です' },
@@ -6598,17 +6619,20 @@ const STORY_SCRIPT = {
         { speaker:'archer',    face:'normal',   text:'どちらにしても、泉へ行けばわかります。行きましょう' },
     ],
     4: [ // 山：魔王の不安（魔王側）／寒がる剣士と、魔王を気にし始める勇者側
-        { speaker:'maou',      face:'normal',   text:'泉も取り戻したぞ。魔界が、少しずつ元気になってきたのう' },
-        { speaker:'darkelf',   face:'panic',    text:'魔王様、次は山です。岩が硬くて、迷宮づくりが大変そうです' },
-        { speaker:'maou',      face:'panic',    text:'なにぃ！？　それは骨が折れるのう……' },
-        { speaker:'fairy',     face:'cry',      text:'さむーい！　山は風がつめたくて、羽がこおっちゃうよぉ' },
-        { speaker:'maou',      face:'normal',   text:'しょうがないやつじゃ。ワシのマントに入っとれ' },
-        { speaker:'fairy',     face:'smile',    text:'わぁい、あったかーい！' },
-        { speaker:'maou',      face:'normal',   text:'……なあ、ヴィオラ。ワシは、ちゃんと魔王をやれておるかのう' },
-        { speaker:'darkelf',   face:'smile',    text:'はい、もちろんです。……少し、背のびをなさっていますけれど' },
-        { speaker:'maou',      face:'panic',    text:'せ、背のびなどしておらん！' },
-        { speaker:'fairy',     face:'smile',    text:'してるしてるー！' },
-        { speaker:'maou',      face:'grin',     text:'ええい、うるさい！　進むぞ！' },
+        { speaker:'maou', face:'normal', text:'泉も取り戻したぞ' },
+        { speaker:'darkelf', face:'smile', text:'魔界が、少しずつ元気になってきましたね' },
+        { speaker:'maou', face:'grin', text:'うむ！　次はどこじゃ？' },
+        { speaker:'darkelf', face:'normal', text:'次は山です。ただ、岩が硬くて、迷宮づくりが大変そうです' },
+        { speaker:'maou', face:'panic', text:'なにぃ！？　それは骨が折れるのう……' },
+        { speaker:'fairy', face:'cry', text:'さむーい！　山は風がつめたくて、羽がこおっちゃうよぉ' },
+        { speaker:'maou', face:'normal', text:'しょうがないやつじゃ。ワシのマントに入っとれ' },
+        { speaker:'fairy', face:'smile', text:'わぁい、あったかーい！' },
+        { speaker:'maou', face:'normal', text:'……なあ、ヴィオラ。ワシは、ちゃんと魔王をやれておるかのう' },
+        { speaker:'darkelf', face:'smile', text:'はい、もちろんです' },
+        { speaker:'darkelf', face:'shy', text:'……少し、背のびをなさっていますけれど' },
+        { speaker:'maou', face:'panic', text:'せ、背のびなどしておらん！' },
+        { speaker:'fairy', face:'smile', text:'してるしてるー！' },
+        { speaker:'maou', face:'grin', text:'ええい、うるさい！　進むぞ！' },
         { speaker:'narration', text:'そのころ、人間たちは――' },
         { speaker:'swordsman', face:'cry',      text:'ぶるぶる……さ、寒い……' },
         { speaker:'firemage',  face:'smile',    text:'だいじょうぶ！　私があったかくしてあげる！　えいっ！' },
@@ -6621,15 +6645,16 @@ const STORY_SCRIPT = {
         { speaker:'firemage',  face:'smile',    text:'ねえ、魔王って、本当は悪い人じゃないんじゃない？' },
         { speaker:'swordsman', face:'angry',    text:'そ、それでも魔王は魔王だ！　城は渡さん！' },
     ],
-    5: [ // 街：人間にも暮らしがあると知る魔王（魔王側）／魔王の正体を知って、話をしたいと思う勇者（勇者側）
-        { speaker:'maou',      face:'smile',    text:'山を越えたぞ！　城はもう目の前じゃ！' },
-        { speaker:'darkelf',   face:'normal',   text:'この先は、魔界の民が暮らす街です。いまは人間の戦士たちが、守りをかためているそうです' },
-        { speaker:'maou',      face:'normal',   text:'……ワシの民たちか。留守にして、さびしい思いをさせたのう' },
-        { speaker:'fairy',     face:'surprise', text:'あ、わたし知ってる！　パン屋のおじさんが、迷子のわたしにパンをくれたんだよ' },
-        { speaker:'maou',      face:'smile',    text:'……そうか。みんな、元気にやっておるのじゃな' },
-        { speaker:'darkelf',   face:'normal',   text:'はい。街の人たちは、魔王様のお帰りを待っています' },
-        { speaker:'maou',      face:'angry',    text:'街の民を、戦いにまきこんではならん。ワシが取り返したいのは、城だけじゃ' },
-        { speaker:'darkelf',   face:'smile',    text:'……それでこそ、魔王様です' },
+    5: [ // 街：魔界の民の街（魔王側）／魔王の正体を知って、話をしたいと思う勇者の合流（勇者側）
+        { speaker:'maou', face:'smile', text:'山を越えたぞ！　城はもう目の前じゃ！' },
+        { speaker:'darkelf', face:'normal', text:'この先は、魔界の民が暮らす街です' },
+        { speaker:'darkelf', face:'normal', text:'いまは、人間の戦士たちが守りをかためているようです' },
+        { speaker:'maou', face:'normal', text:'……ワシの民たちか。留守にして、さびしい思いをさせたのう' },
+        { speaker:'fairy', face:'surprise', text:'あ、わたし知ってる！　パン屋のおじさんが、迷子のわたしにパンをくれたんだよ' },
+        { speaker:'maou', face:'smile', text:'……そうか。みんな、元気にやっておるのじゃな' },
+        { speaker:'darkelf', face:'normal', text:'はい。街の人たちは、魔王様のお帰りを待っています' },
+        { speaker:'maou', face:'angry', text:'街の民を、戦いにまきこんではならん。ワシが取り返したいのは、城だけじゃ' },
+        { speaker:'darkelf', face:'smile', text:'……それでこそ、魔王様です' },
         { speaker:'narration', text:'そのころ、人間たちは――' },
         { speaker:'swordsman', face:'angry',    text:'くそっ、山でも負けたか……。街まで下がって、守りをかためるぞ' },
         { speaker:'ninja',     face:'smile',    text:'ただいまー！　迷宮の奥まで、こっそり見てきたよ！' },
@@ -6643,15 +6668,22 @@ const STORY_SCRIPT = {
         { speaker:'swordsman_f', face:'angry',  text:'魔王が子どもでも、街が戦いになるのはいや。ここは守ります。……話をするのは、そのあとよ' },
         { speaker:'swordsman', face:'grin',     text:'おう！　街は俺たちが守る！' },
     ],
-    6: [ // 城：魔王の決意（魔王側）／魔王と話をすると決める勇者側
-        { speaker:'maou',      face:'surprise', text:'……見えたぞ。あれが、ワシの城じゃ' },
-        { speaker:'darkelf',   face:'angry',    text:'まあ！　お城がへんな旗だらけです！　なんて趣味の悪い！' },
-        { speaker:'fairy',     face:'grin',     text:'お城だー！　ぜーんぶ取り返しちゃおう！' },
-        { speaker:'maou',      face:'grin',     text:'城の壁は硬いが、最後まで気はぬかんぞ！' },
-        { speaker:'maou',      face:'normal',   text:'なあ、ヴィオラ。城を取り戻したら、もう二度と留守にはせんぞ' },
-        { speaker:'darkelf',   face:'smile',    text:'……はい、魔王様。ずっと、お城にいてくださるのですね' },
-        { speaker:'maou',      face:'smile',    text:'うむ。お主たちが、おるからな' },
-        { speaker:'fairy',     face:'smile',    text:'わたしも、ずーっといる！' },
+    6: [ // 城：魔王の決意と、お城での楽しみ（魔王側）／魔王と話をすると決める勇者側
+        { speaker:'maou', face:'surprise', text:'……見えたぞ。あれが、ワシの城じゃ' },
+        { speaker:'darkelf', face:'angry', text:'まあ！　お城がへんな旗だらけです！　なんて趣味の悪い！' },
+        { speaker:'fairy', face:'grin', text:'お城だー！　ぜーんぶ取り返しちゃおう！' },
+        { speaker:'maou', face:'grin', text:'城の壁は硬いが、最後まで気はぬかんぞ！' },
+        { speaker:'maou', face:'normal', text:'なあ、ヴィオラ。城を取り戻したら、もう二度と留守にはせんぞ' },
+        { speaker:'darkelf', face:'smile', text:'……はい、魔王様。ずっと、お城にいてくださるのですね' },
+        { speaker:'maou', face:'smile', text:'うむ。お主たちが、おるからな' },
+        { speaker:'fairy', face:'smile', text:'わたしも、ずーっといる！' },
+        { speaker:'darkelf', face:'smile', text:'ふふ。では、お城でも<b>バカンス</b>が楽しめるように、海と砂浜をつくりましょう！' },
+        { speaker:'maou', face:'panic', text:'いやいや、それはやりすぎじゃ！' },
+        { speaker:'fairy', face:'cry', text:'えー、わたしもバカンスしたいー' },
+        { speaker:'darkelf', face:'smile', text:'ふふ。魔王様のためですから、がんばってつくりますよ' },
+        { speaker:'maou', face:'shy', text:'……まあ、ちょっとだけならよいぞ' },
+        { speaker:'fairy', face:'grin', text:'やったー！　海だー！　いっぱい泳ぐー！' },
+        { speaker:'maou', face:'grin', text:'よし！　そのためにも、まずは城を取り戻すぞ！' },
         { speaker:'narration', text:'そのころ、人間たちは――' },
         { speaker:'thunder',   face:'angry',    text:'勇者殿、相手は魔王です。子どもでも、油断してはいけません' },
         { speaker:'swordsman_f', face:'normal', text:'わかってる。でも、まずは魔王と話がしたいの' },
@@ -6855,27 +6887,30 @@ function finishStoryScene(){
 let stageTitleTimer = null;
 let stageTitleToken = 0;
 const STAGE_TITLE_BLANK_MS = 700;  // 真っ暗なまま待つ「余白」
-const STAGE_TITLE_HOLD_MS = 1900;  // 題名を見せておく時間
+const STAGE_TITLE_FEATURE_DELAY_MS = 900; // 題名を出してから、特徴の一言を出すまでの間
+const STAGE_TITLE_HOLD_MS = 3300;  // 題名（と特徴の一言）を見せておく時間
 let stageTitleOnComplete = null;
 function showStageTitleCard(areaIdx, onComplete){
     const area = areaTypeAt(areaIdx);
     document.getElementById('stage-title-num').textContent = uif('stage_title_num_label', areaIdx);
     document.getElementById('stage-title-name').textContent = uif('stage_title_name_label', area.name_ja);
+    document.getElementById('stage-title-feature').textContent = area.featureDesc || '';
     stageTitleOnComplete = onComplete || null;
     const card = document.getElementById('stage-title-overlay');
-    const numEl = document.getElementById('stage-title-num'), nameEl = document.getElementById('stage-title-name');
+    const numEl = document.getElementById('stage-title-num'), nameEl = document.getElementById('stage-title-name'), featEl = document.getElementById('stage-title-feature');
     // 黒いカードは一瞬で全面に出す（すでに黒くなっているので違和感がなく、裏の建設画面がフェード中に透けない）。
     // 文字は最初は隠しておき、少し間を置いてからフェードで出す
     // ※文字を隠す(pre)ときもtransitionを切っておく。切らないと、前回表示した状態(opacity:1)から0.7秒かけて
     //   消えていく動きになり、「題名が見える→消える→また見える」というちらつきになる
-    [card, numEl, nameEl].forEach(el => { el.style.transition = 'none'; });
-    numEl.classList.add('pre'); nameEl.classList.add('pre');
+    [card, numEl, nameEl, featEl].forEach(el => { el.style.transition = 'none'; });
+    numEl.classList.add('pre'); nameEl.classList.add('pre'); featEl.classList.add('pre');
     card.classList.remove('hidden');
     void card.offsetWidth;
-    [card, numEl, nameEl].forEach(el => { el.style.transition = ''; });
+    [card, numEl, nameEl, featEl].forEach(el => { el.style.transition = ''; });
     clearTimeout(stageTitleTimer);
     const token = ++stageTitleToken;
     setTimeout(() => { if (token===stageTitleToken){ numEl.classList.remove('pre'); nameEl.classList.remove('pre'); } }, STAGE_TITLE_BLANK_MS);
+    setTimeout(() => { if (token===stageTitleToken) featEl.classList.remove('pre'); }, STAGE_TITLE_BLANK_MS + STAGE_TITLE_FEATURE_DELAY_MS);
     stageTitleTimer = setTimeout(finishStageTitleCard, STAGE_TITLE_BLANK_MS + STAGE_TITLE_HOLD_MS); // クリック/Enterで早められる。何もしなくても自動で進む
 }
 function finishStageTitleCard(){
