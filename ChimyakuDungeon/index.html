@@ -3057,17 +3057,27 @@ function setupGridDom(prebuiltDom){
     gridEl.onclick = onGridClick;
     gridEl.onmousemove = onGridMove;
     gridEl.onmouseleave = () => { hoverCell = null; updateGemFocus(null); renderOverlays(); };
-    focusedType = null;
+    focusedType = null; gemFocusCache = null; gridEl.__staticSig = null;
 }
 
 // ---- 因子・素の強調表示（カーソルを合わせた種類だけ目立たせる） ----
 let focusedType = null;
+// 種類(data-type)ごとの素・卵の要素リスト。毎回querySelectorAllで全マスを調べて全部のclassを切り替えると重いので、
+// 前に光らせていた種類と、これから光らせる種類のぶんだけ切り替える（マスを作り直したらnullに戻す）
+let gemFocusCache = null;
+function gemFocusElementsByType(){
+    if (!gemFocusCache){
+        gemFocusCache = {};
+        gridEl.querySelectorAll('.gem, .egg-icon').forEach(el => { (gemFocusCache[el.dataset.type] = gemFocusCache[el.dataset.type] || []).push(el); });
+    }
+    return gemFocusCache;
+}
 function updateGemFocus(newType){
     if (newType === focusedType) return;
+    const cache = gemFocusElementsByType();
+    if (focusedType && cache[focusedType]) cache[focusedType].forEach(el => el.classList.remove('focus'));
     focusedType = newType;
-    gridEl.querySelectorAll('.gem, .egg-icon').forEach(el => {
-        el.classList.toggle('focus', !!focusedType && el.dataset.type === focusedType);
-    });
+    if (focusedType && cache[focusedType]) cache[focusedType].forEach(el => el.classList.add('focus'));
 }
 
 function cellFromEvent(e){
@@ -3143,30 +3153,30 @@ function renderBuildActions(){
                 <button class="sort-btn${meta.shape==='line-v'?' active':''}" onclick="setTrapOrientation('v')">${ui('trap_orient_v_short')}</button>
                 <button class="sort-btn${meta.shape==='line-h'?' active':''}" onclick="setTrapOrientation('h')">${ui('trap_orient_h_short')}</button>
             </div>`;
-        wrap.innerHTML = `<div class="side-panel-title">${ui('move_info_title_trap')}</div>`
+        setHtmlIfChanged(wrap, `<div class="side-panel-title">${ui('move_info_title_trap')}</div>`
             + `<div style="font-weight:800; margin-bottom:6px;">${label}</div>`
             + (isLine ? orientRow : '')
-            + `<div class="status-text" style="margin-bottom:8px;">${escapeHtml(ui('status_pick_trap_cell'))}</div>`;
+            + `<div class="status-text" style="margin-bottom:8px;">${escapeHtml(ui('status_pick_trap_cell'))}</div>`);
         return;
     }
     if (selectedMonsterId!==null){
         const m = monsters.find(x=>x.id===selectedMonsterId);
-        wrap.innerHTML = `<div class="side-panel-title">${ui('move_info_title')}</div>`
-            + (m ? monsterDetailCoreHtml(m, { artClick: `openMonsterDetailModal(${m.id})` }) : '');
+        setHtmlIfChanged(wrap, `<div class="side-panel-title">${ui('move_info_title')}</div>`
+            + (m ? monsterDetailCoreHtml(m, { artClick: `openMonsterDetailModal(${m.id})` }) : ''));
         return;
     }
     if (demonLordMoveSelected){
-        wrap.innerHTML = `<div class="side-panel-title">${ui('move_info_title_demonlord')}</div>`
-            + demonLordCardHtml({ artClick: 'openDemonLordDetailModal()' });
+        setHtmlIfChanged(wrap, `<div class="side-panel-title">${ui('move_info_title_demonlord')}</div>`
+            + demonLordCardHtml({ artClick: 'openDemonLordDetailModal()' }));
         return;
     }
     if (mode === 'idle'){
-        wrap.innerHTML = `<button class="btn btn-primary btn-build-room" onclick="beginRoomPlacement()">${ui('btn_build_room')}</button>`
-            + dungeonOverviewHtml() + (rooms.length===0 ? `<div class="status-text" style="color:var(--ink-dim); font-weight:700;">${ui('hint_click_map')}</div>` : '');
+        setHtmlIfChanged(wrap, `<button class="btn btn-primary btn-build-room" onclick="beginRoomPlacement()">${ui('btn_build_room')}</button>`
+            + dungeonOverviewHtml() + (rooms.length===0 ? `<div class="status-text" style="color:var(--ink-dim); font-weight:700;">${ui('hint_click_map')}</div>` : ''));
     } else {
         // 部屋づくり中：①範囲 › ②通路 › ③確認 のどこにいるかを見せる（戻るは右パネル最上段の「もどる」）
         const step = roomBuildStep();
-        wrap.innerHTML = `<div class="build-steps">${[1,2,3].map(n => `<span class="${n===step?'on':''}">${ui('screen_step_'+n)}</span>`).join('<i>›</i>')}</div>`;
+        setHtmlIfChanged(wrap, `<div class="build-steps">${[1,2,3].map(n => `<span class="${n===step?'on':''}">${ui('screen_step_'+n)}</span>`).join('<i>›</i>')}</div>`);
     }
 }
 // 部屋づくりの段階：1=範囲(角の指定) 2=通路 3=確認
@@ -3196,15 +3206,16 @@ function renderDemonLordFooterWidget(){
     if (!wrap) return;
     if (demonLordCell){
         wrap.className = 'dl-footer-widget placed';
-        wrap.innerHTML = `<button class="btn btn-purple btn-footer-primary" style="width:100%;" onclick="openDemonLordDetailModal()">👑 ${ui('demonlord_label')} Lv.${demonLordCell.level||1}</button>`;
+        setHtmlIfChanged(wrap, `<button class="btn btn-purple btn-footer-primary" style="width:100%;" onclick="openDemonLordDetailModal()">👑 ${ui('demonlord_label')} Lv.${demonLordCell.level||1}</button>`);
         return;
     }
     wrap.className = 'dl-footer-widget unplaced';
-    wrap.innerHTML = `<span id="dl-footer-drag" class="dl-footer-drag" draggable="true"
+    const unplacedChanged = setHtmlIfChanged(wrap, `<span id="dl-footer-drag" class="dl-footer-drag" draggable="true"
                 ondragstart="onDemonLordButtonDragStart(event)" ondragend="onDemonLordButtonDragEnd(event)"
                 style="background-image:url('images/mamono/demon_lord.png');" title="${escapeHtml(ui('dl_footer_drag_hint'))}"></span>
         <div class="dl-footer-hint">${escapeHtml(ui('dl_footer_drag_hint'))}</div>
-        <button class="btn btn-sm dl-footer-status-btn" onclick="openDemonLordDetailModal()">${ui('dl_menu_status')}</button>`;
+        <button class="btn btn-sm dl-footer-status-btn" onclick="openDemonLordDetailModal()">${ui('dl_menu_status')}</button>`);
+    if (!unplacedChanged) return; // 中身が同じなら、ドラッグ用アイコンの設定も前回のまま
     // HTMLの onpointerdown 属性はブラウザによって認識されないことがあるため、確実にプロパティで登録する
     const dragIcon = document.getElementById('dl-footer-drag');
     dragIcon.onpointerdown = (ev) => onUnitPointerDown(ev, dragIcon, 'demonlord-initial');
@@ -3369,10 +3380,13 @@ function findEntranceCandidates(rect){
 // ---- グリッド操作 ----
 function onGridMove(e){
     const cell = cellFromEvent(e);
+    // 同じマスの上で細かく動いている間は何もしない（マウスは1マスを通る間にも何度もイベントを出すため）
+    if (cell===hoverCell || (cell && hoverCell && cell.r===hoverCell.r && cell.c===hoverCell.c)) return;
     hoverCell = cell;
     updateGemFocus(cell ? grid[cell.r][cell.c] : null);
-    if (mode==='placing-rect' && anchorCell) renderOverlays();
-    else if (trapPlaceMode) renderOverlays();
+    // 動いたときに変わるのは「配置プレビュー」と「罠の範囲プレビュー」だけ。部屋・通路・魔物まで描き直さない
+    if (mode==='placing-rect' && anchorCell) renderPlacementPreview();
+    else if (trapPlaceMode) renderTrapPreview();
 }
 function onGridClick(e){
     if (gamePhase==='battle'){
@@ -3565,6 +3579,7 @@ function upgradeGridCellToRareEggVisual(r, c){
     const wrap = cellEl.querySelector('.gem-wrap');
     if (!img || !wrap) return;
     img.dataset.type = 'egg_rare';
+    img.classList.remove('focus'); gemFocusCache = null; // 種類が変わったので、ハイライト用の要素リストを作り直す
     img.src = `images/egg/egg_rare${1+Math.floor(Math.random()*8)}.png`;
     wrap.classList.add('rare-egg-wrap');
 }
@@ -9068,9 +9083,17 @@ function downloadBalanceReport(){
 
 // ---- 描画 ----
 function px(v){ return v*CELL; }
+// innerHTMLは、中身が前回と同じなら書き換えない（毎回作り直すと、画像の再割り当てとスタイル再計算が走って重いため）。
+// 実際に書き換えたときだけtrueを返す。※この関数を通さずに、同じ要素のinnerHTMLを直接書き換えないこと
+function setHtmlIfChanged(el, html){
+    if (el.__html === html) return false;
+    el.__html = html;
+    el.innerHTML = html;
+    return true;
+}
 function renderAll(){
     const curArea = currentAreaType();
-    document.getElementById('hud-stage-badge').innerHTML = `${curArea.icon} ${escapeHtml(curArea.name_ja)}<div class="hud-stage-type">${uif('hud_stage_label', stage)}／${escapeHtml(curArea.effectDesc)}</div>`;
+    setHtmlIfChanged(document.getElementById('hud-stage-badge'), `${curArea.icon} ${escapeHtml(curArea.name_ja)}<div class="hud-stage-type">${uif('hud_stage_label', stage)}／${escapeHtml(curArea.effectDesc)}</div>`);
     const phaseBadge = document.getElementById('hud-phase-badge');
     phaseBadge.textContent = ui(gamePhase==='build' ? 'hud_phase_prepare' : 'hud_phase_battle');
     phaseBadge.classList.toggle('prepare', gamePhase==='build');
@@ -9139,11 +9162,10 @@ function renderUnitIcons(){
         activeIds.add(key);
         let el = document.getElementById(key);
         if (!el){ el = document.createElement('div'); el.id = key; gridEl.appendChild(el); }
-        el.className = 'monster-icon role-' + speciesInfo(m.speciesKey).role
+        const monsterCls = 'monster-icon role-' + speciesInfo(m.speciesKey).role
             + (m.id===selectedMonsterId ? ' selected' : '')
             + (m.id===highlightedMonsterId ? ' map-highlight' : '')
             + (downed ? ' downed' : '');
-        el.style.left = px(m.c)+'px'; el.style.top = px(m.r)+'px'; el.style.width = CELL+'px'; el.style.height = CELL+'px';
         const statusMark = (m.statusEffects||[]).length ? `<span class="status-mark">${(m.statusEffects||[]).map(statusEmojiWithStack).join('')}</span>` : '';
         const imgFile = SPECIES_IMAGE_MAP[m.speciesKey];
         const bodyHtml = imgFile
@@ -9152,16 +9174,25 @@ function renderUnitIcons(){
         // 総合戦闘力ランクは建設フェーズ（配置検討中）だけマップ上にも小さく出す。戦闘中は邪魔になるので出さない
         const mapLvMark = inBattle ? '' : `<span class="map-lv-badge">Lv.${m.level||0}</span>`;
         const mapRankMark = inBattle ? '' : `<span class="rank-badge map-rank-badge rank-${combatRank(m)}">${combatRank(m)}</span>`;
-        el.innerHTML = bodyHtml
+        const monsterHtml = bodyHtml
             + (downed ? '' : hpBarHtml(m.hp, m.maxHp))
             + statusMark
             + mapRankMark
             + mapLvMark
             + (downed ? '<span class="downed-mark">✕</span>' : '');
-        // 建設フェーズ中のみドラッグ＆ドロップ・クリック選択を有効にする（戦闘中はクリックが素通りする必要があるため無効）
-        el.draggable = !inBattle;
-        el.style.pointerEvents = inBattle ? 'none' : 'auto';
-        el.style.cursor = inBattle ? '' : 'grab';
+        // 見た目に関わる値（クラス・位置・中身・操作の可否）が前回と同じなら、DOMには触らない。
+        // 毎回作り直すと、魔物の数だけ画像の再割り当てとスタイル再計算が走って重くなるため
+        const monsterSig = monsterCls+'|'+m.c+'|'+m.r+'|'+(inBattle?1:0)+'|'+monsterHtml;
+        if (el.__sig !== monsterSig){
+            el.__sig = monsterSig;
+            el.className = monsterCls;
+            el.style.left = px(m.c)+'px'; el.style.top = px(m.r)+'px'; el.style.width = CELL+'px'; el.style.height = CELL+'px';
+            el.innerHTML = monsterHtml;
+            // 建設フェーズ中のみドラッグ＆ドロップ・クリック選択を有効にする（戦闘中はクリックが素通りする必要があるため無効）
+            el.draggable = !inBattle;
+            el.style.pointerEvents = inBattle ? 'none' : 'auto';
+            el.style.cursor = inBattle ? '' : 'grab';
+        }
         if (!inBattle){
             el.ondragstart = (ev) => {
                 ev.dataTransfer.setData('text/plain', 'monster:'+m.id);
@@ -9195,15 +9226,20 @@ function renderUnitIcons(){
         activeIds.add(dlKey);
         let el = document.getElementById(dlKey);
         if (!el){ el = document.createElement('div'); el.id = dlKey; gridEl.appendChild(el); }
-        el.className = 'demonlord-icon' + (demonLordMoveSelected ? ' selected' : '');
-        el.style.left = px(demonLordCell.c)+'px'; el.style.top = px(demonLordCell.r)+'px';
+        const dlCls = 'demonlord-icon' + (demonLordMoveSelected ? ' selected' : '');
         const hpBar = demonLordCell.hp!==undefined ? hpBarHtml(demonLordCell.hp, demonLordCell.maxHp, 'var(--danger)') : '';
         const dlBody = `<span class="unit-sprite" style="background-image:url('images/mamono/demon_lord.png'); background-position:${facingToBgPosition(demonLordCell.facing)};"></span>`;
-        el.innerHTML = dlBody + hpBar;
-        el.style.width = CELL+'px'; el.style.height = CELL+'px';
-        el.draggable = !inBattle;
-        el.style.pointerEvents = inBattle ? 'none' : 'auto';
-        el.style.cursor = inBattle ? '' : 'grab';
+        const dlSig = dlCls+'|'+demonLordCell.c+'|'+demonLordCell.r+'|'+(inBattle?1:0)+'|'+dlBody+hpBar;
+        if (el.__sig !== dlSig){ // モンスターと同じく、見た目が変わったときだけDOMを書き換える
+            el.__sig = dlSig;
+            el.className = dlCls;
+            el.style.left = px(demonLordCell.c)+'px'; el.style.top = px(demonLordCell.r)+'px';
+            el.innerHTML = dlBody + hpBar;
+            el.style.width = CELL+'px'; el.style.height = CELL+'px';
+            el.draggable = !inBattle;
+            el.style.pointerEvents = inBattle ? 'none' : 'auto';
+            el.style.cursor = inBattle ? '' : 'grab';
+        }
         if (!inBattle){
             el.ondragstart = (ev) => {
                 ev.dataTransfer.setData('text/plain', 'demonlord');
@@ -9236,34 +9272,39 @@ function renderUnitIcons(){
             activeIds.add(key);
             let el = document.getElementById(key);
             if (!el){ el = document.createElement('div'); el.id = key; gridEl.appendChild(el); }
-            el.className = 'hero-icon';
-            el.style.left = px(h.c)+'px'; el.style.top = px(h.r)+'px'; el.style.width = CELL+'px'; el.style.height = CELL+'px';
             const statusMark = (h.statusEffects||[]).length ? `<span class="status-mark">${(h.statusEffects||[]).map(statusEmojiWithStack).join('')}</span>` : '';
             const heroBody = HERO_IMAGE_CLASS_KEYS.includes(h.heroClassKey)
                 ? `<span class="unit-sprite" style="background-image:url('images/yuusya/${h.heroClassKey}_${h.gender||'m'}.png'); background-position:${facingToBgPosition(h.facing)};"></span>`
                 : `<span>${h.emoji}</span>`;
-            el.innerHTML = heroBody + hpBarHtml(h.hp, h.maxHp, 'var(--teal)') + statusMark;
+            const heroHtml = heroBody + hpBarHtml(h.hp, h.maxHp, 'var(--teal)') + statusMark;
+            const heroSig = h.c+'|'+h.r+'|'+heroHtml;
+            if (el.__sig !== heroSig){ // 見た目が変わったときだけDOMを書き換える
+                el.__sig = heroSig;
+                el.className = 'hero-icon';
+                el.style.left = px(h.c)+'px'; el.style.top = px(h.r)+'px'; el.style.width = CELL+'px'; el.style.height = CELL+'px';
+                el.innerHTML = heroHtml;
+            }
         });
     }
 
     gridEl.querySelectorAll('[id^="unit-"]').forEach(el => { if (!activeIds.has(el.id)) el.remove(); });
 }
 
-function renderOverlays(){
-    updateSideNav();
-    gridEl.querySelectorAll('.overlay-room,.overlay-corridor,.overlay-preview,.overlay-candidate,.overlay-entrancepath,.overlay-trap,.overlay-trap-icon,.overlay-trap-preview,.precost-badge').forEach(el=>el.remove());
-    gridEl.querySelectorAll('.gcell').forEach(el=>el.classList.remove('attach-cell','insufficient'));
-    renderWallZones();
-
-    // 部屋の中に入った因子・素は薄く表示する（建設後はもう見る必要がないため）
-    gridEl.querySelectorAll('.gcell.in-room').forEach(el=>el.classList.remove('in-room'));
-    rooms.forEach(rm => {
-        for (let r=rm.r0;r<=rm.r1;r++) for (let c=rm.c0;c<=rm.c1;c++){
-            const cellEl = gridEl.children[r*GRID_COLS+c];
-            if (cellEl) cellEl.classList.add('in-room');
-        }
-    });
-
+// 確定済みの通路・部屋・罠のオーバーレイは、内容（と選択状態）が前回と同じなら作り直さない。
+// ボタンを押すたびに全部作り直すと、そのたびにスタイル計算とレイアウトが走って重くなるため
+function staticOverlaySig(){
+    return JSON.stringify([
+        currentLang, selectedRoomId, !demonLordCell && mode==='idle', highlightedTrapId,
+        rooms.map(rm => [rm.id, rm.r0, rm.c0, rm.r1, rm.c1, rm.type, roomDisplayNameById(rm.id)]),
+        corridors.map(cd => [cd.id, cd.cells.length, cd.cells[0], cd.cells[cd.cells.length-1]]),
+        traps.map(t => [t.id, t.kind, t.r, t.c, t.roomId]),
+    ]);
+}
+function renderStaticOverlays(){
+    const sig = staticOverlaySig();
+    if (gridEl.__staticSig === sig) return;
+    gridEl.__staticSig = sig;
+    gridEl.querySelectorAll('.overlay-room,.overlay-corridor,.overlay-trap,.overlay-trap-icon').forEach(el=>el.remove());
     // 確定済みの通路
     corridors.forEach(cd => {
         cd.cells.forEach(({r,c}) => {
@@ -9316,7 +9357,21 @@ function renderOverlays(){
         icon.title = ui(meta.labelKey);
         gridEl.appendChild(icon);
     });
-    // 罠の設置中：カーソル位置に効果範囲のプレビューを表示する
+}
+// 部屋の中に入った因子・素は薄く表示する（建設後はもう見る必要がないため）。変わったマスだけclassを付け替える
+function renderInRoomCells(){
+    const want = new Uint8Array(GRID_ROWS*GRID_COLS);
+    rooms.forEach(rm => {
+        for (let r=rm.r0;r<=rm.r1;r++) for (let c=rm.c0;c<=rm.c1;c++) want[r*GRID_COLS+c] = 1;
+    });
+    for (let i=0;i<want.length;i++){
+        const cellEl = gridEl.children[i];
+        if (cellEl && cellEl.classList.contains('in-room') !== !!want[i]) cellEl.classList.toggle('in-room', !!want[i]);
+    }
+}
+// 罠の設置中：カーソル位置に効果範囲のプレビューを表示する。カーソルが別のマスへ動いたときは、全体を描き直さずこれだけを更新する
+function renderTrapPreview(){
+    gridEl.querySelectorAll('.overlay-trap-preview').forEach(el=>el.remove());
     if (trapPlaceMode && hoverCell){
         const trm = rooms.find(r=>r.id===trapPlaceMode.roomId);
         if (trm && hoverCell.r>=trm.r0 && hoverCell.r<=trm.r1 && hoverCell.c>=trm.c0 && hoverCell.c<=trm.c1){
@@ -9330,14 +9385,15 @@ function renderOverlays(){
             });
         }
     }
-    renderUnitIcons();
-
-    // 配置プレビュー（部屋の大きさを決めている間、建設費の目安を表示）
+}
+// 部屋の大きさを決めている間の枠と建設費の目安。これも、カーソルが動いたときはこれだけを更新する
+function renderPlacementPreview(){
+    gridEl.querySelectorAll('.overlay-preview.hover-live,.precost-badge').forEach(el=>el.remove());
     if (mode==='placing-rect' && anchorCell && hoverCell){
         const rect = normalizeRect(anchorCell, hoverCell);
         const err = validateRoomRect(rect);
         const d = document.createElement('div');
-        d.className = 'overlay-preview' + (err ? ' invalid' : '');
+        d.className = 'overlay-preview hover-live' + (err ? ' invalid' : '');
         d.style.left = px(rect.c0)+'px'; d.style.top = px(rect.r0)+'px';
         d.style.width = px(rect.c1-rect.c0+1)+'px'; d.style.height = px(rect.r1-rect.r0+1)+'px';
         gridEl.appendChild(d);
@@ -9349,6 +9405,17 @@ function renderOverlays(){
         badge.textContent = uif('precost_label', roomBuildCost(rw, rh));
         gridEl.appendChild(badge);
     }
+}
+function renderOverlays(){
+    updateSideNav();
+    gridEl.querySelectorAll('.overlay-preview,.overlay-candidate,.overlay-entrancepath,.overlay-trap-preview,.precost-badge').forEach(el=>el.remove());
+    gridEl.querySelectorAll('.gcell.attach-cell,.gcell.insufficient').forEach(el=>el.classList.remove('attach-cell','insufficient'));
+    renderWallZones();
+    renderInRoomCells();
+    renderStaticOverlays();
+    renderTrapPreview();
+    renderUnitIcons();
+    renderPlacementPreview();
     // 接続候補・確定待ちの新部屋プレビュー
     if ((mode==='await-entrance-connector' || mode==='await-connector' || mode==='confirm') && pendingRect){
         const d = document.createElement('div');
@@ -9551,7 +9618,7 @@ function renderRoomDetail(){
         const sorted = roomMonsters.slice().sort((a,b) => powerScore(b) - powerScore(a));
         html += sorted.map(m => monsterCardHtml(m, { clickable:true, highlight: m.id===highlightedMonsterId })).join('');
     }
-    body.innerHTML = html;
+    setHtmlIfChanged(body, html);
 }
 
 // ============================================================
