@@ -1665,6 +1665,7 @@ const UI_TEXT = {
     btn_next_area: { ja: '▶ 次のエリアへ', ja_easy: '▶ つぎの エリアへ', en: '▶ Next Area' },
     battle_result_areaclear_title: { ja: name => `🎉 ${name}エリア制圧！`, ja_easy: name => `🎉 ${name}エリア せいあつ！`, en: name => `🎉 ${name} Area Conquered!` },
     battle_result_areaclear_msg: { ja: '次のエリアへ進みましょう', ja_easy: 'つぎの エリアへ すすみましょう', en: 'Move on to the next area' },
+    battle_result_dl_carry: { ja: lv => `魔王はLv.${lv}を次のエリアへ引き継ぎます`, ja_easy: lv => `まおうは Lv.${lv}を つぎの エリアへ ひきつぎます`, en: lv => `The Demon Lord carries Lv.${lv} over to the next area` },
     player_name_btn: { ja: n => `👤 プレイヤー名：${n}`, ja_easy: n => `👤 プレイヤーめい：${n}`, en: n => `👤 Player: ${n}` },
     btn_ranking: { ja: '🏆 ランキング', en: '🏆 Ranking' },
     btn_settings: { ja: '⚙️ 設定', ja_easy: '⚙️ せってい', en: '⚙️ Settings' },
@@ -2360,7 +2361,7 @@ function confirmStartOver(){
     closeStartOverModal();
     // 「はじめから」は物語も洞窟(エリア1)から完全に最初に戻す（進行中のダンジョンだけでなく、
     // ここまでのエリア進行状況もリセットしないと、以前クリアしたエリアの続きから始まってしまう）
-    storyAreaIndex = 1; storyCleared = false; saveStoryProgress();
+    storyAreaIndex = 1; storyCleared = false; storyDemonLordXp = 0; saveStoryProgress();
     startStoryMode(); // startNewDungeon()の中でclearGameSave()される
 }
 // ステージ選択：クリア済みの6エリアを一覧表示し、選ぶとそのエリアを個別に練習プレイできる
@@ -4833,12 +4834,16 @@ function rollStatMods(min = STAT_MOD_MIN, max = STAT_MOD_MAX){
     return { hp: roll(), atk: roll(), def: roll(), magAtk: roll(), magDef: roll() };
 }
 // 種族の基本値×個体倍率を実際のステータスとして反映する（孵化時・進化時に呼ぶ）
-// 実際のステータス＝（種族の基本値）×（個体差倍率）×（1＋0.25×Lv）。m.levelは呼び出し前に最新の値にしておくこと
+// 実際のステータス＝（種族の基本値）×（個体差倍率）×（1＋0.25×Lv）×（進化段階ごとの倍率EVOLUTION_STAGE_STAT_SCALE）。m.levelは呼び出し前に最新の値にしておくこと
+// 【進化の強化の圧縮】種族の基本値は1段階進むと攻撃・HP・防御が約1.6〜2.0倍（stage1→3で約2.7倍）に設計されていたが、
+// Lv・装備・個体差・部屋のバフと掛け合わさって、終盤は一部の魔物だけが圧倒的な与ダメージになっていた（テストプレイで、1体が総ダメージの約44%）。
+// そこで進化段階ごとの倍率を掛けて、1進化あたり約1.4倍（stage1→3で約2倍）に抑える。stage1が基準
+const EVOLUTION_STAGE_STAT_SCALE = { 1:1, 2:0.82, 3:0.72 };
 // ※進化による強化は、実行時のボーナス倍率ではなく進化後の種族(MONSTER_SPECIES)の基本値そのものに
 //   織り込んである（1進化あたり約1.75倍を目安に基本値を設定）
 function applyStatModsToMonster(m, sp){
     const mods = m.statMods;
-    const lvMult = 1 + 0.25*(m.level||0);
+    const lvMult = (1 + 0.25*(m.level||0)) * (EVOLUTION_STAGE_STAT_SCALE[sp.stage] || 1);
     m.maxHp = Math.max(1, Math.round(sp.hp * mods.hp * lvMult));
     m.atk = Math.max(1, Math.round(sp.atk * mods.atk * lvMult));
     m.def = Math.max(1, Math.round(sp.def * mods.def * lvMult));
@@ -5626,9 +5631,12 @@ function closeHatchResultModal(){ document.getElementById('hatch-result-modal').
 // ============================================================
 // 装備品（勇者撃破ドロップから入手。1体につき1個だけ装備できる。一筆迷宮の装備を踏襲）
 // ============================================================
-// 素材5段階：鉄／銀／金／ダマスカス／オリハルコン。倍率は旧7段階システムの鉄～オリハルコンをそのまま流用
+// 素材5段階：鉄／銀／金／ダマスカス／オリハルコン。
+// 以前の倍率は[1.5, 2.25, 3.25, 4.5, 8]（最上位が最下位の約5倍）で、弓＋レンジャー系の1.5倍ボーナスだと攻撃力が最大＋180%になり、
+// 1体だけ与ダメージが突出する原因になっていた（テストプレイで、弓を装備したゴブリンレンジャーが総ダメージの約44%）。
+// 最上位でも最下位の約2.3倍に抑え、種族ボーナス込みでも最大でおよそ＋50%までにした
 const MATERIALS5 = ['鉄', '銀', '金', 'ダマスカス', 'オリハルコン'];
-const MATERIAL_TIER_MULT5 = [1.5, 2.25, 3.25, 4.5, 8];
+const MATERIAL_TIER_MULT5 = [1.0, 1.3, 1.6, 1.9, 2.3];
 // 形ごとの基本値（鉄=tier0を1倍とみなした基準値。旧システムのbow/sword/staff/armorの数値をそのまま踏襲）。鎧はマイナス補正込み
 const ITEM_SHAPES = [
     { key:'sword', name:'剣', icon:'⚔️', file:'sword', stats:{ atk:10, magAtk:10 } },
@@ -6419,8 +6427,10 @@ function applyDemonLordLevel(dl){
 function setDemonLord(roomId, r, c){
     demonLordRoomId = roomId;
     const prev = demonLordCell; // 置き直しのときはLv・経験値を引き継ぐ
+    // 最初の配置のときは、ストーリーモードなら前のエリアまでの経験値を引き継ぐ（ステージ選択の個別プレイはLv1から）
+    const carriedXp = (!prev && playMode==='story') ? Math.max(xpForLevel(1), storyDemonLordXp) : xpForLevel(1);
     demonLordCell = { r, c, hp: 0, maxHp: 0, atk: 0, def: 0, magAtk: 0, magDef: 0,
-                       level: prev ? (prev.level||1) : 1, xp: prev ? (prev.xp||xpForLevel(1)) : xpForLevel(1),
+                       level: prev ? (prev.level||1) : monsterLevel(carriedXp), xp: prev ? (prev.xp||xpForLevel(1)) : carriedXp,
                        isDemonLord: true, alive: true };
     applyDemonLordLevel(demonLordCell);
     demonLordCell.hp = demonLordCell.maxHp;
@@ -6541,6 +6551,7 @@ function areaTypeAt(areaIdx){
 const STORY_SAVE_KEY = 'chimyaku_story_progress_v1';
 let storyAreaIndex = 1;   // ストーリーモードで次に挑む（または挑戦中の）エリア番号(1-6)
 let storyCleared = false; // 6エリアすべてクリア済みか（ステージ選択の解放条件）
+let storyDemonLordXp = 0; // 魔王の経験値。エリアをクリアするたびに記録し、次のエリアの最初の魔王へ引き継ぐ（ストーリーモードだけ）
 function loadStoryProgress(){
     try {
         const raw = localStorage.getItem(STORY_SAVE_KEY);
@@ -6548,10 +6559,11 @@ function loadStoryProgress(){
         const d = JSON.parse(raw);
         storyAreaIndex = Math.min(Math.max(parseInt(d.areaIndex,10)||1,1), AREA_TYPES.length);
         storyCleared = !!d.cleared;
+        storyDemonLordXp = Math.max(0, parseInt(d.demonLordXp,10)||0);
     } catch(e){ /* 読み込めなければ初期状態のまま */ }
 }
 function saveStoryProgress(){
-    try { localStorage.setItem(STORY_SAVE_KEY, JSON.stringify({ areaIndex: storyAreaIndex, cleared: storyCleared })); } catch(e){}
+    try { localStorage.setItem(STORY_SAVE_KEY, JSON.stringify({ areaIndex: storyAreaIndex, cleared: storyCleared, demonLordXp: storyDemonLordXp })); } catch(e){}
 }
 loadStoryProgress();
 
@@ -7163,13 +7175,15 @@ const GAME_PRESETS = [
 let currentGamePresetKey = 'game1'; // 現在選択中のゲームプリセット（今のところ1種類のみ）
 function currentGamePreset(){ return GAME_PRESETS.find(g=>g.key===currentGamePresetKey); }
 // 魔王のステータス：Lv1では、序盤の手持ち（卵から出るstage1）のモンスターより「ちょい強い」程度から始め、
-// 全ステージクリア時の想定Lv（DEMON_LORD_EXPECTED_FINAL_LEVEL）で「召喚系stage3の種族基礎値の平均」に届くよう、
-// 伸ばす。伸び方は序盤ゆるやか・終盤急になる曲線（進み具合t=(Lv−1)/(想定Lv−1)を1.5乗して、Lv1の値から到達値まで補間）。
-// 直線だとLv2〜3で卵モンスターとの差が急に開いてしまい、魔王だけがレベルアップしてしまうため、序盤を抑えている。
+// 全エリアクリア時の想定Lv（DEMON_LORD_EXPECTED_FINAL_LEVEL。魔王のLvはエリアをまたいで引き継ぐ）で、
+// 「召喚系stage3の魔物がLv8のとき（DEMON_LORD_FINAL_EQUIV_MONSTER_LV）の強さ」に届くよう、直線で伸ばす（進み具合t=(Lv−1)/(想定Lv−1)でLv1の値から到達値まで補間）。
+// 以前は到達値が「Lv補正なしの種族基礎値」で、魔物（Lvで基礎値の2〜3倍になる）よりずっと弱いままだった（Lv3でHP53）。
+// Lvを引き継ぐ設計になったので、序盤を抑える曲線（1.5乗）もやめた
 // Lv1の値：モンスターはLv1で基礎値の1.25倍なので、その1.25倍した卵stage1の平均を基準にする。
 // HPは卵stage1の平均×2、攻防魔攻魔防は同×1.2
-const DEMON_LORD_EXPECTED_FINAL_LEVEL = 10;
-const DEMON_LORD_GROWTH_EXPONENT = 1.5;
+const DEMON_LORD_EXPECTED_FINAL_LEVEL = 13; // 6エリア分のレベルを引き継ぐので、全エリアクリア時（約Lv13）で「stage3の魔物と同じ強さ」に届くようにする
+const DEMON_LORD_GROWTH_EXPONENT = 1.0;
+const DEMON_LORD_FINAL_EQUIV_MONSTER_LV = 8; // 到達値に使う、魔物のLv（魔物のステータスは基礎値×(1+0.25×Lv)）
 const DEMON_LORD_START_HP_MULT = 2, DEMON_LORD_START_STAT_MULT = 1.2;
 const MONSTER_LV1_MULT = 1 + 0.25*1; // applyStatModsToMonsterのlvMultにLv1を入れた値
 const DEMON_LORD_STAT_KEYS = ['hp','atk','def','magAtk','magDef'];
@@ -7178,7 +7192,7 @@ const speciesAvg = (list, k) => list.reduce((sum,sp) => sum + sp[k], 0) / list.l
 const DEMON_LORD_START = {}, DEMON_LORD_TARGET = {};
 DEMON_LORD_STAT_KEYS.forEach(k => {
     DEMON_LORD_START[k] = speciesAvg(EGG_STAGE1_SPECIES, k) * MONSTER_LV1_MULT * (k==='hp' ? DEMON_LORD_START_HP_MULT : DEMON_LORD_START_STAT_MULT);
-    DEMON_LORD_TARGET[k] = speciesAvg(DEMON_LORD_FINAL_SPECIES, k);
+    DEMON_LORD_TARGET[k] = speciesAvg(DEMON_LORD_FINAL_SPECIES, k) * (1 + 0.25*DEMON_LORD_FINAL_EQUIV_MONSTER_LV) * (EVOLUTION_STAGE_STAT_SCALE[3] || 1); // 魔物のstage3と同じ尺度（Lv補正・進化の圧縮）にそろえる
 });
 function demonLordStatAtLevel(k, lv){
     const t = Math.pow((lv - 1) / (DEMON_LORD_EXPECTED_FINAL_LEVEL - 1), DEMON_LORD_GROWTH_EXPONENT);
@@ -7467,8 +7481,9 @@ const HERO_CLASS_STRENGTH_FACTOR = { // [ステージ2の倍率, ステージ7�
 // 【測定方法】テストプレイの実データ（ストーリー洞窟エリア・全クリア・勇者が全ステージで全滅した、強めのダンジョン）を再現し、
 // 本物の戦闘処理で何十〜何百回も戦わせて「勇者が勝つ（魔王を倒す）確率」を測り、次の目標になるよう二分法で求めた。
 // 　ステージ2〜7の目標：5% / 5% / 8% / 12% / 22% / 35%（終盤ほど手ごわい。人数が増えたぶん、1体あたりは大きく下げる必要があった）
-// ※魔物の経験値は人数に反比例させて総量を変えていない（heroKillXp）ので、魔物の成長は旧テストプレイのまま。進化の石の増加ぶんは、魔物を1〜10%強くして織り込んだ
-const HERO_STAGE_STRENGTH_TRIM = { 2:0.82, 3:0.83, 4:0.98, 5:0.66, 6:0.52, 7:0.42 };
+// ※魔物の経験値は人数に反比例させて総量を変えていない（heroKillXp）ので、魔物の成長は旧テストプレイのまま。進化の石の増加ぶんは、魔物を1〜10%強くして織り込んだ。
+// 進化の強化の圧縮(EVOLUTION_STAGE_STAT_SCALE)と装備の縮小(MATERIAL_TIER_MULT5)を反映して、2回目の測定をした値（1回目からの変化は約5%以内）
+const HERO_STAGE_STRENGTH_TRIM = { 2:0.82, 3:0.82, 4:0.92, 5:0.63, 6:0.50, 7:0.40 };
 function heroClassStrengthFactor(classKey, stageNum){
     const f = HERO_CLASS_STRENGTH_FACTOR[classKey];
     if (!f || stageNum < 2) return 1;
@@ -8599,12 +8614,13 @@ function endBattle(outcome){
             // ステージ選択からの個別プレイ(practice)では進行状況を変えない
             if (isLastArea) storyCleared = true;
             else storyAreaIndex = Math.min(currentAreaIndex+1, AREA_TYPES.length);
+            if (demonLordCell) storyDemonLordXp = Math.max(storyDemonLordXp, demonLordCell.xp||0); // 魔王のLvは次のエリアへ引き継ぐ
             saveStoryProgress();
         }
         if (playMode==='story' && !isLastArea){
             // エリア制圧。次のエリアへ進むボタンを出す（完全クリアではないのでエピローグは出さない）
             titleEl.textContent = uif('battle_result_areaclear_title', currentAreaType().name_ja);
-            msgEl.textContent = ui('battle_result_areaclear_msg');
+            msgEl.textContent = ui('battle_result_areaclear_msg') + (demonLordCell ? '（' + uif('battle_result_dl_carry', monsterLevel(demonLordCell.xp||0)) + '）' : '');
             actionsEl.innerHTML = `
                 <button class="btn btn-gold btn-sm" onclick="openScoreModal()">${ui('btn_score')}</button>
                 <button class="btn btn-gold btn-sm" onclick="openBalanceReportModal()">${ui('btn_balance_report')}</button>
