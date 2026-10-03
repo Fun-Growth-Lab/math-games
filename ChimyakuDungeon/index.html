@@ -589,7 +589,7 @@
         #stage-title-overlay.hidden { display:flex !important; opacity:0; pointer-events:none; }
         .stage-title-num { font-size:1.3rem; color:var(--gold); letter-spacing:0.5em; font-weight:800; margin-bottom:14px; margin-left:0.5em; opacity:1; transition:opacity 0.7s ease; }
         .stage-title-num.pre, .stage-title-name.pre, .stage-title-feature.pre { opacity:0; }
-        /* そのステージの特徴の一言。題名のあと、少し遅れて中央に大きめに出す */
+        /* そのステージの特徴の一言（かっこつき）。題名と同時に、中央に大きめに出す */
         .stage-title-feature { margin-top:44px; font-size:2.1rem; font-weight:800; color:var(--gold); letter-spacing:0.06em; text-align:center; text-shadow:0 3px 14px rgba(0,0,0,0.8); opacity:1; transition:opacity 0.7s ease; }
         .stage-title-name { font-size:3.2rem; color:#fff; font-weight:900; letter-spacing:0.06em; text-shadow:0 4px 18px rgba(0,0,0,0.8); opacity:1; transition:opacity 0.7s ease; }
         .hud-stage-type { font-size:0.6rem; font-weight:700; color:var(--ink-dim); margin-top:2px; text-shadow:none; letter-spacing:0; white-space:nowrap; }
@@ -1489,8 +1489,9 @@
     <div id="heal-modal" class="modal-backdrop hidden">
         <div class="modal-box" style="min-width:380px; max-width:460px;">
             <div class="modal-title" data-i18n="heal_title">💊 回復</div>
-            <div class="cost-row"><span data-i18n="heal_mana_label">現在の魔力</span><b id="heal-mana-label">0</b></div>
-            <div class="heal-amount-row">
+            <div class="cost-row" id="heal-mana-row"><span data-i18n="heal_mana_label">現在の魔力</span><b id="heal-mana-label">0</b></div>
+            <div class="status-text hidden" id="heal-free-note" style="color:var(--gold); font-weight:800; margin:6px 0;">この泉では、回復に魔力はいりません</div>
+            <div class="heal-amount-row" id="heal-amount-row">
                 <span data-i18n="heal_amount_label">使う魔力</span>
                 <button class="btn btn-sm heal-adj-btn" onclick="adjustHealAmount(-1)">◁</button>
                 <span id="heal-amount-label" class="heal-amount-value">0</span>
@@ -5299,21 +5300,24 @@ function getHealableUnits(){
     }
     return list;
 }
+// 泉エリア(freeHeal)では回復に魔力を使わない。回復できる量の上限は、魔力があるかぎり（泉では無制限）
+function healIsFree(){ return !!currentAreaType().freeHeal; }
+function healBudget(){ return healIsFree() ? Infinity : mana; }
 function totalMissingHp(){ return getHealableUnits().reduce((s,u)=>s+(u.ref.maxHp-u.ref.hp),0); }
 function openHealModal(){
     cancelRoomCreationIfActive();
-    healAmount = Math.min(mana, totalMissingHp());
+    healAmount = Math.min(healBudget(), totalMissingHp());
     renderHealModal();
     document.getElementById('heal-modal').classList.remove('hidden');
 }
 function closeHealModal(){ document.getElementById('heal-modal').classList.add('hidden'); }
 function adjustHealAmount(delta){
-    const maxAmt = Math.min(mana, totalMissingHp());
+    const maxAmt = Math.min(healBudget(), totalMissingHp());
     healAmount = Math.max(0, Math.min(maxAmt, healAmount+delta));
     renderHealModal();
 }
 function setHealAmountAll(){
-    healAmount = Math.min(mana, totalMissingHp());
+    healAmount = Math.min(healBudget(), totalMissingHp());
     renderHealModal();
 }
 // 最もHPが低いユニットから1ずつ埋めていく（同点なら抽選）。魔力を使い切るか全回復するまで繰り返す
@@ -5328,8 +5332,8 @@ function healAllUnits(){
         cands[Math.floor(Math.random()*cands.length)].hp++;
         spent++;
     }
-    mana -= spent;
-    healAmount = Math.min(mana, totalMissingHp());
+    if (!healIsFree()) mana -= spent;
+    healAmount = Math.min(healBudget(), totalMissingHp());
     renderHealModal();
     renderHealIndividualPanel();
     renderAll();
@@ -5339,16 +5343,21 @@ function healAllUnits(){
 function healSingleUnitFull(kind, id){
     const target = getHealableUnits().find(u => u.kind===kind && (kind==='demonlord' || u.id===id));
     if (!target) return;
-    const amt = Math.min(target.ref.maxHp-target.ref.hp, mana);
+    const amt = Math.min(target.ref.maxHp-target.ref.hp, healBudget());
     target.ref.hp += amt;
-    mana -= amt;
-    healAmount = Math.min(mana, totalMissingHp());
+    if (!healIsFree()) mana -= amt;
+    healAmount = Math.min(healBudget(), totalMissingHp());
     renderHealModal();
     renderHealIndividualPanel();
     renderAll();
     if (amt>0) saveGameState(); // 回復したとき
 }
 function renderHealModal(){
+    // 泉エリアは回復に魔力を使わないので、魔力・使う魔力の欄は隠して「魔力はいらない」の案内だけを出す
+    const free = healIsFree();
+    document.getElementById('heal-mana-row').classList.toggle('hidden', free);
+    document.getElementById('heal-amount-row').classList.toggle('hidden', free);
+    document.getElementById('heal-free-note').classList.toggle('hidden', !free);
     document.getElementById('heal-mana-label').textContent = mana;
     document.getElementById('heal-amount-label').textContent = healAmount;
     const units = getHealableUnits();
@@ -5386,7 +5395,7 @@ function renderHealIndividualPanel(){
                 <div class="heal-ind-name">${escapeHtml(u.label)}</div>
                 <div class="heal-ind-hp">${u.ref.hp}/${u.ref.maxHp}</div>
             </span>
-            <button class="btn btn-teal heal-ind-btn" ${mana<=0?'disabled':''} onclick="healSingleUnitFull('${u.kind}', ${u.id})">${ui('btn_heal_this')}</button>
+            <button class="btn btn-teal heal-ind-btn" ${healBudget()<=0?'disabled':''} onclick="healSingleUnitFull('${u.kind}', ${u.id})">${ui('btn_heal_this')}</button>
         </div>`;
     }).join('');
 }
@@ -5406,7 +5415,7 @@ function renderAutoHealButton(){
 }
 function autoHealIfEnabled(){
     if (!autoHealEnabled) return;
-    const amt = Math.min(mana, totalMissingHp());
+    const amt = Math.min(healBudget(), totalMissingHp());
     if (amt<=0) return;
     healAmount = amt;
     healAllUnits();
@@ -6454,13 +6463,13 @@ function trapAffectedCells(trap, room){
 // 「洞窟→森→泉→山→街→城」の6エリアが、それぞれ独立した1ゲーム（ステージ1〜7）。
 // 6つのゲームを順にクリアしていくと物語が完結する。エリアごとに生産・生産数・建設費のいずれか1つだけに
 // 軽い特徴を持たせてある。特徴はそのエリアの7ステージを通してずっと効く
-// featureDescは、ステージ題名カードに大きく出す特徴の一言（数値は出さず、定性的に言うだけ）
+// featureDescは、ステージ題名カードに大きく出す特徴の一言（数値は出さず、定性的に言うだけ）。freeHeal:trueのエリア（泉）は、魔物の回復に魔力を使わない
 const AREA_TYPES = [
     { key:'cave',     name_ja:'洞窟', icon:'⛰️', effectDesc:'活力+12%', featureDesc:'このステージでは、活力の素が多い',   mapImage:'images/map/map1.jfif',
       vitMult:1.12, manaMult:1,    toolMult:1,   summonMult:1,   roomCostMult:1 },
     { key:'forest',   name_ja:'森',   icon:'🌲', effectDesc:'魔力+12%', featureDesc:'このステージでは、魔力の素が多い',   mapImage:'images/map/map2.jfif',
       vitMult:1,    manaMult:1.12, toolMult:1,   summonMult:1,   roomCostMult:1 },
-    { key:'spring',   name_ja:'泉',   icon:'💧', effectDesc:'通常', featureDesc:'このステージでは、特別な変化はない',       mapImage:'images/map/map3.jfif',
+    { key:'spring',   name_ja:'泉',   icon:'💧', effectDesc:'回復に魔力不要', featureDesc:'このステージでは、魔物の回復に魔力がいらない', freeHeal:true,       mapImage:'images/map/map3.jfif',
       vitMult:1,    manaMult:1,    toolMult:1,   summonMult:1,   roomCostMult:1 },
     { key:'mountain', name_ja:'山',   icon:'🏔️', effectDesc:'掘削半減', featureDesc:'このステージでは、道具の素が少ない',   mapImage:'images/map/map4.jfif',
       vitMult:1,    manaMult:1,    toolMult:0.5, summonMult:1,   roomCostMult:1 },
@@ -6560,14 +6569,17 @@ const STORY_SCRIPT = {
     // 魔王も、街の民（魔界の住人）を戦いにまきこまないよう「城だけを取り返す」と決める。最後は戦いを止めて、話し合って仲直りする。
     // エピローグでは戦士たちが人間界へ帰ったあと、別の国の人間の軍隊が攻めてくる場面で終わり、さらに過酷なモードへつなげる。
     1: [ // 洞窟：魔王の帰還と、勇者側の油断（勇者側は剣士とアーチャーだけ。ほかの仲間は出さない）
-        { speaker:'maou', face:'surprise', text:'ただいま戻ったぞ！' },
-        { speaker:'maou', face:'normal', text:'……ん？　なんだか、城のようすが変じゃのう' },
-        { speaker:'maou', face:'normal', text:'ヴィオラ、ワシが<b>バカンス</b>に行っとる間に、何があったんじゃ？' },
-        { speaker:'darkelf', face:'shy', text:'お、おかえりなさいませ、魔王様。じつは……' },
-        { speaker:'darkelf', face:'panic', text:'お留守の間に、人間の戦士たちが魔王城を乗っ取ってしまったのです！' },
-        { speaker:'maou', face:'panic', text:'なんじゃとーっ！？　ワシの城を！？' },
-        { speaker:'darkelf', face:'shy', text:'……<b>バカンス</b>が、ちょっと長すぎました' },
-        { speaker:'maou', face:'angry', text:'うぬぬぬ……！　よし、ワシが行って取り返してやる！' },
+        { speaker:'maou', face:'normal', text:'ふう、やっと魔界に戻ってこれたわい' },
+        { speaker:'maou', face:'smile', text:'<b>バカンス</b>は楽しかったのう、ヴィオラ' },
+        { speaker:'darkelf', face:'smile', text:'はい、魔王様。ゆっくり休めましたね' },
+        { speaker:'maou', face:'surprise', text:'……ん？　なんだか魔界のようすが、変わっておらんか？' },
+        { speaker:'darkelf', face:'surprise', text:'魔王様、あれを……お城に、知らない旗がたくさん立っています' },
+        { speaker:'maou', face:'panic', text:'なんじゃと！？　ワシの城が！' },
+        { speaker:'darkelf', face:'panic', text:'人間たちに、お城を乗っ取られてしまったようです！' },
+        { speaker:'darkelf', face:'shy', text:'……<b>バカンス</b>が、ちょっと長すぎましたね' },
+        { speaker:'maou', face:'angry', text:'うぬぬぬ……！　よし、ワシが行って取り返してくる！' },
+        { speaker:'darkelf', face:'panic', text:'お待ちください、魔王様！' },
+        { speaker:'maou', face:'normal', text:'なんじゃ、止めるでない' },
         { speaker:'darkelf', face:'normal', text:'お城には、人間の戦士がたくさんいるようです' },
         { speaker:'darkelf', face:'smile', text:'まずは近くの洞窟に迷宮を作り、おびき寄せて追い返しましょう' },
         { speaker:'maou', face:'grin', text:'おお、それは名案じゃ！　よし、迷宮づくりの始まりじゃ！' },
@@ -6611,14 +6623,14 @@ const STORY_SCRIPT = {
         { speaker:'archer', face:'normal', text:'子うさぎを、親うさぎのもとへ返していたようですね' },
         { speaker:'archer_f', face:'surprise', text:'あら、旅の方ですか？' },
         { speaker:'archer_f', face:'normal', text:'私は、この森を守る森林警備隊の者です' },
-        { speaker:'swordsman', face:'smile', text:'うさぎにやさしいんだな、あんた' },
+        { speaker:'swordsman', face:'smile', text:'どうぶつにやさしいんだな、あんた' },
         { speaker:'archer_f', face:'shy', text:'えへへ……森の仲間ですから' },
         { speaker:'swordsman', face:'normal', text:'俺たちは魔王を倒しに来たんだ' },
         { speaker:'swordsman', face:'normal', text:'……だが、森が広くて道に迷ってしまってな' },
         { speaker:'archer_f', face:'smile', text:'それなら、私が案内します' },
         { speaker:'archer_f', face:'smile', text:'この森のことなら、お任せください' },
         { speaker:'swordsman', face:'grin', text:'ちょうどいい！　頼む！' },
-        { speaker:'archer_f', face:'normal', text:'……あれ？　今日は森の魔力が、いつもより元気です' },
+        { speaker:'archer_f', face:'normal', text:'今日は、森の魔力がいつもより元気なんです' },
         { speaker:'archer', face:'surprise', text:'魔王の迷宮のせいかもしれません。気をつけて進みましょう' },
     ],
     3: [ // 泉：ヴィオラののどのかわき（魔王とヴィオラの絆）と後悔（魔王側）／魔王が子どもだと気づく勇者側
@@ -6633,9 +6645,8 @@ const STORY_SCRIPT = {
         { speaker:'maou', face:'grin', text:'よし、次は泉に迷宮を作ってやる！　行くぞ、ヴィオラ！' },
         { speaker:'fairy', face:'smile', text:'ほら、着いたよ！　きれいでしょ！' },
         { speaker:'darkelf', face:'smile', text:'まあ……本当に、きれいな泉ですね' },
-        { speaker:'maou', face:'surprise', text:'水面に映ったワシの顔、ずいぶん疲れておるのう' },
-        { speaker:'darkelf', face:'shy', text:'……やはり、お疲れだったのですね' },
-        { speaker:'darkelf', face:'shy', text:'<b>バカンス</b>をおすすめしたのですが、こんなことになって……' },
+        { speaker:'maou', face:'smile', text:'ふう、泉の水を飲むと、生き返るのう' },
+        { speaker:'darkelf', face:'shy', text:'魔王様……私が<b>バカンス</b>にさそったばっかりに、こんなことになってしまい……' },
         { speaker:'darkelf', face:'cry', text:'ごめんなさい、魔王様' },
         { speaker:'maou', face:'normal', text:'ばかもの。行くと決めたのはワシじゃ。お主のせいではない' },
         { speaker:'maou', face:'smile', text:'それにな、ワシは魔王じゃ。自分の城は、自分で取り返す！' },
@@ -6684,7 +6695,7 @@ const STORY_SCRIPT = {
         { speaker:'firemage', face:'surprise', text:'ケガもなかったよ' },
         { speaker:'darkmage', face:'normal', text:'……俺もだ' },
         { speaker:'archer', face:'normal', text:'魔王が、倒した私たちを外へ運んだのかもしれません' },
-        { speaker:'swordsman', face:'surprise', text:'なに！？　魔王が、そんなことを……？' },
+        { speaker:'swordsman', face:'surprise', text:'なに！？　魔王が、なぜそんなことを……？' },
         { speaker:'firemage', face:'smile', text:'ねえ、魔王って、本当は悪い人じゃないんじゃない？' },
         { speaker:'swordsman', face:'angry', text:'そ、それでも魔王は魔王だ！　油断するな！' },
     ],
@@ -6715,8 +6726,8 @@ const STORY_SCRIPT = {
         { speaker:'swordsman_f', face:'normal', text:'この街の人たちが、教えてくれたの' },
         { speaker:'swordsman_f', face:'normal', text:'「魔王さまは、小さいけれど、やさしい子だ」って' },
         { speaker:'swordsman', face:'surprise', text:'やさしい子……？　魔王が？' },
-        { speaker:'swordsman_f', face:'angry', text:'魔王が子どもでも、街が戦いになるのはいや' },
-        { speaker:'swordsman_f', face:'angry', text:'ここは守ります。……話をするのは、そのあとよ' },
+        { speaker:'swordsman_f', face:'normal', text:'本当かどうかは、まだわからないわ' },
+        { speaker:'swordsman_f', face:'angry', text:'ただ、魔王が来るなら、この街は守らなきゃ' },
         { speaker:'swordsman', face:'grin', text:'おう！　街は俺たちが守る！' },
     ],
     6: [ // 城：魔王の決意と、お城での楽しみ（魔王側）／魔王と話をすると決める勇者側
@@ -6738,18 +6749,16 @@ const STORY_SCRIPT = {
         { speaker:'narration', text:'そのころ、人間たちは――' },
         { speaker:'thunder', face:'angry', text:'勇者殿、相手は魔王です' },
         { speaker:'thunder', face:'angry', text:'子どもでも、油断してはいけません' },
-        { speaker:'swordsman_f', face:'normal', text:'わかってる。でも、まずは魔王と話がしたいの' },
-        { speaker:'swordsman', face:'normal', text:'……俺も、そう思う' },
-        { speaker:'swordsman', face:'normal', text:'魔王は悪いやつだと決めつけて、攻めこんでいた気がするんだ' },
+        { speaker:'swordsman_f', face:'normal', text:'ええ、わかってる。でも、街の人たちの言葉が気になるの' },
+        { speaker:'swordsman', face:'normal', text:'……俺もだ' },
+        { speaker:'swordsman', face:'normal', text:'魔王は悪いやつだと思っていたが、本当にそうなのか、わからなくなってきた' },
         { speaker:'archer', face:'surprise', text:'剣士殿が、そんなことを言うとは……' },
         { speaker:'swordsman', face:'angry', text:'どういう意味だ！' },
         { speaker:'archer', face:'smile', text:'ふふ、いい意味ですよ' },
-        { speaker:'archer', face:'normal', text:'それに、負けた私たちを、魔王は外へ運んでくれていました' },
-        { speaker:'archer', face:'normal', text:'悪い者は、そんなことをしません' },
-        { speaker:'thunder', face:'normal', text:'……わかりました' },
-        { speaker:'thunder', face:'normal', text:'魔王のもとへの道は、私が開きます' },
-        { speaker:'swordsman_f', face:'smile', text:'ありがとう。迷宮を抜けて、魔王に会いに行きましょう' },
-        { speaker:'swordsman', face:'grin', text:'よし、最後の迷宮だ！　全力でぶつかるぞ！' },
+        { speaker:'archer', face:'normal', text:'負けた私たちを外へ運んだ魔王が、ただの悪者とは思えないのも事実です' },
+        { speaker:'thunder', face:'normal', text:'……油断はできませんが、確かめる価値はありそうですね' },
+        { speaker:'swordsman_f', face:'smile', text:'魔王が本当はどんな人なのか、この目で確かめましょう' },
+        { speaker:'swordsman', face:'grin', text:'よし、まずは最後の迷宮を突破するぞ！' },
     ],
 };
 // ストーリーモードで最後のエリア（城）をクリアした後だけに表示するエピローグ。背景はSTORY_ENDING_MAP_IMAGE(map7)を使う。
@@ -6798,7 +6807,8 @@ const STORY_ENDING = [
     { speaker:'darkelf',   face:'surprise', text:'あれは……' },
     { speaker:'maou',      face:'surprise', text:'まさか……' },
     { speaker:'darkelf',   face:'panic',    text:'……別の国の、人間の軍隊です！' },
-    { speaker:'maou',      face:'panic',    text:'なにぃ！？　まだ来るのか！？　ワシは、<b>バカンス</b>の続きがしたいのに！' },
+    { speaker:'maou', face:'angry', text:'やはり、そうか！' },
+    { speaker:'maou', face:'cry', text:'ワシは、<b>バカンス</b>の続きがしたかったのに……' },
     { speaker:'darkelf',   face:'normal',   text:'魔王様。人間の国は、ひとつではないのです' },
     { speaker:'maou',      face:'angry',    text:'……ええい、仕方ない！　また迷宮づくりじゃ！' },
     { speaker:'darkelf', face:'normal', text:'今度は、もっと強い戦士が来るかもしれません' },
@@ -6947,14 +6957,13 @@ function finishStoryScene(){
 let stageTitleTimer = null;
 let stageTitleToken = 0;
 const STAGE_TITLE_BLANK_MS = 700;  // 真っ暗なまま待つ「余白」
-const STAGE_TITLE_FEATURE_DELAY_MS = 900; // 題名を出してから、特徴の一言を出すまでの間
 const STAGE_TITLE_HOLD_MS = 3300;  // 題名（と特徴の一言）を見せておく時間
 let stageTitleOnComplete = null;
 function showStageTitleCard(areaIdx, onComplete){
     const area = areaTypeAt(areaIdx);
     document.getElementById('stage-title-num').textContent = uif('stage_title_num_label', areaIdx);
     document.getElementById('stage-title-name').textContent = uif('stage_title_name_label', area.name_ja);
-    document.getElementById('stage-title-feature').textContent = area.featureDesc || '';
+    document.getElementById('stage-title-feature').textContent = area.featureDesc ? `（${area.featureDesc}）` : '';
     stageTitleOnComplete = onComplete || null;
     const card = document.getElementById('stage-title-overlay');
     const numEl = document.getElementById('stage-title-num'), nameEl = document.getElementById('stage-title-name'), featEl = document.getElementById('stage-title-feature');
@@ -6969,8 +6978,7 @@ function showStageTitleCard(areaIdx, onComplete){
     [card, numEl, nameEl, featEl].forEach(el => { el.style.transition = ''; });
     clearTimeout(stageTitleTimer);
     const token = ++stageTitleToken;
-    setTimeout(() => { if (token===stageTitleToken){ numEl.classList.remove('pre'); nameEl.classList.remove('pre'); } }, STAGE_TITLE_BLANK_MS);
-    setTimeout(() => { if (token===stageTitleToken) featEl.classList.remove('pre'); }, STAGE_TITLE_BLANK_MS + STAGE_TITLE_FEATURE_DELAY_MS);
+    setTimeout(() => { if (token===stageTitleToken){ numEl.classList.remove('pre'); nameEl.classList.remove('pre'); featEl.classList.remove('pre'); } }, STAGE_TITLE_BLANK_MS);
     stageTitleTimer = setTimeout(finishStageTitleCard, STAGE_TITLE_BLANK_MS + STAGE_TITLE_HOLD_MS); // クリック/Enterで早められる。何もしなくても自動で進む
 }
 function finishStageTitleCard(){
@@ -8696,7 +8704,7 @@ function openStageIncomeModal(vitGain, manaGain, levelUpList){
     document.getElementById('stage-income-mana').innerHTML = deltaHtml(manaGain, true);
     const healed = lastAutoHealInfo ? lastAutoHealInfo.healed : 0;
     // 回復に使った魔力の行は、自動回復がONのときだけ出す
-    document.getElementById('stage-income-heal-row').classList.toggle('hidden', !autoHealEnabled);
+    document.getElementById('stage-income-heal-row').classList.toggle('hidden', !autoHealEnabled || healIsFree());
     document.getElementById('stage-income-heal').innerHTML = deltaHtml(healed, false);
     const cardsHtml = levelUpCardHtml(levelUpList) + stageLootCardsHtml();
     document.getElementById('stage-clear-grid').innerHTML = cardsHtml || `<div class="stage-clear-empty">${ui('stage_income_none_ranked')}</div>`;
