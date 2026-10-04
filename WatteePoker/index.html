@@ -1,0 +1,2137 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <script>if(screen.orientation&&screen.orientation.lock){screen.orientation.lock('landscape').catch(function(){});}</script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>割って！九九ポーカー - Fun & Growth Lab</title>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-page:   #e9f6ee;
+            --bg-grad1:  #f6fff9;
+            --bg-grad2:  #bfe8cf;
+            --ink:       #2c3a4f;
+            --ink-dim:   #5d7186;
+            --accent:    #ff7a45;
+            --accent-dk: #e2632f;
+            --teal:      #17b8a6;
+            --teal-dk:   #0f8f81;
+            --gold:      #ffc93d;
+            --card-bdr:  #bfe3cd;
+            --danger:    #ff5d5d;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            overflow: hidden; background: var(--bg-page);
+            font-family: "M PLUS Rounded 1c", sans-serif;
+            user-select: none; -webkit-user-select: none; touch-action: none;
+            height: 100vh; width: 100vw;
+        }
+        #container {
+            width: 1280px; height: 720px; position: absolute; top: 0; left: 0; transform-origin: center center;
+            background: radial-gradient(ellipse at 50% 0%, var(--bg-grad1) 0%, var(--bg-grad2) 100%);
+            box-shadow: 0 0 60px rgba(40,160,100,0.25), 0 20px 60px rgba(20,60,40,0.25);
+            border-radius: 24px; overflow: hidden; border: 3px solid #ffffff;
+        }
+        .hidden { display: none !important; }
+        .screen { position: absolute; top:0; left:0; width:100%; height:100%; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; }
+        .screen::before {
+            content:''; position:absolute; top:0; left:0; width:100%; height:100%;
+            background-image: radial-gradient(rgba(255,255,255,0.6) 2px, transparent 2px);
+            background-size: 34px 34px; opacity: 0.5; pointer-events: none;
+        }
+
+        /* ==================== TITLE / GENERIC BOX ==================== */
+        .title-box {
+            background: rgba(255,255,255,0.78); border: 3px solid #fff; padding: 34px 80px; border-radius: 30px; position: relative; z-index: 1;
+            display: flex; flex-direction: column; align-items: center;
+            box-shadow: 0 18px 40px rgba(20,90,60,0.18), inset 0 0 0 2px rgba(255,201,61,0.35);
+        }
+        .title-h1 {
+            font-size: 4.4rem; font-weight: 900; letter-spacing: 4px; margin-bottom: 6px;
+            background: linear-gradient(180deg,#ffa363,var(--accent-dk)); -webkit-background-clip: text; background-clip: text; color: transparent;
+            filter: drop-shadow(0 3px 4px rgba(200,110,40,0.28));
+        }
+        .title-cards { display: flex; gap: 10px; margin-bottom: 14px; }
+        #title-screen .title-box { padding: 24px 80px 20px; }
+        #title-screen .btn { padding: 10px 24px; margin: 4px; font-size: 1.3rem; }
+        #title-screen .btn-primary { font-size: 1.45rem; }
+        .mini-card {
+            width: 54px; height: 72px; border-radius: 10px; color: #fff; font-weight: 800; font-size: 2.1rem;
+            display: flex; align-items: center; justify-content: center; text-shadow: 0 2px 3px rgba(0,0,0,0.18); box-shadow: 0 4px 0 rgba(0,0,0,0.14);
+        }
+
+        /* ==================== BUTTONS ==================== */
+        .btn {
+            background: linear-gradient(to bottom,#ffffff,#eefaf3); color: var(--ink); border: 3px solid var(--card-bdr);
+            padding: 14px 28px; border-radius: 50px; cursor: pointer; font-size: 1.35rem; margin: 6px; font-weight: 800; font-family: inherit;
+            box-shadow: 0 5px 0 #9fcfb5, 0 8px 16px rgba(20,90,60,0.15); transition: transform 0.1s; width: 400px;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .btn:hover  { transform: translateY(2px); box-shadow: 0 3px 0 #9fcfb5; }
+        .btn:active { transform: translateY(5px); box-shadow: none; }
+        .btn-primary { background: linear-gradient(to bottom,#ffa15f,var(--accent)); color: #fff; border-color: #ffbb85; box-shadow: 0 5px 0 var(--accent-dk), 0 8px 16px rgba(140,60,20,0.25); font-size: 1.5rem; }
+        .btn-primary:hover { box-shadow: 0 3px 0 var(--accent-dk); }
+        .btn-teal { background: linear-gradient(to bottom,#3fd0bd,var(--teal)); color: #fff; border-color: #7ee3d4; box-shadow: 0 5px 0 var(--teal-dk), 0 8px 16px rgba(10,90,80,0.2); }
+        .btn-teal:hover { box-shadow: 0 3px 0 var(--teal-dk); }
+        .btn-danger { background: linear-gradient(to bottom,#ff8a8a,var(--danger)); color: #fff; border-color: #ffb0b0; box-shadow: 0 5px 0 #c94040; }
+        .btn-danger:hover { box-shadow: 0 3px 0 #c94040; }
+        .btn-sm { padding: 11px 18px; font-size: 1.15rem; width: auto; margin: 0; }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn:disabled:hover, .btn:disabled:active { transform: none; box-shadow: 0 5px 0 #9fcfb5, 0 8px 16px rgba(20,90,60,0.15); }
+
+        /* ==================== TITLE（Balatroのタイトルをオマージュ：フェルト卓・カードの扇・渦） ==================== */
+        #title-screen { justify-content: flex-start; overflow: hidden; background:
+            radial-gradient(ellipse at 50% 34%, rgba(90,210,150,0.55) 0%, rgba(0,0,0,0) 60%),
+            linear-gradient(160deg, #1f7a58 0%, #145a45 55%, #0d3d33 100%); }
+        #title-screen::before { background-image: radial-gradient(rgba(255,255,255,0.10) 2px, transparent 2px); opacity: 1; }
+        .ts-swirl { position: absolute; left: 50%; top: 36%; width: 2000px; height: 2000px; margin: -1000px 0 0 -1000px; border-radius: 50%; pointer-events: none;
+            background: repeating-conic-gradient(from 0deg, rgba(255,255,255,0.055) 0deg 10deg, rgba(0,0,0,0) 10deg 20deg);
+            -webkit-mask-image: radial-gradient(circle, #000 18%, transparent 62%); mask-image: radial-gradient(circle, #000 18%, transparent 62%);
+            animation: spinSlow 80s linear infinite; }
+        @keyframes spinSlow { to { transform: rotate(360deg); } }
+        .ts-floaters { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+        .ts-floaters span { position: absolute; bottom: -70px; color: rgba(255,255,255,0.15); font-weight: 900; white-space: nowrap; animation: floatUpFade linear infinite; }
+        @keyframes floatUpFade { 0% { transform: translateY(0) rotate(-6deg); opacity: 0; } 12% { opacity: 1; } 88% { opacity: 1; } 100% { transform: translateY(-860px) rotate(6deg); opacity: 0; } }
+        .ts-logo { position: absolute; left: 0; right: 0; top: 0; height: 372px; z-index: 2; pointer-events: none; }
+        .ts-fan { position: absolute; left: 640px; top: 8px; width: 0; height: 0; }
+        .tcard { position: absolute; left: -78px; top: 0; width: 156px; height: 216px; transform-origin: 50% 360px; transform: rotate(var(--rot)); }
+        .tcard .ti { width: 100%; height: 100%; border-radius: 20px; border: 6px solid #fff; display: flex; align-items: center; justify-content: center; font-size: 6.4rem; font-weight: 900; color: #fff;
+                     text-shadow: 0 4px 0 rgba(0,0,0,0.25); box-shadow: 0 10px 0 rgba(0,0,0,0.3), 0 18px 26px rgba(0,0,0,0.35); animation: tcFloat 3.4s ease-in-out infinite; animation-delay: calc(var(--i) * -0.6s); }
+        .tcard .ti.hit { box-shadow: 0 0 0 6px #ffd84d, 0 0 28px 8px rgba(255,216,77,0.85), 0 10px 0 rgba(0,0,0,0.3); }
+        .tcard .ti.hit::after { content: 'ドラ'; position: absolute; top: -16px; right: -12px; background: #ffc93d; color: #5a3d00; font-size: 1.15rem; font-weight: 900; padding: 2px 12px; border-radius: 50px; border: 3px solid #fff; text-shadow: none; }
+        @keyframes tcFloat { 0%,100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-8px) rotate(1.2deg); } }
+        @keyframes dealIn { 0% { transform: translate(620px, 520px) rotate(300deg) scale(0.35); opacity: 0; } 55% { opacity: 1; } 100% { transform: rotate(var(--rot)); opacity: 1; } }
+        .intro .tcard { animation: dealIn 0.75s cubic-bezier(.2,.85,.3,1.15) both; animation-delay: calc(var(--i) * 0.14s); }
+        .ts-sp { position: absolute; width: 150px !important; height: 204px !important; cursor: default !important; z-index: 1; }
+        .ts-sp .num { font-size: 4.6rem !important; }
+        .ts-sp .shine { position: absolute; inset: 0; border-radius: 18px; overflow: hidden; pointer-events: none; }
+        .ts-sp .shine::after { content: ''; position: absolute; top: -20%; bottom: -20%; width: 40%; left: -60%; transform: skewX(-20deg); background: linear-gradient(90deg, transparent, rgba(255,255,255,0.75), transparent); animation: shimmer 3.2s ease-in-out infinite; animation-delay: var(--sd, 0s); }
+        @keyframes shimmer { 0%, 55% { left: -60%; } 100% { left: 130%; } }
+        .ts-spwrap { position: absolute; z-index: 3; transform: rotate(var(--rot)); }
+        .ts-spwrap .rare-badge { z-index: 2; }
+        .ts-spbob { animation: tcFloat 3.8s ease-in-out infinite; animation-delay: var(--bd, 0s); }
+        .intro .ts-spwrap { animation: spPop 0.6s cubic-bezier(.2,.9,.3,1.3) both; animation-delay: var(--pd, 1.1s); }
+        @keyframes spPop { 0% { transform: rotate(var(--rot)) scale(0); opacity: 0; } 100% { transform: rotate(var(--rot)) scale(1); opacity: 1; } }
+        .ts-title { position: absolute; left: 0; right: 0; top: 176px; text-align: center; z-index: 4; line-height: 1; }
+        .ts-title .l1 { display: block; font-size: 3.4rem; margin-bottom: 4px; }
+        .ts-title .l2 { display: block; font-size: 7rem; letter-spacing: 2px; }
+        .tl { display: inline-block; font-weight: 900; -webkit-text-stroke: 11px #0f2a24; paint-order: stroke fill; color: var(--lc, #fff); text-shadow: 0 9px 0 #0a1c18, 0 14px 22px rgba(0,0,0,0.4);
+              animation: tlBob 2.6s ease-in-out infinite; animation-delay: calc(1.8s + var(--i) * 0.13s); }
+        .intro .tl { animation: tlIn 0.5s cubic-bezier(.2,.9,.3,1.5) backwards, tlBob 2.6s ease-in-out infinite; animation-delay: calc(0.9s + var(--i) * 0.08s), calc(1.8s + var(--i) * 0.13s); }
+        @keyframes tlIn { 0% { transform: translateY(-120px) scale(0.3); opacity: 0; } 100% { transform: none; opacity: 1; } }
+        @keyframes tlBob { 0%,100% { transform: translateY(0) rotate(-1.2deg); } 50% { transform: translateY(-9px) rotate(1.2deg); } }
+        .ts-chips { position: absolute; bottom: 0; left: 0; right: 0; height: 160px; pointer-events: none; z-index: 1; }
+        .ts-chips .chipart { width: 64px; height: 64px; border-width: 5px; box-shadow: 0 6px 0 rgba(0,0,0,0.35); }
+        .ts-coin { position: absolute; width: 46px; height: 46px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff6b0, #f5b800 70%); border: 4px solid #c98600; box-shadow: 0 5px 0 rgba(0,0,0,0.3); animation: coinBob 3s ease-in-out infinite; }
+        @keyframes coinBob { 0%,100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-7px) rotate(10deg); } }
+        .ts-menu { position: absolute; left: 0; right: 0; top: 408px; z-index: 5; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+        .ts-start { font-family: inherit; font-weight: 900; font-size: 2.5rem; color: #fff; width: 600px; height: 92px; border-radius: 24px; cursor: pointer; border: 6px solid #0f2a24;
+                    background: linear-gradient(#ffa35f,#ee6a2a); box-shadow: 0 9px 0 #0a1c18, 0 0 0 4px rgba(255,255,255,0.12), 0 18px 30px rgba(0,0,0,0.35); text-shadow: 0 4px 0 rgba(0,0,0,0.3); letter-spacing: 6px;
+                    animation: startPulse 1.7s ease-in-out infinite; -webkit-tap-highlight-color: transparent; }
+        .ts-start:hover { filter: brightness(1.08); }
+        .ts-start:active { transform: translateY(7px); box-shadow: 0 2px 0 #0a1c18; animation: none; }
+        @keyframes startPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.035); box-shadow: 0 9px 0 #0a1c18, 0 0 0 6px rgba(255,216,77,0.45), 0 18px 34px rgba(0,0,0,0.35); } }
+        .ts-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; width: 920px; }
+        .ts-btn { font-family: inherit; font-weight: 900; font-size: 1.15rem; color: #fff; width: 290px; height: 56px; border-radius: 16px; cursor: pointer; border: 5px solid #0f2a24; box-shadow: 0 6px 0 #0a1c18;
+                  text-shadow: 0 2px 0 rgba(0,0,0,0.3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 10px; -webkit-tap-highlight-color: transparent; }
+        .ts-btn:hover { filter: brightness(1.1); }
+        .ts-btn:active { transform: translateY(5px); box-shadow: 0 1px 0 #0a1c18; }
+        .ts-btn.b1 { background: linear-gradient(#ffd24a,#e8a317); color: #4a2c00; text-shadow: 0 2px 0 rgba(255,255,255,0.4); }
+        .ts-btn.b2 { background: linear-gradient(#4aa8ee,#2a6fc0); }
+        .ts-btn.b3 { background: linear-gradient(#a56cf0,#6e3fc8); }
+        .ts-btn.b4 { background: linear-gradient(#8fa3b3,#5d7186); }
+        .ts-btn.b5 { background: linear-gradient(#ee6a5a,#c2402e); }
+
+        /* ==================== SETTINGS / NAME ==================== */
+        .settings-title { font-size: 2.3rem; color: var(--ink); font-weight: 800; letter-spacing: 2px; margin-bottom: 22px; }
+        .settings-section { margin-bottom: 26px; text-align: center; }
+        .settings-label { font-size: 1.2rem; color: var(--ink-dim); font-weight: 700; letter-spacing: 2px; margin-bottom: 12px; }
+        .settings-lang-options { display: flex; flex-direction: column; gap: 12px; }
+        .settings-lang-btn {
+            background: #ffffff; border: 3px solid var(--card-bdr); color: var(--ink); font-family: inherit; font-size: 1.4rem; font-weight: 700;
+            padding: 14px 40px; border-radius: 50px; cursor: pointer; min-width: 340px;
+        }
+        .settings-lang-btn.active { background: linear-gradient(to bottom,#ffe27a,var(--gold)); border-color: #ffb300; color: #5a3d00; }
+        .settings-desc { color: var(--ink-dim); font-size: 1.1rem; margin-bottom: 10px; text-align: center; }
+        .name-reg-form { display: flex; gap: 8px; justify-content: center; margin-bottom: 14px; }
+        .name-reg-input { padding: 12px 16px; font-size: 24px; border-radius: 14px; border: 3px solid var(--card-bdr); background: #fff; color: var(--ink); font-family: inherit; width: 250px; }
+        .name-reg-input::placeholder { color: var(--ink-dim); }
+        .pl-list { list-style: none; margin: 0 0 18px; padding: 0; display: flex; flex-direction: column; gap: 8px; max-height: 240px; overflow-y: auto; width: 480px; }
+        .pl-item { background: #fff; padding: 12px 18px; border-radius: 16px; display: flex; justify-content: space-between; align-items: center; gap: 10px; border: 3px solid var(--card-bdr); color: var(--ink); font-size: 1.25rem; font-weight: 700; }
+        .pl-item.cur { border-color: var(--accent); background: rgba(255,122,69,0.1); color: var(--accent-dk); }
+        .pl-item-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .pl-item-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+        .pl-select-btn { background: #fff; border: 2px solid var(--card-bdr); color: var(--ink); font-family: inherit; font-weight: 700; font-size: 1rem; padding: 6px 14px; border-radius: 50px; cursor: pointer; white-space: nowrap; }
+        .pl-selected-badge { color: var(--teal-dk); font-size: 1rem; font-weight: 800; white-space: nowrap; }
+        .del-btn { background: var(--danger); color: #fff; border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-weight: 800; font-size: 1.05rem; padding: 0; flex-shrink: 0; }
+
+        /* ==================== RANKING ==================== */
+        .rank-box {
+            background: rgba(255,255,255,0.9); border: 3px solid #fff; border-radius: 26px; padding: 22px 34px; width: 94%; max-width: 1080px; max-height: 690px; overflow-y: auto;
+            touch-action: pan-y; -webkit-overflow-scrolling: touch; box-shadow: 0 18px 40px rgba(20,90,60,0.2); display: flex; flex-direction: column; align-items: center; z-index: 1;
+        }
+        .rank-title { font-size: 2rem; font-weight: 800; color: var(--accent-dk); margin-bottom: 10px; }
+        .rank-toggle { display: flex; gap: 8px; justify-content: center; margin-bottom: 10px; flex-wrap: wrap; }
+        .rank-toggle-btn { padding: 8px 18px; border-radius: 50px; border: 3px solid var(--card-bdr); background: #fff; color: var(--ink-dim); font-size: 1.2rem; font-weight: 800; cursor: pointer; font-family: inherit; }
+        .rank-toggle-btn.active { background: linear-gradient(to bottom,#ffe27a,var(--gold)); color: #5a3d00; border-color: #ffb300; }
+        .rank-loading { text-align: center; color: var(--ink-dim); padding: 16px 0; font-size: 1.2rem; }
+        .rank-list { list-style: none; margin: 6px 0 14px; padding: 0; width: 100%; }
+        .rank-row { display: flex; align-items: center; gap: 12px; padding: 8px 6px; border-bottom: 2px solid var(--card-bdr); color: var(--ink); font-size: 1.15rem; }
+        .rank-num { color: var(--ink-dim); font-weight: 800; width: 34px; flex-shrink: 0; }
+        .rank-num.top3 { color: var(--accent-dk); font-size: 1.35rem; }
+        .rank-pname { flex: 1; min-width: 0; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .rank-tag { font-size: 0.95rem; color: var(--teal-dk); font-weight: 800; white-space: nowrap; }
+        .rank-score { font-weight: 800; font-size: 1.25rem; color: var(--accent-dk); white-space: nowrap; }
+        .rank-turns { color: var(--teal-dk); font-size: 1rem; font-weight: 800; white-space: nowrap; }
+        .rank-date { color: var(--ink-dim); font-size: 0.95rem; white-space: nowrap; }
+        .rank-empty { text-align: center; color: var(--ink-dim); padding: 18px 0; font-size: 1.15rem; width: 100%; }
+        .score-submit-box { margin: 10px 0; text-align: center; }
+        .score-submit-label { font-size: 1.15rem; color: var(--ink-dim); font-weight: 700; margin-bottom: 4px; }
+        .score-submit-value { font-size: 3rem; font-weight: 900; color: var(--accent-dk); margin-bottom: 4px; }
+        .score-submit-msg { font-size: 1rem; margin-top: 6px; min-height: 1.3em; }
+
+        /* ==================== RUN SELECT（Balatroのブラインド選択をオマージュ） ==================== */
+        #run-select-screen { justify-content: flex-start; padding: 12px 22px 10px; background:
+            radial-gradient(ellipse at 50% 38%, rgba(70,190,130,0.55) 0%, rgba(0,0,0,0) 62%),
+            repeating-radial-gradient(circle at 24% 18%, rgba(255,255,255,0.045) 0 46px, rgba(0,0,0,0) 46px 92px),
+            linear-gradient(160deg, #1f7a58 0%, #145a45 55%, #0d3d33 100%); }
+        #run-select-screen::before { background-image: radial-gradient(rgba(255,255,255,0.10) 2px, transparent 2px); opacity: 1; }
+        .rs-top { position: relative; z-index: 2; width: 100%; display: flex; align-items: center; justify-content: space-between; height: 62px; flex-shrink: 0; }
+        .rs-plaque { position: absolute; left: 50%; transform: translateX(-50%); padding: 6px 40px 8px; font-size: 2.3rem; font-weight: 900; letter-spacing: 4px; color: #fff; background: linear-gradient(#2d6f5c,#1d4d40); border: 5px solid #0f2a24; border-radius: 16px; box-shadow: 0 6px 0 #0a1c18, inset 0 0 0 3px rgba(255,255,255,0.12); text-shadow: 0 3px 0 #0a1c18; white-space: nowrap; }
+        .rs-mini { font-family: inherit; font-weight: 900; font-size: 1.25rem; color: #fff; padding: 10px 22px; border-radius: 14px; cursor: pointer; border: 4px solid #0f2a24; background: linear-gradient(#e8604b,#c2402e); box-shadow: 0 5px 0 #0a1c18; text-shadow: 0 2px 0 rgba(0,0,0,0.3); }
+        .rs-mini.blue { background: linear-gradient(#4a9be0,#2f6fb8); }
+        .rs-mini:active { transform: translateY(4px); box-shadow: 0 1px 0 #0a1c18; }
+        .ds-master-badge { position: relative; z-index: 2; margin: 0 0 4px; padding: 3px 18px; border-radius: 50px; font-weight: 900; font-size: 1.05rem; color: #5a3d00; background: linear-gradient(to bottom,#ffe27a,var(--gold)); border: 3px solid #ffb300; }
+        .rs-stage { position: relative; z-index: 2; width: 100%; flex: 1; min-height: 0; display: flex; align-items: center; }
+        .rs-viewport { flex: 1; height: 100%; overflow: hidden; position: relative; }
+        #rs-strip { position: absolute; left: 0; top: 0; height: 100%; display: flex; align-items: center; gap: 20px; padding: 22px 22px 16px; transition: transform 0.35s cubic-bezier(.2,.9,.3,1.15); }
+        .rs-arrow { flex-shrink: 0; width: 58px; height: 92px; border-radius: 16px; border: 4px solid #0f2a24; background: linear-gradient(#f2b84a,#d8901e); color: #4a2c00; font-size: 2rem; font-weight: 900; font-family: inherit; cursor: pointer; box-shadow: 0 5px 0 #0a1c18; z-index: 3; }
+        .rs-arrow:active { transform: translateY(4px); box-shadow: 0 1px 0 #0a1c18; }
+        .rs-arrow:disabled { opacity: 0.35; cursor: default; }
+        .rs-card { position: relative; width: 244px; height: 392px; flex-shrink: 0; display: flex; flex-direction: column; border: 5px solid #0f2a24; border-radius: 20px; background: #fff3d6; box-shadow: 0 8px 0 #0a1c18, 0 18px 28px rgba(0,0,0,0.35); transform: scale(0.93); filter: saturate(0.8) brightness(0.93); transition: transform 0.25s, filter 0.25s; cursor: pointer; overflow: visible; }
+        .rs-card.sel { transform: translateY(-14px) scale(1.04); filter: none; z-index: 2; box-shadow: 0 8px 0 #0a1c18, 0 0 0 5px #ffd84d, 0 0 30px 8px rgba(255,216,77,0.65), 0 22px 30px rgba(0,0,0,0.4); }
+        .rs-tab { height: 70px; display: flex; align-items: center; justify-content: center; text-align: center; padding: 0 10px; font-weight: 900; font-size: 1.3rem; line-height: 1.2; color: #fff; background: var(--c); border-bottom: 5px solid #0f2a24; border-radius: 14px 14px 0 0; text-shadow: 0 3px 0 rgba(0,0,0,0.38); box-shadow: inset 0 -10px 0 rgba(0,0,0,0.12); }
+        .rs-art { position: relative; height: 158px; overflow: hidden; border-bottom: 5px solid #0f2a24; }
+        .rs-body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 6px 12px; text-align: center; }
+        .rs-short { font-size: 1.12rem; font-weight: 800; color: #3b2d1a; line-height: 1.35; }
+        .rs-medals { margin-top: 4px; font-size: 1.15rem; font-weight: 900; color: #8a6a2a; letter-spacing: 1px; }
+        .rs-go { position: absolute; left: 14px; right: 14px; bottom: 14px; height: 56px; display: flex; align-items: center; justify-content: center; font-family: inherit; font-weight: 900; font-size: 1.6rem; color: #fff; border: 5px solid #0f2a24; border-radius: 18px; background: linear-gradient(#ff9a5a,#e8602a); box-shadow: 0 6px 0 #0a1c18; text-shadow: 0 3px 0 rgba(0,0,0,0.3); cursor: pointer; opacity: 0; pointer-events: none; transform: translateY(8px); transition: opacity 0.2s, transform 0.2s; }
+        .rs-card.sel .rs-body { padding-bottom: 76px; }
+        .rs-card.sel .rs-go { opacity: 1; pointer-events: auto; transform: none; animation: goBounce 1.2s ease-in-out infinite; }
+        .rs-go:active { transform: translateY(5px); box-shadow: 0 1px 0 #0a1c18; }
+        @keyframes goBounce { 0%,100% { translate: 0 0; } 50% { translate: 0 -4px; } }
+        .rs-bottom { position: relative; z-index: 2; width: 100%; flex-shrink: 0; margin-top: 12px; padding: 8px 18px 10px; border: 5px solid #0f2a24; border-radius: 20px; background: linear-gradient(#244f42,#17382f); box-shadow: 0 6px 0 #0a1c18, inset 0 0 0 3px rgba(255,255,255,0.08); }
+        .rs-bottom-row { display: flex; flex-direction: column; gap: 6px; }
+        .rs-desc { color: #fff7dc; font-size: 1.12rem; font-weight: 800; line-height: 1.4; text-align: center; min-height: 1.4em; margin-bottom: 6px; }
+        .star-row { display: flex; gap: 10px; flex: 1; }
+        .star-btn { flex: 1; min-width: 0; padding: 3px 2px; border-radius: 14px; border: 4px solid #0f2a24; background: linear-gradient(#fff3d6,#f3dca8); font-family: inherit; font-weight: 900; color: #3b2d1a; cursor: pointer; font-size: 1.25rem; line-height: 1.15; box-shadow: 0 4px 0 #0a1c18; }
+        .star-btn small { display: block; font-size: 1.05rem; color: #7a6540; font-weight: 900; }
+        .star-btn.active { background: linear-gradient(#ffe27a,#ffb724); box-shadow: 0 4px 0 #0a1c18, 0 0 0 3px #fff; }
+        .star-btn.locked { opacity: 0.5; cursor: not-allowed; background: #b9b2a0; }
+        .border-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; flex: 1; }
+        .border-chip { background: rgba(0,0,0,0.28); border: 3px solid #0f2a24; border-radius: 10px; text-align: center; padding: 2px 0; font-weight: 900; color: #ffe27a; font-size: 1.2rem; line-height: 1.15; }
+        .border-chip small { display: block; font-size: 0.72rem; font-weight: 800; color: #bfe6d4; }
+        .ds-best { color: #ffe27a; font-weight: 900; font-size: 1.05rem; }
+        /* ---- カードのイラスト（CSSのみ） ---- */
+        .pc { position: absolute; width: 52px; height: 74px; border-radius: 9px; border: 3px solid #fff; color: #fff; font-weight: 900; font-size: 2rem; display: flex; align-items: center; justify-content: center; text-shadow: 0 2px 0 rgba(0,0,0,0.25); box-shadow: 0 4px 0 rgba(0,0,0,0.25); }
+        .bub { position: absolute; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; color: var(--bc, #2f6fb8); background: radial-gradient(circle at 32% 28%, #fff, rgba(255,255,255,0.7)); border: 3px solid var(--bc, #2f6fb8); box-shadow: 0 4px 0 rgba(0,0,0,0.18); }
+        .chipart { position: absolute; width: 38px; height: 38px; border-radius: 50%; background: radial-gradient(circle, var(--cc) 0 46%, #fff 47% 56%, var(--cc) 57%); border: 3px solid #fff; box-shadow: 0 4px 0 rgba(0,0,0,0.3); }
+        .artbadge { position: absolute; padding: 2px 12px; border-radius: 50px; font-weight: 900; font-size: 1.25rem; color: #fff; background: #0f2a24; border: 3px solid #fff; box-shadow: 0 3px 0 rgba(0,0,0,0.3); }
+        .spark { position: absolute; color: #fff4a8; text-shadow: 0 0 8px #ffd84d, 0 0 14px #ffb300; font-weight: 900; animation: sparkle 1.6s ease-in-out infinite; }
+        @keyframes sparkle { 0%,100% { opacity: 0.4; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.2); } }
+        .hill { position: absolute; border-radius: 50%; }
+        .drop { position: absolute; width: 3px; height: 16px; border-radius: 3px; background: rgba(210,225,255,0.7); transform: rotate(16deg); }
+        /* ==================== PLAY SCREEN ==================== */
+        #play-screen { padding: 12px 16px; }
+        .play-layout { display: flex; align-items: stretch; justify-content: center; gap: 14px; z-index: 1; width: 100%; height: 100%; }
+        .play-side { flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; align-items: stretch; justify-content: center; }
+        .play-side.left { width: 244px; }
+        .play-side.right { width: 306px; }
+        .play-center { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .hud-pill { width: 100%; text-align: center; background: #fff; border: 3px solid var(--card-bdr); border-radius: 18px; padding: 6px 12px; font-weight: 800; color: var(--ink); font-size: 1.15rem; box-shadow: 0 4px 0 var(--card-bdr); }
+        .hud-pill.runname { font-size: 1.15rem; padding: 8px 8px; }
+        .dora-box, .ura-box { background: linear-gradient(160deg,#fff8dc,#ffe9a3); border: 4px solid #ffc93d; border-radius: 20px; text-align: center; padding: 4px 8px 6px; box-shadow: 0 5px 0 #e0a800; }
+        .ura-box { background: linear-gradient(160deg,#f1eaff,#d9ccff); border-color: #a98af5; box-shadow: 0 5px 0 #7e5ad8; }
+        .dora-label { font-size: 1.1rem; font-weight: 900; color: #7a5a00; letter-spacing: 1px; }
+        .ura-box .dora-label { color: #4a2ea0; }
+        .dora-num { font-size: 4.2rem; font-weight: 900; color: #b07800; line-height: 1.05; text-shadow: 0 3px 0 #fff; }
+        .ura-row { display: flex; gap: 8px; justify-content: center; min-height: 50px; align-items: center; flex-wrap: wrap; }
+        .ura-chip { width: 38px; height: 50px; border-radius: 8px; background: linear-gradient(160deg,#9b7af5,#6a45d8); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.5rem; box-shadow: 0 3px 0 #4a2ea0; }
+        .ura-none { font-size: 1.5rem; color: #8a78c8; font-weight: 800; }
+        .chg-box { display: flex; flex-direction: column; gap: 6px; }
+        .btn-chg { font-size: 1.02rem !important; padding: 12px 6px !important; white-space: nowrap; }
+        .tk-row { display: flex; flex-direction: column; gap: 4px; background: #eef9f2; border: 3px solid #aad4bd; border-radius: 14px; padding: 4px 8px 8px; }
+        .tk-title { font-size: 0.95rem; font-weight: 900; color: var(--ink-dim); letter-spacing: 1px; text-align: center; }
+        .tk-pair { display: flex; gap: 12px; justify-content: center; }
+        .tk2 { position: relative; flex: 1; min-width: 0; height: 58px; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,0.28);
+               background: linear-gradient(135deg,var(--t1),var(--t2)); box-shadow: 0 4px 0 var(--t3); line-height: 1.1; }
+        .tk2::before, .tk2::after { content: ''; position: absolute; top: 50%; width: 14px; height: 14px; margin-top: -7px; border-radius: 50%; background: var(--nb, #eef9f2); }
+        .tk2::before { left: -8px; } .tk2::after { right: -8px; }
+        .tk2 .tw { font-size: 1.05rem; font-weight: 900; letter-spacing: 1px; }
+        .tk2 b { font-size: 1.5rem; font-weight: 900; }
+        .tk2.free { --t1: #3fd0bd; --t2: #17a592; --t3: #0f7a6b; }
+        .tk2.stock { --t1: #ffd24a; --t2: #f08a1c; --t3: #b45f08; }
+        .tk2.off { filter: grayscale(1); opacity: 0.4; }
+        .tk2.mini { flex: none; width: 108px; height: 64px; --nb: #fff4d4; }
+        .side-btns { display: flex; flex-direction: column; gap: 6px; }
+        .side-btns .btn { padding: 8px 12px; font-size: 1.05rem; }
+        .roles-panel { background: #fff; border: 3px solid var(--card-bdr); border-radius: 18px; padding: 6px 8px 8px; box-shadow: 0 4px 0 var(--card-bdr); }
+        .rp-title { display: grid; grid-template-columns: 1fr 52px 54px; font-size: 0.95rem; font-weight: 900; color: var(--ink-dim); letter-spacing: 1px; padding: 0 6px 4px 14px; border-bottom: 2px solid var(--card-bdr); margin-bottom: 4px; }
+        .rp-title span:nth-child(n+2) { text-align: right; }
+        .rp-row { position: relative; display: grid; grid-template-columns: 1fr 52px 54px; align-items: center; height: 33px; padding: 0 6px 0 14px; font-weight: 900; color: var(--ink); font-size: 1.12rem; border-radius: 8px; margin-bottom: 2px; }
+        .rp-row i { position: absolute; left: 0; top: 4px; bottom: 4px; width: 7px; border-radius: 4px; background: var(--rc); }
+        .rp-row .rl { text-align: right; font-size: 0.95rem; color: var(--ink-dim); }
+        .rp-row .rpts { text-align: right; font-size: 1.3rem; }
+        .rp-row.weak { background: #fff0ee; }
+        .rp-row.weak .rpts { color: #d1402f; }
+        .rp-row em { position: absolute; left: 118px; top: 50%; transform: translateY(-50%); font-style: normal; font-size: 0.78rem; font-weight: 900; color: #fff; background: #e8503d; padding: 0 6px; border-radius: 50px; }
+        .prog-panel { background: #fff; border: 3px solid var(--card-bdr); border-radius: 18px; padding: 8px 10px; box-shadow: 0 4px 0 var(--card-bdr); display: flex; flex-direction: column; gap: 6px; }
+        .pg-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; text-align: center; }
+        .pg-row span, .pg-score span { display: block; font-size: 0.95rem; font-weight: 800; color: var(--ink-dim); }
+        .pg-row b { font-size: 1.8rem; font-weight: 900; color: var(--accent-dk); line-height: 1.1; }
+        .pg-score { text-align: center; border-top: 2px solid var(--card-bdr); padding-top: 4px; }
+        .pg-score b { font-size: 2rem; font-weight: 900; color: var(--accent-dk); line-height: 1.1; }
+        .pg-score small { display: block; font-size: 0.9rem; font-weight: 700; color: var(--ink-dim); margin-top: 2px; }
+        .bar { height: 12px; border-radius: 8px; background: #dfeae3; margin-top: 4px; overflow: hidden; }
+        .bar > i { display: block; height: 100%; background: linear-gradient(90deg,#3fd0bd,var(--teal)); transition: width 0.4s; }
+        .bar.ok > i { background: linear-gradient(90deg,#ffe27a,var(--gold)); }
+        .pg-coin { display: flex; align-items: center; justify-content: center; gap: 8px; border-top: 2px solid var(--card-bdr); padding-top: 4px; font-size: 1.9rem; font-weight: 900; color: #b07800; }
+        .coin-note { font-size: 0.95rem; font-weight: 900; color: #14703f; margin-left: 4px; }
+        .pg-coin .cn { width: 34px; height: 34px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff6b0, #f5b800 70%); border: 3px solid #c98600; display: inline-block; }
+        .area-label { font-size: 1.1rem; font-weight: 900; color: var(--ink-dim); letter-spacing: 3px; margin-bottom: 4px; }
+        .answers { display: flex; gap: 22px; justify-content: center; height: 272px; align-items: flex-end; }
+        .ans-card {
+            position: relative; width: 192px; height: 250px; border-radius: 24px; cursor: pointer; background: linear-gradient(160deg,#ffffff,#e9f5ef); border: 5px solid #b9dcc8;
+            display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 0 #9fcfb5, 0 14px 22px rgba(20,90,60,0.18); transition: transform 0.15s, box-shadow 0.15s; font-family: inherit;
+        }
+        .ans-card:hover { transform: translateY(-5px); }
+        .ans-card .num { font-size: 7.2rem; font-weight: 900; color: var(--ink); line-height: 1; }
+        .ans-card .num.len2 { font-size: 6.4rem; letter-spacing: -2px; }
+        .ans-card.k-dora { background: linear-gradient(160deg,#fff7c9,#ffd65a 55%,#ffb84a); border-color: #ffa800; box-shadow: 0 8px 0 #d68900, 0 0 26px rgba(255,190,40,0.85); }
+        .ans-card.k-dora .num { color: #7a4a00; }
+        .ans-card.k-dora2 { background: linear-gradient(160deg,#f6e7ff,#c78bff 55%,#9156e8); border-color: #6f2fc8; box-shadow: 0 8px 0 #4e1f96, 0 0 28px rgba(150,90,240,0.85); }
+        .ans-card.k-dora2 .num { color: #3b1470; }
+        .ans-card.k-coin { background: linear-gradient(160deg,#eafff2,#8ce6b0 55%,#3fbf7a); border-color: #1f9a5a; box-shadow: 0 8px 0 #14703f, 0 0 24px rgba(60,200,120,0.75); }
+        .ans-card.k-coin .num { color: #0f4a2a; }
+        .rare-badge { position: absolute; top: -17px; left: 50%; transform: translateX(-50%); background: linear-gradient(to bottom,#e8503d,#b8301f); color: #fff; font-size: 1.1rem; font-weight: 900; padding: 4px 16px; border-radius: 50px; border: 3px solid #fff; white-space: nowrap; box-shadow: 0 3px 0 #7a1f12; }
+        .rare-badge.b-dora2 { background: linear-gradient(to bottom,#9156e8,#5a2db0); box-shadow: 0 3px 0 #3b1a78; }
+        .rare-badge.b-coin { background: linear-gradient(to bottom,#2fbf72,#188a4c); box-shadow: 0 3px 0 #0f5f33; }
+        .ans-card.selected { transform: translateY(-16px); border-color: var(--accent); box-shadow: 0 0 0 5px rgba(255,122,69,0.5), 0 16px 24px rgba(20,90,60,0.25); }
+        .ans-card.pop-in { animation: popIn 0.3s ease; }
+        .ans-card.used { opacity: 0.35; pointer-events: none; }
+        @keyframes popIn { from { transform: scale(0.3) rotate(-8deg); opacity: 0; } to { transform: scale(1) rotate(0); opacity: 1; } }
+        .pair-area { height: 96px; display: flex; gap: 14px; align-items: center; justify-content: center; margin: 4px 0 8px; }
+        .pair-btn { padding: 10px 34px; border-radius: 60px; border: 4px solid var(--accent); background: linear-gradient(to bottom,#fff,#fff0e2); font-family: inherit; font-weight: 900; font-size: 2.7rem; color: var(--accent-dk); cursor: pointer; box-shadow: 0 6px 0 var(--accent-dk); transition: transform 0.1s; line-height: 1.2; }
+        .pair-btn:hover { transform: translateY(2px); box-shadow: 0 4px 0 var(--accent-dk); }
+        .pair-btn:active { transform: translateY(6px); box-shadow: none; }
+        .pair-back { padding: 10px 22px; border-radius: 60px; border: 4px solid #9aa9b8; background: linear-gradient(to bottom,#fff,#e8eef4); font-family: inherit; font-weight: 900; font-size: 1.5rem; color: #5d7186; cursor: pointer; box-shadow: 0 6px 0 #8697a8; line-height: 1.2; }
+        .pair-back:active { transform: translateY(6px); box-shadow: none; }
+        .hand { display: flex; gap: 12px; justify-content: center; height: 200px; align-items: center; }
+        .card { position: relative; width: 124px; height: 172px; border-radius: 18px; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 5.2rem; text-shadow: 0 3px 4px rgba(0,0,0,0.2); box-shadow: 0 7px 0 rgba(0,0,0,0.16), 0 12px 18px rgba(0,0,0,0.12); border: 4px solid rgba(255,255,255,0.85); }
+        .card.empty { background: rgba(255,255,255,0.5) !important; border: 4px dashed #aad4bd; box-shadow: none; color: transparent; text-shadow: none; }
+        .card.pop-in { animation: popIn 0.3s ease; }
+        .card.dora-hit { box-shadow: 0 0 0 6px #ffc93d, 0 0 22px 7px rgba(255,201,61,0.9), 0 7px 0 rgba(0,0,0,0.16); }
+        .card.ura-hit { box-shadow: 0 0 0 6px #a98af5, 0 0 22px 7px rgba(138,92,240,0.9), 0 7px 0 rgba(0,0,0,0.16); }
+        .card .tag { position: absolute; top: -13px; right: -10px; font-size: 1rem; padding: 2px 11px; border-radius: 50px; font-weight: 900; text-shadow: none; background: #ffc93d; color: #5a3d00; border: 3px solid #fff; }
+        .card .tag.u { background: #8a5cf0; color: #fff; }
+        .card.sm { width: 92px; height: 126px; font-size: 3.4rem; border-radius: 14px; }
+
+        /* ==================== MODAL ==================== */
+        .modal-backdrop { position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(20,50,35,0.5); display: flex; align-items: center; justify-content: center; z-index: 200; }
+        .modal-backdrop.hidden { display: none; }
+        .modal-box { background: #fff; border: 4px solid var(--card-bdr); border-radius: 26px; padding: 26px 40px; text-align: center; min-width: 380px; max-height: 700px; overflow-y: auto; box-shadow: 0 18px 40px rgba(20,60,40,0.3); }
+        .modal-msg { font-size: 1.4rem; font-weight: 800; color: var(--ink); margin-bottom: 20px; line-height: 1.7; }
+        .modal-msg.left { text-align: left; font-size: 1.25rem; font-weight: 700; line-height: 1.7; }
+        .modal-box .btn-sm { font-size: 1.3rem; padding: 12px 28px; }
+        .result-title { font-size: 2.8rem; font-weight: 900; margin-bottom: 8px; }
+        .result-title.clear { color: var(--teal-dk); }
+        .result-title.over { color: var(--danger); }
+        .score-submit-box { margin: 10px 0; text-align: center; }
+        .score-submit-label { font-size: 1.15rem; color: var(--ink-dim); font-weight: 700; margin-bottom: 4px; }
+        .score-submit-value { font-size: 3rem; font-weight: 900; color: var(--accent-dk); margin-bottom: 4px; }
+        .score-submit-msg { font-size: 1rem; margin-top: 6px; min-height: 1.3em; }
+
+        /* ---- プレーの結果（得点の見せ方） ---- */
+        .rm { width: 780px; padding: 0 !important; overflow: hidden !important; text-align: left; }
+        .rm-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 26px; background: var(--rc); border-bottom: 5px solid rgba(0,0,0,0.22); }
+        .rm-role { font-size: 2.7rem; font-weight: 900; color: #fff; text-shadow: 0 3px 0 rgba(0,0,0,0.3); letter-spacing: 2px; }
+        .rm-lv { display: flex; align-items: center; gap: 8px; font-weight: 900; font-size: 1.4rem; color: var(--rc); }
+        .rm-lv b { background: #fff; padding: 2px 16px; border-radius: 50px; box-shadow: 0 3px 0 rgba(0,0,0,0.2); }
+        .rm-lv em { font-style: normal; background: #e8503d; color: #fff; padding: 2px 12px; border-radius: 50px; font-size: 1.05rem; box-shadow: 0 3px 0 rgba(0,0,0,0.2); }
+        .rm-body { padding: 14px 26px 18px; background: linear-gradient(#f6fbf8,#e8f4ed); }
+        .rm-top { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+        .rm-hand { display: flex; gap: 12px; padding: 6px 4px; }
+        .rm-dora { display: flex; flex-direction: column; gap: 8px; }
+        .rm-dchip { display: flex; align-items: center; gap: 8px; padding: 4px 12px 4px 10px; border-radius: 14px; border: 3px solid; font-weight: 900; font-size: 1.05rem; min-height: 58px; }
+        .rm-dchip.dd { background: #fff6cf; border-color: #ffc93d; color: #7a5a00; }
+        .rm-dchip.uu { background: #f1eaff; border-color: #a98af5; color: #4a2ea0; }
+        .rm-dchip b { font-size: 2.3rem; line-height: 1; }
+        .flipcard { width: 38px; height: 50px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.6rem; color: #fff; background: linear-gradient(160deg,#9b7af5,#6a45d8); box-shadow: 0 3px 0 #4a2ea0; transition: transform 0.4s; border: 3px solid #fff; }
+        .flipcard.flip { transform: rotateY(360deg); background: linear-gradient(160deg,#fff,#eadfff); color: #4a2ea0; }
+        .rm-calc { display: grid; grid-template-columns: 1fr 34px 1.1fr 34px 1.25fr; align-items: stretch; gap: 6px; margin-top: 12px; }
+        .rm-op { display: flex; align-items: center; justify-content: center; font-size: 2.2rem; font-weight: 900; color: #6c8a7c; }
+        .rm-box { border-radius: 18px; padding: 8px 8px 8px; text-align: center; border: 4px solid; display: flex; flex-direction: column; justify-content: center; }
+        .rm-box .lb { font-size: 1rem; font-weight: 900; letter-spacing: 1px; }
+        .rm-box .vl { font-size: 3.4rem; font-weight: 900; line-height: 1.05; }
+        .rm-box .sb { font-size: 0.95rem; font-weight: 800; min-height: 1.3em; line-height: 1.25; }
+        .rm-box.b1 { background: #fff; border-color: var(--rc); color: var(--ink); } .rm-box.b1 .lb, .rm-box.b1 .sb { color: var(--ink-dim); }
+        .rm-box.b2 { background: #fff6cf; border-color: #ffc93d; color: #9a6a00; } .rm-box.b2 .lb, .rm-box.b2 .sb { color: #8a6a1a; }
+        .rm-box.b3 { background: linear-gradient(160deg,#ff9a5a,#e8602a); border-color: #b8431a; color: #fff; box-shadow: 0 5px 0 #b8431a, 0 0 24px rgba(255,140,60,0.55); animation: scorePop 0.5s ease; }
+        .rm-box.b3 .lb, .rm-box.b3 .sb { color: #ffe9d6; }
+        .rm-box.b3 .vl { font-size: 4.3rem; text-shadow: 0 4px 0 rgba(0,0,0,0.25); }
+        @keyframes scorePop { 0% { transform: scale(0.6); } 60% { transform: scale(1.1); } 100% { transform: scale(1); } }
+        .rm-stage { margin-top: 12px; display: flex; align-items: center; gap: 12px; font-weight: 900; color: var(--ink); font-size: 1.15rem; }
+        .rm-stage .bar { flex: 1; height: 16px; margin: 0; }
+        .rm-coinnote { margin-top: 10px; display: inline-block; background: #e3f9ec; border: 3px solid #3fbf7a; color: #14703f; font-weight: 900; font-size: 1.1rem; padding: 3px 16px; border-radius: 50px; }
+        .rm-foot { margin-top: 12px; text-align: center; }
+
+        /* ---- ステージクリアのポップアップ ---- */
+        .cp { width: 640px; padding: 0 !important; overflow: hidden !important; }
+        .cp-title { background: linear-gradient(#26b98d,#12906c); color: #fff; font-size: 2.6rem; font-weight: 900; padding: 12px 20px; text-shadow: 0 3px 0 rgba(0,0,0,0.25); border-bottom: 5px solid rgba(0,0,0,0.2); letter-spacing: 3px; }
+        .cp-body { padding: 16px 28px 20px; display: flex; flex-direction: column; gap: 12px; }
+        .cp-score { font-size: 1.25rem; font-weight: 800; color: var(--ink-dim); }
+        .cp-coin { display: flex; align-items: center; justify-content: center; gap: 12px; background: #fff6cf; border: 4px solid #ffc93d; border-radius: 18px; padding: 8px 14px; }
+        .cp-coin .cn { width: 50px; height: 50px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff6b0, #f5b800 70%); border: 4px solid #c98600; flex-shrink: 0; }
+        .cp-coin b { font-size: 3rem; font-weight: 900; color: #8a5a00; line-height: 1; }
+        .cp-coin small { display: block; font-size: 1rem; font-weight: 800; color: #8a6a1a; text-align: left; line-height: 1.3; }
+        .cp-sec { font-size: 1.2rem; font-weight: 900; color: var(--ink-dim); letter-spacing: 2px; margin-bottom: -4px; }
+        .cp-role { display: grid; grid-template-columns: 1fr auto; align-items: stretch; border: 5px solid var(--rc); border-radius: 18px; overflow: hidden; background: #fff; box-shadow: 0 5px 0 var(--rc); }
+        .cp-role .nm { background: var(--rc); color: #fff; font-size: 2.1rem; font-weight: 900; padding: 10px 18px; display: flex; align-items: center; text-shadow: 0 3px 0 rgba(0,0,0,0.3); }
+        .cp-role .lv { display: flex; flex-direction: column; justify-content: center; padding: 6px 20px; font-weight: 900; color: var(--ink); text-align: center; gap: 2px; }
+        .cp-role .lv .a { font-size: 2rem; line-height: 1.1; }
+        .cp-role .lv .a em { font-style: normal; color: var(--ink-dim); font-size: 1.2rem; margin: 0 6px; }
+        .cp-role .lv .a b { color: #e2632f; font-size: 2.4rem; }
+        .cp-role .lv .p { font-size: 1.15rem; color: var(--ink-dim); }
+        .cp-role .lv .p b { color: #e2632f; }
+
+        /* ==================== SHOP ==================== */
+        #shop-screen { justify-content: flex-start; padding: 0 22px; background: radial-gradient(ellipse at 50% 0%, #fffbe9 0%, #ffe3a8 100%); }
+        #shop-screen::before { background-image: radial-gradient(rgba(255,255,255,0.7) 2px, transparent 2px); }
+        .shop-awning { position: relative; z-index: 2; width: 100%; height: 34px; flex-shrink: 0; margin: 0 -22px; width: calc(100% + 44px);
+            background: repeating-linear-gradient(90deg,#ff5d5d 0 52px,#fff7ea 52px 104px); box-shadow: 0 6px 0 rgba(160,60,40,0.25); }
+        .shop-awning::after { content:''; position: absolute; left: 0; right: 0; bottom: -14px; height: 14px;
+            background: radial-gradient(circle at 26px 0, #ff5d5d 26px, transparent 27px) 0 0 / 104px 14px repeat-x, radial-gradient(circle at 78px 0, #fff7ea 26px, transparent 27px) 0 0 / 104px 14px repeat-x; }
+        .shop-head { z-index: 1; display: flex; align-items: center; justify-content: space-between; width: 1230px; max-width: 100%; margin-top: 30px; }
+        .shop-title { font-size: 2.5rem; font-weight: 900; color: #fff; -webkit-text-stroke: 8px #c4552a; paint-order: stroke fill; text-shadow: 0 5px 0 #c4552a; letter-spacing: 3px; }
+        .shop-coin { display: flex; align-items: center; gap: 10px; background: linear-gradient(to bottom,#fff4c2,#ffd84d); border: 4px solid #e0a000; border-radius: 60px; padding: 4px 26px 4px 12px; box-shadow: 0 5px 0 #b57a00; font-size: 2.4rem; font-weight: 900; color: #7a4a00; line-height: 1.2; }
+        .shop-coin .cn { width: 48px; height: 48px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff6b0, #f5b800 70%); border: 4px solid #c98600; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; color: #a56a00; }
+        .shop-reward { z-index: 1; margin-top: 2px; padding: 3px 22px; border-radius: 60px; background: #b5651d; color: #fff; font-size: 1.4rem; font-weight: 900; text-shadow: 0 2px 0 rgba(0,0,0,0.25); box-shadow: 0 5px 0 #7a3f0f; text-align: center; }
+        .shop-wrap { display: flex; gap: 26px; width: 1230px; max-width: 100%; z-index: 1; margin-top: 8px; align-items: flex-start; justify-content: center; }
+        .shop-left { flex: 0 0 540px; }
+        .shop-right { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+        .shop-sec { font-size: 1.15rem; font-weight: 900; color: #a8561f; letter-spacing: 2px; margin: 0 0 4px 6px; }
+        .role-list { display: flex; flex-direction: column; gap: 6px; }
+        .role-card { display: grid; grid-template-columns: 1fr 46px 140px 104px; align-items: center; gap: 4px; height: 54px; padding: 0 10px 0 0; border-radius: 16px; background: #fff; border: 3px solid var(--rc); box-shadow: 0 4px 0 var(--rc); }
+        .role-card .rc-name { border-radius: 12px 0 0 12px; font-size: 1.5rem; font-weight: 900; color: #fff; background: var(--rc); height: 100%; display: flex; align-items: center; padding-left: 16px; text-shadow: 0 2px 0 rgba(0,0,0,0.22); }
+        .role-card .rc-lv { text-align: center; font-weight: 900; color: var(--ink); font-size: 1rem; line-height: 1; }
+        .role-card .rc-lv b { display: block; font-size: 1.8rem; color: var(--rc); filter: brightness(0.85); line-height: 1.1; }
+        .role-card .rc-pts { display: flex; align-items: center; justify-content: center; gap: 4px; font-weight: 900; color: var(--ink); font-size: 1.4rem; white-space: nowrap; }
+        .role-card .rc-pts i { font-style: normal; color: var(--ink-dim); font-size: 1.1rem; }
+        .role-card .rc-pts .nx { color: #e2632f; font-size: 1.55rem; }
+        .role-card.flash { animation: flashCard 0.7s ease; }
+        @keyframes flashCard { 0%,100% { transform: scale(1); } 30% { transform: scale(1.04); box-shadow: 0 0 0 5px #ffd84d, 0 4px 0 var(--rc); } }
+        .lvbtn { padding: 8px 6px; border-radius: 50px; border: 3px solid #e0a000; background: linear-gradient(to bottom,#ffe98a,#ffc93d); color: #6a3f00; font-family: inherit; font-weight: 900; font-size: 1.2rem; cursor: pointer; box-shadow: 0 4px 0 #b57a00; white-space: nowrap; position: relative; }
+        .lvbtn:active { transform: translateY(3px); box-shadow: 0 1px 0 #b57a00; }
+        .lvbtn:disabled { opacity: 0.4; cursor: not-allowed; background: #e8e8e8; border-color: #bbb; color: #777; box-shadow: 0 4px 0 #aaa; }
+        .item-card { display: flex; align-items: center; gap: 12px; padding: 4px 12px; height: 72px; border-radius: 22px; text-align: left; border: 4px solid var(--ic); background: linear-gradient(160deg,#fff,var(--ib)); box-shadow: 0 6px 0 var(--ic); }
+        .item-card .ic { font-size: 3.4rem; line-height: 1; filter: drop-shadow(0 3px 0 rgba(0,0,0,0.12)); }
+        .gcard { width: 50px; height: 70px; border-radius: 9px; border: 3px solid #b57a00; background: linear-gradient(160deg,#fff4b0,#ffc93d 55%,#e8a317); display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.2rem; color: #7a2a00; box-shadow: 0 4px 0 rgba(0,0,0,0.25), 0 0 14px rgba(255,216,77,0.8); }
+        .item-card .im { flex: 1; min-width: 0; }
+        .item-card .tt { font-size: 1.3rem; font-weight: 900; color: var(--ink); line-height: 1.25; }
+        .item-card .ds { font-size: 1.05rem; font-weight: 700; color: var(--ink-dim); line-height: 1.3; }
+        .item-card .own { font-size: 1.05rem; font-weight: 900; color: var(--ic); filter: brightness(0.8); margin-top: 2px; }
+        .item-card .lvbtn { padding: 10px 20px; font-size: 1.35rem; }
+        .item-card.flash { animation: flashCard 0.7s ease; }
+        .shop-foot { z-index: 1; margin-top: auto; padding: 4px 0 10px; display: flex; align-items: center; }
+        .shop-foot .btn { width: 440px; margin: 0; padding: 12px 28px; }
+        .shop-foot .btn-sm { width: auto; padding: 10px 18px; }
+
+        .num-panel { background: #fff; border: 3px solid var(--card-bdr); border-radius: 18px; padding: 4px 8px 6px; box-shadow: 0 4px 0 var(--card-bdr); }
+        .np-title { font-size: 0.95rem; font-weight: 900; color: var(--ink-dim); letter-spacing: 1px; padding: 0 4px 3px; }
+        .np-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+        .np-chip { display: flex; flex-direction: column; align-items: center; border-radius: 9px; padding: 2px 0 1px; opacity: 0.55; }
+        .np-chip b { width: 36px; height: 30px; border-radius: 7px; color: #fff; font-size: 1.2rem; font-weight: 900; display: flex; align-items: center; justify-content: center; text-shadow: 0 2px 0 rgba(0,0,0,0.25); }
+        .np-chip span { font-size: 1rem; font-weight: 900; color: var(--ink-dim); line-height: 1.15; }
+        .np-chip.has { opacity: 1; } .np-chip.has span { color: #d1402f; }
+        .np-chip.on { background: #fff6cf; outline: 3px solid #ffc93d; opacity: 1; }
+        .num-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+        .num-cell { min-width: 0; background: #fff; border: 3px solid #cfe3d6; border-radius: 14px; padding: 5px 6px 6px; box-shadow: 0 3px 0 #cfe3d6; display: flex; flex-direction: column; gap: 6px; }
+        .num-cell.flash { animation: flashCard 0.7s ease; }
+        .nc-top { display: flex; align-items: center; justify-content: center; gap: 6px; }
+        .nc-top > b, .cp-num > b { width: 44px; height: 52px; border-radius: 9px; color: #fff; font-size: 2rem; font-weight: 900; display: flex; align-items: center; justify-content: center; text-shadow: 0 2px 0 rgba(0,0,0,0.25); flex-shrink: 0; }
+        .nc-lv { font-weight: 900; color: var(--ink); font-size: 1.3rem; line-height: 1.1; }
+        .nc-pt { font-weight: 900; color: #d1402f; font-size: 1.2rem; white-space: nowrap; line-height: 1.15; }
+        .nc-pt i { font-style: normal; margin: 0 2px; font-size: 0.8rem; } .nc-pt b { color: #e2632f; }
+        .num-cell .lvbtn { padding: 5px 4px; font-size: 1.25rem; }
+        .lvbtn.sale::before { content: 'SALE'; position: absolute; z-index: 6; top: -12px; left: -8px; background: #fff; color: #e8503d; font-size: 0.78rem; font-weight: 900; padding: 0 7px; border-radius: 50px; border: 2px solid #e8503d; line-height: 1.35; letter-spacing: 0.5px; }
+        .role-card:has(.lvbtn.sale), .num-cell:has(.lvbtn.sale), .item-card:has(.lvbtn.sale) { position: relative; z-index: 4; }
+        .lvbtn.sale { background: linear-gradient(to bottom,#ff9a8a,#ee5a45); border-color: #b8301f; color: #fff; box-shadow: 0 4px 0 #8a1f12; }
+        .onsale { box-shadow: 0 0 0 4px #ff6a55, 0 4px 0 #8a1f12 !important; }
+        .cp-nums { display: flex; gap: 12px; justify-content: center; }
+        .cp-num { display: flex; align-items: center; gap: 10px; border: 4px solid #bfe3cd; border-radius: 14px; padding: 6px 14px; background: #fff; font-weight: 900; color: var(--ink); text-align: left; }
+        .cp-num .a { font-size: 1.4rem; line-height: 1.1; } .cp-num .a b { color: #e2632f; font-size: 1.7rem; }
+        .cp-num .p { font-size: 1.05rem; color: var(--ink-dim); } .cp-num .p b { color: #e2632f; }
+        .cp-num em { font-style: normal; color: var(--ink-dim); margin: 0 4px; font-size: 0.9em; }
+        .dora-box { animation: doraGlow 2.6s ease-in-out infinite; }
+        @keyframes doraGlow { 0%,100% { box-shadow: 0 5px 0 #e0a800, 0 0 0 0 rgba(255,201,61,0); } 50% { box-shadow: 0 5px 0 #e0a800, 0 0 20px 5px rgba(255,201,61,0.75); } }
+        .ura-box.has { animation: uraGlow 2s ease-in-out infinite; }
+        @keyframes uraGlow { 0%,100% { box-shadow: 0 5px 0 #7e5ad8, 0 0 0 0 rgba(138,92,240,0); } 50% { box-shadow: 0 5px 0 #7e5ad8, 0 0 20px 5px rgba(138,92,240,0.7); } }
+        .card.dora-hit { animation: hitGlow 1.8s ease-in-out infinite; }
+        @keyframes hitGlow { 0%,100% { box-shadow: 0 0 0 6px #ffc93d, 0 0 14px 4px rgba(255,201,61,0.7), 0 7px 0 rgba(0,0,0,0.16); } 50% { box-shadow: 0 0 0 6px #ffc93d, 0 0 30px 12px rgba(255,201,61,1), 0 7px 0 rgba(0,0,0,0.16); } }
+        .card.dora-hit.pop-in { animation: popIn 0.3s ease; }
+        .pair-btn .dn { color: #a86a00; background: #ffe58a; border-radius: 12px; padding: 0 10px; box-shadow: 0 0 0 4px #ffc93d, 0 0 14px 3px rgba(255,201,61,0.8); }
+        /* ---- あそびかた ---- */
+        .ht-box { width: 1180px; max-width: 98%; padding: 14px 22px 16px !important; }
+        .ht-title { font-size: 1.9rem; font-weight: 900; letter-spacing: 3px; color: var(--accent-dk); margin-bottom: 4px; text-shadow: 0 3px 0 #ffe0cc; }
+        .ht-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+        .ht-card { border: 4px solid var(--hc); border-radius: 18px; background: #fff; overflow: hidden; text-align: left; display: flex; flex-direction: column; box-shadow: 0 4px 0 var(--hc); }
+        .ht-head { background: var(--hc); color: #fff; font-weight: 900; font-size: 1.2rem; padding: 2px 12px; text-shadow: 0 2px 0 rgba(0,0,0,0.25); }
+        .ht-art { height: 52px; display: flex; align-items: center; justify-content: center; gap: 7px; background: var(--hb); }
+        .ht-body { padding: 5px 12px 7px; font-size: 1.05rem; font-weight: 700; color: var(--ink); line-height: 1.42; }
+        .ht-body .em { color: var(--hc); filter: brightness(0.82); font-weight: 900; font-size: 1.08em; background: linear-gradient(transparent 62%, color-mix(in srgb, var(--hc) 24%, transparent) 62%); }
+        .ha-c { width: 38px; height: 50px; border-radius: 8px; background: #fff; border: 3px solid #b9dcc8; font-weight: 900; font-size: 1.35rem; color: var(--ink); display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 0 rgba(0,0,0,0.15); }
+        .ha-c.sel { border-color: var(--accent); transform: translateY(-5px); box-shadow: 0 0 0 3px rgba(255,122,69,0.4), 0 3px 0 rgba(0,0,0,0.15); }
+        .ha-c.coin { background: linear-gradient(160deg,#eafff2,#8ce6b0); border-color: #1f9a5a; }
+        .ha-n { width: 34px; height: 44px; border-radius: 7px; color: #fff; font-weight: 900; font-size: 1.35rem; display: flex; align-items: center; justify-content: center; text-shadow: 0 2px 0 rgba(0,0,0,0.25); box-shadow: 0 3px 0 rgba(0,0,0,0.2); }
+        .ha-n.hit { box-shadow: 0 0 0 3px #ffc93d, 0 0 10px 3px rgba(255,201,61,0.8); }
+        .ha-ar { font-weight: 900; color: var(--ink-dim); font-size: 1.3rem; }
+        .ha-dora { background: linear-gradient(160deg,#fff8dc,#ffe9a3); border: 3px solid #ffc93d; border-radius: 12px; padding: 2px 10px; font-weight: 900; color: #7a5a00; font-size: 0.95rem; text-align: center; line-height: 1.1; }
+        .ha-dora b { display: block; font-size: 1.7rem; color: #b07800; }
+        .ha-chip { background: #ffc93d; color: #5a3d00; font-weight: 900; font-size: 1rem; padding: 2px 10px; border-radius: 50px; border: 2px solid #fff; }
+        .ha-ura { width: 34px; height: 44px; border-radius: 7px; background: linear-gradient(160deg,#9b7af5,#6a45d8); color: #fff; font-weight: 900; font-size: 1.35rem; display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 0 #4a2ea0; }
+        .ha-ura.open { background: linear-gradient(160deg,#fff,#eadfff); color: #4a2ea0; }
+        .ha-coin { width: 40px; height: 40px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff6b0, #f5b800 70%); border: 3px solid #c98600; font-weight: 900; font-size: 0.95rem; color: #7a4a00; display: flex; align-items: center; justify-content: center; }
+        .ha-tk { flex: none; width: 98px; height: 44px; --nb: #dff7f2; }
+        .ha-tk .tw { font-size: 0.95rem; }
+        .ha-plus { font-weight: 900; color: #d1402f; font-size: 1.1rem; margin-right: 6px; }
+        .ha-st { width: 26px; height: 30px; border-radius: 6px; background: #fff; border: 3px solid #f0b3aa; color: #c2402e; font-weight: 900; font-size: 0.95rem; display: flex; align-items: center; justify-content: center; }
+        .ha-st.on { background: #e8503d; color: #fff; border-color: #b8301f; }
+        .toast { position: absolute; left: 50%; top: 90px; transform: translateX(-50%); background: rgba(44,58,79,0.94); color: #fff; padding: 12px 30px; border-radius: 60px; font-weight: 800; font-size: 1.3rem; z-index: 500; pointer-events: none; animation: toastIn 1.8s ease forwards; white-space: nowrap; }
+        @keyframes toastIn { 0% { opacity: 0; transform: translate(-50%,-10px); } 12% { opacity: 1; transform: translate(-50%,0); } 80% { opacity: 1; } 100% { opacity: 0; } }
+    </style>
+    <script src="../tutorial-engine.js"></script>
+</head>
+<body>
+<div id="container">
+
+    <!-- ==================== TITLE ==================== -->
+    <div id="title-screen" class="screen intro">
+        <div class="ts-swirl"></div>
+        <div class="ts-floaters" id="ts-floaters"></div>
+        <div class="ts-chips" id="ts-chips"></div>
+        <div class="ts-logo">
+            <div class="ts-fan" id="ts-fan"></div>
+            <div class="ts-spwrap" style="left:176px; top:84px; --rot:-14deg; --pd:1.25s;"><div class="ts-spbob" style="--bd:-0.4s"><div class="ans-card k-dora ts-sp" style="--sd:0s"><div class="rare-badge b-dora" data-i18n="badge_dora">✨ ドラ札</div><div class="num len2">24</div><div class="shine"></div></div></div></div>
+            <div class="ts-spwrap" style="left:954px; top:70px; --rot:13deg; --pd:1.45s;"><div class="ts-spbob" style="--bd:-1.2s"><div class="ans-card k-dora2 ts-sp" style="--sd:0.9s"><div class="rare-badge b-dora2" data-i18n="badge_dora2">✨✨ ドラドラ札</div><div class="num len2">36</div><div class="shine"></div></div></div></div>
+            <div class="ts-spwrap" style="left:1062px; top:226px; --rot:8deg; --pd:1.65s;"><div class="ts-spbob" style="--bd:-2s"><div class="ans-card k-coin ts-sp" style="--sd:1.7s; width:118px !important; height:160px !important;"><div class="rare-badge b-coin" data-i18n="badge_coin">🪙 コイン札</div><div class="num len2" style="font-size:3.6rem !important">20</div><div class="shine"></div></div></div></div>
+            <h1 class="ts-title"><span class="l1" id="ts-l1"></span><span class="l2" id="ts-l2"></span></h1>
+        </div>
+        <div class="ts-menu">
+            <button class="ts-start" data-i18n="btn_game_start" onclick="goToRunSelect()">ゲームスタート</button>
+            <div class="ts-grid">
+                <button class="ts-btn b1" data-i18n="btn_tutorial" onclick="startTutorial()">🔰 チュートリアル</button>
+                <button id="btn-name-register" class="ts-btn b2" onclick="openNameRegister()">👤 名前の登録</button>
+                <button id="btn-ranking" class="ts-btn b3" data-i18n="btn_ranking" onclick="openRanking()">🏆 ランキング</button>
+                <button class="ts-btn b4" data-i18n="btn_settings" onclick="openSettings()">⚙️ 設定</button>
+                <button class="ts-btn b5" data-i18n="btn_index" onclick="location.href='../index.html'">🏠 INDEXへ</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== NAME REGISTER ==================== -->
+    <div id="name-register-screen" class="screen hidden">
+        <div class="title-box">
+            <h1 class="settings-title" data-i18n="name_register_title">👤 名前の登録</h1>
+            <p class="settings-desc" data-i18n="name_register_desc">お名前を登録してください（最大12文字）</p>
+            <p class="settings-desc"><span data-i18n="name_current_label">現在の名前：</span><span id="name-reg-current" style="color:var(--accent-dk); font-weight:800;"></span></p>
+            <div class="name-reg-form">
+                <input type="text" id="name-reg-input" class="name-reg-input" data-i18n-placeholder="name_input_placeholder" placeholder="なまえをにゅうりょく" maxlength="12">
+                <button class="btn btn-teal btn-sm" data-i18n="btn_add" onclick="addPlayerName()">追加</button>
+            </div>
+            <ul id="name-reg-list" class="pl-list"></ul>
+            <button class="btn" data-i18n="btn_back_title" onclick="closeNameRegister()">◀ タイトルへ戻る</button>
+        </div>
+    </div>
+
+    <!-- ==================== CUSTOM ALERT ==================== -->
+    <div id="custom-alert-modal" class="modal-backdrop hidden" style="z-index:9999;">
+        <div class="modal-box">
+            <p class="modal-msg" id="custom-alert-msg"></p>
+            <button class="btn btn-primary btn-sm" data-i18n="btn_ok" onclick="closeCustomAlert()">OK</button>
+        </div>
+    </div>
+
+    <!-- ==================== RANKING ==================== -->
+    <div id="ranking-screen" class="screen hidden">
+        <div class="rank-box">
+            <div class="rank-title" data-i18n="ranking_title">🏆 ランキング</div>
+            <div id="rank-shackle-toggle" class="rank-toggle"></div>
+            <div id="rank-star-toggle" class="rank-toggle"></div>
+            <div class="rank-toggle">
+                <button id="rank-tab-world-btn" class="rank-toggle-btn active" data-i18n="rank_tab_world" onclick="switchRankTab('world')">ワールド</button>
+                <button id="rank-tab-local-btn" class="rank-toggle-btn" data-i18n="rank_tab_local" onclick="switchRankTab('local')">ローカル</button>
+            </div>
+            <div id="rank-loading" class="rank-loading" style="display:none;" data-i18n="rank_loading">読み込み中…</div>
+            <ul id="rank-list" class="rank-list"></ul>
+            <button class="btn" data-i18n="btn_back_title" onclick="closeRanking()">◀ タイトルへ戻る</button>
+        </div>
+    </div>
+
+    <!-- ==================== SETTINGS ==================== -->
+    <div id="settings-screen" class="screen hidden">
+        <div class="title-box">
+            <h1 class="settings-title" data-i18n="settings_title">⚙️ 設定</h1>
+            <div class="settings-section">
+                <div class="settings-label" data-i18n="settings_lang_label">言語</div>
+                <div id="settings-lang-options" class="settings-lang-options"></div>
+            </div>
+            <button class="btn" data-i18n="btn_back_title" onclick="closeSettings()">◀ タイトルへ戻る</button>
+        </div>
+    </div>
+
+    <!-- ==================== RUN SELECT ==================== -->
+    <div id="run-select-screen" class="screen hidden">
+        <div class="rs-top">
+            <button class="rs-mini" data-i18n="btn_back_title" onclick="goToTitle()">◀ タイトルへ戻る</button>
+            <div class="rs-plaque" data-i18n="runselect_title">RUNをえらぼう</div>
+        </div>
+        <div id="ds-master-badge" class="ds-master-badge hidden" data-i18n="master_badge">👑 すべて金メダル達成！</div>
+        <div class="rs-stage">
+            <button class="rs-arrow" id="rs-prev" onclick="moveShackle(-1)">◀</button>
+            <div class="rs-viewport" id="rs-viewport"><div id="rs-strip"></div></div>
+            <button class="rs-arrow" id="rs-next" onclick="moveShackle(1)">▶</button>
+        </div>
+        <div class="rs-bottom">
+            <div class="rs-desc" id="ds-preview-sub"></div>
+            <div class="rs-bottom-row">
+                <div class="star-row" id="star-row"></div>
+                <div class="border-row" id="border-row"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== PLAY ==================== -->
+    <div id="play-screen" class="screen hidden">
+        <div class="play-layout">
+            <div class="play-side left">
+                <div class="hud-pill runname" id="hud-run"></div>
+                <div class="dora-box"><div class="dora-label" data-i18n="dora_label">ドラ</div><div class="dora-num" id="dora-num">7</div></div>
+                <div class="ura-box"><div class="dora-label" data-i18n="ura_label">うらドラ</div><div class="ura-row" id="ura-row"></div></div>
+                <div class="chg-box">
+                    <button class="btn btn-teal btn-sm btn-chg" id="btn-change" onclick="doChange()"></button>
+                    <div class="tk-row" id="tk-row"></div>
+                </div>
+                <div class="side-btns">
+                    <button class="btn btn-sm" data-i18n="btn_howto" onclick="openHowTo()">📖 あそびかた</button>
+                    <button class="btn btn-danger btn-sm" data-i18n="btn_retire" onclick="requestRetire()">やめる</button>
+                </div>
+            </div>
+            <div class="play-center">
+                <div class="area-label" data-i18n="lbl_answers">九九カード</div>
+                <div id="answers" class="answers"></div>
+                <div id="pair-area" class="pair-area"></div>
+                <div class="area-label" data-i18n="lbl_hand">てふだ</div>
+                <div id="hand" class="hand"></div>
+            </div>
+            <div class="play-side right" id="right-panel">
+                <div class="roles-panel">
+                    <div class="rp-title"><span data-i18n="roles_title">役</span><span data-i18n="th_lv">Lv</span><span data-i18n="th_pts">点</span></div>
+                    <div id="roles-live"></div>
+                </div>
+                <div class="num-panel">
+                    <div class="np-title" data-i18n="num_title">数字ボーナス</div>
+                    <div class="np-grid" id="nums-live"></div>
+                </div>
+                <div class="prog-panel">
+                    <div class="pg-row">
+                        <div><span data-i18n="hud_stage">ステージ</span><b id="hud-stage">1/7</b></div>
+                        <div><span data-i18n="hud_play">プレー</span><b id="hud-play">1/3</b></div>
+                    </div>
+                    <div class="pg-score"><span data-i18n="hud_score">スコア / ボーダー</span><b id="hud-score">0 / 60</b><div class="bar" id="hud-bar"><i style="width:0%"></i></div><small id="hud-total"></small></div>
+                    <div class="pg-coin"><span class="cn"></span><span id="hud-coin">0</span><span class="coin-note" id="hud-coinnote"></span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== SHOP ==================== -->
+    <div id="shop-screen" class="screen hidden">
+        <div class="shop-awning"></div>
+        <div class="shop-head">
+            <div class="shop-title" data-i18n="shop_title">🛒 ショップ</div>
+            <div class="shop-coin"><span class="cn">🪙</span><span id="shop-coin-val">0</span></div>
+        </div>
+        <div class="shop-wrap">
+            <div class="shop-left">
+                <div class="shop-sec" data-i18n="shop_roles_label">役のレベルをあげる</div>
+                <div class="role-list" id="shop-roles"></div>
+            </div>
+            <div class="shop-right">
+                <div class="shop-sec" data-i18n="shop_nums_label">数字のレベルをあげる</div>
+                <div class="num-grid" id="shop-nums"></div>
+                <div class="shop-sec" data-i18n="shop_items_label">どうぐ</div>
+                <div id="shop-items" style="display:flex; flex-direction:column; gap:8px;"></div>
+            </div>
+        </div>
+        <div class="shop-foot">
+            <button class="btn btn-primary" id="btn-next-stage" onclick="goNextStage()">つぎのステージへ ▶</button>
+        </div>
+    </div>
+
+    <!-- ==================== HOW TO PLAY ==================== -->
+    <div id="howto-modal" class="modal-backdrop hidden">
+        <div class="modal-box ht-box">
+            <div class="ht-title" data-i18n="howto_title">あそびかた</div>
+            <div class="ht-grid" id="howto-body"></div>
+            <button class="btn btn-primary btn-sm" style="margin-top:12px" data-i18n="btn_close" onclick="closeHowTo()">とじる</button>
+        </div>
+    </div>
+
+    <!-- ==================== RETIRE CONFIRM ==================== -->
+    <div id="retire-modal" class="modal-backdrop hidden">
+        <div class="modal-box">
+            <p class="modal-msg" data-i18n="confirm_retire_msg">今のRUNをやめて、RUN選択にもどりますか？</p>
+            <button class="btn btn-danger btn-sm" data-i18n="btn_yes" onclick="confirmRetire()">やめる</button>
+            <button class="btn btn-sm" data-i18n="btn_no" onclick="closeRetireModal()">いいえ</button>
+        </div>
+    </div>
+
+    <!-- ==================== PLAY RESULT ==================== -->
+    <div id="play-result-modal" class="modal-backdrop hidden">
+        <div class="modal-box rm" id="play-result-box"></div>
+    </div>
+
+    <!-- ==================== STAGE CLEAR POPUP ==================== -->
+    <div id="clear-modal" class="modal-backdrop hidden">
+        <div class="modal-box cp" id="clear-box"></div>
+    </div>
+    <!-- ==================== RUN END ==================== -->
+    <div id="end-modal" class="modal-backdrop hidden">
+        <div class="modal-box" style="min-width:560px;">
+            <div id="end-title" class="result-title clear"></div>
+            <div id="end-medal" style="font-size:3.6rem; line-height:1.2;"></div>
+            <div id="end-unlock" style="font-size:1.3rem; font-weight:800; color:var(--teal-dk); margin:4px 0 6px;"></div>
+            <div class="score-submit-box">
+                <div class="score-submit-label" data-i18n="end_score_label">ごうけいスコア</div>
+                <div class="score-submit-value" id="end-score-val">0</div>
+                <div class="score-submit-label" id="end-stage-val"></div>
+            </div>
+            <div class="score-submit-msg" id="end-world-submit-msg"></div>
+            <div style="margin-top:12px; display:flex; flex-wrap:wrap; gap:10px; justify-content:center;">
+                <button class="btn btn-sm" data-i18n="btn_back_runselect" onclick="closeEndToSelect()">RUNをえらびなおす</button>
+                <button class="btn btn-primary btn-sm" data-i18n="btn_retry" onclick="closeEndAndRetry()">もう一度</button>
+            </div>
+        </div>
+    </div>
+
+</div><!-- #container -->
+
+<!-- Supabase (direct REST fetch)。他ゲームと同じプロジェクト・同じrankingsテーブルをgame列で書き分けて共有する -->
+<script>
+(function(){
+    const _base = 'https://rpxassndgiunoqkxqcco.supabase.co/rest/v1';
+    const _key  = 'sb_publishable_Wnge6OPvSf5l2YEgaPg4rw_nj4CyYAH';
+    const _hdr  = { 'apikey': _key, 'Authorization': 'Bearer ' + _key,
+                    'Content-Type': 'application/json', 'Prefer': 'return=minimal' };
+    const GAME_ID = 'watte_poker';
+
+    window.saveOnlineScore = async (name, score, stage, difficulty, statusTag) => {
+        if ((score || 0) <= 0) return;
+        const res = await fetch(`${_base}/rankings`, {
+            method: 'POST', headers: _hdr, keepalive: true,
+            body: JSON.stringify({
+                game: GAME_ID, difficulty: difficulty || 'normal_1', player_name: name || 'ななしさん',
+                point_score: score || 0, stage_score: stage || 0, turns: stage || 0, class_name: statusTag || ''
+            })
+        });
+        if (!res.ok) { const t = await res.text(); throw new Error(`HTTP ${res.status}: ${t}`); }
+    };
+
+    // クリアした人を上位にする(次にスコア)。クリアかどうかは結果タグ(class_name)で判別する
+    const CLEAR_TAGS = ['クリア', 'Clear'];
+    window.loadWorldRanking = async (difficulty) => {
+        try {
+            const LIMIT = 30;
+            const fetchRows = async (extra, limit) => {
+                const q = new URLSearchParams({
+                    select: 'player_name,class_name,point_score,turns,created_at',
+                    game: `eq.${GAME_ID}`, difficulty: `eq.${difficulty || 'normal_1'}`, point_score: 'gt.0',
+                    order: 'point_score.desc,turns.asc,created_at.desc', limit: String(limit), ...extra
+                });
+                const res = await fetch(`${_base}/rankings?${q}`, { headers: { 'apikey': _key, 'Authorization': 'Bearer ' + _key } });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return res.json();
+            };
+            const tagList = CLEAR_TAGS.map(t => `"${t}"`).join(',');
+            const cleared = await fetchRows({ class_name: `in.(${tagList})` }, LIMIT);
+            let data = cleared;
+            if (cleared.length < LIMIT){
+                const others = await fetchRows({ or: `(class_name.is.null,class_name.not.in.(${tagList}))` }, LIMIT - cleared.length);
+                data = cleared.concat(others);
+            }
+            return data.map(r => ({
+                name: r.player_name, tag: r.class_name, score: r.point_score, turns: r.turns,
+                date: r.created_at ? new Date(r.created_at).toLocaleDateString('ja-JP') : ''
+            }));
+        } catch (e) {
+            console.error('Ranking: 読み込みエラー', e);
+            return null;
+        }
+    };
+})();
+</script>
+
+<script>
+'use strict';
+
+// ============================================================
+// CORE（ルール本体。画面に依存しない。バランス調整用シミュレーションからもここだけ取り出して使う）
+// ============================================================
+// <<CORE
+// 役。ids は表示順（弱い順）。baseは役Lv.1の基本点
+const ROLES = [
+    { id: 'high',     base: 0   },   // ノーペア（役なし）は0点
+    { id: 'pair',     base: 10  },
+    { id: 'two',      base: 20  },
+    { id: 'three',    base: 30  },
+    { id: 'full',     base: 80  },
+    { id: 'four',     base: 120 },
+    { id: 'straight', base: 150 },
+    { id: 'five',     base: 300 },
+];
+const ROLE_BASE = {}; ROLES.forEach(r => { ROLE_BASE[r.id] = r.base; });
+const LEVELABLE = ROLES.filter(r => r.base > 0);   // Lvアップ・弱体化の対象（0点のやくなしは除く）
+// 数字ボーナス。各数字(1〜9)にLvがあり、最初は0。Lvが1上がるごとに、その数字が手札にある1枚につき基本点が+2される
+// （やくなしでも点が入る）。ステージクリアでランダムに2回選ばれてLvアップ（同じ数字が重なることもある）、ショップでは3コイン
+const NUM_LV_POINTS = 2;
+const NUM_LV_COST = 3;
+const NUM_CLEAR_PICKS = 2;
+function numBonus(cards, numLv){
+    let b = 0;
+    cards.forEach(c => { b += NUM_LV_POINTS * ((numLv && numLv[c]) || 0); });
+    return b;
+}
+const LV_UP_RATE = 0.2;      // 役Lvが1上がるごとに基本点が+20%
+const WEAK_RATE = 0.5;       // 弱体化：基本点が半分
+const STAGES = 7;
+const STARS = 5;            // 難易度 ★1〜★5（やさしい／ふつう／むずかしい／ちょうむず／さいきょう）
+const PLAYS_PER_STAGE = 3;
+const HAND_SIZE = 5;
+// 特別な九九カード。出現率は ドラ札4% / ドラドラ札1% / コイン札5%（残りは普通のカード）。
+// 「ドラ札アップ」を1回買うごとに、ドラ札・ドラドラ札の出現率が (1+回数) 倍（=合計で+5%ずつ）になる
+const CARD_RATE = { dora: 0.04, dora2: 0.01, coin: 0.05 };
+const URA_OF = { dora: 1, dora2: 2 };      // 割ったときに増えるうらドラの枚数（ドラ札=1枚、ドラドラ札=2枚）
+const COIN_CARD_BONUS = 2;                 // コイン札を割ると、そのステージのクリア報酬が+2コイン
+function isUraCard(kind){ return kind === 'dora' || kind === 'dora2'; }
+const DORA_RATE = 0.5;       // ドラ1枚（うらドラも同じ）ごとに得点が+50%（加算）
+// ステージクリアのコイン。点数はドラでインフレするので、ボーダーに対する倍率rの「2倍ごとに+COIN_PER_DOUBLE」の対数で決める
+const COIN_BASE = 4, COIN_PER_DOUBLE = 4, COIN_MAX = 14;
+function coinsFor(stageScore, border){
+    const r = Math.max(1, stageScore / border);
+    return Math.min(COIN_MAX, Math.floor(COIN_BASE + COIN_PER_DOUBLE * Math.log2(r)));
+}
+
+// 5枚の数字から役を判定
+function evalHand(cards){
+    const cnt = {};
+    cards.forEach(c => { cnt[c] = (cnt[c] || 0) + 1; });
+    const g = Object.values(cnt).sort((a, b) => b - a);
+    if (g[0] === 5) return 'five';
+    if (g[0] === 4) return 'four';
+    if (g[0] === 3 && g[1] === 2) return 'full';
+    if (g[0] === 3) return 'three';
+    if (g[0] === 2 && g[1] === 2) return 'two';
+    if (g[0] === 2) return 'pair';
+    const mn = Math.min(...cards), mx = Math.max(...cards);
+    return (mx - mn === 4) ? 'straight' : 'high';
+}
+function roleScore(id, lv, weak){
+    return Math.round(ROLE_BASE[id] * (1 + LV_UP_RATE * (lv - 1)) * (weak ? WEAK_RATE : 1));
+}
+// ドラ数 = 手札のうちドラと同じ数字の枚数 + うらドラごとの同じ数字の枚数
+function countDora(cards, dora, uras){
+    let n = cards.filter(c => c === dora).length;
+    uras.forEach(u => { n += cards.filter(c => c === u).length; });
+    return n;
+}
+function calcScore(cards, dora, uras, lvMap, weakSet, numLv){
+    const role = evalHand(cards);
+    const roleBase = roleScore(role, lvMap[role] || 1, weakSet && weakSet.has(role));
+    const numB = numBonus(cards, numLv);
+    const base = roleBase + numB;
+    const doraN = cards.filter(c => c === dora).length;
+    const uraN = countDora(cards, dora, uras) - doraN;
+    const mult = 1 + DORA_RATE * (doraN + uraN);
+    return { role, roleBase, numB, base, doraN, uraN, mult, total: Math.round(base * mult) };
+}
+
+// 九九81マスの答え（重複なし）。1〜9の段の答えにならない数（11など）は出ない
+const PRODUCTS = (function(){
+    const s = new Set();
+    for (let a = 1; a <= 9; a++) for (let b = 1; b <= 9; b++) s.add(a * b);
+    return Array.from(s).sort((x, y) => x - y);
+})();
+// 答えpになる九九の組（a<=b）。例: 12 → [2,6],[3,4] / 20 → [4,5]
+function pairsOf(p){
+    const out = [];
+    for (let a = 1; a <= 9; a++) { if (p % a === 0 && p / a >= a && p / a <= 9) out.push([a, p / a]); }
+    return out;
+}
+
+// 縛り。filter: 出現してよい九九カード。allRare: 九九カードが必ずドラ札（うらドラが乗る）。weak: ステージごとに役が3つ弱体化
+const SHACKLES = [
+    { id: 'normal',   icon: '🃏', filter: p => true },
+    { id: 'odd',      icon: '🔹', filter: p => p % 2 === 1 },
+    { id: 'even',     icon: '🔸', filter: p => p % 2 === 0 },
+    { id: 'big20',    icon: '🐘', filter: p => p >= 20 },
+    { id: 'big30',    icon: '🦖', filter: p => p >= 30 },
+    { id: 'small60',  icon: '🐭', filter: p => p <= 60 },
+    { id: 'small50',  icon: '🐜', filter: p => p <= 50 },
+    { id: 'dora3',    icon: '🀄', filter: p => true, allRare: true },
+    { id: 'weak',     icon: '🥀', filter: p => true, weak: true },
+];
+const SHACKLE_BY_ID = {}; SHACKLES.forEach(s => { SHACKLE_BY_ID[s.id] = s; });
+// ボーダー表 BORDERS[縛り][★-1][ステージ-1]（★1やさしい〜★5さいきょう）。
+// 「各プレーで最善手を探す」ボットを縛りごとに400周させ、ステージ得点の下位8/16/26/37/48%点
+// （＝RUN全体のクリア率の目安が約55/30/12/4/1%）を直線でなめらかにし、ステージごとに+3%上げた値。
+// ドラ+50%・コインの得点連動式(coinsFor)・役Lv購入・数字ボーナス(クリアで2つ上昇/ショップ3コイン)を含めて測っている。ルールを変えたら測り直す
+const BORDERS = {
+    normal  : [[70, 90, 115, 135, 160, 190, 215], [90, 110, 135, 160, 190, 220, 250], [105, 135, 165, 195, 230, 260, 300], [130, 165, 200, 235, 275, 315, 355], [160, 200, 235, 275, 320, 360, 405]],
+    odd     : [[90, 120, 150, 180, 210, 245, 280], [115, 145, 180, 210, 245, 285, 325], [140, 175, 210, 250, 290, 330, 375], [165, 205, 245, 290, 335, 380, 430], [195, 240, 285, 330, 380, 435, 490]],
+    even    : [[70, 95, 120, 145, 175, 205, 235], [95, 125, 150, 180, 210, 245, 275], [120, 150, 180, 215, 250, 285, 320], [155, 185, 220, 260, 295, 335, 375], [200, 235, 270, 310, 350, 390, 435]],
+    big20   : [[70, 95, 120, 150, 180, 210, 240], [95, 120, 150, 180, 210, 245, 280], [115, 145, 180, 215, 250, 290, 325], [155, 190, 225, 260, 300, 340, 385], [190, 225, 270, 310, 355, 405, 450]],
+    big30   : [[80, 105, 130, 160, 190, 220, 250], [100, 135, 165, 200, 235, 275, 310], [140, 175, 210, 245, 285, 330, 370], [175, 215, 255, 295, 335, 380, 430], [220, 265, 305, 355, 400, 450, 505]],
+    small60 : [[70, 90, 115, 140, 165, 190, 220], [90, 115, 140, 165, 195, 220, 250], [110, 140, 165, 195, 230, 260, 295], [135, 170, 205, 240, 275, 315, 355], [175, 210, 250, 290, 330, 370, 415]],
+    small50 : [[70, 90, 115, 140, 165, 195, 220], [90, 115, 140, 170, 195, 225, 255], [115, 145, 170, 200, 230, 265, 295], [140, 175, 205, 240, 275, 315, 355], [175, 210, 245, 285, 325, 365, 410]],
+    dora3   : [[95, 120, 145, 175, 205, 235, 270], [120, 150, 180, 210, 245, 280, 315], [145, 180, 215, 250, 285, 325, 365], [185, 220, 255, 295, 335, 375, 420], [245, 285, 320, 360, 400, 445, 490]],
+    weak    : [[50, 70, 90, 115, 140, 165, 190], [65, 85, 110, 140, 165, 195, 225], [85, 110, 135, 165, 195, 225, 260], [105, 135, 165, 195, 225, 260, 295], [140, 165, 195, 230, 260, 295, 330]],
+};
+function borderFor(sid, star, stage){
+    return BORDERS[sid][star - 1][stage - 1];
+}
+// 九九カードを1枚引く。excludeValues: いま場に出ている数(重複させない)
+function drawAnswer(shackle, excludeValues, up, rnd){
+    rnd = rnd || Math.random;
+    let pool = PRODUCTS.filter(p => shackle.filter(p) && excludeValues.indexOf(p) < 0);
+    if (pool.length === 0) pool = PRODUCTS.filter(p => shackle.filter(p));
+    const v = pool[Math.floor(rnd() * pool.length)];
+    let kind = 'normal';
+    if (shackle.allRare) kind = 'dora';
+    else {
+        const r = rnd(), k = 1 + (up || 0), d = CARD_RATE.dora * k, d2 = CARD_RATE.dora2 * k;
+        if (r < d) kind = 'dora';
+        else if (r < d + d2) kind = 'dora2';
+        else if (r < d + d2 + CARD_RATE.coin) kind = 'coin';
+    }
+    return { v, kind };
+}
+function drawAnswerSet(shackle, up, rnd){
+    const out = [];
+    for (let i = 0; i < 3; i++) out.push(drawAnswer(shackle, out.map(a => a.v), up, rnd));
+    return out;
+}
+// CORE>>
+
+// ============================================================
+// I18N
+// ============================================================
+const LANG_STORAGE_KEY = 'watteePokerLang';
+const LANGS = ['ja', 'ja_easy', 'en'];
+let currentLang = (function(){
+    try { const v = localStorage.getItem(LANG_STORAGE_KEY); return LANGS.includes(v) ? v : 'ja'; }
+    catch (e){ return 'ja'; }
+})();
+function L(dict){ if (!dict) return ''; return dict[currentLang] || dict.ja || ''; }
+function TF(dict, ...args){ if (!dict) return ''; const fn = dict[currentLang] || dict.ja; return fn ? fn(...args) : ''; }
+function ui(key){ return L(UI_TEXT[key]); }
+function uif(key, ...args){ return TF(UI_TEXT[key], ...args); }
+
+const ROLE_NAMES = {
+    high:     { ja: 'やくなし', ja_easy: 'やくなし', en: 'No Hand' },
+    pair:     { ja: 'ワンペア', en: 'One Pair' },
+    two:      { ja: 'ツーペア', en: 'Two Pair' },
+    three:    { ja: 'スリーカード', en: 'Three of a Kind' },
+    full:     { ja: 'フルハウス', en: 'Full House' },
+    four:     { ja: 'フォーカード', en: 'Four of a Kind' },
+    straight: { ja: 'ストレート', en: 'Straight' },
+    five:     { ja: 'ファイブカード', en: 'Five of a Kind' },
+};
+const ROLE_EX = {
+    pair:     { ja: '同じ数字が2枚', ja_easy: 'おなじ すうじが 2まい', en: '2 of the same' },
+    two:      { ja: 'ペアが2組', ja_easy: 'ペアが 2くみ', en: 'Two pairs' },
+    three:    { ja: '同じ数字が3枚', ja_easy: 'おなじ すうじが 3まい', en: '3 of the same' },
+    full:     { ja: '3枚＋2枚', ja_easy: '3まい ＋ 2まい', en: '3 + 2' },
+    four:     { ja: '同じ数字が4枚', ja_easy: 'おなじ すうじが 4まい', en: '4 of the same' },
+    straight: { ja: '5枚連続（例: 3-4-5-6-7）', ja_easy: '5まい つづき（れい: 3-4-5-6-7）', en: '5 in a row (e.g. 3-4-5-6-7)' },
+    five:     { ja: '同じ数字が5枚', ja_easy: 'おなじ すうじが 5まい', en: '5 of the same' },
+};
+const ROLE_COLOR = { pair: '#3fa9e0', two: '#1fb69a', three: '#7cb82f', full: '#e8a317', four: '#f07a2a', straight: '#e0559f', five: '#7e4fe0' };
+
+const SHACKLE_TEXT = {
+    normal:  { name: { ja: 'ふつう', en: 'Classic' },
+               desc: { ja: 'しばりなし。基本のルールであそぼう。', ja_easy: 'しばりなし。きほんの ルールで あそぼう。', en: 'No restrictions. Play with the basic rules.' } },
+    odd:     { name: { ja: '奇数の世界', ja_easy: 'きすうの せかい', en: 'Odd World' },
+               desc: { ja: '九九カードは奇数だけ（1・3・5・7・9・15…）。出てくる数字も奇数ばかり！', ja_easy: 'くくカードは きすう（1・3・5・7・9・15…）だけ。でてくる すうじも きすうばかり！', en: 'Times cards are odd numbers only (1, 3, 5, 7, 9, 15…). Your hand fills up with odd numbers!' } },
+    even:    { name: { ja: '偶数の世界', ja_easy: 'ぐうすうの せかい', en: 'Even World' },
+               desc: { ja: '九九カードは偶数だけ（2・4・6・8・10・12…）。', ja_easy: 'くくカードは ぐうすう（2・4・6・8・10・12…）だけ。', en: 'Times cards are even numbers only (2, 4, 6, 8, 10, 12…).' } },
+    big20:   { name: { ja: '大きな世界（20以上）', ja_easy: 'おおきな せかい（20いじょう）', en: 'Big World (20+)' },
+               desc: { ja: '九九カードは20以上だけ。大きな数字の九九が中心になるよ。', ja_easy: 'くくカードは 20いじょうだけ。おおきな かずの くくが ちゅうしんだよ。', en: 'Times cards are 20 or more. Big times-table facts take center stage.' } },
+    big30:   { name: { ja: 'もっと大きな世界（30以上）', ja_easy: 'もっと おおきな せかい（30いじょう）', en: 'Bigger World (30+)' },
+               desc: { ja: '九九カードは30以上だけ。九九の高いところに強くなろう！', ja_easy: 'くくカードは 30いじょうだけ。くくの たかいところに つよくなろう！', en: 'Times cards are 30 or more. Master the high end of the table!' } },
+    small60: { name: { ja: '小さな世界（60以下）', ja_easy: 'ちいさな せかい（60いか）', en: 'Small World (60 or less)' },
+               desc: { ja: '九九カードは60以下だけ。63・64・72・81が出ないよ。', ja_easy: 'くくカードは 60いかだけ。63・64・72・81は でないよ。', en: 'Times cards are 60 or less. No 63, 64, 72 or 81.' } },
+    small50: { name: { ja: 'もっと小さな世界（50以下）', ja_easy: 'もっと ちいさな せかい（50いか）', en: 'Smaller World (50 or less)' },
+               desc: { ja: '九九カードは50以下だけ。54より上は出ないよ。', ja_easy: 'くくカードは 50いかだけ。54より うえは でないよ。', en: 'Times cards are 50 or less. Nothing above 49 shows up.' } },
+    dora3:   { name: { ja: 'ドラドラドラ', en: 'Dora Dora Dora' },
+               desc: { ja: '九九カードが必ずドラ札！ 割るたびにうらドラが増える。ドラの倍率を一気にねらえ！', ja_easy: 'くくカードが ぜんぶ ドラふだ！ わるたびに うらドラが ふえるよ。ドラのばいりつを ねらえ！', en: 'Every times card is a Dora Card! Each split adds an ura dora. Go for a huge dora multiplier!' } },
+    weak:    { name: { ja: '弱体化', ja_easy: 'じゃくたいか', en: 'Weakened' },
+               desc: { ja: 'ステージごとに、3つの役のスコアが半分に。どの役を狙うか考えよう！', ja_easy: 'ステージごとに、3つの やくの スコアが はんぶんに。どの やくを ねらうか かんがえよう！', en: 'Each stage, the score of 3 roles is halved. Pick your target hand wisely!' } },
+};
+
+const UI_TEXT = {
+    title_l1: { ja: '割って！', ja_easy: 'わって！', en: 'Split!' },
+    title_l2: { ja: '九九ポーカー', ja_easy: 'くくポーカー', en: 'Kuku Poker' },
+    game_title: { ja: '割って！九九ポーカー', ja_easy: 'わって！くくポーカー', en: 'Split! Kuku Poker' },
+    btn_game_start: { ja: 'ゲームスタート', en: 'Start Game' },
+    btn_tutorial: { ja: '🔰 チュートリアル', ja_easy: '🔰 チュートリアル', en: '🔰 Tutorial' },
+    player_name_btn: { ja: n => `👤 プレイヤー名：${n}`, ja_easy: n => `👤 プレイヤーめい：${n}`, en: n => `👤 Player: ${n}` },
+    btn_ranking: { ja: '🏆 ランキング', en: '🏆 Ranking' },
+    btn_settings: { ja: '⚙️ 設定', ja_easy: '⚙️ せってい', en: '⚙️ Settings' },
+    btn_index: { ja: '🏠 INDEXへ', en: '🏠 Back to INDEX' },
+    btn_back_title: { ja: '◀ タイトルへ戻る', ja_easy: '◀ タイトルへ もどる', en: '◀ Back to Title' },
+
+    name_register_title: { ja: '👤 名前の登録', ja_easy: '👤 なまえの とうろく', en: '👤 Register Name' },
+    name_register_desc: { ja: 'お名前を登録してください（最大12文字）', ja_easy: 'おなまえを とうろくしてね（さいだい12もじ）', en: 'Register your name (max 12 characters)' },
+    name_current_label: { ja: '現在の名前：', ja_easy: 'いまの なまえ：', en: 'Current name: ' },
+    name_input_placeholder: { ja: 'なまえをにゅうりょく', en: 'Enter your name' },
+    btn_add: { ja: '追加', ja_easy: 'ついか', en: 'Add' },
+    name_too_long: { ja: '名前は12文字までです', ja_easy: 'なまえは 12もじまでだよ', en: 'Name must be 12 characters or fewer' },
+    name_duplicate: { ja: 'その名前はすでに登録されています', ja_easy: 'そのなまえは もう とうろくされているよ', en: 'That name is already registered' },
+    btn_ok: { ja: 'OK', ja_easy: 'OK', en: 'OK' },
+    label_name_selected: { ja: '✓ 選択中', ja_easy: '✓ えらんでいる', en: '✓ Selected' },
+    btn_select_name: { ja: '選択する', ja_easy: 'えらぶ', en: 'Select' },
+    default_player_name: { ja: 'ななしさん', en: 'Guest' },
+
+    settings_title: { ja: '⚙️ 設定', ja_easy: '⚙️ せってい', en: '⚙️ Settings' },
+    settings_lang_label: { ja: '言語', ja_easy: 'ことば', en: 'Language' },
+
+    ranking_title: { ja: '🏆 ランキング', en: '🏆 Ranking' },
+    rank_tab_local: { ja: 'ローカル', en: 'Local' },
+    rank_tab_world: { ja: 'ワールド', en: 'World' },
+    rank_loading: { ja: '読み込み中…', ja_easy: 'よみこみちゅう…', en: 'Loading…' },
+    rank_empty: { ja: 'まだ記録がありません', ja_easy: 'まだ きろくが ないよ', en: 'No records yet' },
+    rank_stage_label: { ja: s => `ステージ${s}`, ja_easy: s => `ステージ${s}`, en: s => `Stage ${s}` },
+    world_submit_sending: { ja: '送信中…', ja_easy: 'そうしんちゅう…', en: 'Sending…' },
+    world_submit_done: { ja: '送信しました！', ja_easy: 'そうしんしたよ！', en: 'Submitted!' },
+    world_submit_fail: { ja: '送信に失敗しました', ja_easy: 'そうしんに しっぱいしたよ', en: 'Submission failed' },
+    world_submit_skip: { ja: '（テスト環境のため送信しません）', en: '(Not sent: test environment)' },
+    tag_clear: { ja: 'クリア', en: 'Clear' },
+    tag_gameover: { ja: '道半ば', ja_easy: 'とちゅう', en: 'Retired' },
+
+    runselect_title: { ja: 'RUNをえらぼう', ja_easy: 'RUNを えらぼう', en: 'Choose a RUN' },
+    runselect_desc: { ja: 'しばりをえらんで、★1（やさしい）からクリアしていこう', ja_easy: 'しばりを えらんで、★1（やさしい）から クリアしよう', en: 'Pick a restriction and start from ★1 (Easy)' },
+    runselect_star_label: { ja: 'なんいど（クリアすると次の★があそべる）', ja_easy: 'なんいど（クリアすると つぎの ★が あそべる）', en: 'DIFFICULTY (clear one to unlock the next)' },
+    runselect_border_label: { ja: 'ステージごとのボーダー', ja_easy: 'ステージごとの ボーダー', en: 'BORDER PER STAGE' },
+    master_badge: { ja: '👑 すべてのしばりで ★5 クリア！', ja_easy: '👑 ぜんぶの しばりで ★5 クリア！', en: '👑 ★5 cleared in every RUN!' },
+    btn_run_go: { ja: 'はじめる ▶', ja_easy: 'はじめる ▶', en: 'Play ▶' },
+    btn_run_start: { ja: 'このRUNではじめる', ja_easy: 'この RUNで はじめる', en: 'Start This RUN' },
+    star_locked: { ja: '🔒 まえの★をクリア', ja_easy: '🔒 まえの ★を クリア', en: '🔒 Clear previous ★' },
+    star_names: { ja: ['やさしい', 'ふつう', 'むずかしい', 'ちょうむず', 'さいきょう'], en: ['Easy', 'Normal', 'Hard', 'Very Hard', 'Ultimate'] },
+    star_cleared: { ja: 'クリア済み', ja_easy: 'クリアずみ', en: 'Cleared' },
+    btn_back: { ja: 'もどる', en: 'Back' },
+    best_label: { ja: v => `ベスト：${v}`, ja_easy: v => `ベスト：${v}`, en: v => `Best: ${v}` },
+    stage_chip: { ja: n => `ステージ${n}`, ja_easy: n => `ステージ${n}`, en: n => `Stage ${n}` },
+
+
+    hud_stage: { ja: 'ステージ', en: 'Stage' },
+    hud_play: { ja: 'プレー', en: 'Play' },
+    hud_score: { ja: 'スコア / ボーダー', ja_easy: 'スコア / ボーダー', en: 'Score / Border' },
+    hud_coin: { ja: 'コイン', en: 'Coins' },
+    hud_total: { ja: v => `ごうけい ${v}`, ja_easy: v => `ごうけい ${v}`, en: v => `Total ${v}` },
+    dora_label: { ja: 'ドラ', en: 'Dora' },
+    ura_label: { ja: 'うらドラ', en: 'Ura Dora' },
+    lbl_answers: { ja: '九九カード', ja_easy: 'くくカード', en: 'TIMES CARDS' },
+    lbl_hand: { ja: 'てふだ', en: 'YOUR HAND' },
+    badge_dora: { ja: '✨ ドラ札', ja_easy: '✨ ドラふだ', en: '✨ DORA' },
+    badge_dora2: { ja: '✨✨ ドラドラ札', ja_easy: '✨✨ ドラドラふだ', en: '✨✨ DORA×2' },
+    badge_coin: { ja: '🪙 コイン札', ja_easy: '🪙 コインふだ', en: '🪙 COIN' },
+    cp_coin_card: { ja: n => 'コイン札 +' + n, ja_easy: n => 'コインふだ +' + n, en: n => 'Coin card +' + n },
+    res_coin_card: { ja: n => '🪙 コイン札 ＋' + n + '（クリア報酬に加算）', ja_easy: n => '🪙 コインふだ ＋' + n + '（クリアほうしゅうに たす）', en: n => '🪙 Coin card +' + n + ' (added to the clear reward)' },
+    coin_note: { ja: n => 'コイン札 +' + n, ja_easy: n => 'コインふだ +' + n, en: n => 'Coin card +' + n },
+    coin_card_toast: { ja: '🪙 コイン札！ クリア報酬 +2', ja_easy: '🪙 コインふだ！ ほうしゅう +2', en: '🪙 Coin card! Clear reward +2' },
+    btn_change: { ja: '🔄 九九カードをチェンジ', ja_easy: '🔄 くくカードを チェンジ', en: '🔄 Change times cards' },
+    changed_toast: { ja: '九九カードを入れかえた！', ja_easy: 'くくカードを いれかえた！', en: 'Times cards swapped!' },
+    btn_howto: { ja: '📖 あそびかた', en: '📖 How to Play' },
+    btn_retire: { ja: 'やめる', en: 'Quit' },
+    howto_title: { ja: 'あそびかた', en: 'How to Play' },
+    btn_close: { ja: 'とじる', en: 'Close' },
+    howto_body: {
+        ja: '① 上の「九九カード」を1枚えらびます。\n② その答えになる九九（例：20 → 4×5、12 → 2×6 か 3×4）をえらぶと、その2つの数字が手札に入ります。\n③ もう一度くり返して、手札が5枚になったら役が決まり、点数が入ります。\n・ドラと同じ数字が手札にあると、1枚につき得点が+50%！ 金色の「ドラ札」を割ると「うらドラ」が1枚、紫の「ドラドラ札」は2枚ふえ、結果発表で明かされます。緑の「コイン札」を割ると、ステージクリアのコインが+2！\n・1プレーに1回、九九カードを全部入れかえる「チェンジ」ができます。\n・3プレーで1ステージ。合計スコアがボーダーに届かないとゲームオーバー。7ステージをクリアしよう！',
+        ja_easy: '① うえの「くくカード」を 1まい えらびます。\n② その こたえに なる くく（れい：20 → 4×5、12 → 2×6 か 3×4）を えらぶと、その 2つの すうじが てふだに はいります。\n③ もういちど くりかえして、てふだが 5まいに なったら やくが きまり、てんすうが はいります。\n・ドラと おなじ すうじが てふだに あると、1まいにつき てんすうが +50%！ 金色の「ドラふだ」は うらドラが 1まい、むらさきの「ドラドラふだ」は 2まい ふえて、けっかはっぴょうで あかされます。みどりの「コインふだ」を わると、クリアのコインが +2！\n・1プレーに 1かい、くくカードを ぜんぶ いれかえる「チェンジ」が できます。\n・3プレーで 1ステージ。ごうけいスコアが ボーダーに とどかないと ゲームオーバー。7ステージを クリアしよう！',
+        en: '1) Pick one of the "times cards" at the top.\n2) Choose a multiplication that gives it (20 → 4×5; 12 → 2×6 or 3×4). Both numbers join your hand.\n3) Repeat once more. With 5 cards, your hand is scored.\n- Each card in your hand matching the Dora adds +50% to the score! A golden "Dora Card" adds 1 hidden Ura Dora, a purple "Dora×2 Card" adds 2 (revealed at scoring). A green "Coin Card" gives +2 coins on stage clear.\n- Once per play you can use "Change" to swap all times cards.\n- 3 plays make a stage. Fall short of the border and it is game over. Clear all 7 stages!' },
+    roles_title: { ja: '役', ja_easy: 'やく', en: 'Role' },
+    roles_note: { ja: 'てんすう ＝ 役の点 × ドラばいりつ（ドラ1枚ごとに+50%）', ja_easy: 'てんすう ＝ やくの てん × ドラばいりつ（ドラ1まいごとに+50%）', en: 'Score = role points × dora bonus (+50% per dora card). No hand scores 0.' },
+    th_role: { ja: '役', ja_easy: 'やく', en: 'Role' },
+    th_lv: { ja: 'Lv', en: 'Lv' },
+    th_pts: { ja: '点', ja_easy: 'てん', en: 'Pts' },
+    weak_tag: { ja: '弱体化', ja_easy: 'よわい', en: 'Weak' },
+    confirm_retire_msg: { ja: '今のRUNをやめて、RUN選択にもどりますか？', ja_easy: 'いまの RUNを やめて、RUNを えらぶ がめんに もどる？', en: 'Quit this RUN and return to RUN selection?' },
+    btn_yes: { ja: 'やめる', en: 'Quit' },
+    btn_no: { ja: 'いいえ', en: 'No' },
+
+    res_title: { ja: (name) => `${name}！`, en: (name) => `${name}!` },
+    res_base: { ja: '基本点', ja_easy: 'きほんてん', en: 'Base' },
+    res_mult: { ja: 'ドラ倍率', ja_easy: 'ドラばいりつ', en: 'Dora bonus' },
+    res_total: { ja: '得点', ja_easy: 'てんすう', en: 'Score' },
+    res_pts_unit: { ja: '点', ja_easy: 'てん', en: 'pts' },
+    res_no_dora: { ja: 'ドラなし', ja_easy: 'ドラなし', en: 'No dora' },
+    res_dora_sub: { ja: (d, u) => 'ドラ' + d + '枚 ＋ うらドラ' + u + '枚', ja_easy: (d, u) => 'ドラ' + d + 'まい ＋ うらドラ' + u + 'まい', en: (d, u) => 'Dora ' + d + ' + Ura ' + u },
+    res_base_sub: { ja: (r, lv) => r + ' Lv.' + lv, en: (r, lv) => r + ' Lv.' + lv },
+    res_weak: { ja: '弱体化 ½', ja_easy: 'よわい ½', en: 'Weak ½' },
+    cp_title: { ja: n => 'ステージ' + n + ' クリア！', ja_easy: n => 'ステージ' + n + ' クリア！', en: n => 'Stage ' + n + ' Clear!' },
+    cp_score: { ja: (s, b) => 'スコア ' + s + ' / ボーダー ' + b, ja_easy: (s, b) => 'スコア ' + s + ' / ボーダー ' + b, en: (s, b) => 'Score ' + s + ' / Border ' + b },
+    cp_coin_base: { ja: n => 'きほん ' + n, ja_easy: n => 'きほん ' + n, en: n => 'Base ' + n },
+    cp_coin_bonus: { ja: n => '点数ボーナス +' + n, ja_easy: n => 'てんすうボーナス +' + n, en: n => 'Score bonus +' + n },
+    cp_levelup: { ja: '役レベルアップ！', ja_easy: 'やくレベルアップ！', en: 'ROLE LEVEL UP!' },
+    btn_to_shop: { ja: 'ショップへ ▶', ja_easy: 'ショップへ ▶', en: 'To the Shop ▶' },
+    num_title: { ja: '数字ボーナス', ja_easy: 'すうじボーナス', en: 'Number bonus' },
+    shop_nums_label: { ja: '数字のレベルをあげる（1枚につき+2点ずつ）', ja_easy: 'すうじの レベルを あげる（1まいにつき +2てんずつ）', en: 'LEVEL UP A NUMBER (+2 pts per card)' },
+    cp_num_levelup: { ja: '数字レベルアップ！', ja_easy: 'すうじレベルアップ！', en: 'NUMBER LEVEL UP!' },
+    res_role_part: { ja: (n, p) => n + ' ' + p, ja_easy: (n, p) => n + ' ' + p, en: (n, p) => n + ' ' + p },
+    res_num_part: { ja: n => '数字 +' + n, ja_easy: n => 'すうじ +' + n, en: n => 'Numbers +' + n },
+    res_stage: { ja: (s, b) => `このステージ：${s} / ${b}`, ja_easy: (s, b) => `このステージ：${s} / ${b}`, en: (s, b) => `This stage: ${s} / ${b}` },
+    tag_dora: { ja: 'ドラ', en: 'Dora' },
+    tag_ura: { ja: 'うら', en: 'Ura' },
+    btn_next_play: { ja: 'つぎのプレーへ ▶', ja_easy: 'つぎの プレーへ ▶', en: 'Next Play ▶' },
+    btn_stage_result: { ja: 'ステージのけっかへ ▶', ja_easy: 'ステージの けっかへ ▶', en: 'Stage Result ▶' },
+
+    shop_title: { ja: '🛒 ショップ', en: '🛒 Shop' },
+    shop_banner: { ja: (role, lv, coin) => 'ごほうび：' + role + ' が Lv.' + lv + ' に ／ コイン +' + coin, ja_easy: (role, lv, coin) => 'ごほうび：' + role + ' が Lv.' + lv + ' に ／ コイン +' + coin, en: (role, lv, coin) => 'Bonus: ' + role + ' is now Lv.' + lv + ' / +' + coin + ' coins' },
+    shop_roles_label: { ja: '役のレベルをあげる（基本点 +20%）', ja_easy: 'やくの レベルを あげる（てんすう +20%）', en: 'LEVEL UP A ROLE (+20% points)' },
+    shop_items_label: { ja: 'どうぐ', ja_easy: 'どうぐ', en: 'ITEMS' },
+    btn_levelup: { ja: c => `🪙${c}`, en: c => `🪙${c}` },
+    tk_title: { ja: 'いれかえチケット', ja_easy: 'いれかえチケット', en: 'SWAP TICKETS' },
+    tk_free: { ja: 'フリー', ja_easy: 'フリー', en: 'Free' },
+    tk_stock: { ja: 'ストック', ja_easy: 'ストック', en: 'Stock' },
+    item_special: { ja: 'ストックチケット', ja_easy: 'ストックチケット', en: 'Stock Ticket' },
+    item_special_d: { ja: 'いれかえチケットを1枚ためておける', ja_easy: 'いれかえチケットを 1まい ためておける', en: 'Keep one more swap ticket' },
+    item_special_own: { ja: n => `もっている：${n}枚`, ja_easy: n => `もっている：${n}まい`, en: n => `Owned: ${n}` },
+    item_rare: { ja: 'ドラ札アップ', ja_easy: 'ドラふだアップ', en: 'Dora Card Up' },
+    item_rare_d: { ja: n => `ドラ札・ドラドラ札が出やすくなる（+5%）`, ja_easy: n => `ドラふだ・ドラドラふだが でやすくなる（+5%）`, en: n => `Dora / Dora×2 cards appear more (+5%)` },
+    item_rare_own: { ja: n => `いまの確率：${n}%`, ja_easy: n => `いまの かくりつ：${n}%`, en: n => `Now: ${n}%` },
+    item_maxed: { ja: 'MAX', en: 'MAX' },
+    btn_buy: { ja: c => `🪙${c}`, en: c => `🪙${c}` },
+    btn_next_stage: { ja: n => `ステージ${n}へ ▶`, ja_easy: n => `ステージ${n}へ ▶`, en: n => `To Stage ${n} ▶` },
+
+    end_clear_title: { ja: 'RUNクリア！', en: 'RUN Clear!' },
+    end_over_title: { ja: 'ゲームオーバー', en: 'Game Over' },
+    end_score_label: { ja: 'ごうけいスコア', en: 'Total Score' },
+    end_stage_label: { ja: (s, b) => `とうたつ：ステージ ${s}　／　最高のプレー ${b}点`, ja_easy: (s, b) => `とうたつ：ステージ ${s}　／　いちばんの プレー ${b}てん`, en: (s, b) => `Reached Stage ${s}  /  Best play ${b} pts` },
+    end_new_medal: { ja: '🎉 はじめてのクリア！', ja_easy: '🎉 はじめての クリア！', en: '🎉 First clear!' },
+    end_unlock: { ja: (n) => `★${n}があそべるようになった！`, ja_easy: (n) => `★${n}が あそべるように なった！`, en: (n) => `★${n} unlocked!` },
+    btn_back_runselect: { ja: 'RUNをえらびなおす', ja_easy: 'RUNを えらびなおす', en: 'Choose Another RUN' },
+    btn_retry: { ja: 'もう一度', ja_easy: 'もういちど', en: 'Retry' },
+};
+
+function setLanguage(lang){
+    if (!LANGS.includes(lang)) return;
+    currentLang = lang;
+    try { localStorage.setItem(LANG_STORAGE_KEY, lang); } catch (e){}
+    applyI18n();
+    renderSettingsScreen();
+    updateNameRegisterBtn();
+    if (!document.getElementById('run-select-screen').classList.contains('hidden')) renderRunSelect();
+}
+function showCustomAlert(msg){
+    document.getElementById('custom-alert-msg').textContent = msg;
+    document.getElementById('custom-alert-modal').classList.remove('hidden');
+}
+function closeCustomAlert(){ document.getElementById('custom-alert-modal').classList.add('hidden'); }
+function applyI18n(){
+    document.querySelectorAll('[data-i18n]').forEach(el => { const v = ui(el.getAttribute('data-i18n')); if (typeof v === 'string') el.textContent = v; });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { el.setAttribute('placeholder', ui(el.getAttribute('data-i18n-placeholder'))); });
+    document.documentElement.lang = (currentLang === 'en') ? 'en' : 'ja';
+    document.title = ui('game_title') + ' - Fun & Growth Lab';
+    renderTitleText();
+}
+const LANG_OPTION_LABELS = { ja: '日本語', ja_easy: 'かんたんなにほんご', en: 'English' };
+function openSettings(){ goTo('settings-screen'); renderSettingsScreen(); }
+function closeSettings(){ goTo('title-screen'); }
+function renderSettingsScreen(){
+    const wrap = document.getElementById('settings-lang-options');
+    wrap.innerHTML = LANGS.map(l => `<button class="settings-lang-btn${l===currentLang?' active':''}" onclick="setLanguage('${l}')">${LANG_OPTION_LABELS[l]}</button>`).join('');
+}
+function roleName(id){ return L(ROLE_NAMES[id]); }
+function shackleName(id){ return L(SHACKLE_TEXT[id].name); }
+
+// ============================================================
+// 画面切り替え・共通
+// ============================================================
+function goTo(id){
+    document.querySelectorAll('.screen').forEach(el => el.classList.add('hidden'));
+    document.getElementById(id).classList.remove('hidden');
+    if (id === 'title-screen') playTitleIntro();
+}
+function goToTitle(){ goTo('title-screen'); }
+function escapeHtml(str){
+    return String(str == null ? '' : str).replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]));
+}
+function toast(msg){
+    const el = document.createElement('div');
+    el.className = 'toast'; el.textContent = msg;
+    document.getElementById('container').appendChild(el);
+    setTimeout(() => el.remove(), 1900);
+}
+const CARD_COLORS = { 1:['#ff8a8a','#f05a5a'], 2:['#ffb066','#f0852f'], 3:['#f7d247','#e0aa10'], 4:['#a5da64','#74b72c'],
+                      5:['#55d8b4','#22ae8a'], 6:['#58c4f2','#2b9bd0'], 7:['#8ba3f5','#5a78e0'], 8:['#b793f5','#8c5fe0'], 9:['#f09ad4','#d25fb0'] };
+function cardBg(n){ const c = CARD_COLORS[n]; return `linear-gradient(160deg,${c[0]},${c[1]})`; }
+
+// ============================================================
+// タイトル画面の演出（カードの扇・九九の式の背景・チップ・ロゴの文字）
+// ============================================================
+const TITLE_LETTER_COLORS = ['#ffd84d', '#ff9a6a', '#8be8b0', '#8ccfff', '#e4b0ff', '#ffffff'];
+function titleLetters(text, big){
+    return Array.from(text).map((ch, i) => `<span class="tl" style="--i:${i};--lc:${big ? TITLE_LETTER_COLORS[i % TITLE_LETTER_COLORS.length] : '#ffd84d'}">${ch === ' ' ? '&nbsp;' : escapeHtml(ch)}</span>`).join('');
+}
+function renderTitleText(){
+    document.getElementById('ts-l1').innerHTML = titleLetters(ui('title_l1'), false);
+    document.getElementById('ts-l2').innerHTML = titleLetters(ui('title_l2'), true);
+}
+function buildTitleDecor(){
+    // 数字カードの扇（3が1枚＋ドラの4が3枚＋5：スリーカードの手札）
+    const hand = [{ n: 3 }, { n: 4, hit: true }, { n: 4, hit: true }, { n: 4, hit: true }, { n: 5 }];
+    const rots = [-30, -15, 0, 15, 30];
+    document.getElementById('ts-fan').innerHTML = hand.map((c, i) =>
+        `<div class="tcard" style="--rot:${rots[i]}deg;--i:${i}"><div class="ti${c.hit ? ' hit' : ''}" style="background:${cardBg(c.n)}">${c.n}</div></div>`).join('');
+    // 九九の式がゆっくり浮かぶ背景
+    const out = [];
+    for (let i = 0; i < 16; i++){
+        const a = 1 + Math.floor(Math.random() * 9), b = 1 + Math.floor(Math.random() * 9);
+        const dur = 15 + Math.random() * 14;
+        out.push(`<span style="left:${(Math.random() * 92).toFixed(1)}%;font-size:${(1.4 + Math.random() * 1.3).toFixed(2)}rem;animation-duration:${dur.toFixed(1)}s;animation-delay:${(-Math.random() * dur).toFixed(1)}s">${a}×${b}=${a * b}</span>`);
+    }
+    document.getElementById('ts-floaters').innerHTML = out.join('');
+    // ポーカーチップとコイン（左右の下すみ）
+    const chip = (c, l, b, z) => `<div class="chipart" style="--cc:${c};left:${l}px;bottom:${b}px;z-index:${z || 0}"></div>`;
+    const coin = (l, b, d) => `<div class="ts-coin" style="left:${l}px;bottom:${b}px;animation-delay:${d}s"></div>`;
+    document.getElementById('ts-chips').innerHTML =
+        chip('#e8604b', 40, 18) + chip('#e8604b', 46, 40) + chip('#3b82d6', 112, 14) + chip('#3b82d6', 108, 36) + chip('#2fb872', 74, 8, 1) + chip('#f2b84a', 150, 40) +
+        chip('#8a4fd6', 1130, 16) + chip('#8a4fd6', 1136, 38) + chip('#e8604b', 1062, 12) + chip('#2fb872', 1198, 30) + chip('#f2b84a', 1100, 60) +
+        coin(230, 20, 0) + coin(268, 8, -1) + coin(980, 22, -0.6) + coin(1018, 6, -1.8);
+}
+// 画面に戻るたびに、カードを配るところからやり直す
+function playTitleIntro(){
+    const t = document.getElementById('title-screen');
+    t.classList.remove('intro');
+    void t.offsetWidth;
+    t.classList.add('intro');
+}
+
+// ============================================================
+// プレイヤー名登録
+// ============================================================
+const PLAYERS_KEY = 'watteePokerPlayers';
+const CUR_PLAYER_KEY = 'watteePokerCurPlayer';
+function getPlayerNames(){ try { return JSON.parse(localStorage.getItem(PLAYERS_KEY) || '[]'); } catch (e){ return []; } }
+function savePlayerNames(list){ try { localStorage.setItem(PLAYERS_KEY, JSON.stringify(list)); } catch (e){} }
+function getCurPlayerName(){ try { return localStorage.getItem(CUR_PLAYER_KEY) || ui('default_player_name'); } catch (e){ return ui('default_player_name'); } }
+function setCurPlayerName(n){ try { localStorage.setItem(CUR_PLAYER_KEY, n); } catch (e){} }
+function openNameRegister(){ goTo('name-register-screen'); renderPlayerNameList(); }
+function closeNameRegister(){ goTo('title-screen'); updateNameRegisterBtn(); }
+function updateNameRegisterBtn(){
+    const btn = document.getElementById('btn-name-register');
+    if (btn) btn.textContent = uif('player_name_btn', getCurPlayerName());
+}
+function addPlayerName(){
+    const inp = document.getElementById('name-reg-input');
+    const name = inp.value.trim();
+    if (!name) return;
+    if (name.length > 12){ showCustomAlert(ui('name_too_long')); return; }
+    const list = getPlayerNames();
+    if (list.includes(name)){ showCustomAlert(ui('name_duplicate')); return; }
+    list.push(name);
+    savePlayerNames(list);
+    setCurPlayerName(name);
+    inp.value = '';
+    renderPlayerNameList();
+}
+function selectPlayerNameByIndex(idx){
+    const list = getPlayerNames();
+    if (list[idx] === undefined) return;
+    setCurPlayerName(list[idx]);
+    renderPlayerNameList();
+}
+function deletePlayerNameByIndex(idx){
+    const list = getPlayerNames();
+    const name = list[idx];
+    if (name === undefined) return;
+    list.splice(idx, 1);
+    savePlayerNames(list);
+    if (getCurPlayerName() === name) setCurPlayerName(list[0] || ui('default_player_name'));
+    renderPlayerNameList();
+}
+function renderPlayerNameList(){
+    const cur = getCurPlayerName();
+    const list = getPlayerNames();
+    document.getElementById('name-reg-current').textContent = cur;
+    document.getElementById('name-reg-list').innerHTML = list.map((n, idx) => {
+        const isCur = n === cur;
+        const actionHtml = isCur
+            ? `<span class="pl-selected-badge">${ui('label_name_selected')}</span>`
+            : `<button class="pl-select-btn" onclick="selectPlayerNameByIndex(${idx})">${ui('btn_select_name')}</button>`;
+        return `<li class="pl-item${isCur ? ' cur' : ''}">
+            <span class="pl-item-name">${escapeHtml(n)}</span>
+            <div class="pl-item-actions">
+                ${actionHtml}
+                <button class="del-btn" onclick="deletePlayerNameByIndex(${idx})">×</button>
+            </div>
+        </li>`;
+    }).join('');
+}
+
+// ============================================================
+// 進行状況（メダル・解放）
+// ============================================================
+// テスト版ではランキングを公開しない（ボーダーや得点バランスの調整中のため）。公開するときは true にするだけ
+const RANKING_ENABLED = false;
+const PROG_KEY = 'watteePokerProgress';
+function getProgAll(){ try { return JSON.parse(localStorage.getItem(PROG_KEY) || '{}'); } catch (e){ return {}; } }
+function getProg(sid){ return Object.assign({ clear: 0, best: {} }, getProgAll()[sid] || {}); }
+function saveProg(sid, p){
+    const all = getProgAll(); all[sid] = p;
+    try { localStorage.setItem(PROG_KEY, JSON.stringify(all)); } catch (e){}
+}
+function isAllGold(){ return SHACKLES.every(s => getProg(s.id).clear >= STARS); }
+function starName(n){ return L(UI_TEXT.star_names)[n - 1]; }
+
+// ============================================================
+// RUN選択
+// ============================================================
+let selSid = 'normal', selStar = 1;
+function goToRunSelect(){
+    goTo('run-select-screen');
+    renderRunSelect();
+}
+// 縛りごとのカード色
+const SHACKLE_COLOR = { normal: '#2f9e6a', odd: '#3b82d6', even: '#ee8a3a', big20: '#c99a12', big30: '#c8452c', small60: '#2fb8a2', small50: '#4f9bd9', dora3: '#8a4fd6', weak: '#7d7f92' };
+// 縛りごとのイラスト（CSSだけで描く。数字カード・泡・山などをposition:absoluteで並べる）
+function pcard(n, left, top, rot, extra){
+    return `<div class="pc" style="left:${left}px;top:${top}px;transform:rotate(${rot || 0}deg);background:${cardBg(n)};${extra || ''}">${n}</div>`;
+}
+function bub(n, left, top, size){
+    return `<div class="bub" style="left:${left}px;top:${top}px;width:${size}px;height:${size}px;font-size:${Math.round(size * 0.5)}px">${n}</div>`;
+}
+function shackleArt(id){
+    const sp = (ch, l, t, s, d) => `<div class="spark" style="left:${l}px;top:${t}px;font-size:${s}px;animation-delay:${d || 0}s">${ch}</div>`;
+    switch (id){
+    case 'normal':
+        return `<div class="rs-art" style="background:radial-gradient(circle at 50% 120%,#47c68a,#1d7a54)">
+            ${pcard(4, 52, 44, -16)}${pcard(4, 92, 30, 0)}${pcard(7, 132, 44, 16)}
+            <div class="chipart" style="--cc:#e8604b;left:14px;top:100px"></div><div class="chipart" style="--cc:#3b82d6;left:46px;top:112px"></div><div class="chipart" style="--cc:#f2b84a;left:182px;top:104px"></div>
+            ${sp('✦', 190, 14, 22)}${sp('✦', 20, 24, 16, 0.6)}</div>`;
+    case 'odd':
+        return `<div class="rs-art" style="background:linear-gradient(#9fd8ff,#4a90e2);--bc:#2f6fb8">
+            <div class="hill" style="left:-30px;top:120px;width:200px;height:80px;background:#e9f6ff;opacity:0.7"></div><div class="hill" style="left:100px;top:132px;width:200px;height:80px;background:#d3ecff;opacity:0.8"></div>
+            ${bub(1, 14, 78, 46)}${bub(3, 62, 22, 60)}${bub(5, 126, 70, 52)}${bub(7, 176, 22, 44)}${bub(9, 158, 104, 40)}${sp('✦', 120, 14, 18)}</div>`;
+    case 'even':
+        return `<div class="rs-art" style="background:linear-gradient(#ffd89a,#ee8a3a);--bc:#c25a10">
+            <div class="hill" style="left:150px;top:-20px;width:86px;height:86px;background:radial-gradient(circle at 40% 35%,#fff7b0,#ffcf3d);box-shadow:0 0 22px #fff2a8"></div>
+            <div class="hill" style="left:-20px;top:126px;width:280px;height:90px;background:#c25a10;opacity:0.5"></div>
+            ${bub(2, 16, 70, 50)}${bub(4, 70, 30, 58)}${bub(6, 112, 86, 48)}${bub(8, 172, 78, 52)}</div>`;
+    case 'big20':
+        return `<div class="rs-art" style="background:linear-gradient(#bfe9ff,#f4ffd8)">
+            <div class="hill" style="left:-40px;top:112px;width:200px;height:120px;background:#7ccf5a"></div><div class="hill" style="left:90px;top:124px;width:220px;height:120px;background:#5fb843"></div>
+            <div class="pc" style="left:46px;top:12px;width:104px;height:140px;font-size:3.4rem;transform:rotate(-7deg);background:${cardBg(3)}">20</div>
+            ${pcard(5, 168, 84, 8, 'width:36px;height:52px;font-size:1.3rem')}
+            <div class="artbadge" style="right:12px;top:10px;background:#c99a12">20+</div></div>`;
+    case 'big30':
+        return `<div class="rs-art" style="background:linear-gradient(#4a2a86,#e0553a 75%,#ffae3d)">
+            <div style="position:absolute;left:30px;top:44px;width:176px;height:120px;background:linear-gradient(#6b3b22,#3a1d10);clip-path:polygon(50% 0,100% 100%,0 100%)"></div>
+            <div style="position:absolute;left:92px;top:40px;width:52px;height:26px;background:radial-gradient(circle at 50% 100%,#ffd84d,#ff6a2a);clip-path:polygon(0 100%,18% 20%,36% 70%,50% 0,66% 70%,82% 20%,100% 100%)"></div>
+            <div class="pc" style="left:78px;top:62px;width:80px;height:104px;font-size:2.8rem;transform:rotate(6deg);background:${cardBg(1)}">30</div>
+            <div class="artbadge" style="right:10px;top:10px;background:#c8452c">30+</div>${sp('✦', 20, 20, 18)}${sp('✦', 190, 100, 14, 0.8)}</div>`;
+    case 'small60':
+        return `<div class="rs-art" style="background:linear-gradient(#e2fff6,#8fe5cf)">
+            <div style="position:absolute;left:60px;top:26px;width:92px;height:92px;border-radius:50%;border:7px solid #1f6e5c;background:radial-gradient(circle at 35% 30%,#fff,#d6fff3);box-shadow:0 4px 0 rgba(0,0,0,0.2)"></div>
+            <div style="position:absolute;left:138px;top:104px;width:62px;height:14px;border-radius:7px;background:#1f6e5c;transform:rotate(42deg);transform-origin:left center"></div>
+            ${pcard(6, 90, 50, 0, 'width:30px;height:42px;font-size:1.2rem;border-width:2px')}
+            ${pcard(2, 20, 104, -8, 'width:20px;height:28px;font-size:0.8rem;border-width:2px')}${pcard(5, 36, 112, 6, 'width:20px;height:28px;font-size:0.8rem;border-width:2px')}${pcard(9, 190, 36, 10, 'width:20px;height:28px;font-size:0.8rem;border-width:2px')}
+            <div class="artbadge" style="right:10px;top:8px;background:#2fb8a2;font-size:1.1rem">60↓</div></div>`;
+    case 'small50':
+        return `<div class="rs-art" style="background:linear-gradient(#e8f4ff,#9ccaf0)">
+            <div style="position:absolute;left:34px;top:34px;width:168px;height:150px;border-radius:84px 84px 0 0;border:6px solid rgba(255,255,255,0.95);background:rgba(255,255,255,0.35);box-shadow:inset 0 0 20px rgba(255,255,255,0.8)"></div>
+            <div style="position:absolute;left:20px;top:120px;width:196px;height:14px;border-radius:7px;background:#3b6da0"></div>
+            ${pcard(3, 70, 94, -6, 'width:20px;height:28px;font-size:0.8rem;border-width:2px')}${pcard(8, 100, 98, 4, 'width:20px;height:28px;font-size:0.8rem;border-width:2px')}${pcard(5, 130, 94, -3, 'width:20px;height:28px;font-size:0.8rem;border-width:2px')}${pcard(1, 158, 100, 8, 'width:20px;height:28px;font-size:0.8rem;border-width:2px')}
+            <div class="artbadge" style="right:10px;top:8px;background:#4f9bd9;font-size:1.1rem">50↓</div>${sp('✦', 100, 44, 14)}</div>`;
+    case 'dora3':
+        return `<div class="rs-art" style="background:radial-gradient(circle at 50% 55%,#c06cff,#4b1d8f 70%)">
+            ${[-14, 0, 14].map((r, i) => `<div style="position:absolute;left:${48 + i * 44}px;top:${34 + (i === 1 ? -8 : 4)}px;width:58px;height:82px;border-radius:10px;border:4px solid #b57a00;background:linear-gradient(160deg,#fff4b0,#ffc93d 55%,#e8a317);transform:rotate(${r}deg);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:1.5rem;color:#7a2a00;box-shadow:0 5px 0 rgba(0,0,0,0.3),0 0 18px rgba(255,216,77,0.8)">ドラ</div>`).join('')}
+            ${sp('✦', 20, 20, 22)}${sp('✦', 196, 28, 18, 0.4)}${sp('✦', 170, 110, 14, 0.9)}${sp('✦', 28, 112, 16, 0.2)}</div>`;
+    case 'weak':
+        return `<div class="rs-art" style="background:linear-gradient(#7a7d8e,#33364a)">
+            ${Array.from({ length: 12 }, (_, i) => `<div class="drop" style="left:${10 + i * 20}px;top:${(i * 37) % 70}px"></div>`).join('')}
+            <div class="pc" style="left:76px;top:26px;width:84px;height:112px;font-size:2.8rem;transform:rotate(9deg);background:linear-gradient(160deg,#c9737a,#8a3a44);border-color:#e8d5d5">50</div>
+            <div style="position:absolute;left:100px;top:28px;width:6px;height:70px;background:#2a2230;transform:rotate(-14deg);clip-path:polygon(0 0,100% 10%,40% 40%,100% 60%,20% 100%)"></div>
+            <div class="artbadge" style="right:10px;top:8px;background:#7a4fd0">×½</div>
+            <div style="position:absolute;left:18px;top:100px;color:#ffb0a8;font-weight:900;font-size:1.6rem;letter-spacing:4px;text-shadow:0 2px 0 rgba(0,0,0,0.4)">▼▼▼</div></div>`;
+    }
+    return '<div class="rs-art"></div>';
+}
+const SHACKLE_SHORT = {
+    normal:  { ja: 'しばりなし', ja_easy: 'しばりなし', en: 'No restrictions' },
+    odd:     { ja: '九九カードは奇数だけ', ja_easy: 'くくカードは きすうだけ', en: 'Odd cards only' },
+    even:    { ja: '九九カードは偶数だけ', ja_easy: 'くくカードは ぐうすうだけ', en: 'Even cards only' },
+    big20:   { ja: '20以上の九九カードだけ', ja_easy: '20いじょうの くくカードだけ', en: 'Cards of 20 or more' },
+    big30:   { ja: '30以上の九九カードだけ', ja_easy: '30いじょうの くくカードだけ', en: 'Cards of 30 or more' },
+    small60: { ja: '60以下の九九カードだけ', ja_easy: '60いかの くくカードだけ', en: 'Cards of 60 or less' },
+    small50: { ja: '50以下の九九カードだけ', ja_easy: '50いかの くくカードだけ', en: 'Cards of 50 or less' },
+    dora3:   { ja: '九九カードが全部ドラ札！', ja_easy: 'くくカードが ぜんぶ ドラふだ！', en: 'Every card is a Dora Card!' },
+    weak:    { ja: '毎ステージ3つの役のスコアが半分に', ja_easy: 'まいステージ 3つの やくの スコアが はんぶん', en: '3 roles score half each stage' },
+};
+const RS_CARD_W = 244, RS_GAP = 20;
+function renderRunSelect(){
+    document.getElementById('ds-master-badge').classList.toggle('hidden', !isAllGold());
+    const prog = getProg(selSid);
+    if (selStar > prog.clear + 1) selStar = prog.clear + 1;
+    document.getElementById('rs-strip').innerHTML = SHACKLES.map(s => {
+        const c = getProg(s.id).clear;
+        return `<div class="rs-card${s.id === selSid ? ' sel' : ''}" style="--c:${SHACKLE_COLOR[s.id]}" data-id="${s.id}" onclick="selectShackle('${s.id}')">
+            <div class="rs-tab">${escapeHtml(shackleName(s.id))}</div>
+            ${shackleArt(s.id)}
+            <div class="rs-body"><div class="rs-short">${escapeHtml(L(SHACKLE_SHORT[s.id]))}</div>
+                <div class="rs-medals">${'★'.repeat(c)}${'☆'.repeat(STARS - c)}</div></div>
+            <button class="rs-go" onclick="event.stopPropagation(); startRunFromSelect()">${escapeHtml(ui('btn_run_go'))}</button>
+        </div>`;
+    }).join('');
+    centerShackle();
+    document.getElementById('ds-preview-sub').innerHTML = escapeHtml(L(SHACKLE_TEXT[selSid].desc)) +
+        (prog.best[selStar] ? `　<span class="ds-best">${escapeHtml(uif('best_label', prog.best[selStar]))}</span>` : '');
+    document.getElementById('star-row').innerHTML = Array.from({ length: STARS }, (_, i) => i + 1).map(n => {
+        const locked = n > prog.clear + 1;
+        return `<button class="star-btn${n === selStar ? ' active' : ''}${locked ? ' locked' : ''}" data-star="${n}" onclick="selectStar(${n})">${'★'.repeat(n)}<small>${locked ? '🔒 ' : (prog.clear >= n ? '✔ ' : '')}${escapeHtml(starName(n))}</small></button>`;
+    }).join('');
+    document.getElementById('border-row').innerHTML = Array.from({ length: STAGES }, (_, i) =>
+        `<div class="border-chip"><small>${uif('stage_chip', i + 1)}</small>${borderFor(selSid, selStar, i + 1)}</div>`).join('');
+    const idx = SHACKLES.findIndex(s => s.id === selSid);
+    document.getElementById('rs-prev').disabled = idx <= 0;
+    document.getElementById('rs-next').disabled = idx >= SHACKLES.length - 1;
+}
+// 選んだカードが中央に来るようにストリップを動かす（端では寄せる）
+function centerShackle(){
+    const vp = document.getElementById('rs-viewport');
+    const idx = SHACKLES.findIndex(s => s.id === selSid);
+    const PAD = 22;   // ストリップ左右の余白（選択中カードの光が切れないように）
+    const total = SHACKLES.length * RS_CARD_W + (SHACKLES.length - 1) * RS_GAP + PAD * 2;
+    const vw = vp.clientWidth || 1010;
+    let x = vw / 2 - (PAD + idx * (RS_CARD_W + RS_GAP) + RS_CARD_W / 2);
+    x = Math.max(Math.min(0, vw - total), Math.min(0, x)) ;
+    document.getElementById('rs-strip').style.transform = `translateX(${x}px)`;
+}
+function selectShackle(id){ selSid = id; renderRunSelect(); }
+function moveShackle(d){
+    const idx = SHACKLES.findIndex(s => s.id === selSid) + d;
+    if (idx < 0 || idx >= SHACKLES.length) return;
+    selSid = SHACKLES[idx].id; renderRunSelect();
+}
+function selectStar(n){
+    if (n > getProg(selSid).clear + 1) return;
+    selStar = n; renderRunSelect();
+}
+function startRunFromSelect(){ startRun(selSid, selStar); }
+
+// ============================================================
+// RUN 状態
+// ============================================================
+let run = null;      // RUN全体
+let playSt = null;   // 今のプレー
+let tutorialQueue = null;   // チュートリアル中、補充する九九カードを台本どおりにする
+let busy = false;
+
+function newNumLv(){ const o = {}; for (let n = 1; n <= 9; n++) o[n] = 0; return o; }
+function startRun(sid, star){
+    const lv = {}; ROLES.forEach(r => { lv[r.id] = 1; });
+    run = { sid, star, shackle: SHACKLE_BY_ID[sid], stage: 1, playNo: 1, lv, weak: new Set(), coins: 0, special: 0, rareUp: 0, stageCoinBonus: 0, numLv: newNumLv(), sale: new Set(),
+            roleBuys: 0, stageScore: 0, totalScore: 0, bestPlay: 0 };
+    beginStage();
+}
+function beginStage(){
+    run.playNo = 1; run.stageScore = 0; run.stageCoinBonus = 0;
+    run.weak = new Set();
+    if (run.shackle.weak){
+        const ids = LEVELABLE.map(r => r.id).sort(() => Math.random() - 0.5).slice(0, 3);
+        ids.forEach(i => run.weak.add(i));
+    }
+    goTo('play-screen');
+    startPlay();
+}
+function cardUp(){ return run.rareUp; }
+function familyPct(){ return Math.round((CARD_RATE.dora + CARD_RATE.dora2) * (1 + run.rareUp) * 100); }
+function nextAnswer(excl){
+    if (tutorialQueue && tutorialQueue.length) return { v: tutorialQueue.shift(), kind: 'normal' };
+    return drawAnswer(run.shackle, excl, cardUp());
+}
+function startPlay(){
+    busy = false;
+    playSt = {
+        dora: 1 + Math.floor(Math.random() * 9),
+        hand: [1 + Math.floor(Math.random() * 9)],
+        uras: [], picks: 0, selected: -1, ticket: 1, over: false,
+        answers: drawAnswerSet(run.shackle, cardUp()),
+        coinGain: 0,
+        newFlags: null, newAns: -1, allNewAns: true,
+    };
+    renderPlay();
+}
+
+// ============================================================
+// プレー画面
+// ============================================================
+function cardHtml(n, extra, tags){
+    return `<div class="card${extra ? ' ' + extra : ''}" style="background:${cardBg(n)}">${n}${tags || ''}</div>`;
+}
+function fmtMult(m){ return String(Number(m.toFixed(2))); }
+// 右上に常時表示する「役とスコア」の表（弱い順。やくなしは載せない）。弱体化中の役は赤く表示
+function renderRolesLive(){
+    document.getElementById('roles-live').innerHTML = LEVELABLE.map(r => {
+        const weak = run.weak.has(r.id), lv = run.lv[r.id];
+        return `<div class="rp-row${weak ? ' weak' : ''}" style="--rc:${ROLE_COLOR[r.id]}"><i></i><span>${escapeHtml(roleName(r.id))}</span>${weak ? '<em>½</em>' : ''}<span class="rl">Lv.${lv}</span><span class="rpts">${roleScore(r.id, lv, weak)}</span></div>`;
+    }).join('');
+    const inHand = new Set(playSt ? playSt.hand : []);
+    document.getElementById('nums-live').innerHTML = [1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => {
+        const lv = run.numLv[n];
+        return `<div class="np-chip${lv ? ' has' : ''}${inHand.has(n) ? ' on' : ''}"><b style="background:${cardBg(n)}">${n}</b><span>+${NUM_LV_POINTS * lv}</span></div>`;
+    }).join('');
+}
+// いれかえチケット（CSSで描いたチケット。毎プレー回復する「フリー」と、買ってためておく「ストック」。0枚は灰色）
+function ticketsHtml(){
+    const t = playSt.ticket, sp = run.special;
+    return `<div class="tk-title">${escapeHtml(ui('tk_title'))}</div><div class="tk-pair">
+        <div class="tk2 free${t > 0 ? '' : ' off'}"><span class="tw">${escapeHtml(ui('tk_free'))}</span><b>×${t}</b></div>
+        <div class="tk2 stock${sp > 0 ? '' : ' off'}"><span class="tw">${escapeHtml(ui('tk_stock'))}</span><b>×${sp}</b></div></div>`;
+}
+function renderPlay(){
+    const p = playSt;
+    document.getElementById('hud-run').textContent = `${run.shackle.icon} ${shackleName(run.sid)}　${'★'.repeat(run.star)}`;
+    document.getElementById('dora-num').textContent = p.dora;
+    document.getElementById('ura-row').innerHTML = p.uras.length
+        ? p.uras.map(() => `<div class="ura-chip">?</div>`).join('')
+        : `<div class="ura-none">―</div>`;
+    document.querySelector('.ura-box').classList.toggle('has', p.uras.length > 0);
+    // 九九カード
+    document.getElementById('answers').innerHTML = p.answers.map((a, i) =>
+        `<div class="ans-card${a.kind !== 'normal' ? ' k-' + a.kind : ''}${i === p.selected ? ' selected' : ''}${(i === p.newAns || p.allNewAns) ? ' pop-in' : ''}${p.over ? ' used' : ''}" data-i="${i}" onclick="pickAnswer(${i})">
+            ${a.kind !== 'normal' ? `<div class="rare-badge b-${a.kind}">${ui('badge_' + a.kind)}</div>` : ''}
+            <div class="num${String(a.v).length > 1 ? ' len2' : ''}">${a.v}</div>
+        </div>`).join('');
+    p.newAns = -1; p.allNewAns = false;
+    // 九九の選択（「もどる」でえらびなおし）
+    const pa = document.getElementById('pair-area');
+    if (p.over){
+        pa.innerHTML = '';
+    } else if (p.selected >= 0){
+        pa.innerHTML = `<button class="pair-back" onclick="cancelPick()">↩ ${escapeHtml(ui('btn_back'))}</button>` +
+            pairsOf(p.answers[p.selected].v).map(([x, y], k) =>
+                `<button class="pair-btn" data-k="${k}" onclick="choosePair(${x},${y})">${x === p.dora ? `<span class="dn">${x}</span>` : x} × ${y === p.dora ? `<span class="dn">${y}</span>` : y}</button>`).join('');
+    } else pa.innerHTML = '';
+    // 手札
+    const slots = [];
+    for (let i = 0; i < HAND_SIZE; i++){
+        if (i < p.hand.length){
+            const isNew = !!(p.newFlags && p.newFlags[i]);
+            const hit = p.hand[i] === p.dora;
+            slots.push(cardHtml(p.hand[i], (isNew ? 'pop-in ' : '') + (hit ? 'dora-hit' : ''), hit ? `<span class="tag">${ui('tag_dora')}</span>` : ''));
+        } else slots.push(`<div class="card empty">0</div>`);
+    }
+    p.newFlags = null;
+    document.getElementById('hand').innerHTML = slots.join('');
+    updateSidePanel();
+}
+function updateSidePanel(){
+    const b = borderFor(run.sid, run.star, run.stage);
+    document.getElementById('hud-stage').textContent = `${run.stage}/${STAGES}`;
+    document.getElementById('hud-play').textContent = `${run.playNo}/${PLAYS_PER_STAGE}`;
+    document.getElementById('hud-score').textContent = `${run.stageScore} / ${b}`;
+    const bar = document.getElementById('hud-bar');
+    bar.classList.toggle('ok', run.stageScore >= b);
+    bar.firstElementChild.style.width = Math.min(100, run.stageScore / b * 100) + '%';
+    document.getElementById('hud-total').textContent = uif('hud_total', run.totalScore);
+    document.getElementById('hud-coin').textContent = run.coins;
+    document.getElementById('hud-coinnote').textContent = run.stageCoinBonus ? uif('coin_note', run.stageCoinBonus) : '';
+    renderRolesLive();
+    const btn = document.getElementById('btn-change');
+    btn.textContent = ui('btn_change');
+    btn.disabled = (playSt.ticket + run.special) <= 0 || playSt.over || busy;
+    document.getElementById('tk-row').innerHTML = ticketsHtml();
+}
+function pickAnswer(i){
+    if (busy || playSt.over) return;
+    playSt.selected = (playSt.selected === i) ? -1 : i;
+    renderPlay();
+}
+function cancelPick(){
+    if (busy || playSt.over) return;
+    playSt.selected = -1;
+    renderPlay();
+}
+function choosePair(x, y){
+    const p = playSt;
+    if (busy || p.over || p.selected < 0) return;
+    busy = true;
+    const idx = p.selected, card = p.answers[idx];
+    // 加わるたびに手札を小さい順にならべる（新しく入った2枚は、ならべたあとの位置で光らせる）
+    const items = p.hand.map(v => ({ v, n: false })).concat([{ v: x, n: true }, { v: y, n: true }]);
+    items.sort((a, b) => (a.v - b.v) || (a.n - b.n));
+    p.hand = items.map(it => it.v);
+    p.newFlags = items.map(it => it.n);
+    if (isUraCard(card.kind)){
+        for (let n = 0; n < URA_OF[card.kind]; n++) p.uras.push(1 + Math.floor(Math.random() * 9));
+    } else if (card.kind === 'coin'){
+        run.stageCoinBonus += COIN_CARD_BONUS; p.coinGain += COIN_CARD_BONUS;
+        toast(ui('coin_card_toast'));
+    }
+    p.picks++;
+    p.selected = -1;
+    if (p.picks >= 2 || p.hand.length >= HAND_SIZE){
+        p.over = true;
+        renderPlay();
+        setTimeout(finishPlay, 650);
+        return;
+    }
+    p.answers[idx] = nextAnswer(p.answers.map(a => a.v));
+    p.newAns = idx;
+    renderPlay();
+    setTimeout(() => { busy = false; updateSidePanel(); }, 280);
+}
+function doChange(){
+    const p = playSt;
+    if (busy || p.over) return;
+    if (p.ticket > 0) p.ticket--;
+    else if (run.special > 0) run.special--;
+    else return;
+    p.answers = drawAnswerSet(run.shackle, cardUp());
+    p.selected = -1; p.allNewAns = true;
+    toast(ui('changed_toast'));
+    renderPlay();
+}
+
+// ---- プレーの結果（役の帯 → 手札とドラ → 基本点 × ドラ倍率 ＝ 得点） ----
+function finishPlay(){
+    const p = playSt;
+    const cards = p.hand.slice();
+    const r = calcScore(cards, p.dora, p.uras, run.lv, run.weak, run.numLv);
+    run.stageScore += r.total;
+    run.totalScore += r.total;
+    if (r.total > run.bestPlay) run.bestPlay = r.total;
+    const b = borderFor(run.sid, run.star, run.stage);
+    const sorted = cards.slice().sort((a, c) => a - c);
+    const box = document.getElementById('play-result-box');
+    const noRole = r.role === 'high';
+    const rc = r.role === 'high' ? '#8a8f9c' : ROLE_COLOR[r.role];
+    const lvNow = run.lv[r.role] || 1, weakNow = run.weak.has(r.role);
+    const doraSub = (r.doraN + r.uraN === 0) ? ui('res_no_dora') : uif('res_dora_sub', r.doraN, r.uraN);
+    const baseSub = [r.roleBase > 0 ? uif('res_role_part', roleName(r.role), r.roleBase) : '', r.numB > 0 ? uif('res_num_part', r.numB) : ''].filter(Boolean).join(' ＋ ');
+    box.style.setProperty('--rc', rc);
+    box.innerHTML = `
+        <div class="rm-head"><div class="rm-role">${escapeHtml(roleName(r.role))}</div>
+            <div class="rm-lv">${noRole ? '' : `<b>Lv.${lvNow}</b>`}${weakNow ? `<em>${escapeHtml(ui('res_weak'))}</em>` : ''}</div></div>
+        <div class="rm-body">
+            <div class="rm-top">
+                <div class="rm-hand" id="res-hand">${sorted.map(n => cardHtml(n, 'sm')).join('')}</div>
+                <div class="rm-dora">
+                    <div class="rm-dchip dd"><span>${ui('dora_label')}</span><b>${p.dora}</b></div>
+                    <div class="rm-dchip uu"><span>${ui('ura_label')}</span>${p.uras.length ? p.uras.map((u, i) => `<div class="flipcard" id="ura-f${i}">?</div>`).join('') : '<b>―</b>'}</div>
+                </div>
+            </div>
+            <div id="res-after" style="visibility:hidden">
+                <div class="rm-calc">
+                    <div class="rm-box b1"><div class="lb">${escapeHtml(ui('res_base'))}</div><div class="vl">${r.base}</div><div class="sb">${escapeHtml(baseSub)}</div></div>
+                    <div class="rm-op">×</div>
+                    <div class="rm-box b2"><div class="lb">${escapeHtml(ui('res_mult'))}</div><div class="vl">×${fmtMult(r.mult)}</div><div class="sb">${escapeHtml(doraSub)}</div></div>
+                    <div class="rm-op">＝</div>
+                    <div class="rm-box b3"><div class="lb">${escapeHtml(ui('res_total'))}</div><div class="vl">${r.total}</div><div class="sb">${escapeHtml(ui('res_pts_unit'))}</div></div>
+                </div>
+                ${p.coinGain ? `<div class="rm-coinnote">${escapeHtml(uif('res_coin_card', p.coinGain))}</div>` : ''}
+                <div class="rm-stage"><span>${escapeHtml(uif('res_stage', run.stageScore, b))}</span><div class="bar${run.stageScore >= b ? ' ok' : ''}"><i style="width:${Math.min(100, run.stageScore / b * 100)}%"></i></div></div>
+                <div class="rm-foot"><button class="btn btn-primary btn-sm" id="btn-res-next" onclick="afterPlayResult()">${run.playNo < PLAYS_PER_STAGE ? ui('btn_next_play') : ui('btn_stage_result')}</button></div>
+            </div>
+        </div>`;
+    document.getElementById('play-result-modal').classList.remove('hidden');
+    const reveal = () => {
+        const hand = document.getElementById('res-hand');
+        Array.from(hand.children).forEach(el => {
+            const n = Number(el.textContent);
+            const isD = n === p.dora, isU = p.uras.indexOf(n) >= 0;
+            if (isD) { el.classList.add('dora-hit'); el.insertAdjacentHTML('beforeend', `<span class="tag">${ui('tag_dora')}</span>`); }
+            else if (isU) { el.classList.add('ura-hit'); el.insertAdjacentHTML('beforeend', `<span class="tag u">${ui('tag_ura')}</span>`); }
+        });
+        document.getElementById('res-after').style.visibility = 'visible';
+        updateSidePanel();
+    };
+    p.uras.forEach((u, i) => setTimeout(() => {
+        const el = document.getElementById('ura-f' + i);
+        if (el){ el.classList.add('flip'); el.textContent = u; }
+    }, 450 + i * 450));
+    setTimeout(reveal, 450 + p.uras.length * 450 + 350);
+}
+function afterPlayResult(){
+    document.getElementById('play-result-modal').classList.add('hidden');
+    if (run.playNo < PLAYS_PER_STAGE){
+        run.playNo++;
+        startPlay();
+        return;
+    }
+    const b = borderFor(run.sid, run.star, run.stage);
+    if (run.stageScore < b) { endRun(false); return; }
+    if (run.stage >= STAGES) { endRun(true); return; }
+    openShopAfterClear();
+}
+
+// ============================================================
+// ステージクリア → ポップアップ（コインと役Lvアップ）→ ショップ
+// ============================================================
+const ROLE_LV_COST_BASE = 4, ROLE_LV_COST_STEP = 2;
+const SPECIAL_COST = 3, RARE_UP_COST = 6, RARE_UP_MAX = 3, SPECIAL_MAX = 9;
+const SALE_RATE = 0.05, SALE_OFF = 1;   // 商品ごとに5%の確率で1コイン引き。ショップに入るたびに抽選し、そのショップでは個数制限なし
+function roleLvCost(){ return ROLE_LV_COST_BASE + ROLE_LV_COST_STEP * run.roleBuys; }
+function priceOf(key, base){ return run.sale.has(key) ? Math.max(1, base - SALE_OFF) : base; }
+function saleKeys(){
+    return LEVELABLE.map(r => 'role-' + r.id).concat([1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => 'num-' + n), ['special', 'rare']);
+}
+// 値段ボタンの中身（割引中は元の値段を取り消し線で並べる）
+function priceHtml(key, base){
+    const p = priceOf(key, base);
+    return `🪙${p}`;
+}
+let shopFlash = '';
+function openShopAfterClear(){
+    const b = borderFor(run.sid, run.star, run.stage);
+    const base = coinsFor(run.stageScore, b);          // 点数がボーダーの何倍かで決まる（2倍ごとに+COIN_PER_DOUBLE）
+    const cardBonus = run.stageCoinBonus;              // コイン札で増えた分
+    const coin = base + cardBonus;
+    run.coins += coin;
+    // 役Lvアップ（ランダム1つ）
+    const roleId = LEVELABLE[Math.floor(Math.random() * LEVELABLE.length)].id;
+    const oldLv = run.lv[roleId];
+    run.lv[roleId]++;
+    // 数字Lvアップ（ランダムにNUM_CLEAR_PICKS回。同じ数字が重なることもある）
+    const before = Object.assign({}, run.numLv);
+    const picks = [];
+    for (let i = 0; i < NUM_CLEAR_PICKS; i++){ const n = 1 + Math.floor(Math.random() * 9); run.numLv[n]++; picks.push(n); }
+    const numUps = Array.from(new Set(picks)).sort((x, y) => x - y).map(n => ({ n, from: before[n], to: run.numLv[n] }));
+    // ショップの割引抽選
+    run.sale = new Set(saleKeys().filter(() => Math.random() < SALE_RATE));
+    run.shopInfo = { coin, bonus: base - COIN_BASE, cardBonus, roleId, oldLv, newLv: run.lv[roleId], numUps, score: run.stageScore, border: b };
+    run.weak = new Set();   // 弱体化はステージごとの抽選。次のステージの開始時にあらためて決まる
+    shopFlash = 'role-' + roleId;
+    showClearPopup();
+}
+function numChipHtml(n, cls){
+    return `<b class="${cls || ''}" style="background:${cardBg(n)}">${n}</b>`;
+}
+function showClearPopup(){
+    const i = run.shopInfo, rid = i.roleId;
+    const box = document.getElementById('clear-box');
+    box.style.setProperty('--rc', ROLE_COLOR[rid]);
+    box.innerHTML = `
+        <div class="cp-title">${escapeHtml(uif('cp_title', run.stage))}</div>
+        <div class="cp-body">
+            <div class="cp-score">${escapeHtml(uif('cp_score', i.score, i.border))}</div>
+            <div class="cp-coin"><span class="cn"></span><b>+${i.coin}</b><small>${escapeHtml(uif('cp_coin_base', COIN_BASE))}<br>${escapeHtml(uif('cp_coin_bonus', i.bonus))}${i.cardBonus ? '<br>' + escapeHtml(uif('cp_coin_card', i.cardBonus)) : ''}</small></div>
+            <div class="cp-sec">${escapeHtml(ui('cp_levelup'))}</div>
+            <div class="cp-role"><div class="nm">${escapeHtml(roleName(rid))}</div>
+                <div class="lv"><div class="a">Lv.${i.oldLv}<em>▶</em><b>Lv.${i.newLv}</b></div>
+                <div class="p">${roleScore(rid, i.oldLv, false)} <em style="font-style:normal">▶</em> <b>${roleScore(rid, i.newLv, false)}</b> ${escapeHtml(ui('res_pts_unit'))}</div></div></div>
+            <div class="cp-sec">${escapeHtml(ui('cp_num_levelup'))}</div>
+            <div class="cp-nums">${i.numUps.map(u => `<div class="cp-num">${numChipHtml(u.n)}<div><div class="a">Lv.${u.from}<em>▶</em><b>Lv.${u.to}</b></div><div class="p">+${NUM_LV_POINTS * u.from} <em>▶</em> <b>+${NUM_LV_POINTS * u.to}</b></div></div></div>`).join('')}</div>
+            <div><button class="btn btn-primary btn-sm" onclick="enterShop()">${escapeHtml(ui('btn_to_shop'))}</button></div>
+        </div>`;
+    document.getElementById('clear-modal').classList.remove('hidden');
+}
+function enterShop(){
+    document.getElementById('clear-modal').classList.add('hidden');
+    goTo('shop-screen');
+    renderShop();
+}
+function renderShop(){
+    const info = run.shopInfo;
+    document.getElementById('shop-coin-val').textContent = run.coins;
+    const cost = roleLvCost();
+    document.getElementById('shop-roles').innerHTML = LEVELABLE.map(r => {
+        const lv = run.lv[r.id], key = 'role-' + r.id, price = priceOf(key, cost);
+        return `<div class="role-card${shopFlash === key ? ' flash' : ''}${run.sale.has(key) ? ' onsale' : ''}" style="--rc:${ROLE_COLOR[r.id]}">
+            <div class="rc-name">${escapeHtml(roleName(r.id))}</div>
+            <div class="rc-lv">Lv<b>${lv}</b></div>
+            <div class="rc-pts"><span>${roleScore(r.id, lv, false)}</span><i>▶</i><span class="nx">${roleScore(r.id, lv + 1, false)}</span></div>
+            <button class="lvbtn${run.sale.has(key) ? ' sale' : ''}" ${run.coins < price ? 'disabled' : ''} onclick="buyRoleLevel('${r.id}')">⬆ ${priceHtml(key, cost)}</button>
+        </div>`;
+    }).join('');
+    document.getElementById('shop-nums').innerHTML = [1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => {
+        const lv = run.numLv[n], key = 'num-' + n, price = priceOf(key, NUM_LV_COST);
+        return `<div class="num-cell${shopFlash === key ? ' flash' : ''}${run.sale.has(key) ? ' onsale' : ''}">
+            <div class="nc-top">${numChipHtml(n)}<div><div class="nc-lv">Lv.${lv}</div><div class="nc-pt">+${NUM_LV_POINTS * lv}</div></div></div>
+            <button class="lvbtn${run.sale.has(key) ? ' sale' : ''}" ${run.coins < price ? 'disabled' : ''} onclick="buyNum(${n})">⬆ ${priceHtml(key, NUM_LV_COST)}</button>
+        </div>`;
+    }).join('');
+    const rareNow = familyPct();
+    const spPrice = priceOf('special', SPECIAL_COST), raPrice = priceOf('rare', RARE_UP_COST);
+    document.getElementById('shop-items').innerHTML = `
+        <div class="item-card${shopFlash === 'special' ? ' flash' : ''}" style="--ic:#e8a317; --ib:#fff4d4">
+            <div class="ic"><div class="tk2 stock mini"><span class="tw">${escapeHtml(ui('tk_stock'))}</span></div></div><div class="im"><div class="tt">${escapeHtml(ui('item_special'))}</div>
+            <div class="own">${escapeHtml(uif('item_special_own', run.special))}</div></div>
+            <button class="lvbtn${run.sale.has('special') ? ' sale' : ''}" ${run.coins < spPrice || run.special >= SPECIAL_MAX ? 'disabled' : ''} onclick="buySpecial()">${priceHtml('special', SPECIAL_COST)}</button>
+        </div>
+        <div class="item-card${shopFlash === 'rare' ? ' flash' : ''}" style="--ic:#e8503d; --ib:#ffe9e4">
+            <div class="ic"><div class="gcard">ドラ</div></div><div class="im"><div class="tt">${escapeHtml(ui('item_rare'))}</div>
+            <div class="own">${escapeHtml(uif('item_rare_own', rareNow))}</div></div>
+            <button class="lvbtn${run.sale.has('rare') ? ' sale' : ''}" ${run.coins < raPrice || run.rareUp >= RARE_UP_MAX ? 'disabled' : ''} onclick="buyRare()">${run.rareUp >= RARE_UP_MAX ? escapeHtml(ui('item_maxed')) : priceHtml('rare', RARE_UP_COST)}</button>
+        </div>`;
+    document.getElementById('btn-next-stage').textContent = uif('btn_next_stage', run.stage + 1);
+    shopFlash = '';
+}
+function buyRoleLevel(id){
+    const key = 'role-' + id, cost = priceOf(key, roleLvCost());
+    if (run.coins < cost) return;
+    run.coins -= cost; run.roleBuys++; run.lv[id]++;
+    shopFlash = key;
+    renderShop();
+}
+function buyNum(n){
+    const key = 'num-' + n, cost = priceOf(key, NUM_LV_COST);
+    if (run.coins < cost) return;
+    run.coins -= cost; run.numLv[n]++;
+    shopFlash = key;
+    renderShop();
+}
+function buySpecial(){
+    const cost = priceOf('special', SPECIAL_COST);
+    if (run.coins < cost || run.special >= SPECIAL_MAX) return;
+    run.coins -= cost; run.special++;
+    shopFlash = 'special';
+    renderShop();
+}
+function buyRare(){
+    const cost = priceOf('rare', RARE_UP_COST);
+    if (run.coins < cost || run.rareUp >= RARE_UP_MAX) return;
+    run.coins -= cost; run.rareUp++;
+    shopFlash = 'rare';
+    renderShop();
+}
+function goNextStage(){
+    run.stage++;
+    beginStage();
+}
+
+// ---- あそびかた：色分けしたカードに、CSSで描いた小さなイラストと短い説明 ----
+const hn = n => `<span class="ha-n" style="background:${cardBg(n)}">${n}</span>`;
+const hcard = (n, cls) => `<span class="ha-c${cls ? ' ' + cls : ''}">${n}</span>`;
+const HOWTO = [
+    { c: '#3fa9e0', bg: '#e4f4fd', art: () => hcard(12) + hcard(20, 'sel') + hcard(6),
+      t: { ja: '① 九九カードをえらぶ', ja_easy: '① くくカードを えらぶ', en: '1. Pick a times card' },
+      b: { ja: '上の *3枚* から *1枚* タップ！', ja_easy: 'うえの *3まい* から *1まい* タップ！', en: 'Tap *1 of the 3 cards* at the top.' } },
+    { c: '#f07a2a', bg: '#ffeedd', art: () => hcard(20) + '<span class="ha-ar">▶</span>' + hn(4) + '<span class="ha-ar">×</span>' + hn(5),
+      t: { ja: '② 九九をえらぶ', ja_easy: '② くくを えらぶ', en: '2. Pick a multiplication' },
+      b: { ja: '20 なら *4×5*、12 なら 2×6 か 3×4。えらぶと *2つの数字* が手札に入るよ。', ja_easy: '20 なら *4×5*、12 なら 2×6 か 3×4。えらぶと *2つの すうじ* が てふだに はいるよ。', en: '20 → *4×5*; 12 → 2×6 or 3×4. *Both numbers* join your hand.' } },
+    { c: '#7cb82f', bg: '#eef8dc', art: () => [3, 4, 4, 5, 6].map(hn).join(''),
+      t: { ja: '③ 5枚で役を作る', ja_easy: '③ 5まいで やくを つくる', en: '3. Make a hand' },
+      b: { ja: 'もう1回くり返して *5枚* になったら、ポーカーの *役* で点数が決まる！', ja_easy: 'もう1かい くりかえして *5まい* に なったら、ポーカーの *やく* で てんすうが きまる！', en: 'Do it once more. With *5 cards*, your poker *hand* is scored!' } },
+    { c: '#e8a317', bg: '#fff6d6', art: () => '<span class="ha-dora">ドラ <b>4</b></span><span class="ha-ar">▶</span><span class="ha-n hit" style="background:' + cardBg(4) + '">4</span><span class="ha-chip">+50%</span>',
+      t: { ja: 'ドラ', ja_easy: 'ドラ', en: 'Dora' },
+      b: { ja: '手札にドラと同じ数字があると、1枚ごとに得点が *+50%*！', ja_easy: 'てふだに ドラと おなじ すうじが あると、1まいごとに てんすうが *+50%*！', en: 'Each card matching the Dora adds *+50%* to the score!' } },
+    { c: '#8a5cf0', bg: '#efe8ff', art: () => '<span class="ha-ura">?</span><span class="ha-ura">?</span><span class="ha-ar">▶</span><span class="ha-ura open">7</span>',
+      t: { ja: 'うらドラ', ja_easy: 'うらドラ', en: 'Ura Dora' },
+      b: { ja: '結果発表まで *ないしょ* の数字。金の *ドラ札* で1つ、紫の *ドラドラ札* で2つふえる。', ja_easy: 'けっかはっぴょうまで *ないしょ* の すうじ。金の *ドラふだ* で 1つ、むらさきの *ドラドラふだ* で 2つ ふえる。', en: 'A *secret* number revealed at scoring. Gold *Dora Card*: +1, purple *Dora×2 Card*: +2.' } },
+    { c: '#2fb872', bg: '#e1f8ec', art: () => '<span class="ha-c coin">20</span><span class="ha-ar">▶</span><span class="ha-coin">+2</span>',
+      t: { ja: 'コイン札', ja_easy: 'コインふだ', en: 'Coin Card' },
+      b: { ja: '緑の *コイン札* を割ると、ステージクリアのコインが *+2*！', ja_easy: 'みどりの *コインふだ* を わると、クリアの コインが *+2*！', en: 'Splitting a green *Coin Card* gives *+2 coins* on stage clear!' } },
+    { c: '#1fb69a', bg: '#dff7f2', art: () => '<span class="tk2 free ha-tk"><span class="tw">' + escapeHtml(ui('tk_free')) + '</span></span><span class="tk2 stock ha-tk"><span class="tw">' + escapeHtml(ui('tk_stock')) + '</span></span>',
+      t: { ja: 'いれかえチケット', ja_easy: 'いれかえチケット', en: 'Swap Tickets' },
+      b: { ja: '九九カードを *3枚ぜんぶ* 入れかえる。*フリー* は毎プレー1枚、*ストック* はショップで買ってためる。', ja_easy: 'くくカードを *3まい ぜんぶ* いれかえる。*フリー* は まいプレー 1まい、*ストック* は ショップで かって ためる。', en: 'Swap *all 3* cards. *Free* refills each play; *Stock* is bought in the shop.' } },
+    { c: '#e0559f', bg: '#fde6f1', art: () => hn(3) + '<span class="ha-plus">+2</span>' + hn(5) + '<span class="ha-plus">+4</span>',
+      t: { ja: '数字ボーナス', ja_easy: 'すうじボーナス', en: 'Number Bonus' },
+      b: { ja: '数字のレベルを上げると、手札のその数字 *1枚ごとに+2点*。役なしでも点が入る！', ja_easy: 'すうじの レベルを あげると、てふだの その すうじ *1まいごとに +2てん*。やくなしでも てんが はいる！', en: 'Level up a number: *+2 pts per card* of it in your hand, even with no hand!' } },
+    { c: '#e8503d', bg: '#ffe6e1', art: () => Array.from({ length: 7 }, (_, i) => '<span class="ha-st' + (i < 3 ? ' on' : '') + '">' + (i + 1) + '</span>').join(''),
+      t: { ja: 'ステージ', ja_easy: 'ステージ', en: 'Stages' },
+      b: { ja: '*3プレー* で1ステージ。合計が *ボーダー* に届けばクリア。*7ステージ* をのりこえよう！', ja_easy: '*3プレー* で 1ステージ。ごうけいが *ボーダー* に とどけば クリア。*7ステージ* を のりこえよう！', en: '*3 plays* per stage. Reach the *border* to clear. Beat all *7 stages*!' } },
+];
+function openHowTo(){
+    const em = txt => escapeHtml(txt).replace(/\*(.+?)\*/g, '<b class="em">$1</b>');
+    document.getElementById('howto-body').innerHTML = HOWTO.map(h =>
+        `<div class="ht-card" style="--hc:${h.c};--hb:${h.bg}"><div class="ht-head">${escapeHtml(L(h.t))}</div><div class="ht-art">${h.art()}</div><div class="ht-body">${em(L(h.b))}</div></div>`).join('');
+    document.getElementById('howto-modal').classList.remove('hidden');
+}
+function closeHowTo(){ document.getElementById('howto-modal').classList.add('hidden'); }
+function requestRetire(){ document.getElementById('retire-modal').classList.remove('hidden'); }
+function closeRetireModal(){ document.getElementById('retire-modal').classList.add('hidden'); }
+function confirmRetire(){
+    closeRetireModal();
+    run = null; playSt = null;
+    goToRunSelect();
+}
+
+// ============================================================
+// RUN終了・メダル・ランキング
+// ============================================================
+const RANK_STORAGE_PREFIX = 'watteePokerRanking_';
+const isClearTag = tag => tag === 'クリア' || tag === 'Clear';
+function rankKey(sid, star){ return `${sid}_${star}`; }
+function getLocalRanking(sid, star){
+    try { return JSON.parse(localStorage.getItem(RANK_STORAGE_PREFIX + rankKey(sid, star)) || '[]'); } catch (e){ return []; }
+}
+function compareRank(a, b){
+    const ca = isClearTag(a.tag) ? 1 : 0, cb = isClearTag(b.tag) ? 1 : 0;
+    if (ca !== cb) return cb - ca;
+    if (b.score !== a.score) return b.score - a.score;
+    if (a.turns !== b.turns) return a.turns - b.turns;
+    return (b.dateIso || '').localeCompare(a.dateIso || '');
+}
+function saveLocalScore(sid, star, entry){
+    const list = getLocalRanking(sid, star);
+    list.push(entry); list.sort(compareRank);
+    try { localStorage.setItem(RANK_STORAGE_PREFIX + rankKey(sid, star), JSON.stringify(list.slice(0, 30))); } catch (e){}
+}
+let lastEnd = null;
+function endRun(cleared){
+    const reachedStage = run.stage;
+    const tag = ui(cleared ? 'tag_clear' : 'tag_gameover');
+    const prog = getProg(run.sid);
+    let newMedal = false, unlocked = 0;
+    if (cleared && run.star > prog.clear){
+        prog.clear = run.star; newMedal = true;
+        if (run.star < STARS) unlocked = run.star + 1;
+    }
+    if (run.totalScore > (prog.best[run.star] || 0)) prog.best[run.star] = run.totalScore;
+    saveProg(run.sid, prog);
+    const now = new Date();
+    if (run.totalScore > 0) saveLocalScore(run.sid, run.star, {
+        name: getCurPlayerName(), score: run.totalScore, turns: reachedStage, tag,
+        dateIso: now.toISOString(), date: `${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()}`
+    });
+    lastEnd = { sid: run.sid, star: run.star, score: run.totalScore, stage: reachedStage, tag };
+    const t = document.getElementById('end-title');
+    t.className = 'result-title ' + (cleared ? 'clear' : 'over');
+    t.textContent = ui(cleared ? 'end_clear_title' : 'end_over_title');
+    document.getElementById('end-medal').textContent = cleared ? '★'.repeat(run.star) + '　' + starName(run.star) : '';
+    document.getElementById('end-unlock').textContent = cleared
+        ? (newMedal ? ui('end_new_medal') + (unlocked ? '　' + uif('end_unlock', unlocked) : '') : '')
+        : '';
+    document.getElementById('end-score-val').textContent = run.totalScore;
+    document.getElementById('end-stage-val').textContent = uif('end_stage_label', reachedStage, run.bestPlay);
+    document.getElementById('end-world-submit-msg').textContent = '';
+    document.getElementById('end-modal').classList.remove('hidden');
+    if (RANKING_ENABLED && run.totalScore > 0) submitScoreToWorld();
+}
+async function submitScoreToWorld(){
+    const msg = document.getElementById('end-world-submit-msg');
+    // ローカル確認・ファイル直開きの動作テストでは世界ランキングを汚さない
+    if (!/^https?:$/.test(location.protocol) || /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)){
+        msg.style.color = 'var(--ink-dim)'; msg.textContent = ui('world_submit_skip'); return;
+    }
+    msg.style.color = 'var(--ink-dim)';
+    msg.textContent = ui('world_submit_sending');
+    try {
+        await window.saveOnlineScore(getCurPlayerName(), lastEnd.score, lastEnd.stage, rankKey(lastEnd.sid, lastEnd.star), lastEnd.tag);
+        msg.style.color = 'var(--teal-dk)';
+        msg.textContent = ui('world_submit_done');
+    } catch (e){
+        msg.style.color = 'var(--danger)';
+        msg.textContent = ui('world_submit_fail');
+        console.error('submitScoreToWorld error:', e);
+    }
+}
+function closeEndToSelect(){
+    document.getElementById('end-modal').classList.add('hidden');
+    run = null; playSt = null;
+    goToRunSelect();
+}
+function closeEndAndRetry(){
+    document.getElementById('end-modal').classList.add('hidden');
+    const sid = run.sid, star = run.star;
+    startRun(sid, star);
+}
+
+// ============================================================
+// ランキング画面
+// ============================================================
+let rankTab = 'world', rankSid = 'normal', rankStar = 1;
+function openRanking(){
+    goTo('ranking-screen');
+    renderRankToggles();
+    switchRankTab('world');
+}
+function closeRanking(){ goTo('title-screen'); }
+function renderRankToggles(){
+    document.getElementById('rank-shackle-toggle').innerHTML = SHACKLES.map(s =>
+        `<button class="rank-toggle-btn${s.id === rankSid ? ' active' : ''}" title="${escapeHtml(shackleName(s.id))}" onclick="switchRankShackle('${s.id}')">${s.icon}</button>`).join('');
+    document.getElementById('rank-star-toggle').innerHTML =
+        `<span style="font-weight:800;color:var(--ink);align-self:center;font-size:1.3rem;">${escapeHtml(shackleName(rankSid))}</span>` +
+        Array.from({ length: STARS }, (_, i) => i + 1).map(n => `<button class="rank-toggle-btn${n === rankStar ? ' active' : ''}" onclick="switchRankStar(${n})" title="${escapeHtml(starName(n))}">${'★'.repeat(n)}</button>`).join('');
+}
+function switchRankShackle(id){ rankSid = id; renderRankToggles(); loadAndRenderRanking(); }
+function switchRankStar(n){ rankStar = n; renderRankToggles(); loadAndRenderRanking(); }
+function switchRankTab(tab){
+    rankTab = tab;
+    document.getElementById('rank-tab-local-btn').classList.toggle('active', tab === 'local');
+    document.getElementById('rank-tab-world-btn').classList.toggle('active', tab === 'world');
+    loadAndRenderRanking();
+}
+async function loadAndRenderRanking(){
+    const loading = document.getElementById('rank-loading');
+    const list = document.getElementById('rank-list');
+    if (rankTab === 'local'){
+        renderRankList(getLocalRanking(rankSid, rankStar).sort(compareRank).map(e => ({ name: e.name, tag: e.tag, score: e.score, turns: e.turns, date: e.date })));
+        return;
+    }
+    loading.style.display = 'block';
+    list.innerHTML = '';
+    const rows = await (window.loadWorldRanking ? window.loadWorldRanking(rankKey(rankSid, rankStar)) : Promise.resolve(null));
+    loading.style.display = 'none';
+    if (rows === null){
+        list.innerHTML = `<li class="rank-empty">${ui('rank_empty')}</li>`;
+        return;
+    }
+    renderRankList(rows);
+}
+function renderRankList(rows){
+    const list = document.getElementById('rank-list');
+    if (!rows || rows.length === 0){
+        list.innerHTML = `<li class="rank-empty">${ui('rank_empty')}</li>`;
+        return;
+    }
+    list.innerHTML = rows.map((r, i) => `
+        <li class="rank-row">
+            <span class="rank-num${i < 3 ? ' top3' : ''}">${i + 1}</span>
+            <span class="rank-pname">${escapeHtml(r.name)}</span>
+            <span class="rank-tag">${escapeHtml(r.tag || '')}</span>
+            <span class="rank-score">${r.score}</span>
+            <span class="rank-turns">${uif('rank_stage_label', r.turns ?? 0)}</span>
+            <span class="rank-date">${escapeHtml(r.date || '')}</span>
+        </li>`).join('');
+}
+
+// ============================================================
+// チュートリアル（練習プレイ）
+// ============================================================
+// 書き込みはエンジンが止めるので、ランキング・メダル・保存データは一切汚れない
+function startTutorial(){
+    FGLTutorial.begin({ root: '#container', getLang: () => currentLang });
+    tutorialQueue = [8];
+    const lv = {}; ROLES.forEach(r => { lv[r.id] = 1; });
+    run = { sid: 'normal', star: 1, shackle: SHACKLE_BY_ID.normal, stage: 1, playNo: 1, lv, weak: new Set(), coins: 0, special: 0, rareUp: 0, stageCoinBonus: 0, numLv: newNumLv(), sale: new Set(),
+            roleBuys: 0, stageScore: 0, totalScore: 0, bestPlay: 0 };
+    goTo('play-screen');
+    startPlay();
+    playSt.dora = 4; playSt.hand = [4];
+    playSt.answers = [{ v: 20, kind: 'normal' }, { v: 12, kind: 'normal' }, { v: 6, kind: 'normal' }];
+    renderPlay();
+    const tp = (en, ja, easy) => ({ ja, easy, en });
+    FGLTutorial.run([
+        { type: 'say', target: '#answers', pos: 'bottom', text: tp(
+            'These are the times cards: answers from the multiplication table. Pick one, then pick a multiplication that makes it.',
+            'ここの3枚が「九九カード」。九九の答えが並んでいるよ。1枚えらんで、その答えになる九九をえらぼう。',
+            'ここの 3まいが「くくカード」。くくの こたえが ならんでいるよ。1まい えらんで、その こたえに なる くくを えらぼう。') },
+        { type: 'say', target: '#hand', pos: 'top', text: tp(
+            'This is your hand. You start with 1 card. Each split adds 2 cards, so after 2 splits you have 5 cards and your poker hand is scored!',
+            'ここが手札。最初は1枚だけ。九九を選ぶと2枚ふえて、2回くり返すと5枚になり、ポーカーの役で点数が入るよ！',
+            'ここが てふだ。さいしょは 1まいだけ。くくを えらぶと 2まい ふえて、2かい くりかえすと 5まいに なり、ポーカーの やくで てんすうが はいるよ！') },
+        { type: 'say', target: '.dora-box', pos: 'right', text: tp(
+            'The Dora is a lucky number chosen each play. Every card in your hand matching it adds +50% to your score!',
+            'これが「ドラ」。プレーごとに決まるラッキー数字だよ。手札にドラと同じ数字が1枚あるごとに、点数が+50%！',
+            'これが「ドラ」。プレーごとに きまる ラッキーすうじだよ。てふだに ドラと おなじ すうじが 1まい あるごとに、てんすうが +50%！') },
+        { type: 'do', target: '#answers .ans-card:nth-child(1)', pos: 'bottom', until: () => playSt && playSt.selected === 0, text: tp(
+            'Tap the "20" card.', '「20」のカードをタップしてみよう！', '「20」の カードを タップしてみよう！') },
+        { type: 'say', target: '#pair-area', pos: 'bottom', text: tp(
+            '20 can only be made as 4 × 5. (For 12 you could choose 2×6 or 3×4.) Splitting adds both numbers to your hand.',
+            '20になる九九は 4×5 だけ。（12なら 2×6 と 3×4 のどちらかを選べるよ）選ぶと、2つの数字が手札に入るよ。',
+            '20に なる くくは 4×5 だけ。（12なら 2×6 と 3×4 の どちらかを えらべるよ）えらぶと、2つの すうじが てふだに はいるよ。') },
+        { type: 'do', target: '#pair-area .pair-btn[data-k="0"]', pos: 'bottom', until: () => playSt && playSt.hand.length >= 3, text: tp(
+            'Tap "4 × 5"!', '「4 × 5」をタップ！', '「4 × 5」を タップ！') },
+        { type: 'run', fn: () => FGLTutorial.wait(() => !busy, 4000) },
+        { type: 'say', target: '#hand', pos: 'top', text: tp(
+            'Now your hand has 4, 4 and 5. Two 4s make a pair — and 4 is the Dora, so they glow! The used times card was replaced with a new one.',
+            '手札が 4・4・5 になったよ。4が2枚でペア！ しかも4はドラだから光っているね。使った九九カードは新しくなったよ。',
+            'てふだが 4・4・5 に なったよ。4が 2まいで ペア！ しかも 4は ドラだから ひかっているね。つかった くくカードは あたらしく なったよ。') },
+        { type: 'do', target: '#answers .ans-card:nth-child(1)', pos: 'bottom', until: () => playSt && playSt.selected === 0, text: tp(
+            'Tap the new "8" card. Can you make another 4?', 'あたらしい「8」のカードをタップ！ もう1枚 4が作れるかな？', 'あたらしい「8」の カードを タップ！ もう1まい 4が つくれるかな？') },
+        { type: 'do', target: '#pair-area .pair-btn[data-k="1"]', pos: 'bottom', until: () => playSt && playSt.over, text: tp(
+            'Choose 2 × 4. That brings another 4 into your hand!', '「2 × 4」をえらぼう。手札にもう1枚 4が入るよ！', '「2 × 4」を えらぼう。てふだに もう1まい 4が はいるよ！') },
+        { type: 'run', fn: () => FGLTutorial.wait(() => !document.getElementById('res-after') || (document.getElementById('res-after') && document.getElementById('res-after').style.visibility === 'visible'), 8000) },
+        { type: 'say', target: '#play-result-box', pos: 'bottom', text: tp(
+            'Three 4s = Three of a Kind (30 pts). All three match the Dora: +50% each makes ×2.5, so 30 × 2.5 = 75! Splitting a golden "Dora Card" adds a hidden "Ura Dora" that is revealed here.',
+            '4が3枚で「スリーカード」(30点)。3枚ともドラだから +50%ずつで ×2.5 になって、30×2.5＝75点！ 金色の「ドラ札」を割ると「うらドラ」がふえて、この結果発表で明かされるよ。',
+            '4が 3まいで「スリーカード」(30てん)。3まいとも ドラだから +50%ずつで ×2.5 に なって、30×2.5＝75てん！ 金色の「ドラふだ」を わると「うらドラ」が ふえて、この けっかはっぴょうで あかされるよ。') },
+        { type: 'say', target: '#btn-res-next', pos: 'bottom', text: tp(
+            'Do 3 plays per stage. If the stage total reaches the border, you clear it and can buy upgrades in the shop. Clear all 7 stages!',
+            '3プレーで1ステージ。合計スコアがボーダーに届けばクリア！ ショップで役のレベルアップもできるよ。7ステージをめざそう！',
+            '3プレーで 1ステージ。ごうけいスコアが ボーダーに とどけば クリア！ ショップで やくの レベルアップも できるよ。7ステージを めざそう！') },
+    ]);
+}
+
+// ============================================================
+// 画面サイズが変わっても縦横比(1280×720)を保ったまま拡大縮小する
+// ============================================================
+let isMobileRotated = false;
+let currentScale = 1;
+function scaleContainer(){
+    const el = document.getElementById('container');
+    const vp = window.visualViewport;
+    const w = vp ? vp.width : window.innerWidth, h = vp ? vp.height : window.innerHeight;
+    if (w <= 0 || h <= 0) return;
+    el.style.left = `${w / 2 - 640}px`;
+    el.style.top = `${h / 2 - 360}px`;
+    isMobileRotated = w < h && w <= 900;
+    if (isMobileRotated) {
+        const s = Math.min(h / 1280, w / 720);
+        currentScale = s;
+        el.style.transform = `rotate(90deg) scale(${s})`;
+    } else {
+        const s = Math.min(w / 1280, h / 720);
+        currentScale = s;
+        el.style.transform = `scale(${s})`;
+    }
+}
+window.addEventListener('resize', scaleContainer);
+window.addEventListener('load', scaleContainer);
+scaleContainer();
+(function setupRotatedTouchScroll(){
+    const root = document.getElementById('container');
+    if (!root) return;
+    function findScrollable(el){
+        while (el && el !== root){
+            const cs = getComputedStyle(el);
+            if ((cs.overflowY === 'auto' || cs.overflowY === 'scroll') && el.scrollHeight > el.clientHeight) return el;
+            el = el.parentElement;
+        }
+        return null;
+    }
+    let box = null, dragging = false, startX = 0, startScrollTop = 0;
+    root.addEventListener('touchstart', e => {
+        if (!isMobileRotated || e.touches.length !== 1) return;
+        box = findScrollable(e.target);
+        if (!box) return;
+        dragging = true; startX = e.touches[0].clientX; startScrollTop = box.scrollTop;
+    }, { passive: true });
+    root.addEventListener('touchmove', e => {
+        if (!dragging || !box || !isMobileRotated) return;
+        e.preventDefault();
+        const dx = e.touches[0].clientX - startX;
+        box.scrollTop = startScrollTop - dx / (currentScale || 1);
+    }, { passive: false });
+    root.addEventListener('touchend', () => { dragging = false; box = null; });
+})();
+requestAnimationFrame(scaleContainer);
+setTimeout(scaleContainer, 300);
+if (window.visualViewport) window.visualViewport.addEventListener('resize', scaleContainer);
+setTimeout(scaleContainer, 100);
+
+// ============================================================
+// 初期化
+// ============================================================
+buildTitleDecor();
+if (!RANKING_ENABLED) document.getElementById('btn-ranking').classList.add('hidden');
+applyI18n();
+updateNameRegisterBtn();
+</script>
+</body>
+</html>
