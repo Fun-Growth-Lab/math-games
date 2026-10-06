@@ -299,6 +299,11 @@
         .rp-row em.lk { background: #8a94a3; }
         .np-chip.locked { opacity: 0.4; filter: grayscale(0.9); }
         .role-card.locked, .num-cell.locked, .item-card.locked { opacity: 0.5; filter: grayscale(0.85); }
+        .rm-fail { margin-top: 10px; padding: 6px 12px; text-align: center; font-weight: 900; font-size: 1.25rem; color: #fff; background: linear-gradient(#ff7a6a,#d63a22); border: 3px solid #8a2412; border-radius: 16px; box-shadow: 0 4px 0 #8a2412; animation: popIn 0.4s ease; }
+        .shop-warn { background: #fff; color: #d63a22; border: 3px solid #d63a22; border-radius: 50px; padding: 2px 18px; font-size: 1.25rem; font-weight: 900; box-shadow: 0 3px 0 #8a2412; margin: 0 16px; }
+        .tk-none { text-align: center; font-weight: 900; color: #7a8a9a; font-size: 1.15rem; padding: 12px 4px; }
+        .cp-list li.mult { color: #c4501a; }
+        .cp-list li.mult b { color: #c4501a; font-size: 1.15em; }
         .rm-clear { margin-top: 10px; padding: 6px 12px; text-align: center; font-weight: 900; font-size: 1.25rem; color: #7a4a00; background: linear-gradient(#fff3bd,#ffd65a); border: 3px solid #ffb800; border-radius: 16px; box-shadow: 0 4px 0 #d68900; animation: popIn 0.4s ease; }
         .rp-row.weak { background: #fff0ee; }
         .rp-row.weak .rpts { color: #d1402f; }
@@ -848,6 +853,7 @@
         <div class="shop-awning"></div>
         <div class="shop-head">
             <div class="shop-title" data-i18n="shop_title">🛒 ショップ</div>
+            <div class="shop-warn hidden" id="shop-warn"></div>
             <div class="shop-coin"><span class="cn">🪙</span><span id="shop-coin-val">0</span></div>
         </div>
         <div class="shop-wrap">
@@ -1030,8 +1036,11 @@ function evalHand(cards){
     const mn = Math.min(...cards), mx = Math.max(...cards);
     return (mx - mn === 4) ? 'straight' : 'high';
 }
+// 縛りによる「役の基本点の倍率」（ストレート大好き／フルハウス大好き）。RUNの開始時に setRoleMult で切り替える
+let ROLE_MULT = {};
+function setRoleMult(m){ ROLE_MULT = m || {}; }
 function roleScore(id, lv, weak){
-    return Math.round(ROLE_BASE[id] * (1 + LV_UP_RATE * (lv - 1)) * (weak ? WEAK_RATE : 1));
+    return Math.round(ROLE_BASE[id] * (ROLE_MULT[id] || 1) * (1 + LV_UP_RATE * (lv - 1)) * (weak ? WEAK_RATE : 1));
 }
 // ドラ数 = 手札のうちドラと同じ数字の枚数 + うらドラごとの同じ数字の枚数
 function countDora(cards, dora, uras){
@@ -1039,7 +1048,7 @@ function countDora(cards, dora, uras){
     uras.forEach(u => { n += cards.filter(c => c === u).length; });
     return n;
 }
-function calcScore(cards, dora, uras, lvMap, weakSet, numLv){
+function calcScore(cards, dora, uras, lvMap, weakSet, numLv, opts){
     const role = evalHand(cards);
     const roleBase = roleScore(role, lvMap[role] || 1, weakSet && weakSet.has(role));
     const numB = numBonus(cards, numLv);
@@ -1047,7 +1056,8 @@ function calcScore(cards, dora, uras, lvMap, weakSet, numLv){
     const doraN = cards.filter(c => c === dora).length;
     const uraN = countDora(cards, dora, uras) - doraN;
     const mult = 1 + DORA_RATE * (doraN + uraN);
-    return { role, roleBase, numB, base, doraN, uraN, mult, total: Math.round(base * mult) };
+    const dead = !!(opts && opts.needDora) && (doraN + uraN === 0);   // デッドオアライブ：ドラ・うらドラが1枚も乗らないと0点
+    return { role, roleBase, numB, base, doraN, uraN, mult, dead, total: dead ? 0 : Math.round(base * mult) };
 }
 
 // 九九81マスの答え（重複なし）。1〜9の段の答えにならない数（11など）は出ない
@@ -1063,6 +1073,9 @@ function pairsOf(p){
     return out;
 }
 
+// 新しい縛り（2026-10-06）: hiddenDora=見えないうらドラ2枚に変身 / roleMult=役の基本点の倍率 / coinMult=クリアのコイン倍率 / needDora=ドラが乗らないと0点 /
+// failOnHigh=やくなしで即ゲームオーバー / zeroCoins=ショップを出るとコイン0 / noChange=チェンジ・ストックチケット不可 / plays=1ステージのプレー回数 / startNumLv=最初の数字Lv
+const SQUARES = { 1: 1, 4: 1, 9: 1, 16: 1, 25: 1, 36: 1, 49: 1, 64: 1, 81: 1 };   // ぞろ目（同じ数をかけた答え）
 // 縛り。filter: 出現してよい九九カード。rates: 九九カードの種類の出現率を固定（ドラ札アップは使えない）。weak: ステージごとに役が3つ弱体化。
 // startSpecial: 最初から持っているストックチケットの数。oddOnly: 手札・ドラ・うらドラも奇数だけ（偶数の数字Lvはロック）。lockRoles: Lvを上げられない役（ロック）
 const SHACKLES = [
@@ -1075,6 +1088,17 @@ const SHACKLES = [
     { id: 'small50',  icon: '🐜', filter: p => p <= 50 },
     { id: 'dora3',    icon: '🀄', filter: p => true, rates: { dora: 0.4, dora2: 0.1, coin: 0.05 } },
     { id: 'weak',     icon: '🥀', filter: p => true, weak: true },
+    { id: 'luck',     icon: '🍀', filter: p => true, hiddenDora: 2 },
+    { id: 'nozoro',   icon: '🚫', filter: p => !SQUARES[p] },
+    { id: 'straight2', icon: '🌈', filter: p => true, roleMult: { straight: 2 } },
+    { id: 'full2',    icon: '🏠', filter: p => true, roleMult: { full: 2 } },
+    { id: 'rich',     icon: '💰', filter: p => true, coinMult: 5 },
+    { id: 'dead',     icon: '☠️', filter: p => true, needDora: true },
+    { id: 'nofail',   icon: '😎', filter: p => true, failOnHigh: true },
+    { id: 'nomoney',  icon: '💸', filter: p => true, zeroCoins: true },
+    { id: 'nochange', icon: '🔒', filter: p => true, noChange: true },
+    { id: 'oneshot',  icon: '☝️', filter: p => true, plays: 1, startSpecial: 5 },
+    { id: 'lucky7',   icon: '7️⃣', filter: p => true, startNumLv: { 7: 10 } },
 ];
 const SHACKLE_BY_ID = {}; SHACKLES.forEach(s => { SHACKLE_BY_ID[s.id] = s; });
 // 縛りによるロックと、出てくる数字
@@ -1085,7 +1109,7 @@ function rareLocked(sh){ return !!sh.rates; }
 function randNum(sh, rnd){ const a = shackleNums(sh); return a[Math.floor((rnd || Math.random)() * a.length)]; }
 // ボーダー表 BORDERS[縛り][★-1][ステージ-1]（★1やさしい／★2ふつう／★3むずかしい）。
 // 「各プレーで最善手を探す」ボットを縛りごとに400周させ、3プレーの合計点の下位8/17/28%点
-// （＝RUN全体のクリア率の目安が約45/20/8%）を直線でなめらかにし、ステージごとに+3%上げた値。
+// （＝RUN全体のクリア率の目安が約45/20/8%。新しい11の縛りも同じ方法で測り、ボット基準のクリア率が★1約40〜50%/★2約16〜29%/★3約3〜10%に収まることを確認）を直線でなめらかにし、ステージごとに+3%上げた値。
 // ボーダーに届いたらすぐクリア・クリアしたプレーでコインが決まる(coinsFor)・役Lv購入(6コイン)・数字ボーナス(クリアで2つ上昇/ショップ4コイン)・縛りのロックを含めて測っている。ルールを変えたら測り直す
 const BORDERS = {
     normal  : [[75, 85, 95, 105, 120, 130, 145], [95, 105, 120, 135, 150, 165, 180], [125, 140, 155, 170, 185, 200, 215]],
@@ -1097,6 +1121,17 @@ const BORDERS = {
     small50 : [[75, 85, 100, 110, 120, 135, 145], [95, 110, 120, 135, 150, 165, 180], [130, 140, 155, 170, 185, 205, 220]],
     dora3   : [[90, 105, 115, 130, 140, 155, 170], [115, 130, 145, 160, 175, 195, 210], [140, 160, 180, 195, 215, 240, 260]],
     weak    : [[60, 65, 75, 85, 95, 105, 115], [75, 85, 100, 110, 120, 135, 145], [95, 110, 125, 140, 155, 170, 185]],
+    luck    : [[75, 90, 100, 115, 130, 140, 155], [100, 115, 130, 145, 165, 180, 200], [130, 145, 165, 185, 205, 225, 245]],
+    nozoro  : [[45, 55, 65, 75, 90, 100, 110], [55, 70, 80, 90, 105, 115, 130], [70, 80, 95, 105, 120, 135, 150]],
+    straight2: [[70, 80, 90, 100, 115, 125, 140], [90, 100, 115, 125, 135, 150, 165], [120, 130, 145, 155, 170, 185, 195]],
+    full2   : [[75, 85, 95, 105, 120, 130, 145], [90, 105, 120, 135, 145, 165, 180], [125, 145, 160, 180, 200, 220, 240]],
+    rich    : [[75, 90, 100, 115, 125, 140, 155], [95, 110, 125, 140, 160, 180, 195], [120, 140, 165, 185, 210, 235, 260]],
+    dead    : [[35, 45, 50, 60, 65, 75, 85], [55, 65, 75, 80, 90, 100, 110], [70, 80, 95, 105, 120, 135, 150]],
+    nofail  : [[75, 85, 95, 110, 120, 135, 145], [95, 105, 120, 135, 150, 165, 180], [115, 135, 150, 170, 190, 210, 230]],
+    nomoney : [[70, 80, 95, 105, 120, 135, 150], [90, 100, 115, 130, 145, 165, 180], [110, 130, 145, 165, 185, 205, 225]],
+    nochange: [[60, 70, 80, 90, 105, 120, 130], [75, 85, 95, 110, 120, 135, 150], [85, 95, 110, 125, 140, 160, 175]],
+    oneshot : [[20, 20, 25, 30, 30, 35, 40], [20, 25, 30, 35, 40, 45, 50], [30, 35, 40, 45, 50, 55, 60]],
+    lucky7  : [[105, 120, 130, 145, 160, 170, 185], [125, 140, 160, 175, 195, 210, 230], [155, 170, 190, 210, 225, 245, 265]],
 };
 function borderFor(sid, star, stage){
     return BORDERS[sid][star - 1][stage - 1];
@@ -1182,6 +1217,28 @@ const SHACKLE_TEXT = {
                desc: { ja: '九九カードの半分がドラ札！（そのうち2割はうらドラが2枚のドラドラ札）うらドラがどんどん増える。ドラ札アップは使えない。', ja_easy: 'くくカードの はんぶんが ドラふだ！（そのうち 2わりは うらドラが 2まいの ドラドラふだ）うらドラが どんどん ふえるよ。ドラふだアップは つかえない。', en: 'Half of the times cards are Dora Cards! (a fifth of those are Dora×2.) Ura dora pile up. Dora Card Up is locked.' } },
     weak:    { name: { ja: '弱体化', ja_easy: 'じゃくたいか', en: 'Weakened' },
                desc: { ja: 'ステージごとに、3つの役のスコアが半分に。どの役を狙うか考えよう！', ja_easy: 'ステージごとに、3つの やくの スコアが はんぶんに。どの やくを ねらうか かんがえよう！', en: 'Each stage, the score of 3 roles is halved. Pick your target hand wisely!' } },
+    luck:    { name: { ja: '運に身を任せよ', ja_easy: 'うんに みを まかせよ', en: 'Leave It to Luck' },
+               desc: { ja: 'ドラが見えない！ ドラは「見えないうらドラ2枚」に変身。結果発表までドキドキ。ドラ札を割れば、うらドラはさらに増える。', ja_easy: 'ドラが みえない！ ドラは「みえない うらドラ 2まい」に へんしん。けっかはっぴょうまで ドキドキ。', en: 'The dora is hidden! It turns into 2 secret ura dora. Revealed only at scoring.' } },
+    nozoro:  { name: { ja: 'ぞろ目禁止令', ja_easy: 'ぞろめ きんしれい', en: 'No Doubles Decree' },
+               desc: { ja: '1・4・9・16・25・36・49・64・81（同じ数をかけた答え）の九九カードが出ない。同じ数字のペアを作りにくくなるぞ。', ja_easy: '1・4・9・16・25・36・49・64・81（おなじ かずを かけた こたえ）の くくカードが でない。', en: 'Times cards 1, 4, 9, 16, 25, 36, 49, 64, 81 (squares) never appear.' } },
+    straight2: { name: { ja: 'ストレート大好き', ja_easy: 'ストレート だいすき', en: 'Straight Lover' },
+               desc: { ja: 'ストレートの基本点が2倍！ 5枚つづきを思いきりねらえ。', ja_easy: 'ストレートの きほんてんが 2ばい！ 5まい つづきを ねらえ。', en: 'Straight base points are doubled! Go for 5 in a row.' } },
+    full2:   { name: { ja: 'フルハウス大好き', ja_easy: 'フルハウス だいすき', en: 'Full House Lover' },
+               desc: { ja: 'フルハウスの基本点が2倍！ 3枚＋2枚をそろえよう。', ja_easy: 'フルハウスの きほんてんが 2ばい！ 3まい ＋ 2まいを そろえよう。', en: 'Full House base points are doubled! Build 3 + 2.' } },
+    rich:    { name: { ja: '大金持ちだぁ！', ja_easy: 'おおがねもちだぁ！', en: 'Filthy Rich!' },
+               desc: { ja: 'ステージクリアでもらえるコインが5倍！ ショップで買いまくろう。そのぶんボーダーは高めだよ。', ja_easy: 'ステージクリアで もらえる コインが 5ばい！ ショップで かいまくろう。', en: 'Stage-clear coins are x5! Shop till you drop. Borders are higher.' } },
+    dead:    { name: { ja: 'デッドオアライブ', ja_easy: 'デッド オア ライブ', en: 'Dead or Alive' },
+               desc: { ja: 'ドラかうらドラが1枚も乗らないと、そのプレーは0点！ ドラを手札に入れよう。', ja_easy: 'ドラか うらドラが 1まいも のらないと、そのプレーは 0てん！', en: 'If no dora or ura dora hits, the play scores 0!' } },
+    nofail:  { name: { ja: '私、失敗しないので', ja_easy: 'わたし、しっぱい しないので', en: 'I Never Fail' },
+               desc: { ja: '「やくなし」になったら、その場でゲームオーバー！ 少なくともペアはつくろう。', ja_easy: '「やくなし」に なったら、その場で ゲームオーバー！ ペアは つくろう。', en: 'Score "No Hand" and it is instant Game Over. At least make a pair!' } },
+    nomoney: { name: { ja: '宵越しの金は持たねぇ！', ja_easy: 'よいごしの かねは もたねぇ！', en: 'Spend It All!' },
+               desc: { ja: 'ショップを出ると、のこりのコインが0になる。コインは買い切ろう！', ja_easy: 'ショップを でると、のこりの コインが 0に なる。かい きろう！', en: 'Leaving the shop wipes your coins to 0. Spend them all!' } },
+    nochange: { name: { ja: '初志貫徹', ja_easy: 'しょしかんてつ', en: 'Stick to Your Guns' },
+               desc: { ja: 'チェンジができない。ストックチケットも買えず、ロックもなし。最初に出た九九カードで勝負！', ja_easy: 'チェンジが できない。ストックチケットも かえない。さいしょの くくカードで しょうぶ！', en: 'No swaps, no Stock Tickets, no locks. Play the cards you are dealt!' } },
+    oneshot: { name: { ja: '一発勝負！', ja_easy: 'いっぱつ しょうぶ！', en: 'One Shot!' },
+               desc: { ja: '1ステージのプレーは1回だけ。そのかわりストックチケット5枚つきでスタート！', ja_easy: '1ステージの プレーは 1かいだけ。ストックチケット 5まいつきで スタート！', en: 'Only 1 play per stage. Start with 5 Stock Tickets!' } },
+    lucky7:  { name: { ja: 'ラッキーセブン！', ja_easy: 'ラッキーセブン！', en: 'Lucky Seven!' },
+               desc: { ja: '数字の7のレベルが、最初から10！ 手札の7は1枚+10点。7を集めよう。', ja_easy: 'すうじの 7の レベルが さいしょから 10！ てふだの 7は 1まい +10てん。', en: 'Number 7 starts at Lv 10! Each 7 in hand gives +10. Collect sevens!' } },
 };
 
 const UI_TEXT = {
@@ -1264,6 +1321,13 @@ const UI_TEXT = {
     btn_ok: { ja: 'OK', ja_easy: 'OK', en: 'OK' },
     hud_score_now: { ja: 'スコア', ja_easy: 'スコア', en: 'Score' },
     hud_goal: { ja: '🚩 ボーダー', ja_easy: '🚩 ボーダー', en: '🚩 Border' },
+    res_dead: { ja: 'ドラなし→0点', ja_easy: 'ドラなし→0てん', en: 'No dora → 0 pts' },
+    res_fail: { ja: 'やくなし…ゲームオーバー！', ja_easy: 'やくなし…ゲームオーバー！', en: 'No hand... Game Over!' },
+    btn_game_over: { ja: 'ゲームオーバー ▶', ja_easy: 'ゲームオーバー ▶', en: 'Game Over ▶' },
+    cp_it_mult: { ja: '大金持ちボーナス', ja_easy: 'おおがねもちボーナス', en: 'Rich bonus' },
+    tk_none: { ja: 'チェンジなし', ja_easy: 'チェンジなし', en: 'No swaps' },
+    btn_change_none: { ja: 'チェンジできない', ja_easy: 'チェンジできない', en: 'No swaps' },
+    shop_warn_zero: { ja: 'ショップを出るとコインが0に！', ja_easy: 'ショップを でると コインが 0に！', en: 'Coins reset to 0 when you leave!' },
     cp_lb_score: { ja: 'スコア', ja_easy: 'スコア', en: 'SCORE' },
     cp_goal: { ja: b => `🚩 ボーダー ${b}`, ja_easy: b => `🚩 ボーダー ${b}`, en: b => `🚩 Border ${b}` },
     cp_lb_coin: { ja: 'コイン', ja_easy: 'コイン', en: 'COINS' },
@@ -1541,7 +1605,7 @@ function goToRunSelect(){
     renderRunSelect();
 }
 // 縛りごとのカード色
-const SHACKLE_COLOR = { normal: '#2f9e6a', odd: '#3b82d6', even: '#ee8a3a', big20: '#c99a12', big30: '#c8452c', small60: '#2fb8a2', small50: '#4f9bd9', dora3: '#8a4fd6', weak: '#7d7f92' };
+const SHACKLE_COLOR = { normal: '#2f9e6a', odd: '#3b82d6', even: '#ee8a3a', big20: '#c99a12', big30: '#c8452c', small60: '#2fb8a2', small50: '#4f9bd9', dora3: '#8a4fd6', weak: '#7d7f92', luck: '#5a6ad6', nozoro: '#d6453c', straight2: '#e0559f', full2: '#e8a317', rich: '#d4a000', dead: '#4a3a52', nofail: '#2fa8c9', nomoney: '#c24a2f', nochange: '#6d7f95', oneshot: '#e8503d', lucky7: '#2fae60' };
 // 縛りごとのイラスト（CSSだけで描く。数字カード・泡・山などをposition:absoluteで並べる）
 function pcard(n, left, top, rot, extra){
     return `<div class="pc" style="left:${left}px;top:${top}px;transform:rotate(${rot || 0}deg);background:${cardBg(n)};${extra || ''}">${n}</div>`;
@@ -1602,6 +1666,62 @@ function shackleArt(id){
             <div style="position:absolute;left:100px;top:28px;width:6px;height:70px;background:#2a2230;transform:rotate(-14deg);clip-path:polygon(0 0,100% 10%,40% 40%,100% 60%,20% 100%)"></div>
             <div class="artbadge" style="right:10px;top:8px;background:#7a4fd0">×½</div>
             <div style="position:absolute;left:18px;top:100px;color:#ffb0a8;font-weight:900;font-size:1.6rem;letter-spacing:4px;text-shadow:0 2px 0 rgba(0,0,0,0.4)">▼▼▼</div></div>`;
+    case 'luck':
+        return `<div class="rs-art" style="background:linear-gradient(#241c5e,#6a55d8)">
+            <div class="pc" style="left:46px;top:46px;transform:rotate(-12deg);background:linear-gradient(160deg,#9b7af5,#6a45d8)">？</div>
+            <div class="pc" style="left:136px;top:46px;transform:rotate(12deg);background:linear-gradient(160deg,#9b7af5,#6a45d8)">？</div>
+            <div style="position:absolute;left:86px;top:6px;font-size:62px;filter:drop-shadow(0 4px 0 rgba(0,0,0,0.3))">🍀</div>
+            ${sp('✦', 20, 20, 20)}${sp('✦', 200, 22, 16, 0.5)}${sp('✦', 190, 110, 14, 0.9)}</div>`;
+    case 'nozoro':
+        return `<div class="rs-art" style="background:linear-gradient(#fff0ee,#f5a79d)">
+            ${pcard(4, 58, 48, -10)}${pcard(9, 124, 48, 10)}
+            <div style="position:absolute;left:68px;top:14px;width:104px;height:104px;border-radius:50%;border:10px solid #e03a2f;box-shadow:0 4px 0 rgba(0,0,0,0.25)"></div>
+            <div style="position:absolute;left:62px;top:60px;width:116px;height:10px;background:#e03a2f;transform:rotate(-45deg);border-radius:5px;box-shadow:0 3px 0 rgba(0,0,0,0.25)"></div></div>`;
+    case 'straight2':
+        return `<div class="rs-art" style="background:linear-gradient(#ffe0f0,#e0559f)">
+            ${[3, 4, 5, 6, 7].map((n, i) => pcard(n, 14 + i * 40, 56 - (i === 2 ? 8 : 0), (i - 2) * 6, 'width:40px;height:58px;font-size:1.5rem;border-width:2px')).join('')}
+            <div class="artbadge" style="right:10px;top:8px;background:#c0397f">×2</div>${sp('✦', 20, 14, 18)}</div>`;
+    case 'full2':
+        return `<div class="rs-art" style="background:linear-gradient(#fff3d0,#f0a820)">
+            ${[3, 3, 3].map((n, i) => pcard(n, 14 + i * 36, 62, (i - 1) * 8, 'width:40px;height:58px;font-size:1.5rem;border-width:2px')).join('')}
+            ${[8, 8].map((n, i) => pcard(n, 134 + i * 38, 62, (i - 0.5) * 10, 'width:40px;height:58px;font-size:1.5rem;border-width:2px')).join('')}
+            <div style="position:absolute;left:92px;top:2px;font-size:44px">🏠</div><div class="artbadge" style="right:10px;top:8px;background:#c98600">×2</div></div>`;
+    case 'rich':
+        return `<div class="rs-art" style="background:radial-gradient(circle at 50% 60%,#fff6b0,#e8b400 75%)">
+            ${[[20, 90], [52, 104], [150, 98], [182, 88], [88, 108], [118, 112]].map(([l, t]) => `<div class="chipart" style="--cc:#f2b84a;left:${l}px;top:${t}px"></div>`).join('')}
+            <div style="position:absolute;left:78px;top:14px;font-size:70px;filter:drop-shadow(0 5px 0 rgba(0,0,0,0.25))">💰</div>
+            <div class="artbadge" style="right:10px;top:8px;background:#b57a00">×5</div>${sp('✦', 24, 18, 22)}${sp('✦', 190, 70, 16, 0.6)}</div>`;
+    case 'dead':
+        return `<div class="rs-art" style="background:radial-gradient(circle at 50% 50%,#7a3a5a,#241420 78%)">
+            <div style="position:absolute;left:62px;top:14px;font-size:84px;filter:drop-shadow(0 5px 0 rgba(0,0,0,0.5))">☠️</div>
+            <div class="pc" style="left:160px;top:50px;width:50px;height:72px;font-size:1.2rem;transform:rotate(12deg);background:linear-gradient(160deg,#fff4b0,#ffc93d 55%,#e8a317);color:#7a2a00;border-color:#b57a00">ドラ</div>
+            <div class="artbadge" style="left:10px;top:8px;background:#d63a22">0点</div></div>`;
+    case 'nofail':
+        return `<div class="rs-art" style="background:linear-gradient(#e6fbff,#4fb8d6)">
+            <div style="position:absolute;left:22px;top:28px;font-size:78px;filter:drop-shadow(0 5px 0 rgba(0,0,0,0.25))">😎</div>
+            ${pcard(5, 130, 40, -8)}${pcard(5, 168, 46, 8)}
+            <div class="artbadge" style="right:10px;top:8px;background:#d63a22">OUT</div>
+            <div style="position:absolute;left:120px;top:104px;font-size:1.3rem;font-weight:900;color:#0f5a70;background:#fff;border:3px solid #0f5a70;border-radius:50px;padding:0 12px">ペア ✓</div></div>`;
+    case 'nomoney':
+        return `<div class="rs-art" style="background:linear-gradient(#141a48,#6a3a68 70%,#c24a2f)">
+            <div style="position:absolute;left:150px;top:6px;font-size:54px">🌙</div>
+            ${[[24, 18, 14], [64, 54, -20], [108, 20, 30], [40, 96, 10], [140, 100, -30], [190, 72, 20]].map(([l, t, r]) => `<div class="chipart" style="--cc:#f2b84a;left:${l}px;top:${t}px;transform:rotate(${r}deg)"></div>`).join('')}
+            <div style="position:absolute;left:84px;top:62px;font-size:56px;filter:drop-shadow(0 4px 0 rgba(0,0,0,0.4))">💸</div></div>`;
+    case 'nochange':
+        return `<div class="rs-art" style="background:linear-gradient(#e3eaf3,#7f92aa)">
+            <div style="position:absolute;left:62px;top:8px;font-size:104px;line-height:1;font-weight:900;color:#fff;text-shadow:0 5px 0 rgba(0,0,0,0.25)">⟳</div>
+            <div style="position:absolute;left:86px;top:54px;font-size:60px;filter:drop-shadow(0 4px 0 rgba(0,0,0,0.35))">🔒</div>
+            ${pcard(3, 20, 70, -8, 'width:40px;height:58px;font-size:1.5rem;border-width:2px')}${pcard(8, 176, 70, 8, 'width:40px;height:58px;font-size:1.5rem;border-width:2px')}</div>`;
+    case 'oneshot':
+        return `<div class="rs-art" style="background:linear-gradient(#ffe1d8,#f0735b)">
+            <div style="position:absolute;left:62px;top:10px;width:122px;height:122px;border-radius:50%;background:radial-gradient(circle,#d63a22 0 14%,#fff 15% 30%,#d63a22 31% 46%,#fff 47% 62%,#d63a22 63% 78%,#fff 79%);border:5px solid #8a2412;box-shadow:0 5px 0 rgba(0,0,0,0.25)"></div>
+            <div class="artbadge" style="right:8px;top:8px;background:#8a2412">1回</div>
+            <div class="artbadge" style="left:8px;bottom:8px;background:#e8a317;font-size:1.05rem">🎟 ×5</div>${sp('✦', 20, 20, 18)}</div>`;
+    case 'lucky7':
+        return `<div class="rs-art" style="background:linear-gradient(#d8ffe5,#2fae60)">
+            <div class="pc" style="left:78px;top:14px;width:80px;height:112px;font-size:4rem;transform:rotate(-4deg);background:linear-gradient(160deg,#fff4b0,#ffc93d 55%,#e8a317);color:#7a2a00;border-color:#b57a00;box-shadow:0 6px 0 rgba(0,0,0,0.3),0 0 22px rgba(255,216,77,0.9)">7</div>
+            ${pcard(7, 22, 54, -14, 'width:44px;height:64px;font-size:1.6rem;border-width:2px')}${pcard(7, 172, 54, 14, 'width:44px;height:64px;font-size:1.6rem;border-width:2px')}
+            <div class="artbadge" style="right:8px;top:8px;background:#1f8f4a;font-size:1.05rem">Lv10</div>${sp('✦', 24, 16, 20)}${sp('✦', 196, 104, 16, 0.5)}</div>`;
     }
     return '<div class="rs-art"></div>';
 }
@@ -1615,6 +1735,17 @@ const SHACKLE_SHORT = {
     small50: { ja: '50以下の九九カードだけ', ja_easy: '50いかの くくカードだけ', en: 'Cards of 50 or less' },
     dora3:   { ja: 'ドラ札50%！', ja_easy: 'ドラふだ 50%！', en: 'Dora Cards 50%!' },
     weak:    { ja: '毎ステージ3つの役のスコアが半分に', ja_easy: 'まいステージ 3つの やくの スコアが はんぶん', en: '3 roles score half each stage' },
+    luck:    { ja: 'ドラは見えないうらドラ2枚に', ja_easy: 'ドラは みえない うらドラ 2まいに', en: 'Dora becomes 2 hidden ura' },
+    nozoro:  { ja: 'ぞろ目の九九カードが出ない', ja_easy: 'ぞろめの くくカードが でない', en: 'No square cards' },
+    straight2: { ja: 'ストレートの点が2倍', ja_easy: 'ストレートの てんが 2ばい', en: 'Straight scores x2' },
+    full2:   { ja: 'フルハウスの点が2倍', ja_easy: 'フルハウスの てんが 2ばい', en: 'Full House scores x2' },
+    rich:    { ja: 'もらえるコインが5倍', ja_easy: 'もらえる コインが 5ばい', en: 'Coins earned x5' },
+    dead:    { ja: 'ドラが乗らないと0点', ja_easy: 'ドラが のらないと 0てん', en: 'No dora = 0 pts' },
+    nofail:  { ja: 'やくなしで即ゲームオーバー', ja_easy: 'やくなしで すぐ ゲームオーバー', en: 'No hand = Game Over' },
+    nomoney: { ja: 'ショップを出るとコインが0に', ja_easy: 'ショップを でると コインが 0に', en: 'Coins reset after shop' },
+    nochange: { ja: 'チェンジができない', ja_easy: 'チェンジが できない', en: 'No swaps allowed' },
+    oneshot: { ja: '1ステージ1プレー（チケット5枚）', ja_easy: '1ステージ 1プレー（チケット 5まい）', en: '1 play per stage (5 tickets)' },
+    lucky7:  { ja: '7のレベルが最初から10', ja_easy: '7の レベルが さいしょから 10', en: 'Number 7 starts at Lv 10' },
 };
 const RS_CARD_W = 244, RS_GAP = 20;
 function renderRunSelect(){
@@ -1675,11 +1806,13 @@ let playSt = null;   // 今のプレー
 let tutorialQueue = null;   // チュートリアル中、補充する九九カードを台本どおりにする
 let busy = false;
 
-function newNumLv(){ const o = {}; for (let n = 1; n <= 9; n++) o[n] = 0; return o; }
+function newNumLv(sh){ const o = {}; for (let n = 1; n <= 9; n++) o[n] = (sh && sh.startNumLv && sh.startNumLv[n]) || 0; return o; }
+function playsPer(){ return (run && run.shackle && run.shackle.plays) || PLAYS_PER_STAGE; }
 function startRun(sid, star){
     saveLastRun(sid, star); selSid = sid; selStar = star;
+    setRoleMult(SHACKLE_BY_ID[sid].roleMult);
     const lv = {}; ROLES.forEach(r => { lv[r.id] = 1; });
-    run = { sid, star, shackle: SHACKLE_BY_ID[sid], stage: 1, playNo: 1, lv, weak: new Set(), coins: 0, special: SHACKLE_BY_ID[sid].startSpecial || 0, rareUp: 0, stageCoinBonus: 0, numLv: newNumLv(), sale: new Set(),
+    run = { sid, star, shackle: SHACKLE_BY_ID[sid], stage: 1, playNo: 1, lv, weak: new Set(), coins: 0, special: SHACKLE_BY_ID[sid].startSpecial || 0, rareUp: 0, stageCoinBonus: 0, numLv: newNumLv(SHACKLE_BY_ID[sid]), sale: new Set(),
             roleBuys: 0, stageScore: 0, totalScore: 0, bestPlay: 0 };
     beginStage();
 }
@@ -1694,6 +1827,17 @@ const PLAY_THEME = {
     small50: { a: '#f0f7ff', b: '#a8c9ee', bdr: '#b8d3ef', zone: '#8fb5e0', gl: ['5', '10', '20'], gc: '#3b6da0' },
     dora3:   { a: '#f8eeff', b: '#c9a6f7', bdr: '#d6bff3', zone: '#b58be8', gl: ['ドラ', '✦', '🀄'], gc: '#7a3fd0' },
     weak:    { a: '#f1f2f6', b: '#aeb3c6', bdr: '#c6c9d6', zone: '#9aa0b6', gl: ['▼', '½', '💧'], gc: '#5d6378' },
+    luck:    { a: '#f1f0ff', b: '#b9b6f3', bdr: '#cbc8f5', zone: '#a49ee6', gl: ['？', '🍀', '✦'], gc: '#5a4fc0' },
+    nozoro:  { a: '#fff1ef', b: '#f5aaa0', bdr: '#f3c4bd', zone: '#e8938a', gl: ['🚫', '4', '9', '16'], gc: '#c0392b' },
+    straight2: { a: '#fff0f8', b: '#f4a8d2', bdr: '#f3c3e0', zone: '#e88cc0', gl: ['3', '4', '5', '6', '7'], gc: '#c0397f' },
+    full2:   { a: '#fff8e6', b: '#ffd98a', bdr: '#f5deb0', zone: '#eabf68', gl: ['🏠', '3', '8'], gc: '#c98600' },
+    rich:    { a: '#fffbe0', b: '#ffe27a', bdr: '#f3e3a0', zone: '#e8c84a', gl: ['💰', '🪙', '＄'], gc: '#b8860b' },
+    dead:    { a: '#f1eaf0', b: '#b8a3b4', bdr: '#cfc0cc', zone: '#a78ca2', gl: ['☠', 'ドラ', '✦'], gc: '#6a3a5a' },
+    nofail:  { a: '#eafbff', b: '#9fdcec', bdr: '#b4e4f0', zone: '#7fcde2', gl: ['😎', '✓', '役'], gc: '#1f7f9a' },
+    nomoney: { a: '#fff1e8', b: '#f3b79b', bdr: '#f3cbb6', zone: '#e8a07f', gl: ['💸', '🌙', '両'], gc: '#b0431f' },
+    nochange: { a: '#eff3f8', b: '#b4c2d3', bdr: '#c8d3e0', zone: '#9fb0c4', gl: ['🔒', '⟳', '✕'], gc: '#53657b' },
+    oneshot: { a: '#fff0ec', b: '#f6a999', bdr: '#f5c4ba', zone: '#ea8e7c', gl: ['①', '🎯', '1'], gc: '#c23a28' },
+    lucky7:  { a: '#effff3', b: '#9fe5b5', bdr: '#b5ecc6', zone: '#7fd49a', gl: ['7', '🍀', '7'], gc: '#1f8f4a' },
 };
 function applyPlayTheme(sid){
     const t = PLAY_THEME[sid] || PLAY_THEME.normal, el = document.getElementById('play-screen');
@@ -1746,9 +1890,10 @@ function nextAnswer(excl){
 function startPlay(){
     busy = false;
     playSt = {
-        dora: randNum(run.shackle),
+        dora: run.shackle.hiddenDora ? null : randNum(run.shackle),   // 運に身を任せよ：ドラは見えない（うらドラ2枚に変身）
         hand: [randNum(run.shackle)],
-        uras: [], picks: 0, selected: -1, ticket: 1, over: false,
+        uras: run.shackle.hiddenDora ? Array.from({ length: run.shackle.hiddenDora }, () => randNum(run.shackle)) : [],
+        picks: 0, selected: -1, ticket: run.shackle.noChange ? 0 : 1, over: false,
         answers: drawAnswerSet(run.shackle, cardUp()), locked: [false, false, false],
         coinGain: 0,
         newFlags: null, newAns: -1, allNewAns: true,
@@ -1779,6 +1924,7 @@ function renderRolesLive(){
 // いれかえチケット（CSSで描いたチケット。毎プレー回復する「フリー」と、買ってためておく「ストック」。0枚は灰色）
 function ticketsHtml(){
     const t = playSt.ticket, sp = run.special;
+    if (run.shackle.noChange) return `<div class="tk-title">${escapeHtml(ui('tk_title'))}</div><div class="tk-none">🔒 ${escapeHtml(ui('tk_none'))}</div>`;
     return `<div class="tk-title">${escapeHtml(ui('tk_title'))}</div><div class="tk-pair">
         <div class="tk2 free${t > 0 ? '' : ' off'}"><span class="tw">${escapeHtml(ui('tk_free'))}</span><b>×${t}</b></div>
         <div class="tk2 stock${sp > 0 ? '' : ' off'}"><span class="tw">${escapeHtml(ui('tk_stock'))}</span><b>×${sp}</b></div></div>`;
@@ -1786,7 +1932,7 @@ function ticketsHtml(){
 function renderPlay(){
     const p = playSt;
     document.getElementById('hud-run').textContent = `${run.shackle.icon} ${shackleName(run.sid)}　${'★'.repeat(run.star)}`;
-    document.getElementById('dora-num').textContent = p.dora;
+    document.getElementById('dora-num').textContent = p.dora == null ? '―' : p.dora;
     document.getElementById('ura-row').innerHTML = p.uras.length
         ? p.uras.map(() => `<div class="ura-chip">?</div>`).join('')
         : `<div class="ura-none">―</div>`;
@@ -1798,7 +1944,7 @@ function renderPlay(){
             ${a.kind !== 'normal' ? `<div class="rare-badge b-${a.kind}">${ui('badge_' + a.kind)}</div>` : ''}
             <div class="num${String(a.v).length > 1 ? ' len2' : ''}">${a.v}</div>
         </div>
-        <button class="lock-btn${p.locked[i] ? ' on' : ''}" onclick="toggleLock(${i})" ${p.over ? 'disabled' : ''}>${p.locked[i] ? '🔒' : '🔓'} ${escapeHtml(ui(p.locked[i] ? 'btn_locked' : 'btn_lock'))}</button>
+        ${run.shackle.noChange ? '' : `<button class="lock-btn${p.locked[i] ? ' on' : ''}" onclick="toggleLock(${i})" ${p.over ? 'disabled' : ''}>${p.locked[i] ? '🔒' : '🔓'} ${escapeHtml(ui(p.locked[i] ? 'btn_locked' : 'btn_lock'))}</button>`}
         </div>`).join('');
     p.newAns = -1; p.allNewAns = false; p.newMany = null;
     // 九九の選択（「もどる」でえらびなおし）
@@ -1828,10 +1974,10 @@ function updateSidePanel(){
     document.getElementById('hud-stage').textContent = run.stage;
     document.getElementById('hud-stage-of').textContent = '/' + STAGES;
     document.getElementById('hud-play').textContent = run.playNo;
-    document.getElementById('hud-play-of').textContent = '/' + PLAYS_PER_STAGE;
+    document.getElementById('hud-play-of').textContent = '/' + playsPer();
     const pip = (n, cur) => Array.from({ length: n }, (_, i) => `<i class="${i + 1 < cur ? 'done' : (i + 1 === cur ? 'now' : '')}"></i>`).join('');
     document.getElementById('pips-stage').innerHTML = pip(STAGES, run.stage);
-    document.getElementById('pips-play').innerHTML = pip(PLAYS_PER_STAGE, run.playNo);
+    document.getElementById('pips-play').innerHTML = pip(playsPer(), run.playNo);
     document.getElementById('hud-score-now').textContent = run.stageScore;
     document.getElementById('hud-score-goal').textContent = b;
     const bar = document.getElementById('hud-bar');
@@ -1842,8 +1988,8 @@ function updateSidePanel(){
     document.getElementById('hud-coinnote').textContent = run.stageCoinBonus ? uif('coin_note', run.stageCoinBonus) : '';
     renderRolesLive();
     const btn = document.getElementById('btn-change');
-    btn.textContent = ui('btn_change');
-    btn.disabled = (playSt.ticket + run.special) <= 0 || playSt.over || busy;
+    btn.textContent = run.shackle.noChange ? '🔒 ' + ui('btn_change_none') : ui('btn_change');
+    btn.disabled = !!run.shackle.noChange || (playSt.ticket + run.special) <= 0 || playSt.over || busy;
     document.getElementById('tk-row').innerHTML = ticketsHtml();
 }
 function pickAnswer(i){
@@ -1852,7 +1998,7 @@ function pickAnswer(i){
     renderPlay();
 }
 function toggleLock(i){
-    if (busy || playSt.over) return;
+    if (busy || playSt.over || run.shackle.noChange) return;
     playSt.locked[i] = !playSt.locked[i];
     renderPlay();
 }
@@ -1893,7 +2039,7 @@ function choosePair(x, y){
 }
 function doChange(){
     const p = playSt;
-    if (busy || p.over) return;
+    if (busy || p.over || run.shackle.noChange) return;
     if (p.ticket > 0) p.ticket--;
     else if (run.special > 0) run.special--;
     else return;
@@ -1915,7 +2061,9 @@ function doChange(){
 function finishPlay(){
     const p = playSt;
     const cards = p.hand.slice();
-    const r = calcScore(cards, p.dora, p.uras, run.lv, run.weak, run.numLv);
+    const r = calcScore(cards, p.dora, p.uras, run.lv, run.weak, run.numLv, { needDora: !!run.shackle.needDora });
+    run.lastRole = r.role;
+    const failNow = !!run.shackle.failOnHigh && r.role === 'high';   // 私、失敗しないので：やくなしで即ゲームオーバー
     run.stageScore += r.total;
     run.totalScore += r.total;
     if (r.total > run.bestPlay){ run.bestPlay = r.total; run.bestRole = r.role; }
@@ -1925,7 +2073,7 @@ function finishPlay(){
     const noRole = r.role === 'high';
     const rc = r.role === 'high' ? '#8a8f9c' : ROLE_COLOR[r.role];
     const lvNow = run.lv[r.role] || 1, weakNow = run.weak.has(r.role);
-    const doraSub = (r.doraN + r.uraN === 0) ? ui('res_no_dora') : uif('res_dora_sub', r.doraN, r.uraN);
+    const doraSub = r.dead ? ui('res_dead') : ((r.doraN + r.uraN === 0) ? ui('res_no_dora') : uif('res_dora_sub', r.doraN, r.uraN));
     const baseSub = [r.roleBase > 0 ? uif('res_role_part', roleName(r.role), r.roleBase) : '', r.numB > 0 ? uif('res_num_part', r.numB) : ''].filter(Boolean).join(' ＋ ');
     box.style.setProperty('--rc', rc);
     box.innerHTML = `
@@ -1935,7 +2083,7 @@ function finishPlay(){
             <div class="rm-top">
                 <div class="rm-hand" id="res-hand">${sorted.map(n => cardHtml(n, 'sm')).join('')}</div>
                 <div class="rm-dora">
-                    <div class="rm-dchip dd"><span>${ui('dora_label')}</span><b>${p.dora}</b></div>
+                    <div class="rm-dchip dd"><span>${ui('dora_label')}</span><b>${p.dora == null ? '―' : p.dora}</b></div>
                     <div class="rm-dchip uu${p.uras.length >= 3 ? ' many' : ''}"><span>${ui('ura_label')}</span>${p.uras.length ? `<div class="fc-row">${p.uras.map((u, i) => `<div class="flipcard" id="ura-f${i}">?</div>`).join('')}</div>` : '<b>―</b>'}</div>
                 </div>
             </div>
@@ -1949,8 +2097,9 @@ function finishPlay(){
                 </div>
                 ${p.coinGain ? `<div class="rm-coinnote">${escapeHtml(uif('res_coin_card', p.coinGain))}</div>` : ''}
                 ${run.stageScore >= b ? `<div class="rm-clear">🎉 ${escapeHtml(uif('res_cleared', run.playNo, coinsFor(run.playNo) + run.stageCoinBonus))}</div>` : ''}
+                ${failNow ? `<div class="rm-fail">💥 ${escapeHtml(ui('res_fail'))}</div>` : ''}
                 <div class="rm-stage"><span>${escapeHtml(uif('res_stage', run.stageScore, b))}</span><div class="bar${run.stageScore >= b ? ' ok' : ''}"><i style="width:${Math.min(100, run.stageScore / b * 100)}%"></i></div></div>
-                <div class="rm-foot"><button class="btn btn-primary btn-sm" id="btn-res-next" onclick="afterPlayResult()">${run.stageScore >= b ? ui('btn_stage_clear') : (run.playNo < PLAYS_PER_STAGE ? ui('btn_next_play') : ui('btn_stage_result'))}</button></div>
+                <div class="rm-foot"><button class="btn btn-primary btn-sm" id="btn-res-next" onclick="afterPlayResult()">${failNow ? ui('btn_game_over') : (run.stageScore >= b ? ui('btn_stage_clear') : (run.playNo < playsPer() ? ui('btn_next_play') : ui('btn_stage_result')))}</button></div>
             </div>
         </div>`;
     document.getElementById('play-result-modal').classList.remove('hidden');
@@ -1977,8 +2126,12 @@ function finishPlay(){
 }
 function afterPlayResult(){
     document.getElementById('play-result-modal').classList.add('hidden');
+    if (run.shackle.failOnHigh && run.lastRole === 'high'){
+        (run.stageLog = run.stageLog || []).push({ stage: run.stage, score: run.stageScore, border: borderFor(run.sid, run.star, run.stage), ok: false, plays: run.playNo });
+        endRun(false); return;
+    }
     // ボーダーに届いたらすぐクリア。届かなければ、プレーが残っているあいだは次のプレーへ
-    if (run.playNo < PLAYS_PER_STAGE && run.stageScore < borderFor(run.sid, run.star, run.stage)){
+    if (run.playNo < playsPer() && run.stageScore < borderFor(run.sid, run.star, run.stage)){
         run.playNo++;
         startPlay();
         return;
@@ -2016,7 +2169,8 @@ function openShopAfterClear(){
     const b = borderFor(run.sid, run.star, run.stage);
     const bonus = COIN_CLEAR_BONUS[run.playNo - 1] || 0;   // 何プレー目でクリアしたかのボーナス
     const cardBonus = run.stageCoinBonus;                   // コイン札で増えた分
-    const coin = COIN_BASE + bonus + cardBonus;
+    const coinMult = run.shackle.coinMult || 1;               // 大金持ちだぁ！：もらえるコインが5倍
+    const coin = (COIN_BASE + bonus + cardBonus) * coinMult;
     run.coins += coin;
     // 役Lvアップ（ランダム1つ）
     const openRoles = LEVELABLE.filter(r => !roleLocked(run.shackle, r.id));
@@ -2030,7 +2184,7 @@ function openShopAfterClear(){
     const numUps = Array.from(new Set(picks)).sort((x, y) => x - y).map(n => ({ n, from: before[n], to: run.numLv[n] }));
     // ショップの割引抽選
     run.sale = new Set(pickSale());
-    run.shopInfo = { coin, bonus, playNo: run.playNo, cardBonus, roleId, oldLv, newLv: run.lv[roleId], numUps, score: run.stageScore, border: b };
+    run.shopInfo = { coin, coinMult, bonus, playNo: run.playNo, cardBonus, roleId, oldLv, newLv: run.lv[roleId], numUps, score: run.stageScore, border: b };
     run.weak = new Set();   // 弱体化はステージごとの抽選。次のステージの開始時にあらためて決まる
     shopFlash = 'role-' + roleId;
     showClearPopup();
@@ -2045,6 +2199,7 @@ function showClearPopup(){
     const list = [`<li><span>${escapeHtml(ui('cp_it_base'))}</span><b>${COIN_BASE}</b></li>`];
     if (i.bonus) list.push(`<li><span>${escapeHtml(uif('cp_it_play', i.playNo))}</span><b>+${i.bonus}</b></li>`);
     if (i.cardBonus) list.push(`<li><span>${escapeHtml(ui('cp_it_card'))}</span><b>+${i.cardBonus}</b></li>`);
+    if (i.coinMult > 1) list.push(`<li class="mult"><span>${escapeHtml(ui('cp_it_mult'))}</span><b>×${i.coinMult}</b></li>`);
     box.innerHTML = `
         <div class="cp-head"><div class="cp-title">${escapeHtml(uif('cp_title', run.stage))}</div><div class="cp-badge">${escapeHtml(uif('cp_badge', i.playNo))}</div></div>
         <div class="cp-grid">
@@ -2074,6 +2229,7 @@ function enterShop(){
 }
 function renderShop(){
     const info = run.shopInfo;
+    const wz = document.getElementById('shop-warn'); wz.classList.toggle('hidden', !run.shackle.zeroCoins); wz.textContent = '⚠ ' + ui('shop_warn_zero');
     document.getElementById('shop-coin-val').textContent = run.coins;
     const cost = roleLvCost();
     document.getElementById('shop-roles').innerHTML = LEVELABLE.map(r => {
@@ -2095,10 +2251,10 @@ function renderShop(){
     const rareNow = familyPct();
     const spPrice = priceOf('special', SPECIAL_COST), raPrice = priceOf('rare', RARE_UP_COST);
     document.getElementById('shop-items').innerHTML = `
-        <div class="item-card${shopFlash === 'special' ? ' flash' : ''}" style="--ic:#e8a317; --ib:#fff4d4">
+        <div class="item-card${shopFlash === 'special' ? ' flash' : ''}${run.shackle.noChange ? ' locked' : ''}" style="--ic:#e8a317; --ib:#fff4d4">
             <div class="ic"><div class="tk2 stock mini"><span class="tw">${escapeHtml(ui('tk_stock'))}</span></div></div><div class="im"><div class="tt">${escapeHtml(ui('item_special'))}</div>
-            <div class="own">${escapeHtml(uif('item_special_own', run.special))}</div></div>
-            <button class="lvbtn${run.sale.has('special') ? ' sale' : ''}" ${run.coins < spPrice || run.special >= SPECIAL_MAX ? 'disabled' : ''} onclick="buySpecial()">${priceHtml('special', SPECIAL_COST)}</button>
+            <div class="own">${escapeHtml(run.shackle.noChange ? ui('item_locked') : uif('item_special_own', run.special))}</div></div>
+            <button class="lvbtn${run.sale.has('special') ? ' sale' : ''}" ${run.coins < spPrice || run.special >= SPECIAL_MAX || run.shackle.noChange ? 'disabled' : ''} onclick="buySpecial()">${run.shackle.noChange ? '🔒' : priceHtml('special', SPECIAL_COST)}</button>
         </div>
         <div class="item-card${shopFlash === 'rare' ? ' flash' : ''}${rareLocked(run.shackle) ? ' locked' : ''}" style="--ic:#e8503d; --ib:#ffe9e4">
             <div class="ic"><div class="gcard">ドラ</div></div><div class="im"><div class="tt">${escapeHtml(ui('item_rare'))}</div>
@@ -2124,7 +2280,7 @@ function buyNum(n){
 }
 function buySpecial(){
     const cost = priceOf('special', SPECIAL_COST);
-    if (run.coins < cost || run.special >= SPECIAL_MAX) return;
+    if (run.coins < cost || run.special >= SPECIAL_MAX || run.shackle.noChange) return;
     run.coins -= cost; run.special++;
     shopFlash = 'special';
     renderShop();
@@ -2137,6 +2293,7 @@ function buyRare(){
     renderShop();
 }
 function goNextStage(){
+    if (run.shackle.zeroCoins) run.coins = 0;   // 宵越しの金は持たねぇ！：ショップを出たらコインは0
     run.stage++;
     beginStage();
 }
@@ -2379,6 +2536,7 @@ function renderRankList(rows){
 // ============================================================
 // 書き込みはエンジンが止めるので、ランキング・メダル・保存データは一切汚れない
 function startTutorial(){
+    setRoleMult({});
     FGLTutorial.begin({ root: '#container', getLang: () => currentLang });
     tutorialQueue = [8];
     const lv = {}; ROLES.forEach(r => { lv[r.id] = 1; });
