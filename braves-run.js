@@ -4,7 +4,9 @@
 // ゲームのhtmlで決められるもの: GAME.stageCount(ステージ数。既定7) / GAME.stageThemes(ステージの色 [{c}]) / GAME.titleScene(タイトルの街の形)
 
 // ステージ数と、ステージごとの世界の色(c)
-const STAGE_COUNT = GAME.stageCount || 7;
+// ステージ数。★ごとに変わるゲーム(わりざん)は GAME.stageCountFor(star) を用意すると、RUNを始めるときに入れかわる
+let STAGE_COUNT = GAME.stageCount || 7;
+function stageCountFor(star) { return GAME.stageCountFor ? GAME.stageCountFor(star) : (GAME.stageCount || 7); }
 const STAR_LOCK = true;       // ★は1つ前をクリアすると開く(九九ポーカー方式)
 
 // ステージごとの世界。bgf=通常戦の背景に重ねるフィルター(haikei_1を色変え)、bossf=ボス戦(haikei_2を色変え)
@@ -130,7 +132,7 @@ function renderRunSelect() {
             renderRunSelect();
         });
     });
-    document.getElementById('chip-row').innerHTML = STAGE_THEMES.map((th, i) =>
+    document.getElementById('chip-row').innerHTML = STAGE_THEMES.slice(0, stageCountFor(selStar)).map((th, i) =>
         `<div class="stage-chip" style="border-color:${th.c}"><small>${T('stage_word')}</small><b>${i + 1}</b></div>`).join('');
     document.getElementById('rs-prev').disabled = runSelIdx <= 0;
     document.getElementById('rs-next').disabled = runSelIdx >= RUN_LIST.length - 1;
