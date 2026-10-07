@@ -653,7 +653,7 @@ let currentLang = localStorage.getItem(GAME.keys.lang) || 'ja';
 function T(key, params) {
     const dict = STRINGS[currentLang] || STRINGS.ja;
     let str = dict[key] !== undefined ? dict[key] : (STRINGS.ja[key] || key);
-    if (params) { Object.keys(params).forEach(k => { str = str.replace(`{${k}}`, params[k]); }); }
+    if (params) { Object.keys(params).forEach(k => { str = str.split(`{${k}}`).join(params[k]); }); }
     return str;
 }
 // ---- アイコン(絵文字は使わずSVGで描く) ----

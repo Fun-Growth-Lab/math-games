@@ -41,7 +41,7 @@ function buildTitleDecor() {
     document.getElementById('ts-bots').innerHTML = bots.map(([k, l, t, sc, c], i) =>
         `<div class="ts-bot" style="left:${l}px;top:${t}px;animation-delay:${-i * 0.7}s"><div class="mon" style="--s:${sc};--c:${c}">${monHTML(k)}</div></div>`).join('');
     // ふわふわ飛ぶ数字カード
-    const nums = [3, 5, 8, 12, 7, 4, 9, 6];
+    const nums = GAME.titleNums || [3, 5, 8, 12, 7, 4, 9, 6];
     document.getElementById('ts-cards').innerHTML = nums.map((n, i) => {
         const left = 60 + (i * 157) % 1160, dur = 11 + (i * 3) % 7, delay = -((i * 2.7) % 14);
         return `<div class="pc" style="left:${left}px;animation-duration:${dur}s;animation-delay:${delay}s;background:${i % 3 === 0 ? 'linear-gradient(160deg,#fff4b0,#ffc93d 55%,#e8a317);color:#7a2a00' : 'linear-gradient(#fff,#dfe8ff);color:#2d3d78'};border-color:#fff;">${n}</div>`;
@@ -84,12 +84,14 @@ function pcard(n, left, top, rot, extra) {
 function runArt(id) {
     const sp = (ch, l, t, s, d) => `<div class="spark" style="left:${l}px;top:${t}px;font-size:${s}px;animation-delay:${d || 0}s">${ch}</div>`;
     const white = 'background:linear-gradient(#fff,#dfe8ff);color:#2d3d78;border-color:#c9d3f0;';
+    const rn = GAME.runArtNums || [4, 6, 10];       // RUNカードに浮かべる数字(しょうすうは小数)
+    const rl = GAME.runArtLayout || [[6, 62, -12], [38, 76, 7], [160, 8, 10]];     // その位置 [left, top, 角度]
     if (id === 'normal') {
         return `<div class="rs-art" style="background:linear-gradient(hsl(calc(var(--h) + 5) 72.3% 32.6%),hsl(calc(var(--h) + 8) 77.8% 17.6%))">
             <div class="rsa-floor"></div>
             <div class="mon" style="position:absolute;left:58px;top:2px;width:150px;height:150px;--c:${GAME.runArt.color};transform:scale(0.92);transform-origin:50% 100%">${monHTML(GAME.runArt.shape)}</div>
-            ${pcard(4, 6, 62, -12, white)}${pcard(6, 38, 76, 7, white)}
-            ${pcard(10, 160, 8, 10, 'background:linear-gradient(160deg,#fff4b0,#ffc93d 55%,#e8a317);color:#7a2a00;border-color:#b57a00;box-shadow:0 4px 0 rgba(0,0,0,0.3),0 0 18px rgba(255,216,77,0.9);')}
+            ${pcard(rn[0], rl[0][0], rl[0][1], rl[0][2], white)}${pcard(rn[1], rl[1][0], rl[1][1], rl[1][2], white)}
+            ${pcard(rn[2], rl[2][0], rl[2][1], rl[2][2], 'background:linear-gradient(160deg,#fff4b0,#ffc93d 55%,#e8a317);color:#7a2a00;border-color:#b57a00;box-shadow:0 4px 0 rgba(0,0,0,0.3),0 0 18px rgba(255,216,77,0.9);')}
             ${sp('✦', 126, 14, 20)}${sp('✦', 14, 20, 16, 0.6)}${sp('✦', 200, 100, 14, 1.1)}</div>`;
     }
     return `<div class="rs-art" style="background:linear-gradient(#4a4f66,#2a2d40)">
