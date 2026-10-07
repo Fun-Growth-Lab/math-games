@@ -6,7 +6,8 @@
 //   GAME.titleBots / GAME.runArt : タイトルとRUNカードに出すロボの配置
 //   GAME.rules    : ゲーム固有のルール(merge / canAttack / damage / damageNumber / mergeHint)
 // ほかに PRESET_EASY/NORMAL/HARD, STAGE_CLEAR_TIME, BOSS_MIN_SCALE, ENEMY_COLORS, RUN_LIST, ROBOTS, ROBOT_BOSS をゲーム側で定義する。
-document.getElementById('container').innerHTML = `
+// ゲーム画面(左右パネル+盤面)と遊び方は、ゲームごとに GAME.gameLayerHTML / GAME.howtoHTML で差し替えられる
+const _GAME_LAYER_HTML = `
     <div id="game-layer">
         <div id="left-panel">
             <div class="sp-brand"><i class="ico" data-ico="robot"></i><span data-i18n="subject_badge">たしざん</span><i class="ico" data-ico="robot"></i></div>
@@ -60,7 +61,8 @@ document.getElementById('container').innerHTML = `
             </div>
         </div>
     </div>
-
+`;
+const _HOWTO_HTML = `
     <!-- 遊び方モーダル -->
     <div id="howto-modal" class="hidden">
         <div class="howto-inner">
@@ -81,7 +83,8 @@ document.getElementById('container').innerHTML = `
             </div>
         </div>
     </div>
-
+`;
+document.getElementById('container').innerHTML = (GAME.gameLayerHTML || _GAME_LAYER_HTML) + (GAME.howtoHTML || _HOWTO_HTML) + `
     <!-- ==================== TITLE ==================== -->
     <div id="title-screen" class="intro">
         <div class="ts-bg">
@@ -285,6 +288,13 @@ document.getElementById('container').innerHTML = `
     };
 })();
 
+function bindBtn(btn, callback) {
+    if (btn) {
+        btn.addEventListener('click', (e) => { e.preventDefault(); callback(); });
+        btn.addEventListener('touchstart', (e) => { e.preventDefault(); callback(); }, {passive: false});
+    }
+}
+
 // ブラウザ標準のalert()/confirm()の代わりに使うゲーム内ポップアップ
 function showCustomAlert(msg, onClose){
     document.getElementById('custom-alert-msg').textContent = msg;
@@ -399,6 +409,8 @@ const STRINGS = {
         "btn_run_go": "はじめる ▶",
         "best_label": "ベスト {n}点",
         "stage_chip": "ステージ{n}",
+        "stage_word": "STAGE",
+        "rank_stage_prefix": "S",
         "final_title": "ファイナルステージ！",
         "stage_log": "🗺️ <b>ステージ{n}</b> {name}",
         "stage_clear_title": "ステージ{n} クリア！",
@@ -505,6 +517,8 @@ const STRINGS = {
         "btn_run_go": "はじめる ▶",
         "best_label": "ベスト {n}てん",
         "stage_chip": "ステージ{n}",
+        "stage_word": "STAGE",
+        "rank_stage_prefix": "S",
         "final_title": "ファイナルステージ！",
         "stage_log": "🗺️ <b>ステージ{n}</b> {name}",
         "stage_clear_title": "ステージ{n} クリア！",
@@ -611,6 +625,8 @@ const STRINGS = {
         "btn_run_go": "Start ▶",
         "best_label": "Best {n} pts",
         "stage_chip": "Stage {n}",
+        "stage_word": "STAGE",
+        "rank_stage_prefix": "S",
         "final_title": "FINAL STAGE!",
         "stage_log": "🗺️ <b>Stage {n}</b> {name}",
         "stage_clear_title": "Stage {n} Clear!",
@@ -841,8 +857,9 @@ function resize() {
     // Xアプリ内蔵ブラウザ等、bodyのflexセンタリングがcontainer(1280x720という
     // ビューポートよりずっと大きいtransform前サイズ)を正しく中央寄せできない環境が
     // あるため、flexに頼らずJSでleft/topを絶対座標指定する(scale/rotateに依存しない)
-    container.style.left = `${winW / 2 - BASE_WIDTH / 2}px`;
-    container.style.top = `${winH / 2 - BASE_HEIGHT / 2}px`;
+    // (白いふち分もふくめた実際の大きさ offsetWidth/Height で中央に置く。1280x720だけで計算すると、ふちの分だけ右下にずれて切れる)
+    container.style.left = `${winW / 2 - container.offsetWidth / 2}px`;
+    container.style.top = `${winH / 2 - container.offsetHeight / 2}px`;
     isMobileRotated = winW < winH && winW <= 900;
     if (isMobileRotated) {
         const scale = Math.min(winH / BASE_WIDTH, winW / BASE_HEIGHT);
@@ -949,7 +966,7 @@ function updateCurrentPlayerDisplay() {
         state.playerName = "ななしさん";
     }
     ui.currentPlayerDisplay.textContent = state.playerName;
-    ui.playerNameDisplay.textContent = state.playerName; 
+    if (ui.playerNameDisplay) ui.playerNameDisplay.textContent = state.playerName;
 }
 
 function renderPlayerList() {
@@ -1147,7 +1164,7 @@ async function showRankingScreen() {
             if (data.stage) {
                 const tag = document.createElement('span');
                 tag.className = 'ranking-tag' + (data.clear ? ' clear' : '');
-                tag.textContent = data.clear ? '👑' : 'S' + data.stage;
+                tag.textContent = data.clear ? '👑' : T('rank_stage_prefix') + data.stage;
                 li.appendChild(tag);
             }
             li.appendChild(scoreSpan);
