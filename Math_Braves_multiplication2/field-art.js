@@ -1,18 +1,61 @@
-// かけざん2の絵: スチームロボ(真ちゅうの圧力ゲージ・ボイラー・歯車・蒸気)。
-// ロボは150x150の箱に描く(ボスは190x190)。体の色は .mon の --c で変える。ROUND_COLORS はラウンドごとの体の色。
+// かけざん2の絵: 前から好きだった、まるっこい簡単なモンスター(おばけ・しかく・しずく・トゲトゲ・ひとつ目・ツノのボス)。
+// 形は元のまま、ぬりをグラデーションにして ふち・つや・かげ・まばたきを足して きれいに描いた(SVG)。
+// 体の色は .mon の --c で変える。ROUND_COLORS はラウンドごとの体の色。
+const ROUND_COLORS = ['#9b59b6', '#3498db', '#2ecc71', '#f1c40f', '#e67e22', '#34495e'];
+
+let _mnId = 0;
+// 1体ぶんのSVG。body=からだのパス(または図形)、eyes=目の位置、size=箱の大きさ
+function mnSVG(size, bodyShape, extraBack, eyes, extraFront) {
+    const id = 'mg' + (++_mnId);
+    const eyeHTML = eyes.map(e => `<g class="mn-eye"><circle cx="${e.x}" cy="${e.y}" r="${e.r}" fill="#fff" stroke="#1c1426" stroke-width="2.5"/><circle cx="${e.x + e.r * 0.12}" cy="${e.y + e.r * 0.18}" r="${e.r * 0.5}" fill="#1c1426"/><circle cx="${e.x - e.r * 0.05}" cy="${e.y - e.r * 0.08}" r="${e.r * 0.2}" fill="#fff"/></g>`).join('');
+    return `<svg class="mn-svg" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+            <linearGradient id="${id}" x1="0" y1="0" x2="0.8" y2="1"><stop offset="0" style="stop-color:color-mix(in srgb, var(--c) 45%, #fff)"/><stop offset="0.5" style="stop-color:var(--c)"/><stop offset="1" style="stop-color:color-mix(in srgb, var(--c) 66%, #000)"/></linearGradient>
+        </defs>
+        <ellipse cx="${size / 2}" cy="${size - 8}" rx="${size * 0.34}" ry="7" fill="rgba(0,0,0,.28)"/>
+        ${extraBack || ''}
+        <g fill="url(#${id})" stroke="color-mix(in srgb, var(--c) 38%, #12091f)" stroke-width="3.5" stroke-linejoin="round">${bodyShape}</g>
+        ${eyeHTML}
+        ${extraFront || ''}
+    </svg>`;
+}
+const gloss = (cx, cy, rx, ry, rot) => `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" transform="rotate(${rot || -28} ${cx} ${cy})" fill="rgba(255,255,255,.45)"/>`;
+
+function starPath(cx, cy, ro, ri, n) {
+    const pts = [];
+    for (let i = 0; i < n * 2; i++) { const a = -Math.PI / 2 + i * Math.PI / n, r = i % 2 === 0 ? ro : ri; pts.push(`${(cx + Math.cos(a) * r).toFixed(1)},${(cy + Math.sin(a) * r).toFixed(1)}`); }
+    return `<polygon points="${pts.join(' ')}"/>`;
+}
+
+// ぬりのグラデーションのidは、描くたびに新しく作る(同じidが2つあると、かくれた方を見て色が消えるため)
 const ROBOTS = [
-    `<div class="ab sdk" style="left:66px;top:2px;width:18px;height:30px;border-radius:6px"></div><div class="ab" style="left:70px;top:-8px;width:10px;height:14px;border-radius:50%;background:rgba(255,255,255,.7);animation:stPuff 2s infinite"></div><div class="ab" style="left:10px;top:22px;width:130px;height:118px;border-radius:50%;background:linear-gradient(135deg,#ffe27a,#c8801a);box-shadow:inset 0 -8px 0 rgba(0,0,0,.18)"></div><div class="ab" style="left:22px;top:34px;width:106px;height:94px;border-radius:50%;background:radial-gradient(circle at 40% 30%,#fffdf0,#f0e6c4)"></div><div class="ab" style="left:73px;top:38px;width:4px;height:10px;background:#7a4a2a;transform-origin:2px 38px;transform:rotate(-60deg)"></div><div class="ab" style="left:73px;top:38px;width:4px;height:10px;background:#7a4a2a;transform-origin:2px 38px;transform:rotate(-30deg)"></div><div class="ab" style="left:73px;top:38px;width:4px;height:10px;background:#7a4a2a;transform-origin:2px 38px;transform:rotate(0deg)"></div><div class="ab" style="left:73px;top:38px;width:4px;height:10px;background:#7a4a2a;transform-origin:2px 38px;transform:rotate(30deg)"></div><div class="ab" style="left:73px;top:38px;width:4px;height:10px;background:#7a4a2a;transform-origin:2px 38px;transform:rotate(60deg)"></div><div class="sjt" style="left:47.2px;top:76.7px;width:24.8px;height:18.6px"><div class="sp" style="left:4.959999999999999px;top:2.719999999999999px;width:14.880000000000003px;height:14.880000000000003px"></div><div class="sl" style="height:13.3px;background:#f4ead0"></div></div><div class="sjt" style="left:78px;top:76.7px;width:24.8px;height:18.6px"><div class="sp" style="left:4.959999999999999px;top:2.719999999999999px;width:14.880000000000003px;height:14.880000000000003px"></div><div class="sl" style="height:13.3px;background:#f4ead0"></div></div>`,
-    `<div class="ab sdk" style="left:98px;top:0px;width:26px;height:40px;border-radius:4px 4px 0 0"></div><div class="ab" style="left:100px;top:-10px;width:22px;height:16px;border-radius:50%;background:rgba(255,255,255,.7);animation:stPuff 2s infinite"></div><div class="ab sgr" style="left:8px;top:26px;width:134px;height:90px;border-radius:44px"></div><div class="ab sgd" style="left:40px;top:26px;width:10px;height:90px;"></div><div class="ab sgd" style="left:100px;top:26px;width:10px;height:90px;"></div><div class="ab ssc" style="left:52px;top:40px;width:46px;height:60px;border-radius:12px"></div><div class="sjt" style="left:53px;top:62.5px;width:20px;height:15px"><div class="sp" style="left:4px;top:2px;width:12px;height:12px"></div><div class="sl" style="height:11.5px;background:#10281c"></div></div><div class="sjt" style="left:77px;top:62.5px;width:20px;height:15px"><div class="sp" style="left:4px;top:2px;width:12px;height:12px"></div><div class="sl" style="height:11.5px;background:#10281c"></div></div><div class="ab sgd" style="left:20px;top:112px;width:36px;height:36px;border-radius:50%;box-shadow:0 0 0 4px #7a4a2a inset"></div><div class="ab sgd" style="left:94px;top:112px;width:36px;height:36px;border-radius:50%;box-shadow:0 0 0 4px #7a4a2a inset"></div>`,
-    `<div class="ab" style="left:4px;top:4px;width:142px;height:142px;background:linear-gradient(135deg,#ffe27a,#c8801a);clip-path:polygon(90.0% 50.0%,99.8% 53.9%,98.3% 62.9%,87.7% 63.4%,84.6% 70.0%,91.2% 78.3%,85.4% 85.4%,76.0% 80.4%,70.0% 84.6%,71.5% 95.1%,62.9% 98.3%,57.3% 89.3%,50.0% 90.0%,46.1% 99.8%,37.1% 98.3%,36.6% 87.7%,30.0% 84.6%,21.7% 91.2%,14.6% 85.4%,19.6% 76.0%,15.4% 70.0%,4.9% 71.5%,1.7% 62.9%,10.7% 57.3%,10.0% 50.0%,0.2% 46.1%,1.7% 37.1%,12.3% 36.6%,15.4% 30.0%,8.8% 21.7%,14.6% 14.6%,24.0% 19.6%,30.0% 15.4%,28.5% 4.9%,37.1% 1.7%,42.7% 10.7%,50.0% 10.0%,53.9% 0.2%,62.9% 1.7%,63.4% 12.3%,70.0% 15.4%,78.3% 8.8%,85.4% 14.6%,80.4% 24.0%,84.6% 30.0%,95.1% 28.5%,98.3% 37.1%,89.3% 42.7%);animation:stSpin 14s linear infinite"></div><div class="ab sgr" style="left:24px;top:24px;width:102px;height:102px;border-radius:50%"></div><div class="ab ssc" style="left:34px;top:34px;width:82px;height:82px;border-radius:50%"></div><div class="sjt" style="left:42.8px;top:68.3px;width:31.200000000000003px;height:23.400000000000002px"><div class="sp" style="left:6.24px;top:3.6799999999999997px;width:18.720000000000002px;height:18.720000000000002px"></div><div class="sl" style="height:15.700000000000001px;background:#10281c"></div></div><div class="sjt" style="left:76px;top:68.3px;width:31.200000000000003px;height:23.400000000000002px"><div class="sp" style="left:6.24px;top:3.6799999999999997px;width:18.720000000000002px;height:18.720000000000002px"></div><div class="sl" style="height:15.700000000000001px;background:#10281c"></div></div><div class="ab" style="left:62px;top:106px;width:26px;height:5px;background:#2a3a32;border-radius:3px"></div>`,
-    `<div class="ab" style="left:54px;top:4px;width:42px;height:34px;background:linear-gradient(90deg,rgba(255,255,255,.6),rgba(200,255,230,.3));box-shadow:0 0 0 3px rgba(255,255,255,.7);border-radius:6px 6px 0 0"></div><div class="ab sgd" style="left:48px;top:0px;width:54px;height:10px;border-radius:5px"></div><div class="ab" style="left:14px;top:36px;width:122px;height:108px;border-radius:50% 50% 30% 30%/70% 70% 30% 30%;background:rgba(220,255,240,.35);box-shadow:0 0 0 4px rgba(255,255,255,.7) inset"></div><div class="ab" style="left:20px;top:76px;width:110px;height:66px;border-radius:0 0 40px 40px/0 0 36px 36px;background:linear-gradient(#6fffa8,#14c860)"></div><div class="ab" style="left:40px;top:100px;width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,.55)"></div><div class="ab" style="left:96px;top:112px;width:14px;height:14px;border-radius:50%;background:rgba(255,255,255,.55)"></div><div class="ab" style="left:70px;top:88px;width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.55)"></div><div class="sjt" style="left:47.2px;top:84.7px;width:24.8px;height:18.6px"><div class="sp" style="left:4.959999999999999px;top:2.719999999999999px;width:14.880000000000003px;height:14.880000000000003px"></div><div class="sl" style="height:13.3px;background:#38d880"></div></div><div class="sjt" style="left:78px;top:84.7px;width:24.8px;height:18.6px"><div class="sp" style="left:4.959999999999999px;top:2.719999999999999px;width:14.880000000000003px;height:14.880000000000003px"></div><div class="sl" style="height:13.3px;background:#38d880"></div></div>`,
-    `<div class="ab" style="left:20px;top:4px;width:110px;height:100px;border-radius:50%;background:linear-gradient(135deg,#8af0b6,#2fbf71 55%,#14804a)"></div><div class="ab sgd" style="left:20px;top:38px;width:110px;height:8px;border-radius:4px"></div><div class="ab sgd" style="left:20px;top:70px;width:110px;height:8px;border-radius:4px"></div><div class="ab" style="left:32px;top:44px;width:86px;height:30px;background:#10281c;border-radius:14px"></div><div class="sjt" style="left:51px;top:50.75px;width:22px;height:16.5px"><div class="sp" style="left:4.3999999999999995px;top:2.299999999999999px;width:13.200000000000001px;height:13.200000000000001px"></div><div class="sl" style="height:12.25px;background:#10281c"></div></div><div class="sjt" style="left:77px;top:50.75px;width:22px;height:16.5px"><div class="sp" style="left:4.3999999999999995px;top:2.299999999999999px;width:13.200000000000001px;height:13.200000000000001px"></div><div class="sl" style="height:12.25px;background:#10281c"></div></div><div class="ab sgd" style="left:48px;top:108px;width:54px;height:26px;border-radius:6px 6px 14px 14px"></div><div class="ab sdk" style="left:62px;top:100px;width:4px;height:12px;"></div><div class="ab sdk" style="left:84px;top:100px;width:4px;height:12px;"></div><div class="ab sdk" style="left:106px;top:118px;width:30px;height:6px;animation:stSpin 1s linear infinite"></div><div class="ab sdk" style="left:14px;top:112px;width:6px;height:6px;"></div>`,
+    // 1 おばけ
+    () => mnSVG(150, `<path d="M20 74 A55 55 0 0 1 130 74 L130 124 L112 108 L93 126 L75 108 L57 126 L38 108 L20 124 Z"/>`, '',
+        [{ x: 55, y: 66, r: 14 }, { x: 95, y: 66, r: 14 }], gloss(48, 38, 18, 9)),
+    // 2 しかく
+    () => mnSVG(150, `<rect x="20" y="24" width="110" height="108" rx="20"/>`, '',
+        [{ x: 54, y: 68, r: 14 }, { x: 96, y: 68, r: 14 }], gloss(46, 42, 20, 9)),
+    // 3 しずく
+    () => mnSVG(150, `<path d="M75 12 C24 54 16 118 75 128 C134 118 126 54 75 12 Z"/>`, '',
+        [{ x: 58, y: 84, r: 14 }, { x: 92, y: 84, r: 14 }], gloss(56, 52, 12, 22, -22)),
+    // 4 トゲトゲ
+    () => mnSVG(150, starPath(75, 76, 68, 44, 8), '',
+        [{ x: 58, y: 74, r: 14 }, { x: 92, y: 74, r: 14 }], gloss(56, 44, 16, 8)),
+    // 5 ひとつ目
+    () => mnSVG(150, `<circle cx="75" cy="76" r="62"/>`, '',
+        [{ x: 75, y: 72, r: 26 }], gloss(46, 36, 20, 10)),
 ];
-const ROBOT_BOSS = `<div class="ab sdk" style="left:120px;top:0px;width:36px;height:56px;border-radius:6px 6px 0 0"></div><div class="ab" style="left:124px;top:-6px;width:28px;height:20px;border-radius:50%;background:rgba(255,255,255,.7);animation:stPuff 2.2s infinite"></div><div class="ab sgr" style="left:18px;top:20px;width:154px;height:120px;border-radius:56px"></div><div class="ab sgd" style="left:48px;top:20px;width:12px;height:120px;"></div><div class="ab sgd" style="left:90px;top:20px;width:12px;height:120px;"></div><div class="ab sgd" style="left:132px;top:20px;width:12px;height:120px;"></div><div class="ab ssc" style="left:50px;top:38px;width:90px;height:54px;border-radius:16px"></div><div class="sjt" style="left:59.800000000000004px;top:52.3px;width:31.200000000000003px;height:23.400000000000002px"><div class="sp" style="left:6.24px;top:3.6799999999999997px;width:18.720000000000002px;height:18.720000000000002px"></div><div class="sl" style="height:15.700000000000001px;background:#10281c"></div></div><div class="sjt" style="left:99px;top:52.3px;width:31.200000000000003px;height:23.400000000000002px"><div class="sp" style="left:6.24px;top:3.6799999999999997px;width:18.720000000000002px;height:18.720000000000002px"></div><div class="sl" style="height:15.700000000000001px;background:#10281c"></div></div><div class="ab" style="left:60px;top:100px;width:70px;height:34px;border-radius:8px 8px 18px 18px;background:#1a0a04;box-shadow:inset 0 -10px 18px #ff7a1c,0 0 0 4px #7a4a2a;animation:stGlow 1.2s infinite"></div><div class="ab sdk" style="left:18px;top:130px;width:154px;height:46px;border-radius:10px"></div><div class="ab sgd" style="left:34px;top:138px;width:34px;height:34px;border-radius:50%;box-shadow:0 0 0 4px #7a4a2a inset"></div><div class="ab sgd" style="left:80px;top:138px;width:34px;height:34px;border-radius:50%;box-shadow:0 0 0 4px #7a4a2a inset"></div><div class="ab sgd" style="left:126px;top:138px;width:34px;height:34px;border-radius:50%;box-shadow:0 0 0 4px #7a4a2a inset"></div>`;
-const ROUND_COLORS = ['#2fbf71', '#4aa0f0', '#ef6a4a', '#a064ea', '#26c6da', '#2fbf71'];
-// 共通の画面(タイトルのロボ・RUNカード)が使う、ロボ1体のHTML
+// 6 ツノのボス(190x190)
+const ROBOT_BOSS = () => mnSVG(190,
+    `<circle cx="95" cy="112" r="74"/>`,
+    `<g fill="#e8e4f0" stroke="#12091f" stroke-width="3.5" stroke-linejoin="round"><path d="M44 62 L24 10 L74 44 Z"/><path d="M146 62 L166 10 L116 44 Z"/></g>`,
+    [{ x: 66, y: 102, r: 18 }, { x: 124, y: 102, r: 18 }],
+    `<path d="M44 82 L88 94" stroke="#12091f" stroke-width="6" stroke-linecap="round"/><path d="M146 82 L102 94" stroke="#12091f" stroke-width="6" stroke-linecap="round"/><path d="M70 144 Q95 160 120 144" stroke="#12091f" stroke-width="5" fill="none" stroke-linecap="round"/>` + gloss(62, 64, 22, 10));
+
+// 共通の画面(タイトルのモンスター・RUNカード)が使う、モンスター1体のHTML
 function monHTML(shape) {
-    return `<div class="glow"></div><div class="rbx">${ROBOTS[shape % ROBOTS.length]}</div>`;
+    return `<div class="glow"></div>${ROBOTS[shape % ROBOTS.length]()}`;
 }
 function bossHTML() {
-    return `<div class="glow"></div><div class="rbx big">${ROBOT_BOSS}</div>`;
+    return `<div class="glow"></div>${ROBOT_BOSS()}`;
 }
