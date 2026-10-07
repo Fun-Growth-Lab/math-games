@@ -37,6 +37,9 @@ function buildTitleName() {
 function buildTitleHero() {
     const el = document.getElementById('ts-hero');
     if (!el) return;
+    // ゲームごとに作った主役の絵(GAME.titleHero が html を返す)があれば それを使う。なければ数字カードの扇
+    const h2 = document.getElementById('ts-hero2');
+    if (GAME.titleHero && h2) { h2.innerHTML = GAME.titleHero(); el.innerHTML = ''; return; }
     const cards = GAME.titleCards || ['3', '7', '10', '9', '6'], gold = GAME.titleGold === undefined ? 2 : GAME.titleGold, op = GAME.titleOp || '＋';
     const maxLen = Math.max(...cards.map(c => String(c).replace(/<[^>]*>/g, '').length)), step = maxLen >= 3 ? 112 : 96;
     el.innerHTML = cards.map((c, i) => {

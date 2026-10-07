@@ -101,6 +101,7 @@ document.getElementById('container').innerHTML = (GAME.gameLayerHTML || _GAME_LA
             <span class="l2" id="ts-l2"></span>
         </div>
         <div class="ts-hero" id="ts-hero"></div>
+        <div class="hv-layer" id="ts-hero2"></div>
         <div class="ts-menu">
             <button id="btn-start-menu" class="tm-btn primary" data-i18n="btn_start">はじめる</button>
             <div class="tm-row">
