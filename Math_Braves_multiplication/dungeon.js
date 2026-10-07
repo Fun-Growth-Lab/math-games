@@ -668,6 +668,9 @@ function startStage(n) {
     if (n > 1) initFloor();
     state.stageStartScore = state.score;
     state.isGameClearProcessing = false;
+    const area = document.getElementById('game-area');
+    area.style.setProperty('--sc', STAGE_THEMES[n - 1].c);          // フロアの色(盤面の上のふち・背景の光)
+    area.classList.toggle('bossfield', n === STAGE_COUNT);         // さいごのフロア(ボス)は赤むらさきの背景
     updateStageLabel();
     updateUI();
     addDungeonLog(T('stage_log', { n: n, name: stageName(n) }));
@@ -1340,7 +1343,7 @@ function clearDungeonLayer() {
     if (layer) layer.innerHTML = '';
     DG.ready = false; DG.cells = []; DG.hand = []; DG.sig = []; DG.handSig = [];
     const area = document.getElementById('game-area');
-    if (area) area.classList.remove('hurt', 'danger');
+    if (area) area.classList.remove('hurt', 'danger', 'bossfield');
 }
 
 // ロボ1体のHTML。idx=1〜8(元のてきの絵の番号)・ボスは bossImgIdx。色ちがいは .v1〜.v3

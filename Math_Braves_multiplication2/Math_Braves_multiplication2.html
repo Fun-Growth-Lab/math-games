@@ -12,1800 +12,344 @@
       gtag('config', 'G-5C4G61Y29Q');
     </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Math Braves - かけざん２</title>
-    <script>
-(function(){
-    const _b = 'https://rpxassndgiunoqkxqcco.supabase.co/rest/v1';
-    const _k = 'sb_publishable_Wnge6OPvSf5l2YEgaPg4rw_nj4CyYAH';
-    const _h = {'apikey':_k,'Authorization':'Bearer '+_k,'Content-Type':'application/json','Prefer':'return=minimal'};
-    const _rh = {'apikey':_k,'Authorization':'Bearer '+_k};
-    window.currentUser = {uid:'guest', displayName:''};
-    window.saveOnlineScore = async (uid, name, score, difficulty) => {
-        if((score||0)<=0) return;
-        try {
-            const res = await fetch(`${_b}/rankings`,{method:'POST',headers:_h,keepalive:true,
-                body:JSON.stringify({game:'math_braves_multiplication2',difficulty:difficulty||'normal',player_name:name||'ゲスト',point_score:Math.round(score)||0})});
-            if(!res.ok){const t=await res.text();throw new Error(`HTTP ${res.status}: ${t}`);}
-        } catch(e){console.error('Ranking save error:',e);}
-    };
-    window.fetchOnlineRanking = async (difficulty) => {
-        try {
-            const q = new URLSearchParams({select:'player_name,point_score,created_at',game:'eq.math_braves_multiplication2',difficulty:`eq.${difficulty||'normal'}`,point_score:'gt.0',order:'point_score.desc',limit:'10'});
-            const res = await fetch(`${_b}/rankings?${q}`,{headers:_rh});
-            if(!res.ok) throw new Error(`HTTP ${res.status}`);
-            const data = await res.json();
-            return data.map(r=>({uid:'',name:r.player_name,score:r.point_score,date:r.created_at?new Date(r.created_at).toLocaleDateString('ja-JP'):''}));
-        } catch(e){console.error('Ranking load error:',e);return [];}
-    };
-})();
-</script>
-    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;900&display=swap" rel="stylesheet">
+    <title>かけざん２ - Fun & Growth Lab</title>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../braves-common.css?v=20261012">
     <style>
-        :root {
-            /* 明るいRPGカラー設定 */
-            --main-bg-color: #87ceeb;
-            --window-bg-top: #4facfe;
-            --window-bg-bottom: #00f2fe;
-            --text-color: #ffffff;
-            --accent-color: #fff700;
-            --danger-color: #ff5252;
-            
-            /* ボタンカラー */
-            --btn-blue-top: #00c6ff; --btn-blue-bot: #0072ff;
-            --btn-red-top: #ff512f; --btn-red-bot: #dd2476;
-            --btn-green-top: #11998e; --btn-green-bot: #38ef7d;
-            --btn-gold-top: #fce38a; --btn-gold-bot: #f38181;
-        }
+        /* ティール×金(スチーム)。--h は共通CSSの色相(たしざん=220, ひきざん=352, かけざん=150) */
+        :root { --h: 172; --led: #7dffd8; --led-soft: rgba(125,255,216,0.45); }
+        .mon { --c: #2fbf71; }
 
-        body {
-            margin: 0; padding: 0; overflow: hidden;
-            background-color: #111;
-            color: var(--text-color);
-            font-family: 'M PLUS Rounded 1c', sans-serif;
-            touch-action: none; user-select: none;
-            width: 100vw; height: 100vh;
-        }
+        /* ---- スチームロボ(150x150の箱に描いて縮小する。ボスは190x190)。体の色は --c ---- */
+        .rbx { position:absolute; left:50%; top:50%; width:150px; height:150px; margin:-75px 0 0 -75px; transform:scale(1.04); z-index:1; }
+        .rbx.big { width:190px; height:190px; margin:-95px 0 0 -95px; transform:scale(0.84); }
+        .rbx .ab { position:absolute; }
+        .sgr { background:linear-gradient(135deg, color-mix(in srgb, var(--c) 52%, #fff), var(--c) 55%, color-mix(in srgb, var(--c) 62%, #000)); box-shadow:inset 0 -6px 0 rgba(0,0,0,.16); }
+        .sgd { background:linear-gradient(135deg,#fff3a8,#ffc93d 55%,#d9931a); box-shadow:inset 0 -5px 0 rgba(0,0,0,.14); }
+        .sdk { background:linear-gradient(135deg,#5a6a62,#2a3a32); }
+        .ssc { background:#10281c; border:4px solid #2a5a40; box-shadow:inset 0 0 12px rgba(120,255,180,.25); }
+        /* ジト目(まぶたが上半分をおおう・光なし) */
+        .sjt { position:absolute; border-radius:50%; background:#fff; overflow:hidden; box-shadow:0 0 0 2.5px #1a2a22; animation: stBlink 4.8s infinite; }
+        .sjt .sp { position:absolute; border-radius:50%; background:#1a1220; }
+        .sjt .sl { position:absolute; left:-4px; right:-4px; top:-4px; border-bottom:3px solid #1a2a22; }
+        @keyframes stBlink { 0%,92%,100% { transform:scaleY(1); } 95% { transform:scaleY(.1); } }
+        @keyframes stSpin { to { transform:rotate(360deg); } }
+        @keyframes stPuff { 0% { transform:translateY(0) scale(.5); opacity:.9; } 100% { transform:translateY(-34px) scale(1.3); opacity:0; } }
+        @keyframes stGlow { 0%,100% { opacity:.7; } 50% { opacity:1; } }
 
-        /* --- ゲーム画面コンテナ --- */
-        #game-scaler {
-            width: 1280px; height: 720px;
-            position: absolute; top: 0; left: 0;
-            transform-origin: center center;
-            background-color: var(--main-bg-color); 
-            display: flex;
-            overflow: hidden;
-            flex-shrink: 0;
-            border: 4px solid #fff;
-            box-shadow: 0 0 50px rgba(0,0,0,0.8);
-        }
+        /* ---- 戦闘の画面 ---- */
+        .fd-enemy { position:absolute; left:0; top:0; width:0; height:0; }
+        .fd-enemy.dead { animation: enDead 0.5s ease-in forwards; transform-origin:360px 150px; }
+        .fd-enemy .gnd { position:absolute; height:22px; border-radius:50%; background:radial-gradient(ellipse at center, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0) 70%); }
+        .fd-enemy .rw { position:absolute; left:285px; top:44px; width:150px; height:150px; transform:scale(1.4); transform-origin:50% 0; }
+        .fd-enemy .mon { position:absolute; left:0; top:0; width:150px; height:150px; animation: monBob 2.4s ease-in-out infinite; }
+        .fd-enemy .mon.hit { animation: monHit 0.45s ease-out; }
+        .fd-field { position:absolute; left:0; top:0; width:120px; height:160px; box-sizing:border-box; border-radius:18px; border:5px solid #ffd24a; text-align:center; will-change:transform;
+            background:linear-gradient(160deg,#4d6458,#243229); box-shadow:0 7px 0 #8a5a00, 0 0 22px rgba(255,210,74,.55), inset 0 0 18px rgba(0,0,0,.45); }
+        .fd-field::before { content:''; position:absolute; inset:0; border-radius:12px; pointer-events:none;
+            background: radial-gradient(circle at 9px 9px,#fff3a8 0 2.4px,transparent 3px), radial-gradient(circle at calc(100% - 9px) 9px,#fff3a8 0 2.4px,transparent 3px),
+                        radial-gradient(circle at 9px calc(100% - 9px),#fff3a8 0 2.4px,transparent 3px), radial-gradient(circle at calc(100% - 9px) calc(100% - 9px),#fff3a8 0 2.4px,transparent 3px); }
+        .fd-field .nm { position:absolute; left:0; right:0; top:50%; transform:translateY(-50%); font-weight:900; line-height:1; color:#ffe27a; text-shadow:0 3px 0 #a35c00, 0 0 14px rgba(255,200,60,.7); }
+        .fd-field .almost { position:absolute; left:50%; bottom:7px; transform:translateX(-50%); padding:0 10px; border-radius:50px; white-space:nowrap; font-size:.8rem; font-weight:900; color:#fff; background:linear-gradient(#ff7a5c,#d03a24); border:2px solid #fff; box-shadow:0 3px 0 rgba(0,0,0,.35); }
+        .fd-field .almost:empty { display:none; }
+        .fd-field.hot { border-color:#ff7a3a; animation: fdHot .7s ease-in-out infinite; }
+        @keyframes fdHot { 0%,100% { box-shadow:0 7px 0 #8a3a00, 0 0 16px rgba(255,120,50,.55), inset 0 0 18px rgba(0,0,0,.45); } 50% { box-shadow:0 7px 0 #8a3a00, 0 0 34px 8px rgba(255,140,50,.95), inset 0 0 18px rgba(0,0,0,.45); } }
+        .fd-field.tgt { border-color:#fff3b0; box-shadow:0 7px 0 #8a5a00, 0 0 0 6px rgba(255,243,176,.9), 0 0 30px 10px rgba(255,210,80,.9), inset 0 0 18px rgba(0,0,0,.45); }
+        .hc.fh .nm { top:50%; bottom:auto; transform:translateY(-50%); color:#2c4a42; }
+        .hc.fh.sel { border-color:#ffe84a; box-shadow:0 6px 0 #c9a800, 0 0 22px 8px rgba(255,235,60,.9), 0 10px 14px rgba(0,0,0,.4); }
 
-        /* 共通ウィンドウデザイン */
-        .rpg-window {
-            background: linear-gradient(to bottom, var(--window-bg-top), var(--window-bg-bottom));
-            border: 4px solid #fff;
-            border-radius: 15px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3), inset 0 0 30px rgba(255,255,255,0.4);
-            color: #fff;
-        }
+        /* ---- 左右パネル ---- */
+        .dg-items { display:flex; flex-direction:column; }
+        .dg-items .sp-lb { margin-bottom:5px; }
+        #item-list { min-height:70px; }
+        .item-row { display:flex; align-items:center; gap:7px; height:34px; padding:0 8px; margin-bottom:4px; border-radius:9px; cursor:pointer; background:rgba(255,255,255,.08); border-left:3px solid rgba(255,214,100,.4); color:#fff; font-weight:800; font-size:.85rem; -webkit-tap-highlight-color:transparent; }
+        .item-row:hover { background:rgba(255,255,255,.15); }
+        .item-icon { display:flex; width:26px; height:26px; flex-shrink:0; align-items:center; justify-content:center; }
+        .item-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .item-count { color:#ffd24a; font-weight:900; font-size:.95rem; }
+        .no-item { text-align:center; padding:10px 0; color:rgba(255,255,255,.5); font-size:.82rem; font-weight:800; }
+        .fd-rule { font-size:.82rem; font-weight:800; line-height:1.55; color:#fff; }
+        .fd-rule b { color:#ffd24a; }
+        .fd-rule .eq { display:block; margin-top:6px; text-align:center; font-size:.95rem; color:#ffe27a; background:rgba(0,0,0,.28); border-radius:9px; padding:4px 2px; }
+        img.ii { vertical-align:-3px; margin:0 1px; }
+        .sp-score.bump { animation: spBump 0.4s ease-out; }
 
-        /* レイアウト */
-        .side-panel {
-            width: 290px; 
-            height: 720px;
-            padding: 20px; 
-            display: flex; flex-direction: column;
-            box-sizing: border-box; 
-            z-index: 10;
-            flex: 0 0 290px;
-            /* 落ち着いた紺色 */
-            background: rgba(10, 20, 40, 0.9);
-            border-right: 2px solid #555; 
-            border-left: 2px solid #555;
-        }
-        
-        /* 戦闘画面の中央エリア */
-        #game-wrapper {
-            width: 700px;
-            height: 720px;
-            position: relative;
-            display: flex; justify-content: center; align-items: center;
-            background-image: url('images/battle.png');
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-            overflow: hidden;
-            flex: 0 0 700px;
-            transition: background-image 0.5s;
-        }
+        /* ---- アイテムのポップアップ ---- */
+        .dg-btns { display:flex; justify-content:center; gap:14px; margin-top:16px; }
+        .dg-btns .rs-mini { min-width:110px; text-align:center; }
+        .dg-btns .rs-mini.orange { background:linear-gradient(#ff9a5a,#e8602a); }
+        .dg-ov { position:absolute; inset:0; z-index:160; display:flex; align-items:center; justify-content:center; background:rgba(5,20,14,.7); }
+        .dg-ov.hidden { display:none !important; }
+        .dg-box { box-sizing:border-box; min-width:260px; max-width:360px; padding:22px 26px 20px; text-align:center; border-radius:24px; background:linear-gradient(180deg,#fffef4,#fff2c6); border:6px solid #ffd24a; box-shadow:0 0 0 5px #fff, 0 18px 40px rgba(0,0,0,.5); animation: endPop .35s cubic-bezier(.2,1.4,.4,1); }
+        .ip-icon { display:flex; justify-content:center; height:64px; margin-bottom:6px; }
+        .ip-icon img { width:60px; height:60px; }
+        .ip-name { font-size:1.3rem; font-weight:900; color:#4a3a1a; margin-bottom:8px; }
+        .ip-desc { font-size:.95rem; font-weight:700; line-height:1.6; color:#6a5530; text-align:center; }
 
-        canvas {
-            border: 3px solid rgba(255,255,255,0.5);
-            background-color: rgba(0, 0, 0, 0.2);
-            border-radius: 12px;
-            box-shadow: 0 0 20px rgba(0,0,0,0.5);
-        }
-
-        /* 左パネル */
-        #left-panel h2 { 
-            margin-top: 0; border-bottom: 2px solid #aaa; 
-            padding-bottom: 10px; font-size: 24px; color: #fff;
-            text-shadow: none;
-        }
-        #left-panel ol { padding-left: 20px; line-height: 1.6; font-size: 15px; color: #ccc; text-shadow: none; font-weight: normal; }
-        #left-panel li { margin-bottom: 10px; }
-        
-        .btn-back {
-            margin-top: auto; 
-            background: linear-gradient(to bottom, #7f8c8d, #2c3e50);
-            color: #fff; border: 2px solid #aaa;
-            padding: 15px; border-radius: 12px; font-size: 18px; font-weight: bold;
-            cursor: pointer; transition: transform 0.1s;
-            box-shadow: 0 4px 0 #111;
-        }
-        .btn-back:hover { filter: brightness(1.2); }
-        .btn-back:active { transform: translateY(4px); box-shadow: none; }
-
-        /* 右パネル */
-        #right-panel-content { display: none; flex-direction: column; height: 100%; width: 100%; }
-        
-        .info-block { margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #555; }
-        .info-label { font-size: 14px; color: #aaa; margin-bottom: 5px; font-weight: normal; }
-        .info-value { font-size: 26px; font-weight: bold; color: #fff; }
-        #item-list { flex: 1; overflow-y: auto; padding-right: 5px; }
-        
-        #item-list::-webkit-scrollbar { width: 8px; }
-        #item-list::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); }
-        #item-list::-webkit-scrollbar-thumb { background: #777; border-radius: 4px; }
-
-        .item-btn {
-            display: block; width: 100%; padding: 10px; margin-bottom: 8px;
-            border: 1px solid #777; border-radius: 8px; color: #fff; font-weight: bold; font-size: 14px;
-            cursor: pointer; text-align: left; position: relative;
-            background: rgba(255, 255, 255, 0.1);
-            box-shadow: none; transition: transform 0.1s;
-            text-shadow: 1px 1px 0 #000;
-        }
-        .item-btn:hover { background: rgba(255,255,255,0.2); transform: translateX(2px); }
-        .item-count {
-            position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
-            background: #fff; color: #000; border: none; padding: 2px 8px; border-radius: 10px; font-size: 12px;
-            box-shadow: none; font-weight: bold;
-        }
-
-        /* --- オーバーレイ（全画面） --- */
-        #global-overlays {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none; z-index: 100;
-        }
-        .full-screen-overlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
-            background-color: #000;
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-            pointer-events: auto; opacity: 0; transition: opacity 0.3s;
-            z-index: 110;
-        }
-        .full-screen-overlay.active { opacity: 1; pointer-events: auto; }
-
-        /* 背景画像クラス */
-        .bg-title-img {
-            background-image: url('images/title.png');
-        }
-
-        /* コンテンツを見やすくする白い半透明ボックス */
-        .content-box-translucent {
-            background: rgba(255, 255, 255, 0.85); 
-            padding: 30px 50px;
-            border-radius: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            border: 4px solid #fff;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-            max-width: 90%;
-            max-height: 90%;
-        }
-
-        /* タイトル画面 */
-        .title-main { 
-            font-size: 80px; margin: 0; color: #fff; 
-            text-shadow: 4px 4px 0 #0072ff, 0 0 20px #fff; 
-            font-weight: 900; letter-spacing: 2px;
-            background: linear-gradient(to bottom, #fff, #c2e9fb);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            filter: drop-shadow(4px 4px 0 rgba(0,0,0,0.2));
-        }
-        .title-sub { 
-            font-size: 32px; color: #0072ff; margin: 10px 0 30px 0; font-weight: bold; 
-            text-shadow: none; letter-spacing: 4px;
-        }
-
-        /* ポップなボタン共通 */
-        .puz-btn {
-            width: 360px; height: 65px; margin: 10px;
-            font-size: 24px; font-weight: 900; font-family: 'M PLUS Rounded 1c', sans-serif;
-            color: #fff; 
-            border: 3px solid #fff; border-radius: 50px;
-            cursor: pointer; position: relative;
-            box-shadow: 0 5px 0 rgba(0,0,0,0.2);
-            transition: all 0.1s;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
-            display: flex; justify-content: center; align-items: center;
-        }
-        .puz-btn:active { transform: translateY(5px); box-shadow: none; }
-        .puz-btn:hover { filter: brightness(1.1); transform: scale(1.02); }
-        
-        .btn-start { background: linear-gradient(to bottom, var(--btn-blue-top), var(--btn-blue-bot)); }
-        .btn-score { background: linear-gradient(to bottom, var(--btn-green-top), var(--btn-green-bot)); }
-        .btn-player { background: linear-gradient(to bottom, var(--btn-gold-top), var(--btn-gold-bot)); text-shadow: 1px 1px 0 rgba(0,0,0,0.2); }
-        .btn-login { background: linear-gradient(to bottom, #a18cd1, #fbc2eb); }
-        .btn-sub { background: linear-gradient(to bottom, #cfd9df, #e2ebf0); color: #555; text-shadow: none; }
-        .btn-settings { background: linear-gradient(to bottom, #f7971e, #ffd200); color: #fff; }
-
-        /* タイトル画面：ボタンを詰めてはみ出し防止 */
-        #title-screen .puz-btn {
-            height: 56px;
-            margin: 5px;
-            font-size: 21px;
-        }
-        #title-screen .content-box-translucent {
-            padding: 20px 50px;
-            overflow-y: auto;
-        }
-        #title-screen .title-main { font-size: 70px; }
-        #title-screen .title-sub { font-size: 26px; margin: 4px 0 14px 0; }
-        
-        /* 難易度選択 */
-        .btn-diff { width: 220px; height: 120px; margin: 10px; font-size: 28px; border-radius: 20px; } 
-        .btn-easy { background: linear-gradient(to bottom, #42e695, #3bb2b8); }
-        .btn-normal { background: linear-gradient(to bottom, #4facfe, #00f2fe); }
-        .btn-hard { background: linear-gradient(to bottom, #ff9a9e, #fecfef); }
-
-        .diff-container { 
-            display: flex; flex-direction: row; 
-            justify-content: center; align-items: flex-end; 
-            gap: 30px; margin-top: 20px;
-        }
-        .diff-column {
-            display: flex; flex-direction: column; align-items: center;
-            width: 240px;
-        }
-        .crown-area {
-            height: 60px;
-            display: flex; justify-content: center; align-items: center;
-            margin-bottom: 5px;
-        }
-        .crown-icon { font-size: 50px; filter: drop-shadow(0 0 5px gold); }
-        
-        .clear-label { 
-            color: #333; font-weight: 900; font-size: 20px; margin-top: 10px;
-            background: #fff; border: 1px solid #ccc;
-            padding: 5px 15px; border-radius: 20px;
-        }
-
-        /* プレーヤーモーダル (背景暗転なし) */
-        #player-modal-overlay { background: rgba(0,0,0,0); z-index: 200; }
-        .player-modal { width: 500px; padding: 10px; }
-        .player-modal-inner { padding: 25px; text-align: center; }
-        .player-modal h2 { margin-top: 0; color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,0.3); border-bottom: 2px solid #fff; display: inline-block; padding-bottom: 5px; }
-        .player-input {
-            width: 70%; padding: 12px; border-radius: 30px; border: 2px solid #fff; 
-            font-size: 18px; text-align: center; background: rgba(255,255,255,0.9); color: #333; font-weight: bold;
-        }
-        .btn-add {
-            background: linear-gradient(to bottom, var(--btn-green-top), var(--btn-green-bot));
-            color: #fff; border: 2px solid #fff; padding: 12px 25px;
-            border-radius: 30px; font-weight: bold; cursor: pointer;
-            box-shadow: 0 4px 0 rgba(0,0,0,0.2);
-        }
-        .btn-add:active { transform: translateY(4px); box-shadow: none; }
-        
-        .player-list { list-style: none; padding: 0; max-height: 200px; overflow-y: auto; text-align: left; margin-top: 20px; }
-        .player-item {
-            background: rgba(255,255,255,0.2); padding: 12px; margin-bottom: 8px;
-            border-radius: 12px; display: flex; justify-content: space-between; cursor: pointer;
-            border: 2px solid rgba(255,255,255,0.5); transition: background 0.2s;
-        }
-        .player-item:hover { background: rgba(255,255,255,0.4); }
-        .player-item.selected { border: 2px solid var(--accent-color); background: rgba(255,247,0,0.3); }
-        .btn-delete-name { background: linear-gradient(135deg, #ff7a7a, #ff5252); color: white; border: 2px solid #fff; border-radius: 50%; width: 30px; height: 30px; cursor: pointer; line-height: 26px; font-weight: bold; }
-
-        /* リザルト画面 (地味なダークブラウン・セピア調) */
-        .result-box { 
-            padding: 40px; width: 500px; text-align: center;
-            background: linear-gradient(to bottom, #4e342e, #3e2723); 
-            border: 4px solid #8d6e63;
-            border-radius: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
-        }
-        .res-row { display: flex; justify-content: space-between; font-size: 20px; margin: 15px 0; border-bottom: 2px dashed #8d6e63; padding-bottom: 5px; color: #d7ccc8; }
-        .res-val { color: #ffccbc; font-weight: 900; font-size: 24px; text-shadow: none; }
-        .res-total { font-size: 50px; color: #ffab91; text-shadow: none; margin: 10px 0; font-weight: 900; }
-
-        /* ランキング */
-        #ranking-popup { background-color: #000; }
-        /* ランキングは画面いっぱいまで拡大 */
-        #ranking-popup .content-box-translucent { height: 90%; }
-        .ranking-container { display: flex; gap: 20px; width: 100%; flex: 1; min-height: 0; }
-        .ranking-col { flex: 1; padding: 10px; display: flex; flex-direction: column; background: rgba(0,0,0,0.5); border-radius: 10px; border: 2px solid #fff; }
-        .rank-item { display: flex; justify-content: space-between; align-items: center; gap: 6px; padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.3); color: #fff; font-weight: bold; }
-        .rank-item .rank-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .rank-score { color: var(--accent-color); text-shadow: 0 1px 2px rgba(0,0,0,0.5); flex-shrink: 0; }
-        .rank-date { font-size: 11px; color: rgba(255,255,255,0.65); font-weight: normal; flex-shrink: 0; }
-        .lang-btn { opacity: 0.55; }
-        .lang-btn.active-mode { opacity: 1; }
-        .tab-btn {
-            background: linear-gradient(135deg, #aaaaaa, #999999); color: #fff; border: 2px solid #fff; padding: 10px 30px;
-            border-radius: 15px 15px 0 0; cursor: pointer; font-size: 18px; margin: 0 5px;
-            position: relative; top: 4px; font-weight: bold;
-        }
-        .tab-btn.active {
-            background: linear-gradient(135deg, #4facfe, #00c6ff); color: #fff; border-bottom: none;
-            z-index: 10;
-        }
-
-        /* ゲーム内演出 */
-        #transition-overlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
-            background: rgba(0,0,0,0.6); z-index: 50; color: white;
-            opacity: 0; pointer-events: none; transition: opacity 0.3s;
-        }
-        #transition-overlay.active { opacity: 1; pointer-events: auto; cursor: pointer; }
-        .transition-text { 
-            font-size: 80px; font-weight: 900; color: #fff;
-            text-shadow: 4px 4px 0 #0072ff, 0 0 30px #fff; 
-            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
-        }
-        @keyframes popIn { from { transform: scale(0); } to { transform: scale(1); } }
-        
-        /* アイテム確認ポップアップ (地味なダークグレー系) */
-        #item-confirm-popup {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            padding: 20px; width: 350px; text-align: center; z-index: 150;
-            display: none;
-            background: linear-gradient(to bottom, #34495e, #2c3e50);
-            border: 4px solid #7f8c8d;
-            border-radius: 10px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
-        }
-        .hidden { display: none !important; opacity: 0; pointer-events: none; }
-
-        /* 設定モーダル */
-        .setting-mode-btn {
-            width: 300px; height: 58px; margin: 6px auto;
-            font-size: 22px;
-            background: linear-gradient(to bottom, #cfd9df, #e2ebf0);
-            color: #555; text-shadow: none;
-        }
-        .setting-mode-btn.active-mode {
-            background: linear-gradient(to bottom, var(--btn-blue-top), var(--btn-blue-bot));
-            color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
-            box-shadow: 0 5px 0 rgba(0,0,100,0.3);
-        }
-        .mode-desc-box {
-            background: rgba(0,0,0,0.07); border-radius: 10px;
-            padding: 10px 16px; font-size: 14px; color: #555;
-            min-height: 44px; line-height: 1.6; text-align: center;
-            margin-top: 8px; width: 300px;
-        }
-
+        /* ---- 設定: カードの操作方法 ---- */
+        .set-sec { font-size:.9rem; color:#888; margin:0 0 10px; }
+        .set-row { display:flex; gap:8px; } .set-row .btn { flex:1; width:auto; min-width:0; padding:0 4px; font-size:.82rem; height:46px; }
+        #mode-desc-text { margin:10px 0 12px; padding:6px; border-radius:10px; background:rgba(0,0,0,.05); font-size:.9rem; font-weight:700; color:#555; white-space:pre-line; min-height:2.6em; }
+        .howto-inner { max-height:640px; overflow-y:auto; }
     </style>
     <script src="../tutorial-engine.js"></script>
 </head>
 <body>
 
-<!-- X内蔵ブラウザ等での表示崩れ調査用の一時デバッグ表示。URLに ?debug=1 を付けた時だけ表示される -->
-<div id="fgl-debug-overlay" style="display:none;position:fixed;top:0;left:0;right:0;z-index:2147483647;background:rgba(0,0,0,0.88);color:#0f0;font:11px/1.5 monospace;padding:6px 8px;white-space:pre-wrap;pointer-events:none;"></div>
+<div id="container"></div>
+
+<script src="field-config.js?v=20261012"></script>
 <script>
-(function(){
-  if (!/[?&]debug=1/.test(location.search)) return;
-  function safe(fn){ try { var v = fn(); return v===undefined?'(undefined)':String(v); } catch(e){ return '(n/a)'; } }
-  var el = document.getElementById('fgl-debug-overlay');
-  el.style.display = 'block';
-  function upd(){
-    var vp = window.visualViewport;
-    el.textContent =
-      '[FGL DEBUG] ' + new Date().toLocaleTimeString('ja-JP') + '\n' +
-      'window.innerW/H: ' + window.innerWidth + ' / ' + window.innerHeight + '\n' +
-      'visualViewport W/H: ' + (vp?vp.width.toFixed(1):'-') + ' / ' + (vp?vp.height.toFixed(1):'-') +
-        '  offset: ' + (vp?vp.offsetLeft.toFixed(1):'-') + ',' + (vp?vp.offsetTop.toFixed(1):'-') + '  scale: ' + (vp?vp.scale.toFixed(2):'-') + '\n' +
-      'documentElement clientW/H: ' + document.documentElement.clientWidth + ' / ' + document.documentElement.clientHeight + '\n' +
-      'screen W/H: ' + screen.width + ' / ' + screen.height + '  dpr: ' + window.devicePixelRatio + '\n' +
-      'isMobileRotated: ' + safe(function(){ return game.isMobileRotated; }) + '\n' +
-      'UA: ' + navigator.userAgent;
-  }
-  upd();
-  window.addEventListener('resize', upd);
-  if (window.visualViewport) window.visualViewport.addEventListener('resize', upd);
-  setInterval(upd, 500);
-})();
-</script>
-
-<div id="game-scaler">
-
-    <div id="left-panel" class="side-panel">
-        <h2 data-i18n="howto_title">あそびかた</h2>
-        <ol>
-            <li data-i18n="howto_1">しろいカードをばのカードにかさねるとかずがかけざんされるよ</li>
-            <li data-i18n-html="howto_2">ばのカードが <b>101いじょう</b> になると<br>てきに こうげき するよ！</li>
-            <li data-i18n-html="howto_3">こうげきすると <b>アクション</b> がへるよ。<br>0になると ゲームオーバー</li>
-            <li data-i18n-html="howto_4">てきをたおすと ラウンドクリア！<br>アイテムが１つもらえるよ！</li>
-            <li data-i18n-html="howto_5">アイテムを うまくつかって<br>さいごのボスを たおそう！</li>
-        </ol>
-        <button id="btn-return-title" class="btn-back hidden" onclick="game.showTitle()" data-i18n="btn_to_title">タイトルへ もどる</button>
-    </div>
-
-    <div id="game-wrapper">
-        <canvas id="gameCanvas"></canvas>
-
-        <div id="transition-overlay">
-            <div class="transition-text" id="transition-msg">クリア！</div>
-            <div style="font-size: 24px; margin-top:20px; animation: blink 1s infinite; text-shadow:1px 1px 0 #000;" data-i18n="touch_to_continue">タッチして すすむ</div>
-        </div>
-
-        <div id="item-confirm-popup" class="hidden" style="display:none;">
-            <h3 id="popup-name" style="margin:0 0 10px 0; color:#f1c40f; font-size:24px; text-shadow:1px 1px 0 #000;">アイテム名</h3>
-            <p id="popup-desc" style="font-size:16px; color:#ecf0f1; min-height:60px; font-weight:bold;">せつめい</p>
-            <div style="display:flex; gap:10px; justify-content:center;">
-                <button class="puz-btn btn-start" style="width:120px; height:50px; font-size:20px; margin:0;" onclick="game.confirmItemUse(true)" data-i18n="btn_use">つかう</button>
-                <button class="puz-btn btn-sub" style="width:120px; height:50px; font-size:20px; margin:0;" onclick="game.confirmItemUse(false)">やめる</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="right-panel" class="side-panel">
-        <div id="right-panel-content">
-            <div class="info-block">
-                <div class="info-label" data-i18n="label_level">レベル</div>
-                <div class="info-value" id="level-display">ちゅうきゅう</div>
-            </div>
-            <div class="info-block">
-                <div class="info-label">ROUND</div>
-                <div class="info-value" id="round-display">1 / 6</div>
-            </div>
-            <div class="info-block">
-                <div class="info-label" data-i18n="label_score">スコア</div>
-                <div class="info-value" id="score-display">0</div>
-            </div>
-            <div class="info-block" style="flex: 1; display: flex; flex-direction: column; border-bottom: none; overflow: hidden;">
-                <div class="info-label" data-i18n="label_item">アイテム</div>
-                <div id="item-list"></div>
-            </div>
-        </div>
-    </div>
-
-    <div id="global-overlays">
-
-        <div id="title-screen" class="full-screen-overlay bg-title-img active">
-            <div class="content-box-translucent">
-                <h1 class="title-main">MATH BRAVES</h1>
-                <div class="title-sub" data-i18n="title_sub">- かけざん２ -</div>
-
-                <div style="display:flex; flex-direction:column; align-items:center;">
-                    <button class="puz-btn btn-start" onclick="game.showDifficultySelect()" data-i18n="btn_start">はじめる</button>
-
-                    <button class="puz-btn btn-tutorial" style="background:linear-gradient(to bottom,#ffd54f,#ff9800);" onclick="game.startTutorial()" data-i18n="btn_tutorial">🔰 チュートリアル</button>
-
-                    <button class="puz-btn btn-player" onclick="game.openPlayerModal()">
-                        <span style="font-size:16px; margin-right:10px;" data-i18n="label_player">プレーヤー:</span>
-                        <span id="current-player-name-title">ななしさん</span>
-                    </button>
-
-                    <button id="btn-title-login" class="puz-btn btn-login" onclick="game.login()" style="display:none">Googleでログイン</button>
-                    <button id="btn-title-logout" class="puz-btn btn-login hidden" onclick="game.logout()" style="display:none">ログアウト</button>
-
-                    <button class="puz-btn btn-score" onclick="game.toggleRankingPopup(true)" data-i18n="btn_ranking">ランキング</button>
-
-                    <button class="puz-btn btn-settings" onclick="game.openSettings()" data-i18n="btn_settings">⚙ 設定</button>
-                    <button class="puz-btn btn-sub" onclick="window.location.href='../index.html'" data-i18n="btn_index">INDEXへ</button>
-                </div>
-            </div>
-        </div>
-
-        <div id="difficulty-select-screen" class="full-screen-overlay bg-title-img hidden">
-            <div class="content-box-translucent">
-                <h2 class="title-main" style="font-size:50px; margin-bottom:40px; text-shadow: 2px 2px 0 #0072ff; color: #333;" data-i18n="diff_prompt">なんいどを えらぶ</h2>
-
-                <div class="diff-container">
-                    <div class="diff-column">
-                        <div class="crown-area"><div class="crown-icon" id="crown-easy"></div></div>
-                        <button class="puz-btn btn-diff btn-easy" onclick="game.initGame('easy')" data-i18n="diff_easy">しょきゅう</button>
-                        <div class="clear-label" id="count-easy">0回</div>
-                    </div>
-                    <div class="diff-column">
-                        <div class="crown-area"><div class="crown-icon" id="crown-normal"></div></div>
-                        <button class="puz-btn btn-diff btn-normal" onclick="game.initGame('normal')" data-i18n="diff_normal">ちゅうきゅう</button>
-                        <div class="clear-label" id="count-normal">0回</div>
-                    </div>
-                    <div class="diff-column">
-                        <div class="crown-area"><div class="crown-icon" id="crown-hard"></div></div>
-                        <button class="puz-btn btn-diff btn-hard" onclick="game.initGame('hard')" data-i18n="diff_hard">じょうきゅう</button>
-                        <div class="clear-label" id="count-hard">0回</div>
-                    </div>
-                </div>
-
-                <button class="puz-btn btn-sub" style="margin-top:40px;" onclick="game.showTitle()" data-i18n="btn_back">もどる</button>
-            </div>
-        </div>
-
-        <div id="player-modal-overlay" class="full-screen-overlay hidden">
-            <div class="player-modal rpg-window">
-                <div class="player-modal-inner">
-                    <h2 data-i18n="pm_title">プレーヤー設定</h2>
-                    <div style="display:flex; gap:10px; justify-content:center; margin-bottom:20px;">
-                        <input type="text" id="new-player-input" class="player-input" placeholder="なまえ (ひらがな)" maxlength="8" data-i18n-placeholder="pm_placeholder">
-                        <button class="btn-add" onclick="game.addPlayerName()" data-i18n="btn_add">ついか</button>
-                    </div>
-                    <div id="validation-msg" style="color:#ff5252; height:20px; font-weight:bold; text-shadow:0 1px 1px rgba(0,0,0,0.2);"></div>
-                    <ul id="player-list-ui" class="player-list"></ul>
-                    <button class="puz-btn btn-sub" style="margin:20px auto 0 auto; width:150px; height:50px;" onclick="game.closePlayerModal()" data-i18n="btn_close">とじる</button>
-                </div>
-            </div>
-        </div>
-
-        <div id="ranking-popup" class="full-screen-overlay bg-title-img hidden">
-            <div class="content-box-translucent" style="width: 1000px;">
-                <h2 class="title-main" style="font-size:40px; margin-bottom:20px; text-shadow: 2px 2px 0 #0072ff; color:#333;" data-i18n="rank_title">ランキング</h2>
-                <div>
-                    <button class="tab-btn active" data-mode="world" onclick="game.switchRankingTab('world')" data-i18n="rank_tab_world">ワールド</button>
-                    <button class="tab-btn" data-mode="local" onclick="game.switchRankingTab('local')" data-i18n="rank_tab_local">ローカル</button>
-                </div>
-                <div class="ranking-container">
-                    <div class="ranking-col">
-                        <h3 style="text-align:center; color:#2ecc71; margin:0 0 10px 0; text-shadow:0 1px 2px rgba(0,0,0,0.5);" data-i18n="diff_easy">しょきゅう</h3>
-                        <div style="overflow-y:auto; flex:1; -webkit-overflow-scrolling:touch; touch-action:pan-y;" id="rank-list-easy"></div>
-                    </div>
-                    <div class="ranking-col">
-                        <h3 style="text-align:center; color:#3498db; margin:0 0 10px 0; text-shadow:0 1px 2px rgba(0,0,0,0.5);" data-i18n="diff_normal">ちゅうきゅう</h3>
-                        <div style="overflow-y:auto; flex:1; -webkit-overflow-scrolling:touch; touch-action:pan-y;" id="rank-list-normal"></div>
-                    </div>
-                    <div class="ranking-col">
-                        <h3 style="text-align:center; color:#e74c3c; margin:0 0 10px 0; text-shadow:0 1px 2px rgba(0,0,0,0.5);" data-i18n="diff_hard">じょうきゅう</h3>
-                        <div style="overflow-y:auto; flex:1; -webkit-overflow-scrolling:touch; touch-action:pan-y;" id="rank-list-hard"></div>
-                    </div>
-                </div>
-                <button class="puz-btn btn-sub" style="margin-top:20px;" onclick="game.toggleRankingPopup(false)" data-i18n="btn_close">とじる</button>
-            </div>
-        </div>
-
-        <div id="settings-modal" class="full-screen-overlay hidden">
-            <div class="content-box-translucent" style="width:420px;">
-                <h2 style="color:#333; margin:0 0 6px 0; font-size:28px;" data-i18n="settings_title">⚙ 設定</h2>
-                <div style="color:#666; font-size:15px; margin-bottom:16px; font-weight:bold;" data-i18n="settings_control_label">カードの操作方法をえらぼう</div>
-                <div style="display:flex; flex-direction:column; align-items:center; width:100%;">
-                    <button id="setting-drag" class="puz-btn setting-mode-btn" onclick="game.setControlMode('drag')" data-i18n="control_drag">🖱 ドラッグ</button>
-                    <button id="setting-doubletap" class="puz-btn setting-mode-btn" onclick="game.setControlMode('doubletap')" data-i18n="control_doubletap">👆👆 ダブルタップ</button>
-                    <button id="setting-singletap" class="puz-btn setting-mode-btn" onclick="game.setControlMode('singletap')" data-i18n="control_singletap">👆 シングルタップ</button>
-                </div>
-                <div class="mode-desc-box" id="mode-desc-text"></div>
-                <hr style="width:100%; border:none; border-top:1px solid rgba(0,0,0,0.1); margin:16px 0;">
-                <div style="color:#666; font-size:15px; margin-bottom:10px; font-weight:bold;" data-i18n="settings_lang_label">言語 / Language</div>
-                <div style="display:flex; flex-direction:column; align-items:center; width:100%;">
-                    <button id="lang-btn-simple" class="puz-btn setting-mode-btn lang-btn" onclick="game.selectLanguage('simple')" data-i18n="lang_simple">かんたんなにほんご</button>
-                    <button id="lang-btn-ja"     class="puz-btn setting-mode-btn lang-btn" onclick="game.selectLanguage('ja')"     data-i18n="lang_ja">日本語</button>
-                    <button id="lang-btn-en"     class="puz-btn setting-mode-btn lang-btn" onclick="game.selectLanguage('en')"     data-i18n="lang_en">English</button>
-                </div>
-                <button class="puz-btn btn-sub" style="margin-top:18px; width:200px;" onclick="game.closeSettings()" data-i18n="btn_close">とじる</button>
-            </div>
-        </div>
-
-        <!-- ブラウザ標準confirm()の代替 -->
-        <div id="custom-confirm-overlay" class="full-screen-overlay hidden" style="z-index:200; background-color: rgba(0,0,0,0.6);">
-            <div class="content-box-translucent" style="width:340px;">
-                <p id="custom-confirm-msg" style="font-size:18px; font-weight:bold; color:#333; text-align:center; margin:0 0 20px 0;"></p>
-                <div style="display:flex; gap:14px; justify-content:center; width:100%;">
-                    <button id="custom-confirm-yes-btn" class="puz-btn btn-diff btn-hard" style="width:110px; height:48px; font-size:18px; margin:0;" data-i18n="btn_yes">はい</button>
-                    <button id="custom-confirm-no-btn" class="puz-btn btn-sub" style="width:110px; height:48px; font-size:18px; margin:0;" data-i18n="btn_no">いいえ</button>
-                </div>
-            </div>
-        </div>
-
-        <div id="result-screen" class="full-screen-overlay hidden">
-            <div class="result-box">
-                <h2 id="result-popup-title" class="title-main" style="font-size:48px; margin-bottom:20px;">GAME OVER</h2>
-                <div class="res-row"><span data-i18n="res_difficulty">難易度</span><span class="res-val" id="res-level"></span></div>
-                <div class="res-row"><span data-i18n="res_base_score">基本スコア</span><span class="res-val" id="res-base-score"></span></div>
-                <div class="res-row"><span data-i18n="res_bonus">ボーナス</span><span class="res-val" id="res-bonus"></span></div>
-                <div style="margin-top:20px; font-weight:bold; color:#fff;">TOTAL SCORE</div>
-                <div class="res-total" id="res-final-score">0</div>
-                <button class="puz-btn btn-start" style="margin:30px auto 0 auto;" onclick="game.showTitle()" data-i18n="btn_to_title2">タイトルへ</button>
-            </div>
-        </div>
-
-    </div>
-
-</div>
-
-<script>
-const NG_WORDS_HIRAGANA = [
-    'しね', 'しぬ', 'しに', 'ころす', 'ころせ', 'さつがい', 'くたばれ',
-    'じさつ', 'ぎさつ', 'つるす', 'れんたん', 'しにたい',
-    'てろ', 'てろりすと', 'ばくは', 'ばくだん', 'ほうか',
-    'はんざい', 'ごうとう', 'ゆうかい', 'かんきん', 'おそう',
-    'やくざ', 'ぼうりょく', 'はんぐれ', 'ちんぴら', 'まふぃあ',
-    'たいま', 'まやく', 'かくせいざい', 'しゃぶ', 'どらっぐ', 'こかいん',
-    'へろいん', 'えくすたしー', 'だっぽう', 'きめせく',
-    'いじめ', 'ぎゃくたい',
-    'ばか', 'あほ', 'まぬけ', 'きちがい', 'き違い',
-    'うざい', 'うざ', 'きもい', 'きも', 'きしょい', 'きえろ',
-    'くず', 'ごみ', 'ごみむし', 'かす', 'ざこ', 'ぜつ',
-    'ぶす', 'でぶ', 'はげ', 'ちび', 'でっぱ', 'いなかもの',
-    'うじ', 'はいぼく', 'まけいぬ', 'おつむ', 'のうたりん',
-    'ていのう', 'ちしょう', 'しょうがい', 'がいじ', 'かたわ', 'びっこ',
-    'めくら', 'つんぼ', 'おし', 'どじん', 'えた', 'ひにん',
-    'たひ', 'たひね',
-    'うせろ', 'だまれ',
-    'ちんちん', 'ちんこ', 'ちんぽ', 'ちんか', 'まら', 'さお',
-    'まんこ', 'まんしゅう', 'まんげ', 'われめ', 'おまた',
-    'くり', 'くりとりす', 'いんしん', 'いんかく', 'びらびら',
-    'こうがん', 'たまきん', 'きんたま', 'ふぐり',
-    'おっぱい', 'ちち', 'にゅうりん', 'にゅうとう', 'きょにゅう', 'ひんにゅう',
-    'けつ', 'あなる', 'こうもん', 'けつのあな',
-    'えろ', 'えっち', 'すけべ', 'へんたい', 'むっつり', 'しこ',
-    'せっくす', 'せいこう', 'まぐわい', 'そうにゅう', 'はめる',
-    'おなにー', 'じい', 'しこしこ', 'ふぇら', 'ぱいずり', 'くんに',
-    'いらま', 'しっしん', 'なかだし', 'ごっくん', 'ぶっかけ',
-    'しおふき', 'ぜっちょう', 'いく', 'いかせろ', 'あえぎ',
-    'どうてい', 'しょじょ', 'やりまん', 'やりちん', 'びっち',
-    'せふれ', 'ぱこ', 'ぱこぱこ', 'わいせつ', 'ろり', 'しょた', 'ぺど',
-    'きんしん', 'じゅうかん', 'りょうじょく', 'らんこう', 'すかんと',
-    'のーぱん', 'ぱんちら',
-    'れいぷ', 'ごうかん', 'ちかん', 'とうさつ', 'のぞき', 'ろしゅつ',
-    'ふうぞく', 'そーぷ', 'へるす', 'でりへる', 'ぴんさろ', 'いめくら',
-    'あだると', 'えーぶい', 'えぶい', 'ぽるの', 'うらびでお', 'むしゅうせい',
-    'えんこう', 'えんじょ', 'うり', 'かいしゅん', 'ばいしゅん',
-    'ぱぱかつ', 'ままかつ', 'うりせん',
-    'うんこ', 'うんち', 'くそ', 'げり', 'べん', 'ふん',
-    'しっこ', 'しょんべん', 'にょう', 'ほうにょう',
-    'へ', 'おなら', 'げろ', 'たん',
-    'うんえい', 'こうしき', 'すたっふ', 'かんり', 'ぱとろーる',
-    'じえむ', 'げーむますたー', 'ますたー', 'あどみん', 'しすてむ',
-    'さーばー', 'あかばん', 'ばん', 'ちーと', 'ちーたー', 'ばぐ',
-    'らいん', 'かかお', 'すかいぷ', 'いんすた', 'ついったー', 'でぃすこ',
-    'でんわ', 'ばんごう', 'けいたい', 'あどれす', 'めあど', 'じゅうしょ',
-    'あお', 'あいたい', 'まちあわせ', 'ほてる', 'らぶほ', 'おふかい',
-    'ぱすわーど', 'ぱす', 'あかうんと', 'こじんじょうほう'
+// ---- このゲーム(固有)の設定 ----
+const RUN_LIST = [
+    { id: 'normal', color: '#2fa8a0' },
+    { id: 'locked', color: '#7d7f92', locked: true },
 ];
+const GAME = {
+    sbGame: 'math_braves_multiplication2',
+    keys: { lang: 'mb_mul2_lang', lastStar: 'mb_mul2_last_star', ranking: d => `math_braves_mul2_ranking_v2_${d}`, clearCount: d => `math_braves_mul2_clears_v2_${d}` },
+    stageCount: MAX_ROUND,
+    stageThemes: [{ c: '#9acd4a' }, { c: '#2fbf71' }, { c: '#e8a317' }, { c: '#4aa0f0' }, { c: '#a064ea' }, { c: '#ef6a4a' }],
+    titleBots: [[1, 70, 110, 1.3, '#2fbf71'], [0, 120, 372, 1.6, '#4aa0f0'], [4, 14, 540, 1.1, '#ef6a4a'],
+                  [3, 1050, 96, 1.3, '#a064ea'], [2, 990, 372, 1.7, '#26c6da'], [0, 1120, 540, 1.1, '#2fbf71']],
+    runArt: { shape: 1, color: '#2fbf71' },
+    // ラウンドクリアの画面: アイテムとのこりアクション
+    clearRows: (st, stageScore) => `<div><span>${T('fd_loot_row')}</span><b>${state.lootKey ? itemImgTag(state.lootKey, 24) + ' ' + itemName(state.lootKey) : '–'}</b></div>`
+        + `<div><span>${T('fd_left_ap')}</span><b>${state.actionCount}</b></div>`,
+    endBreakdown: (cleared, finalScore, bonus) => `⚔️ ${state.score} ＋ ${T('fd_bonus_label')} ${bonus}`,
+    settingsExtraHTML: `
+            <p class="set-sec" data-i18n="settings_control_label">カードの操作方法をえらぼう</p>
+            <div class="set-row">
+                <button id="setting-drag" class="btn lang-btn" data-i18n="control_drag">ドラッグ</button>
+                <button id="setting-doubletap" class="btn lang-btn" data-i18n="control_doubletap">ダブルタップ</button>
+                <button id="setting-singletap" class="btn lang-btn" data-i18n="control_singletap">シングルタップ</button>
+            </div>
+            <div id="mode-desc-text"></div>`,
+    // ゲーム画面(左右パネル+盤面)
+    gameLayerHTML: `
+    <div id="game-layer">
+        <div id="left-panel">
+            <div class="sp-brand"><i class="ico" data-ico="robot"></i><span data-i18n="subject_badge">かけざん２</span><i class="ico" data-ico="robot"></i></div>
+            <div class="sp-mode"><span class="rn" id="sp-run"></span><span class="df" id="sp-diff"></span></div>
+            <div class="sp-card sp-player">
+                <div class="av" id="sp-av">な</div>
+                <div class="who"><div class="sp-lb" data-i18n="label_player" data-noemo>プレーヤー</div><span id="disp-player-name">ななしさん</span></div>
+            </div>
+            <div class="sp-card">
+                <div class="sp-lb"><i class="ico" data-ico="flag"></i><span data-i18n="label_stage" data-noemo>ラウンド</span><b class="rt-num" id="disp-difficulty-label"></b></div>
+                <div class="rt-list" id="sp-route"></div>
+            </div>
+            <div class="sp-card">
+                <div class="sp-lb"><i class="ico" data-ico="sword"></i><span data-i18n="rule_title" data-noemo>ルール</span></div>
+                <div class="fd-rule" data-i18n-html="rule_text">ばのカードが <b>101いじょう</b>になると こうげき！</div>
+            </div>
+            <div class="sp-spacer"></div>
+            <button id="btn-howto" class="sp-btn"><i class="ico" data-ico="book"></i><span data-i18n="btn_howto" data-noemo>あそびかた</span></button>
+            <button id="btn-to-title" class="sp-btn red hidden title-menu-btn"><i class="ico" data-ico="home"></i><span data-i18n="btn_to_title">タイトルへ もどる</span></button>
+        </div>
 
+        <div id="game-area">
+            <div id="bl"></div>
+            <canvas id="gameCanvas"></canvas>
+            <div id="game-result" style="display: none;"></div>
+        </div>
 
-// ============================================================
-//  I18N（かんたんなにほんご／日本語／English）
-// ============================================================
-const STRINGS = {
-    ja: {
-        howto_title: 'あそびかた',
-        howto_1: 'しろいカードをばのカードにかさねるとかずがかけざんされるよ',
-        howto_2: 'ばのカードが <b>101いじょう</b> になると<br>てきに こうげき するよ！',
-        howto_3: 'こうげきすると <b>アクション</b> がへるよ。<br>0になると ゲームオーバー',
-        howto_4: 'てきをたおすと ラウンドクリア！<br>アイテムが１つもらえるよ！',
-        howto_5: 'アイテムを うまくつかって<br>さいごのボスを たおそう！',
-        btn_to_title: 'タイトルへ もどる', touch_to_continue: 'タッチして すすむ',
-        btn_use: 'つかう', btn_cancel: 'やめる',
-        label_level: 'レベル', label_score: 'スコア', label_item: 'アイテム',
-        title_sub: '- かけざん２ -', btn_start: 'はじめる', btn_tutorial: '🔰 チュートリアル', label_player: 'プレーヤー:',
-        btn_ranking: 'ランキング', btn_settings: '⚙ 設定', btn_index: 'INDEXへ',
-        diff_prompt: 'なんいどを えらぶ', diff_easy: 'しょきゅう', diff_normal: 'ちゅうきゅう', diff_hard: 'じょうきゅう', btn_back: 'もどる',
-        pm_title: 'プレーヤー設定', pm_placeholder: 'なまえ (ひらがな)', btn_add: 'ついか', btn_close: 'とじる',
-        pm_empty_list: 'プレーヤーがいません。<br>うえから ついか してね。',
-        rank_title: 'ランキング', rank_tab_world: 'ワールド', rank_tab_local: 'ローカル', rank_loading: 'ロード中...', rank_empty: '記録なし',
-        settings_title: '⚙ 設定', settings_control_label: 'カードの操作方法をえらぼう',
-        control_drag: '🖱 ドラッグ', control_doubletap: '👆👆 ダブルタップ', control_singletap: '👆 シングルタップ',
-        control_desc_drag: 'カードを ばのカードまで\nドラッグして はなす',
-        control_desc_doubletap: 'カードを 2かい すばやく\nタップ（クリック）する',
-        control_desc_singletap: 'カードを 1かい\nタップ（クリック）する',
-        settings_lang_label: '言語 / Language', lang_simple: 'かんたんなにほんご', lang_ja: '日本語', lang_en: 'English',
-        res_difficulty: '難易度', res_base_score: '基本スコア', res_bonus: 'ボーナス', btn_to_title2: 'タイトルへ',
-        clear_count: '{n}回クリア',
-        name_empty: 'おなまえを かいてね', name_hiragana_only: 'ひらがな だけで かいてね', name_ng_word: 'つかえない ことばが はいっています',
-        name_duplicate: 'そのおなまえは すでにあります', name_max_players: 'とうろく できるのは 5にん までです',
-        delete_confirm: 'このプレーヤーを削除しますか？', btn_yes: 'はい', btn_no: 'いいえ',
-        item_change_name: 'チェンジ', item_change_desc: 'てふだ を すべて ひきなおす',
-        item_action_plus_name: 'アクション＋１', item_action_plus_desc: 'アクションが １ かいふくする',
-        item_x20_name: '×２０', item_x20_desc: 'ばのカードを ２０ばい する\n(101いじょうで すぐにこうげき)',
-        item_damage_500_name: 'ダメージ500', item_damage_500_desc: 'てきに 500ダメージを あたえる\n(アクションは へらない)',
-        item_all_plus_5_name: 'ぜんぶ＋５', item_all_plus_5_desc: 'てふだの すうじが すべて ＋５ される',
-        result_title_clear: '完全クリア！', unit_pts: '点',
-        transition_clear: 'クリア！', transition_game_clear: 'ゲームクリア！',
-        canvas_actions_left: 'のこりアクション', canvas_almost: 'あとすこし!',
-    },
-    simple: {
-        howto_title: 'あそびかた',
-        howto_1: 'しろいカードを ばのカードに かさねると かずが かけざんされるよ',
-        howto_2: 'ばのカードが <b>101いじょう</b> になると<br>てきに こうげき するよ！',
-        howto_3: 'こうげきすると <b>アクション</b> が へるよ。<br>0になると ゲームオーバー',
-        howto_4: 'てきを たおすと ラウンドクリア！<br>アイテムが１つ もらえるよ！',
-        howto_5: 'アイテムを うまく つかって<br>さいごの ボスを たおそう！',
-        btn_to_title: 'タイトルへ もどる', touch_to_continue: 'タッチして すすむ',
-        btn_use: 'つかう', btn_cancel: 'やめる',
-        label_level: 'レベル', label_score: 'スコア', label_item: 'アイテム',
-        title_sub: '- かけざん２ -', btn_start: 'はじめる', btn_tutorial: '🔰 チュートリアル', label_player: 'プレーヤー:',
-        btn_ranking: 'ランキング', btn_settings: '⚙ せってい', btn_index: 'INDEXへ',
-        diff_prompt: 'なんいどを えらぶ', diff_easy: 'しょきゅう', diff_normal: 'ちゅうきゅう', diff_hard: 'じょうきゅう', btn_back: 'もどる',
-        pm_title: 'プレーヤー せってい', pm_placeholder: 'なまえ (ひらがな)', btn_add: 'ついか', btn_close: 'とじる',
-        pm_empty_list: 'プレーヤーが いません。<br>うえから ついか してね。',
-        rank_title: 'ランキング', rank_tab_world: 'ワールド', rank_tab_local: 'ローカル', rank_loading: 'ロードちゅう...', rank_empty: 'きろくなし',
-        settings_title: '⚙ せってい', settings_control_label: 'カードの そうさほうほうを えらぼう',
-        control_drag: '🖱 ドラッグ', control_doubletap: '👆👆 ダブルタップ', control_singletap: '👆 シングルタップ',
-        control_desc_drag: 'カードを ばのカードまで\nドラッグして はなす',
-        control_desc_doubletap: 'カードを 2かい すばやく\nタップ（クリック）する',
-        control_desc_singletap: 'カードを 1かい\nタップ（クリック）する',
-        settings_lang_label: '言語 / Language', lang_simple: 'かんたんなにほんご', lang_ja: '日本語', lang_en: 'English',
-        res_difficulty: 'なんいど', res_base_score: 'きほんスコア', res_bonus: 'ボーナス', btn_to_title2: 'タイトルへ',
-        clear_count: '{n}かい クリア',
-        name_empty: 'おなまえを かいてね', name_hiragana_only: 'ひらがな だけで かいてね', name_ng_word: 'つかえない ことばが はいっています',
-        name_duplicate: 'そのおなまえは もう あります', name_max_players: 'とうろく できるのは 5にん までです',
-        delete_confirm: 'この プレーヤーを さくじょしますか？', btn_yes: 'はい', btn_no: 'いいえ',
-        item_change_name: 'チェンジ', item_change_desc: 'てふだ を すべて ひきなおす',
-        item_action_plus_name: 'アクション＋１', item_action_plus_desc: 'アクションが １ かいふくする',
-        item_x20_name: '×２０', item_x20_desc: 'ばのカードを ２０ばい する\n(101いじょうで すぐに こうげき)',
-        item_damage_500_name: 'ダメージ500', item_damage_500_desc: 'てきに 500ダメージを あたえる\n(アクションは へらない)',
-        item_all_plus_5_name: 'ぜんぶ＋５', item_all_plus_5_desc: 'てふだの すうじが すべて ＋５ される',
-        result_title_clear: 'かんぜんクリア！', unit_pts: 'てん',
-        transition_clear: 'クリア！', transition_game_clear: 'ゲームクリア！',
-        canvas_actions_left: 'のこりアクション', canvas_almost: 'あとすこし!',
-    },
-    en: {
-        howto_title: 'How to Play',
-        howto_1: 'Stack a white card onto a field card to multiply the numbers',
-        howto_2: 'When the field card reaches <b>101 or more</b>,<br>it attacks the enemy!',
-        howto_3: 'Attacking uses up an <b>Action</b>.<br>Game over at 0',
-        howto_4: 'Defeat the enemy to clear the round!<br>You get 1 item!',
-        howto_5: 'Use your items wisely<br>to defeat the final boss!',
-        btn_to_title: 'Back to Title', touch_to_continue: 'Touch to continue',
-        btn_use: 'Use', btn_cancel: 'Cancel',
-        label_level: 'Level', label_score: 'Score', label_item: 'Items',
-        title_sub: ' - Multiplication 2 - ', btn_start: 'Start', btn_tutorial: '🔰 Tutorial', label_player: 'Player:',
-        btn_ranking: 'Ranking', btn_settings: '⚙ Settings', btn_index: 'To INDEX',
-        diff_prompt: 'Choose a Difficulty', diff_easy: 'Beginner', diff_normal: 'Intermediate', diff_hard: 'Advanced', btn_back: 'Back',
-        pm_title: 'Player Settings', pm_placeholder: 'Name (Hiragana)', btn_add: 'Add', btn_close: 'Close',
-        pm_empty_list: 'No players yet.<br>Add one above.',
-        rank_title: 'Ranking', rank_tab_world: 'World', rank_tab_local: 'Local', rank_loading: 'Loading...', rank_empty: 'No records',
-        settings_title: '⚙ Settings', settings_control_label: 'Choose how to control cards',
-        control_drag: '🖱 Drag', control_doubletap: '👆👆 Double Tap', control_singletap: '👆 Single Tap',
-        control_desc_drag: 'Drag a card onto the field\ncard, then release',
-        control_desc_doubletap: 'Quickly tap (click)\na card twice',
-        control_desc_singletap: 'Tap (click)\na card once',
-        settings_lang_label: '言語 / Language', lang_simple: 'かんたんなにほんご', lang_ja: '日本語', lang_en: 'English',
-        res_difficulty: 'Difficulty', res_base_score: 'Base Score', res_bonus: 'Bonus', btn_to_title2: 'To Title',
-        clear_count: '{n} clears',
-        name_empty: 'Please enter a name', name_hiragana_only: 'Please use Hiragana only', name_ng_word: 'That name contains a word that cannot be used',
-        name_duplicate: 'That name is already registered', name_max_players: 'You can register up to 5 players',
-        delete_confirm: 'Delete this player?', btn_yes: 'Yes', btn_no: 'No',
-        item_change_name: 'Change', item_change_desc: 'Redraw your entire hand',
-        item_action_plus_name: 'Action+1', item_action_plus_desc: 'Restores 1 Action',
-        item_x20_name: '×20', item_x20_desc: 'Multiplies the field card by 20\n(Attacks immediately if 101+)',
-        item_damage_500_name: '500 Damage', item_damage_500_desc: 'Deals 500 damage to the enemy\n(Does not cost an Action)',
-        item_all_plus_5_name: 'All+5', item_all_plus_5_desc: 'Adds +5 to every number in your hand',
-        result_title_clear: 'Complete Clear!', unit_pts: 'pt',
-        transition_clear: 'Clear!', transition_game_clear: 'Game Clear!',
-        canvas_actions_left: 'Actions Left', canvas_almost: 'Almost!',
+        <div id="right-panel">
+            <div id="right-panel-content" class="invisible">
+                <div class="sp-card">
+                    <div class="sp-lb"><i class="ico" data-ico="trophy"></i><span data-i18n="label_total_score" data-noemo>ごうけい スコア</span></div>
+                    <div id="disp-total-score" class="sp-score">0</div>
+                </div>
+                <div class="sp-card">
+                    <div class="sp-lb"><i class="ico" data-ico="medal"></i><span data-i18n="fd_max_damage" data-noemo>さいだい ダメージ</span></div>
+                    <div id="disp-max-score" class="sp-best">0</div>
+                </div>
+                <div class="sp-card dg-items">
+                    <div class="sp-lb"><i class="ico" data-ico="list"></i><span data-i18n="label_item" data-noemo>アイテム</span></div>
+                    <div id="item-list"></div>
+                </div>
+                <div class="sp-card sp-log">
+                    <div class="sp-lb"><i class="ico" data-ico="list"></i><span data-i18n="panel_battle_log" data-noemo>バトルログ</span></div>
+                    <div id="battle-log-entries"></div>
+                </div>
+            </div>
+        </div>
+    </div>`,
+    strings: {
+        ja: {
+            subject_badge: "かけざん２", title_plaque: "かけざん２",
+            run_normal_desc: "6つのラウンドを進んで、ボスロボをたおそう！",
+            stage_name_1: "ゲージロボ", stage_name_2: "ボイラーロボ", stage_name_3: "ギアヘッド", stage_name_4: "フラスコロボ", stage_name_5: "ひこうせんロボ", stage_name_6: "ボイラーまじん",
+            stage_word: "ROUND", rank_stage_prefix: "R", stage_log: "<b>ラウンド{n}</b> {name}", final_title: "ファイナルラウンド！",
+            label_stage: "ラウンド", stage_clear_title: "ラウンド{n} クリア！", sc_stage_score: "このラウンドのスコア", btn_next_stage: "ラウンド{n}へ ▶", end_reached: "とうたつ ラウンド",
+            label_item: "アイテム", btn_use: "つかう", btn_cancel: "やめる",
+            canvas_actions_left: "のこりアクション", fd_ap_circle: "アクション", canvas_almost: "あとすこし!",
+            rule_title: "ルール", rule_text: "ばのカードが <b>101いじょう</b>になると こうげき！<span class=\"eq\">ダメージ ＝ ばのカードの数</span>",
+            fd_no_items: "アイテムなし", fd_used: "つかった: {name}", fd_max_damage: "さいだい ダメージ", fd_loot_row: "ゲットしたアイテム", fd_left_ap: "のこりアクション", fd_bonus_label: "ボーナス",
+            fd_log_attack: "⚔️ <b>{n}</b> ダメージ！", fd_log_item: "{icon} 「{name}」を つかった", fd_log_loot: "{icon} 「{name}」を ゲット！",
+            item_change_name: "チェンジ", item_change_desc: "てふだを すべて ひきなおす",
+            item_action_plus_name: "アクション＋１", item_action_plus_desc: "アクションが １ かいふくする",
+            item_x20_name: "×２０", item_x20_desc: "ばのカードを ２０ばい する\n(101いじょうで すぐにこうげき)",
+            item_damage_500_name: "ダメージ500", item_damage_500_desc: "てきに 500ダメージを あたえる\n(アクションは へらない)",
+            item_all_plus_5_name: "ぜんぶ＋５", item_all_plus_5_desc: "てふだの すうじが すべて ＋５ される",
+            settings_control_label: "カードの操作方法をえらぼう",
+            control_drag: "ドラッグ", control_doubletap: "ダブルタップ", control_singletap: "シングルタップ",
+            control_desc_drag: "カードを ばのカードまで\nドラッグして はなす",
+            control_desc_doubletap: "カードを 2かい すばやく\nタップ（クリック）する",
+            control_desc_singletap: "カードを 1かい\nタップ（クリック）する",
+            howto_p1: "1. しろいカードを まん中の<br><strong>ばのカード</strong>に かさねると<br><strong>かけざん</strong>されるよ！",
+            howto_p2: "2. ばのカードが <strong>101いじょう</strong>になると<br>てきに こうげき！<br>ダメージは ばのカードの数そのまま。",
+            howto_p3: "3. こうげきすると <strong>アクション</strong>が<br>1へるよ。0になると ゲームオーバー。",
+            howto_p4: "4. てきを たおすと <strong>アイテム</strong>が<br>1つ もらえるよ。ラウンドごとに<br>アクションも もどるよ。",
+            howto_p5: "5. アイテムを うまく つかって<br>さいごの <strong>ボス</strong>を たおそう！",
+            howto_p6: "6. クリアすると のこりアクション ×1000てんの<br><strong>ボーナス</strong>！",
+        },
+        simple: {
+            subject_badge: "かけざん２", title_plaque: "かけざん２",
+            run_normal_desc: "6つの ラウンドを すすんで、ボスロボを たおそう！",
+            stage_name_1: "ゲージロボ", stage_name_2: "ボイラーロボ", stage_name_3: "ギアヘッド", stage_name_4: "フラスコロボ", stage_name_5: "ひこうせんロボ", stage_name_6: "ボイラーまじん",
+            stage_word: "ROUND", rank_stage_prefix: "R", stage_log: "<b>ラウンド{n}</b> {name}", final_title: "ファイナルラウンド！",
+            label_stage: "ラウンド", stage_clear_title: "ラウンド{n} クリア！", sc_stage_score: "この ラウンドの スコア", btn_next_stage: "ラウンド{n}へ ▶", end_reached: "とうたつ ラウンド",
+            label_item: "アイテム", btn_use: "つかう", btn_cancel: "やめる",
+            canvas_actions_left: "のこりアクション", fd_ap_circle: "アクション", canvas_almost: "あとすこし!",
+            rule_title: "ルール", rule_text: "ばのカードが <b>101いじょう</b>に なると こうげき！<span class=\"eq\">ダメージ ＝ ばのカードの かず</span>",
+            fd_no_items: "アイテムなし", fd_used: "つかった: {name}", fd_max_damage: "さいだい ダメージ", fd_loot_row: "ゲットした アイテム", fd_left_ap: "のこりアクション", fd_bonus_label: "ボーナス",
+            fd_log_attack: "⚔️ <b>{n}</b> ダメージ！", fd_log_item: "{icon} 「{name}」を つかった", fd_log_loot: "{icon} 「{name}」を ゲット！",
+            item_change_name: "チェンジ", item_change_desc: "てふだを すべて ひきなおす",
+            item_action_plus_name: "アクション＋１", item_action_plus_desc: "アクションが １ かいふくする",
+            item_x20_name: "×２０", item_x20_desc: "ばのカードを ２０ばい する\n(101いじょうで すぐに こうげき)",
+            item_damage_500_name: "ダメージ500", item_damage_500_desc: "てきに 500ダメージを あたえる\n(アクションは へらない)",
+            item_all_plus_5_name: "ぜんぶ＋５", item_all_plus_5_desc: "てふだの すうじが すべて ＋５ される",
+            settings_control_label: "カードの そうさほうほうを えらぼう",
+            control_drag: "ドラッグ", control_doubletap: "ダブルタップ", control_singletap: "シングルタップ",
+            control_desc_drag: "カードを ばのカードまで\nドラッグして はなす",
+            control_desc_doubletap: "カードを 2かい すばやく\nタップ（クリック）する",
+            control_desc_singletap: "カードを 1かい\nタップ（クリック）する",
+            howto_p1: "1. しろいカードを まんなかの<br><strong>ばのカード</strong>に かさねると<br><strong>かけざん</strong>されるよ！",
+            howto_p2: "2. ばのカードが <strong>101いじょう</strong>に なると<br>てきに こうげき！<br>ダメージは ばのカードの かずそのまま。",
+            howto_p3: "3. こうげきすると <strong>アクション</strong>が<br>1へるよ。0に なると ゲームオーバー。",
+            howto_p4: "4. てきを たおすと <strong>アイテム</strong>が<br>1つ もらえるよ。ラウンドごとに<br>アクションも もどるよ。",
+            howto_p5: "5. アイテムを うまく つかって<br>さいごの <strong>ボス</strong>を たおそう！",
+            howto_p6: "6. クリアすると のこりアクション ×1000てんの<br><strong>ボーナス</strong>！",
+        },
+        en: {
+            subject_badge: "Multiply 2", title_plaque: "Multiplication 2",
+            run_normal_desc: "Go through 6 rounds and defeat the boss robot!",
+            stage_name_1: "Gauge Bot", stage_name_2: "Boiler Bot", stage_name_3: "Gearhead", stage_name_4: "Flask Bot", stage_name_5: "Airship Bot", stage_name_6: "Boiler Titan",
+            stage_word: "ROUND", rank_stage_prefix: "R", stage_log: "<b>Round {n}</b> {name}", final_title: "Final Round!",
+            label_stage: "Round", stage_clear_title: "Round {n} Clear!", sc_stage_score: "Score this round", btn_next_stage: "To Round {n} ▶", end_reached: "Round reached",
+            label_item: "Items", btn_use: "Use", btn_cancel: "Cancel",
+            canvas_actions_left: "Actions Left", fd_ap_circle: "Actions", canvas_almost: "Almost!",
+            rule_title: "Rule", rule_text: "When the field card is <b>101 or more</b>, it attacks!<span class=\"eq\">Damage = the field card's number</span>",
+            fd_no_items: "No items", fd_used: "Used: {name}", fd_max_damage: "Max damage", fd_loot_row: "Item you got", fd_left_ap: "Actions left", fd_bonus_label: "Bonus",
+            fd_log_attack: "⚔️ <b>{n}</b> damage!", fd_log_item: "{icon} Used \"{name}\"", fd_log_loot: "{icon} Got \"{name}\"!",
+            item_change_name: "Change", item_change_desc: "Redraw your entire hand",
+            item_action_plus_name: "Action+1", item_action_plus_desc: "Restores 1 Action",
+            item_x20_name: "×20", item_x20_desc: "Multiplies the field card by 20\n(Attacks immediately if 101+)",
+            item_damage_500_name: "500 Damage", item_damage_500_desc: "Deals 500 damage to the enemy\n(Does not cost an Action)",
+            item_all_plus_5_name: "All+5", item_all_plus_5_desc: "Adds +5 to every number in your hand",
+            settings_control_label: "Choose how to control cards",
+            control_drag: "Drag", control_doubletap: "Double Tap", control_singletap: "Single Tap",
+            control_desc_drag: "Drag a card onto the field\ncard, then release",
+            control_desc_doubletap: "Quickly tap (click)\na card twice",
+            control_desc_singletap: "Tap (click)\na card once",
+            howto_p1: "1. Stack a white card onto the<br><strong>field card</strong> in the middle<br>to <strong>multiply</strong> the numbers!",
+            howto_p2: "2. When the field card is <strong>101 or more</strong>,<br>it attacks the enemy!<br>Damage = the field card's number.",
+            howto_p3: "3. Attacking uses up an <strong>Action</strong>.<br>Game over at 0.",
+            howto_p4: "4. Defeat an enemy to get 1 <strong>item</strong>.<br>Actions refill every round.",
+            howto_p5: "5. Use items wisely to beat<br>the final <strong>boss</strong>!",
+            howto_p6: "6. Clear it all for a <strong>bonus</strong> of<br>actions left × 1000 points!",
+        },
     },
 };
-let currentLang = localStorage.getItem('mb_mul2_lang') || 'ja';
-function T(key, params) {
-    const dict = STRINGS[currentLang] || STRINGS.ja;
-    let str = dict[key] !== undefined ? dict[key] : (STRINGS.ja[key] || key);
-    if (params) { Object.keys(params).forEach(k => { str = str.split(`{${k}}`).join(params[k]); }); }
-    return str;
-}
-function applyLanguage() {
-    document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = T(el.getAttribute('data-i18n')); });
-    document.querySelectorAll('[data-i18n-html]').forEach(el => { el.innerHTML = T(el.getAttribute('data-i18n-html')); });
-    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { el.setAttribute('placeholder', T(el.getAttribute('data-i18n-placeholder'))); });
-    ['simple', 'ja', 'en'].forEach(l => {
-        const btn = document.getElementById('lang-btn-' + l);
-        if (btn) btn.classList.toggle('active-mode', l === currentLang);
-    });
-    if (window.game) {
-        if (typeof window.game.updateClearCounts === 'function') window.game.updateClearCounts();
-        if (typeof window.game._refreshSettingUI === 'function') window.game._refreshSettingUI();
-    }
-}
-// ブラウザ標準のconfirm()の代わりに使うゲーム内ポップアップ
-function showCustomConfirm(msg, onYes) {
-    const overlay = document.getElementById('custom-confirm-overlay');
-    document.getElementById('custom-confirm-msg').textContent = msg;
-    overlay.classList.remove('hidden');
-    overlay.classList.add('active');
-    document.getElementById('custom-confirm-yes-btn').onclick = () => {
-        overlay.classList.remove('active');
-        setTimeout(() => overlay.classList.add('hidden'), 300);
-        if (onYes) onYes();
-    };
-    document.getElementById('custom-confirm-no-btn').onclick = () => {
-        overlay.classList.remove('active');
-        setTimeout(() => overlay.classList.add('hidden'), 300);
-    };
-}
-
-class Game {
-    constructor() {
-        this.canvas = document.getElementById('gameCanvas');
-        this.ctx = this.canvas.getContext('2d');
-        this.collectionName = "scores_multiplication2";
-
-        this.baseWidth = 700;
-        this.baseHeight = 720; 
-
-        this.scaler = document.getElementById('game-scaler');
-        this.designWidth = 1280;
-        this.designHeight = 720;
-        this.resize();
-        window.addEventListener('resize', () => this.resize());
-        // X(Twitter)等アプリ内ブラウザは起動直後にビューポート値が未確定のことがあり、
-        // その時点でscale計算をしてしまうと後からズレる。少し遅らせて再計算する。
-        setTimeout(() => this.resize(), 300);
-        if (window.visualViewport) {
-            window.visualViewport.addEventListener('resize', () => this.resize());
-        }
-
-        // 縦持ちスマホでの回転表示(rotate(90deg))中は、ランキング等のCSS
-        // overflow-y:auto + touch-action:pan-yによるネイティブのタッチスクロールが
-        // 正しく効かないブラウザがあるため、回転中だけタッチ位置の差分から
-        // scrollTopを直接操作する簡易スクロールに切り替える
-        // （回転していない時はネイティブのタッチスクロールに任せる）
-        (() => {
-            const root = this.scaler;
-            const self = this;
-            if(!root) return;
-            function findScrollable(el){
-                while(el && el!==root){
-                    const cs = getComputedStyle(el);
-                    if((cs.overflowY==='auto'||cs.overflowY==='scroll') && el.scrollHeight>el.clientHeight) return el;
-                    el = el.parentElement;
-                }
-                return null;
-            }
-            let box=null, dragging=false, startX=0, startScrollTop=0;
-            root.addEventListener('touchstart', e=>{
-                if(!self.isMobileRotated || e.touches.length!==1) return;
-                box = findScrollable(e.target);
-                if(!box) return;
-                dragging=true; startX=e.touches[0].clientX; startScrollTop=box.scrollTop;
-            }, {passive:true});
-            root.addEventListener('touchmove', e=>{
-                if(!dragging || !box || !self.isMobileRotated) return;
-                e.preventDefault();
-                const dx = e.touches[0].clientX - startX;
-                box.scrollTop = startScrollTop - dx / (self.scaleRatio || 1);
-            }, {passive:false});
-            root.addEventListener('touchend', ()=>{ dragging=false; box=null; });
-        })();
-
-        this.attachInputHandlers();
-        this.setupAuth();
-
-        this.state = 'TITLE';
-        this.difficulty = 'normal';
-        this.round = 1;
-        this.maxRound = 6;
-        this.score = 0;
-        this.actionCount = 0;
-        this.rankingMode = 'world';
-        this.user = null;
-
-        this.playerList = [];
-        this.currentPlayerIndex = -1;
-        this.loadPlayerSystem();
-
-        this.handCards = [];
-        this.fieldCard = null;
-        this.enemy = null;
-        this.draggedCard = null;
-        this.dragOffset = {x:0, y:0};
-        this.particles = [];
-        this.floatTexts = [];
-
-        this.items = {
-            'change': { name: 'チェンジ', desc: 'てふだ を すべて ひきなおす', count: 0, color: '#f1c40f' },
-            'action_plus': { name: 'アクション＋１', desc: 'アクションが １ かいふくする', count: 0, color: '#2ecc71' },
-            'x20': { name: '×２０', desc: 'ばのカードを ２０ばい する\n(101いじょうで すぐにこうげき)', count: 0, color: '#9b59b6' },
-            'damage_500': { name: 'ダメージ500', desc: 'てきに 500ダメージを あたえる\n(アクションは へらない)', count: 0, color: '#e74c3c' },
-            'all_plus_5': { name: 'ぜんぶ＋５', desc: 'てふだの すうじが すべて ＋５ される', count: 0, color: '#3498db' }
-        };
-        this.itemKeys = Object.keys(this.items);
-        this.selectedItemKey = null;
-        this.lastItemJSON = "";
-
-        this.lastTime = 0;
-        this.controlMode = localStorage.getItem('math_braves_control_mode') || 'drag';
-        this.updateClearCounts();
-    }
-
-    setupAuth() {}
-
-    login() {}
-
-    logout() {}
-
-    resize() {
-        this.canvas.width = this.baseWidth;
-        this.canvas.height = this.baseHeight;
-        this.canvas.style.width = this.baseWidth + "px";
-        this.canvas.style.height = this.baseHeight + "px";
-
-        const vp = window.visualViewport;
-        const winW = vp ? vp.width : window.innerWidth;
-        const winH = vp ? vp.height : window.innerHeight;
-        // Xアプリ内蔵ブラウザ等、bodyのflexセンタリングがscaler(designWidth/Heightという
-        // ビューポートよりずっと大きいtransform前サイズ)を正しく中央寄せできない環境が
-        // あるため、flexに頼らずJSでleft/topを絶対座標指定する(scale/rotateに依存しない)
-        this.scaler.style.left = `${winW / 2 - this.designWidth / 2}px`;
-        this.scaler.style.top = `${winH / 2 - this.designHeight / 2}px`;
-        // 縦持ちスマホでも横長ゲームを大きく表示するため、縦持ち×スマホ幅のときは
-        // CSSで90度回転させ、画面の縦幅を「横幅」として使うスケール計算に切り替える。
-        // （回転中はgetPos()でのタップ座標の変換も回転考慮の計算式に切り替わる）
-        this.isMobileRotated = winW < winH && winW <= 900;
-        if (this.isMobileRotated) {
-            this.scaleRatio = Math.min(winH / this.designWidth, winW / this.designHeight);
-            this.scaler.style.transform = `rotate(90deg) scale(${this.scaleRatio})`;
-        } else {
-            this.scaleRatio = Math.min(winW / this.designWidth, winH / this.designHeight);
-            this.scaler.style.transform = `scale(${this.scaleRatio})`;
-        }
-    }
-
-    loadPlayerSystem() {
-        const savedList = localStorage.getItem('math_braves_player_list');
-        const savedIndex = localStorage.getItem('math_braves_current_player_index');
-        
-        if (savedList) {
-            this.playerList = JSON.parse(savedList);
-            this.currentPlayerIndex = savedIndex ? parseInt(savedIndex) : -1;
-        } else {
-            this.playerList = [];
-            this.currentPlayerIndex = -1;
-        }
-        this.updatePlayerButton();
-    }
-
-    savePlayerSystem() {
-        localStorage.setItem('math_braves_player_list', JSON.stringify(this.playerList));
-        localStorage.setItem('math_braves_current_player_index', this.currentPlayerIndex);
-        this.updatePlayerButton();
-    }
-
-    updatePlayerButton() {
-        const nameTitle = document.getElementById('current-player-name-title');
-        let name = "ななしさん";
-        if (this.currentPlayerIndex >= 0 && this.currentPlayerIndex < this.playerList.length) {
-            name = this.playerList[this.currentPlayerIndex];
-        }
-        nameTitle.textContent = name;
-    }
-
-    openPlayerModal() {
-        document.getElementById('player-modal-overlay').classList.remove('hidden');
-        document.getElementById('player-modal-overlay').classList.add('active');
-        document.getElementById('validation-msg').textContent = ""; 
-        document.getElementById('new-player-input').value = "";
-        this.renderPlayerModalList();
-    }
-
-    closePlayerModal() {
-        document.getElementById('player-modal-overlay').classList.remove('active');
-        setTimeout(() => document.getElementById('player-modal-overlay').classList.add('hidden'), 300);
-    }
-
-    renderPlayerModalList() {
-        const listEl = document.getElementById('player-list-ui');
-        listEl.innerHTML = '';
-        
-        if (this.playerList.length === 0) {
-            listEl.innerHTML = `<li style="text-align:center; color:#ccc;">${T('pm_empty_list')}</li>`;
-        }
-
-        this.playerList.forEach((name, index) => {
-            const li = document.createElement('li');
-            li.className = 'player-item';
-            if (index === this.currentPlayerIndex) li.classList.add('selected');
-            
-            li.onclick = () => this.handleSelectPlayer(index);
-
-            li.innerHTML = `
-                <span style="font-size:20px; font-weight:bold; color:#fff;">${name}</span>
-                <button class="btn-delete-name" onclick="event.stopPropagation(); game.handleDeletePlayer(${index})">×</button>
-            `;
-            listEl.appendChild(li);
-        });
-    }
-
-    addPlayerName() {
-        const input = document.getElementById('new-player-input');
-        const msgEl = document.getElementById('validation-msg');
-        let name = input.value.trim();
-        msgEl.textContent = "";
-
-        if (!name) {
-            msgEl.textContent = T('name_empty');
-            return;
-        }
-        if (!/^[ぁ-んー]+$/.test(name)) {
-            msgEl.textContent = T('name_hiragana_only');
-            return;
-        }
-        for (const ng of NG_WORDS_HIRAGANA) {
-            if (name.includes(ng)) {
-                msgEl.textContent = T('name_ng_word');
-                return;
-            }
-        }
-        if (this.playerList.includes(name)) {
-            msgEl.textContent = T('name_duplicate');
-            return;
-        }
-        if (this.playerList.length >= 5) {
-            msgEl.textContent = T('name_max_players');
-            return;
-        }
-        
-        this.playerList.push(name);
-        this.currentPlayerIndex = this.playerList.length - 1; 
-        input.value = '';
-        this.savePlayerSystem();
-        this.renderPlayerModalList();
-    }
-
-    handleSelectPlayer(index) {
-        this.currentPlayerIndex = index;
-        this.savePlayerSystem();
-        this.renderPlayerModalList();
-    }
-
-    handleDeletePlayer(index) {
-        showCustomConfirm(T('delete_confirm'), () => {
-            this.playerList.splice(index, 1);
-
-            if (this.currentPlayerIndex === index) {
-                this.currentPlayerIndex = this.playerList.length > 0 ? 0 : -1;
-            } else if (this.currentPlayerIndex > index) {
-                this.currentPlayerIndex--;
-            }
-
-            this.savePlayerSystem();
-            this.renderPlayerModalList();
-        });
-    }
-
-    attachInputHandlers() {
-        const getPos = (e) => {
-            const rect = this.canvas.getBoundingClientRect();
-            let clientX, clientY;
-            if (e.touches && e.touches.length > 0) {
-                clientX = e.touches[0].clientX; clientY = e.touches[0].clientY;
-            } else if (e.changedTouches && e.changedTouches.length > 0) {
-                clientX = e.changedTouches[0].clientX; clientY = e.changedTouches[0].clientY;
-            } else {
-                clientX = e.clientX; clientY = e.clientY;
-            }
-            if (this.isMobileRotated) {
-                const px = clientX - rect.left, py = clientY - rect.top;
-                return { x: py / this.scaleRatio, y: this.designHeight - px / this.scaleRatio };
-            }
-            return { x: (clientX - rect.left) / this.scaleRatio, y: (clientY - rect.top) / this.scaleRatio };
-        };
-
-        const findCardAt = (pos) => {
-            for (let i = this.handCards.length - 1; i >= 0; i--) {
-                const c = this.handCards[i];
-                if (pos.x >= c.x - c.width/2 && pos.x <= c.x + c.width/2 &&
-                    pos.y >= c.y - c.height/2 && pos.y <= c.y + c.height/2) return c;
-            }
-            return null;
-        };
-
-        // --- ドラッグ ---
-        const onDragStart = (e) => {
-            if (this.controlMode !== 'drag') return;
-            if (this.state === 'ROUND_TRANSITION_WAIT') { this.nextRound(); return; }
-            if (this.state === 'GAME_OVER_WAIT') { this.gameOver(); return; }
-            if (this.state !== 'PLAYING') return;
-            e.preventDefault();
-            const pos = getPos(e);
-            const card = findCardAt(pos);
-            if (card) {
-                this.draggedCard = card;
-                card.isDragging = true;
-                this.dragOffset.x = pos.x - card.x;
-                this.dragOffset.y = pos.y - card.y;
-                this.handCards.splice(this.handCards.indexOf(card), 1);
-                this.handCards.push(card);
-            }
-        };
-        const onDragMove = (e) => {
-            if (this.controlMode !== 'drag' || !this.draggedCard) return;
-            e.preventDefault();
-            const pos = getPos(e);
-            this.draggedCard.x = pos.x - this.dragOffset.x;
-            this.draggedCard.y = pos.y - this.dragOffset.y;
-        };
-        const onDragEnd = (e) => {
-            if (this.controlMode !== 'drag' || !this.draggedCard) return;
-            const card = this.draggedCard;
-            const field = this.fieldCard;
-            const dist = Math.sqrt(Math.pow(card.x - field.x, 2) + Math.pow(card.y - field.y, 2));
-            if (dist < 80 && this.state === 'PLAYING') this.mergeCard(card);
-            else card.isDragging = false;
-            this.draggedCard = null;
-        };
-
-        // --- タップ共通 ---
-        let lastTapCard = null;
-        let lastTapTime = 0;
-
-        const onTap = (e) => {
-            if (this.controlMode === 'drag') return;
-            if (this.state === 'ROUND_TRANSITION_WAIT') { this.nextRound(); return; }
-            if (this.state === 'GAME_OVER_WAIT') { this.gameOver(); return; }
-            if (this.state !== 'PLAYING') return;
-            const pos = getPos(e);
-            const card = findCardAt(pos);
-            if (!card) return;
-            if (this.controlMode === 'singletap') {
-                this.clearCardSelection();
-                this.mergeCard(card);
-            } else if (this.controlMode === 'doubletap') {
-                const now = Date.now();
-                if (lastTapCard === card && now - lastTapTime < 400) {
-                    this.clearCardSelection();
-                    this.mergeCard(card);
-                    lastTapCard = null; lastTapTime = 0;
-                } else {
-                    if (lastTapCard) lastTapCard.isSelected = false;
-                    card.isSelected = true;
-                    lastTapCard = card; lastTapTime = now;
-                }
-            }
-        };
-
-        // --- イベント登録 ---
-        this.canvas.addEventListener('mousedown', (e) => { if (this.controlMode === 'drag') onDragStart(e); });
-        this.canvas.addEventListener('mousemove', (e) => { if (this.controlMode === 'drag') onDragMove(e); });
-        this.canvas.addEventListener('mouseup',   (e) => { if (this.controlMode === 'drag') onDragEnd(e); else onTap(e); });
-
-        this.canvas.addEventListener('touchstart', (e) => { e.preventDefault(); if (this.controlMode === 'drag') onDragStart(e); }, {passive: false});
-        this.canvas.addEventListener('touchmove',  (e) => { e.preventDefault(); if (this.controlMode === 'drag') onDragMove(e); }, {passive: false});
-        this.canvas.addEventListener('touchend',   (e) => { e.preventDefault(); if (this.controlMode === 'drag') onDragEnd(e); else onTap(e); }, {passive: false});
-
-        document.getElementById('transition-overlay').addEventListener('click', () => {
-            if (this.state === 'ROUND_TRANSITION_WAIT') this.nextRound();
-            else if (this.state === 'GAME_OVER_WAIT') this.gameOver();
-        });
-    }
-
-    clearCardSelection() {
-        this.handCards.forEach(c => c.isSelected = false);
-    }
-
-    openSettings() {
-        const modal = document.getElementById('settings-modal');
-        modal.classList.remove('hidden');
-        modal.classList.add('active');
-        this._refreshSettingUI();
-    }
-
-    closeSettings() {
-        const modal = document.getElementById('settings-modal');
-        modal.classList.remove('active');
-        setTimeout(() => modal.classList.add('hidden'), 300);
-    }
-
-    setControlMode(mode) {
-        this.controlMode = mode;
-        localStorage.setItem('math_braves_control_mode', mode);
-        this.clearCardSelection();
-        this._refreshSettingUI();
-    }
-
-    selectLanguage(lang) {
-        currentLang = lang;
-        localStorage.setItem('mb_mul2_lang', lang);
-        this.lastItemJSON = ''; // 言語切替でアイテム一覧の表示を再生成させる
-        applyLanguage();
-    }
-
-    itemLabel(key) { return T(`item_${key}_name`); }
-    itemDescText(key) { return T(`item_${key}_desc`); }
-
-    _refreshSettingUI() {
-        const descs = {
-            drag:       T('control_desc_drag'),
-            doubletap:  T('control_desc_doubletap'),
-            singletap:  T('control_desc_singletap')
-        };
-        ['drag', 'doubletap', 'singletap'].forEach(m => {
-            const btn = document.getElementById(`setting-${m}`);
-            if (btn) btn.classList.toggle('active-mode', this.controlMode === m);
-        });
-        const desc = document.getElementById('mode-desc-text');
-        if (desc) desc.innerText = descs[this.controlMode] || '';
-    }
-
-    // ============================================================
-    // チュートリアル（練習プレイ）
-    // ============================================================
-    // 実際のバトル画面で「手札を場のカードに重ねて かけざんし、101いじょうで こうげき」を体験する。
-    // 書き込みはエンジンが止めるので、ランキング・クリア回数は一切汚れない。
-    startTutorial() {
-        FGLTutorial.begin({ root: '#game-scaler', getLang: () => currentLang });
-        const g = this;
-        this.initGame('easy');
-        // 手順どおりに進むよう、手札と場のカードを決めた値にする(3 ×4 ×5 ×2 = 120 → 101いじょうで こうげき)
-        [4, 5, 3, 2, 6].forEach((v, i) => { this.handCards[i].value = v; });
-        this.fieldCard.value = 3;
-        const CV = '#gameCanvas';
-        const cv = (x, y, w, h) => ({ sel: CV, rect: [x, y, w, h], of: [this.canvas.width, this.canvas.height], pad: 8 });
-        // 手順どおりの操作だけ許すための、ぴったりの範囲(余白なし)。手札は最初のカード(順に 4,5,3,2,6)を覚えておく
-        const hand0 = this.handCards.slice();
-        const rect0 = (x, y, w, h) => ({ sel: CV, rect: [x, y, w, h], of: [this.canvas.width, this.canvas.height], pad: 0 });
-        const handP = (i) => () => { const c = hand0[i]; return rect0(c.x - c.width / 2, c.y - c.height / 2, c.width, c.height); };
-        const fieldP = () => { const f = g.fieldCard; return rect0(f.x - f.width / 2, f.y - f.height / 2, f.width, f.height); };
-        const enemyR = () => cv(180, 130, 340, 200);
-        const actionR = () => cv(240, 10, 220, 105);
-        const fieldR = () => cv(g.fieldCard.x - 70, g.fieldCard.y - 90, 140, 180);
-        const handR = () => cv(70, 535, 560, 130);
-        const bothR = () => cv(60, 330, 580, 340);
-        const settle = () => FGLTutorial.wait(() => g.state === 'PLAYING', 8000);
-        FGLTutorial.run([
-            { type: 'say', target: enemyR, pos: 'bottom', text: {
-                ja: 'てきが登場！ HPバーを0にすればたおせるよ。こうげきの力は「カードをかけざんして大きな数を作る」ことだよ。',
-                easy: 'てきがとうじょう！ HPバーを0にすればたおせるよ。こうげきのちからは「カードをかけざんしておおきなかずをつくる」ことだよ。',
-                en: 'An enemy appears! Bring its HP bar to 0 to win. Your attack power comes from multiplying cards into a big number.' } },
-            { type: 'say', target: actionR, pos: 'bottom', text: {
-                ja: '「のこりアクション」。こうげきするたびに1へって、0になるとゲームオーバー。少ない回数で大きなダメージを与えよう！',
-                easy: '「のこりアクション」。こうげきするたびに1へって、0になるとゲームオーバー。すくないかいすうでおおきなダメージをあたえよう！',
-                en: 'Remaining actions. Each attack uses one, and at 0 it\'s game over. Deal big damage in as few attacks as you can!' } },
-            { type: 'say', target: fieldR, pos: 'top', text: {
-                ja: 'まん中の「ばのカード」が、こうげきの元になる数。いまは 3 だね。',
-                easy: 'まんなかの「ばのカード」が、こうげきのもとになるかず。いまは 3 だね。',
-                en: 'The card in the middle is the "field card", the base of your attack. It\'s 3 right now.' } },
-            { type: 'say', target: handR, pos: 'top', text: {
-                ja: '下のしろいカードが手札。ドラッグして、ばのカードに重ねると、数がかけざんされるよ！',
-                easy: 'したのしろいカードがてふだ。ドラッグして、ばのカードにかさねると、かずがかけざんされるよ！',
-                en: 'The white cards below are your hand. Drag one onto the field card and the numbers are multiplied!' } },
-            { type: 'do', target: bothR, pos: 'top', until: () => g.fieldCard.value === 12,
+</script>
+<script src="../braves-common.js?v=20261012"></script>
+<script src="field-icons.js?v=20261012"></script>
+<script src="field-art.js?v=20261012"></script>
+<script src="field.js?v=20261012"></script>
+<script src="../braves-run.js?v=20261012"></script>
+<script>
+// ============================================================
+// チュートリアル（練習プレイ）
+// ============================================================
+// 実際のバトル画面で「手札を場のカードに重ねて かけざんし、101いじょうで こうげき」を体験する。
+// 書き込みはエンジンが止めるので、ランキング・クリア回数は一切汚れない。
+function startTutorial() {
+    FGLTutorial.begin({ root: '#container', getLang: () => currentLang });
+    state.star = 1; state.difficulty = 'STAR1';
+    CONFIG = Object.assign({}, PRESET_EASY);
+    initGame();
+    state.tutorial = true;
+    state.controlMode = 'drag';      // 説明はドラッグ操作。設定は保存しない(終わるとページが読みこまれなおす)
+    startStage(1);
+    // 手順どおりに進むよう、手札と場のカードを決めた値にする(3 ×4 ×5 ×2 = 120 → 101いじょうで こうげき)
+    [4, 5, 3, 2, 6].forEach((v, i) => { state.cards[i].value = v; });
+    state.field.value = 3;
+    const CV = '#gameCanvas';
+    const cv = (x, y, w, h) => ({ sel: CV, rect: [x, y, w, h], of: [canvas.width, canvas.height], pad: 8 });
+    // 手順どおりの操作だけ許すための、ぴったりの範囲(余白なし)。手札は最初のカード(順に 4,5,3,2,6)を覚えておく
+    const hand0 = state.cards.slice();
+    const rect0 = (x, y, w, h) => ({ sel: CV, rect: [x, y, w, h], of: [canvas.width, canvas.height], pad: 0 });
+    const handP = (i) => () => { const c = hand0[i]; return rect0(c.x - c.width / 2, c.y - c.height / 2, c.width, c.height); };
+    const fieldP = () => { const f = state.field; return rect0(f.x - f.width / 2, f.y - f.height / 2, f.width, f.height); };
+    const enemyR = () => cv(150, 30, 420, 320);
+    const actionR = () => cv(16, 16, 88, 88);
+    const fieldR = () => cv(state.field.x - 70, state.field.y - 90, 140, 180);
+    const handR = () => cv(state.width / 2 - 285, HAND_Y - 75, 570, 150);
+    const bothR = () => cv(60, FIELD_Y - 100, 600, 350);
+    const settle = () => FGLTutorial.wait(() => state.phase === 'PLAY', 8000);
+    FGLTutorial.run([
+        { type: 'say', target: enemyR, pos: 'bottom', text: {
+            ja: 'てきが登場！ HPバーを0にすればたおせるよ。こうげきの力は「カードをかけざんして大きな数を作る」ことだよ。',
+            easy: 'てきがとうじょう！ HPバーを0にすればたおせるよ。こうげきのちからは「カードをかけざんしておおきなかずをつくる」ことだよ。',
+            en: 'An enemy appears! Bring its HP bar to 0 to win. Your attack power comes from multiplying cards into a big number.' } },
+        { type: 'say', target: actionR, pos: 'bottom', text: {
+            ja: '「のこりアクション」。こうげきするたびに1へって、0になるとゲームオーバー。少ない回数で大きなダメージを与えよう！',
+            easy: '「のこりアクション」。こうげきするたびに1へって、0になるとゲームオーバー。すくないかいすうでおおきなダメージをあたえよう！',
+            en: 'Remaining actions. Each attack uses one, and at 0 it\'s game over. Deal big damage in as few attacks as you can!' } },
+        { type: 'say', target: fieldR, pos: 'top', text: {
+            ja: 'まん中の「ばのカード」が、こうげきの元になる数。いまは 3 だね。',
+            easy: 'まんなかの「ばのカード」が、こうげきのもとになるかず。いまは 3 だね。',
+            en: 'The card in the middle is the "field card", the base of your attack. It\'s 3 right now.' } },
+        { type: 'say', target: handR, pos: 'top', text: {
+            ja: '下のしろいカードが手札。ドラッグして、ばのカードに重ねると、数がかけざんされるよ！',
+            easy: 'したのしろいカードがてふだ。ドラッグして、ばのカードにかさねると、かずがかけざんされるよ！',
+            en: 'The white cards below are your hand. Drag one onto the field card and the numbers are multiplied!' } },
+        { type: 'do', target: bothR, pos: 'top', until: () => state.field.value === 12,
           only: { from: handP(0), to: fieldP, hint: {
-                ja: '手札の「4」のカードを、まん中のばのカードにドラッグして重ねてみよう！',
-                easy: 'てふだの「4」のカードを、まんなかのばのカードにドラッグしてかさねてみよう！',
-                en: 'Drag the "4" card from your hand onto the field card in the middle!' } }, text: {
-                ja: '手札の「4」を、ばのカードに重ねてみよう！ 3 × 4 = 12 になるよ。',
-                easy: 'てふだの「4」を、ばのカードにかさねてみよう！ 3 × 4 = 12 になるよ。',
-                en: 'Drag the "4" from your hand onto the field card! 3 × 4 = 12.' } },
-            { type: 'do', target: bothR, pos: 'top', until: () => g.fieldCard.value === 60,
+            ja: '手札の「4」のカードを、まん中のばのカードにドラッグして重ねてみよう！',
+            easy: 'てふだの「4」のカードを、まんなかのばのカードにドラッグしてかさねてみよう！',
+            en: 'Drag the "4" card from your hand onto the field card in the middle!' } }, text: {
+            ja: '手札の「4」を、ばのカードに重ねてみよう！ 3 × 4 = 12 になるよ。',
+            easy: 'てふだの「4」を、ばのカードにかさねてみよう！ 3 × 4 = 12 になるよ。',
+            en: 'Drag the "4" from your hand onto the field card! 3 × 4 = 12.' } },
+        { type: 'do', target: bothR, pos: 'top', until: () => state.field.value === 60,
           only: { from: handP(1), to: fieldP, hint: {
-                ja: '手札の「5」のカードを、まん中のばのカードにドラッグして重ねよう！',
-                easy: 'てふだの「5」のカードを、まんなかのばのカードにドラッグしてかさねよう！',
-                en: 'Drag the "5" card from your hand onto the field card!' } }, text: {
-                ja: 'いいね！ 次は「5」を重ねよう。12 × 5 = 60 だよ。',
-                easy: 'いいね！ つぎは「5」をかさねよう。12 × 5 = 60 だよ。',
-                en: 'Nice! Now stack the "5": 12 × 5 = 60.' } },
-            { type: 'say', target: fieldR, pos: 'top', text: {
-                ja: 'ばのカードが「101いじょう」になると、てきにこうげき！ ダメージは、ばのカードの数そのままだよ。あと少し、60 を 101 以上にしよう。',
-                easy: 'ばのカードが「101いじょう」になると、てきにこうげき！ ダメージは、ばのカードのかずそのままだよ。あとすこし、60 を 101 いじょうにしよう。',
-                en: 'When the field card reaches 101 or more, you attack! The damage equals the field card\'s number. Let\'s push 60 past 101.' } },
-            { type: 'do', target: bothR, pos: 'top', until: () => g.score > 0,
+            ja: '手札の「5」のカードを、まん中のばのカードにドラッグして重ねよう！',
+            easy: 'てふだの「5」のカードを、まんなかのばのカードにドラッグしてかさねよう！',
+            en: 'Drag the "5" card from your hand onto the field card!' } }, text: {
+            ja: 'いいね！ 次は「5」を重ねよう。12 × 5 = 60 だよ。',
+            easy: 'いいね！ つぎは「5」をかさねよう。12 × 5 = 60 だよ。',
+            en: 'Nice! Now stack the "5": 12 × 5 = 60.' } },
+        { type: 'say', target: fieldR, pos: 'top', text: {
+            ja: 'ばのカードが「101いじょう」になると、てきにこうげき！ ダメージは、ばのカードの数そのままだよ。あと少し、60 を 101 以上にしよう。',
+            easy: 'ばのカードが「101いじょう」になると、てきにこうげき！ ダメージは、ばのカードのかずそのままだよ。あとすこし、60 を 101 いじょうにしよう。',
+            en: 'When the field card reaches 101 or more, you attack! The damage equals the field card\'s number. Let\'s push 60 past 101.' } },
+        { type: 'do', target: bothR, pos: 'top', until: () => state.score > 0,
           only: { from: handP(3), to: fieldP, hint: {
-                ja: '手札の「2」のカードを、まん中のばのカードにドラッグして重ねよう！',
-                easy: 'てふだの「2」のカードを、まんなかのばのカードにドラッグしてかさねよう！',
-                en: 'Drag the "2" card from your hand onto the field card!' } }, text: {
-                ja: '「2」のカードを重ねよう！ 60 × 2 = 120 で、101を超えるからこうげきだ！',
-                easy: '「2」のカードをかさねよう！ 60 × 2 = 120 で、101をこえるからこうげきだ！',
-                en: 'Stack the "2"! 60 × 2 = 120, which is over 101, so you attack!' } },
-            { type: 'run', fn: settle },
-            { type: 'say', target: '#right-panel', pos: 'bottom', text: {
-                ja: 'ダメージ 120 が入ったよ！ 右にはラウンドとスコア。てきをたおすと、アイテムが1つもらえて、ここにたまるよ。アイテムを上手に使って、最後のボスをたおそう！',
-                easy: 'ダメージ 120 がはいったよ！ みぎにはラウンドとスコア。てきをたおすと、アイテムが1つもらえて、ここにたまるよ。アイテムをじょうずにつかって、さいごのボスをたおそう！',
-                en: '120 damage! On the right you see the round and score. Defeating an enemy gives an item that collects here. Use items wisely to beat the final boss!' } }
-        ]);
-    }
-
-    showDifficultySelect() {
-        document.getElementById('title-screen').classList.remove('active');
-        setTimeout(() => document.getElementById('title-screen').classList.add('hidden'), 300);
-        
-        document.getElementById('difficulty-select-screen').classList.remove('hidden');
-        document.getElementById('difficulty-select-screen').classList.add('active');
-    }
-
-    initGame(diff) {
-        this.difficulty = diff;
-        this.score = 0;
-        this.round = 1;
-        this.itemKeys.forEach(k => this.items[k].count = 0);
-        this.lastItemJSON = ""; 
-        
-        document.getElementById('title-screen').classList.add('hidden');
-        document.getElementById('difficulty-select-screen').classList.add('hidden');
-        document.getElementById('difficulty-select-screen').classList.remove('active');
-        document.getElementById('result-screen').classList.add('hidden');
-        document.getElementById('result-screen').classList.remove('active');
-        document.getElementById('transition-overlay').classList.remove('active');
-        
-        // アイテムポップアップを強制的に隠す
-        document.getElementById('item-confirm-popup').classList.add('hidden');
-        document.getElementById('item-confirm-popup').style.display = 'none';
-
-        // パネル表示
-        document.getElementById('right-panel-content').style.display = 'flex';
-        document.getElementById('btn-return-title').classList.remove('hidden');
-        
-        this.startRound();
-        this.state = 'PLAYING';
-        this.loop();
-    }
-
-    startRound() {
-        const n = this.round;
-        let baseAction = n + 4;
-        let hp = (n + 4) * (50 * n + (this.difficulty==='easy'?300 : this.difficulty==='normal'?350 : 400));
-        
-        // 背景切り替え（ボス戦だけ特別）
-        const wrapper = document.getElementById('game-wrapper');
-        if (this.round === 6) {
-            wrapper.style.backgroundImage = "url('images/boss.png')";
-        } else {
-            wrapper.style.backgroundImage = "url('images/battle.png')";
-        }
-
-        this.actionCount = baseAction;
-        this.enemy = { hp: hp, maxHp: hp, shake: 0 };
-        this.handCards = [];
-        for(let i=0; i<5; i++) this.addHandCard(i);
-        this.setFieldCard();
-        this.addFloatText(this.round === 6 ? 'FINAL ROUND' : `ROUND ${this.round}`, this.baseWidth/2, this.baseHeight/2, 60, '#fff');
-    }
-
-    addHandCard(index) {
-        const spacing = 110;
-        const startX = (this.baseWidth - (5 * spacing)) / 2 + spacing/2;
-        const cardY = 600; 
-        this.handCards.push({
-            value: [2,2,3,3,4,5,6,7,8,9][Math.floor(Math.random() * 10)], 
-            x: startX + index * spacing, y: cardY,
-            width: 90, height: 130,
-            targetX: startX + index * spacing, targetY: cardY,
-            isDragging: false, alpha: 1
-        });
-    }
-
-    setFieldCard() {
-        const fieldY = 420; 
-        this.fieldCard = {
-            value: Math.floor(Math.random() * 8) + 2,
-            x: this.baseWidth / 2, y: fieldY,
-            width: 120, height: 160, scale: 1.0, alpha: 1,
-            targetY: fieldY, originalY: fieldY
-        };
-    }
-
-    loop(timestamp) {
-        const dt = timestamp - this.lastTime;
-        this.lastTime = timestamp;
-        this.update(dt);
-        this.draw();
-        this.updateUI(); 
-        if (this.state !== 'TITLE') requestAnimationFrame(t => this.loop(t));
-    }
-
-    update(dt) {
-        this.handCards.forEach(card => {
-            if (!card.isDragging) {
-                card.x += (card.targetX - card.x) * 0.2;
-                card.y += (card.targetY - card.y) * 0.2;
-            }
-        });
-        if (this.state === 'ATTACKING') {
-            this.fieldCard.y -= 15;
-            this.fieldCard.alpha -= 0.05;
-            if (this.fieldCard.alpha <= 0) this.applyDamage(this.fieldCard.value);
-        } else {
-            if (this.fieldCard && this.fieldCard.scale > 1.0) this.fieldCard.scale -= 0.05;
-        }
-        this.particles.forEach(p => { p.x+=p.vx; p.y+=p.vy; p.life--; p.alpha-=0.02; });
-        this.particles = this.particles.filter(p => p.life > 0);
-        this.floatTexts.forEach(t => { t.y-=1; t.life--; });
-        this.floatTexts = this.floatTexts.filter(t => t.life > 0);
-        if (this.enemy && this.enemy.shake > 0) this.enemy.shake--;
-    }
-
-    updateUI() {
-        const diffText = T('diff_' + this.difficulty);
-        document.getElementById('level-display').textContent = diffText;
-        document.getElementById('round-display').textContent = `${this.round} / ${this.maxRound}${this.round===6?' (FINAL)':''}`;
-        document.getElementById('score-display').textContent = this.score;
-
-        const currentJSON = JSON.stringify(this.items);
-        if (this.lastItemJSON !== currentJSON) {
-            this.lastItemJSON = currentJSON;
-            const itemList = document.getElementById('item-list');
-            itemList.innerHTML = '';
-            this.itemKeys.forEach(key => {
-                const item = this.items[key];
-                if (item.count > 0) {
-                    const btn = document.createElement('button');
-                    btn.className = 'item-btn';
-                    btn.style.color = item.color; // アイテム色は文字色に反映
-                    btn.innerHTML = `<span style="text-shadow:1px 1px 0 #000;">${this.itemLabel(key)}</span><span class="item-count">x${item.count}</span>`;
-                    btn.onclick = () => this.openItemConfirm(key);
-                    itemList.appendChild(btn);
-                }
-            });
-        }
-    }
-
-    mergeCard(handCard) {
-        handCard.isSelected = false;
-        this.fieldCard.value *= handCard.value;
-        this.fieldCard.scale = 1.5;
-        this.createParticles(this.fieldCard.x, this.fieldCard.y, 10, '#f1c40f');
-        this.addFloatText(`×${handCard.value}`, this.fieldCard.x, this.fieldCard.y - 80, 40, '#e74c3c');
-        handCard.value = [2,2,3,3,4,5,6,7,8,9][Math.floor(Math.random() * 10)];
-        handCard.isDragging = false;
-        handCard.x = handCard.targetX; handCard.y = handCard.targetY;
-
-        if (this.fieldCard.value > 100) this.triggerAttackAnim();
-    }
-
-    triggerAttackAnim() {
-        this.state = 'ATTACKING'; 
-        this.actionCount--;
-    }
-
-    applyDamage(damage, resetField = true) {
-        if (!this.enemy) return;
-        this.enemy.hp -= damage;
-        this.enemy.shake = 20;
-        this.score += damage;
-        this.createParticles(this.baseWidth/2, 200, 30, '#e74c3c');
-        this.addFloatText(`-${damage}`, this.baseWidth/2, 180, 70, '#ff0000');
-
-        if (this.enemy.hp <= 0) {
-            this.enemy.hp = 0;
-            this.winRoundWait();
-        } else if (this.actionCount <= 0) {
-            this.waitGameOver();
-        } else {
-            if (resetField) this.setFieldCard();
-            this.state = 'PLAYING';
-        }
-    }
-
-    winRoundWait() {
-        const msg = this.round === this.maxRound ? T('transition_game_clear') : T('transition_clear');
-        document.getElementById('transition-msg').textContent = msg;
-        document.getElementById('transition-msg').style.color = 'white';
-        document.getElementById('transition-overlay').classList.add('active');
-        this.state = 'ROUND_TRANSITION_WAIT';
-    }
-
-    waitGameOver() {
-        document.getElementById('transition-msg').textContent = "GAME OVER";
-        document.getElementById('transition-msg').style.color = '#e74c3c';
-        document.getElementById('transition-overlay').classList.add('active');
-        this.state = 'GAME_OVER_WAIT';
-    }
-
-    nextRound() {
-        document.getElementById('transition-overlay').classList.remove('active');
-        if (this.round >= this.maxRound) {
-            this.gameClear();
-        } else {
-            const itemKey = this.itemKeys[Math.floor(Math.random() * this.itemKeys.length)];
-            this.items[itemKey].count++;
-            this.addFloatText(`GET: ${this.itemLabel(itemKey)}`, this.baseWidth/2, this.baseHeight/2, 40, '#f39c12');
-            this.round++;
-            this.startRound();
-            this.state = 'PLAYING';
-        }
-    }
-
-    gameOver() {
-        document.getElementById('transition-overlay').classList.remove('active');
-        this.state = 'RESULT';
-        document.getElementById('result-popup-title').textContent = "GAME OVER";
-        document.getElementById('result-popup-title').style.color = "#e74c3c";
-        this.saveScore(this.score);
-        this.showResult();
-    }
-
-    gameClear() {
-        this.state = 'RESULT';
-        const bonus = this.actionCount * 1000;
-        this.score += bonus;
-        document.getElementById('result-popup-title').textContent = T('result_title_clear');
-        document.getElementById('result-popup-title').style.color = "#f1c40f";
-        this.showResult(bonus);
-        this.saveScore(this.score);
-        this.updateLocalClearCount();
-    }
-
-    showResult(bonus = 0) {
-        document.getElementById('result-screen').classList.remove('hidden');
-        document.getElementById('result-screen').classList.add('active');
-        document.getElementById('right-panel-content').style.display = 'none';
-        document.getElementById('btn-return-title').classList.add('hidden'); 
-
-        const finalScore = this.score;
-        const baseScore = finalScore - bonus;
-        const diffText = T('diff_' + this.difficulty);
-
-        document.getElementById('res-level').textContent = diffText;
-        document.getElementById('res-base-score').textContent = `${baseScore}${T('unit_pts')}`;
-        document.getElementById('res-bonus').textContent = `${bonus}${T('unit_pts')}`;
-        document.getElementById('res-final-score').textContent = `${finalScore}${T('unit_pts')}`;
-    }
-
-    showTitle() {
-        this.state = 'TITLE';
-        
-        document.getElementById('title-screen').classList.remove('hidden');
-        document.getElementById('title-screen').classList.add('active');
-        
-        document.getElementById('difficulty-select-screen').classList.remove('active');
-        document.getElementById('difficulty-select-screen').classList.add('hidden');
-        
-        document.getElementById('result-screen').classList.remove('active');
-        document.getElementById('result-screen').classList.add('hidden');
-        
-        document.getElementById('right-panel-content').style.display = 'none';
-        document.getElementById('btn-return-title').classList.add('hidden');
-        
-        this.updateClearCounts();
-    }
-
-    openItemConfirm(key) {
-        if (this.state !== 'PLAYING') return;
-        this.selectedItemKey = key;
-        document.getElementById('popup-name').textContent = this.itemLabel(key);
-        document.getElementById('popup-desc').innerText = this.itemDescText(key);
-        const popup = document.getElementById('item-confirm-popup');
-        popup.classList.remove('hidden');
-        popup.style.display = 'block';
-        this.state = 'ITEM_POPUP'; 
-    }
-    confirmItemUse(doUse) {
-        const popup = document.getElementById('item-confirm-popup');
-        popup.classList.add('hidden');
-        popup.style.display = 'none';
-        
-        if (doUse && this.selectedItemKey) this.useItem(this.selectedItemKey);
-        this.selectedItemKey = null;
-        this.state = 'PLAYING'; 
-    }
-    useItem(key) {
-        if (this.items[key].count <= 0) return;
-        this.items[key].count--;
-        this.lastItemJSON = ""; 
-        const item = this.items[key];
-        this.addFloatText(`USED: ${this.itemLabel(key)}`, this.baseWidth/2, this.baseHeight/2 - 100, 40, item.color);
-        switch(key) {
-            case 'change': this.handCards.forEach(c => c.value = [2,2,3,3,4,5,6,7,8,9][Math.floor(Math.random() * 10)]); break;
-            case 'action_plus': this.actionCount++; break;
-            case 'x20':
-                this.fieldCard.value *= 20;
-                this.fieldCard.scale = 2.0;
-                if (this.fieldCard.value > 100) setTimeout(() => this.triggerAttackAnim(), 600);
-                break;
-            case 'damage_500': if(this.enemy) this.applyDamage(500, false); break;
-            case 'all_plus_5': this.handCards.forEach(c => c.value += 5); break;
-        }
-    }
-
-    draw() {
-        this.ctx.clearRect(0, 0, this.baseWidth, this.baseHeight);
-        
-        this.ctx.strokeStyle = 'rgba(255,255,255,0.1)'; this.ctx.lineWidth = 2;
-        // グリッド線
-        // for(let i=0; i<this.baseWidth; i+=60) { this.ctx.beginPath(); this.ctx.moveTo(i,0); this.ctx.lineTo(i,this.baseHeight); this.ctx.stroke(); }
-        // for(let i=0; i<this.baseHeight; i+=60) { this.ctx.beginPath(); this.ctx.moveTo(0,i); this.ctx.lineTo(this.baseWidth,i); this.ctx.stroke(); }
-
-        this.ctx.fillStyle = '#fff'; this.ctx.font = "bold 24px 'M PLUS Rounded 1c'"; this.ctx.textAlign = 'center';
-        this.ctx.shadowColor="black"; this.ctx.shadowBlur=4;
-        this.ctx.fillText(T('canvas_actions_left'), this.baseWidth/2, 40);
-        this.ctx.font = "900 64px 'M PLUS Rounded 1c'";
-        
-        this.ctx.lineWidth = 6; this.ctx.strokeStyle = '#c0392b'; 
-        this.ctx.strokeText(this.actionCount, this.baseWidth/2, 100);
-        this.ctx.fillStyle = '#ff5252'; this.ctx.fillText(this.actionCount, this.baseWidth/2, 100);
-        this.ctx.shadowBlur=0;
-
-        if (this.enemy && this.enemy.hp > 0) {
-            const shakeX = (Math.random() - 0.5) * this.enemy.shake;
-            this.drawEnemyIcon(this.baseWidth/2 + shakeX, 200, this.round);
-            
-            const barW = 300, barH = 24, barY = 280;
-            const hpPct = Math.max(0, this.enemy.hp / this.enemy.maxHp);
-            
-            this.ctx.shadowBlur = 0;
-            this.ctx.fillStyle = '#000';
-            this.ctx.beginPath(); this.ctx.roundRect(this.baseWidth/2 - barW/2, barY, barW, barH, 12); this.ctx.fill();
-            
-            this.ctx.fillStyle = hpPct > 0.5 ? '#2ecc71' : hpPct > 0.2 ? '#f1c40f' : '#e74c3c';
-            this.ctx.beginPath(); this.ctx.roundRect(this.baseWidth/2 - barW/2 + 2, barY + 2, (barW-4) * hpPct, barH - 4, 10); this.ctx.fill();
-            
-            this.ctx.fillStyle = '#fff'; this.ctx.font = "bold 20px 'M PLUS Rounded 1c'";
-            this.ctx.shadowColor="black"; this.ctx.shadowBlur=4;
-            this.ctx.fillText(`${this.enemy.hp} / ${this.enemy.maxHp}`, this.baseWidth/2, barY + 50);
-            this.ctx.shadowBlur=0;
-        }
-
-        if (this.fieldCard && this.fieldCard.alpha > 0) this.drawCard(this.fieldCard, true);
-        this.handCards.forEach(card => this.drawCard(card, false));
-
-        this.particles.forEach(p => {
-            this.ctx.globalAlpha = p.alpha; this.ctx.fillStyle = p.color;
-            this.ctx.beginPath(); this.ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); this.ctx.fill();
-        });
-        this.ctx.globalAlpha = 1.0;
-        this.floatTexts.forEach(t => {
-            this.ctx.save();
-            this.ctx.shadowColor = 'rgba(0,0,0,0.8)'; this.ctx.shadowBlur = 4;
-            this.ctx.fillStyle = t.color; this.ctx.font = `bold ${t.size}px 'M PLUS Rounded 1c'`;
-            this.ctx.textAlign = 'center'; this.ctx.lineWidth = 3;
-            this.ctx.strokeText(t.text, t.x, t.y); this.ctx.fillText(t.text, t.x, t.y);
-            this.ctx.restore();
-        });
-    }
-
-    drawCard(card, isField) {
-        this.ctx.save();
-        this.ctx.translate(card.x, card.y);
-        this.ctx.scale(card.scale, card.scale);
-        this.ctx.globalAlpha = card.alpha;
-        if (card.isDragging) { this.ctx.shadowColor='rgba(0,0,0,0.5)'; this.ctx.shadowBlur=20; this.ctx.scale(1.1,1.1); }
-
-        this.ctx.fillStyle = isField ? '#2a1a3a' : '#ffffff';
-        this.ctx.beginPath(); this.ctx.roundRect(-card.width/2, -card.height/2, card.width, card.height, 12); this.ctx.fill();
-        
-        this.ctx.lineWidth = isField ? 4 : (card.isSelected ? 4 : 2);
-        this.ctx.strokeStyle = isField ? '#ffd700' : (card.isSelected ? '#ffff00' : '#888');
-        if (!isField && card.isSelected) {
-            this.ctx.shadowColor = 'rgba(255,255,0,0.9)';
-            this.ctx.shadowBlur = 18;
-        }
-        this.ctx.stroke();
-
-        this.ctx.fillStyle = isField ? '#ffd700' : '#2c3e50'; 
-        this.ctx.font = `bold ${isField?64:52}px 'M PLUS Rounded 1c'`;
-        this.ctx.textAlign = 'center'; this.ctx.textBaseline = 'middle';
-        
-        // 修正: 手札の影を完全に消去
-        if (isField) {
-            this.ctx.shadowColor = 'rgba(255,215,0,0.5)'; 
-            this.ctx.shadowBlur = 10;
-        } else {
-            this.ctx.shadowColor = 'transparent'; // 透明にする
-            this.ctx.shadowBlur = 0;
-        }
-        
-        this.ctx.fillText(card.value, 0, 0);
-        
-        if (isField && card.value >= 80 && card.value <= 100 && this.state === 'PLAYING') {
-             this.ctx.fillStyle = '#ff5252'; this.ctx.font = 'bold 16px sans-serif'; 
-             this.ctx.fillText(T('canvas_almost'), 0, card.height/2 + 20);
-        }
-        this.ctx.restore();
-    }
-
-    drawEnemyIcon(x, y, round) {
-        this.ctx.save(); this.ctx.translate(x, y);
-        const colors = ['#9b59b6', '#3498db', '#2ecc71', '#f1c40f', '#e67e22', '#34495e'];
-        this.ctx.fillStyle = colors[(round-1)%6];
-        
-        this.ctx.shadowColor = colors[(round-1)%6]; this.ctx.shadowBlur = 20;
-
-        this.ctx.beginPath();
-        switch(round) {
-            case 1: this.ctx.arc(0, -20, 60, Math.PI, 0); for(let i=0; i<=6; i++) this.ctx.lineTo(60 - i*20, (i%2===0)?40:60); break;
-            case 2: this.ctx.roundRect(-50, -60, 100, 100, 10); break;
-            case 3: this.ctx.moveTo(0, -70); this.ctx.bezierCurveTo(-60, -20, -70, 50, 0, 50); this.ctx.bezierCurveTo(70, 50, 60, -20, 0, -70); break;
-            case 4: for(let i=0; i<8; i++) { const a = (Math.PI*2/8)*i; this.ctx.lineTo(Math.cos(a)*70, Math.sin(a)*70); this.ctx.lineTo(Math.cos(a+0.4)*40, Math.sin(a+0.4)*40); } break;
-            case 5: this.ctx.arc(0, 0, 65, 0, Math.PI*2); break;
-            case 6: this.ctx.moveTo(-40, -60); this.ctx.lineTo(-70, -110); this.ctx.lineTo(-20, -75); this.ctx.moveTo(40, -60); this.ctx.lineTo(70, -110); this.ctx.lineTo(20, -75); this.ctx.arc(0, 0, 75, 0, Math.PI*2); break;
-        }
-        this.ctx.closePath(); this.ctx.fill();
-        this.ctx.fillStyle = 'white';
-        if (round === 5) {
-            this.ctx.beginPath(); this.ctx.arc(0, -10, 25, 0, Math.PI*2); this.ctx.fill();
-            this.ctx.fillStyle = 'black'; this.ctx.beginPath(); this.ctx.arc(0, -10, 10, 0, Math.PI*2); this.ctx.fill();
-        } else {
-            this.ctx.beginPath(); this.ctx.arc(-20, -20, 15, 0, Math.PI*2); this.ctx.fill();
-            this.ctx.beginPath(); this.ctx.arc(20, -20, 15, 0, Math.PI*2); this.ctx.fill();
-            this.ctx.fillStyle = 'black'; this.ctx.beginPath(); this.ctx.arc(-20, -20, 6, 0, Math.PI*2); this.ctx.fill();
-            this.ctx.beginPath(); this.ctx.arc(20, -20, 6, 0, Math.PI*2); this.ctx.fill();
-        }
-        this.ctx.restore();
-    }
-
-    updateLocalClearCount() {
-        const key = `clearCount_${this.difficulty}_mul2`;
-        localStorage.setItem(key, (parseInt(localStorage.getItem(key)||0)+1));
-        this.updateClearCounts();
-    }
-    updateClearCounts() {
-        ['easy', 'normal', 'hard'].forEach(d => {
-            const c = localStorage.getItem(`clearCount_${d}_mul2`)||0;
-            document.getElementById(`count-${d}`).textContent = T('clear_count', {n: c});
-            document.getElementById(`crown-${d}`).textContent = c>=10?'👑':c>=5?'🥈':c>=1?'🥉':'';
-        });
-    }
-    async saveScore(score) {
-        let nameToSave = "ななしさん";
-        if (this.currentPlayerIndex >= 0 && this.currentPlayerIndex < this.playerList.length) {
-            nameToSave = this.playerList[this.currentPlayerIndex];
-        }
-
-        let ranks = JSON.parse(localStorage.getItem(`ranking_local_${this.collectionName}`) || "{}");
-        if(!ranks[this.difficulty]) ranks[this.difficulty] = [];
-        ranks[this.difficulty].push({name: nameToSave, score: score, date: new Date().toISOString()});
-        ranks[this.difficulty].sort((a,b)=>b.score-a.score);
-        ranks[this.difficulty] = ranks[this.difficulty].slice(0,10);
-        localStorage.setItem(`ranking_local_${this.collectionName}`, JSON.stringify(ranks));
-
-        await window.saveOnlineScore(window.currentUser.uid, nameToSave, score, this.difficulty);
-    }
-
-    toggleRankingPopup(show) {
-        document.getElementById('ranking-popup').classList.toggle('hidden', !show);
-        document.getElementById('ranking-popup').classList.toggle('active', show);
-        if(show) { this.rankingMode = 'world'; document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === 'world')); this.loadRankingData(); }
-    }
-    switchRankingTab(mode) {
-        this.rankingMode = mode;
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
-        this.loadRankingData();
-    }
-    async loadRankingData() {
-        ['easy', 'normal', 'hard'].forEach(diff => {
-            const list = document.getElementById(`rank-list-${diff}`);
-            list.innerHTML = `<div style="text-align:center; margin-top:10px;">${T('rank_loading')}</div>`;
-            this.getRanking(diff).then(data => {
-                list.innerHTML = '';
-                if(data.length===0) { list.innerHTML = `<div style="text-align:center; padding:10px; color:#ddd;">${T('rank_empty')}</div>`; return; }
-                data.forEach((r, i) => {
-                    const row = document.createElement('div');
-                    row.className = 'rank-item';
-                    const nameSpan = document.createElement('span');
-                    nameSpan.className = 'rank-name';
-                    nameSpan.textContent = `${i+1}. ${r.name}`;
-                    const scoreSpan = document.createElement('span');
-                    scoreSpan.className = 'rank-score';
-                    scoreSpan.textContent = r.score;
-                    row.appendChild(nameSpan); row.appendChild(scoreSpan);
-                    if (r.date) {
-                        const dateSpan = document.createElement('span');
-                        dateSpan.className = 'rank-date';
-                        dateSpan.textContent = typeof r.date === 'string' && r.date.includes('T')
-                            ? (() => { const d = new Date(r.date); return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`; })()
-                            : r.date;
-                        row.appendChild(dateSpan);
-                    }
-                    list.appendChild(row);
-                });
-            });
-        });
-    }
-    async getRanking(diff) {
-        if(this.rankingMode === 'local') {
-            const ranks = JSON.parse(localStorage.getItem(`ranking_local_${this.collectionName}`) || "{}");
-            return ranks[diff] || [];
-        } else {
-            const data = await window.fetchOnlineRanking(diff);
-            return data;
-        }
-    }
-
-    createParticles(x, y, n, c) { for(let i=0;i<n;i++) this.particles.push({x,y,vx:(Math.random()-0.5)*10,vy:(Math.random()-0.5)*10,life:30,size:Math.random()*5+2,color:c,alpha:1}); }
-    addFloatText(t, x, y, s, c) { this.floatTexts.push({text:t,x,y,size:s,color:c,life:60}); }
+            ja: '手札の「2」のカードを、まん中のばのカードにドラッグして重ねよう！',
+            easy: 'てふだの「2」のカードを、まんなかのばのカードにドラッグしてかさねよう！',
+            en: 'Drag the "2" card from your hand onto the field card!' } }, text: {
+            ja: '「2」のカードを重ねよう！ 60 × 2 = 120 で、101を超えるからこうげきだ！',
+            easy: '「2」のカードをかさねよう！ 60 × 2 = 120 で、101をこえるからこうげきだ！',
+            en: 'Stack the "2"! 60 × 2 = 120, which is over 101, so you attack!' } },
+        { type: 'run', fn: settle },
+        { type: 'say', target: '#right-panel', pos: 'bottom', text: {
+            ja: 'ダメージ 120 が入ったよ！ 右にはスコアとアイテム。てきをたおすと、アイテムが1つもらえて、ここにたまるよ。アイテムを上手に使って、最後のボスをたおそう！',
+            easy: 'ダメージ 120 がはいったよ！ みぎにはスコアとアイテム。てきをたおすと、アイテムが1つもらえて、ここにたまるよ。アイテムをじょうずにつかって、さいごのボスをたおそう！',
+            en: '120 damage! On the right you see the score and items. Defeating an enemy gives an item that collects here. Use items wisely to beat the final boss!' } }
+    ]);
 }
-
-const game = new Game();
-window.game = game;
-applyLanguage();
 </script>
 </body>
 </html>

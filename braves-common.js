@@ -153,6 +153,7 @@ document.getElementById('container').innerHTML = (GAME.gameLayerHTML || _GAME_LA
     <div id="settings-screen" class="hidden">
         <div class="overlay-content" style="width: 380px;">
             <h2 style="color: #7e57c2; margin-top: 0; border:none;" data-i18n="settings_title">⚙ 設定</h2>
+            ${GAME.settingsExtraHTML || ''}
             <p style="font-size:0.9rem; color:#888; margin-bottom:16px;" data-i18n="settings_sub">言語 / Language</p>
             <div style="display:flex; flex-direction:column; gap:10px;">
                 <button id="lang-btn-simple" class="btn lang-btn" onclick="selectLanguage('simple')" data-i18n="lang_simple">かんたんなにほんご</button>

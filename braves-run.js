@@ -167,8 +167,8 @@ function showStageClear(st, stageScore) {
     const pts = T('unit_pts');
     document.getElementById('sc-rows').innerHTML =
         `<div><span>${T('sc_stage_score')}</span><b>${stageScore}${pts}</b></div>` +
-        `<div><span>${T('sc_time_bonus')}</span><b>+${stageClearTime(st)}</b></div>` +
-        `<div><span>${T('sc_time_now')}</span><b>${state.time}</b></div>` +
+        (GAME.clearRows ? GAME.clearRows(st, stageScore) : `<div><span>${T('sc_time_bonus')}</span><b>+${stageClearTime(st)}</b></div>` +
+        `<div><span>${T('sc_time_now')}</span><b>${state.time}</b></div>`) +
         `<div class="big"><span>${T('result_total_score')}</span><b>${state.score}${pts}</b></div>`;
     document.getElementById('sc-next').textContent = T('sc_next', { name: stageName(st + 1) });
     document.getElementById('sc-go').textContent = T('btn_next_stage', { n: st + 1 });
@@ -209,7 +209,7 @@ function showRunEnd(cleared, finalScore, isNewRecord, timeBonus, maxScoreBonus) 
             <div class="end-stats">
                 <div class="end-stat s1">${isNewRecord ? `<div class="rec">${T('high_score_msg')}</div>` : ''}
                     <div class="lb">${T('result_final_score')}</div><div class="vl">${finalScore}<small style="font-size:1.6rem">${pts}</small></div>
-                    <div class="sb">⚔️ ${state.score} ＋ ⏱ ${timeBonus} ＋ 🥇 ${maxScoreBonus}</div></div>
+                    <div class="sb">${GAME.endBreakdown ? GAME.endBreakdown(cleared, finalScore, timeBonus, maxScoreBonus) : `⚔️ ${state.score} ＋ ⏱ ${timeBonus} ＋ 🥇 ${maxScoreBonus}`}</div></div>
                 <div class="end-stat s2"><div class="lb">${T('end_reached')}</div><div class="vl">${reached}<small style="font-size:1.6rem"> / ${STAGE_COUNT}</small></div>
                     <div class="sb">${stageName(reached)}</div></div>
             </div>
