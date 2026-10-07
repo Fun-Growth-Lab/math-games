@@ -1,15 +1,16 @@
 // わりざん(ロボのしわけ)の本体。
 // 見た目はDOM(#bl)で描き、入力は透明なcanvasが受ける。座標はゲームエリア内のpx(720x720)。
-// ルールは元のわりざんと同じ: 手札(わる数 2〜10)を、場のロボ(わられる数)にかさねて わりざん。
+// ルールは元のわりざんと同じ: 手札(わる数 2〜10)を、場の数字カード(わられる数)にかさねて わりざん。
 // 商と余りの 1〜9 のパネル(3×3)にHITさせ、ノルマの数だけ HITさせればラウンドクリア。ターゲット・ビンゴ・パーフェクトのボーナスつき。
+// 画面の中央には ロボが1体。のこりのHIT数が ロボのHP(HITするたびにへり、0で たおす)。
 // ステージ制RUN(ラウンド=ステージ。ラウンド数は★ごとに3/5/7)の画面は braves-run.js が受け持つ。
 const STAR_PRESETS = { 1: PRESET_EASY, 2: PRESET_NORMAL, 3: PRESET_HARD };
 
 // 画面の寸法(ゲームエリア 720x720)
-const PANEL = 72, PGAP = 9, GROUP_W = 3 * PANEL + 2 * PGAP;       // パネル1枚と、3x3のかたまり
-const GROUP_Y = 124;
-const GROUP_X_Q = 26, GROUP_X_R = 720 - 26 - GROUP_W;
-const SLOT_W = 150, SLOT_H = 164, SLOT_Y = 372, SLOT_GAP = 20;     // 場のロボ(わられる数)
+const PANEL = 66, PGAP = 8, GROUP_W = 3 * PANEL + 2 * PGAP;       // パネル1枚と、3x3のかたまり
+const GROUP_Y = 132;
+const GROUP_X_Q = 22, GROUP_X_R = 720 - 22 - GROUP_W;
+const SLOT_W = 150, SLOT_H = 136, SLOT_Y = 388, SLOT_GAP = 20;     // 場の数字カード(わられる数)
 const HAND_W = 80, HAND_H = 100, HAND_GAP = 20, HAND_Y = 594;      // 手札(わる数)
 const LINES = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
 
@@ -17,7 +18,7 @@ Object.assign(state, {
     round: 1, ap: 10, quota: 10, roundHits: 0, roundScore: 0, roundBingos: 0, roundPerfects: 0, totalBingos: 0, totalPerfects: 0,
     equationText: '', fieldCards: [null, null, null], quotientPanels: Array(9).fill(false), remainderPanels: Array(9).fill(false),
     completedLinesQ: Array(8).fill(false), completedLinesR: Array(8).fill(false), perfectQ: false, perfectR: false,
-    targetQuotient: null, targetRemainder: null, phase: 'IDLE', tutorial: false
+    targetQuotient: null, targetRemainder: null, phase: 'IDLE', tutorial: false, enemy: null
 });
 
 function getRandomInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
@@ -50,8 +51,14 @@ function refillHand(index) {
 }
 function slotX(i) { return (state.width - (3 * SLOT_W + 2 * SLOT_GAP)) / 2 + i * (SLOT_W + SLOT_GAP); }
 function makeFieldCard(index, val) {
+    return { value: val, x: slotX(index), y: SLOT_Y, w: SLOT_W, h: SLOT_H, _id: Math.random() };
+}
+// 中央のロボ(ラウンドごとに1体。のこりHITがHP)
+function newEnemy() {
     const col = ROBOT_COLORS[Math.floor(Math.random() * ROBOT_COLORS.length)];
-    return { value: val, x: slotX(index), y: SLOT_Y, w: SLOT_W, h: SLOT_H, robot: Math.floor(Math.random() * ROBOTS.length), c: col[0], c2: col[1], _id: Math.random() };
+    let k;
+    do { k = Math.floor(Math.random() * ROBOTS.length); } while (state.enemy && k === state.enemy.robot && ROBOTS.length > 1);
+    return { robot: k, c: col[0], c2: col[1] };
 }
 function newFieldValue(exceptIndex) {
     const others = state.fieldCards.map((c, i) => (i === exceptIndex || !c) ? -1 : c.value);
@@ -133,6 +140,7 @@ function startRound(n) {
     state.targetQuotient = getRandomInt(1, 9);
     state.targetRemainder = getRandomInt(1, 9);
     state.isProcessing = false; state.phase = 'PLAY';
+    state.enemy = newEnemy();
     state.cards = [null, null, null, null, null];
     for (let i = 0; i < 5; i++) refillHand(i);
     state.fieldCards = [null, null, null];
@@ -210,6 +218,7 @@ function processAttack(cardIndex, fieldIndex) {
         const p = panelCenter(remainder, 'R'); burst(p.x, p.y, '#ff9ac8');
     }
 
+    enemyHit((isQHit ? 1 : 0) + (isRHit ? 1 : 0));
     let base = 0;
     if (isQHit && isRHit) { base = 300; flash(); }
     else if (isQHit || isRHit) { base = 100; flash(); }
@@ -251,7 +260,8 @@ function checkRoundStatus() {
     const full = state.quotientPanels.every(b => b) && state.remainderPanels.every(b => b);
     if (full || state.roundHits >= state.quota) {
         state.phase = 'CLEAR_WAIT';
-        setTimeout(handleRoundClear, 700);
+        if (DV.enemyEl) DV.enemyEl.classList.add('dead');
+        setTimeout(handleRoundClear, 900);
     } else if (state.ap <= 0) {
         state.phase = 'OVER_WAIT';
         setTimeout(() => { if (state.screen === 'PLAYING') finishRun(false); }, 800);
@@ -291,7 +301,7 @@ const dvScore = document.getElementById('disp-total-score');
 function dvInit() {
     const layer = document.getElementById('bl');
     if (DV.ready && DV.eq && layer.contains(DV.eq)) return;
-    let h = `<div class="dv-eq"><span></span></div><div class="dv-quota"><small></small><b>0</b><em></em></div><div class="dv-hbox"></div><div class="bl-hint" style="display:none"></div>`;
+    let h = `<div class="dv-eq"><span></span></div><div class="dv-hp"><small></small><div class="bar"><i></i><b></b></div></div><div class="dv-enemy"></div><div class="dv-hbox"></div><div class="bl-hint" style="display:none"></div>`;
     ['Q', 'R'].forEach(type => {
         const x0 = type === 'Q' ? GROUP_X_Q : GROUP_X_R;
         h += `<div class="dv-cap ${type}" style="left:${x0}px;top:${GROUP_Y - 56}px;width:${GROUP_W}px"><small></small><b></b></div>`;
@@ -301,7 +311,7 @@ function dvInit() {
     });
     layer.innerHTML = h;
     DV.eq = layer.querySelector('.dv-eq'); DV.eqSpan = DV.eq.querySelector('span');
-    DV.quota = layer.querySelector('.dv-quota'); DV.hint = layer.querySelector('.bl-hint');
+    DV.hp = layer.querySelector('.dv-hp'); DV.enemyEl = layer.querySelector('.dv-enemy'); DV.hint = layer.querySelector('.bl-hint');
     DV.hbox = layer.querySelector('.dv-hbox');
     const hx = handX(0) - 18;
     DV.hbox.style.cssText = `left:${hx}px;top:${HAND_Y - 16}px;width:${5 * HAND_W + 4 * HAND_GAP + 36}px;height:${HAND_H + 32}px`;
@@ -326,9 +336,32 @@ function buildSlot(fc) {
     const el = document.createElement('div');
     el.className = 'dv-slot pop';
     el.style.cssText = `left:${fc.x}px;top:${fc.y}px;width:${fc.w}px;height:${fc.h}px;`;
-    el.innerHTML = `<div class="dv-bot" style="--c:${fc.c};--c2:${fc.c2}"><div class="dv-in"><div class="rbx">${ROBOTS[fc.robot]}</div></div></div><div class="dv-plate" style="border-color:${tensColor(fc.value)}"><b>${fc.value}</b></div>`;
+    el.innerHTML = `<div class="dv-nc" style="--tc:${tensColor(fc.value)}"><small>${T('dv_dividend')}</small><b>${fc.value}</b></div>`;
     el.addEventListener('animationend', (e) => { if (e.animationName === 'dvPop') el.classList.remove('pop'); });
     return el;
+}
+// 中央のロボを つくる/とりかえる
+function setEnemyEl() {
+    const e = state.enemy;
+    if (!e) { DV.enemyEl.innerHTML = ''; DV.enemyEl._e = null; return; }
+    if (DV.enemyEl._e === e) return;
+    DV.enemyEl._e = e;
+    DV.enemyEl.className = 'dv-enemy pop';
+    DV.enemyEl.style.cssText = `--c:${e.c};--c2:${e.c2}`;
+    DV.enemyEl.innerHTML = `<div class="gnd"></div><div class="dv-ein"><div class="rbx">${ROBOTS[e.robot]}</div></div>`;
+    DV.enemyEl.onanimationend = (ev) => { if (ev.animationName === 'dvPop') DV.enemyEl.classList.remove('pop'); if (ev.animationName === 'monHit') DV.enemyEl.classList.remove('hit'); };
+}
+function enemyHit(n) {
+    const el = DV.enemyEl; if (!el || !n) return;
+    el.classList.remove('hit'); void el.offsetWidth; el.classList.add('hit');
+    const c = { x: 360, y: 230 };
+    burst(c.x, c.y, '#ffd24a', 90);
+    const layer = document.getElementById('bl');
+    const t = document.createElement('div');
+    t.className = 'fx-t'; t.style.cssText = `left:${c.x}px;top:${c.y - 40}px;color:#ff8a6a;font-size:46px`;
+    t.textContent = '−' + n;
+    t.addEventListener('animationend', () => t.remove());
+    layer.appendChild(t);
 }
 
 // カードを持っているとき、どのロボの上にいるか
@@ -346,15 +379,17 @@ function renderDv() {
     // けいさんしき
     const eq = state.equationText || T('equation_placeholder');
     if (DV.eqSpan._t !== eq) { DV.eqSpan._t = eq; DV.eqSpan.textContent = eq; DV.eq.classList.toggle('ph', !state.equationText); }
-    // ノルマ
+    // ロボのHP(のこりHIT)
     const rem = Math.max(0, state.quota - state.roundHits);
-    const qs = rem + '|' + state.roundHits + '|' + state.quota;
-    if (DV.quota._s !== qs) {
-        DV.quota._s = qs;
-        DV.quota.querySelector('small').textContent = T('dv_quota_top');
-        DV.quota.querySelector('b').textContent = rem;
-        DV.quota.querySelector('em').textContent = `HIT ${state.roundHits} / ${state.quota}`;
+    const qs = rem + '|' + state.quota;
+    if (DV.hp._s !== qs) {
+        DV.hp._s = qs;
+        const pct = state.quota ? rem / state.quota : 0;
+        DV.hp.querySelector('small').textContent = T('dv_quota_top');
+        const f = DV.hp.querySelector('i'); f.style.width = (pct * 100) + '%'; f.className = pct > 0.5 ? '' : pct > 0.25 ? 'mid' : 'low';
+        DV.hp.querySelector('b').textContent = `${rem} / ${state.quota}`;
     }
+    setEnemyEl();
     // パネルの見出し
     document.querySelectorAll('.dv-cap').forEach(el => {
         const t = el.classList.contains('Q') ? 'canvas_quotient' : 'canvas_remainder';

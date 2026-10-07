@@ -21,11 +21,37 @@ const STAGE_THEMES = GAME.stageThemes || [
 ];
 function stageName(n) { return T('stage_name_' + n); }
 
+// ---- タイトルの ゲーム名(大きく)。文字数に合わせて大きさを決める ----
+function buildTitleName() {
+    const el = document.getElementById('ts-l2');
+    if (!el) return;
+    const text = T('title_plaque');
+    if (el._t === text) return;
+    el._t = text;
+    const units = Array.from(text).reduce((a, ch) => a + (/[ -~]/.test(ch) ? 0.56 : 1.0), 0);
+    el.style.fontSize = Math.max(44, Math.min(132, Math.floor(1040 / (units + 0.4)))) + 'px';
+    el.innerHTML = Array.from(text).map((ch, i) => ch === ' ' ? '<span class="ts-sp"></span>' : `<span class="tl" data-t="${ch}" style="--i:${i + 4}">${ch}</span>`).join('');
+}
+// ---- タイトルの主役: 大きな数字カードの扇(まん中の金のカードが「答え」)と 演算のバッジ ----
+// GAME.titleCards=[カード5まい(html可)] / GAME.titleGold=金のカードの番号(既定2) / GAME.titleOp=バッジの記号
+function buildTitleHero() {
+    const el = document.getElementById('ts-hero');
+    if (!el) return;
+    const cards = GAME.titleCards || ['3', '7', '10', '9', '6'], gold = GAME.titleGold === undefined ? 2 : GAME.titleGold, op = GAME.titleOp || '＋';
+    const maxLen = Math.max(...cards.map(c => String(c).replace(/<[^>]*>/g, '').length)), step = maxLen >= 3 ? 112 : 96;
+    el.innerHTML = cards.map((c, i) => {
+        const k = i - 2, len = String(c).replace(/<[^>]*>/g, '').length, isFr = /class="fr"/.test(c);
+        const fs0 = isFr ? 4 : len === 1 ? 7.2 : len === 2 ? 5.8 : len === 3 ? 4 : 3.6, fs = (k === 0 ? fs0 * (isFr ? 1.08 : len === 1 ? 1.1 : 1.3) : fs0).toFixed(2);
+        return `<div class="th-card${i === gold ? ' gold' : ''}${k < 0 ? ' l' : k > 0 ? ' r' : ''}" style="--r:${k * 12}deg;--x:${k * step}px;--y:${Math.abs(k) * 22 + (k === 0 ? 0 : 6)}px;z-index:${10 - Math.abs(k)};--fs:${fs}rem"><b>${c}</b></div>`;
+    }).join('') + `<div class="th-op">${op}</div>`;
+}
+
 // ---- タイトルの飾り ----
 function buildTitleDecor() {
     const letters = (text) => Array.from(text).map((ch, i) => `<span class="tl" data-t="${ch}" style="--i:${i}">${ch}</span>`).join('');
-    document.getElementById('ts-l1').innerHTML = letters('MATH');
-    document.getElementById('ts-l2').innerHTML = letters('BRAVES');
+    document.getElementById('ts-l1').innerHTML = Array.from('MATH BRAVES').map((ch, i) => ch === ' ' ? '<span class="ts-sp"></span>' : `<span class="tl" data-t="${ch}" style="--i:${i}">${ch}</span>`).join('');
+    buildTitleName();
+    buildTitleHero();
     // 街のシルエット(ビルの高さをばらつかせる)
     const skyline = (seed, lo, hi, step) => {
         const pts = ['0% 100%']; let x = 0, r = seed;

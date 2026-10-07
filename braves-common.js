@@ -99,15 +99,17 @@ document.getElementById('container').innerHTML = (GAME.gameLayerHTML || _GAME_LA
             <div class="ts-emblem"><i class="ico" data-ico="sword"></i><i class="ico" data-ico="sword"></i></div>
             <span class="l1" id="ts-l1"></span>
             <span class="l2" id="ts-l2"></span>
-            <div class="ts-sub" data-i18n="title_plaque">たしざんバトル</div>
         </div>
+        <div class="ts-hero" id="ts-hero"></div>
         <div class="ts-menu">
             <button id="btn-start-menu" class="tm-btn primary" data-i18n="btn_start">はじめる</button>
-            <button id="btn-tutorial" class="tm-btn"><span class="ic"><i class="ico" data-ico="help"></i></span><span data-i18n="tm_tutorial">チュートリアル</span></button>
-            <button id="btn-view-ranking" class="tm-btn"><span class="ic"><i class="ico" data-ico="trophy"></i></span><span data-i18n="tm_ranking">ランキング</span></button>
-            <button id="btn-open-settings" class="tm-btn"><span class="ic"><i class="ico" data-ico="gear"></i></span><span data-i18n="tm_settings">設定</span></button>
-            <button id="player-select-btn" class="tm-btn sub" title="プレーヤーをへんこうする"><span class="ic"><i class="ico" data-ico="user"></i></span><span id="current-player-name-display">ななしさん</span></button>
-            <button id="btn-index" class="tm-btn"><span class="ic"><i class="ico" data-ico="home"></i></span><span data-i18n="tm_index">INDEXへ</span></button>
+            <div class="tm-row">
+                <button id="btn-tutorial" class="tm-btn mini"><span class="ic"><i class="ico" data-ico="help"></i></span><span data-i18n="tm_tutorial">チュートリアル</span></button>
+                <button id="btn-view-ranking" class="tm-btn mini"><span class="ic"><i class="ico" data-ico="trophy"></i></span><span data-i18n="tm_ranking">ランキング</span></button>
+                <button id="btn-open-settings" class="tm-btn mini"><span class="ic"><i class="ico" data-ico="gear"></i></span><span data-i18n="tm_settings">設定</span></button>
+                <button id="player-select-btn" class="tm-btn mini sub" title="プレーヤーをへんこうする"><span class="ic"><i class="ico" data-ico="user"></i></span><span id="current-player-name-display">ななしさん</span></button>
+                <button id="btn-index" class="tm-btn mini"><span class="ic"><i class="ico" data-ico="home"></i></span><span data-i18n="tm_index">INDEXへ</span></button>
+            </div>
             <button id="btn-login" class="btn btn-auth title-menu-btn" style="display:none;">Googleでログイン</button>
             <button id="btn-logout" class="btn btn-danger title-menu-btn hidden" style="display:none;">ログアウト</button>
             <div id="auth-status" style="display:none;"></div>
@@ -694,6 +696,7 @@ function applyLanguage() {
     });
     const psb = document.getElementById('player-select-btn');
     if (psb) psb.title = T('player_change_title');
+    if (typeof buildTitleName === 'function') buildTitleName();
     if (typeof updateTitleScreenStats === 'function') updateTitleScreenStats();
 }
 function selectLanguage(lang) {
