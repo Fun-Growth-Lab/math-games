@@ -7,7 +7,7 @@
 // ステージ数。★ごとに変わるゲーム(わりざん)は GAME.stageCountFor(star) を用意すると、RUNを始めるときに入れかわる
 let STAGE_COUNT = GAME.stageCount || 7;
 function stageCountFor(star) { return GAME.stageCountFor ? GAME.stageCountFor(star) : (GAME.stageCount || 7); }
-const STAR_LOCK = true;       // ★は1つ前をクリアすると開く(九九ポーカー方式)
+const STAR_LOCK = false;      // true にすると、★は1つ前をクリアすると開く。今は ★を自由に選べる
 
 // ステージごとの世界。bgf=通常戦の背景に重ねるフィルター(haikei_1を色変え)、bossf=ボス戦(haikei_2を色変え)
 const STAGE_THEMES = GAME.stageThemes || [

@@ -1607,7 +1607,15 @@ function renderPlayerNameList(){
 const RANKING_ENABLED = true;
 const PROG_KEY = 'watteePokerProgress';
 function getProgAll(){ try { return JSON.parse(localStorage.getItem(PROG_KEY) || '{}'); } catch (e){ return {}; } }
-function getProg(sid){ const p = Object.assign({ clear: 0, best: {}, bestPlay: {} }, getProgAll()[sid] || {}); p.clear = Math.min(STARS, p.clear || 0); return p; }
+// stars: 各★をクリアしたか({1:true,...})。★は自由に選べるので、★ごとに記録する(古い保存データは clear=n なら ★1〜n を済みとして読む)
+function getProg(sid){
+    const p = Object.assign({ clear: 0, best: {}, bestPlay: {} }, getProgAll()[sid] || {});
+    const legacy = Math.min(STARS, p.clear || 0);
+    p.stars = Object.assign({}, p.stars || {});
+    if (!getProgAll()[sid] || !getProgAll()[sid].stars) for (let n = 1; n <= legacy; n++) p.stars[n] = true;
+    p.clear = Object.keys(p.stars).filter(k => p.stars[k]).length;   // クリアした★の数
+    return p;
+}
 function saveProg(sid, p){
     const all = getProgAll(); all[sid] = p;
     try { localStorage.setItem(PROG_KEY, JSON.stringify(all)); } catch (e){}
@@ -1779,14 +1787,13 @@ const RS_CARD_W = 244, RS_GAP = 20;
 function renderRunSelect(){
     document.getElementById('ds-master-badge').classList.toggle('hidden', !isAllGold());
     const prog = getProg(selSid);
-    if (selStar > prog.clear + 1) selStar = prog.clear + 1;
     document.getElementById('rs-strip').innerHTML = SHACKLES.map(s => {
-        const c = getProg(s.id).clear;
+        const sp = getProg(s.id).stars;
         return `<div class="rs-card${s.id === selSid ? ' sel' : ''}" style="--c:${SHACKLE_COLOR[s.id]}" data-id="${s.id}" onclick="selectShackle('${s.id}')">
             <div class="rs-tab">${escapeHtml(shackleName(s.id))}</div>
             ${shackleArt(s.id)}
             <div class="rs-body"><div class="rs-short">${escapeHtml(L(SHACKLE_SHORT[s.id]))}</div>
-                <div class="rs-medals">${'★'.repeat(c)}${'☆'.repeat(STARS - c)}</div></div>
+                <div class="rs-medals">${[1, 2, 3].map(n => sp[n] ? '★' : '☆').join('')}</div></div>
             <button class="rs-go" onclick="event.stopPropagation(); startRunFromSelect()">${escapeHtml(ui('btn_run_go'))}</button>
         </div>`;
     }).join('');
@@ -1794,8 +1801,8 @@ function renderRunSelect(){
     document.getElementById('ds-preview-sub').innerHTML = escapeHtml(L(SHACKLE_TEXT[selSid].desc)) +
         (prog.best[selStar] ? `　<span class="ds-best">${escapeHtml(uif('best_label', prog.best[selStar]))}</span>` : '');
     document.getElementById('star-row').innerHTML = Array.from({ length: STARS }, (_, i) => i + 1).map(n => {
-        const locked = n > prog.clear + 1;
-        return `<button class="star-btn${n === selStar ? ' active' : ''}${locked ? ' locked' : ''}${prog.clear >= n ? ' cleared' : ''}" data-star="${n}" onclick="selectStar(${n})">${'★'.repeat(n)}<small>${locked ? '🔒 ' : (prog.clear >= n ? '✔ ' : '')}${escapeHtml(starName(n))}</small></button>`;
+        const locked = false;   // ★は自由に選べる(ロックなし)
+        return `<button class="star-btn${n === selStar ? ' active' : ''}${locked ? ' locked' : ''}${prog.stars[n] ? ' cleared' : ''}" data-star="${n}" onclick="selectStar(${n})">${'★'.repeat(n)}<small>${locked ? '🔒 ' : (prog.clear >= n ? '✔ ' : '')}${escapeHtml(starName(n))}</small></button>`;
     }).join('');
     document.getElementById('border-row').innerHTML = Array.from({ length: STAGES }, (_, i) =>
         `<div class="border-chip"><small>${uif('stage_chip', i + 1)}</small>${borderFor(selSid, selStar, i + 1)}</div>`).join('');
@@ -1821,7 +1828,6 @@ function moveShackle(d){
     selSid = SHACKLES[idx].id; renderRunSelect();
 }
 function selectStar(n){
-    if (n > getProg(selSid).clear + 1) return;
     selStar = n; renderRunSelect();
 }
 function startRunFromSelect(){ startRun(selSid, selStar); }
@@ -2410,9 +2416,9 @@ function endRun(cleared){
     const tag = ui(cleared ? 'tag_clear' : 'tag_gameover');
     const prog = getProg(run.sid);
     let newMedal = false, unlocked = 0;
-    if (cleared && run.star > prog.clear){
-        prog.clear = run.star; newMedal = true;
-        if (run.star < STARS) unlocked = run.star + 1;
+    if (cleared && !prog.stars[run.star]){
+        prog.stars[run.star] = true; newMedal = true;
+        // ★は自由に選べるので、「次の★が解放」の表示は出さない
     }
     const prevBest = prog.best[run.star] || 0, prevPlay = (prog.bestPlay || {})[run.star] || 0;
     if (run.totalScore > prevBest) prog.best[run.star] = run.totalScore;
