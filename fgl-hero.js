@@ -58,6 +58,17 @@ const FH = {
     star(ch, l, t, size, delay) {
         return `<div class="hv-star" style="left:${l}px;top:${t}px;font-size:${size}px;animation-delay:${delay || 0}s">${ch || '✦'}</div>`;
     },
+    // 本物のゲーム画面の切りぬきを、まん中にならべる。items=[{f:'board', w, h, dy, r}] (w,h=見せる大きさ)。想像で描かず、実際の画面を使う
+    shots(items, o) {
+        o = o || {};
+        const gap = o.gap === undefined ? 34 : o.gap, cy = o.cy || 371, tot = items.reduce((a, it) => a + it.w, 0) + gap * (items.length - 1);
+        let x = 640 - tot / 2, h = '';
+        items.forEach(it => {
+            h += `<img class="hv-shot" src="title_parts/${it.f}.webp" alt="" style="left:${Math.round(x)}px;top:${Math.round(cy - it.h / 2 + (it.dy || 0))}px;width:${it.w}px;height:${it.h}px;--r:${it.r || 0}deg">`;
+            x += it.w + gap;
+        });
+        return h;
+    },
     // 盤のマス
     cell(txt, l, t, w, h, bg, o) {
         o = o || {};
