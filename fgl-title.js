@@ -47,6 +47,7 @@
             const hideEls = cfg.hide ? [].concat.apply([], cfg.hide.map(s => Array.from(document.querySelectorAll(s)))) : [];
             const root = document.createElement('div');
             root.className = 'fgt fgt-in';
+            if (cfg.layout === 'column') root.classList.add('col');
             root.style.setProperty('--fh', cfg.hue === undefined ? 200 : cfg.hue);
             if (cfg.title && typeof FH !== 'undefined' && FH.applyTitleColors) FH.applyTitleColors(root, cfg.title);   // 題名の色(FH.PAL のどれか)
             const lang = () => { try { return cfg.lang ? (cfg.lang() || 'ja') : 'ja'; } catch (e) { return 'ja'; } };
@@ -109,7 +110,7 @@
                 if (nameEl._t !== text) {
                     nameEl._t = text;
                     const units = Array.from(text).reduce((a, ch) => a + (/[\x20-\x7e]/.test(ch) ? 0.56 : 1.0), 0);
-                    const fs = Math.max(44, Math.min((cfg.cards || cfg.heroHTML) ? 120 : 132, Math.floor(1040 / (units + 0.4))));
+                    const fs = Math.max(44, Math.min(cfg.layout === 'column' ? 112 : ((cfg.cards || cfg.heroHTML) ? 120 : 132), Math.floor(1040 / (units + 0.4))));
                     nameEl.style.fontSize = fs + 'px';
                     nameEl.innerHTML = Array.from(text).map((ch, i) => ch === ' ' ? '<span class="fgt-sp"></span>' : '<span class="fgt-l" data-t="' + ch + '" style="--i:' + (i + 2) + '">' + ch + '</span>').join('');
                     subEl.style.top = (46 + fs + 8) + 'px';
