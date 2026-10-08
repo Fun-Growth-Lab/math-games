@@ -713,7 +713,12 @@ rescale();
 function rr(x,y,w,h,r,fill,stroke,lw=1){
   if(w<=0||h<=0) return;
   ctx.beginPath();ctx.roundRect(x,y,w,h,r);
-  if(fill){ctx.fillStyle=fill;ctx.fill();}
+  if(fill){
+    const big=w>150&&h>120&&w<1200;
+    if(big){ctx.save();ctx.shadowColor='rgba(90,60,140,0.22)';ctx.shadowBlur=18;ctx.shadowOffsetY=7;}
+    ctx.fillStyle=fill;ctx.fill();
+    if(big)ctx.restore();
+  }
   if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=lw;ctx.stroke();}
 }
 function tx(s,x,y,sz,col,align='left',bold=false){
@@ -1270,7 +1275,7 @@ const RIGHT_W=W-RIGHT_X-26;      // 290
 // ============================================================
 function cellXY(r,c){ return {x:GX+c*CELL, y:GY+r*CELL}; }
 function drawBoard(){
-  rr(GX-6,GY-6,GN*CELL+12,GN*CELL+12,12,'#f2efe9','#e4e0da',2);
+  rr(GX-8,GY-8,GN*CELL+16,GN*CELL+16,16,'#fdfbf6','#c9b8ea',4);
   for(let r=0;r<GN;r++) for(let c=0;c<GN;c++){
     const {x,y}=cellXY(r,c);
     const selectedMark = G.selMark && G.selMark.r===r && G.selMark.c===c;
@@ -1690,8 +1695,28 @@ function drawItemConfirm(){
   rr(W/2+20,btnY,120,44,10,'#e05656','#a03030',2);
   tx(T('btn.no'),W/2+80,btnY+22,17,'#fff','center',true);
 }
+let _bgCache=null;
+function drawBg(){
+  if(!_bgCache){
+    const c=document.createElement('canvas');c.width=W;c.height=H;const g=c.getContext('2d');
+    const gr=g.createLinearGradient(0,0,W,H);gr.addColorStop(0,'#fff6e6');gr.addColorStop(0.5,'#f0ebff');gr.addColorStop(1,'#ffe8f3');
+    g.fillStyle=gr;g.fillRect(0,0,W,H);
+    // 色と形のもよう(うすく)
+    const deco=[[60,90,70,'tri','#ff6b6b'],[1210,70,60,'sq','#4dabf7'],[40,420,50,'cir','#4ade80'],[1230,400,66,'tri','#ffca3a'],[70,650,62,'sq','#a678e8'],[1200,660,54,'cir','#ff8fb5'],[640,690,48,'tri','#4dabf7']];
+    deco.forEach(([x,y,r,t,col])=>{
+      g.save();g.globalAlpha=0.22;g.fillStyle=col;g.translate(x,y);g.rotate((x+y)%7*0.2);
+      g.beginPath();
+      if(t==='cir')g.arc(0,0,r*0.9,0,Math.PI*2);
+      else if(t==='sq')g.roundRect(-r*0.8,-r*0.8,r*1.6,r*1.6,r*0.25);
+      else{g.moveTo(0,-r);g.lineTo(r*0.95,r*0.7);g.lineTo(-r*0.95,r*0.7);g.closePath();}
+      g.fill();g.restore();
+    });
+    _bgCache=c;
+  }
+  ctx.drawImage(_bgCache,0,0);
+}
 function drawGame(){
-  ctx.fillStyle=C_BG;ctx.fillRect(0,0,W,H);
+  drawBg();
   BR={};
   drawBoard();
   drawHandRow();
