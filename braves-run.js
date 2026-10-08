@@ -28,6 +28,7 @@ function buildTitleName() {
     const text = T('title_plaque');
     if (el._t === text) return;
     el._t = text;
+    if (GAME.titleColors && typeof FH !== 'undefined' && FH.applyTitleColors) FH.applyTitleColors(el, typeof GAME.titleColors === 'string' ? FH.PAL[GAME.titleColors] : GAME.titleColors);   // 題名の色(ゲームごと)
     const units = Array.from(text).reduce((a, ch) => a + (/[ -~]/.test(ch) ? 0.56 : 1.0), 0);
     el.style.fontSize = Math.max(44, Math.min(132, Math.floor(1040 / (units + 0.4)))) + 'px';
     el.innerHTML = Array.from(text).map((ch, i) => ch === ' ' ? '<span class="ts-sp"></span>' : `<span class="tl" data-t="${ch}" style="--i:${i + 4}">${ch}</span>`).join('');

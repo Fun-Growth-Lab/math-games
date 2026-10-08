@@ -2,7 +2,36 @@
 // ゲームごとに内容を吟味して、これらと SVG・絵文字・ゲームの絵を組み合わせて 主役のシーンを作る。
 // 絵文字をきれいに出すフォント指定(style に足す)
 const EMO = 'font-family:Segoe UI Emoji,Apple Color Emoji,Noto Color Emoji,sans-serif;';
+// 題名の色(ゲームごとに変える)。fill=文字の塗り、stroke=ふち、shadow=かげ
 const FH = {
+    PAL: (function () {
+        const g = (a, b, c, d) => 'linear-gradient(180deg,' + a + ' 0%,' + b + ' 36%,' + c + ' 58%,' + d + ' 100%)';
+        return {
+            sky: { fill: g('#ffffff', '#bfe6ff', '#3aa0f0', '#9fd4ff'), stroke: '#08305f', shadow: '#041c3c' },
+            candy: { fill: g('#ffffff', '#ffc4e4', '#ff4aa8', '#ff9ad0'), stroke: '#5a0a3a', shadow: '#3a0524' },
+            coral: { fill: g('#ffffff', '#ffd2c8', '#ff7a68', '#ffb4a6'), stroke: '#6a0a1a', shadow: '#400510' },
+            lime: { fill: g('#fbffe0', '#d4f58a', '#8fd13a', '#c4ee7a'), stroke: '#164a14', shadow: '#0a2c0a' },
+            mint: { fill: g('#f2fff0', '#9af0a8', '#2fbf5a', '#8de0a0'), stroke: '#0e4a24', shadow: '#052a14' },
+            teal: { fill: g('#eaffff', '#6ff0d0', '#12c8a0', '#7fe8d0'), stroke: '#04403a', shadow: '#022a26' },
+            purple: { fill: g('#ffffff', '#e4d4ff', '#a070f0', '#cdb0ff'), stroke: '#2a0a5a', shadow: '#180636' },
+            orange: { fill: g('#fff3d0', '#ffb74d', '#ff7a00', '#ffa94d'), stroke: '#5a2400', shadow: '#3a1600' },
+            cream: { fill: g('#ffffff', '#fff4d8', '#ffe0a0', '#fff0c8'), stroke: '#6a2a00', shadow: '#3e1800' },
+            ice: { fill: g('#ffffff', '#dff4ff', '#8fd0f0', '#e8f8ff'), stroke: '#0a2a4a', shadow: '#051a30' },
+            violet: { fill: g('#ffffff', '#ffd6f5', '#ff8ae0', '#ffc4f0'), stroke: '#4a0a5a', shadow: '#2c0636' },
+            plum: { fill: g('#ffffff', '#fff6e0', '#ffe9b0', '#fff2d0'), stroke: '#5a0a3a', shadow: '#36051f' },
+            fire: { fill: g('#fff0d0', '#ffb060', '#e8501a', '#ff9a50'), stroke: '#4a1204', shadow: '#2c0a02' },
+            ruby: { fill: g('#ffffff', '#ffd0d6', '#ff4a62', '#ff9aaa'), stroke: '#3a0612', shadow: '#22030a' },
+            magenta: { fill: g('#ffffff', '#ffc4dc', '#ec407a', '#ff9ac0'), stroke: '#4a0a2a', shadow: '#2a0418' },
+            green: { fill: g('#f4ffe0', '#b6f070', '#58c030', '#a6e860'), stroke: '#1a4a0a', shadow: '#0c2c04' },
+            rainbow: { fill: 'linear-gradient(90deg,#ff7a3a 0%,#ffd23a 25%,#3ad07a 55%,#3aa8ff 80%,#a070f0 100%)', stroke: '#1d3a5a', shadow: '#0e2036' },
+            multi: { fill: 'linear-gradient(90deg,#ff5a5a 0%,#ffb84a 35%,#4ac86a 65%,#4a9aff 100%)', stroke: '#2a1060', shadow: '#150838' }
+        };
+    })(),
+    // 題名の色を、要素(の子の文字)に反映する。pal を省くと 金色(既定)
+    applyTitleColors(el, pal) {
+        if (!el || !pal) return;
+        el.style.setProperty('--tfill', pal.fill); el.style.setProperty('--tstroke', pal.stroke); el.style.setProperty('--tshadow', pal.shadow || pal.stroke);
+    },
     card(txt, l, t, w, h, o) {
         o = o || {};
         return `<div class="hv-card${o.gold ? ' gold' : ''}${o.dark ? ' dark' : ''}${o.cls ? ' ' + o.cls : ''}" style="left:${l}px;top:${t}px;width:${w}px;height:${h}px;--r:${o.r || 0}deg;font-size:${o.fs || Math.round(h * 0.4)}px;${o.style || ''}">${txt}</div>`;

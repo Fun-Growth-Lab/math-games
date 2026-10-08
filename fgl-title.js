@@ -48,6 +48,7 @@
             const root = document.createElement('div');
             root.className = 'fgt fgt-in';
             root.style.setProperty('--fh', cfg.hue === undefined ? 200 : cfg.hue);
+            if (cfg.title && typeof FH !== 'undefined' && FH.applyTitleColors) FH.applyTitleColors(root, cfg.title);   // 題名の色(FH.PAL のどれか)
             const lang = () => { try { return cfg.lang ? (cfg.lang() || 'ja') : 'ja'; } catch (e) { return 'ja'; } };
             const hero = cfg.cards ? (function () {
                 const gold = cfg.gold === undefined ? 2 : cfg.gold, cards = cfg.cards;
