@@ -176,6 +176,7 @@
         .rank-toggle { display: flex; gap: 8px; justify-content: center; margin-bottom: 10px; flex-wrap: wrap; }
         .rank-toggle-btn { padding: 8px 18px; border-radius: 50px; border: 3px solid var(--card-bdr); background: #fff; color: var(--ink-dim); font-size: 1.2rem; font-weight: 800; cursor: pointer; font-family: inherit; }
         .rank-toggle-btn.active { background: linear-gradient(to bottom,#ffe27a,var(--gold)); color: #5a3d00; border-color: #ffb300; }
+        .rank-star { font-weight: 800; font-size: 0.95rem; color: #b8860b; background: rgba(255,201,61,0.28); border-radius: 50px; padding: 2px 10px; white-space: nowrap; min-width: 40px; text-align: center; }
         .rank-loading { text-align: center; color: var(--ink-dim); padding: 16px 0; font-size: 1.2rem; }
         .rank-list { list-style: none; margin: 6px 0 14px; padding: 0; width: 100%; }
         .rank-row { display: flex; align-items: center; gap: 12px; padding: 8px 6px; border-bottom: 2px solid var(--card-bdr); color: var(--ink); font-size: 1.15rem; }
@@ -755,9 +756,12 @@
             <div class="rank-title" data-i18n="ranking_title">🏆 ランキング</div>
             <div id="rank-shackle-toggle" class="rank-toggle"></div>
             <div id="rank-star-toggle" class="rank-toggle"></div>
-            <div class="rank-toggle">
-                <button id="rank-tab-world-btn" class="rank-toggle-btn active" data-i18n="rank_tab_world" onclick="switchRankTab('world')">ワールド</button>
-                <button id="rank-tab-local-btn" class="rank-toggle-btn" data-i18n="rank_tab_local" onclick="switchRankTab('local')">ローカル</button>
+            <div style="display:flex;justify-content:center;gap:36px;flex-wrap:wrap;">
+                <div id="rank-kind-toggle" class="rank-toggle"></div>
+                <div class="rank-toggle">
+                    <button id="rank-tab-world-btn" class="rank-toggle-btn active" data-i18n="rank_tab_world" onclick="switchRankTab('world')">ワールド</button>
+                    <button id="rank-tab-local-btn" class="rank-toggle-btn" data-i18n="rank_tab_local" onclick="switchRankTab('local')">ローカル</button>
+                </div>
             </div>
             <div id="rank-loading" class="rank-loading" style="display:none;" data-i18n="rank_loading">読み込み中…</div>
             <ul id="rank-list" class="rank-list"></ul>
@@ -923,7 +927,9 @@
     const _key  = 'sb_publishable_Wnge6OPvSf5l2YEgaPg4rw_nj4CyYAH';
     const _hdr  = { 'apikey': _key, 'Authorization': 'Bearer ' + _key,
                     'Content-Type': 'application/json', 'Prefer': 'return=minimal' };
-    const GAME_ID = 'watte_poker';
+    // まだ公開前なので、テスト用の記録が混ざらないように新しいIDを使う
+    const GAME_ID = 'watte_poker_v2';          // 総スコア(クリア優先 → スコア)
+    const HAND_ID = 'watte_poker_hand_v2';     // 最大の手(1プレーの最高点。class_name に役のID)
 
     window.saveOnlineScore = async (name, score, stage, difficulty, statusTag) => {
         if ((score || 0) <= 0) return;
@@ -936,31 +942,50 @@
         });
         if (!res.ok) { const t = await res.text(); throw new Error(`HTTP ${res.status}: ${t}`); }
     };
+    window.saveOnlineHand = async (name, score, roleId, stage, difficulty) => {
+        if ((score || 0) <= 0) return;
+        const res = await fetch(`${_base}/rankings`, {
+            method: 'POST', headers: _hdr, keepalive: true,
+            body: JSON.stringify({
+                game: HAND_ID, difficulty: difficulty || 'normal_1', player_name: name || 'ななしさん',
+                point_score: score || 0, stage_score: stage || 0, turns: stage || 0, class_name: roleId || ''
+            })
+        });
+        if (!res.ok) { const t = await res.text(); throw new Error(`HTTP ${res.status}: ${t}`); }
+    };
 
     // クリアした人を上位にする(次にスコア)。クリアかどうかは結果タグ(class_name)で判別する
     const CLEAR_TAGS = ['クリア', 'Clear'];
-    window.loadWorldRanking = async (difficulty) => {
+    // kind: 'score' | 'hand'。star: 0=すべての★(そのRUNぜんぶ) / 1〜3=その★だけ。
+    window.loadWorldRanking = async (sid, star, kind) => {
         try {
             const LIMIT = 30;
-            const fetchRows = async (extra, limit) => {
+            const diffFilter = star ? { difficulty: `eq.${sid}_${star}` } : { difficulty: `like.${sid}_*` };
+            const fetchRows = async (game, extra, limit) => {
                 const q = new URLSearchParams({
-                    select: 'player_name,class_name,point_score,turns,created_at',
-                    game: `eq.${GAME_ID}`, difficulty: `eq.${difficulty || 'normal_1'}`, point_score: 'gt.0',
-                    order: 'point_score.desc,turns.asc,created_at.desc', limit: String(limit), ...extra
+                    select: 'player_name,class_name,point_score,turns,created_at,difficulty',
+                    game: `eq.${game}`, point_score: 'gt.0',
+                    order: 'point_score.desc,turns.asc,created_at.desc', limit: String(limit), ...diffFilter, ...extra
                 });
                 const res = await fetch(`${_base}/rankings?${q}`, { headers: { 'apikey': _key, 'Authorization': 'Bearer ' + _key } });
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 return res.json();
             };
-            const tagList = CLEAR_TAGS.map(t => `"${t}"`).join(',');
-            const cleared = await fetchRows({ class_name: `in.(${tagList})` }, LIMIT);
-            let data = cleared;
-            if (cleared.length < LIMIT){
-                const others = await fetchRows({ or: `(class_name.is.null,class_name.not.in.(${tagList}))` }, LIMIT - cleared.length);
-                data = cleared.concat(others);
+            let data;
+            if (kind === 'hand'){
+                data = await fetchRows(HAND_ID, {}, LIMIT);
+            } else {
+                const tagList = CLEAR_TAGS.map(t => `"${t}"`).join(',');
+                const cleared = await fetchRows(GAME_ID, { class_name: `in.(${tagList})` }, LIMIT);
+                data = cleared;
+                if (cleared.length < LIMIT){
+                    const others = await fetchRows(GAME_ID, { or: `(class_name.is.null,class_name.not.in.(${tagList}))` }, LIMIT - cleared.length);
+                    data = cleared.concat(others);
+                }
             }
             return data.map(r => ({
                 name: r.player_name, tag: r.class_name, score: r.point_score, turns: r.turns,
+                star: parseInt(String(r.difficulty || '').split('_').pop(), 10) || 0,
                 date: r.created_at ? new Date(r.created_at).toLocaleDateString('ja-JP') : ''
             }));
         } catch (e) {
@@ -1269,6 +1294,9 @@ const UI_TEXT = {
     settings_lang_label: { ja: '言語', ja_easy: 'ことば', en: 'Language' },
 
     ranking_title: { ja: '🏆 ランキング', en: '🏆 Ranking' },
+    rank_star_all: { ja: 'すべて', ja_easy: 'ぜんぶ', en: 'All' },
+    rank_kind_score: { ja: '総スコア', ja_easy: 'ごうけいスコア', en: 'Total Score' },
+    rank_kind_hand: { ja: '最大の手', ja_easy: 'いちばん高い手', en: 'Best Hand' },
     rank_tab_local: { ja: 'ローカル', en: 'Local' },
     rank_tab_world: { ja: 'ワールド', en: 'World' },
     rank_loading: { ja: '読み込み中…', ja_easy: 'よみこみちゅう…', en: 'Loading…' },
@@ -1576,7 +1604,7 @@ function renderPlayerNameList(){
 // 進行状況（メダル・解放）
 // ============================================================
 // テスト版ではランキングを公開しない（ボーダーや得点バランスの調整中のため）。公開するときは true にするだけ
-const RANKING_ENABLED = false;
+const RANKING_ENABLED = true;
 const PROG_KEY = 'watteePokerProgress';
 function getProgAll(){ try { return JSON.parse(localStorage.getItem(PROG_KEY) || '{}'); } catch (e){ return {}; } }
 function getProg(sid){ const p = Object.assign({ clear: 0, best: {}, bestPlay: {} }, getProgAll()[sid] || {}); p.clear = Math.min(STARS, p.clear || 0); return p; }
@@ -2366,6 +2394,16 @@ function saveLocalScore(sid, star, entry){
     list.push(entry); list.sort(compareRank);
     try { localStorage.setItem(RANK_STORAGE_PREFIX + rankKey(sid, star), JSON.stringify(list.slice(0, 30))); } catch (e){}
 }
+// ---- 最大の手のローカル記録(RUN×★ごと) ----
+const HAND_STORAGE_PREFIX = 'watteePokerHand_';
+function getLocalHand(sid, star){
+    try { return JSON.parse(localStorage.getItem(HAND_STORAGE_PREFIX + rankKey(sid, star)) || '[]'); } catch (e){ return []; }
+}
+function saveLocalHand(sid, star, entry){
+    const list = getLocalHand(sid, star);
+    list.push(entry); list.sort((a, b) => b.score - a.score || (b.dateIso || '').localeCompare(a.dateIso || ''));
+    try { localStorage.setItem(HAND_STORAGE_PREFIX + rankKey(sid, star), JSON.stringify(list.slice(0, 30))); } catch (e){}
+}
 let lastEnd = null;
 function endRun(cleared){
     const reachedStage = run.stage;
@@ -2385,10 +2423,14 @@ function endRun(cleared){
         name: getCurPlayerName(), score: run.totalScore, turns: reachedStage, tag,
         dateIso: now.toISOString(), date: `${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()}`
     });
-    lastEnd = { sid: run.sid, star: run.star, score: run.totalScore, stage: reachedStage, tag };
+    if (run.bestPlay > 0) saveLocalHand(run.sid, run.star, {
+        name: getCurPlayerName(), score: run.bestPlay, turns: reachedStage, tag: run.bestRole || '',
+        dateIso: now.toISOString(), date: `${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()}`
+    });
+    lastEnd = { sid: run.sid, star: run.star, score: run.totalScore, stage: reachedStage, tag, hand: run.bestPlay, role: run.bestRole };
     renderEnd(cleared, { reachedStage, newMedal, unlocked, newBest: run.totalScore > prevBest, newPlay: run.bestPlay > prevPlay });
     document.getElementById('end-modal').classList.remove('hidden');
-    if (RANKING_ENABLED && run.totalScore > 0) submitScoreToWorld();
+    if (RANKING_ENABLED && (run.totalScore > 0 || run.bestPlay > 0)) submitScoreToWorld();
 }
 
 // ---- RUN終了画面（クリア：紙吹雪とバースト／ゲームオーバー：落ち着いた配色）。合計スコアと「いちばん高い1プレー」を並べて見せる ----
@@ -2452,7 +2494,11 @@ async function submitScoreToWorld(){
     msg.style.color = 'var(--ink-dim)';
     msg.textContent = ui('world_submit_sending');
     try {
-        await window.saveOnlineScore(getCurPlayerName(), lastEnd.score, lastEnd.stage, rankKey(lastEnd.sid, lastEnd.star), lastEnd.tag);
+        const key = rankKey(lastEnd.sid, lastEnd.star), nm = getCurPlayerName();
+        await Promise.all([
+            window.saveOnlineScore(nm, lastEnd.score, lastEnd.stage, key, lastEnd.tag),
+            window.saveOnlineHand(nm, lastEnd.hand, lastEnd.role, lastEnd.stage, key)
+        ]);
         msg.style.color = 'var(--teal-dk)';
         msg.textContent = ui('world_submit_done');
     } catch (e){
@@ -2475,7 +2521,7 @@ function closeEndAndRetry(){
 // ============================================================
 // ランキング画面
 // ============================================================
-let rankTab = 'world', rankSid = 'normal', rankStar = 1;
+let rankTab = 'world', rankSid = 'normal', rankStar = 0, rankKind = 'score';   // rankStar: 0=すべての★
 function openRanking(){
     goTo('ranking-screen');
     renderRankToggles();
@@ -2485,28 +2531,47 @@ function closeRanking(){ goTo('title-screen'); }
 function renderRankToggles(){
     document.getElementById('rank-shackle-toggle').innerHTML = SHACKLES.map(s =>
         `<button class="rank-toggle-btn${s.id === rankSid ? ' active' : ''}" title="${escapeHtml(shackleName(s.id))}" onclick="switchRankShackle('${s.id}')">${s.icon}</button>`).join('');
+    const stars = [0].concat(Array.from({ length: STARS }, (_, i) => i + 1));
     document.getElementById('rank-star-toggle').innerHTML =
         `<span style="font-weight:800;color:var(--ink);align-self:center;font-size:1.3rem;">${escapeHtml(shackleName(rankSid))}</span>` +
-        Array.from({ length: STARS }, (_, i) => i + 1).map(n => `<button class="rank-toggle-btn${n === rankStar ? ' active' : ''}" onclick="switchRankStar(${n})" title="${escapeHtml(starName(n))}">${'★'.repeat(n)}</button>`).join('');
+        stars.map(n => `<button class="rank-toggle-btn${n === rankStar ? ' active' : ''}" onclick="switchRankStar(${n})" title="${n ? escapeHtml(starName(n)) : ''}">${n ? '★' + n : escapeHtml(ui('rank_star_all'))}</button>`).join('');
+    document.getElementById('rank-kind-toggle').innerHTML =
+        ['score', 'hand'].map(k => `<button class="rank-toggle-btn${k === rankKind ? ' active' : ''}" onclick="switchRankKind('${k}')">${escapeHtml(ui('rank_kind_' + k))}</button>`).join('');
 }
 function switchRankShackle(id){ rankSid = id; renderRankToggles(); loadAndRenderRanking(); }
 function switchRankStar(n){ rankStar = n; renderRankToggles(); loadAndRenderRanking(); }
+function switchRankKind(k){ rankKind = k; renderRankToggles(); loadAndRenderRanking(); }
 function switchRankTab(tab){
     rankTab = tab;
     document.getElementById('rank-tab-local-btn').classList.toggle('active', tab === 'local');
     document.getElementById('rank-tab-world-btn').classList.toggle('active', tab === 'world');
     loadAndRenderRanking();
 }
+// ローカル: ★を絞らないときは、そのRUNの3つの★をまとめる(各行に★バッジ)
+function localRows(){
+    const stars = rankStar ? [rankStar] : Array.from({ length: STARS }, (_, i) => i + 1);
+    let rows = [];
+    stars.forEach(st => {
+        const list = rankKind === 'hand' ? getLocalHand(rankSid, st) : getLocalRanking(rankSid, st);
+        list.forEach(e => rows.push({ name: e.name, tag: e.tag, score: e.score, turns: e.turns, date: e.date, dateIso: e.dateIso, star: st }));
+    });
+    rows.sort(rankKind === 'hand' ? ((a, b) => b.score - a.score || (b.dateIso || '').localeCompare(a.dateIso || '')) : compareRank);
+    return rows.slice(0, 30);
+}
+let rankSeq = 0;
 async function loadAndRenderRanking(){
     const loading = document.getElementById('rank-loading');
     const list = document.getElementById('rank-list');
+    const mySeq = ++rankSeq;
     if (rankTab === 'local'){
-        renderRankList(getLocalRanking(rankSid, rankStar).sort(compareRank).map(e => ({ name: e.name, tag: e.tag, score: e.score, turns: e.turns, date: e.date })));
+        loading.style.display = 'none';
+        renderRankList(localRows());
         return;
     }
     loading.style.display = 'block';
     list.innerHTML = '';
-    const rows = await (window.loadWorldRanking ? window.loadWorldRanking(rankKey(rankSid, rankStar)) : Promise.resolve(null));
+    const rows = await (window.loadWorldRanking ? window.loadWorldRanking(rankSid, rankStar, rankKind) : Promise.resolve(null));
+    if (mySeq !== rankSeq) return;     // 読み込み中に切りかえられたら、古い結果は捨てる
     loading.style.display = 'none';
     if (rows === null){
         list.innerHTML = `<li class="rank-empty">${ui('rank_empty')}</li>`;
@@ -2520,13 +2585,15 @@ function renderRankList(rows){
         list.innerHTML = `<li class="rank-empty">${ui('rank_empty')}</li>`;
         return;
     }
+    const isHand = rankKind === 'hand';
     list.innerHTML = rows.map((r, i) => `
         <li class="rank-row">
             <span class="rank-num${i < 3 ? ' top3' : ''}">${i + 1}</span>
             <span class="rank-pname">${escapeHtml(r.name)}</span>
-            <span class="rank-tag">${escapeHtml(r.tag || '')}</span>
+            <span class="rank-star">${r.star ? '★' + r.star : ''}</span>
+            <span class="rank-tag">${escapeHtml(isHand ? (ROLE_NAMES[r.tag] ? roleName(r.tag) : '') : (r.tag || ''))}</span>
             <span class="rank-score">${r.score}</span>
-            <span class="rank-turns">${uif('rank_stage_label', r.turns ?? 0)}</span>
+            ${isHand ? '' : `<span class="rank-turns">${uif('rank_stage_label', r.turns ?? 0)}</span>`}
             <span class="rank-date">${escapeHtml(r.date || '')}</span>
         </li>`).join('');
 }
