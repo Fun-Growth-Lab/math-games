@@ -150,6 +150,13 @@
             document.documentElement.classList.add('fgt-ready');   // 起動前に仕込んだ「もとの画面をかくす」指定(head の #fgt-pre)を解除
             if (window.ResizeObserver) new ResizeObserver(fit).observe(host); else window.addEventListener('resize', fit);
             setInterval(sync, 350);
+            // 画面の切りかえ(クラス・styleの変化)を すぐ(描画の前に)つかまえて、もとのボタンが一瞬見えるのを防ぐ。
+            // 自分の変更で自分が呼ばれつづけないように、同期のあとで takeRecords で捨てる
+            if (window.MutationObserver) {
+                let busy = false;
+                const mo = new MutationObserver(function () { if (busy) return; busy = true; try { sync(); } finally { mo.takeRecords(); busy = false; } });
+                mo.observe(document.documentElement, { subtree: true, attributes: true, attributeFilter: ['class', 'style', 'hidden'], childList: true });
+            }
             return root;
         }
     };
