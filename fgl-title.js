@@ -146,6 +146,7 @@
                 stage.style.transform = 'translate(-50%,-50%) scale(' + k + ')';
             }
             fit(); sync();
+            document.documentElement.classList.add('fgt-ready');   // 起動前に仕込んだ「もとの画面をかくす」指定(head の #fgt-pre)を解除
             if (window.ResizeObserver) new ResizeObserver(fit).observe(host); else window.addEventListener('resize', fit);
             setInterval(sync, 350);
             return root;
