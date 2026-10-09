@@ -278,6 +278,11 @@
         .border-chip { background: rgba(0,0,0,0.28); border: 3px solid #0f2a24; border-radius: 10px; text-align: center; padding: 2px 0; font-weight: 900; color: #ffe27a; font-size: 1.2rem; line-height: 1.15; }
         .border-chip small { display: block; font-size: 0.72rem; font-weight: 800; color: #bfe6d4; }
         .ds-best { color: #ffe27a; font-weight: 900; font-size: 1.05rem; }
+        .ds-lock { color: #ffd0b8; font-weight: 900; font-size: 1.05rem; }
+        .rs-card.locked { filter: grayscale(0.9) brightness(0.8); }
+        .rs-card.locked .rs-art::after { content: '🔒'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 3.4rem; background: rgba(20,30,28,0.45); }
+        .rs-card.sel.locked { filter: grayscale(0.85) brightness(0.9); }
+        .rs-go.off { background: linear-gradient(#aab3ae,#7d8782); border-color: #5b6560; color: #eef2ef; box-shadow: 0 5px 0 #3f4743; cursor: not-allowed; animation: none !important; }
         /* ---- カードのイラスト（CSSのみ） ---- */
         .pc { position: absolute; width: 52px; height: 74px; border-radius: 9px; border: 3px solid #fff; color: #fff; font-weight: 900; font-size: 2rem; display: flex; align-items: center; justify-content: center; text-shadow: 0 2px 0 rgba(0,0,0,0.25); box-shadow: 0 4px 0 rgba(0,0,0,0.25); }
         .bub { position: absolute; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; color: var(--bc, #2f6fb8); background: radial-gradient(circle at 32% 28%, #fff, rgba(255,255,255,0.7)); border: 3px solid var(--bc, #2f6fb8); box-shadow: 0 4px 0 rgba(0,0,0,0.18); }
@@ -1366,6 +1371,9 @@ const UI_TEXT = {
     runselect_border_label: { ja: 'ステージごとのボーダー', ja_easy: 'ステージごとの ボーダー', en: 'BORDER PER STAGE' },
     master_badge: { ja: '👑 すべてのしばりで ★5 クリア！', ja_easy: '👑 ぜんぶの しばりで ★5 クリア！', en: '👑 ★5 cleared in every RUN!' },
     btn_run_go: { ja: 'はじめる ▶', ja_easy: 'はじめる ▶', en: 'Play ▶' },
+    btn_run_locked: { ja: 'ロック中', ja_easy: 'ロックちゅう', en: 'Locked' },
+    rs_locked: { ja: n => `🔒 「${n}」をクリアすると遊べるよ！`, ja_easy: n => `🔒 「${n}」を クリアすると あそべるよ！`, en: n => `🔒 Clear "${n}" to unlock!` },
+    rs_cap: { ja: (n, s) => `「${n}」を「${s}」でクリアすると、「${s}」が選べるよ`, ja_easy: (n, s) => `「${n}」を「${s}」で クリアすると、「${s}」が えらべるよ`, en: (n, s) => `Clear "${n}" on ${s} to unlock ${s}` },
     btn_run_start: { ja: 'このRUNではじめる', ja_easy: 'この RUNで はじめる', en: 'Start This RUN' },
     star_locked: { ja: '🔒 まえの★をクリア', ja_easy: '🔒 まえの ★を クリア', en: '🔒 Clear previous ★' },
     star_names: { ja: ['やさしい', 'ふつう', 'むずかしい'], en: ['Easy', 'Normal', 'Hard'] },
@@ -1689,6 +1697,10 @@ const LAST_RUN_KEY = 'watteePokerLastRun';
 function saveLastRun(sid, star){ try { localStorage.setItem(LAST_RUN_KEY, JSON.stringify({ sid, star })); } catch (e){} }
 function goToRunSelect(){
     goTo('run-select-screen');
+    if (!runAccess(selSid).open){   // 前回のRUNがまだ解放されていなければ、遊べる一番先のRUNから
+        let k = 0; SHACKLES.forEach((s, i) => { if (runAccess(s.id).open) k = i; });
+        selSid = SHACKLES[k].id;
+    }
     renderRunSelect();
 }
 // 縛りごとのカード色
@@ -1835,24 +1847,43 @@ const SHACKLE_SHORT = {
     lucky7:  { ja: '7のレベルが最初から10', ja_easy: '7の レベルが さいしょから 10', en: 'Number 7 starts at Lv 10' },
 };
 const RS_CARD_W = 244, RS_GAP = 20;
+// RUNの解放：最初の「ふつう」だけ最初から遊べる。ほかのRUNは、ひとつ前のRUNをクリアすると遊べるようになり、
+// 選べる難易度は「ひとつ前のRUNでクリアした一番高い難易度」まで（ふつうのRUNだけは最初から★3まで選べる）
+function maxClearedStar(sid){
+    const st = getProg(sid).stars || {};
+    let m = 0; for (let n = 1; n <= STARS; n++) if (st[n]) m = n;
+    return m;
+}
+function runAccess(sid){
+    const i = SHACKLES.findIndex(s => s.id === sid);
+    if (i <= 0) return { open: true, maxStar: STARS, prevId: null };
+    const prevId = SHACKLES[i - 1].id, m = maxClearedStar(prevId);
+    return { open: m >= 1, maxStar: m, prevId };
+}
 function renderRunSelect(){
     document.getElementById('ds-master-badge').classList.toggle('hidden', !isAllGold());
     const prog = getProg(selSid);
+    const acc = runAccess(selSid);
+    if (acc.open) selStar = Math.max(1, Math.min(selStar, acc.maxStar));
     document.getElementById('rs-strip').innerHTML = SHACKLES.map(s => {
-        const sp = getProg(s.id).stars;
-        return `<div class="rs-card${s.id === selSid ? ' sel' : ''}" style="--c:${SHACKLE_COLOR[s.id]}" data-id="${s.id}" onclick="selectShackle('${s.id}')">
+        const sp = getProg(s.id).stars, lk = !runAccess(s.id).open;
+        return `<div class="rs-card${s.id === selSid ? ' sel' : ''}${lk ? ' locked' : ''}" style="--c:${SHACKLE_COLOR[s.id]}" data-id="${s.id}" onclick="selectShackle('${s.id}')">
             <div class="rs-tab">${escapeHtml(shackleName(s.id))}</div>
             ${shackleArt(s.id)}
             <div class="rs-body"><div class="rs-short">${escapeHtml(L(SHACKLE_SHORT[s.id]))}</div>
-                <div class="rs-medals">${[1, 2, 3].map(n => sp[n] ? '★' : '☆').join('')}</div></div>
-            <button class="rs-go" onclick="event.stopPropagation(); startRunFromSelect()">${escapeHtml(ui('btn_run_go'))}</button>
+                <div class="rs-medals">${lk ? '🔒' : [1, 2, 3].map(n => sp[n] ? '★' : '☆').join('')}</div></div>
+            <button class="rs-go${lk ? ' off' : ''}" ${lk ? 'disabled' : ''} onclick="event.stopPropagation(); startRunFromSelect()">${escapeHtml(ui(lk ? 'btn_run_locked' : 'btn_run_go'))}</button>
         </div>`;
     }).join('');
     centerShackle();
+    const prevName = acc.prevId ? shackleName(acc.prevId) : '';
+    let note = '';
+    if (!acc.open) note = `<br><span class="ds-lock">${escapeHtml(uif('rs_locked', prevName))}</span>`;
+    else if (acc.prevId && acc.maxStar < STARS) note = `<br><span class="ds-lock">${escapeHtml(uif('rs_cap', prevName, starName(acc.maxStar + 1)))}</span>`;
     document.getElementById('ds-preview-sub').innerHTML = escapeHtml(L(SHACKLE_TEXT[selSid].desc)) +
-        (prog.best[selStar] ? `　<span class="ds-best">${escapeHtml(uif('best_label', prog.best[selStar]))}</span>` : '');
+        (prog.best[selStar] ? `　<span class="ds-best">${escapeHtml(uif('best_label', prog.best[selStar]))}</span>` : '') + note;
     document.getElementById('star-row').innerHTML = Array.from({ length: STARS }, (_, i) => i + 1).map(n => {
-        const locked = false;   // ★は自由に選べる(ロックなし)
+        const locked = !acc.open || n > acc.maxStar;
         return `<button class="star-btn${n === selStar ? ' active' : ''}${locked ? ' locked' : ''}${prog.stars[n] ? ' cleared' : ''}" data-star="${n}" onclick="selectStar(${n})">${'★'.repeat(n)}<small>${locked ? '🔒 ' : (prog.clear >= n ? '✔ ' : '')}${escapeHtml(starName(n))}</small></button>`;
     }).join('');
     document.getElementById('border-row').innerHTML = Array.from({ length: STAGES }, (_, i) =>
@@ -1879,9 +1910,15 @@ function moveShackle(d){
     selSid = SHACKLES[idx].id; renderRunSelect();
 }
 function selectStar(n){
+    const acc = runAccess(selSid);
+    if (!acc.open || n > acc.maxStar) return;
     selStar = n; renderRunSelect();
 }
-function startRunFromSelect(){ startRun(selSid, selStar); }
+function startRunFromSelect(){
+    const acc = runAccess(selSid);
+    if (!acc.open || selStar > acc.maxStar) return;
+    startRun(selSid, selStar);
+}
 
 // ============================================================
 // RUN 状態
