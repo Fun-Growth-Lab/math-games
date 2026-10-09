@@ -79,7 +79,7 @@ function backToTitle() {
 }
 
 function initGame() {
-    state.score = 0; state.stage = 1; state.runMode = false; state.stageStartScore = 0; state.stageScores = []; state.tutorial = false;
+    state.score = 0; state.bestPlay = 0; state.stage = 1; state.runMode = false; state.stageStartScore = 0; state.stageScores = []; state.tutorial = false;
     state.ap = 10; state.cakes = [0, 0, 0]; state.cards = []; state.dragInfo = null; state.lastEq = '';
     state.combo = 0; state.roundCoins = 0; state.inputLocked = false; state.phase = 'IDLE';
     state.endBase = 0; state.apBonus = 0;
@@ -196,6 +196,7 @@ function roundClear() {
     const total = Math.floor(base * rate);
     state.roundBase = base; state.roundRate = rate; state.roundHeal = CONFIG.apHeal;
     state.ap += CONFIG.apHeal;
+    noteBestPlay(total);
     state.score += total;
     state.stageScores[state.stage - 1] = total;
     state.inputLocked = true;

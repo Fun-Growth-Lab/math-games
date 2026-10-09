@@ -112,7 +112,7 @@ function backToTitle() {
 }
 
 function initGame() {
-    state.score = 0; state.round = 1; state.stage = 1; state.runMode = false; state.stageStartScore = 0; state.stageScores = [];
+    state.score = 0; state.bestPlay = 0; state.round = 1; state.stage = 1; state.runMode = false; state.stageStartScore = 0; state.stageScores = [];
     state.totalBingos = 0; state.totalPerfects = 0; state.tutorial = false;
     state.cards = [null, null, null, null, null]; state.fieldCards = [null, null, null]; state.dragInfo = null;
     state.isProcessing = false; state.inputLocked = false; state.phase = 'IDLE';
@@ -194,6 +194,7 @@ function checkBingo() {
     [['Q', nq], ['R', nr]].forEach(([type, n]) => {
         if (n <= 0) return;
         const pts = n * 500;
+        noteBestPlay(pts);
         state.score += pts; state.roundScore += pts; state.roundBingos += n; state.totalBingos += n;
         popup(type, 'BINGO!!', pts, true);
         addLog(T('dv_log_bingo', { n: pts }));
@@ -227,6 +228,7 @@ function processAttack(cardIndex, fieldIndex) {
     if (isRHit && remainder === state.targetRemainder) hitTargets++;
     const mult = hitTargets === 2 ? 4 : hitTargets === 1 ? 2 : 1;
     const total = base * mult;
+    noteBestPlay(total);
     state.score += total; state.roundScore += total;
 
     // パネルごとの表示点(両方HITなら150ずつ)

@@ -179,6 +179,7 @@ document.getElementById('container').innerHTML = (GAME.gameLayerHTML || _GAME_LA
         </div>
         <div class="rk-panel">
             <div class="rk-ctrl">
+                <div class="rk-seg" id="rk-seg-kind"></div>
                 <div class="rk-seg" id="rk-seg-star"></div>
                 <div class="rk-seg" id="rk-seg-tab"></div>
             </div>
@@ -238,13 +239,13 @@ document.getElementById('container').innerHTML = (GAME.gameLayerHTML || _GAME_LA
 
     window.currentUser = {uid:'guest', displayName:''};
 
-    window.saveOnlineScore = async (uid, name, difficulty, score, stage, tag) => {
+    window.saveOnlineScore = async (uid, name, difficulty, score, stage, tag, gameId) => {
         if ((score||0) <= 0) return;
         try {
             const res = await fetch(`${_b}/rankings`, {
                 method:'POST', headers:_h, keepalive:true,
                 body: JSON.stringify({
-                    game: GAME.sbGame,
+                    game: gameId || GAME.sbGame,
                     difficulty: difficulty||'normal',
                     player_name: name||'ゲスト',
                     point_score: Math.round(score)||0,
@@ -258,11 +259,11 @@ document.getElementById('container').innerHTML = (GAME.gameLayerHTML || _GAME_LA
         } catch(e) { console.error('Ranking save error:', e); throw e; }
     };
 
-    window.fetchOnlineRanking = async (difficulty, limit) => {
+    window.fetchOnlineRanking = async (difficulty, limit, gameId) => {
         try {
             const q = new URLSearchParams({
                 select: 'player_name,point_score,created_at,class_name,stage_score',
-                game: `eq.${GAME.sbGame}`,
+                game: `eq.${gameId || GAME.sbGame}`,
                 difficulty: `eq.${difficulty||'normal'}`,
                 point_score: 'gt.0',
                 order: 'point_score.desc,created_at.asc',
@@ -316,6 +317,8 @@ function showCustomConfirm(msg, onYes){
 // ============================================================
 const STRINGS = {
     ja: {
+        "rank_kind_score": "総スコア",
+        "rank_kind_hand": "最大の手",
         "ranking_title": "ランキング",
         "btn_back_prev": "◀ もどる",
         "rank_star_all": "すべて",
@@ -436,6 +439,8 @@ const STRINGS = {
         "rank_star_3": "★★★ むずかしい",
     },
     simple: {
+        "rank_kind_score": "ごうけいスコア",
+        "rank_kind_hand": "いちばん大きい手",
         "ranking_title": "ランキング",
         "btn_back_prev": "◀ もどる",
         "rank_star_all": "ぜんぶ",
@@ -556,6 +561,8 @@ const STRINGS = {
         "rank_star_3": "★★★ むずかしい",
     },
     en: {
+        "rank_kind_score": "Total Score",
+        "rank_kind_hand": "Best Play",
         "ranking_title": "Ranking",
         "btn_back_prev": "◀ Back",
         "rank_star_all": "All",
@@ -801,7 +808,7 @@ let state = {
     time: 15,
     score: 0,
     lastScore: 0,
-    maxScore: 0, 
+    maxScore: 0, bestPlay: 0, 
     enemiesRemaining: 0, 
     cards: [null, null, null, null, null],
     enemies: [],
@@ -1150,8 +1157,28 @@ function saveScore(difficulty, score, stage, cleared) {
     if (window.currentUser && window.saveOnlineScore) {
         window.saveOnlineScore(window.currentUser.uid, state.playerName, difficulty, score, stage, cleared ? 'クリア' : 'ステージ' + stage);
     }
+    saveBestPlay(difficulty, stage, cleared);
 
     return isNewRecord;
+}
+
+// ---- 最大の手(1回の行動で得た いちばん大きい点)。ゲームごとに点が入るたびに noteBestPlay(点) を呼ぶ。
+// 攻撃ダメージを数えるゲームは state.maxScore / maxSingleScore / maxDamage が すでにその値 ----
+function noteBestPlay(pts) { if (pts > (state.bestPlay || 0)) state.bestPlay = pts; }
+function bestPlayValue() { return Math.max(state.bestPlay || 0, state.maxScore || 0, state.maxSingleScore || 0, state.maxDamage || 0); }
+const HAND_GAME_ID = () => GAME.sbGame + '_hand';
+function saveBestPlay(difficulty, stage, cleared) {
+    const score = bestPlayValue();
+    if (score <= 0) return;
+    const hkey = 'HAND_' + difficulty;
+    let ranking = getLocalRanking(hkey);
+    const now = new Date();
+    ranking.push({ score, name: state.playerName, date: `${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()}`, stage: stage || 0, clear: !!cleared });
+    ranking.sort((a, b) => b.score - a.score);
+    localStorage.setItem(getRankingKey(hkey), JSON.stringify(ranking.slice(0, 10)));
+    if (window.currentUser && window.saveOnlineScore) {
+        window.saveOnlineScore(window.currentUser.uid, state.playerName, difficulty, score, stage, cleared ? 'クリア' : 'ステージ' + stage, HAND_GAME_ID());
+    }
 }
 
 function updateTitleScreenStats() {
@@ -1160,7 +1187,7 @@ function updateTitleScreenStats() {
 }
 
 // ---- ランキング画面: 上にRUNカードの帯、下に記録の板(RUN選択と同じ作り) ----
-let rkRunIdx = 0, rkStar = 0, rkSeq = 0;   // rkStar: 0=すべての★
+let rkRunIdx = 0, rkStar = 0, rkSeq = 0, rkKind = 'score';   // rkStar: 0=すべての★
 const RK_W = 150, RK_GAP = 14, RK_PAD = 18;
 function showRankingScreen() {
     ui.rankingScreen.classList.remove('hidden');
@@ -1192,6 +1219,8 @@ function renderRankScreen() {
         el.innerHTML = items.map(([v, label]) => `<button data-v="${v}" class="${v === cur ? 'on' : ''}">${label}</button>`).join('');
         return el;
     };
+    seg('rk-seg-kind', [['score', T('rank_kind_score')], ['hand', T('rank_kind_hand')]], rkKind).querySelectorAll('button').forEach(b =>
+        bindBtn(b, () => { rkKind = b.dataset.v; renderRankScreen(); loadRankRows(); }));
     seg('rk-seg-star', [[0, T('rank_star_all')]].concat([1, 2, 3].map(k => [k, '★' + k])), rkStar).querySelectorAll('button').forEach(b =>
         bindBtn(b, () => { rkStar = parseInt(b.dataset.v, 10); renderRankScreen(); loadRankRows(); }));
     seg('rk-seg-tab', [['WORLD', T('rank_tab_world')], ['LOCAL', T('rank_tab_local')]], state.rankingMode).querySelectorAll('button').forEach(b =>
@@ -1206,11 +1235,11 @@ async function loadRankRows() {
     if (state.rankingMode === 'WORLD') {
         list.innerHTML = `<li class="rk-loading">${T('rank_loading')}</li>`;
         if (!window.fetchOnlineRanking) return;
-        const parts = await Promise.all(stars.map(async k => { const r = await window.fetchOnlineRanking(starKey(k), rkStar ? 20 : 10); return (r || []).map(x => Object.assign({ star: k }, x)); }));
+        const parts = await Promise.all(stars.map(async k => { const r = await window.fetchOnlineRanking(starKey(k), rkStar ? 20 : 10, rkKind === 'hand' ? HAND_GAME_ID() : undefined); return (r || []).map(x => Object.assign({ star: k }, x)); }));
         if (mySeq !== rkSeq) return;       // 読み込み中に切りかえられたら古い結果は捨てる
         rows = [].concat.apply([], parts);
     } else {
-        rows = [].concat.apply([], stars.map(k => getLocalRanking(starKey(k)).map(x => Object.assign({ star: k }, x))));
+        rows = [].concat.apply([], stars.map(k => getLocalRanking((rkKind === 'hand' ? 'HAND_' : '') + starKey(k)).map(x => Object.assign({ star: k }, x))));
     }
     rows.sort((a, b) => b.score - a.score);
     renderRankRows(rows.slice(0, 20));

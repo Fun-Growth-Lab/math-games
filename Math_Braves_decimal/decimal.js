@@ -89,7 +89,7 @@ function backToTitle() {
 }
 
 function initGame() {
-    state.score = 0; state.stage = 1; state.runMode = false; state.stageStartScore = 0; state.stageScores = []; state.tutorial = false;
+    state.score = 0; state.bestPlay = 0; state.stage = 1; state.runMode = false; state.stageStartScore = 0; state.stageScores = []; state.tutorial = false;
     state.maxHp = CONFIG.maxHp; state.hp = CONFIG.maxHp; state.gems = 0; state.snacks = []; state.availSnacks = [...ALL_SNACKS];
     state.cards = [null, null, null, null, null]; state.dragInfo = null; state.events = [];
     state.ribbon = 0; state.disp = 0; state.target = 0; state.anim = false; state.lastEq = '';
@@ -237,6 +237,7 @@ function checkEvents() {
     if (hit) triggerEvent(hit);
     if (v % 1 === 0 && v > 0 && v <= 4) {
         const bonus = v * 200;
+        noteBestPlay(bonus);
         state.score += bonus;
         burst(vx(v), BAR_Y + BAR_H / 2, '#FFD700', 28);
         showGameMessage(T('msg_just_bonus', { n: v, pts: bonus }));
@@ -259,6 +260,7 @@ function triggerEvent(ev) {
     const px = vx(Math.min(state.ribbon, 5)), py = BAR_Y + BAR_H / 2;
     if (ev.type === 'gold') {
         const pts = ev.sub === 'mega_gold' ? 1500 : 500;
+        noteBestPlay(pts);
         state.score += pts;
         burst(px, py, '#FFF59D', 26);
         showGameMessage(T('msg_gold_found', { icon: ev.icon, pts: pts }), () => { ev.cleared = true; });
@@ -299,6 +301,7 @@ function checkStageClear() {
     if (v < 5.0) return;
     if (v === 5.0) {
         state.phase = 'CLEAR_WAIT';
+        noteBestPlay(1000);
         state.score += 1000;
         burst(vx(5), BAR_Y + BAR_H / 2, '#FFD700', 40);
         showGameMessage(T('msg_just_5'), onStageDone);
