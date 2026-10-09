@@ -288,6 +288,8 @@ bindBtn(ui.btnViewRanking, () => {
 bindBtn(ui.btnCloseRanking, () => {
     ui.rankingScreen.classList.add('hidden');
 });
+bindBtn(document.getElementById('rk-prev'), () => { if (rkRunIdx > 0) { rkRunIdx--; renderRankScreen(); loadRankRows(); } });
+bindBtn(document.getElementById('rk-next'), () => { if (rkRunIdx < RUN_LIST.length - 1 && !RUN_LIST[rkRunIdx + 1].locked) { rkRunIdx++; renderRankScreen(); loadRankRows(); } });
 
 bindBtn(ui.btnToTitle, () => {
     if (state.runMode && state.screen === 'PLAYING') showCustomConfirm(T('confirm_quit'), () => backToTitle());
@@ -309,14 +311,6 @@ bindBtn(ui.btnIndex, () => {
 bindBtn(ui.btnOpenSettings, () => { document.getElementById('settings-screen').classList.remove('hidden'); });
 bindBtn(ui.btnCloseSettings, () => { document.getElementById('settings-screen').classList.add('hidden'); });
 
-bindBtn(ui.btnRankLocal, () => {
-    state.rankingMode = 'LOCAL';
-    showRankingScreen();
-});
-bindBtn(ui.btnRankWorld, () => {
-    state.rankingMode = 'WORLD';
-    showRankingScreen();
-});
 
 bindBtn(ui.playerSelectBtn, () => {
     renderPlayerList();

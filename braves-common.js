@@ -167,32 +167,23 @@ document.getElementById('container').innerHTML = (GAME.gameLayerHTML || _GAME_LA
         </div>
     </div>
 
-    <div id="ranking-screen" class="hidden">
-        <div id="ranking-overlay">
-            <div class="overlay-content" style="width: 95%; max-width: 900px;">
-                <h2 id="ranking-header-title" style="color: #ff7043; margin-top: 0; border:none;">ベストスコア 10</h2>
-
-                <div style="margin-bottom: 20px;">
-                    <button id="btn-rank-world" class="btn btn-toggle active" data-i18n="rank_tab_world">ワールド</button>
-                    <button id="btn-rank-local" class="btn btn-toggle" data-i18n="rank_tab_local">ローカル</button>
-                </div>
-
-                <div class="ranking-container">
-                    <div class="ranking-box">
-                        <div class="ranking-title" style="color: #4caf50;" data-i18n="rank_star_1">★ やさしい</div>
-                        <ul id="rank-list-star1" class="ranking-list"></ul>
-                    </div>
-                    <div class="ranking-box">
-                        <div class="ranking-title" style="color: #29b6f6;" data-i18n="rank_star_2">★★ ふつう</div>
-                        <ul id="rank-list-star2" class="ranking-list"></ul>
-                    </div>
-                    <div class="ranking-box">
-                        <div class="ranking-title" style="color: #ef5350;" data-i18n="rank_star_3">★★★ むずかしい</div>
-                        <ul id="rank-list-star3" class="ranking-list"></ul>
-                    </div>
-                </div>
-                <button id="btn-close-ranking" class="btn" data-i18n="btn_close">とじる</button>
+    <div id="ranking-screen" class="screen hidden">
+        <div class="rs-top">
+            <button class="rs-mini" id="btn-close-ranking" data-i18n="btn_back_prev">◀ もどる</button>
+            <div class="rs-plaque" data-i18n="ranking_title">ランキング</div>
+        </div>
+        <div class="rk-stage">
+            <button class="rs-arrow rk-arrow" id="rk-prev">◀</button>
+            <div class="rs-viewport" id="rk-viewport"><div id="rk-strip"></div></div>
+            <button class="rs-arrow rk-arrow" id="rk-next">▶</button>
+        </div>
+        <div class="rk-panel">
+            <div class="rk-ctrl">
+                <div class="rk-seg" id="rk-seg-star"></div>
+                <div class="rk-seg" id="rk-seg-tab"></div>
             </div>
+            <div class="rk-head" id="rk-head"></div>
+            <ul class="rk-list" id="rk-list"></ul>
         </div>
     </div>
 
@@ -267,7 +258,7 @@ document.getElementById('container').innerHTML = (GAME.gameLayerHTML || _GAME_LA
         } catch(e) { console.error('Ranking save error:', e); throw e; }
     };
 
-    window.fetchOnlineRanking = async (difficulty) => {
+    window.fetchOnlineRanking = async (difficulty, limit) => {
         try {
             const q = new URLSearchParams({
                 select: 'player_name,point_score,created_at,class_name,stage_score',
@@ -275,7 +266,7 @@ document.getElementById('container').innerHTML = (GAME.gameLayerHTML || _GAME_LA
                 difficulty: `eq.${difficulty||'normal'}`,
                 point_score: 'gt.0',
                 order: 'point_score.desc,created_at.asc',
-                limit: '10'
+                limit: String(limit || 10)
             });
             const res = await fetch(`${_b}/rankings?${q}`, {headers:_rh});
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -325,6 +316,18 @@ function showCustomConfirm(msg, onYes){
 // ============================================================
 const STRINGS = {
     ja: {
+        "ranking_title": "ランキング",
+        "btn_back_prev": "◀ もどる",
+        "rank_star_all": "すべて",
+        "rk_col_rank": "順位",
+        "rk_col_name": "なまえ",
+        "rk_col_star": "なんいど",
+        "rk_col_result": "けっか",
+        "rk_col_score": "スコア",
+        "rk_col_date": "ひづけ",
+        "rank_result_clear": "クリア",
+        "rank_result_stage": "ステージ{n}",
+        "rank_empty_sub": "RUNをあそんで、いちばんのりをめざそう！",
         "panel_battle_info": "⚔️ バトル情報",
         "label_player": "👤 プレーヤー",
         "label_level": "🎯 レベル",
@@ -433,6 +436,18 @@ const STRINGS = {
         "rank_star_3": "★★★ むずかしい",
     },
     simple: {
+        "ranking_title": "ランキング",
+        "btn_back_prev": "◀ もどる",
+        "rank_star_all": "ぜんぶ",
+        "rk_col_rank": "じゅんい",
+        "rk_col_name": "なまえ",
+        "rk_col_star": "なんいど",
+        "rk_col_result": "けっか",
+        "rk_col_score": "スコア",
+        "rk_col_date": "ひづけ",
+        "rank_result_clear": "クリア",
+        "rank_result_stage": "ステージ{n}",
+        "rank_empty_sub": "RUNを あそんで、いちばんを めざそう！",
         "panel_battle_info": "⚔️ バトルじょうほう",
         "label_player": "👤 プレーヤー",
         "label_level": "🎯 レベル",
@@ -541,6 +556,18 @@ const STRINGS = {
         "rank_star_3": "★★★ むずかしい",
     },
     en: {
+        "ranking_title": "Ranking",
+        "btn_back_prev": "◀ Back",
+        "rank_star_all": "All",
+        "rk_col_rank": "Rank",
+        "rk_col_name": "Name",
+        "rk_col_star": "Level",
+        "rk_col_result": "Result",
+        "rk_col_score": "Score",
+        "rk_col_date": "Date",
+        "rank_result_clear": "Clear",
+        "rank_result_stage": "Stage {n}",
+        "rank_empty_sub": "Play this RUN and be the first!",
         "panel_battle_info": "⚔️ Battle Info",
         "label_player": "👤 Player",
         "label_level": "🎯 Level",
@@ -821,7 +848,6 @@ const ui = {
     
     result: document.getElementById('game-result'),
     rankingScreen: document.getElementById('ranking-screen'),
-    rankingHeaderTitle: document.getElementById('ranking-header-title'),
     
     // タイトルメニューボタン
     btnStartMenu: document.getElementById('btn-start-menu'),
@@ -835,8 +861,6 @@ const ui = {
     btnCloseRanking: document.getElementById('btn-close-ranking'),
     btnToTitle: document.getElementById('btn-to-title'),
     
-    btnRankLocal: document.getElementById('btn-rank-local'),
-    btnRankWorld: document.getElementById('btn-rank-world'),
 
     playerSelectBtn: document.getElementById('player-select-btn'),
     currentPlayerDisplay: document.getElementById('current-player-name-display'),
@@ -1135,56 +1159,72 @@ function updateTitleScreenStats() {
     if (typeof runSelectVisible === 'function' && runSelectVisible()) renderRunSelect();
 }
 
-async function showRankingScreen() {
+// ---- ランキング画面: 上にRUNカードの帯、下に記録の板(RUN選択と同じ作り) ----
+let rkRunIdx = 0, rkStar = 0, rkSeq = 0;   // rkStar: 0=すべての★
+const RK_W = 150, RK_GAP = 14, RK_PAD = 18;
+function showRankingScreen() {
     ui.rankingScreen.classList.remove('hidden');
-
-    if (state.rankingMode === 'WORLD') {
-        ui.btnRankWorld.classList.add('active');
-        ui.btnRankLocal.classList.remove('active');
-        ui.rankingHeaderTitle.textContent = T('rank_header_world');
-    } else {
-        ui.btnRankWorld.classList.remove('active');
-        ui.btnRankLocal.classList.add('active');
-        ui.rankingHeaderTitle.textContent = T('rank_header_local', {name: state.playerName});
-    }
-
-    const ids = [1, 2, 3].map(n => 'rank-list-star' + n);
-    ids.forEach(id => {
-        document.getElementById(id).innerHTML = `<li style="justify-content:center; color:#7f8c8d;">${T('rank_loading')}</li>`;
-    });
-
-    const render = (ul, list, isOnline) => {
-        ul.innerHTML = '';
-        if (!list || list.length === 0) {
-            ul.innerHTML = `<li style="justify-content:center; color:#7f8c8d;">${T('rank_empty')}</li>`;
-            return;
-        }
-        list.forEach((data, index) => {
-            const li = document.createElement('li');
-            const rankSpan = document.createElement('span'); rankSpan.className = 'ranking-rank'; rankSpan.textContent = `${index + 1}.`;
-            const nameSpan = document.createElement('span'); nameSpan.className = 'ranking-name'; nameSpan.textContent = data.name || state.playerName;
-            if (isOnline) nameSpan.style.cssText = 'color:#888;';
-            const scoreSpan = document.createElement('span'); scoreSpan.className = 'ranking-score'; scoreSpan.textContent = data.score;
-            li.appendChild(rankSpan); li.appendChild(nameSpan);
-            if (data.stage) {
-                const tag = document.createElement('span');
-                tag.className = 'ranking-tag' + (data.clear ? ' clear' : '');
-                tag.textContent = data.clear ? '👑' : T('rank_stage_prefix') + data.stage;
-                li.appendChild(tag);
-            }
-            li.appendChild(scoreSpan);
-            if (data.date) { const dateSpan = document.createElement('span'); dateSpan.className = 'ranking-date'; dateSpan.textContent = data.date; li.appendChild(dateSpan); }
-            ul.appendChild(li);
-        });
+    rkRunIdx = (typeof runSelIdx === 'number' && RUN_LIST[runSelIdx] && !RUN_LIST[runSelIdx].locked) ? runSelIdx : 0;
+    renderRankScreen();
+    loadRankRows();
+}
+function renderRankScreen() {
+    document.getElementById('rk-strip').innerHTML = RUN_LIST.map((r, i) => `
+        <div class="rk-card${i === rkRunIdx ? ' sel' : ''}${r.locked ? ' locked' : ''}" style="--c:${r.color}" data-idx="${i}">
+            <div class="rk-tab">${T('run_' + r.id + '_name')}</div>
+            <div class="rk-art"><div class="rk-art-in">${runArt(r.id)}</div></div>
+        </div>`).join('');
+    document.querySelectorAll('#rk-strip .rk-card').forEach(el => bindBtn(el, () => {
+        const i = parseInt(el.dataset.idx, 10);
+        if (RUN_LIST[i].locked) return;
+        rkRunIdx = i; renderRankScreen(); loadRankRows();
+    }));
+    const n = RUN_LIST.length, vp = document.getElementById('rk-viewport');
+    const total = n * RK_W + (n - 1) * RK_GAP + RK_PAD * 2, vw = vp.clientWidth || 1100;
+    let x = vw / 2 - (RK_PAD + rkRunIdx * (RK_W + RK_GAP) + RK_W / 2);
+    x = Math.max(Math.min(0, vw - total), Math.min(0, x));
+    if (total < vw) x = (vw - total) / 2;
+    document.getElementById('rk-strip').style.transform = `translateX(${x}px)`;
+    document.getElementById('rk-prev').disabled = rkRunIdx <= 0;
+    document.getElementById('rk-next').disabled = rkRunIdx >= n - 1 || !!RUN_LIST[rkRunIdx + 1].locked;
+    const seg = (id, items, cur) => {
+        const el = document.getElementById(id);
+        el.innerHTML = items.map(([v, label]) => `<button data-v="${v}" class="${v === cur ? 'on' : ''}">${label}</button>`).join('');
+        return el;
     };
-
+    seg('rk-seg-star', [[0, T('rank_star_all')]].concat([1, 2, 3].map(k => [k, '★' + k])), rkStar).querySelectorAll('button').forEach(b =>
+        bindBtn(b, () => { rkStar = parseInt(b.dataset.v, 10); renderRankScreen(); loadRankRows(); }));
+    seg('rk-seg-tab', [['WORLD', T('rank_tab_world')], ['LOCAL', T('rank_tab_local')]], state.rankingMode).querySelectorAll('button').forEach(b =>
+        bindBtn(b, () => { state.rankingMode = b.dataset.v; renderRankScreen(); loadRankRows(); }));
+    const col = (k, cls) => `<span class="${cls || ''}">${T(k)}</span>`;
+    document.getElementById('rk-head').innerHTML = col('rk_col_rank') + col('rk_col_name') + col('rk_col_star', 'c') + col('rk_col_result', 'c') + col('rk_col_score', 'r') + col('rk_col_date', 'r');
+}
+async function loadRankRows() {
+    const list = document.getElementById('rk-list'), mySeq = ++rkSeq;
+    const stars = rkStar ? [rkStar] : [1, 2, 3];
+    let rows;
     if (state.rankingMode === 'WORLD') {
+        list.innerHTML = `<li class="rk-loading">${T('rank_loading')}</li>`;
         if (!window.fetchOnlineRanking) return;
-        await Promise.all([1, 2, 3].map(async n => {
-            const list = await window.fetchOnlineRanking(starKey(n));
-            render(document.getElementById('rank-list-star' + n), list, true);
-        }));
+        const parts = await Promise.all(stars.map(async k => { const r = await window.fetchOnlineRanking(starKey(k), rkStar ? 20 : 10); return (r || []).map(x => Object.assign({ star: k }, x)); }));
+        if (mySeq !== rkSeq) return;       // 読み込み中に切りかえられたら古い結果は捨てる
+        rows = [].concat.apply([], parts);
     } else {
-        [1, 2, 3].forEach(n => render(document.getElementById('rank-list-star' + n), getLocalRanking(starKey(n)), false));
+        rows = [].concat.apply([], stars.map(k => getLocalRanking(starKey(k)).map(x => Object.assign({ star: k }, x))));
     }
+    rows.sort((a, b) => b.score - a.score);
+    renderRankRows(rows.slice(0, 20));
+}
+function renderRankRows(rows) {
+    const list = document.getElementById('rk-list');
+    if (!rows.length) {
+        list.innerHTML = `<li class="rk-empty"><div class="rk-chip"></div><b>${T('rank_empty')}</b><span>${T('rank_empty_sub')}</span></li>`;
+        return;
+    }
+    const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    list.innerHTML = rows.map((d, i) => {
+        const cls = 'rk-row' + (i < 3 ? ' r' + (i + 1) : '') + ((d.name || '') === state.playerName ? ' me' : '');
+        const res = d.clear ? `<span class="rk-res clear">${T('rank_result_clear')}</span>` : (d.stage ? `<span class="rk-res">${T('rank_result_stage', { n: d.stage })}</span>` : '<span></span>');
+        return `<li class="${cls}"><span class="rk-no">${i + 1}</span><span class="rk-name">${esc(d.name || state.playerName)}</span><span class="rk-star">${d.star ? '★' + d.star : ''}</span>${res}<span class="rk-score">${d.score}</span><span class="rk-sub">${esc(d.date || '')}</span></li>`;
+    }).join('');
 }
