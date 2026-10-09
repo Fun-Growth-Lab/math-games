@@ -257,8 +257,15 @@
         .rs-body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 6px 12px; text-align: center; }
         .rs-short { font-size: 1.12rem; font-weight: 800; color: #3b2d1a; line-height: 1.35; }
         .rs-medals { margin-top: 4px; font-size: 1.15rem; font-weight: 900; color: #8a6a2a; letter-spacing: 1px; }
-        .rs-go { position: absolute; left: 14px; right: 14px; bottom: 14px; height: 56px; display: flex; align-items: center; justify-content: center; font-family: inherit; font-weight: 900; font-size: 1.6rem; color: #fff; border: 5px solid #0f2a24; border-radius: 18px; background: linear-gradient(#ff9a5a,#e8602a); box-shadow: 0 6px 0 #0a1c18; text-shadow: 0 3px 0 rgba(0,0,0,0.3); cursor: pointer; opacity: 0; pointer-events: none; transform: translateY(8px); transition: opacity 0.2s, transform 0.2s; }
-        .rs-card.sel .rs-body { padding-bottom: 76px; }
+        .rs-go .go-st { display: block; font-size: 1.25rem; line-height: 1; color: #ffe27a; letter-spacing: 3px; text-shadow: 0 2px 0 rgba(0,0,0,0.35); }
+        .rs-go.has-st { flex-direction: column; gap: 2px; height: auto; min-height: 56px; padding: 6px 0 7px; }
+        .rs-medal { position: absolute; top: 6px; right: 8px; z-index: 4; width: 46px; height: 46px; border-radius: 50%; border: 3px solid #fff; display: flex; align-items: center; justify-content: center; font-size: 0.95rem; font-weight: 900; letter-spacing: 0; line-height: 1; text-shadow: 0 1px 0 rgba(255,255,255,0.5); box-shadow: 0 4px 0 rgba(0,0,0,0.35); }
+        .rs-medal.m1 { background: radial-gradient(circle at 35% 30%,#ffd9b0,#cd7f32 70%); color: #5a2e08; }
+        .rs-medal.m2 { background: radial-gradient(circle at 35% 30%,#ffffff,#b9c4cf 70%); color: #34414f; }
+        .rs-medal.m3 { background: radial-gradient(circle at 35% 30%,#fff7b0,#ffc61a 70%); color: #7a4a00; box-shadow: 0 4px 0 rgba(0,0,0,0.35), 0 0 14px rgba(255,210,60,0.9); }
+        .rs-medal .crown { font-size: 1.7rem; line-height: 1; filter: drop-shadow(0 2px 0 rgba(0,0,0,0.3)); }
+        .rs-go { position: absolute; left: 14px; right: 14px; bottom: 14px; min-height: 56px; display: flex; align-items: center; justify-content: center; font-family: inherit; font-weight: 900; font-size: 1.6rem; color: #fff; border: 5px solid #0f2a24; border-radius: 18px; background: linear-gradient(#ff9a5a,#e8602a); box-shadow: 0 6px 0 #0a1c18; text-shadow: 0 3px 0 rgba(0,0,0,0.3); cursor: pointer; opacity: 0; pointer-events: none; transform: translateY(8px); transition: opacity 0.2s, transform 0.2s; }
+        .rs-card.sel .rs-body { padding-bottom: 100px; }
         .rs-card.sel .rs-go { opacity: 1; pointer-events: auto; transform: none; animation: goBounce 1.2s ease-in-out infinite; }
         .rs-go:active { transform: translateY(5px); box-shadow: 0 1px 0 #0a1c18; }
         @keyframes goBounce { 0%,100% { translate: 0 0; } 50% { translate: 0 -4px; } }
@@ -1882,13 +1889,14 @@ function renderRunSelect(){
     const acc = runAccess(selSid);
     if (acc.open) selStar = Math.max(1, Math.min(selStar, acc.maxStar));
     document.getElementById('rs-strip').innerHTML = SHACKLES.map(s => {
-        const sp = getProg(s.id).stars, lk = !runAccess(s.id).open;
+        const mc = maxClearedStar(s.id), lk = !runAccess(s.id).open;
         return `<div class="rs-card${s.id === selSid ? ' sel' : ''}${lk ? ' locked' : ''}" style="--c:${SHACKLE_COLOR[s.id]}" data-id="${s.id}" onclick="selectShackle('${s.id}')">
             <div class="rs-tab">${escapeHtml(shackleName(s.id))}</div>
             ${shackleArt(s.id)}
+            ${mc ? `<div class="rs-medal m${mc}">${mc === 3 ? '<span class="crown">👑</span>' : '★'.repeat(mc)}</div>` : ''}
             <div class="rs-body"><div class="rs-short">${escapeHtml(L(SHACKLE_SHORT[s.id]))}</div>
-                <div class="rs-medals">${lk ? '🔒' : [1, 2, 3].map(n => sp[n] ? '★' : '☆').join('')}</div></div>
-            <button class="rs-go${lk ? ' off' : ''}" ${lk ? 'disabled' : ''} onclick="event.stopPropagation(); startRunFromSelect()">${escapeHtml(lk ? ui('btn_run_locked') : uif('btn_run_go_star', '★'.repeat(selStar)))}</button>
+                ${lk ? '<div class="rs-medals">🔒</div>' : ''}</div>
+            <button class="rs-go${lk ? ' off' : ' has-st'}" ${lk ? 'disabled' : ''} onclick="event.stopPropagation(); startRunFromSelect()">${lk ? escapeHtml(ui('btn_run_locked')) : `<span class="go-st">${'★'.repeat(selStar)}</span><span>${escapeHtml(ui('btn_run_go'))}</span>`}</button>
         </div>`;
     }).join('');
     centerShackle();
@@ -2657,7 +2665,7 @@ function renderRankScreen(){
     centerRankStrip();
     const seg = (id, items, cur) => { document.getElementById(id).innerHTML = items.map(([v, label, fn]) => `<button class="${v === cur ? 'on' : ''}" onclick="${fn}">${escapeHtml(label)}</button>`).join(''); };
     seg('rk-seg-kind', [['score', ui('rank_kind_score'), "switchRankKind('score')"], ['hand', ui('rank_kind_hand'), "switchRankKind('hand')"]], rankKind);
-    seg('rk-seg-star', [[0, ui('rank_star_all'), 'switchRankStar(0)']].concat([1, 2, 3].map(n => [n, '★' + n, `switchRankStar(${n})`])), rankStar);
+    seg('rk-seg-star', [[0, ui('rank_star_all'), 'switchRankStar(0)']].concat([1, 2, 3].map(n => [n, '★'.repeat(n), `switchRankStar(${n})`])), rankStar);
     seg('rk-seg-tab', [['world', ui('rank_tab_world'), "switchRankTab('world')"], ['local', ui('rank_tab_local'), "switchRankTab('local')"]], rankTab);
 }
 function centerRankStrip(){
@@ -2722,7 +2730,7 @@ function renderRankList(rows){
         return `<li class="${cls}">
             <span class="rk-no">${i + 1}</span>
             <span class="rk-name">${escapeHtml(r.name)}</span>
-            <span class="rk-star">${r.star ? '★' + r.star : ''}</span>
+            <span class="rk-star">${'★'.repeat(r.star || 0)}</span>
             ${mid}
             <span class="rk-score">${r.score}</span>
             ${isHand ? '' : `<span class="rk-sub">${escapeHtml(uif('rank_stage_label', r.turns ?? 0))}</span>`}
@@ -2749,6 +2757,10 @@ function startTutorial(){
     renderPlay();
     const tp = (en, ja, easy) => ({ ja, easy, en });
     FGLTutorial.run([
+        { type: 'say', target: null, pos: 'middle', text: tp(
+            'This is the game screen. Let\'s take a quick look around, then play one hand together!',
+            'これがゲーム画面だよ。まずは画面を見ていこう。そのあと、いっしょに1回あそんでみよう！',
+            'これが ゲームがめんだよ。まずは がめんを みていこう。そのあと、いっしょに 1かい あそんでみよう！') },
         { type: 'say', target: '#answers', pos: 'bottom', text: tp(
             'These are the times cards: answers from the multiplication table. Pick one, then pick a multiplication that makes it.',
             'ここの3枚が「九九カード」。九九の答えが並んでいるよ。1枚えらんで、その答えになる九九をえらぼう。',
