@@ -1040,12 +1040,10 @@
                 data = await fetchRows(HAND_ID, {}, LIMIT);
             } else {
                 const tagList = CLEAR_TAGS.map(t => `"${t}"`).join(',');
+                // クリアボーナスを足した得点で並べるので、クリアした人と、していない人のそれぞれ上位LIMIT件を取り、あとで合算して並べ直す
                 const cleared = await fetchRows(GAME_ID, { class_name: `in.(${tagList})` }, LIMIT);
-                data = cleared;
-                if (cleared.length < LIMIT){
-                    const others = await fetchRows(GAME_ID, { or: `(class_name.is.null,class_name.not.in.(${tagList}))` }, LIMIT - cleared.length);
-                    data = cleared.concat(others);
-                }
+                const others = await fetchRows(GAME_ID, { or: `(class_name.is.null,class_name.not.in.(${tagList}))` }, LIMIT);
+                data = cleared.concat(others);
             }
             return data.map(r => ({
                 name: r.player_name, tag: r.class_name, score: r.point_score, turns: r.turns,
@@ -1374,6 +1372,8 @@ const UI_TEXT = {
     rk_col_result: { ja: 'けっか', ja_easy: 'けっか', en: 'Result' },
     rk_col_role: { ja: 'やく', ja_easy: 'やく', en: 'Hand' },
     rk_col_score: { ja: 'スコア', ja_easy: 'スコア', en: 'Score' },
+    rk_col_score_b: { ja: n => `スコア(クリア+${n})`, ja_easy: n => `スコア(クリア+${n})`, en: n => `Score (clear +${n})` },
+    end_bonus: { ja: (b, t) => `クリアボーナス +${b} ＝ ランキング ${t}`, ja_easy: (b, t) => `クリアボーナス +${b} ＝ ランキング ${t}`, en: (b, t) => `Clear bonus +${b} = ranking ${t}` },
     rk_col_stage: { ja: 'とうたつ', ja_easy: 'とうたつ', en: 'Reached' },
     rk_col_date: { ja: 'ひづけ', ja_easy: 'ひづけ', en: 'Date' },
     rank_empty_sub: { ja: 'RUNをあそんで、いちばんのりをめざそう！', ja_easy: 'RUNを あそんで、いちばんを めざそう！', en: 'Play this RUN and be the first!' },
@@ -2507,10 +2507,12 @@ function rankKey(sid, star){ return `${sid}_${star}`; }
 function getLocalRanking(sid, star){
     try { return JSON.parse(localStorage.getItem(RANK_STORAGE_PREFIX + rankKey(sid, star)) || '[]'); } catch (e){ return []; }
 }
+// ランキングの得点＝ごうけいスコア＋クリアボーナス（クリアしたRUNだけ）。クリアの有無では並べず、この得点だけで順番を決める
+const CLEAR_BONUS = 500;
+function rankScore(row){ return (row.score || 0) + (isClearTag(row.tag) ? CLEAR_BONUS : 0); }
 function compareRank(a, b){
-    const ca = isClearTag(a.tag) ? 1 : 0, cb = isClearTag(b.tag) ? 1 : 0;
-    if (ca !== cb) return cb - ca;
-    if (b.score !== a.score) return b.score - a.score;
+    const sa = rankScore(a), sb = rankScore(b);
+    if (sb !== sa) return sb - sa;
     if (a.turns !== b.turns) return a.turns - b.turns;
     return (b.dateIso || '').localeCompare(a.dateIso || '');
 }
@@ -2586,7 +2588,7 @@ function renderEnd(cleared, o){
         return `<div class="ej ${cls}"><div class="dot">${e && !e.ok ? '✕' : i + 1}</div><div class="sc">${e ? e.score : '―'}</div></div>`;
     }).join('');
     const last = log[log.length - 1];
-    const sub1 = cleared ? '' : (last ? uif('end_short', last.stage, last.score, last.border) : '');
+    const sub1 = cleared ? uif('end_bonus', CLEAR_BONUS, run.totalScore + CLEAR_BONUS) : (last ? uif('end_short', last.stage, last.score, last.border) : '');
     const sub2 = run.bestPlay > 0 && run.bestRole ? roleName(run.bestRole) : '';
     box.innerHTML = `
         <div class="end-ribbon">${ribbon}</div>
@@ -2708,14 +2710,16 @@ async function loadAndRenderRanking(){
     list.innerHTML = `<li class="rk-loading">${escapeHtml(ui('rank_loading'))}</li>`;
     const rows = await (window.loadWorldRanking ? window.loadWorldRanking(rankSid, rankStar, rankKind) : Promise.resolve(null));
     if (mySeq !== rankSeq) return;     // 読み込み中に切りかえられたら、古い結果は捨てる
-    renderRankList(rows || []);
+    let list2 = rows || [];
+    if (rankKind !== 'hand') list2 = list2.slice().sort(compareRank).slice(0, 30);   // クリアボーナスを足した得点だけで並べる
+    renderRankList(list2);
 }
 function renderRankHead(){
     const isHand = rankKind === 'hand';
     document.getElementById('rk-panel').classList.toggle('rk-hand', isHand);
     const col = (k, cls) => `<span class="${cls || ''}">${escapeHtml(ui(k))}</span>`;
     document.getElementById('rk-head').innerHTML = col('rk_col_rank') + col('rk_col_name') + col('rk_col_star', 'c')
-        + (isHand ? col('rk_col_role', 'c') : col('rk_col_result', 'c')) + col('rk_col_score', 'r') + (isHand ? '' : col('rk_col_stage', 'r')) + col('rk_col_date', 'r');
+        + (isHand ? col('rk_col_role', 'c') : col('rk_col_result', 'c')) + (isHand ? col('rk_col_score', 'r') : `<span class="r">${escapeHtml(uif('rk_col_score_b', CLEAR_BONUS))}</span>`) + (isHand ? '' : col('rk_col_stage', 'r')) + col('rk_col_date', 'r');
 }
 function renderRankList(rows){
     const list = document.getElementById('rank-list');
@@ -2734,7 +2738,7 @@ function renderRankList(rows){
             <span class="rk-name">${escapeHtml(r.name)}</span>
             <span class="rk-star">${'★'.repeat(r.star || 0)}</span>
             ${mid}
-            <span class="rk-score">${r.score}</span>
+            <span class="rk-score">${rankScore(r)}</span>
             ${isHand ? '' : `<span class="rk-sub">${escapeHtml(uif('rank_stage_label', r.turns ?? 0))}</span>`}
             <span class="rk-sub">${escapeHtml(r.date || '')}</span>
         </li>`;
