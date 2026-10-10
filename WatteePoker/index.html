@@ -434,7 +434,6 @@
         .rare-badge { position: absolute; top: -17px; left: 50%; transform: translateX(-50%); background: linear-gradient(to bottom,#e8503d,#b8301f); color: #fff; font-size: 1.1rem; font-weight: 900; padding: 4px 16px; border-radius: 50px; border: 3px solid #fff; white-space: nowrap; box-shadow: 0 3px 0 #7a1f12; }
         .rare-badge.b-dora2 { background: linear-gradient(to bottom,#9156e8,#5a2db0); box-shadow: 0 3px 0 #3b1a78; }
         .rare-badge.b-coin { background: linear-gradient(to bottom,#2fbf72,#188a4c); box-shadow: 0 3px 0 #0f5f33; }
-        .rare-badge.cbot { top: auto; bottom: 8px; font-size: 0.95rem; padding: 2px 10px; }
         .gcard.coinc { font-size: 1.6rem; background: linear-gradient(160deg,#eafff2,#8ce6b0 55%,#3fbf7a); border-color: #1f9a5a; color: #0f4a2a; box-shadow: 0 4px 0 rgba(0,0,0,0.25), 0 0 14px rgba(60,200,120,0.7); }
         /* ショップのどうぐ(3つ)：絵と名前を横に、ボタンを下に */
         #shop-items .item-card { display: grid; grid-template-columns: 74px 1fr; grid-template-rows: 1fr auto; gap: 2px 8px; padding: 8px 10px 10px; text-align: left; align-items: center; justify-content: stretch; }
@@ -1109,12 +1108,18 @@ const STARS = 3;            // 難易度 ★1〜★3（やさしい／ふつう�
 const PLAYS_PER_STAGE = 3;
 const HAND_SIZE = 5;
 // 特別な九九カード。出現率は ドラ札4% / ドラドラ札1% / コイン札4% / ダブルコイン札1%（コイン札系は合計5%で、その2割がダブル。残りは普通のカード）。
-// 「ドラ札アップ」を買うごとに、ドラ札系の出現率が+5%ずつ（最大50%）。「コイン札アップ」も同じ。ドラ札系とコイン札系は別々に（同時に）抽選するので、おたがい邪魔しない
+// 「ドラ札アップ」を買うごとに、ドラ札系の出現率が+5%ずつ（最大50%）。「コイン札アップ」も同じ。
+// 抽選は乱数を1回だけ引く：0〜ドラ札系の率＝ドラ札系、1−コイン札系の率〜1＝コイン札系（どちらも最大50%なので重ならない）。当たった系統の中で、2割がドラドラ札／ダブルコイン札
 const RARE_UP_STEP = 0.5;                  // （旧仕様の名残。計算には使わない）
 const UP_STEP = 0.05;                      // 「ドラ札アップ」「コイン札アップ」1回ごとに、その系統の出現率の合計が+5%
 const FAMILY_BASE = 0.05, FAMILY_MAX = 0.5;   // 各系統の合計は5%から、最大50%まで
 const DOUBLE_SHARE = 0.2;                  // ドラドラ札はドラ札系の2割、ダブルコイン札はコイン札系の2割
 function familyRate(ups){ return Math.min(FAMILY_MAX, FAMILY_BASE + UP_STEP * (ups || 0)); }
+// コイン札系の率。フィーバー(coinBase)は最初から50%
+function coinRate(sh, ups){ return Math.min(FAMILY_MAX, ((sh && sh.coinBase) || FAMILY_BASE) + UP_STEP * (ups || 0)); }
+// 高得点のコイン：1プレーが100点以上で+2、以後50点上がるごとに+2（100〜149=+2／150〜199=+4／200〜249=+6…）。そのステージをクリアしたときにもらえる
+const HIGH_COIN_FROM = 100, HIGH_COIN_STEP = 50, HIGH_COIN_UNIT = 2;
+function highScoreCoin(total){ return total >= HIGH_COIN_FROM ? HIGH_COIN_UNIT * (Math.floor(total / HIGH_COIN_STEP) - 1) : 0; }
 const CARD_RATE = { dora: 0.04, dora2: 0.01, coin: 0.04, coin2: 0.01 };
 const URA_OF = { dora: 1, dora2: 2 };      // 割ったときに増えるうらドラの枚数（ドラ札=1枚、ドラドラ札=2枚）
 const COIN_CARD_BONUS = 2;                 // コイン札を割ると、そのステージのクリア報酬が+2コイン
@@ -1205,6 +1210,7 @@ const SHACKLES = [
     { id: 'nochange', icon: '🔒', filter: p => true, noChange: true },
     { id: 'oneshot',  icon: '☝️', filter: p => true, plays: 1, startSpecial: 5 },
     { id: 'lucky7',   icon: '7️⃣', filter: p => true, startNumLv: { 7: 10 } },
+    { id: 'fever',    icon: '🪙', filter: p => true, coinBase: 0.5 },
 ];
 const SHACKLE_BY_ID = {}; SHACKLES.forEach(s => { SHACKLE_BY_ID[s.id] = s; });
 // 縛りによるロックと、出てくる数字
@@ -1212,6 +1218,7 @@ function shackleNums(sh){ return sh.oddOnly ? [1, 3, 5, 7, 9] : [1, 2, 3, 4, 5, 
 function numLocked(sh, n){ return !!sh.oddOnly && n % 2 === 0; }
 function roleLocked(sh, id){ return !!(sh.lockRoles && sh.lockRoles.indexOf(id) >= 0); }
 function rareLocked(sh){ return !!sh.rates; }
+function coinLocked(sh){ return !!sh.coinBase; }
 function randNum(sh, rnd){ const a = shackleNums(sh); return a[Math.floor((rnd || Math.random)() * a.length)]; }
 // ボーダー表 BORDERS[縛り][★-1][ステージ-1]（★1やさしい／★2ふつう／★3むずかしい）。
 // 「ふつうの人」を想定したボット（先の手を読まず、いまの1手で一番よく見える手を選ぶ。15%はうっかりミス。チェンジは役もドラもできない時だけ）を
@@ -1239,6 +1246,7 @@ const BORDERS = {
     nochange: [[35, 40, 45, 55, 60, 70, 75], [45, 60, 70, 75, 85, 90, 100], [80, 90, 95, 110, 120, 140, 150]],
     oneshot : [[5, 5, 5, 10, 10, 10, 15], [10, 10, 15, 15, 15, 20, 20], [20, 25, 25, 30, 30, 35, 40]],
     lucky7  : [[60, 65, 70, 75, 85, 95, 100], [75, 85, 95, 100, 110, 115, 125], [115, 120, 130, 145, 155, 170, 185]],
+    fever   : [[40, 45, 50, 55, 60, 65, 75], [55, 65, 70, 80, 85, 90, 105], [85, 95, 105, 120, 130, 135, 155]],
 };
 function borderFor(sid, star, stage){
     return BORDERS[sid][star - 1][stage - 1];
@@ -1249,22 +1257,20 @@ function drawAnswer(shackle, excludeValues, up, rnd){
     let pool = PRODUCTS.filter(p => shackle.filter(p) && excludeValues.indexOf(p) < 0);
     if (pool.length === 0) pool = PRODUCTS.filter(p => shackle.filter(p));
     const v = pool[Math.floor(rnd() * pool.length)];
-    let kind = 'normal', c = null;
+    let kind = 'normal';
     let ud = 0, uc = 0;
     if (up && typeof up === 'object'){ ud = up.d || 0; uc = up.c || 0; } else ud = up || 0;
-    const r1 = rnd(), r2 = rnd();
-    // ドラ札系
+    const r = rnd(), r2 = rnd();
+    const fc = coinRate(shackle, uc);
     if (shackle.rates){
         const R = shackle.rates;
-        if (r1 < R.dora) kind = 'dora'; else if (r1 < R.dora + R.dora2) kind = 'dora2';
+        if (r < R.dora) kind = 'dora'; else if (r < R.dora + R.dora2) kind = 'dora2';
+        else if (r >= 1 - fc) kind = r2 < DOUBLE_SHARE ? 'coin2' : 'coin';
     } else {
         const fd = familyRate(ud);
-        if (r1 < fd * (1 - DOUBLE_SHARE)) kind = 'dora'; else if (r1 < fd) kind = 'dora2';
+        if (r < fd) kind = r2 < DOUBLE_SHARE ? 'dora2' : 'dora';
+        else if (r >= 1 - fc) kind = r2 < DOUBLE_SHARE ? 'coin2' : 'coin';
     }
-    // コイン札系（ドラ札系とは別の抽選）
-    const fc = familyRate(uc);
-    if (r2 < fc * (1 - DOUBLE_SHARE)) c = 'coin'; else if (r2 < fc) c = 'coin2';
-    if (c){ if (kind === 'normal') kind = c; else return { v, kind, c }; }
     return { v, kind };
 }
 function drawAnswerSet(shackle, up, rnd){
@@ -1348,6 +1354,8 @@ const SHACKLE_TEXT = {
                desc: { ja: 'チェンジができない。ストックチケットも買えず、ロックもなし。最初に出た九九カードで勝負！', ja_easy: 'チェンジが できない。ストックチケットも かえない。さいしょの くくカードで しょうぶ！', en: 'No swaps, no Stock Tickets, no locks. Play the cards you are dealt!' } },
     oneshot: { name: { ja: '一発勝負！', ja_easy: 'いっぱつ しょうぶ！', en: 'One Shot!' },
                desc: { ja: '1ステージのプレーは1回だけ。そのかわりストックチケット5枚つきでスタート！', ja_easy: '1ステージの プレーは 1かいだけ。ストックチケット 5まいつきで スタート！', en: 'Only 1 play per stage. Start with 5 Stock Tickets!' } },
+    fever:   { name: { ja: 'フィーバータイム！', ja_easy: 'フィーバータイム！', en: 'Fever Time!' },
+               desc: { ja: 'コイン札が最初から50%！ コインがじゃんじゃん入る。ショップで使いまくろう。', ja_easy: 'コインふだが さいしょから 50%！ コインが どんどん はいる。', en: 'Coin cards appear 50% from the start! Coins pour in. Spend them all.' } },
     lucky7:  { name: { ja: 'ラッキーセブン！', ja_easy: 'ラッキーセブン！', en: 'Lucky Seven!' },
                desc: { ja: '数字の7のレベルが、最初から10！ 手札の7は1枚+10点。7を集めよう。', ja_easy: 'すうじの 7の レベルが さいしょから 10！ てふだの 7は 1まい +10てん。', en: 'Number 7 starts at Lv 10! Each 7 in hand gives +10. Collect sevens!' } },
 };
@@ -1467,6 +1475,8 @@ const UI_TEXT = {
     cp_it_base: { ja: 'きほん', ja_easy: 'きほん', en: 'Base' },
     cp_it_play: { ja: p => `${p}プレー目でクリア`, ja_easy: p => `${p}プレーめで クリア`, en: p => `Cleared on play ${p}` },
     cp_it_card: { ja: 'コイン札', ja_easy: 'コインふだ', en: 'Coin card' },
+    cp_it_high: { ja: '高得点', ja_easy: 'たかい とくてん', en: 'High score' },
+    res_high_coin: { ja: n => '🪙 高得点 ＋' + n + '（クリア報酬に加算）', ja_easy: n => '🪙 たかい とくてん ＋' + n + '（クリアほうしゅうに たす）', en: n => '🪙 High score +' + n + ' (added to the clear reward)' },
     btn_lock: { ja: 'ロック', ja_easy: 'ロック', en: 'Lock' },
     btn_locked: { ja: 'ロック中', ja_easy: 'ロックちゅう', en: 'Locked' },
     btn_howto: { ja: '📖 あそびかた', en: '📖 How to Play' },
@@ -1750,7 +1760,7 @@ function goToRunSelect(){
     renderRunSelect();
 }
 // 縛りごとのカード色
-const SHACKLE_COLOR = { normal: '#2f9e6a', odd: '#3b82d6', even: '#ee8a3a', big20: '#c99a12', big30: '#c8452c', small60: '#2fb8a2', small50: '#4f9bd9', dora3: '#8a4fd6', weak: '#7d7f92', luck: '#5a6ad6', nozoro: '#d6453c', straight2: '#e0559f', full2: '#e8a317', rich: '#d4a000', dead: '#4a3a52', nofail: '#2fa8c9', nomoney: '#c24a2f', nochange: '#6d7f95', oneshot: '#e8503d', lucky7: '#2fae60' };
+const SHACKLE_COLOR = { normal: '#2f9e6a', odd: '#3b82d6', even: '#ee8a3a', big20: '#c99a12', big30: '#c8452c', small60: '#2fb8a2', small50: '#4f9bd9', dora3: '#8a4fd6', weak: '#7d7f92', luck: '#5a6ad6', nozoro: '#d6453c', straight2: '#e0559f', full2: '#e8a317', rich: '#d4a000', dead: '#4a3a52', nofail: '#2fa8c9', nomoney: '#c24a2f', nochange: '#6d7f95', oneshot: '#e8503d', lucky7: '#2fae60', fever: '#e8a317' };
 // 縛りごとのイラスト（CSSだけで描く。数字カード・泡・山などをposition:absoluteで並べる）
 function pcard(n, left, top, rot, extra){
     return `<div class="pc" style="left:${left}px;top:${top}px;transform:rotate(${rot || 0}deg);background:${cardBg(n)};${extra || ''}">${n}</div>`;
@@ -1862,6 +1872,11 @@ function shackleArt(id){
             <div style="position:absolute;left:62px;top:10px;width:122px;height:122px;border-radius:50%;background:radial-gradient(circle,#d63a22 0 14%,#fff 15% 30%,#d63a22 31% 46%,#fff 47% 62%,#d63a22 63% 78%,#fff 79%);border:5px solid #8a2412;box-shadow:0 5px 0 rgba(0,0,0,0.25)"></div>
             <div class="artbadge" style="right:8px;top:8px;background:#8a2412">1回</div>
             <div class="artbadge" style="left:8px;bottom:8px;background:#e8a317;font-size:1.05rem">🎟 ×5</div>${sp('✦', 20, 20, 18)}</div>`;
+    case 'fever':
+        return `<div class="rs-art" style="background:linear-gradient(#fff6c8,#f0b429)">
+            <div style="position:absolute;left:70px;top:6px;font-size:112px;line-height:1;filter:drop-shadow(0 6px 0 rgba(0,0,0,0.28))">🪙</div>
+            <div class="artbadge" style="right:8px;top:8px;background:#b8860b;font-size:1.05rem">50%</div>
+            ${pcard(6, 16, 70, -12, 'width:40px;height:58px;font-size:1.5rem;border-width:2px')}${pcard(9, 184, 70, 12, 'width:40px;height:58px;font-size:1.5rem;border-width:2px')}${sp('✦', 24, 14, 18)}${sp('✦', 200, 112, 16, 0.5)}</div>`;
     case 'lucky7':
         return `<div class="rs-art" style="background:linear-gradient(#d8ffe5,#2fae60)">
             <div class="pc" style="left:78px;top:14px;width:80px;height:112px;font-size:4rem;transform:rotate(-4deg);background:linear-gradient(160deg,#fff4b0,#ffc93d 55%,#e8a317);color:#7a2a00;border-color:#b57a00;box-shadow:0 6px 0 rgba(0,0,0,0.3),0 0 22px rgba(255,216,77,0.9)">7</div>
@@ -1890,6 +1905,7 @@ const SHACKLE_SHORT = {
     nomoney: { ja: 'ショップを出るとコインが0に', ja_easy: 'ショップを でると コインが 0に', en: 'Coins reset after shop' },
     nochange: { ja: 'チェンジができない', ja_easy: 'チェンジが できない', en: 'No swaps allowed' },
     oneshot: { ja: '1ステージ1プレー（チケット5枚）', ja_easy: '1ステージ 1プレー（チケット 5まい）', en: '1 play per stage (5 tickets)' },
+    fever:   { ja: 'コイン札が最初から50%', ja_easy: 'コインふだが さいしょから 50%', en: 'Coin cards 50% from the start' },
     lucky7:  { ja: '7のレベルが最初から10', ja_easy: '7の レベルが さいしょから 10', en: 'Number 7 starts at Lv 10' },
 };
 const RS_CARD_W = 244, RS_GAP = 20;
@@ -1981,7 +1997,7 @@ function startRun(sid, star){
     saveLastRun(sid, star); selSid = sid; selStar = star;
     setRoleMult(SHACKLE_BY_ID[sid].roleMult);
     const lv = {}; ROLES.forEach(r => { lv[r.id] = 1; });
-    run = { sid, star, shackle: SHACKLE_BY_ID[sid], stage: 1, playNo: 1, lv, weak: new Set(), coins: 0, special: SHACKLE_BY_ID[sid].startSpecial || 0, rareUp: 0, coinUp: 0, stageCoinBonus: 0, numLv: newNumLv(SHACKLE_BY_ID[sid]), sale: new Set(),
+    run = { sid, star, shackle: SHACKLE_BY_ID[sid], stage: 1, playNo: 1, lv, weak: new Set(), coins: 0, special: SHACKLE_BY_ID[sid].startSpecial || 0, rareUp: 0, coinUp: 0, stageCoinBonus: 0, stageHighBonus: 0, numLv: newNumLv(SHACKLE_BY_ID[sid]), sale: new Set(),
             roleBuys: 0, stageScore: 0, totalScore: 0, bestPlay: 0 };
     beginStage();
 }
@@ -2006,6 +2022,7 @@ const PLAY_THEME = {
     nomoney: { a: '#fff1e8', b: '#f3b79b', bdr: '#f3cbb6', zone: '#e8a07f', gl: ['💸', '🌙', '両'], gc: '#b0431f' },
     nochange: { a: '#eff3f8', b: '#b4c2d3', bdr: '#c8d3e0', zone: '#9fb0c4', gl: ['🔒', '⟳', '✕'], gc: '#53657b' },
     oneshot: { a: '#fff0ec', b: '#f6a999', bdr: '#f5c4ba', zone: '#ea8e7c', gl: ['①', '🎯', '1'], gc: '#c23a28' },
+    fever:   { a: '#fff9e0', b: '#ffd95c', bdr: '#f5e3a0', zone: '#f0c93a', gl: ['🪙', '＄', '🪙'], gc: '#b8860b' },
     lucky7:  { a: '#effff3', b: '#9fe5b5', bdr: '#b5ecc6', zone: '#7fd49a', gl: ['7', '🍀', '7'], gc: '#1f8f4a' },
 };
 function applyPlayTheme(sid){
@@ -2019,7 +2036,7 @@ function applyPlayTheme(sid){
 }
 function beginStage(){
     applyPlayTheme(run.sid);
-    run.playNo = 1; run.stageScore = 0; run.stageCoinBonus = 0;
+    run.playNo = 1; run.stageScore = 0; run.stageCoinBonus = 0; run.stageHighBonus = 0;
     run.weak = new Set();
     if (run.shackle.weak){
         const ids = LEVELABLE.map(r => r.id).sort(() => Math.random() - 0.5).slice(0, 3);
@@ -2052,7 +2069,7 @@ function showWeakNotice(){
 }
 function cardUp(){ return { d: run.rareUp, c: run.coinUp || 0 }; }
 function familyPct(){ return Math.round(familyRate(run.rareUp) * 1000) / 10; }
-function coinFamilyPct(){ return Math.round(familyRate(run.coinUp || 0) * 1000) / 10; }
+function coinFamilyPct(){ return Math.round(coinRate(run.shackle, run.coinUp || 0) * 1000) / 10; }
 function nextAnswer(excl){
     if (tutorialQueue && tutorialQueue.length) return { v: tutorialQueue.shift(), kind: 'normal' };
     return drawAnswer(run.shackle, excl, cardUp());
@@ -2112,7 +2129,6 @@ function renderPlay(){
         `<div class="ans-slot${p.locked[i] ? ' locked' : ''}">
         <div class="ans-card${a.kind !== 'normal' ? ' k-' + a.kind : ''}${i === p.selected ? ' selected' : ''}${(i === p.newAns || p.allNewAns || (p.newMany && p.newMany.indexOf(i) >= 0)) ? ' pop-in' : ''}${p.over ? ' used' : ''}" data-i="${i}" onclick="pickAnswer(${i})">
             ${a.kind !== 'normal' ? `<div class="rare-badge b-${a.kind}">${ui('badge_' + a.kind)}</div>` : ''}
-            ${a.c ? `<div class="rare-badge b-${a.c} cbot">${ui('badge_' + a.c)}</div>` : ''}
             <div class="num${String(a.v).length > 1 ? ' len2' : ''}">${a.v}</div>
         </div>
         ${run.shackle.noChange ? '' : `<button class="lock-btn${p.locked[i] ? ' on' : ''}" onclick="toggleLock(${i})" ${p.over ? 'disabled' : ''}>${p.locked[i] ? '🔒' : '🔓'} ${escapeHtml(ui(p.locked[i] ? 'btn_locked' : 'btn_lock'))}</button>`}
@@ -2156,7 +2172,7 @@ function updateSidePanel(){
     bar.firstElementChild.style.width = Math.min(100, run.stageScore / b * 100) + '%';
     document.getElementById('hud-total').textContent = uif('hud_total', run.totalScore);
     document.getElementById('hud-coin').textContent = run.coins;
-    document.getElementById('hud-coinnote').textContent = run.stageCoinBonus ? uif('coin_note', run.stageCoinBonus) : '';
+    document.getElementById('hud-coinnote').textContent = (run.stageCoinBonus + (run.stageHighBonus || 0)) ? uif('coin_note', run.stageCoinBonus + (run.stageHighBonus || 0)) : '';
     renderRolesLive();
     const btn = document.getElementById('btn-change');
     btn.textContent = run.shackle.noChange ? '🔒 ' + ui('btn_change_none') : ui('btn_change');
@@ -2191,10 +2207,10 @@ function choosePair(x, y){
     if (isUraCard(card.kind)){
         for (let n = 0; n < URA_OF[card.kind]; n++) p.uras.push(randNum(run.shackle));
     }
-    const cgain = (COIN_OF[card.kind] || 0) + (COIN_OF[card.c] || 0);   // コイン札系の追加コイン（ドラ札と重なっていても両方もらえる）
+    const cgain = COIN_OF[card.kind] || 0;
     if (cgain){
         run.stageCoinBonus += cgain; p.coinGain += cgain;
-        toast(uif('coin_card_toast2', cgain, card.kind === 'coin2' || card.c === 'coin2'));
+        toast(uif('coin_card_toast2', cgain, card.kind === 'coin2'));
     }
     p.picks++;
     p.selected = -1;
@@ -2240,6 +2256,8 @@ function finishPlay(){
     run.stageScore += r.total;
     run.totalScore += r.total;
     if (r.total > run.bestPlay){ run.bestPlay = r.total; run.bestRole = r.role; }
+    const highCoin = highScoreCoin(r.total);   // 高得点のコイン（そのステージをクリアしたときにもらえる）
+    run.stageHighBonus += highCoin;
     const b = borderFor(run.sid, run.star, run.stage);
     const sorted = cards.slice().sort((a, c) => a - c);
     const box = document.getElementById('play-result-box');
@@ -2269,7 +2287,8 @@ function finishPlay(){
                     <div class="rm-box b3"><div class="lb">${escapeHtml(ui('res_total'))}</div><div class="vl">${r.total}</div><div class="sb">${escapeHtml(ui('res_pts_unit'))}</div></div>
                 </div>
                 ${p.coinGain ? `<div class="rm-coinnote">${escapeHtml(uif('res_coin_card', p.coinGain))}</div>` : ''}
-                ${run.stageScore >= b ? `<div class="rm-clear">🎉 ${escapeHtml(uif('res_cleared', run.playNo, coinsFor(run.playNo) + run.stageCoinBonus))}</div>` : ''}
+                ${highCoin ? `<div class="rm-coinnote">${escapeHtml(uif('res_high_coin', highCoin))}</div>` : ''}
+                ${run.stageScore >= b ? `<div class="rm-clear">🎉 ${escapeHtml(uif('res_cleared', run.playNo, coinsFor(run.playNo) + run.stageCoinBonus + run.stageHighBonus))}</div>` : ''}
                 ${failNow ? `<div class="rm-fail">💥 ${escapeHtml(ui('res_fail'))}</div>` : ''}
                 <div class="rm-stage"><span>${escapeHtml(uif('res_stage', run.stageScore, b))}</span><div class="bar${run.stageScore >= b ? ' ok' : ''}"><i style="width:${Math.min(100, run.stageScore / b * 100)}%"></i></div></div>
                 <div class="rm-foot"><button class="btn btn-primary btn-sm" id="btn-res-next" onclick="afterPlayResult()">${failNow ? ui('btn_game_over') : (run.stageScore >= b ? ui('btn_stage_clear') : (run.playNo < playsPer() ? ui('btn_next_play') : ui('btn_stage_result')))}</button></div>
@@ -2331,7 +2350,7 @@ function pickSale(){
     // ストックチケット(4→2コイン)・ドラ札アップ(8→4コイン)・コイン札アップ(4→2コイン)は、それぞれ1/8の確率でセール
     if (!run.shackle.noChange && Math.random() < SALE_ITEM_RATE) keys.push('special');
     if (!rareLocked(run.shackle) && Math.random() < SALE_ITEM_RATE) keys.push('rare');
-    if (Math.random() < SALE_ITEM_RATE) keys.push('coin');
+    if (!coinLocked(run.shackle) && Math.random() < SALE_ITEM_RATE) keys.push('coin');
     return keys;
 }
 const SALE_ITEM_RATE = 1 / 8;
@@ -2348,8 +2367,9 @@ function openShopAfterClear(){
     const b = borderFor(run.sid, run.star, run.stage);
     const bonus = COIN_CLEAR_BONUS[run.playNo - 1] || 0;   // 何プレー目でクリアしたかのボーナス
     const cardBonus = run.stageCoinBonus;                   // コイン札で増えた分
+    const highBonus = run.stageHighBonus || 0;              // 高得点で増えた分
     const coinMult = run.shackle.coinMult || 1;               // 大金持ちだぁ！：もらえるコインが5倍
-    const coin = (COIN_BASE + bonus + cardBonus) * coinMult;
+    const coin = (COIN_BASE + bonus + cardBonus + highBonus) * coinMult;
     run.coins += coin;
     // 役Lvアップ（ランダム1つ）
     const openRoles = LEVELABLE.filter(r => !roleLocked(run.shackle, r.id));
@@ -2363,7 +2383,7 @@ function openShopAfterClear(){
     const numUps = Array.from(new Set(picks)).sort((x, y) => x - y).map(n => ({ n, from: before[n], to: run.numLv[n] }));
     // ショップの割引抽選
     run.sale = new Set(pickSale());
-    run.shopInfo = { coin, coinMult, bonus, playNo: run.playNo, cardBonus, roleId, oldLv, newLv: run.lv[roleId], numUps, score: run.stageScore, border: b };
+    run.shopInfo = { coin, coinMult, bonus, playNo: run.playNo, cardBonus, highBonus, roleId, oldLv, newLv: run.lv[roleId], numUps, score: run.stageScore, border: b };
     run.weak = new Set();   // 弱体化はステージごとの抽選。次のステージの開始時にあらためて決まる
     shopFlash = 'role-' + roleId;
     showClearPopup();
@@ -2378,6 +2398,7 @@ function showClearPopup(){
     const list = [`<li><span>${escapeHtml(ui('cp_it_base'))}</span><b>${COIN_BASE}</b></li>`];
     if (i.bonus) list.push(`<li><span>${escapeHtml(uif('cp_it_play', i.playNo))}</span><b>+${i.bonus}</b></li>`);
     if (i.cardBonus) list.push(`<li><span>${escapeHtml(ui('cp_it_card'))}</span><b>+${i.cardBonus}</b></li>`);
+    if (i.highBonus) list.push(`<li><span>${escapeHtml(ui('cp_it_high'))}</span><b>+${i.highBonus}</b></li>`);
     if (i.coinMult > 1) list.push(`<li class="mult"><span>${escapeHtml(ui('cp_it_mult'))}</span><b>×${i.coinMult}</b></li>`);
     box.innerHTML = `
         <div class="cp-head"><div class="cp-title">${escapeHtml(uif('cp_title', run.stage))}</div><div class="cp-badge">${escapeHtml(uif('cp_badge', i.playNo))}</div></div>
@@ -2441,10 +2462,10 @@ function renderShop(){
             <div class="own">${escapeHtml(rareLocked(run.shackle) ? ui('item_locked') : uif('item_rare_own', rareNow))}</div></div>
             <button class="lvbtn${run.sale.has('rare') ? ' sale' : ''}" ${run.coins < raPrice || run.rareUp >= RARE_UP_MAX || rareLocked(run.shackle) ? 'disabled' : ''} onclick="buyRare()">${rareLocked(run.shackle) ? '🔒' : (run.rareUp >= RARE_UP_MAX ? escapeHtml(ui('item_maxed')) : priceHtml('rare', RARE_UP_COST))}</button>
         </div>
-        <div class="item-card${shopFlash === 'coin' ? ' flash' : ''}" style="--ic:#2fae60; --ib:#e4f8ec">
+        <div class="item-card${shopFlash === 'coin' ? ' flash' : ''}${coinLocked(run.shackle) ? ' locked' : ''}" style="--ic:#2fae60; --ib:#e4f8ec">
             <div class="ic"><div class="gcard coinc">コイン</div></div><div class="im"><div class="tt">${escapeHtml(ui('item_coin'))}</div>
-            <div class="own">${escapeHtml(uif('item_rare_own', coinNow))}</div></div>
-            <button class="lvbtn${run.sale.has('coin') ? ' sale' : ''}" ${run.coins < coPrice || (run.coinUp || 0) >= COIN_UP_MAX ? 'disabled' : ''} onclick="buyCoinUp()">${(run.coinUp || 0) >= COIN_UP_MAX ? escapeHtml(ui('item_maxed')) : priceHtml('coin', COIN_UP_COST)}</button>
+            <div class="own">${escapeHtml(coinLocked(run.shackle) ? ui('item_locked') : uif('item_rare_own', coinNow))}</div></div>
+            <button class="lvbtn${run.sale.has('coin') ? ' sale' : ''}" ${run.coins < coPrice || (run.coinUp || 0) >= COIN_UP_MAX || coinLocked(run.shackle) ? 'disabled' : ''} onclick="buyCoinUp()">${coinLocked(run.shackle) ? '🔒' : ((run.coinUp || 0) >= COIN_UP_MAX ? escapeHtml(ui('item_maxed')) : priceHtml('coin', COIN_UP_COST))}</button>
         </div>`;
     document.getElementById('btn-next-stage').textContent = uif('btn_next_stage', run.stage + 1);
     shopFlash = '';
@@ -2479,7 +2500,7 @@ function buyRare(){
 }
 function buyCoinUp(){
     const cost = priceOf('coin', COIN_UP_COST);
-    if (run.coins < cost || (run.coinUp || 0) >= COIN_UP_MAX) return;
+    if (run.coins < cost || (run.coinUp || 0) >= COIN_UP_MAX || coinLocked(run.shackle)) return;
     run.coins -= cost; run.coinUp = (run.coinUp || 0) + 1;
     shopFlash = 'coin';
     renderShop();
