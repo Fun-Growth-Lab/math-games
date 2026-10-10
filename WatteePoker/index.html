@@ -434,6 +434,19 @@
         .rare-badge { position: absolute; top: -17px; left: 50%; transform: translateX(-50%); background: linear-gradient(to bottom,#e8503d,#b8301f); color: #fff; font-size: 1.1rem; font-weight: 900; padding: 4px 16px; border-radius: 50px; border: 3px solid #fff; white-space: nowrap; box-shadow: 0 3px 0 #7a1f12; }
         .rare-badge.b-dora2 { background: linear-gradient(to bottom,#9156e8,#5a2db0); box-shadow: 0 3px 0 #3b1a78; }
         .rare-badge.b-coin { background: linear-gradient(to bottom,#2fbf72,#188a4c); box-shadow: 0 3px 0 #0f5f33; }
+        .rare-badge.cbot { top: auto; bottom: 8px; font-size: 0.95rem; padding: 2px 10px; }
+        .gcard.coinc { font-size: 1.6rem; background: linear-gradient(160deg,#eafff2,#8ce6b0 55%,#3fbf7a); border-color: #1f9a5a; color: #0f4a2a; box-shadow: 0 4px 0 rgba(0,0,0,0.25), 0 0 14px rgba(60,200,120,0.7); }
+        /* ショップのどうぐ(3つ)：絵と名前を横に、ボタンを下に */
+        #shop-items .item-card { display: grid; grid-template-columns: 74px 1fr; grid-template-rows: 1fr auto; gap: 2px 8px; padding: 8px 10px 10px; text-align: left; align-items: center; justify-content: stretch; }
+        #shop-items .item-card .ic { grid-row: 1; grid-column: 1; display: flex; align-items: center; justify-content: center; }
+        #shop-items .item-card .im { grid-row: 1; grid-column: 2; }
+        #shop-items .item-card .lvbtn { grid-row: 2; grid-column: 1 / span 2; padding: 6px 10px; font-size: 1.3rem; }
+        #shop-items .item-card .tt { font-size: 1.15rem; }
+        #shop-items .item-card .own { font-size: 0.95rem; }
+        #shop-items .tk2.mini { width: 70px; height: 46px; }
+        #shop-items .gcard { width: 44px; height: 56px; font-size: 1rem; }
+        #shop-items .gcard.coinc { font-size: 0.8rem; }
+        #shop-items .tk2.mini .tw { font-size: 0.85rem; letter-spacing: 0; }
         .rare-badge.b-coin2 { background: linear-gradient(to bottom,#e8b822,#2a9a5a 80%); box-shadow: 0 3px 0 #0b5e30; }
         .ans-card.selected { transform: scale(1.02); border-color: var(--accent); box-shadow: 0 0 0 5px rgba(255,122,69,0.75), 0 7px 0 #d9a77c; }
         .ans-card.pop-in { animation: popIn 0.3s ease; }
@@ -850,6 +863,7 @@
         <div class="rs-top">
             <button class="rs-mini" data-i18n="btn_back_title" onclick="goToTitle()">◀ タイトルへ戻る</button>
             <div class="rs-plaque" data-i18n="runselect_title">RUNをえらぼう</div>
+            <button class="rs-mini blue" data-i18n="btn_ranking" onclick="openRanking('run-select-screen', selSid)">🏆 ランキング</button>
         </div>
         <div id="ds-master-badge" class="ds-master-badge hidden" data-i18n="master_badge">👑 すべて金メダル達成！</div>
         <div class="rs-stage">
@@ -1095,8 +1109,12 @@ const STARS = 3;            // 難易度 ★1〜★3（やさしい／ふつう�
 const PLAYS_PER_STAGE = 3;
 const HAND_SIZE = 5;
 // 特別な九九カード。出現率は ドラ札4% / ドラドラ札1% / コイン札4% / ダブルコイン札1%（コイン札系は合計5%で、その2割がダブル。残りは普通のカード）。
-// 「ドラ札アップ」を1回買うごとに、ドラ札・ドラドラ札の出現率が元の+50%ずつ増える（RARE_UP_STEP。合計で+2.5%ずつ、最大6回）
-const RARE_UP_STEP = 0.5;                  // 「ドラ札アップ」1回ごとに、ドラ札・ドラドラ札の出現率が元の+50%ずつ増える（合計+2.5%ずつ）
+// 「ドラ札アップ」を買うごとに、ドラ札系の出現率が+5%ずつ（最大50%）。「コイン札アップ」も同じ。ドラ札系とコイン札系は別々に（同時に）抽選するので、おたがい邪魔しない
+const RARE_UP_STEP = 0.5;                  // （旧仕様の名残。計算には使わない）
+const UP_STEP = 0.05;                      // 「ドラ札アップ」「コイン札アップ」1回ごとに、その系統の出現率の合計が+5%
+const FAMILY_BASE = 0.05, FAMILY_MAX = 0.5;   // 各系統の合計は5%から、最大50%まで
+const DOUBLE_SHARE = 0.2;                  // ドラドラ札はドラ札系の2割、ダブルコイン札はコイン札系の2割
+function familyRate(ups){ return Math.min(FAMILY_MAX, FAMILY_BASE + UP_STEP * (ups || 0)); }
 const CARD_RATE = { dora: 0.04, dora2: 0.01, coin: 0.04, coin2: 0.01 };
 const URA_OF = { dora: 1, dora2: 2 };      // 割ったときに増えるうらドラの枚数（ドラ札=1枚、ドラドラ札=2枚）
 const COIN_CARD_BONUS = 2;                 // コイン札を割ると、そのステージのクリア報酬が+2コイン
@@ -1231,20 +1249,22 @@ function drawAnswer(shackle, excludeValues, up, rnd){
     let pool = PRODUCTS.filter(p => shackle.filter(p) && excludeValues.indexOf(p) < 0);
     if (pool.length === 0) pool = PRODUCTS.filter(p => shackle.filter(p));
     const v = pool[Math.floor(rnd() * pool.length)];
-    let kind = 'normal';
+    let kind = 'normal', c = null;
+    let ud = 0, uc = 0;
+    if (up && typeof up === 'object'){ ud = up.d || 0; uc = up.c || 0; } else ud = up || 0;
+    const r1 = rnd(), r2 = rnd();
+    // ドラ札系
     if (shackle.rates){
-        const r = rnd(), R = shackle.rates;
-        if (r < R.dora) kind = 'dora';
-        else if (r < R.dora + R.dora2) kind = 'dora2';
-        else if (r < R.dora + R.dora2 + (R.coin || 0)) kind = 'coin';
-        else if (r < R.dora + R.dora2 + (R.coin || 0) + (R.coin2 || 0)) kind = 'coin2';
+        const R = shackle.rates;
+        if (r1 < R.dora) kind = 'dora'; else if (r1 < R.dora + R.dora2) kind = 'dora2';
     } else {
-        const r = rnd(), k = 1 + RARE_UP_STEP * (up || 0), d = CARD_RATE.dora * k, d2 = CARD_RATE.dora2 * k;
-        if (r < d) kind = 'dora';
-        else if (r < d + d2) kind = 'dora2';
-        else if (r < d + d2 + CARD_RATE.coin) kind = 'coin';
-        else if (r < d + d2 + CARD_RATE.coin + CARD_RATE.coin2) kind = 'coin2';
+        const fd = familyRate(ud);
+        if (r1 < fd * (1 - DOUBLE_SHARE)) kind = 'dora'; else if (r1 < fd) kind = 'dora2';
     }
+    // コイン札系（ドラ札系とは別の抽選）
+    const fc = familyRate(uc);
+    if (r2 < fc * (1 - DOUBLE_SHARE)) c = 'coin'; else if (r2 < fc) c = 'coin2';
+    if (c){ if (kind === 'normal') kind = c; else return { v, kind, c }; }
     return { v, kind };
 }
 function drawAnswerSet(shackle, up, rnd){
@@ -1508,8 +1528,9 @@ const UI_TEXT = {
     item_special: { ja: 'ストックチケット', ja_easy: 'ストックチケット', en: 'Stock Ticket' },
     item_special_d: { ja: 'いれかえチケットを1枚ためておける', ja_easy: 'いれかえチケットを 1まい ためておける', en: 'Keep one more swap ticket' },
     item_special_own: { ja: n => `もっている：${n}枚`, ja_easy: n => `もっている：${n}まい`, en: n => `Owned: ${n}` },
+    item_coin: { ja: 'コイン札アップ', ja_easy: 'コインふだアップ', en: 'Coin Card Up' },
     item_rare: { ja: 'ドラ札アップ', ja_easy: 'ドラふだアップ', en: 'Dora Card Up' },
-    item_rare_d: { ja: n => `ドラ札・ドラドラ札が出やすくなる（+2.5%）`, ja_easy: n => `ドラふだ・ドラドラふだが でやすくなる（+2.5%）`, en: n => `Dora / Dora×2 cards appear more (+2.5%)` },
+    item_rare_d: { ja: n => `ドラ札・ドラドラ札が出やすくなる（+5%）`, ja_easy: n => `ドラふだ・ドラドラふだが でやすくなる（+5%）`, en: n => `Dora / Dora×2 cards appear more (+5%)` },
     item_rare_own: { ja: n => `いまの確率：${n}%`, ja_easy: n => `いまの かくりつ：${n}%`, en: n => `Now: ${n}%` },
     item_maxed: { ja: 'MAX', en: 'MAX' },
     btn_buy: { ja: c => `🪙${c}`, en: c => `🪙${c}` },
@@ -1960,7 +1981,7 @@ function startRun(sid, star){
     saveLastRun(sid, star); selSid = sid; selStar = star;
     setRoleMult(SHACKLE_BY_ID[sid].roleMult);
     const lv = {}; ROLES.forEach(r => { lv[r.id] = 1; });
-    run = { sid, star, shackle: SHACKLE_BY_ID[sid], stage: 1, playNo: 1, lv, weak: new Set(), coins: 0, special: SHACKLE_BY_ID[sid].startSpecial || 0, rareUp: 0, stageCoinBonus: 0, numLv: newNumLv(SHACKLE_BY_ID[sid]), sale: new Set(),
+    run = { sid, star, shackle: SHACKLE_BY_ID[sid], stage: 1, playNo: 1, lv, weak: new Set(), coins: 0, special: SHACKLE_BY_ID[sid].startSpecial || 0, rareUp: 0, coinUp: 0, stageCoinBonus: 0, numLv: newNumLv(SHACKLE_BY_ID[sid]), sale: new Set(),
             roleBuys: 0, stageScore: 0, totalScore: 0, bestPlay: 0 };
     beginStage();
 }
@@ -2029,8 +2050,9 @@ function showWeakNotice(){
         <button class="btn btn-primary btn-sm" onclick="document.getElementById('weak-modal').classList.add('hidden')">${escapeHtml(ui('btn_ok'))}</button>`;
     document.getElementById('weak-modal').classList.remove('hidden');
 }
-function cardUp(){ return run.rareUp; }
-function familyPct(){ return Math.round((CARD_RATE.dora + CARD_RATE.dora2) * (1 + RARE_UP_STEP * run.rareUp) * 1000) / 10; }
+function cardUp(){ return { d: run.rareUp, c: run.coinUp || 0 }; }
+function familyPct(){ return Math.round(familyRate(run.rareUp) * 1000) / 10; }
+function coinFamilyPct(){ return Math.round(familyRate(run.coinUp || 0) * 1000) / 10; }
 function nextAnswer(excl){
     if (tutorialQueue && tutorialQueue.length) return { v: tutorialQueue.shift(), kind: 'normal' };
     return drawAnswer(run.shackle, excl, cardUp());
@@ -2090,6 +2112,7 @@ function renderPlay(){
         `<div class="ans-slot${p.locked[i] ? ' locked' : ''}">
         <div class="ans-card${a.kind !== 'normal' ? ' k-' + a.kind : ''}${i === p.selected ? ' selected' : ''}${(i === p.newAns || p.allNewAns || (p.newMany && p.newMany.indexOf(i) >= 0)) ? ' pop-in' : ''}${p.over ? ' used' : ''}" data-i="${i}" onclick="pickAnswer(${i})">
             ${a.kind !== 'normal' ? `<div class="rare-badge b-${a.kind}">${ui('badge_' + a.kind)}</div>` : ''}
+            ${a.c ? `<div class="rare-badge b-${a.c} cbot">${ui('badge_' + a.c)}</div>` : ''}
             <div class="num${String(a.v).length > 1 ? ' len2' : ''}">${a.v}</div>
         </div>
         ${run.shackle.noChange ? '' : `<button class="lock-btn${p.locked[i] ? ' on' : ''}" onclick="toggleLock(${i})" ${p.over ? 'disabled' : ''}>${p.locked[i] ? '🔒' : '🔓'} ${escapeHtml(ui(p.locked[i] ? 'btn_locked' : 'btn_lock'))}</button>`}
@@ -2167,9 +2190,11 @@ function choosePair(x, y){
     p.newFlags = items.map(it => it.n);
     if (isUraCard(card.kind)){
         for (let n = 0; n < URA_OF[card.kind]; n++) p.uras.push(randNum(run.shackle));
-    } else if (COIN_OF[card.kind]){
-        run.stageCoinBonus += COIN_OF[card.kind]; p.coinGain += COIN_OF[card.kind];
-        toast(uif('coin_card_toast2', COIN_OF[card.kind], card.kind === 'coin2'));
+    }
+    const cgain = (COIN_OF[card.kind] || 0) + (COIN_OF[card.c] || 0);   // コイン札系の追加コイン（ドラ札と重なっていても両方もらえる）
+    if (cgain){
+        run.stageCoinBonus += cgain; p.coinGain += cgain;
+        toast(uif('coin_card_toast2', cgain, card.kind === 'coin2' || card.c === 'coin2'));
     }
     p.picks++;
     p.selected = -1;
@@ -2296,16 +2321,17 @@ function afterPlayResult(){
 // ステージクリア → ポップアップ（コインと役Lvアップ）→ ショップ
 // ============================================================
 const ROLE_LV_COST_BASE = 6, ROLE_LV_COST_STEP = 0;   // 役Lvの値段は一定（買うたびには上がらない）
-const SPECIAL_COST = 3, RARE_UP_COST = 10, RARE_UP_MAX = 6, SPECIAL_MAX = 9;
+const SPECIAL_COST = 4, RARE_UP_COST = 8, RARE_UP_MAX = 9, COIN_UP_COST = 4, COIN_UP_MAX = 9, SPECIAL_MAX = 9;
 const SALE_ROLES = 2, SALE_NUMS = 2;   // ショップに入るたびに、役2つ・数字2つがランダムで半額（端数は切り上げ）。個数制限なし
 function roleLvCost(){ return ROLE_LV_COST_BASE + ROLE_LV_COST_STEP * run.roleBuys; }
 function priceOf(key, base){ return run.sale.has(key) ? Math.max(1, Math.ceil(base / 2)) : base; }
 function pickSale(){
     const pick = (arr, n) => arr.slice().sort(() => Math.random() - 0.5).slice(0, n);
     const keys = pick(LEVELABLE.filter(r => !roleLocked(run.shackle, r.id)).map(r => 'role-' + r.id), SALE_ROLES).concat(pick(shackleNums(run.shackle).map(n => 'num-' + n), SALE_NUMS));
-    // ストックチケット(3→2コイン)とドラ札アップ(10→5コイン)は、それぞれ1/8の確率でセール
+    // ストックチケット(4→2コイン)・ドラ札アップ(8→4コイン)・コイン札アップ(4→2コイン)は、それぞれ1/8の確率でセール
     if (!run.shackle.noChange && Math.random() < SALE_ITEM_RATE) keys.push('special');
     if (!rareLocked(run.shackle) && Math.random() < SALE_ITEM_RATE) keys.push('rare');
+    if (Math.random() < SALE_ITEM_RATE) keys.push('coin');
     return keys;
 }
 const SALE_ITEM_RATE = 1 / 8;
@@ -2402,7 +2428,8 @@ function renderShop(){
         </div>`;
     }).join('');
     const rareNow = familyPct();
-    const spPrice = priceOf('special', SPECIAL_COST), raPrice = priceOf('rare', RARE_UP_COST);
+    const spPrice = priceOf('special', SPECIAL_COST), raPrice = priceOf('rare', RARE_UP_COST), coPrice = priceOf('coin', COIN_UP_COST);
+    const coinNow = coinFamilyPct();
     document.getElementById('shop-items').innerHTML = `
         <div class="item-card${shopFlash === 'special' ? ' flash' : ''}${run.shackle.noChange ? ' locked' : ''}" style="--ic:#e8a317; --ib:#fff4d4">
             <div class="ic"><div class="tk2 stock mini"><span class="tw">${escapeHtml(ui('tk_stock'))}</span></div></div><div class="im"><div class="tt">${escapeHtml(ui('item_special'))}</div>
@@ -2413,6 +2440,11 @@ function renderShop(){
             <div class="ic"><div class="gcard">ドラ</div></div><div class="im"><div class="tt">${escapeHtml(ui('item_rare'))}</div>
             <div class="own">${escapeHtml(rareLocked(run.shackle) ? ui('item_locked') : uif('item_rare_own', rareNow))}</div></div>
             <button class="lvbtn${run.sale.has('rare') ? ' sale' : ''}" ${run.coins < raPrice || run.rareUp >= RARE_UP_MAX || rareLocked(run.shackle) ? 'disabled' : ''} onclick="buyRare()">${rareLocked(run.shackle) ? '🔒' : (run.rareUp >= RARE_UP_MAX ? escapeHtml(ui('item_maxed')) : priceHtml('rare', RARE_UP_COST))}</button>
+        </div>
+        <div class="item-card${shopFlash === 'coin' ? ' flash' : ''}" style="--ic:#2fae60; --ib:#e4f8ec">
+            <div class="ic"><div class="gcard coinc">コイン</div></div><div class="im"><div class="tt">${escapeHtml(ui('item_coin'))}</div>
+            <div class="own">${escapeHtml(uif('item_rare_own', coinNow))}</div></div>
+            <button class="lvbtn${run.sale.has('coin') ? ' sale' : ''}" ${run.coins < coPrice || (run.coinUp || 0) >= COIN_UP_MAX ? 'disabled' : ''} onclick="buyCoinUp()">${(run.coinUp || 0) >= COIN_UP_MAX ? escapeHtml(ui('item_maxed')) : priceHtml('coin', COIN_UP_COST)}</button>
         </div>`;
     document.getElementById('btn-next-stage').textContent = uif('btn_next_stage', run.stage + 1);
     shopFlash = '';
@@ -2443,6 +2475,13 @@ function buyRare(){
     if (run.coins < cost || run.rareUp >= RARE_UP_MAX || rareLocked(run.shackle)) return;
     run.coins -= cost; run.rareUp++;
     shopFlash = 'rare';
+    renderShop();
+}
+function buyCoinUp(){
+    const cost = priceOf('coin', COIN_UP_COST);
+    if (run.coins < cost || (run.coinUp || 0) >= COIN_UP_MAX) return;
+    run.coins -= cost; run.coinUp = (run.coinUp || 0) + 1;
+    shopFlash = 'coin';
     renderShop();
 }
 function goNextStage(){
@@ -2602,6 +2641,7 @@ function renderEnd(cleared, o){
         <div class="end-journey">${journey}</div>
         <div class="end-msg" id="end-world-submit-msg"></div>
         <div class="end-btns">
+            <button class="btn" onclick="closeEndToRanking()">${escapeHtml(ui('btn_ranking'))}</button>
             <button class="btn" onclick="closeEndToSelect()">${escapeHtml(ui('btn_back_runselect'))}</button>
             <button class="btn btn-primary" onclick="closeEndAndRetry()">${escapeHtml(ui('btn_retry'))}</button>
         </div>`;
@@ -2639,6 +2679,12 @@ function closeEndToSelect(){
     run = null; playSt = null;
     goToRunSelect();
 }
+function closeEndToRanking(){
+    document.getElementById('end-modal').classList.add('hidden');
+    const e = lastEnd;
+    run = null; playSt = null;
+    openRanking('run-select-screen', e && e.sid, e && e.star);
+}
 function closeEndAndRetry(){
     document.getElementById('end-modal').classList.add('hidden');
     const sid = run.sid, star = run.star;
@@ -2650,12 +2696,15 @@ function closeEndAndRetry(){
 // ============================================================
 let rankTab = 'world', rankSid = 'normal', rankStar = 0, rankKind = 'score';   // rankStar: 0=すべての★
 const RK_W = 150, RK_GAP = 14, RK_PAD = 18;
-function openRanking(){
+function openRanking(from, sid, star){
+    rankFrom = from || 'title-screen';
+    if (sid && SHACKLE_BY_ID[sid]){ rankSid = sid; rankStar = star || 0; }
     goTo('ranking-screen');
     renderRankScreen();
     loadAndRenderRanking();
 }
-function closeRanking(){ goTo('title-screen'); }
+let rankFrom = 'title-screen';   // どこから開いたか（もどるボタンの行き先）
+function closeRanking(){ if (rankFrom === 'run-select-screen') goToRunSelect(); else goTo('title-screen'); }
 // 上のRUNカードの帯 + 3つの切りかえ(記録の種類 / ★ / ワールド・ローカル)
 function renderRankScreen(){
     document.getElementById('rk-strip').innerHTML = SHACKLES.map(sh => `
@@ -2719,7 +2768,7 @@ function renderRankHead(){
     document.getElementById('rk-panel').classList.toggle('rk-hand', isHand);
     const col = (k, cls) => `<span class="${cls || ''}">${escapeHtml(ui(k))}</span>`;
     document.getElementById('rk-head').innerHTML = col('rk_col_rank') + col('rk_col_name') + col('rk_col_star', 'c')
-        + (isHand ? col('rk_col_role', 'c') : col('rk_col_result', 'c')) + (isHand ? col('rk_col_score', 'r') : `<span class="r">${escapeHtml(uif('rk_col_score_b', CLEAR_BONUS))}</span>`) + (isHand ? '' : col('rk_col_stage', 'r')) + col('rk_col_date', 'r');
+        + (isHand ? col('rk_col_role', 'c') : col('rk_col_result', 'c')) + col('rk_col_score', 'r') + (isHand ? '' : col('rk_col_stage', 'r')) + col('rk_col_date', 'r');
 }
 function renderRankList(rows){
     const list = document.getElementById('rank-list');
