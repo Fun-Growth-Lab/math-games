@@ -10,7 +10,7 @@ function stageCountFor(star) { return GAME.stageCountFor ? GAME.stageCountFor(st
 const STAR_LOCK = false;      // true にすると、★は1つ前をクリアすると開く。今は ★を自由に選べる
 
 // ステージごとの世界。bgf=通常戦の背景に重ねるフィルター(haikei_1を色変え)、bossf=ボス戦(haikei_2を色変え)
-const STAGE_THEMES = GAME.stageThemes || [
+const STAGE_THEMES_ALL = [
     { c: '#4caf50', bgf: 'none',                                                              bossf: 'none' },
     { c: '#26a9e0', bgf: 'hue-rotate(-10deg) saturate(1.05) brightness(1.08)',                bossf: 'hue-rotate(-70deg) saturate(1.1)' },
     { c: '#ff8a50', bgf: 'sepia(0.5) saturate(1.8) hue-rotate(-18deg) brightness(0.92)',      bossf: 'hue-rotate(40deg) saturate(1.2)' },
@@ -19,7 +19,9 @@ const STAGE_THEMES = GAME.stageThemes || [
     { c: '#7e8bff', bgf: 'brightness(1.2) saturate(0.85) hue-rotate(-8deg) contrast(0.95)',   bossf: 'hue-rotate(60deg) saturate(1.3) brightness(1.05)' },
     { c: '#8e24aa', img: 'haikei_2.png', bgf: 'brightness(0.95) saturate(1.1)',               bossf: 'brightness(0.8) saturate(1.35) contrast(1.1)' },
 ];
-function stageName(n) { return T('stage_name_' + n); }
+// GAME.stagePick = [1, 4, 7] のように、元の7つの世界のうち どれを使うか(ステージ数を減らしたゲーム用)。名前と色が その世界のものになる
+const STAGE_THEMES = GAME.stageThemes || (GAME.stagePick ? GAME.stagePick.map(k => STAGE_THEMES_ALL[k - 1]) : STAGE_THEMES_ALL);
+function stageName(n) { return T('stage_name_' + (GAME.stagePick ? GAME.stagePick[n - 1] : n)); }
 
 // ---- タイトルの ゲーム名(大きく)。文字数に合わせて大きさを決める ----
 function buildTitleName() {
