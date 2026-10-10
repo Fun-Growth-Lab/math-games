@@ -92,6 +92,8 @@ try { selStar = Math.max(1, Math.min(3, parseInt(localStorage.getItem(LAST_STAR_
 function starKey(n) { return 'STAR' + n; }
 function starCleared(n) { return getClearCount(starKey(n)) > 0; }
 function starUnlocked(n) { return !STAR_LOCK || n === 1 || starCleared(n - 1); }
+function maxClearedStar() { let m = 0; for (let n = 1; n <= 3; n++) if (starCleared(n)) m = n; return m; }     // クリアした いちばん高い★(0=まだ)
+const CROWN_SVG = '<svg viewBox="0 0 64 50" aria-hidden="true"><path d="M6 40 L9 13 L23 27 L32 7 L41 27 L55 13 L58 40 Z" fill="var(--c1)" stroke="var(--c3)" stroke-width="3" stroke-linejoin="round"/><rect x="6" y="39" width="52" height="9" rx="3" fill="var(--c2)" stroke="var(--c3)" stroke-width="3"/><circle cx="9" cy="12" r="4.5" fill="var(--c4)" stroke="var(--c3)" stroke-width="2"/><circle cx="32" cy="6" r="4.5" fill="var(--c4)" stroke="var(--c3)" stroke-width="2"/><circle cx="55" cy="12" r="4.5" fill="var(--c4)" stroke="var(--c3)" stroke-width="2"/><path d="M13 24 L15 18" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity="0.7"/></svg>';
 function bestScore(n) { const l = getLocalRanking(starKey(n)); return l.length ? l[0].score : 0; }
 function runSelectVisible() { return !document.getElementById('run-select-screen').classList.contains('hidden'); }
 
@@ -134,12 +136,14 @@ function renderRunSelect() {
     if (!starUnlocked(selStar)) selStar = 1;
     const cur = RUN_LIST[runSelIdx];
     document.getElementById('rs-strip').innerHTML = RUN_LIST.map((r, i) => {
-        const medals = r.locked ? '' : [1, 2, 3].map(n => starCleared(n) ? '★' : '☆').join('');
+        // クリアした いちばん高い難易度を、RUNカードの王冠(銅・銀・金)で見せる
+        const mc = r.locked ? 0 : maxClearedStar();
         return `<div class="rs-card${i === runSelIdx ? ' sel' : ''}${r.locked ? ' locked' : ''}" style="--c:${r.color}" data-idx="${i}">
             <div class="rs-tab">${T('run_' + r.id + '_name')}</div>
+            ${mc ? `<div class="rs-medal m${mc}">${CROWN_SVG}</div>` : ''}
             ${runArt(r.id)}
-            <div class="rs-body"><div class="rs-short">${T('run_' + r.id + '_short')}</div><div class="rs-medals">${medals}</div></div>
-            ${r.locked ? '' : `<button class="rs-go" data-go="1">${T('btn_run_go')}</button>`}
+            <div class="rs-body"><div class="rs-short">${T('run_' + r.id + '_short')}</div></div>
+            ${r.locked ? '' : `<button class="rs-go has-st" data-go="1"><span class="go-st">${'★'.repeat(selStar)}</span><span>${T('btn_run_go')}</span></button>`}
         </div>`;
     }).join('');
     document.querySelectorAll('#rs-strip .rs-card').forEach(el => {
@@ -155,7 +159,7 @@ function renderRunSelect() {
         (best && !cur.locked ? `　<span class="ds-best">${T('best_label', { n: best })}</span>` : '');
     document.getElementById('star-row').innerHTML = [1, 2, 3].map(n => {
         const locked = !starUnlocked(n);
-        return `<button class="star-btn${n === selStar ? ' active' : ''}${locked ? ' locked' : ''}${starCleared(n) ? ' cleared' : ''}" data-star="${n}">${'★'.repeat(n)}<small>${locked ? `<span class="ico" style="width:.85em;height:.85em;vertical-align:-.1em">${ICO.lock}</span> ` : ''}${T(['diff_easy', 'diff_normal', 'diff_hard'][n - 1])}</small></button>`;
+        return `<button class="star-btn${n === selStar ? ' active' : ''}${locked ? ' locked' : ''}${starCleared(n) ? ' cleared' : ''}" data-star="${n}">${n === selStar ? `<em class="pick">▶ ${T('rs_picked')}</em>` : ''}${'★'.repeat(n)}<small>${locked ? `<span class="ico" style="width:.85em;height:.85em;vertical-align:-.1em">${ICO.lock}</span> ` : (starCleared(n) ? '✔ ' : '')}${T(['diff_easy', 'diff_normal', 'diff_hard'][n - 1])}</small></button>`;
     }).join('');
     document.querySelectorAll('#star-row .star-btn').forEach(el => {
         bindBtn(el, () => {
@@ -166,8 +170,10 @@ function renderRunSelect() {
             renderRunSelect();
         });
     });
-    document.getElementById('chip-row').innerHTML = STAGE_THEMES.slice(0, stageCountFor(selStar)).map((th, i) =>
-        `<div class="stage-chip" style="border-color:${th.c}"><small>${T('stage_word')}</small><b>${i + 1}</b></div>`).join('');
+    // ひらいているRUNを、すべて★3でクリアしたら、まん中の上に バッジを出す
+    const mb = document.getElementById('ds-master-badge');
+    mb.innerHTML = `<span class="rs-medal m3 mini">${CROWN_SVG}</span>${T('master_badge')}`;
+    mb.classList.toggle('hidden', !(RUN_LIST.some(r => !r.locked) && starCleared(3)));
     document.getElementById('rs-prev').disabled = runSelIdx <= 0;
     document.getElementById('rs-next').disabled = runSelIdx >= RUN_LIST.length - 1;
 }
@@ -217,13 +223,24 @@ bindBtn(document.getElementById('sc-go'), () => {
     startStage(state.stage + 1);
 });
 
-// ---- RUNの結果の画面(クリア／ゲームオーバー共通)----
-function showRunEnd(cleared, finalScore, isNewRecord, timeBonus, maxScoreBonus) {
+// ---- RUNの結果の画面(クリア／ゲームオーバー共通)。九九ポーカーと同じ作り: 星・バッジ・2枚のスコア札・ステージの道のり・ボタン ----
+function endCountUp(el, to, ms, delay) {
+    if (!el) return;
+    const t0 = performance.now() + (delay || 0);
+    const tick = (now) => {
+        const k = Math.min(1, Math.max(0, (now - t0) / ms));
+        el.textContent = Math.round(to * (1 - Math.pow(1 - k, 3)));
+        if (k < 1) requestAnimationFrame(tick);
+    };
+    el.textContent = 0;
+    requestAnimationFrame(tick);
+}
+function showRunEnd(cleared, finalScore, isNewRecord, timeBonus, maxScoreBonus, clearBonus) {
     const el = document.getElementById('run-end-screen');
     const pts = T('unit_pts');
     const title = cleared ? T('end_clear_title') : T('gameover_title');
     const ribbon = Array.from(title).map((ch, i) => `<span style="--i:${i}">${ch}</span>`).join('');
-    const reached = cleared ? STAGE_COUNT : state.stage;
+    const diffName = T(['diff_easy', 'diff_normal', 'diff_hard'][state.star - 1]);
     const journey = Array.from({ length: STAGE_COUNT }, (_, i) => {
         const n = i + 1;
         const ok = cleared ? true : n < state.stage;
@@ -235,30 +252,50 @@ function showRunEnd(cleared, finalScore, isNewRecord, timeBonus, maxScoreBonus) 
         const c = ['#ffd84d', '#ff8a50', '#5cc7ff', '#7be05c', '#ff6b8e', '#b48aff'][i % 6];
         return `<i style="left:${(i * 37) % 1280}px;background:${c};animation-duration:${3 + (i % 5)}s;animation-delay:${-(i % 7)}s"></i>`;
     }).join('') : '';
+    const handBest = (typeof bestPlayValue === 'function') ? bestPlayValue() : 0;
+    const bdItem = (label, v) => `<span class="bdi">${label} <b>${v}</b></span>`;
+    const breakdown = GAME.endBreakdown ? GAME.endBreakdown(cleared, finalScore, timeBonus, maxScoreBonus)
+        : [bdItem(T('bd_attack'), state.score), bdItem(T('bd_time'), timeBonus), bdItem(T('bd_best'), maxScoreBonus)].concat(clearBonus ? [bdItem(T('bd_clear'), clearBonus)] : []).join('<span class="bdp">＋</span>');
+    const stars = cleared
+        ? `<div class="end-stars">${[1, 2, 3].map(n => `<b class="${n <= state.star ? '' : 'off'}" style="--i:${n}">★</b>`).join('')}<em>${diffName}</em></div>`
+        : '';
+    const badges = cleared && runFirstClear ? `<span>${T('end_new_medal')}</span>` : '';
     el.className = cleared ? '' : 'over';
     el.innerHTML = `
         <div class="end-rays"></div><div class="end-confetti">${confetti}</div>
         <div class="end-box${cleared ? '' : ' over'}">
             <div class="end-ribbon">${ribbon}</div>
-            <div class="end-run"><span class="rn">${T('run_normal_name')}</span><span>${'★'.repeat(state.star)}　${T(['diff_easy', 'diff_normal', 'diff_hard'][state.star - 1])}</span></div>
-            <div class="end-journey">${journey}</div>
+            <div class="end-run"><span class="rn">${T('run_normal_name')}</span>${cleared ? '' : `<span>${'★'.repeat(state.star)}　${diffName}</span>`}</div>
+            ${stars}
+            <div class="end-badges">${badges}</div>
             <div class="end-stats">
-                <div class="end-stat s1">${isNewRecord ? `<div class="rec">${T('high_score_msg')}</div>` : ''}
-                    <div class="lb">${T('result_final_score')}</div><div class="vl">${finalScore}<small style="font-size:1.6rem">${pts}</small></div>
-                    <div class="sb">${GAME.endBreakdown ? GAME.endBreakdown(cleared, finalScore, timeBonus, maxScoreBonus) : `⚔️ ${state.score} ＋ ⏱ ${timeBonus} ＋ 🥇 ${maxScoreBonus}`}</div></div>
-                <div class="end-stat s2"><div class="lb">${T('end_reached')}</div><div class="vl">${reached}<small style="font-size:1.6rem"> / ${STAGE_COUNT}</small></div>
-                    <div class="sb">${stageName(reached)}</div></div>
+                <div class="end-stat s1">${isNewRecord ? `<div class="rec">${T('end_record')}</div>` : ''}
+                    <div class="lb">${T('rank_kind_score')}</div><div class="vl"><span id="end-v1">0</span><small>${pts}</small></div>
+                    <div class="sb">${breakdown}</div></div>
+                <div class="end-stat s2">${state.handRecord && handBest > 0 ? `<div class="rec">${T('end_record')}</div>` : ''}
+                    <div class="lb">${T('rank_kind_hand')}</div><div class="vl"><span id="end-v2">0</span><small>${pts}</small></div>
+                    <div class="sb">${T('end_hand_note')}</div></div>
             </div>
+            <div class="end-journey">${journey}</div>
             <div class="end-btns">
-                <button class="rs-mini orange" id="end-retry">${T('btn_retry')}</button>
+                <button class="rs-mini" id="end-rank">${T('btn_ranking')}</button>
                 <button class="rs-mini blue" id="end-runselect">${T('btn_back_runselect')}</button>
-                <button class="rs-mini" id="end-title">${T('btn_to_title')}</button>
+                <button class="rs-mini orange" id="end-retry">${T('btn_retry')}</button>
             </div>
         </div>`;
     el.classList.remove('hidden');
+    endCountUp(document.getElementById('end-v1'), finalScore, 1400, 300);
+    endCountUp(document.getElementById('end-v2'), handBest, 1000, 900);
     bindBtn(document.getElementById('end-retry'), () => { el.classList.add('hidden'); startRun(state.star); });
     bindBtn(document.getElementById('end-runselect'), () => { goRunSelect(); });
-    bindBtn(document.getElementById('end-title'), () => { backToTitle(); });
+    // ランキング: RUN選択に戻ったうえで、いま遊んだ★の記録を開く(もどると RUN選択)
+    bindBtn(document.getElementById('end-rank'), () => {
+        const star = state.star;
+        goRunSelect();
+        state.rankingMode = window.currentUser ? 'WORLD' : 'LOCAL';
+        rkStar = star;
+        showRankingScreen();
+    });
 }
 
 // タイトル → RUN選択

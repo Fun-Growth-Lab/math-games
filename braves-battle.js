@@ -720,11 +720,12 @@ function finishRun(cleared) {
     if (!cleared) state.stageScores[state.stage - 1] = state.score - state.stageStartScore;
     const timeBonus = state.time * 100;
     const maxScoreBonus = state.maxScore * 2;
-    const finalScore = state.score + timeBonus + maxScoreBonus;
+    const clearBonus = cleared ? (GAME.clearBonus || 0) : 0;      // クリアボーナス(GAME.clearBonus。九九ポーカーと同じく、クリアした RUN の得点に足す)
+    const finalScore = state.score + timeBonus + maxScoreBonus + clearBonus;
     const key = starKey(state.star);
     const isNewRecord = saveScore(key, finalScore, state.stage, cleared);
     if (cleared) incrementClearCount(key);
-    showRunEnd(cleared, finalScore, isNewRecord, timeBonus, maxScoreBonus);
+    showRunEnd(cleared, finalScore, isNewRecord, timeBonus, maxScoreBonus, clearBonus);
 }
 function gameOver() { finishRun(false); }
 function gameClear() { finishRun(true); }

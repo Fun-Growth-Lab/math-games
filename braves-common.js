@@ -124,6 +124,7 @@ document.getElementById('container').innerHTML = (GAME.gameLayerHTML || _GAME_LA
             <div class="rs-plaque" data-i18n="runselect_title">RUNをえらぼう</div>
             <button class="rs-mini blue" id="rs-rank" data-i18n="btn_ranking">🏆 ランキング</button>
         </div>
+        <div id="ds-master-badge" class="ds-master-badge hidden"></div>
         <div class="rs-stage">
             <button class="rs-arrow" id="rs-prev">◀</button>
             <div class="rs-viewport" id="rs-viewport"><div id="rs-strip"></div></div>
@@ -133,7 +134,6 @@ document.getElementById('container').innerHTML = (GAME.gameLayerHTML || _GAME_LA
             <div class="rs-desc" id="rs-desc"></div>
             <div class="rs-bottom-row">
                 <div class="star-row" id="star-row"></div>
-                <div class="chip-row" id="chip-row"></div>
             </div>
         </div>
     </div>
@@ -317,6 +317,15 @@ function showCustomConfirm(msg, onYes){
 // ============================================================
 const STRINGS = {
     ja: {
+        "end_record": "自己ベスト！",
+        "rs_picked": "選択中",
+        "master_badge": "すべての RUN で ★3 クリア！",
+        "end_new_medal": "はじめてのクリア！",
+        "bd_attack": "こうげき",
+        "bd_time": "のこり時間",
+        "bd_best": "最大の手",
+        "bd_clear": "クリアボーナス",
+        "end_hand_note": "1回の行動で いちばん大きい点",
         "rank_kind_score": "総スコア",
         "rank_kind_hand": "最大の手",
         "ranking_title": "ランキング",
@@ -439,6 +448,15 @@ const STRINGS = {
         "rank_star_3": "★★★ むずかしい",
     },
     simple: {
+        "end_record": "じこベスト！",
+        "rs_picked": "せんたくちゅう",
+        "master_badge": "ぜんぶの RUN で ★3 クリア！",
+        "end_new_medal": "はじめての クリア！",
+        "bd_attack": "こうげき",
+        "bd_time": "のこりじかん",
+        "bd_best": "いちばん大きい手",
+        "bd_clear": "クリアボーナス",
+        "end_hand_note": "1かいで いちばん おおきい てん",
         "rank_kind_score": "ごうけいスコア",
         "rank_kind_hand": "いちばん大きい手",
         "ranking_title": "ランキング",
@@ -561,6 +579,15 @@ const STRINGS = {
         "rank_star_3": "★★★ むずかしい",
     },
     en: {
+        "end_record": "New best!",
+        "rs_picked": "Selected",
+        "master_badge": "★3 cleared in every RUN!",
+        "end_new_medal": "First clear!",
+        "bd_attack": "Attacks",
+        "bd_time": "Time left",
+        "bd_best": "Best play",
+        "bd_clear": "Clear bonus",
+        "end_hand_note": "Biggest single play",
         "rank_kind_score": "Total Score",
         "rank_kind_hand": "Best Play",
         "ranking_title": "Ranking",
@@ -1131,9 +1158,11 @@ function getClearCount(difficulty) {
     return parseInt(localStorage.getItem(key)) || 0;
 }
 
+let runFirstClear = false;     // 直前のクリアが、その★の はじめてのクリアか(RUNの結果の画面で使う)
 function incrementClearCount(difficulty) {
     const key = getClearCountKey(difficulty);
     let count = getClearCount(difficulty);
+    runFirstClear = count === 0;
     count++;
     localStorage.setItem(key, count);
     return count;
@@ -1169,9 +1198,11 @@ function bestPlayValue() { return Math.max(state.bestPlay || 0, state.maxScore |
 const HAND_GAME_ID = () => GAME.sbGame + '_hand';
 function saveBestPlay(difficulty, stage, cleared) {
     const score = bestPlayValue();
+    state.handRecord = false;
     if (score <= 0) return;
     const hkey = 'HAND_' + difficulty;
     let ranking = getLocalRanking(hkey);
+    state.handRecord = score > (ranking.length ? ranking[0].score : 0);     // 自己ベスト(これまでの最大の手を こえた)
     const now = new Date();
     ranking.push({ score, name: state.playerName, date: `${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()}`, stage: stage || 0, clear: !!cleared });
     ranking.sort((a, b) => b.score - a.score);
@@ -1221,7 +1252,7 @@ function renderRankScreen() {
     };
     seg('rk-seg-kind', [['score', T('rank_kind_score')], ['hand', T('rank_kind_hand')]], rkKind).querySelectorAll('button').forEach(b =>
         bindBtn(b, () => { rkKind = b.dataset.v; renderRankScreen(); loadRankRows(); }));
-    seg('rk-seg-star', [[0, T('rank_star_all')]].concat([1, 2, 3].map(k => [k, '★' + k])), rkStar).querySelectorAll('button').forEach(b =>
+    seg('rk-seg-star', [[0, T('rank_star_all')]].concat([1, 2, 3].map(k => [k, '★'.repeat(k)])), rkStar).querySelectorAll('button').forEach(b =>
         bindBtn(b, () => { rkStar = parseInt(b.dataset.v, 10); renderRankScreen(); loadRankRows(); }));
     seg('rk-seg-tab', [['WORLD', T('rank_tab_world')], ['LOCAL', T('rank_tab_local')]], state.rankingMode).querySelectorAll('button').forEach(b =>
         bindBtn(b, () => { state.rankingMode = b.dataset.v; renderRankScreen(); loadRankRows(); }));
