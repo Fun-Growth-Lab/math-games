@@ -264,6 +264,7 @@
         .rs-medal svg { width: 100%; height: 100%; display: block; }
         .rs-medal.m1 { --c1: #e0a060; --c2: #b06a2a; --c3: #5a2e08; --c4: #ffd9b0; }
         .rs-medal.m2 { --c1: #eef2f6; --c2: #a8b4c2; --c3: #46535f; --c4: #ffffff; }
+        .rs-medal.m4 { --c1: #c08bff; --c2: #7a3fd0; --c3: #2a0f5e; --c4: #ffe4ff; filter: drop-shadow(0 3px 0 rgba(0,0,0,0.45)) drop-shadow(0 0 10px rgba(190,120,255,1)); }
         .rs-medal.m3 { --c1: #ffd42e; --c2: #e8a800; --c3: #7a4a00; --c4: #fff6b0; filter: drop-shadow(0 3px 0 rgba(0,0,0,0.4)) drop-shadow(0 0 8px rgba(255,210,60,0.95)); }
         .rs-go { position: absolute; left: 14px; right: 14px; bottom: 14px; min-height: 56px; display: flex; align-items: center; justify-content: center; font-family: inherit; font-weight: 900; font-size: 1.6rem; color: #fff; border: 5px solid #0f2a24; border-radius: 18px; background: linear-gradient(#ff9a5a,#e8602a); box-shadow: 0 6px 0 #0a1c18; text-shadow: 0 3px 0 rgba(0,0,0,0.3); cursor: pointer; opacity: 0; pointer-events: none; transform: translateY(8px); transition: opacity 0.2s, transform 0.2s; }
         .rs-card.sel .rs-body { padding-bottom: 100px; }
@@ -283,6 +284,12 @@
         .star-btn.cleared::after { content: 'CLEAR'; position: absolute; top: -13px; right: -8px; transform: rotate(7deg); background: linear-gradient(#ff7a5c,#e0402a); color: #fff; font-size: 0.82rem; font-weight: 900; letter-spacing: 1px; padding: 0 9px; border-radius: 50px; border: 2px solid #fff; line-height: 1.5; box-shadow: 0 2px 0 #8a2412; }
         .star-btn.cleared.active { background: linear-gradient(#ffe27a,#ffb724); color: #3b2d1a; }
         .star-btn.cleared.active small { color: #7a6540; }
+        .star-btn.secret { background: linear-gradient(#e9d8ff,#b48cf0); border-color: #2a0f5e; color: #2a0f5e; }
+        .star-btn.secret small { color: #4a2a8a; }
+        .star-btn.secret.cleared { background: linear-gradient(#e9d8ff,#b48cf0); color: #2a0f5e; }
+        .star-btn.secret.cleared small { color: #4a2a8a; }
+        .star-btn.secret.active { background: linear-gradient(#ffe27a,#ffb724); color: #3b2d1a; }
+        .star-btn.secret.active small { color: #7a6540; }
         .star-btn.active { transform: translateY(-4px); box-shadow: 0 6px 0 #0a1c18, 0 0 0 4px #fff, 0 0 20px 6px rgba(255,216,77,0.85); z-index: 2; }
         .star-btn.active { padding-top: 14px; }
         .star-btn .pick { position: absolute; left: 8px; top: 3px; background: #1f2d3d; color: #ffe27a; font-style: normal; font-size: 0.95rem; font-weight: 900; letter-spacing: 1px; padding: 0 9px; border-radius: 6px; white-space: nowrap; line-height: 1.45; box-shadow: 0 2px 0 rgba(0,0,0,0.4); }
@@ -1104,7 +1111,8 @@ function numBonus(cards, numLv){
 const LV_UP_RATE = 0.2;      // 役Lvが1上がるごとに基本点が+20%
 const WEAK_RATE = 0.5;       // 弱体化：基本点が半分
 const STAGES = 7;
-const STARS = 3;            // 難易度 ★1〜★3（やさしい／ふつう／むずかしい）
+const STARS = 4;            // 難易度 ★1〜★4（やさしい／ふつう／むずかしい／名人）
+const BASE_STARS = 3;       // ふつうに選べる難易度は★3まで。★4(名人)は、そのRUNの★3をクリアすると出てくるシークレット
 const PLAYS_PER_STAGE = 3;
 const HAND_SIZE = 5;
 // 特別な九九カード。出現率は ドラ札4% / ドラドラ札1% / コイン札4% / ダブルコイン札1%（コイン札系は合計5%で、その2割がダブル。残りは普通のカード）。
@@ -1213,6 +1221,7 @@ const SHACKLES = [
     { id: 'fever',    icon: '🪙', filter: p => true, coinBase: 0.5 },
 ];
 const SHACKLE_BY_ID = {}; SHACKLES.forEach(s => { SHACKLE_BY_ID[s.id] = s; });
+// （★4＝名人は、★3の約1.4倍。最善手ボットのクリア率は基本で約5%）
 // 縛りによるロックと、出てくる数字
 function shackleNums(sh){ return sh.oddOnly ? [1, 3, 5, 7, 9] : [1, 2, 3, 4, 5, 6, 7, 8, 9]; }
 function numLocked(sh, n){ return !!sh.oddOnly && n % 2 === 0; }
@@ -1226,27 +1235,27 @@ function randNum(sh, rnd){ const a = shackleNums(sh); return a[Math.floor((rnd |
 // （基本のステージ7が ★1=75 / ★2=100 / ★3=200。★3は後半ほど大きく上げてある（基本は90,100,115,140,160,180,200）。★2は★1と★3の中間（各ステージの幾何平均＝基本のステージ7は120）。人ボットのクリア率は★1約85%/★2約43%/★3約3%、最善手ボットなら★2約88%/★3約38%）。デッドオアライブは較正値のまま、私、失敗しないのでは基本と同じボーダー。
 // （最善手を読むボットなら、これよりずっとクリアしやすい）ボーダーに届いたらすぐクリア・クリアしたプレーでコインが決まる(coinsFor)・役Lv購入(6コイン)・数字ボーナス(クリアで2つ上昇/ショップ4コイン)・縛りのロックを含めて測っている。ルールを変えたら測り直す
 const BORDERS = {
-    normal  : [[40, 45, 50, 55, 60, 65, 75], [60, 65, 75, 90, 100, 110, 120], [90, 100, 115, 140, 160, 180, 200]],
-    odd     : [[75, 85, 100, 110, 125, 140, 155], [115, 130, 150, 175, 200, 225, 250], [180, 200, 230, 280, 320, 360, 400]],
-    even    : [[35, 45, 50, 55, 65, 70, 80], [60, 70, 80, 90, 105, 120, 130], [95, 105, 125, 145, 165, 210, 215]],
-    big20   : [[45, 50, 55, 55, 60, 70, 75], [70, 75, 85, 90, 95, 110, 120], [105, 110, 125, 140, 155, 180, 185]],
-    big30   : [[55, 55, 60, 60, 65, 70, 70], [85, 85, 95, 95, 105, 115, 120], [125, 130, 145, 150, 165, 195, 200]],
-    small60 : [[40, 45, 50, 55, 60, 65, 70], [60, 70, 75, 90, 95, 110, 115], [95, 105, 115, 140, 155, 180, 185]],
-    small50 : [[40, 45, 50, 55, 60, 70, 75], [55, 65, 75, 90, 100, 115, 125], [80, 100, 110, 140, 160, 195, 205]],
-    dora3   : [[45, 50, 60, 65, 70, 80, 85], [70, 75, 90, 100, 115, 135, 140], [105, 120, 140, 160, 190, 220, 235]],
-    weak    : [[25, 30, 35, 40, 50, 55, 60], [40, 45, 55, 65, 80, 95, 100], [70, 70, 90, 110, 130, 160, 165]],
-    luck    : [[45, 50, 60, 65, 70, 75, 85], [70, 75, 90, 100, 115, 125, 140], [105, 120, 140, 160, 185, 215, 225]],
-    nozoro  : [[30, 35, 40, 45, 50, 55, 60], [40, 50, 60, 70, 75, 90, 100], [60, 70, 90, 105, 120, 150, 160]],
-    straight2: [[35, 45, 50, 55, 60, 70, 75], [55, 65, 75, 85, 100, 115, 120], [90, 100, 115, 135, 160, 195, 200]],
-    full2   : [[45, 45, 50, 55, 60, 65, 70], [65, 65, 75, 85, 95, 105, 115], [95, 100, 115, 135, 155, 175, 185]],
-    rich    : [[40, 45, 50, 60, 65, 70, 80], [65, 70, 80, 95, 105, 120, 125], [100, 110, 130, 145, 165, 200, 200]],
-    dead    : [[5, 5, 10, 10, 10, 10, 10], [25, 30, 30, 35, 40, 50, 55], [45, 50, 55, 65, 75, 90, 100]],
-    nofail  : [[40, 45, 50, 55, 60, 65, 75], [60, 65, 75, 90, 100, 110, 120], [90, 100, 115, 140, 160, 180, 200]],
-    nomoney : [[35, 40, 50, 55, 60, 65, 75], [60, 65, 75, 90, 95, 110, 120], [95, 100, 115, 140, 155, 180, 195]],
-    nochange: [[35, 40, 45, 55, 60, 70, 75], [55, 65, 70, 85, 95, 115, 120], [90, 100, 110, 135, 155, 195, 200]],
-    oneshot : [[5, 5, 5, 10, 10, 10, 15], [10, 10, 10, 20, 20, 20, 30], [25, 30, 30, 35, 40, 50, 55]],
-    lucky7  : [[60, 65, 70, 75, 85, 95, 100], [90, 95, 100, 115, 130, 150, 155], [130, 135, 150, 175, 200, 235, 245]],
-    fever   : [[40, 45, 50, 55, 60, 65, 75], [60, 70, 75, 90, 100, 110, 125], [95, 105, 120, 145, 165, 185, 205]],
+    normal  : [[40, 45, 50, 55, 60, 65, 75], [60, 65, 75, 90, 100, 110, 120], [90, 100, 115, 140, 160, 180, 200], [125, 140, 160, 195, 225, 250, 280]],
+    odd     : [[75, 85, 100, 110, 125, 140, 155], [115, 130, 150, 175, 200, 225, 250], [180, 200, 230, 280, 320, 360, 400], [250, 280, 320, 390, 450, 505, 560]],
+    even    : [[35, 45, 50, 55, 65, 70, 80], [60, 70, 80, 90, 105, 120, 130], [95, 105, 125, 145, 165, 210, 215], [135, 145, 175, 205, 230, 295, 300]],
+    big20   : [[45, 50, 55, 55, 60, 70, 75], [70, 75, 85, 90, 95, 110, 120], [105, 110, 125, 140, 155, 180, 185], [145, 155, 175, 195, 215, 250, 260]],
+    big30   : [[55, 55, 60, 60, 65, 70, 70], [85, 85, 95, 95, 105, 115, 120], [125, 130, 145, 150, 165, 195, 200], [175, 180, 205, 210, 230, 275, 280]],
+    small60 : [[40, 45, 50, 55, 60, 65, 70], [60, 70, 75, 90, 95, 110, 115], [95, 105, 115, 140, 155, 180, 185], [135, 145, 160, 195, 215, 250, 260]],
+    small50 : [[40, 45, 50, 55, 60, 70, 75], [55, 65, 75, 90, 100, 115, 125], [80, 100, 110, 140, 160, 195, 205], [110, 140, 155, 195, 225, 275, 285]],
+    dora3   : [[45, 50, 60, 65, 70, 80, 85], [70, 75, 90, 100, 115, 135, 140], [105, 120, 140, 160, 190, 220, 235], [145, 170, 195, 225, 265, 310, 330]],
+    weak    : [[25, 30, 35, 40, 50, 55, 60], [40, 45, 55, 65, 80, 95, 100], [70, 70, 90, 110, 130, 160, 165], [100, 100, 125, 155, 180, 225, 230]],
+    luck    : [[45, 50, 60, 65, 70, 75, 85], [70, 75, 90, 100, 115, 125, 140], [105, 120, 140, 160, 185, 215, 225], [145, 170, 195, 225, 260, 300, 315]],
+    nozoro  : [[30, 35, 40, 45, 50, 55, 60], [40, 50, 60, 70, 75, 90, 100], [60, 70, 90, 105, 120, 150, 160], [85, 100, 125, 145, 170, 210, 225]],
+    straight2: [[35, 45, 50, 55, 60, 70, 75], [55, 65, 75, 85, 100, 115, 120], [90, 100, 115, 135, 160, 195, 200], [125, 140, 160, 190, 225, 275, 280]],
+    full2   : [[45, 45, 50, 55, 60, 65, 70], [65, 65, 75, 85, 95, 105, 115], [95, 100, 115, 135, 155, 175, 185], [135, 140, 160, 190, 215, 245, 260]],
+    rich    : [[40, 45, 50, 60, 65, 70, 80], [65, 70, 80, 95, 105, 120, 125], [100, 110, 130, 145, 165, 200, 200], [140, 155, 180, 205, 230, 280, 280]],
+    dead    : [[5, 5, 10, 10, 10, 10, 10], [25, 30, 30, 35, 40, 50, 55], [45, 50, 55, 65, 75, 90, 100], [65, 70, 75, 90, 105, 125, 140]],
+    nofail  : [[40, 45, 50, 55, 60, 65, 75], [60, 65, 75, 90, 100, 110, 120], [90, 100, 115, 140, 160, 180, 200], [125, 140, 160, 195, 225, 250, 280]],
+    nomoney : [[35, 40, 50, 55, 60, 65, 75], [60, 65, 75, 90, 95, 110, 120], [95, 100, 115, 140, 155, 180, 195], [135, 140, 160, 195, 215, 250, 275]],
+    nochange: [[35, 40, 45, 55, 60, 70, 75], [55, 65, 70, 85, 95, 115, 120], [90, 100, 110, 135, 155, 195, 200], [125, 140, 155, 190, 215, 275, 280]],
+    oneshot : [[5, 5, 5, 10, 10, 10, 15], [10, 10, 10, 20, 20, 20, 30], [25, 30, 30, 35, 40, 50, 55], [35, 40, 40, 50, 55, 70, 75]],
+    lucky7  : [[60, 65, 70, 75, 85, 95, 100], [90, 95, 100, 115, 130, 150, 155], [130, 135, 150, 175, 200, 235, 245], [180, 190, 210, 245, 280, 330, 345]],
+    fever   : [[40, 45, 50, 55, 60, 65, 75], [60, 70, 75, 90, 100, 110, 125], [95, 105, 120, 145, 165, 185, 205], [135, 145, 170, 205, 230, 260, 285]],
 };
 function borderFor(sid, star, stage){
     return BORDERS[sid][star - 1][stage - 1];
@@ -1427,7 +1436,7 @@ const UI_TEXT = {
     rs_cap: { ja: (n, s) => `「${n}」を「${s}」でクリアすると、「${s}」が選べるよ`, ja_easy: (n, s) => `「${n}」を「${s}」で クリアすると、「${s}」が えらべるよ`, en: (n, s) => `Clear "${n}" on ${s} to unlock ${s}` },
     btn_run_start: { ja: 'このRUNではじめる', ja_easy: 'この RUNで はじめる', en: 'Start This RUN' },
     star_locked: { ja: '🔒 まえの★をクリア', ja_easy: '🔒 まえの ★を クリア', en: '🔒 Clear previous ★' },
-    star_names: { ja: ['やさしい', 'ふつう', 'むずかしい'], en: ['Easy', 'Normal', 'Hard'] },
+    star_names: { ja: ['やさしい', 'ふつう', 'むずかしい', '名人'], en: ['Easy', 'Normal', 'Hard', 'Master'] },
     star_cleared: { ja: 'クリア済み', ja_easy: 'クリアずみ', en: 'Cleared' },
     btn_back: { ja: 'もどる', en: 'Back' },
     best_label: { ja: v => `ベスト：${v}`, ja_easy: v => `ベスト：${v}`, en: v => `Best: ${v}` },
@@ -1725,7 +1734,7 @@ function getProgAll(){ try { return JSON.parse(localStorage.getItem(PROG_KEY) ||
 // stars: 各★をクリアしたか({1:true,...})。★は自由に選べるので、★ごとに記録する(古い保存データは clear=n なら ★1〜n を済みとして読む)
 function getProg(sid){
     const p = Object.assign({ clear: 0, best: {}, bestPlay: {} }, getProgAll()[sid] || {});
-    const legacy = Math.min(STARS, p.clear || 0);
+    const legacy = Math.min(BASE_STARS, p.clear || 0);
     p.stars = Object.assign({}, p.stars || {});
     if (!getProgAll()[sid] || !getProgAll()[sid].stars) for (let n = 1; n <= legacy; n++) p.stars[n] = true;
     p.clear = Object.keys(p.stars).filter(k => p.stars[k]).length;   // クリアした★の数
@@ -1735,7 +1744,7 @@ function saveProg(sid, p){
     const all = getProgAll(); all[sid] = p;
     try { localStorage.setItem(PROG_KEY, JSON.stringify(all)); } catch (e){}
 }
-function isAllGold(){ return SHACKLES.every(s => getProg(s.id).clear >= STARS); }
+function isAllGold(){ return SHACKLES.every(s => { const st = getProg(s.id).stars; return st[1] && st[2] && st[3]; }); }
 function starName(n){ return L(UI_TEXT.star_names)[n - 1]; }
 
 // ============================================================
@@ -1918,15 +1927,22 @@ function maxClearedStar(sid){
 }
 function runAccess(sid){
     const i = SHACKLES.findIndex(s => s.id === sid);
-    if (i <= 0) return { open: true, maxStar: STARS, prevId: null };
-    const prevId = SHACKLES[i - 1].id, m = maxClearedStar(prevId);
+    if (i <= 0) return { open: true, maxStar: BASE_STARS, prevId: null };
+    const prevId = SHACKLES[i - 1].id, m = Math.min(BASE_STARS, maxClearedStar(prevId));
     return { open: m >= 1, maxStar: m, prevId };
+}
+// ★4(名人)は、そのRUNの★3をクリアしていれば出てくる（ひとつ前のRUNの進み具合は関係ない）
+function secretOpen(sid){ return !!getProg(sid).stars[BASE_STARS]; }
+function starOpen(sid, n){
+    const acc = runAccess(sid);
+    if (!acc.open) return false;
+    return n > BASE_STARS ? secretOpen(sid) : n <= acc.maxStar;
 }
 function renderRunSelect(){
     document.getElementById('ds-master-badge').classList.toggle('hidden', !isAllGold());
     const prog = getProg(selSid);
     const acc = runAccess(selSid);
-    if (acc.open) selStar = Math.max(1, Math.min(selStar, acc.maxStar));
+    if (acc.open) selStar = Math.max(1, Math.min(selStar, secretOpen(selSid) ? STARS : acc.maxStar));
     document.getElementById('rs-strip').innerHTML = SHACKLES.map(s => {
         const mc = maxClearedStar(s.id), lk = !runAccess(s.id).open;
         return `<div class="rs-card${s.id === selSid ? ' sel' : ''}${lk ? ' locked' : ''}" style="--c:${SHACKLE_COLOR[s.id]}" data-id="${s.id}" onclick="selectShackle('${s.id}')">
@@ -1942,12 +1958,12 @@ function renderRunSelect(){
     const prevName = acc.prevId ? shackleName(acc.prevId) : '';
     let note = '';
     if (!acc.open) note = `<br><span class="ds-lock">${escapeHtml(uif('rs_locked', prevName))}</span>`;
-    else if (acc.prevId && acc.maxStar < STARS) note = `<br><span class="ds-lock">${escapeHtml(uif('rs_cap', prevName, starName(acc.maxStar + 1)))}</span>`;
+    else if (acc.prevId && acc.maxStar < BASE_STARS) note = `<br><span class="ds-lock">${escapeHtml(uif('rs_cap', prevName, starName(acc.maxStar + 1)))}</span>`;
     document.getElementById('ds-preview-sub').innerHTML = escapeHtml(L(SHACKLE_TEXT[selSid].desc)) +
         (prog.best[selStar] ? `　<span class="ds-best">${escapeHtml(uif('best_label', prog.best[selStar]))}</span>` : '') + note;
-    document.getElementById('star-row').innerHTML = Array.from({ length: STARS }, (_, i) => i + 1).map(n => {
-        const locked = !acc.open || n > acc.maxStar;
-        return `<button class="star-btn${n === selStar ? ' active' : ''}${locked ? ' locked' : ''}${prog.stars[n] ? ' cleared' : ''}" data-star="${n}" onclick="selectStar(${n})">${n === selStar ? `<em class="pick">▶ ${escapeHtml(ui('rs_picked'))}</em>` : ''}${'★'.repeat(n)}<small>${locked ? '🔒 ' : (prog.clear >= n ? '✔ ' : '')}${escapeHtml(starName(n))}</small></button>`;
+    document.getElementById('star-row').innerHTML = Array.from({ length: STARS }, (_, i) => i + 1).filter(n => n <= BASE_STARS || secretOpen(selSid)).map(n => {
+        const locked = !starOpen(selSid, n);
+        return `<button class="star-btn${n === selStar ? ' active' : ''}${locked ? ' locked' : ''}${prog.stars[n] ? ' cleared' : ''}${n > BASE_STARS ? ' secret' : ''}" data-star="${n}" onclick="selectStar(${n})">${n === selStar ? `<em class="pick">▶ ${escapeHtml(ui('rs_picked'))}</em>` : ''}${'★'.repeat(n)}<small>${locked ? '🔒 ' : (prog.stars[n] ? '✔ ' : '')}${escapeHtml(starName(n))}</small></button>`;
     }).join('');
     document.getElementById('border-row').innerHTML = Array.from({ length: STAGES }, (_, i) =>
         `<div class="border-chip"><small>${uif('stage_chip', i + 1)}</small>${borderFor(selSid, selStar, i + 1)}</div>`).join('');
@@ -1973,13 +1989,11 @@ function moveShackle(d){
     selSid = SHACKLES[idx].id; renderRunSelect();
 }
 function selectStar(n){
-    const acc = runAccess(selSid);
-    if (!acc.open || n > acc.maxStar) return;
+    if (!starOpen(selSid, n)) return;
     selStar = n; renderRunSelect();
 }
 function startRunFromSelect(){
-    const acc = runAccess(selSid);
-    if (!acc.open || selStar > acc.maxStar) return;
+    if (!starOpen(selSid, selStar)) return;
     startRun(selSid, selStar);
 }
 
@@ -2637,7 +2651,7 @@ function renderEnd(cleared, o){
     box.className = 'end-box' + (cleared ? '' : ' over');
     const title = ui(cleared ? 'end_clear_title' : 'end_over_title');
     const ribbon = Array.from(title).map((ch, i) => `<span style="--i:${i}">${escapeHtml(ch)}</span>`).join('');
-    const stars = cleared ? `<div class="end-stars">${Array.from({ length: STARS }, (_, i) => i + 1).map(n => `<b class="${n <= run.star ? '' : 'off'}" style="--i:${n}">★</b>`).join('')}<em>${escapeHtml(starName(run.star))}</em></div>` : '';
+    const stars = cleared ? `<div class="end-stars">${Array.from({ length: run.star > BASE_STARS ? STARS : BASE_STARS }, (_, i) => i + 1).map(n => `<b class="${n <= run.star ? '' : 'off'}" style="--i:${n}">★</b>`).join('')}<em>${escapeHtml(starName(run.star))}</em></div>` : '';
     const badges = [];
     if (cleared && o.newMedal) badges.push(`<span>${escapeHtml(ui('end_new_medal'))}</span>`);
     if (cleared && o.unlocked) badges.push(`<span class="u">${escapeHtml(uif('end_unlock', o.unlocked))}</span>`);
@@ -2739,7 +2753,7 @@ function renderRankScreen(){
     centerRankStrip();
     const seg = (id, items, cur) => { document.getElementById(id).innerHTML = items.map(([v, label, fn]) => `<button class="${v === cur ? 'on' : ''}" onclick="${fn}">${escapeHtml(label)}</button>`).join(''); };
     seg('rk-seg-kind', [['score', ui('rank_kind_score'), "switchRankKind('score')"], ['hand', ui('rank_kind_hand'), "switchRankKind('hand')"]], rankKind);
-    seg('rk-seg-star', [[0, ui('rank_star_all'), 'switchRankStar(0)']].concat([1, 2, 3].map(n => [n, '★'.repeat(n), `switchRankStar(${n})`])), rankStar);
+    seg('rk-seg-star', [[0, ui('rank_star_all'), 'switchRankStar(0)']].concat([1, 2, 3, 4].map(n => [n, '★'.repeat(n), `switchRankStar(${n})`])), rankStar);
     seg('rk-seg-tab', [['world', ui('rank_tab_world'), "switchRankTab('world')"], ['local', ui('rank_tab_local'), "switchRankTab('local')"]], rankTab);
 }
 function centerRankStrip(){
