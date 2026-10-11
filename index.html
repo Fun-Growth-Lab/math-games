@@ -561,6 +561,21 @@
         .card-brick       { border-top: 3px solid #78716c; }
         .card-tasu-ten    { border-top: 3px solid #06b6d4; }
 
+        /* お気に入りボタン(カードの右下。サムネの題名にかぶらない場所。押すと いちばん上の「お気に入り」に入る) */
+        .fav-btn {
+            position: absolute; bottom: 8px; right: 8px; z-index: 3;
+            width: 34px; height: 34px; padding: 0; border: none; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            background: #f3f4f6; color: #9ca3af;
+            font-family: inherit; font-size: 1.2rem; line-height: 1; cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.28);
+            transition: transform 0.15s, color 0.15s;
+        }
+        .fav-btn:hover { transform: scale(1.12); color: #e5566d; }
+        .fav-btn.on { color: #e5566d; }
+        .fav-btn:focus-visible { outline: 3px solid #f97316; outline-offset: 2px; }
+        @media (max-width: 600px) { .fav-btn { width: 30px; height: 30px; font-size: 1.05rem; bottom: 6px; right: 6px; } }
+
         /* 新作バッジ */
         .card-new::before {
             content: 'NEW';
@@ -1681,7 +1696,7 @@
                 <span class="mini-tag" data-i18n="tag_gr3">3年生〜</span>
             </div>
             <a href="WatteePoker/index.html" class="media-container">
-                <img src="images/WatteePoker.svg" alt="割って！九九ポーカー">
+                <img src="images/WatteePoker.png?v=20261211" alt="割って！九九ポーカー">
             </a>
             <div class="start-btn-area">
                 <a href="WatteePoker/index.html" class="play-btn">ゲームスタート ▶</a>
@@ -1995,6 +2010,9 @@
                     </div>',
 
                 sec_count: '{n}つ', sec_count_one: '{n}つ',
+                sec_fav_title: 'お気に入り', sec_fav_sub: 'ハートを おした ゲームが ここに あつまるよ',
+                sec_pop_title: '人気ゲーム', sec_pop_sub: 'みんなが よく あそんでいる ゲーム',
+                fav_add: 'お気に入りに入れる', fav_remove: 'お気に入りからはずす',
                 sec_add_title: 'たしざん', sec_add_sub: 'けいさんの きほんを きたえよう',
                 sec_sub_title: 'ひきざん', sec_sub_sub: 'ひく ちからを みにつけよう',
                 sec_mul_title: 'かけざん', sec_mul_sub: '九九を マスターしよう',
@@ -2173,6 +2191,9 @@
                     </div>',
 
                 sec_count: '{n} games', sec_count_one: '{n} game',
+                sec_fav_title: 'Favorites', sec_fav_sub: 'Games you tapped the heart on gather here',
+                sec_pop_title: 'Popular Games', sec_pop_sub: 'Games that many kids love',
+                fav_add: 'Add to favorites', fav_remove: 'Remove from favorites',
                 sec_add_title: 'Addition', sec_add_sub: 'Build the basics of calculation',
                 sec_sub_title: 'Subtraction', sec_sub_sub: 'Master the skill of subtracting',
                 sec_mul_title: 'Multiplication', sec_mul_sub: 'Master your times tables',
@@ -2349,6 +2370,34 @@
             'con-sim':   { key: 'sim',  icon: '営',  color: '#7a5a8a', shadow: 'rgba(122,90,138,0.32)', tint: '#f4eff7' }
         };
 
+        // 「お気に入り」「人気ゲーム」: 一番上と2番目に出す特別なセクション(contentInfo の分野別セクションとは別)
+        const specialInfo = {
+            'sp-fav': { key: 'fav', icon: '♥', color: '#e5566d', shadow: 'rgba(229,86,109,0.32)', tint: '#fdeef1' },
+            'sp-pop': { key: 'pop', icon: '★', color: '#e0a21a', shadow: 'rgba(224,162,26,0.32)', tint: '#fff7e0' }
+        };
+        const POPULAR_GAMES = ['WatteePoker/index.html', 'Arithmetica/index.html'];   // 「人気ゲーム」に出すゲーム(この順に並ぶ)
+        const FAV_KEY = 'fgl_fav';                                                      // お気に入りにしたゲーム(カードのリンク先の配列)をブラウザに保存
+        function getFavs() {
+            try { const a = JSON.parse(localStorage.getItem(FAV_KEY) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; }
+        }
+        function setFavs(a) { try { localStorage.setItem(FAV_KEY, JSON.stringify(a)); } catch (e) {} }
+        function cardGameId(card) {
+            const a = card.querySelector('a.media-container');
+            return a ? a.getAttribute('href') : '';
+        }
+        // ハートを押す: 保存して並べ直す。押したカードが画面の同じ場所に見えるよう、スクロールを合わせる
+        function toggleFav(id, btn) {
+            const favs = getFavs(), i = favs.indexOf(id);
+            const sec = btn.closest('.content-section');
+            const secId = sec ? sec.id : '', top0 = btn.getBoundingClientRect().top;
+            if (i >= 0) favs.splice(i, 1); else favs.push(id);
+            setFavs(favs);
+            buildContentSections();
+            const nsec = secId && document.getElementById(secId);
+            const nb = nsec && Array.from(nsec.querySelectorAll('.fav-btn')).find(b => b.dataset.gid === id);
+            if (nb) window.scrollBy({ top: nb.getBoundingClientRect().top - top0, left: 0, behavior: 'instant' });
+        }
+
         function buildContentSections() {
             const container = document.getElementById('contentSections');
             const jumpBar = document.getElementById('jumpBar');
@@ -2357,50 +2406,76 @@
             jumpBar.innerHTML = '';
 
             const allCards = Array.from(document.querySelectorAll('.game-grid .game-card:not([data-pending])'));
+            const favs = getFavs();
+
+            // カードを複製して、学年の表示とお気に入りボタンをつける
+            const makeClone = (card) => {
+                const dataTags = card.getAttribute('data-tags') || '';
+                const clone = card.cloneNode(true);
+                // data-tags から学年だけ抽出して、大きく表示する形に置き換え（表示テキストの言語に依存しない）
+                const tagsContainer = clone.querySelector('.card-tags');
+                if (tagsContainer) {
+                    const gradeMatch = dataTags.match(/gr-(\d)/);
+                    const gradeText = gradeMatch ? T('tag_gr' + gradeMatch[1]) : '';
+                    tagsContainer.innerHTML = gradeText
+                        ? '<span class="card-grade">' + gradeText + '</span>'
+                        : '';
+                }
+                const id = cardGameId(card);
+                if (id) {
+                    const on = favs.indexOf(id) >= 0;
+                    const b = document.createElement('button');
+                    b.type = 'button';
+                    b.className = 'fav-btn' + (on ? ' on' : '');
+                    b.dataset.gid = id;
+                    b.textContent = on ? '♥' : '♡';
+                    b.title = T(on ? 'fav_remove' : 'fav_add');
+                    b.setAttribute('aria-label', b.title);
+                    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+                    b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); toggleFav(id, b); });
+                    clone.appendChild(b);
+                }
+                return clone;
+            };
 
             // セクションごとにカードを分類（複数セクションに属するカードは複数回含まれる）
             const sections = {};
             Object.keys(contentInfo).forEach(tag => {
                 sections[tag] = { cards: [] };
             });
-
-            // カードを分類
             allCards.forEach(card => {
                 const dataTags = card.getAttribute('data-tags') || '';
                 const hasArithmetica = card.classList.contains('card-arithmetica');
-
                 Object.keys(contentInfo).forEach(conTag => {
                     if (dataTags.includes(conTag)) {
-                        const clone = card.cloneNode(true);
-                        // data-tags から学年だけ抽出して、大きく表示する形に置き換え（表示テキストの言語に依存しない）
-                        const tagsContainer = clone.querySelector('.card-tags');
-                        if (tagsContainer) {
-                            const gradeMatch = dataTags.match(/gr-(\d)/);
-                            const gradeText = gradeMatch ? T('tag_gr' + gradeMatch[1]) : '';
-                            tagsContainer.innerHTML = gradeText
-                                ? '<span class="card-grade">' + gradeText + '</span>'
-                                : '';
-                        }
                         const gm = dataTags.match(/gr-(\d)/);
                         sections[conTag].cards.push({
-                            element: clone,
+                            element: makeClone(card),
                             isArithmetica: hasArithmetica,
                             grade: gm ? parseInt(gm[1], 10) : 99
                         });
                     }
                 });
             });
+            // アリスメティカを先頭に、あとは学年の小さい順(同じ学年は元の並び)
+            Object.values(sections).forEach(sd => sd.cards.sort((a, b) => (b.isArithmetica - a.isArithmetica) || (a.grade - b.grade)));
+
+            // 一番上: お気に入り(1つでもあれば) → 人気ゲーム。そのあとに分野別
+            const byId = {};
+            allCards.forEach(c => { byId[cardGameId(c)] = c; });
+            const ordered = [];
+            const favCards = favs.map(id => byId[id]).filter(Boolean);
+            if (favCards.length) ordered.push(['sp-fav', specialInfo['sp-fav'], favCards.map(c => ({ element: makeClone(c) }))]);
+            const popCards = POPULAR_GAMES.map(id => byId[id]).filter(Boolean);
+            if (popCards.length) ordered.push(['sp-pop', specialInfo['sp-pop'], popCards.map(c => ({ element: makeClone(c) }))]);
+            Object.keys(contentInfo).forEach(conTag => {
+                if (sections[conTag].cards.length) ordered.push([conTag, contentInfo[conTag], sections[conTag].cards]);
+            });
 
             // セクションを表示
-            Object.entries(sections).forEach(([conTag, sectionData]) => {
-                if (sectionData.cards.length === 0) return;
-
-                const info = contentInfo[conTag];
+            ordered.forEach(([conTag, info, cards]) => {
                 const secTitle = T('sec_' + info.key + '_title');
                 const secSub = T('sec_' + info.key + '_sub');
-
-                // アリスメティカを先頭に、あとは学年の小さい順(同じ学年は元の並び)
-                sectionData.cards.sort((a, b) => (b.isArithmetica - a.isArithmetica) || (a.grade - b.grade));
 
                 const section = document.createElement('div');
                 section.className = 'content-section';
@@ -2422,30 +2497,28 @@
                         '<div class="section-sub"></div>' +
                     '</div>';
                 header.querySelector('.section-title').textContent = secTitle;
-                const countKey = sectionData.cards.length === 1 ? 'sec_count_one' : 'sec_count';
-                header.querySelector('.section-count').textContent = T(countKey, {n: sectionData.cards.length});
+                const countKey = cards.length === 1 ? 'sec_count_one' : 'sec_count';
+                header.querySelector('.section-count').textContent = T(countKey, {n: cards.length});
                 header.querySelector('.section-sub').textContent = secSub;
                 section.appendChild(header);
 
                 const grid = document.createElement('div');
                 grid.className = 'section-grid';
-                sectionData.cards.forEach(item => grid.appendChild(item.element));
+                cards.forEach(item => grid.appendChild(item.element));
                 section.appendChild(grid);
 
                 container.appendChild(section);
 
                 // ジャンプバーにアイコンボタンを追加
-                if (jumpBar) {
-                    const btn = document.createElement('button');
-                    btn.className = 'jump-btn';
-                    btn.textContent = info.icon;
-                    btn.title = secTitle;
-                    btn.style.setProperty('--sec-tint', info.tint);
-                    btn.addEventListener('click', () => {
-                        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    });
-                    jumpBar.appendChild(btn);
-                }
+                const btn = document.createElement('button');
+                btn.className = 'jump-btn';
+                btn.textContent = info.icon;
+                btn.title = secTitle;
+                btn.style.setProperty('--sec-tint', info.tint);
+                btn.addEventListener('click', () => {
+                    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                });
+                jumpBar.appendChild(btn);
             });
         }
 
