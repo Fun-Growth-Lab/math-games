@@ -473,15 +473,26 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.05);
             z-index: 90;
             display: flex;
-            justify-content: center;
+            justify-content: flex-start;     /* 中央よせは はみ出したとき左が見切れるので、両はしの auto マージンで中央にする */
             gap: 6px;
             padding: 6px 10px;
             overflow-x: auto;
+            overscroll-behavior-x: contain;
+            -webkit-overflow-scrolling: touch;
             transform: translateY(-120%);
             transition: transform 0.25s ease;
         }
         .jump-bar.visible { transform: translateY(0); }
         .jump-bar::-webkit-scrollbar { display: none; }
+        .jump-bar { scrollbar-width: none; }
+        .jump-bar > .jump-btn:first-child { margin-left: auto; }
+        .jump-bar > .jump-btn:last-child { margin-right: auto; }
+        /* 横にはみ出しているときは、両はしを少しぼかして「スライドできる」ことを見せる */
+        .jump-bar.scrollable {
+            -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 16px, #000 calc(100% - 16px), transparent 100%);
+            mask-image: linear-gradient(90deg, transparent 0, #000 16px, #000 calc(100% - 16px), transparent 100%);
+        }
+        .jump-btn svg { width: 17px; height: 17px; display: block; color: #e5566d; }
         .jump-btn {
             flex-shrink: 0;
             width: 34px;
@@ -571,10 +582,11 @@
             box-shadow: 0 2px 6px rgba(0,0,0,0.28);
             transition: transform 0.15s, color 0.15s;
         }
+        .fav-btn svg { width: 18px; height: 18px; display: block; }
         .fav-btn:hover { transform: scale(1.12); color: #e5566d; }
         .fav-btn.on { color: #e5566d; }
         .fav-btn:focus-visible { outline: 3px solid #f97316; outline-offset: 2px; }
-        @media (max-width: 600px) { .fav-btn { width: 30px; height: 30px; font-size: 1.05rem; bottom: 6px; right: 6px; } }
+        @media (max-width: 600px) { .fav-btn { width: 30px; height: 30px; bottom: 6px; right: 6px; } .fav-btn svg { width: 16px; height: 16px; } }
 
         /* 新作バッジ */
         .card-new::before {
@@ -2370,9 +2382,14 @@
             'con-sim':   { key: 'sim',  icon: '営',  color: '#7a5a8a', shadow: 'rgba(122,90,138,0.32)', tint: '#f4eff7' }
         };
 
+        // ハートの絵(文字の♥は字体によって縦長になるので、SVGで描く)。on=ぬりつぶし／off=ふちだけ
+        function heartSvg(on) {
+            return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.8C5.8 16.4 2.6 13 2.6 9.2 2.6 6.1 4.9 3.9 7.6 3.9 9.4 3.9 11 4.8 12 6.4 13 4.8 14.6 3.9 16.4 3.9 19.1 3.9 21.4 6.1 21.4 9.2 21.4 13 18.2 16.4 12 20.8z" ' +
+                (on ? 'fill="currentColor"' : 'fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"') + '/></svg>';
+        }
         // 「お気に入り」「人気ゲーム」: 一番上と2番目に出す特別なセクション(contentInfo の分野別セクションとは別)
         const specialInfo = {
-            'sp-fav': { key: 'fav', icon: '♥', color: '#e5566d', shadow: 'rgba(229,86,109,0.32)', tint: '#fdeef1' },
+            'sp-fav': { key: 'fav', icon: heartSvg(true), color: '#e5566d', shadow: 'rgba(229,86,109,0.32)', tint: '#fdeef1' },
             'sp-pop': { key: 'pop', icon: '★', color: '#e0a21a', shadow: 'rgba(224,162,26,0.32)', tint: '#fff7e0' }
         };
         const POPULAR_GAMES = ['WatteePoker/index.html', 'Arithmetica/index.html'];   // 「人気ゲーム」に出すゲーム(この順に並ぶ)
@@ -2428,7 +2445,7 @@
                     b.type = 'button';
                     b.className = 'fav-btn' + (on ? ' on' : '');
                     b.dataset.gid = id;
-                    b.textContent = on ? '♥' : '♡';
+                    b.innerHTML = heartSvg(on);
                     b.title = T(on ? 'fav_remove' : 'fav_add');
                     b.setAttribute('aria-label', b.title);
                     b.setAttribute('aria-pressed', on ? 'true' : 'false');
@@ -2512,7 +2529,7 @@
                 // ジャンプバーにアイコンボタンを追加
                 const btn = document.createElement('button');
                 btn.className = 'jump-btn';
-                btn.textContent = info.icon;
+                btn.innerHTML = info.icon;
                 btn.title = secTitle;
                 btn.style.setProperty('--sec-tint', info.tint);
                 btn.addEventListener('click', () => {
@@ -2520,7 +2537,14 @@
                 });
                 jumpBar.appendChild(btn);
             });
+            updateJumpScrollable();
         }
+        // ジャンプバーが画面の幅をこえるか(こえるとき横スライドできる印をつける)
+        function updateJumpScrollable() {
+            const jb = document.getElementById('jumpBar');
+            if (jb) jb.classList.toggle('scrollable', jb.scrollWidth > jb.clientWidth + 2);
+        }
+        window.addEventListener('resize', updateJumpScrollable);
 
         document.addEventListener('DOMContentLoaded', function() {
             applyLanguage();
