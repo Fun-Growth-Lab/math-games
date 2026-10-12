@@ -25,15 +25,11 @@ function ringPath(r0, r1, a0, a1) {
     return `M${ax.toFixed(2)} ${ay.toFixed(2)}A${r1} ${r1} 0 0 1 ${bx.toFixed(2)} ${by.toFixed(2)}L${cx.toFixed(2)} ${cy.toFixed(2)}A${r0} ${r0} 0 0 0 ${dx.toFixed(2)} ${dy.toFixed(2)}Z`;
 }
 
-// ケーキの大きさごとの クリームの色(同じ大きさは同じ色。1=金のホール)
-function cakeColor(val) {
-    const r = val / UNIT_MAX;
-    if (val === UNIT_MAX) return '#ffd45c';
-    if (r >= 0.75) return '#ff7fa6';
-    if (r >= 0.5) return '#b7714f';
-    if (r >= 0.25) return '#ffc6d8';
-    return '#fff0b8';
-}
+// 大きさ(○こ分)ごとの色。手札のカード・ケーキ・大きさの札・ターゲットが ぜんぶ同じ色で そろう(色を見れば大きさが分かる)
+//   1こ分=赤 2=だいだい 3=黄 4=みどり 5=青緑 6=青 7=あい 8=むらさき 9=ピンク / ちょうど1(ホール)=金
+const SIZE_COLORS = ['#ff5a5f', '#ff9a3c', '#ffd23f', '#5fd068', '#2ec4b6', '#3a9bff', '#7a6bff', '#b45cff', '#ff5fb0'];
+function sizeColor(val) { return val >= UNIT_MAX ? '#ffc61a' : SIZE_COLORS[(val - 1) % SIZE_COLORS.length]; }
+function cakeColor(val) { return sizeColor(val); }
 
 // 上から見た ケーキ1つ(24きれ + 切り目 + 切り目ごとの いちご)。大きさは paintCake で変える
 function cakeSVG(div, uid) {
