@@ -137,7 +137,7 @@ const _PLAYER_MGR_INNER_HTML = `
             </p>
 
             <div class="add-player-form">
-                <input type="text" id="input-new-player" class="input-name" placeholder="なまえ (ひらがな 12もじ)" maxlength="12" data-i18n-placeholder="pm_placeholder">
+                <input type="text" id="input-new-player" class="input-name" placeholder="なまえ (12もじまで)" maxlength="12" data-i18n-placeholder="pm_placeholder">
                 <button id="btn-add-player" class="btn btn-success" style="border-radius:10px;" data-i18n="btn_add">ついか</button>
             </div>
 
@@ -250,7 +250,7 @@ document.getElementById('container').innerHTML = (GAME.gameLayerHTML || _GAME_LA
                 body: JSON.stringify({
                     game: gameId || GAME.sbGame,
                     difficulty: difficulty||'normal',
-                    player_name: name||'ゲスト',
+                    player_name: (typeof FGLName !== 'undefined' ? FGLName.display(name || 'ゲスト', 'ゲスト') : (name || 'ゲスト')),
                     point_score: Math.round(score)||0,
                     stage_score: stage||0,
                     turns: stage||0,
@@ -277,7 +277,7 @@ document.getElementById('container').innerHTML = (GAME.gameLayerHTML || _GAME_LA
             const data = await res.json();
             return data.map(r=>({
                 uid: '',
-                name: r.player_name,
+                name: (typeof FGLName !== 'undefined' ? FGLName.display(r.player_name, 'ななしさん') : r.player_name),
                 score: r.point_score,
                 stage: r.stage_score || 0,
                 clear: r.class_name === 'クリア',
@@ -393,13 +393,11 @@ const STRINGS = {
         "rank_empty": "記録なし",
         "pm_title": "プレーヤーをえらぶ",
         "pm_hint": "<b>ひらがな</b>　でにゅうりょくしてね<br>みんなが見るなまえです<br>ていねいなことばをつかってね",
-        "pm_placeholder": "なまえ (ひらがな 12もじ)",
+        "pm_placeholder": "なまえ (12もじまで)",
         "pm_empty_list": "プレーヤーがいません。<br>うえから ついか してね。",
         "pm_delete_title": "さくじょ",
         "btn_add": "ついか",
         "delete_confirm": "{name} をさくじょしますか？",
-        "alert_hiragana_only": "ひらがな で にゅうりょく してね。（カタカナや かんじは つかえません）",
-        "alert_ng_word": "そのなまえは つかえません。",
         "alert_max_players": "とうろくできるのは 5人 までです。",
         "alert_duplicate_name": "すでに そのなまえは あります。",
         "boss_appear": "👹 <b>ボスが あらわれた！</b>",
@@ -524,13 +522,11 @@ const STRINGS = {
         "rank_empty": "きろくなし",
         "pm_title": "プレーヤーを えらぶ",
         "pm_hint": "<b>ひらがな</b>　で にゅうりょくしてね<br>みんなが みる なまえです<br>ていねいな ことばを つかってね",
-        "pm_placeholder": "なまえ (ひらがな 12もじ)",
+        "pm_placeholder": "なまえ (12もじまで)",
         "pm_empty_list": "プレーヤーが いません。<br>うえから ついか してね。",
         "pm_delete_title": "さくじょ",
         "btn_add": "ついか",
         "delete_confirm": "{name} を さくじょしますか？",
-        "alert_hiragana_only": "ひらがな で にゅうりょく してね。（カタカナや かんじは つかえません）",
-        "alert_ng_word": "そのなまえは つかえません。",
         "alert_max_players": "とうろくできるのは 5人 までです。",
         "alert_duplicate_name": "すでに そのなまえは あります。",
         "boss_appear": "👹 <b>ボスが あらわれた！</b>",
@@ -655,13 +651,11 @@ const STRINGS = {
         "rank_empty": "No records",
         "pm_title": "Choose Player",
         "pm_hint": "Use <b>Hiragana</b> only<br>This name is shown to everyone<br>Please use polite language",
-        "pm_placeholder": "Name (Hiragana, up to 12)",
+        "pm_placeholder": "Name (up to 12)",
         "pm_empty_list": "No players yet.<br>Add one above.",
         "pm_delete_title": "Delete",
         "btn_add": "Add",
         "delete_confirm": "Delete {name}?",
-        "alert_hiragana_only": "Please use Hiragana only (no Katakana or Kanji).",
-        "alert_ng_word": "That name cannot be used.",
         "alert_max_players": "You can register up to 5 players.",
         "alert_duplicate_name": "That name is already registered.",
         "boss_appear": "👹 <b>A boss appeared!</b>",
@@ -779,56 +773,7 @@ function closeSettings() {
  * Game Configuration & State
  */
 
-// NGワードリスト（ひらがな）
-const NG_WORDS_HIRAGANA = [
-    'しね', 'しぬ', 'しに', 'ころす', 'ころせ', 'さつがい', 'くたばれ',
-    'じさつ', 'ぎさつ', 'つるす', 'れんたん', 'しにたい',
-    'てろ', 'てろりすと', 'ばくは', 'ばくだん', 'ほうか',
-    'はんざい', 'ごうとう', 'ゆうかい', 'かんきん', 'おそう',
-    'やくざ', 'ぼうりょく', 'はんぐれ', 'ちんぴら', 'まふぃあ',
-    'たいま', 'まやく', 'かくせいざい', 'しゃぶ', 'どらっぐ', 'こかいん',
-    'へろいん', 'えくすたしー', 'だっぽう', 'きめせく',
-    'いじめ', 'ぎゃくたい',
-    'ばか', 'あほ', 'まぬけ', 'きちがい', 'き違い',
-    'うざい', 'うざ', 'きもい', 'きも', 'きしょい', 'きえろ',
-    'くず', 'ごみ', 'ごみむし', 'かす', 'ざこ', 'ぜつ',
-    'ぶす', 'でぶ', 'はげ', 'ちび', 'でっぱ', 'いなかもの',
-    'うじ', 'はいぼく', 'まけいぬ', 'おつむ', 'のうたりん',
-    'ていのう', 'ちしょう', 'しょうがい', 'がいじ', 'かたわ', 'びっこ',
-    'めくら', 'つんぼ', 'おし', 'どじん', 'えた', 'ひにん',
-    'たひ', 'たひね',
-    'うせろ', 'だまれ',
-    'ちんちん', 'ちんこ', 'ちんぽ', 'ちんか', 'まら', 'さお',
-    'まんこ', 'まんしゅう', 'まんげ', 'われめ', 'おまた',
-    'くり', 'くりとりす', 'いんしん', 'いんかく', 'びらびら',
-    'こうがん', 'たまきん', 'きんたま', 'ふぐり',
-    'おっぱい', 'ちち', 'にゅうりん', 'にゅうとう', 'きょにゅう', 'ひんにゅう',
-    'けつ', 'あなる', 'こうもん', 'けつのあな',
-    'えろ', 'えっち', 'すけべ', 'へんたい', 'むっつり', 'しこ',
-    'せっくす', 'せいこう', 'まぐわい', 'そうにゅう', 'はめる',
-    'おなにー', 'じい', 'しこしこ', 'ふぇら', 'ぱいずり', 'くんに',
-    'いらま', 'しっしん', 'なかだし', 'ごっくん', 'ぶっかけ',
-    'しおふき', 'ぜっちょう', 'いく', 'いかせろ', 'あえぎ',
-    'どうてい', 'しょじょ', 'やりまん', 'やりちん', 'びっち',
-    'せふれ', 'ぱこ', 'ぱこぱこ', 'わいせつ', 'ろり', 'しょた', 'ぺど',
-    'きんしん', 'じゅうかん', 'りょうじょく', 'らんこう', 'すかんと',
-    'のーぱん', 'ぱんちら',
-    'れいぷ', 'ごうかん', 'ちかん', 'とうさつ', 'のぞき', 'ろしゅつ',
-    'ふうぞく', 'そーぷ', 'へるす', 'でりへる', 'ぴんさろ', 'いめくら',
-    'あだると', 'えーぶい', 'えぶい', 'ぽるの', 'うらびでお', 'むしゅうせい',
-    'えんこう', 'えんじょ', 'うり', 'かいしゅん', 'ばいしゅん',
-    'ぱぱかつ', 'ままかつ', 'うりせん',
-    'うんこ', 'うんち', 'くそ', 'げり', 'べん', 'ふん',
-    'しっこ', 'しょんべん', 'にょう', 'ほうにょう',
-    'へ', 'おなら', 'げろ', 'たん',
-    'うんえい', 'こうしき', 'すたっふ', 'かんり', 'ぱとろーる',
-    'じえむ', 'げーむますたー', 'ますたー', 'あどみん', 'しすてむ',
-    'さーばー', 'あかばん', 'ばん', 'ちーと', 'ちーたー', 'ばぐ',
-    'らいん', 'かかお', 'すかいぷ', 'いんすた', 'ついったー', 'でぃすこ',
-    'でんわ', 'ばんごう', 'けいたい', 'あどれす', 'めあど', 'じゅうしょ',
-    'あお', 'あいたい', 'まちあわせ', 'ほてる', 'らぶほ', 'おふかい',
-    'ぱすわーど', 'ぱす', 'あかうんと', 'こじんじょうほう'
-];
+// ニックネームの検査(文字の決まり・NGワード)は共通の fgl-name.js(FGLName)で行う
 
 let CONFIG = Object.assign({}, PRESET_NORMAL);
 
@@ -1076,33 +1021,14 @@ function renderPlayerList() {
     });
 }
 
-function checkNGWord(text) {
-    for (const ng of NG_WORDS_HIRAGANA) {
-        if (text.includes(ng)) {
-            return true;
-        }
-    }
-    return false;
-}
-
-function validateHiragana(text) {
-    const regex = /^[ぁ-んー]+$/;
-    return regex.test(text);
-}
-
 function addPlayer() {
-    const name = ui.inputNewPlayer.value.trim();
-    if (!name) return;
-
-    if (!validateHiragana(name)) {
-        showCustomAlert(T('alert_hiragana_only'));
+    // 文字と数字なら何語でもOK(絵文字・記号は不可)。12文字まで。NGワード・個人情報は不可
+    const v = FGLName.validate(ui.inputNewPlayer.value);
+    if (!v.ok) {
+        if (v.reason !== 'empty') showCustomAlert(FGLName.message(v.reason, currentLang));
         return;
     }
-
-    if (checkNGWord(name)) {
-        showCustomAlert(T('alert_ng_word'));
-        return;
-    }
+    const name = v.name;
 
     let list = loadPlayers();
     if (list.length >= 5) {
@@ -1288,6 +1214,6 @@ function renderRankRows(rows) {
     list.innerHTML = rows.map((d, i) => {
         const cls = 'rk-row' + (i < 3 ? ' r' + (i + 1) : '') + ((d.name || '') === state.playerName ? ' me' : '');
         const res = d.clear ? `<span class="rk-res clear">${T('rank_result_clear')}</span>` : (d.stage ? `<span class="rk-res">${T('rank_result_stage', { n: d.stage })}</span>` : '<span></span>');
-        return `<li class="${cls}"><span class="rk-no">${i + 1}</span><span class="rk-name">${esc(d.name || state.playerName)}</span><span class="rk-star">${d.star ? '★' + d.star : ''}</span>${res}<span class="rk-score">${d.score}</span><span class="rk-sub">${esc(d.date || '')}</span></li>`;
+        return `<li class="${cls}"><span class="rk-no">${i + 1}</span><span class="rk-name">${esc(FGLName.display(d.name || state.playerName, 'ななしさん'))}</span><span class="rk-star">${d.star ? '★' + d.star : ''}</span>${res}<span class="rk-score">${d.score}</span><span class="rk-sub">${esc(d.date || '')}</span></li>`;
     }).join('');
 }

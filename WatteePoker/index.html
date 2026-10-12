@@ -802,6 +802,7 @@
         .toast { position: absolute; left: 50%; top: 90px; transform: translateX(-50%); background: rgba(44,58,79,0.94); color: #fff; padding: 12px 30px; border-radius: 60px; font-weight: 800; font-size: 1.3rem; z-index: 500; pointer-events: none; animation: toastIn 1.8s ease forwards; white-space: nowrap; }
         @keyframes toastIn { 0% { opacity: 0; transform: translate(-50%,-10px); } 12% { opacity: 1; transform: translate(-50%,0); } 80% { opacity: 1; } 100% { opacity: 0; } }
     </style>
+    <script src="../fgl-name.js?v=20261223"></script>
     <script src="../tutorial-engine.js"></script>
 </head>
 <body>
@@ -1046,7 +1047,7 @@
         const res = await fetch(`${_base}/rankings`, {
             method: 'POST', headers: _hdr, keepalive: true,
             body: JSON.stringify({
-                game: GAME_ID, difficulty: difficulty || 'normal_1', player_name: name || 'ななしさん',
+                game: GAME_ID, difficulty: difficulty || 'normal_1', player_name: FGLName.display(name || 'ななしさん'),
                 point_score: score || 0, stage_score: stage || 0, turns: stage || 0, class_name: statusTag || ''
             })
         });
@@ -1057,7 +1058,7 @@
         const res = await fetch(`${_base}/rankings`, {
             method: 'POST', headers: _hdr, keepalive: true,
             body: JSON.stringify({
-                game: HAND_ID, difficulty: difficulty || 'normal_1', player_name: name || 'ななしさん',
+                game: HAND_ID, difficulty: difficulty || 'normal_1', player_name: FGLName.display(name || 'ななしさん'),
                 point_score: score || 0, stage_score: stage || 0, turns: stage || 0, class_name: roleId || ''
             })
         });
@@ -1092,7 +1093,7 @@
                 data = cleared.concat(others);
             }
             return data.map(r => ({
-                name: r.player_name, tag: r.class_name, score: r.point_score, turns: r.turns,
+                name: FGLName.display(r.player_name), tag: r.class_name, score: r.point_score, turns: r.turns,
                 star: parseInt(String(r.difficulty || '').split('_').pop(), 10) || 0,
                 date: r.created_at ? new Date(r.created_at).toLocaleDateString('ja-JP') : ''
             }));
@@ -1702,9 +1703,10 @@ function updateNameRegisterBtn(){
 }
 function addPlayerName(){
     const inp = document.getElementById('name-reg-input');
-    const name = inp.value.trim();
-    if (!name) return;
-    if (name.length > 12){ showCustomAlert(ui('name_too_long')); return; }
+    // 文字と数字なら何語でもOK(絵文字・記号は不可)。12文字まで。NGワード・個人情報は不可(共通の fgl-name.js)
+    const v = FGLName.validate(inp.value);
+    if (!v.ok){ if (v.reason !== 'empty') showCustomAlert(FGLName.message(v.reason, currentLang)); return; }
+    const name = v.name;
     const list = getPlayerNames();
     if (list.includes(name)){ showCustomAlert(ui('name_duplicate')); return; }
     list.push(name);
@@ -2840,7 +2842,7 @@ function renderRankList(rows){
             : `<span class="rk-res${isClearTag(r.tag) ? ' clear' : ''}">${escapeHtml(r.tag || '')}</span>`;
         return `<li class="${cls}">
             <span class="rk-no">${i + 1}</span>
-            <span class="rk-name">${escapeHtml(r.name)}</span>
+            <span class="rk-name">${escapeHtml(FGLName.display(r.name))}</span>
             <span class="rk-star">${'★'.repeat(r.star || 0)}</span>
             ${mid}
             <span class="rk-score">${rankScore(r)}</span>
