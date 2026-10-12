@@ -18,7 +18,7 @@
     <link rel="stylesheet" href="../braves-common.css?v=20261221">
     <link rel="stylesheet" href="../fgl-felt.css?v=2">
     <link rel="stylesheet" href="fraction-ui.css?v=20">
-    <link rel="stylesheet" href="fraction-game.css?v=28">
+    <link rel="stylesheet" href="fraction-game.css?v=32">
     <script src="../tutorial-engine.js"></script>
 </head>
 <body>
@@ -87,12 +87,25 @@ const GAME = {
         pts.push('100% 100%');
         return 'polygon(' + pts.join(',') + ')';
     },
-    // ステージクリアの画面: きそてん・コンボばいりつ・AP回復
-    clearRows: (st, stageScore) => `<div><span>${T('fc_base')}</span><b>${state.roundBase}</b></div>`
-        + (state.roundWholes ? `<div><span>${T('fc_hole')} ${state.roundWholes}</span><b>×${state.roundHole.toFixed(1)}</b></div>` : '')
-        + (state.roundHit ? `<div><span>${T(TARGET_TIERS[state.roundTier].key)}</span><b>×${state.roundTarget}</b></div>` : '')
-        + `<div><span>${T('fc_heal')}</span><b>+${state.roundHeal}</b></div>`
-        + (state.roundUp || []).map(u => `<div class="up"><span>${T('fc_form_up', { f: u.v === UNIT_MAX ? '1' : fracParts(u.v).n + '/' + fracParts(u.v).d })} Lv+${u.lv}</span><b>+${u.lv * FORM_LV_PTS}</b></div>`).join(''),
+    // ステージクリアの画面: 計算(きほんてん × ホール × ターゲット) → このステージのスコア → ライン → 大きく ごうけいスコア → きほんてんアップ(図とLv)
+    clearHTML: (st, stageScore) => {
+        const pts = T('unit_pts');
+        const nm = v => v === UNIT_MAX ? '1' : fracParts(v).n + '/' + fracParts(v).d;
+        const pie = v => { const d = document.createElement('div'); d.innerHTML = cakeSVG(UNIT_MAX); paintCake(d.firstElementChild, v, UNIT_MAX); return d.innerHTML; };
+        const calc = `<div class="cl-row"><span>${T('fc_base')}</span><b>${state.roundBase}</b></div>`
+            + (state.roundWholes ? `<div class="cl-row"><span>${T('fc_hole')}　${state.roundWholes}</span><b>×${state.roundHole.toFixed(1)}</b></div>` : '')
+            + (state.roundHit ? `<div class="cl-row"><span>${T(TARGET_TIERS[state.roundTier].key)}</span><b>×${state.roundTarget}</b></div>` : '')
+            + `<div class="cl-row stage"><span>${T('sc_stage_score')}</span><b>${stageScore}${pts}</b></div>`;
+        const total = `<div class="cl-total"><span>${T('result_total_score')}</span><b>${state.score}${pts}</b></div>`;
+        const ups = (state.roundUp || []).map((u, i) => `<div class="cl-up${i ? ' sub' : ''}" style="--cc:${sizeColor(u.v)}">
+                <div class="cu-pie">${pie(u.v)}</div>
+                <div class="cu-fr">${nm(u.v)}</div>
+                <div class="cu-lv"><span>Lv${u.from}</span><i>▶</i><b>Lv${u.to}</b></div>
+                <div class="cu-pts"><span>${BASE_PTS + FORM_LV_PTS * u.from}</span><i>▶</i><b>${BASE_PTS + FORM_LV_PTS * u.to}</b></div>
+                <em>+${u.lv}</em>
+            </div>`).join('');
+        return `<div class="cl-calc">${calc}</div>${total}<div class="cl-uptitle"><span>${T('fc_up_title')}</span><em>${T('fc_heal')} +${state.roundHeal}</em></div><div class="cl-ups">${ups}</div>`;
+    },
     endBreakdown: () => `${T('fc_end_score')} ${state.endBase} ＋ ${T('fc_end_ap')} ${state.apBonus}`,
     // タイトル: このゲーム専用の作り(いちごピンクのギンガム+ひさし、左にスロット、右に大きさのちがうボタン)
     titleHTML: `
@@ -211,6 +224,7 @@ const GAME = {
             fc_done: "できあがり！",
             label_whole_bonus: "ホールボーナス", label_whole_count: "ホールの数", label_whole_rate: "ばいりつ",
             label_forms: "きほんてん", fc_form_up: "{f}の きほんてん",
+            fc_up_title: "きほんてん アップ！",
             particle_target_add: "ターゲットが ふえた！", particle_target_dup: "ターゲット ×{n}！", target_hint: "ホールを つくると ふえる！", diff_master: "めいじん", diff_legend: "でんせつ",
             fc_log_change: "手札を チェンジ (AP −1)", fc_log_clear: "ステージクリア！ <b>+{n}</b>",
             fc_hits: "あたった ターゲット", fc_hits_unit: "まい", fc_base: "きほんてん", fc_rate: "コンボ倍率", fc_heal: "AP回復", fc_end_score: "スコア", fc_end_ap: "APボーナス",
@@ -236,6 +250,7 @@ const GAME = {
             fc_done: "できあがり！",
             label_whole_bonus: "ホールボーナス", label_whole_count: "ホールの かず", label_whole_rate: "ばいりつ",
             label_forms: "きほんてん", fc_form_up: "{f}の きほんてん",
+            fc_up_title: "きほんてん アップ！",
             particle_target_add: "ターゲットが ふえた！", particle_target_dup: "ターゲット ×{n}！", target_hint: "ホールを つくると ふえる！", diff_master: "めいじん", diff_legend: "でんせつ",
             fc_log_change: "てふだを チェンジ (AP −1)", fc_log_clear: "ステージクリア！ <b>+{n}</b>",
             fc_hits: "あたった ターゲット", fc_hits_unit: "まい", fc_base: "きほんてん", fc_rate: "コンボばいりつ", fc_heal: "APかいふく", fc_end_score: "スコア", fc_end_ap: "APボーナス",
@@ -261,6 +276,7 @@ const GAME = {
             fc_done: "Done!",
             label_whole_bonus: "Whole Bonus", label_whole_count: "Wholes", label_whole_rate: "Rate",
             label_forms: "Base Pts", fc_form_up: "{f} base",
+            fc_up_title: "Base Points Up!",
             particle_target_add: "A new target!", particle_target_dup: "Target x{n}!", target_hint: "Make a whole to add one!", diff_master: "Master", diff_legend: "Legend",
             fc_log_change: "Changed the hand (AP −1)", fc_log_clear: "Stage clear! <b>+{n}</b>",
             fc_hits: "Targets hit", fc_hits_unit: "", fc_base: "Base pts", fc_rate: "Combo Rate", fc_heal: "AP Restored", fc_end_score: "Score", fc_end_ap: "AP Bonus",
@@ -289,8 +305,8 @@ DIVISIONS.forEach((n) => {
 <script src="../fgl-name.js?v=20261223"></script>
 <script src="../braves-common.js?v=20261223"></script>
 <script src="fraction-art.js?v=20261430"></script>
-<script src="fraction.js?v=20261441"></script>
-<script src="../braves-run.js?v=20261430"></script>
+<script src="fraction.js?v=20261442"></script>
+<script src="../braves-run.js?v=20261442"></script>
 <script>
 // ============================================================
 // チュートリアル（練習プレイ）

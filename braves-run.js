@@ -215,7 +215,7 @@ function showStageClear(st, stageScore) {
     document.getElementById('sc-title').textContent = T('stage_clear_title', { n: st });
     document.getElementById('sc-theme').textContent = stageName(st);
     const pts = T('unit_pts');
-    document.getElementById('sc-rows').innerHTML =
+    document.getElementById('sc-rows').innerHTML = GAME.clearHTML ? GAME.clearHTML(st, stageScore) :
         `<div><span>${T('sc_stage_score')}</span><b>${stageScore}${pts}</b></div>` +
         (GAME.clearRows ? GAME.clearRows(st, stageScore) : `<div><span>${T('sc_time_bonus')}</span><b>+${stageClearTime(st)}</b></div>` +
         `<div><span>${T('sc_time_now')}</span><b>${state.time}</b></div>`) +

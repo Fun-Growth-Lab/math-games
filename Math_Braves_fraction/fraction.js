@@ -231,7 +231,7 @@ function roundClear() {
     const upLv = Math.max(1, Math.min(FORM_UP_MAX, Math.floor(total / FORM_UP_PER)));     // 点数しだい: 100台=+1, 200台=+2 … さいだい +5
     state.roundUp = [{ v: form, lv: upLv }];
     if (pick) state.roundUp.push({ v: pick, lv: FORM_UP_RANDOM });
-    state.roundUp.forEach(u => { state.formLv[u.v] = (state.formLv[u.v] || 0) + u.lv; });
+    state.roundUp.forEach(u => { u.from = state.formLv[u.v] || 0; state.formLv[u.v] = u.from + u.lv; u.to = state.formLv[u.v]; });
     state.ap += heal;
     noteBestPlay(total);
     state.score += total;
