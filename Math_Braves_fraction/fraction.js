@@ -205,15 +205,12 @@ function roundClear() {
     state.stageScores[state.stage - 1] = total;
     state.inputLocked = true;
     updateUI();
-    fxText(360, 330, T('particle_ap_gain', { n: heal }), '#ffb066', 44);
-    if (hit) fxText(360, 280, T(TARGET_TIERS[state.targetTier].key) + '！', TARGET_TIERS[state.targetTier].color, 44);
-    confetti();
-    document.querySelectorAll('.fc-cake').forEach(el => el.classList.add('matched'));
+    completeFx(total, heal);
     setTimeout(() => {
         if (state.screen !== 'PLAYING') return;
         if (state.stage >= CONFIG.maxRound) { finishRun(true); return; }
         showStageClear(state.stage, total);
-    }, 1000);
+    }, 1500);
 }
 
 // ---- RUNの結果 ----
@@ -290,16 +287,32 @@ function burst(x, y, color, n) {
         layer.appendChild(el);
     }
 }
-function confetti() {
+// できあがりの演出: ケーキが順にポンッとはね、輪とキラキラが広がり、台を光がさっと走って、点数がふわっと上がる
+function completeFx(total, heal) {
     const layer = document.getElementById('bl');
-    if (!layer) return;
-    for (let i = 0; i < 44; i++) {
+    const add = (cls, css, text) => {
+        if (!layer) return null;
         const el = document.createElement('i');
-        el.className = 'fc-cf';
-        el.style.cssText = `left:${10 + Math.random() * 700}px;top:${-20 - Math.random() * 60}px;background:hsl(${Math.random() * 360} 90% 62%);--dx:${(Math.random() - 0.5) * 120}px;animation-delay:${Math.random() * 0.5}s;animation-duration:${1.4 + Math.random() * 0.9}s`;
+        el.className = cls; el.style.cssText = css;
+        if (text) el.textContent = text;
         el.addEventListener('animationend', () => el.remove());
         layer.appendChild(el);
-    }
+        return el;
+    };
+    const cols = ['#ffd24a', '#fff6c0', '#8cc4f6', '#ffa84a', '#ffffff'];
+    document.querySelectorAll('.fc-cake').forEach((el, i) => {
+        el.style.setProperty('--i', i);
+        el.classList.add('done');
+        const cx = cakeX(i) + CAKE / 2, cy = CAKE_Y + CAKE / 2, t = i * 0.12;
+        add('fx-ring', `left:${cx}px;top:${cy}px;width:${CAKE}px;height:${CAKE}px;animation-delay:${t + 0.1}s`);
+        for (let k = 0; k < 8; k++) {
+            const a = (k / 8) * Math.PI * 2 + Math.random() * 0.4, d = CAKE * 0.55 + Math.random() * 40;
+            add('fx-star', `left:${cx}px;top:${cy}px;color:${cols[(i + k) % cols.length]};--dx:${Math.cos(a) * d}px;--dy:${Math.sin(a) * d}px;--s:${0.7 + Math.random() * 0.7};animation-delay:${t + 0.1}s`);
+        }
+    });
+    add('fx-sweep', '');
+    add('fx-score', `left:360px;top:${CAKE_Y + CAKE / 2}px;animation-delay:.35s`, '+' + total);
+    if (heal) add('fx-heal', `left:360px;top:60px;animation-delay:.6s`, 'AP +' + heal);
 }
 
 // カードを持っているとき、どのケーキの上にいるか
@@ -408,7 +421,7 @@ function updateUI() {
         grid.innerHTML = `<div class="tc-card new" style="--cc:${sizeColor(v)}"><div class="tc-cake">${d.innerHTML}</div><div class="tc-fr">${fracHTML(v)}</div></div>`;
         const area = document.getElementById('card-target');
         area.className = 'fc-tarea tier-' + state.targetMul;
-        document.getElementById('disp-target-name').innerHTML = `<span>${T(TARGET_TIERS[state.targetTier].key).replace(/^(スーパー|グッド|ビッグ)/, '$1<br>')}</span><b>×${state.targetMul}</b>`;
+        document.getElementById('disp-target-name').innerHTML = `<span>${T(TARGET_TIERS[state.targetTier].key).replace(/^(スーパー)/, '$1<br>')}</span><b>×${state.targetMul}</b>`;
     }
 }
 function gameLoop() {
