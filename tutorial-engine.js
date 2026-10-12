@@ -267,6 +267,8 @@
         } else {
             hole.style.display = 'none';
             dim.style.display = 'block';
+            // overview:true(画面全体の説明)は、画面の並びが見えるように うすく暗くするだけにする
+            dim.style.background = s.overview ? 'rgba(0,0,0,0.22)' : '';
             blockers.forEach(function (b, i) {
                 if (i === 0 && s.type === 'say') { b.style.display = 'block'; b.style.left = '0px'; b.style.top = '0px'; b.style.width = m.W + 'px'; b.style.height = m.H + 'px'; }
                 else b.style.display = 'none';
