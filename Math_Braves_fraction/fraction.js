@@ -9,13 +9,13 @@
 let CAKE_N = 3, CAKE = 210, CAKE_Y = 151, CAKE_GAP = 14, LAB_Y = 369, LAB_W = 124, PILL_H = 96, PILL_F = 2.3;
 function setLayout(n) {
     CAKE_N = n;
-    CAKE = n <= 3 ? 210 : n === 4 ? 158 : 126;
-    CAKE_GAP = n <= 3 ? 14 : n === 4 ? 12 : 10;
-    PILL_H = n <= 3 ? 96 : n === 4 ? 84 : 72;
-    PILL_F = n <= 3 ? 2.3 : n === 4 ? 2.0 : 1.65;
+    CAKE = n <= 3 ? 200 : n === 4 ? 158 : 126;
+    CAKE_GAP = n <= 3 ? 16 : n === 4 ? 12 : 10;
+    PILL_H = n <= 3 ? 90 : n === 4 ? 82 : 72;
+    PILL_F = n <= 3 ? 2.1 : n === 4 ? 1.9 : 1.65;
     LAB_W = Math.min(124, CAKE + 8);
     const groupH = CAKE + 8 + PILL_H;
-    CAKE_Y = Math.round(150 + (322 - groupH) / 2);       // 台(上150〜下472)の まん中に ケーキと札をそろえる
+    CAKE_Y = Math.round(178 + (300 - groupH) / 2);       // 台(上178〜下478)の まん中に ケーキと札をそろえる。上の30pxは「AP+1」の札の場所
     LAB_Y = CAKE_Y + CAKE + 8;
 }
 function cakeX(i) { return (720 - (CAKE_N * CAKE + (CAKE_N - 1) * CAKE_GAP)) / 2 + i * (CAKE + CAKE_GAP); }
@@ -150,12 +150,12 @@ function processAttack(cardIdx, cakeIdx) {
     if (next > UNIT_MAX) next -= UNIT_MAX; else if (next === UNIT_MAX) one = true;
     state.cakes[cakeIdx] = next;
     const cx = cakeX(cakeIdx) + CAKE / 2, cy = CAKE_Y + CAKE / 2;
-    burst(cx, cy, '#ffd24a', 14);
+    burst(cx, cy, '#edc96a', 14);
     if (one) {
-        fxText(cx, cy - 40, T('particle_whole'), '#ff8a7a', 42);   // ちょうど「1」(ホール)
-        burst(cx, cy, '#ff8fb0', 22);
+        fxText(cx, cy - 40, T('particle_whole'), '#e89a8a', 42);   // ちょうど「1」(ホール)
+        burst(cx, cy, '#e394a8', 22);
         state.wholes++;                                            // ホール: このステージのスコア +20%
-        fxText(cx, cy - 90, '×' + (1 + WHOLE_RATE * state.wholes).toFixed(1), '#ffb724', 38);
+        fxText(cx, cy - 90, '×' + (1 + WHOLE_RATE * state.wholes).toFixed(1), '#e8bc5a', 38);
     }
     if (raw >= UNIT_MAX && !state.apGot[cakeIdx]) {                // 12時をまわった(ちょうど でも こえても): ケーキ1つにつき ステージで1回 AP +1
         state.apGot[cakeIdx] = true;
@@ -247,7 +247,7 @@ function fcInit() {
     for (let i = 0; i < CAKE_N; i++) {
         h += `<div class="fc-cake" data-i="${i}" style="left:${cakeX(i)}px;top:${CAKE_Y}px;width:${CAKE}px;height:${CAKE}px">${cakeSVG(CONFIG.gridDiv)}</div>`;
         h += `<div class="fc-lab" data-i="${i}" style="left:${cakeX(i) + CAKE / 2 - LAB_W / 2}px;top:${LAB_Y}px;width:${LAB_W}px;--ph:${PILL_H}px;--pf:${PILL_F}rem"></div>`;
-        h += `<div class="fc-apb" data-i="${i}" style="left:${cakeX(i) + CAKE - 62}px;top:${CAKE_Y - 4}px;width:62px;text-align:center">AP+${AP_WHOLE_HEAL}</div>`;
+        h += `<div class="fc-apb" data-i="${i}" style="left:${cakeX(i) + CAKE / 2 - 31}px;top:${CAKE_Y - 30}px;width:62px;text-align:center">AP+${AP_WHOLE_HEAL}</div>`;
     }
     h += `<div class="fc-hbox" style="left:${HAND_L - 6}px;top:${HAND_Y - 24}px;width:${HAND_AREA + 12}px;height:${HAND_H + 40}px"></div>`;
     h += `<div class="fc-tag t-cake">${T('tag_cake')}</div><div class="fc-tag t-hand" style="top:${HAND_Y - 44}px">${T('tag_hand')}</div>`;
@@ -395,17 +395,9 @@ function updateUI() {
         fcScore.textContent = state.score;
         if (!first && state.score > 0) { fcScore.classList.remove('bump'); void fcScore.offsetWidth; fcScore.classList.add('bump'); }
     }
-    // ホール: 作った数とスコアの倍率
-    const hm = document.getElementById('disp-hole-mul');
-    if (hm) {
-        hm.textContent = '×' + (1 + WHOLE_RATE * state.wholes).toFixed(1);
-        hm.closest('.sp-hole').setAttribute('data-mul', hm.textContent);
-        const hc = document.getElementById('disp-hole-cakes');
-        if (hc._n !== state.wholes) {
-            hc._n = state.wholes;
-            hc.innerHTML = state.wholes ? '<i></i>'.repeat(Math.min(state.wholes, 12)) + (state.wholes > 12 ? '<b>+</b>' : '') : '<span class="h0">0</span>';
-        }
-    }
+    // ホールボーナス: ホールの数と 倍率
+    const hn = document.getElementById('disp-hole-count'), hm = document.getElementById('disp-hole-mul');
+    if (hn) { hn.textContent = state.wholes; hm.textContent = '×' + (1 + WHOLE_RATE * state.wholes).toFixed(1); }
     // ターゲット: ケーキの絵と分数。名前と ばいりつ(×2〜×5)を言葉と色で
     const sig = state.targetVal + '|' + state.targetMul + '|' + UNIT_MAX + '|' + currentLang;
     if (FC.tsig !== sig) {
@@ -416,7 +408,7 @@ function updateUI() {
         grid.innerHTML = `<div class="tc-card new" style="--cc:${sizeColor(v)}"><div class="tc-cake">${d.innerHTML}</div><div class="tc-fr">${fracHTML(v)}</div></div>`;
         const area = document.getElementById('card-target');
         area.className = 'fc-tarea tier-' + state.targetMul;
-        document.getElementById('disp-target-name').innerHTML = `<span>${T(TARGET_TIERS[state.targetTier].key).replace(/^スーパー/, 'スーパー<br>')}</span><b>×${state.targetMul}</b>`;
+        document.getElementById('disp-target-name').innerHTML = `<span>${T(TARGET_TIERS[state.targetTier].key).replace(/^(スーパー|グッド|ビッグ)/, '$1<br>')}</span><b>×${state.targetMul}</b>`;
     }
 }
 function gameLoop() {

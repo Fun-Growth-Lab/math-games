@@ -14,7 +14,7 @@ function fracHTML(val) {
 }
 
 // ---- いちご・ケーキの かたち ----
-const STRAWB = (x, y, s) => `<g transform="translate(${x} ${y}) scale(${s})"><path d="M0 -3Q3 -11 9 -13" stroke="#3a8a2a" stroke-width="1.6" fill="none" stroke-linecap="round"/><circle cx="0" cy="2" r="7" fill="#e8344e" stroke="#a81830" stroke-width="1"/><circle cx="-2.4" cy="-0.6" r="1.8" fill="#fff" opacity=".75"/></g>`;
+const STRAWB = (x, y, s) => `<g transform="translate(${x} ${y}) scale(${s})"><path d="M0 -3Q3 -11 9 -13" stroke="#5a8a4a" stroke-width="1.6" fill="none" stroke-linecap="round"/><circle cx="0" cy="2" r="7" fill="#c9566e" stroke="#8f3042" stroke-width="1"/><circle cx="-2.4" cy="-0.6" r="1.8" fill="#fff" opacity=".75"/></g>`;
 function pt(cx, cy, r, deg) { const a = deg * Math.PI / 180; return [cx + r * Math.cos(a), cy + r * Math.sin(a)]; }
 function wedgePath(r, a0, a1) {
     const [x0, y0] = pt(100, 100, r, a0), [x1, y1] = pt(100, 100, r, a1);
@@ -27,8 +27,8 @@ function ringPath(r0, r1, a0, a1) {
 
 // 大きさ(○こ分)ごとの色。手札のカード・ケーキ・大きさの札・ターゲットが ぜんぶ同じ色で そろう(色を見れば大きさが分かる)
 //   1こ分=赤 2=だいだい 3=黄 4=みどり 5=青緑 6=青 7=あい 8=むらさき 9=ピンク / ちょうど1(ホール)=金
-const SIZE_COLORS = ['#ff5a5f', '#ff9a3c', '#ffd23f', '#5fd068', '#2ec4b6', '#3a9bff', '#7a6bff', '#b45cff', '#ff5fb0'];
-function sizeColor(val) { return val >= UNIT_MAX ? '#ffc61a' : SIZE_COLORS[(val - 1) % SIZE_COLORS.length]; }
+const SIZE_COLORS = ['#ff5a5f', '#ecaa60', '#ffd23f', '#5fd068', '#2ec4b6', '#3a9bff', '#7a6bff', '#b45cff', '#ff5fb0'];
+function sizeColor(val) { return val >= UNIT_MAX ? '#e8c050' : SIZE_COLORS[(val - 1) % SIZE_COLORS.length]; }
 function cakeColor(val) { return sizeColor(val); }
 
 // 上から見た ケーキ1つ(24きれ + 切り目 + 切り目ごとの いちご)。大きさは paintCake で変える
@@ -65,27 +65,27 @@ const ART = [
     // 0 ホールケーキ(よこから)
     SV(`<ellipse cx="75" cy="133" rx="66" ry="8" fill="rgba(0,0,0,.28)"/><ellipse cx="75" cy="125" rx="66" ry="12" fill="#fff" stroke="#eadfd6" stroke-width="3"/>
         <path d="M26 122V74H124V122Q124 134 75 134Q26 134 26 122Z" fill="#8a5240"/><path d="M26 99H124V109H26Z" fill="#fff4e4"/><path d="M26 109H124V122Q124 134 75 134Q26 134 26 122Z" fill="#6e3e2e"/>
-        <path d="M26 74Q26 62 75 62Q124 62 124 74Q124 86 75 86Q26 86 26 74Z" fill="#ffb3c8"/><path d="M26 74Q26 80 36 82V92Q36 96 42 96Q48 96 48 90V84H60V94Q60 99 66 99Q72 99 72 93V86H84V90Q84 96 90 96Q96 96 96 90V85Q110 83 118 80V90Q118 95 123 95Q124 95 124 90V74" fill="#ffb3c8"/>
-        <ellipse cx="75" cy="64" rx="49" ry="10" fill="#ffd0de"/><path d="M48 53 Q51 44 57 42" stroke="#3a8a2a" stroke-width="2.5" fill="none" stroke-linecap="round"/><circle cx="48" cy="62" r="9" fill="#e8344e" stroke="#a81830" stroke-width="1.5"/><circle cx="45" cy="59" r="2.6" fill="#fff" opacity=".8"/><path d="M75 59 Q78 50 84 48" stroke="#3a8a2a" stroke-width="2.5" fill="none" stroke-linecap="round"/><circle cx="75" cy="68" r="9" fill="#e8344e" stroke="#a81830" stroke-width="1.5"/><circle cx="72" cy="65" r="2.6" fill="#fff" opacity=".8"/><path d="M102 53 Q105 44 111 42" stroke="#3a8a2a" stroke-width="2.5" fill="none" stroke-linecap="round"/><circle cx="102" cy="62" r="9" fill="#e8344e" stroke="#a81830" stroke-width="1.5"/><circle cx="99" cy="59" r="2.6" fill="#fff" opacity=".8"/>
+        <path d="M26 74Q26 62 75 62Q124 62 124 74Q124 86 75 86Q26 86 26 74Z" fill="#f2c4d0"/><path d="M26 74Q26 80 36 82V92Q36 96 42 96Q48 96 48 90V84H60V94Q60 99 66 99Q72 99 72 93V86H84V90Q84 96 90 96Q96 96 96 90V85Q110 83 118 80V90Q118 95 123 95Q124 95 124 90V74" fill="#f2c4d0"/>
+        <ellipse cx="75" cy="64" rx="49" ry="10" fill="#ffd0de"/><path d="M48 53 Q51 44 57 42" stroke="#5a8a4a" stroke-width="2.5" fill="none" stroke-linecap="round"/><circle cx="48" cy="62" r="9" fill="#c9566e" stroke="#8f3042" stroke-width="1.5"/><circle cx="45" cy="59" r="2.6" fill="#fff" opacity=".8"/><path d="M75 59 Q78 50 84 48" stroke="#5a8a4a" stroke-width="2.5" fill="none" stroke-linecap="round"/><circle cx="75" cy="68" r="9" fill="#c9566e" stroke="#8f3042" stroke-width="1.5"/><circle cx="72" cy="65" r="2.6" fill="#fff" opacity=".8"/><path d="M102 53 Q105 44 111 42" stroke="#5a8a4a" stroke-width="2.5" fill="none" stroke-linecap="round"/><circle cx="102" cy="62" r="9" fill="#c9566e" stroke="#8f3042" stroke-width="1.5"/><circle cx="99" cy="59" r="2.6" fill="#fff" opacity=".8"/>
         <rect x="71" y="30" width="8" height="26" rx="2" fill="#7ec8f0" stroke="#3a8fc0" stroke-width="1.5"/><path d="M75 12C70 18 70 24 75 28C80 24 80 18 75 12Z" fill="#ffb300"/>`),
     // 1 ケーキの1きれ
     SV(`<ellipse cx="75" cy="130" rx="62" ry="8" fill="rgba(0,0,0,.28)"/><ellipse cx="75" cy="124" rx="62" ry="11" fill="#fff" stroke="#eadfd6" stroke-width="3"/>
-        <polygon points="22,76 128,66 80,38" fill="#ffc2d4" stroke="#e58aa6" stroke-width="2"/>
-        <polygon points="22,76 128,66 128,112 22,122" fill="#f0bb72"/><polygon points="22,94 128,86 128,96 22,104" fill="#fff4e4"/><polygon points="22,76 128,66 128,76 22,86" fill="#ffd9e4"/>
+        <polygon points="22,76 128,66 80,38" fill="#f4cdd8" stroke="#e58aa6" stroke-width="2"/>
+        <polygon points="22,76 128,66 128,112 22,122" fill="#f0bb72"/><polygon points="22,94 128,86 128,96 22,104" fill="#fff4e4"/><polygon points="22,76 128,66 128,76 22,86" fill="#f8e0e8"/>
         ${STRAWB(80, 60, 1.6)}`),
     // 2 いちご
-    SV(`<ellipse cx="75" cy="134" rx="40" ry="6" fill="rgba(0,0,0,.25)"/><g transform="translate(75 78) scale(6.4)"><path d="M0 -7C6 -9 11 -2 8 4C6 9 0 12 0 12C0 12 -6 9 -8 4C-11 -2 -6 -9 0 -7Z" fill="#e8344e" stroke="#a81830" stroke-width=".6"/><path d="M-5 -8 0 -12 5 -8 2 -6 0 -9 -2 -6Z" fill="#37b24d"/><g fill="#ffe0a8"><circle cx="-3" cy="0" r=".9"/><circle cx="3" cy="1" r=".9"/><circle cx="0" cy="5" r=".9"/><circle cx="-2.5" cy="7.5" r=".7"/><circle cx="2.5" cy="6.5" r=".7"/><circle cx="-4.5" cy="4" r=".7"/><circle cx="4.5" cy="4.5" r=".7"/><circle cx="0" cy="-3" r=".7"/></g></g>`),
+    SV(`<ellipse cx="75" cy="134" rx="40" ry="6" fill="rgba(0,0,0,.25)"/><g transform="translate(75 78) scale(6.4)"><path d="M0 -7C6 -9 11 -2 8 4C6 9 0 12 0 12C0 12 -6 9 -8 4C-11 -2 -6 -9 0 -7Z" fill="#c9566e" stroke="#8f3042" stroke-width=".6"/><path d="M-5 -8 0 -12 5 -8 2 -6 0 -9 -2 -6Z" fill="#37b24d"/><g fill="#ffe0a8"><circle cx="-3" cy="0" r=".9"/><circle cx="3" cy="1" r=".9"/><circle cx="0" cy="5" r=".9"/><circle cx="-2.5" cy="7.5" r=".7"/><circle cx="2.5" cy="6.5" r=".7"/><circle cx="-4.5" cy="4" r=".7"/><circle cx="4.5" cy="4.5" r=".7"/><circle cx="0" cy="-3" r=".7"/></g></g>`),
     // 3 カップケーキ
     SV(`<ellipse cx="75" cy="134" rx="46" ry="7" fill="rgba(0,0,0,.25)"/><path d="M34 82H116L104 130Q103 134 98 134H52Q47 134 46 130Z" fill="#ff9ec0" stroke="#d86a92" stroke-width="2"/><path d="M52 84L58 132M68 84L70 134M82 84L80 134M98 84L92 132" stroke="#ffd0e0" stroke-width="3"/>
-        <path d="M30 84Q26 62 50 62Q46 44 70 42Q72 24 90 34Q112 30 108 52Q126 58 120 84Z" fill="#fff4e4" stroke="#e8d2b8" stroke-width="2"/><path d="M44 74Q75 82 108 72" stroke="#ffd9e4" stroke-width="6" fill="none" stroke-linecap="round"/>
-        <circle cx="75" cy="30" r="9" fill="#d81b3c"/><path d="M75 22Q78 12 86 10" stroke="#3a8a2a" stroke-width="2.5" fill="none"/>`),
+        <path d="M30 84Q26 62 50 62Q46 44 70 42Q72 24 90 34Q112 30 108 52Q126 58 120 84Z" fill="#fff4e4" stroke="#e8d2b8" stroke-width="2"/><path d="M44 74Q75 82 108 72" stroke="#f8e0e8" stroke-width="6" fill="none" stroke-linecap="round"/>
+        <circle cx="75" cy="30" r="9" fill="#b8465a"/><path d="M75 22Q78 12 86 10" stroke="#5a8a4a" stroke-width="2.5" fill="none"/>`),
     // 4 上から見た3/4のケーキ
     SV(`<ellipse cx="75" cy="136" rx="58" ry="7" fill="rgba(0,0,0,.25)"/><circle cx="75" cy="75" r="68" fill="#fff" stroke="#eadfd6" stroke-width="3"/><circle cx="75" cy="75" r="62" fill="#fffaf3"/>
-        <path d="M75 75L75 13A62 62 0 1 1 13 75Z" fill="#ffb3c8" stroke="#e8a56a" stroke-width="1"/><path d="M75 75L75 13A62 62 0 1 1 13 75" fill="none" stroke="#e8b06a" stroke-width="9" opacity=".8"/>
+        <path d="M75 75L75 13A62 62 0 1 1 13 75Z" fill="#f2c4d0" stroke="#e8a56a" stroke-width="1"/><path d="M75 75L75 13A62 62 0 1 1 13 75" fill="none" stroke="#e8b06a" stroke-width="9" opacity=".8"/>
         <path d="M75 75L75 13M75 75L13 75M75 75L131 100" stroke="#b5835a" stroke-width="1.5" opacity=".5" fill="none"/>${STRAWB(100, 50, 1.2)}${STRAWB(103, 100, 1.2)}${STRAWB(55, 108, 1.2)}`),
     // 5 ケーキのおさら+フォーク
     SV(`<ellipse cx="75" cy="132" rx="62" ry="8" fill="rgba(0,0,0,.25)"/><ellipse cx="75" cy="112" rx="62" ry="22" fill="#fff" stroke="#eadfd6" stroke-width="3"/><ellipse cx="75" cy="112" rx="48" ry="15" fill="#fffaf3"/>
-        <path d="M44 108L84 72L96 108Z" fill="#f0bb72"/><path d="M44 108L84 72L88 82L50 108Z" fill="#fff4e4"/><path d="M84 72L96 108L108 100L92 66Z" fill="#ffc2d4"/>${STRAWB(86, 66, 1.3)}`)
+        <path d="M44 108L84 72L96 108Z" fill="#f0bb72"/><path d="M44 108L84 72L88 82L50 108Z" fill="#fff4e4"/><path d="M84 72L96 108L108 100L92 66Z" fill="#f4cdd8"/>${STRAWB(86, 66, 1.3)}`)
 ];
 // タイトル・RUNカードで使う絵。shape は ART の番号
 function monHTML(shape) { return ART[shape % ART.length]; }

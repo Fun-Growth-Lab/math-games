@@ -12,9 +12,9 @@ const DIVISIONS = [3, 4, 5, 6, 7, 8, 9, 10];
 const BASE_PTS = 100;
 const WHOLE_RATE = 0.2;
 const TARGET_TIERS = [                 // 出る確率(%)は 昔の 70/15/10/5。1ステージ目は かならず いちばん下
-    { mul: 2, w: 70, key: 'target_chance', color: '#ffe27a' },        // チャンス
-    { mul: 3, w: 15, key: 'target_good', color: '#ffb35a' },          // グッドチャンス
-    { mul: 4, w: 10, key: 'target_big', color: '#ff8a7a' },           // ビッグチャンス
+    { mul: 2, w: 70, key: 'target_chance', color: '#f0d890' },        // チャンス
+    { mul: 3, w: 15, key: 'target_good', color: '#eab070' },          // グッドチャンス
+    { mul: 4, w: 10, key: 'target_big', color: '#e89a8a' },           // ビッグチャンス
     { mul: 5, w: 5, key: 'target_supergood', color: '#e8a0ff' },      // スーパービッグチャンス
 ];
 const AP_BONUS_PTS = 5;                // クリア・ゲームオーバー時の のこりAP 1つにつき
