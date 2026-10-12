@@ -186,14 +186,17 @@ function renderRunSelect() {
     document.getElementById('rs-next').disabled = runSelIdx >= RUN_LIST.length - 1;
 }
 function centerRunStrip() {
-    const vp = document.getElementById('rs-viewport');
-    const PAD = 22, n = RUN_LIST.length;
-    const total = n * RS_CARD_W + (n - 1) * RS_GAP + PAD * 2;
+    const vp = document.getElementById('rs-viewport'), strip = document.getElementById('rs-strip');
     const vw = vp.clientWidth || 1010;
-    let x = vw / 2 - (PAD + runSelIdx * (RS_CARD_W + RS_GAP) + RS_CARD_W / 2);
+    const cards = strip.querySelectorAll('.rs-card');
+    const last = cards[cards.length - 1], cur = cards[runSelIdx];
+    // 実際の位置から決める(CSSの gap や 余白が かわっても ずれない)。いちばん右のカードも 全部 見えるように 余白を足す
+    const total = last ? last.offsetLeft + last.offsetWidth + 22 + 12 : vw;
+    const center = cur ? cur.offsetLeft + cur.offsetWidth / 2 : vw / 2;
+    let x = vw / 2 - center;
     x = Math.max(Math.min(0, vw - total), Math.min(0, x));
     if (total < vw) x = (vw - total) / 2;           // カードが少ない時は中央に寄せる
-    document.getElementById('rs-strip').style.transform = `translateX(${x}px)`;
+    strip.style.transform = `translateX(${x}px)`;
 }
 
 // ---- ステージ演出 ----
