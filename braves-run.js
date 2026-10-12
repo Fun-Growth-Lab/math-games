@@ -226,6 +226,7 @@ bindBtn(document.getElementById('sc-go'), () => {
     const box = document.getElementById('stage-clear');
     if (box.classList.contains('hidden')) return;
     box.classList.add('hidden');
+    if (GAME.beforeNextStage) { GAME.beforeNextStage(() => startStage(state.stage + 1)); return; }   // ゲームごとのショップなど
     startStage(state.stage + 1);
 });
 

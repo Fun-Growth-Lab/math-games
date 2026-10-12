@@ -4,10 +4,8 @@
 //   ケーキは「24分のいくつ」で持つ(24=ちょうど1)。1をこえたらのこりだけが残る。
 //   APはカードを使う・手札をチェンジするたびに1へる(0でゲームオーバー)。ステージクリアでAP回復。全10ステージ。
 //   ホール(ちょうど「1」)を作るたびに、ターゲットが1まい増える(カンドラ)。同じ大きさがかさなると ×まい数。
-//   トッピング: カード1まいにつき1つ。のせるたびにケーキの下の数がふえる。ケーキの大きさ(○こ分)の倍数なら「ぴったり」。
-//   点数: ケーキ1つ100点(ぴったりなら300点)。3つともぴったりなら+100。ターゲットに当たったら その点をもう1回ずつ足す。最後にのこりAP×100。
-// ステージ制RUN(ラウンド=ステージ。★で しょきゅう/ちゅうきゅう/じょうきゅう)の画面は braves-run.js が受け持つ。
-
+//   トッピング: カードに0〜3個。のせたケーキに積まれて、1つにつき +10点。点数: ケーキ1つ100点+トッピング。
+//   ターゲットに当たるごとに、そのステージのスコアの50%を足す。クリアでコインがもらえ、ショップで能力アップ。
 // 画面の寸法(ゲームエリア 720x720)
 const CAKE = 206, CAKE_Y = 160, CAKE_GAP = 20;
 function cakeX(i) { return (720 - (3 * CAKE + 2 * CAKE_GAP)) / 2 + i * (CAKE + CAKE_GAP); }
@@ -15,7 +13,7 @@ const LAB_Y = CAKE_Y + CAKE + 4;                       // 大きさの札
 const HAND_W = 104, HAND_H = 140, HAND_GAP = 16, HAND_Y = 522, HAND_L = 20, HAND_AREA = 680;   // 手札はケーキの真下に近づけて、横はば いっぱいに並べる
 
 Object.assign(state, {
-    ap: 10, cakes: [0, 0, 0], tops: [0, 0, 0], targets: [],
+    ap: 10, cakes: [0, 0, 0], tops: [0, 0, 0], targets: [], coins: 0, run: null,
     phase: 'IDLE', tutorial: false, lastEq: '',
     roundBase: 0, roundHeal: 0, endBase: 0, apBonus: 0
 });
@@ -72,9 +70,10 @@ function backToTitle() {
 
 function initGame() {
     state.score = 0; state.bestPlay = 0; state.stage = 1; state.runMode = false; state.stageStartScore = 0; state.stageScores = []; state.tutorial = false;
-    state.ap = CONFIG.startAp || 10; state.cakes = [0, 0, 0]; state.tops = [0, 0, 0]; state.targets = []; state.cards = []; state.dragInfo = null; state.lastEq = '';
+    state.ap = CONFIG.startAp || 10; state.cakes = [0, 0, 0]; state.tops = [0, 0, 0]; state.targets = [];
+    state.coins = 0; state.run = { topLv: 0, healUp: 0, spiceLv: 0, shapes: {}, favs: {}, favUses: 0, bought: [] }; state.cards = []; state.dragInfo = null; state.lastEq = '';
     state.inputLocked = false; state.phase = 'IDLE';
-    state.endBase = 0; state.apBonus = 0; state.roundHits = 0; state.roundPerfect = 0; state.roundCakePts = 0; state.roundBonus = 0; state.roundSub = 0;
+    state.endBase = 0; state.apBonus = 0; state.roundHits = 0; state.roundCakePts = 0; state.roundTopSum = 0; state.roundTopPts = 0; state.roundTargetPts = 0; state.roundShape = false; state.roundSub = 0; state.roundCoins = 0;
     state.width = 720; state.height = 720; canvas.width = 720; canvas.height = 720;
     hideAllOverlays();
     clearFcLayer();
@@ -92,11 +91,18 @@ function handX(i, n) {
     const w = cnt * HAND_W + (cnt - 1) * HAND_GAP;
     return HAND_L + (HAND_AREA - w) / 2 + i * (HAND_W + HAND_GAP);
 }
+// カードのトッピング数(0〜3)。ショップの「たね」のLvで出やすさが変わる
+function drawTop() {
+    const w = TOP_WEIGHTS[Math.min(state.run ? state.run.topLv : 0, TOP_WEIGHTS.length - 1)];
+    let r = Math.random() * w.reduce((a, b) => a + b, 0);
+    for (let k = 0; k < w.length; k++) { r -= w[k]; if (r < 0) return k; }
+    return 0;
+}
 function makeCard(i, n) {
     const types = CONFIG.cardTypes.filter(v => v !== UNIT_MAX);
     const val = types[getRandomInt(0, types.length - 1)];
     const x = handX(i, n);
-    return { val: val, x: x, y: HAND_Y, w: HAND_W, h: HAND_H, targetX: x, targetY: HAND_Y, isDragging: false };
+    return { val: val, top: drawTop(), x: x, y: HAND_Y, w: HAND_W, h: HAND_H, targetX: x, targetY: HAND_Y, isDragging: false };
 }
 function fillHand() {
     state.cards = [];
@@ -112,7 +118,7 @@ function startRound(n) {
     const start = types.filter(v => v < UNIT_MAX);          // はじめのケーキは ちょうど1でない大きさ
     do { state.cakes = [0, 1, 2].map(() => start[getRandomInt(0, start.length - 1)]); }
     while (state.cakes[0] === state.cakes[1] && state.cakes[1] === state.cakes[2]);
-    state.tops = [0, 1, 2].map(() => getRandomInt(1, TOP_INIT_MAX));   // はじめから のっているトッピング
+    state.tops = [0, 0, 0];
     if (n === 1 || !state.cards.length) fillHand();
     state.phase = 'PLAY';
     clearFcLayer(true);
@@ -136,7 +142,8 @@ function processAttack(cardIdx, cakeIdx) {
     if (next > UNIT_MAX) next -= UNIT_MAX; else if (next === UNIT_MAX) one = true;
     state.lastEq = `${fracText(cur)} + ${fracText(c.val)} = ${fracText(raw)}` + (raw > UNIT_MAX ? ` → ${fracText(next)}` : '');
     state.cakes[cakeIdx] = next;
-    state.tops[cakeIdx]++;                       // カード1まいにつき トッピング1つ
+    state.tops[cakeIdx] += c.top;                // カードのトッピングが ケーキにのる
+    if (state.run && state.run.favs[c.val]) state.run.favUses++;   // おきにいりカード: 使うたび 最終スコアの倍率が上がる
     const cx = cakeX(cakeIdx) + CAKE / 2, cy = CAKE_Y + CAKE / 2;
     burst(cx, cy, '#ffd24a', 14);
     if (one) {
@@ -175,26 +182,30 @@ function checkGameOver() {
 
 function roundClear() {
     if (state.screen !== 'PLAYING') return;
-    const size = state.cakes[0];
-    const perfect = state.tops.map(t => t > 0 && t % size === 0);              // トッピングが「ケーキの大きさ」の倍数ぴったり
-    const nPerfect = perfect.filter(Boolean).length;
-    const cakePts = perfect.reduce((sum, p) => sum + (p ? CAKE_PERFECT_PTS : CAKE_PTS), 0);
-    const bonus = nPerfect === 3 ? PERFECT_BONUS : 0;
+    const size = state.cakes[0], R = state.run;
+    const topSum = state.tops.reduce((a, b) => a + b, 0);
+    const cakePts = CAKE_PTS * 3, topPts = topSum * TOP_PTS;
     const hits = state.targets.filter(v => v === size).length;                // 当たったターゲットのまい数
-    const sub = cakePts + bonus;
-    const total = sub * (1 + hits);                                           // ターゲット1まいごとに、同じ点をもう1回
-    state.roundHits = hits; state.roundPerfect = nPerfect; state.roundCakePts = cakePts; state.roundBonus = bonus; state.roundSub = sub;
-    state.roundBase = sub; state.roundHeal = CONFIG.apHeal;
-    state.ap += CONFIG.apHeal;
+    const rate = TARGET_RATE + 0.1 * R.spiceLv;                               // ターゲット1まいで +50%(スパイスで +10%ずつ)
+    const subtotal = cakePts + topPts;
+    const targetPts = Math.round(subtotal * rate * hits);
+    const shapeMul = R.shapes[size] ? 1.1 : 1;                                // かたちマスター
+    const total = Math.round((subtotal + targetPts) * shapeMul);
+    const coins = coinsFor(total);
+    const heal = CONFIG.apHeal + R.healUp;
+    state.roundHits = hits; state.roundCakePts = cakePts; state.roundTopSum = topSum; state.roundTopPts = topPts;
+    state.roundTargetPts = targetPts; state.roundShape = shapeMul > 1; state.roundSub = subtotal;
+    state.roundCoins = coins; state.roundHeal = heal;
+    state.coins += coins;
+    state.ap += heal;
     noteBestPlay(total);
     state.score += total;
     state.stageScores[state.stage - 1] = total;
     state.inputLocked = true;
     updateUI();
-    fxText(360, 330, T('particle_ap_gain', { n: CONFIG.apHeal }), '#ffb066', 44);
-    perfect.forEach((p, i) => { if (p) fxText(cakeX(i) + CAKE / 2, CAKE_Y + 70, T('particle_perfect'), '#ffd24a', 34); });
-    if (nPerfect === 3) fxText(360, 250, T('particle_perfect_all'), '#ff4a7a', 44);
-    if (hits > 0) fxText(360, 300, T('particle_target_bonus'), '#ffe27a', 40);
+    fxText(360, 330, T('particle_ap_gain', { n: heal }), '#ffb066', 44);
+    if (hits > 0) fxText(360, 280, T('particle_target_bonus'), '#ffe27a', 40);
+    fxText(360, 380, '+' + coins + T('coin_unit'), '#ffb724', 40);
     confetti();
     document.querySelectorAll('.fc-cake').forEach(el => el.classList.add('matched'));
     setTimeout(() => {
@@ -213,7 +224,8 @@ function finishRun(cleared) {
     if (state.stageScores[state.stage - 1] === undefined) state.stageScores[state.stage - 1] = 0;
     state.endBase = state.score;
     state.apBonus = Math.max(0, state.ap) * 100;
-    const total = state.endBase + state.apBonus;
+    state.favMul = 1 + 0.03 * (state.run ? state.run.favUses : 0);              // おきにいりカードの倍率
+    const total = Math.round((state.endBase + state.apBonus) * state.favMul);
     state.score = total;
     updateUI();
     const key = starKey(state.star);
@@ -318,13 +330,12 @@ function renderFc() {
         if (el._v !== v) { el._v = v; paintCake(el.firstElementChild, v, CONFIG.gridDiv); FC.labs[i].innerHTML = `<div class="pill">${fracHTML(v)}</div>`; }
         el.classList.toggle('over', i === ov);
         FC.labs[i].classList.toggle('over', i === ov);
-        // トッピングの数(ケーキの大きさの倍数ならぴったり=強調)
-        const tp = FC.tops[i], tv = state.tops[i], ok = tv > 0 && v > 0 && tv % v === 0;
-        const sg = tv + '|' + ok;
-        if (tp._sg !== sg) {
-            tp._sg = sg;
-            tp.className = 'fc-top' + (ok ? ' ok' : '');
-            tp.innerHTML = `<span class="tpi">${TOP_ICO}</span><b>× ${tv}</b>${ok ? `<em>${T('top_ok')}</em>` : ''}`;
+        // ケーキの下: のっているトッピングの数
+        const tp = FC.tops[i], tv = state.tops[i];
+        if (tp._sg !== tv) {
+            tp._sg = tv;
+            tp.className = 'fc-top' + (tv > 0 ? ' has' : '');
+            tp.innerHTML = `<span class="tpi">${TOP_ICO}</span><b>× ${tv}</b><em>+${tv * TOP_PTS}</em>`;
         }
     }
     // チェンジのボタン(右パネルの下)
@@ -341,7 +352,7 @@ function renderFc() {
             el.addEventListener('animationend', () => { el._popping = false; el.classList.remove('pop'); });
             el._card = c; FC.hand[i] = el;
             el.style.width = c.w + 'px'; el.style.height = c.h + 'px';
-            el.innerHTML = `<div class="tpi">${TOP_ICO}</div><div class="nm">${fracHTML(c.val)}</div>`;
+            el.innerHTML = `<div class="tpi">${c.top ? TOP_ICO.repeat(c.top) : '<i class="t0">—</i>'}</div><div class="nm">${fracHTML(c.val)}</div>`;
             document.getElementById('bl').appendChild(el);
             el._popping = true; el.classList.add('pop');
         }
@@ -379,6 +390,9 @@ function updateUI() {
         fcScore.textContent = state.score;
         if (!first && state.score > 0) { fcScore.classList.remove('bump'); void fcScore.offsetWidth; fcScore.classList.add('bump'); }
     }
+    // コイン・最終スコアの倍率
+    const ce = document.getElementById('disp-coins'), me = document.getElementById('disp-mult');
+    if (ce) { ce.textContent = state.coins; me.textContent = '×' + (1 + 0.03 * (state.run ? state.run.favUses : 0)).toFixed(2); }
     // ターゲット(カードをならべる。同じ大きさは1まいにまとめて ×まい数)
     const sig = state.targets.join(',') + '|' + UNIT_MAX;
     if (FC.tsig !== sig) {
