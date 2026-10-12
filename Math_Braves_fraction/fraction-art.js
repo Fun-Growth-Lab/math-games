@@ -67,9 +67,9 @@ const SV = (b) => `<svg viewBox="0 0 150 150" width="150" height="150" style="po
 const ART = [
     // 0 ホールケーキ(よこから)
     SV(`<ellipse cx="75" cy="133" rx="66" ry="8" fill="rgba(0,0,0,.28)"/><ellipse cx="75" cy="125" rx="66" ry="12" fill="#fff" stroke="#eadfd6" stroke-width="3"/>
-        <path d="M26 122V74H124V122Q124 134 75 134Q26 134 26 122Z" fill="#f0bb72"/><path d="M26 99H124V109H26Z" fill="#fff4e4"/><path d="M26 109H124V122Q124 134 75 134Q26 134 26 122Z" fill="#e9a95a"/>
+        <path d="M26 122V74H124V122Q124 134 75 134Q26 134 26 122Z" fill="#8a5240"/><path d="M26 99H124V109H26Z" fill="#fff4e4"/><path d="M26 109H124V122Q124 134 75 134Q26 134 26 122Z" fill="#6e3e2e"/>
         <path d="M26 74Q26 62 75 62Q124 62 124 74Q124 86 75 86Q26 86 26 74Z" fill="#ffb3c8"/><path d="M26 74Q26 80 36 82V92Q36 96 42 96Q48 96 48 90V84H60V94Q60 99 66 99Q72 99 72 93V86H84V90Q84 96 90 96Q96 96 96 90V85Q110 83 118 80V90Q118 95 123 95Q124 95 124 90V74" fill="#ffb3c8"/>
-        <ellipse cx="75" cy="64" rx="49" ry="10" fill="#ffd0de"/>${STRAWB(48, 60, 1.5)}${STRAWB(75, 66, 1.6)}${STRAWB(102, 60, 1.5)}
+        <ellipse cx="75" cy="64" rx="49" ry="10" fill="#ffd0de"/><path d="M48 53 Q51 44 57 42" stroke="#3a8a2a" stroke-width="2.5" fill="none" stroke-linecap="round"/><circle cx="48" cy="62" r="9" fill="#e8344e" stroke="#a81830" stroke-width="1.5"/><circle cx="45" cy="59" r="2.6" fill="#fff" opacity=".8"/><path d="M75 59 Q78 50 84 48" stroke="#3a8a2a" stroke-width="2.5" fill="none" stroke-linecap="round"/><circle cx="75" cy="68" r="9" fill="#e8344e" stroke="#a81830" stroke-width="1.5"/><circle cx="72" cy="65" r="2.6" fill="#fff" opacity=".8"/><path d="M102 53 Q105 44 111 42" stroke="#3a8a2a" stroke-width="2.5" fill="none" stroke-linecap="round"/><circle cx="102" cy="62" r="9" fill="#e8344e" stroke="#a81830" stroke-width="1.5"/><circle cx="99" cy="59" r="2.6" fill="#fff" opacity=".8"/>
         <rect x="71" y="30" width="8" height="26" rx="2" fill="#7ec8f0" stroke="#3a8fc0" stroke-width="1.5"/><path d="M75 12C70 18 70 24 75 28C80 24 80 18 75 12Z" fill="#ffb300"/>`),
     // 1 ケーキの1きれ
     SV(`<ellipse cx="75" cy="130" rx="62" ry="8" fill="rgba(0,0,0,.28)"/><ellipse cx="75" cy="124" rx="62" ry="11" fill="#fff" stroke="#eadfd6" stroke-width="3"/>

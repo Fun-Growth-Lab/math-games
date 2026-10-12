@@ -84,9 +84,7 @@ const _HOWTO_HTML = `
         </div>
     </div>
 `;
-document.getElementById('container').innerHTML = (GAME.gameLayerHTML || _GAME_LAYER_HTML) + (GAME.howtoHTML || _HOWTO_HTML) + `
-    <!-- ==================== TITLE ==================== -->
-    <div id="title-screen" class="intro">
+const _TITLE_INNER_HTML = `
         <div class="ts-bg">
             <div class="ts-stars"></div><div class="ts-sun"></div>
             <div class="ts-city far" id="ts-city1"></div><div class="ts-city" id="ts-city2"></div>
@@ -115,7 +113,43 @@ document.getElementById('container').innerHTML = (GAME.gameLayerHTML || _GAME_LA
             <button id="btn-logout" class="btn btn-danger title-menu-btn hidden" style="display:none;">ログアウト</button>
             <div id="auth-status" style="display:none;"></div>
         </div>
-    </div>
+`;
+const _SETTINGS_INNER_HTML = `
+        <div class="overlay-content" style="width: 380px;">
+            <h2 style="color: #7e57c2; margin-top: 0; border:none;" data-i18n="settings_title">⚙ 設定</h2>
+            ${GAME.settingsExtraHTML || ''}
+            <p style="font-size:0.9rem; color:#888; margin-bottom:16px;" data-i18n="settings_sub">言語 / Language</p>
+            <div style="display:flex; flex-direction:column; gap:10px;">
+                <button id="lang-btn-simple" class="btn lang-btn" onclick="selectLanguage('simple')" data-i18n="lang_simple">かんたんなにほんご</button>
+                <button id="lang-btn-ja"     class="btn lang-btn" onclick="selectLanguage('ja')"     data-i18n="lang_ja">日本語</button>
+                <button id="lang-btn-en"     class="btn lang-btn" onclick="selectLanguage('en')"     data-i18n="lang_en">English</button>
+            </div>
+            <button id="btn-close-settings" class="btn" style="margin-top:20px;" data-i18n="btn_close">とじる</button>
+        </div>
+`;
+const _PLAYER_MGR_INNER_HTML = `
+        <div class="overlay-content" style="width: 400px;">
+            <h2 style="color: #ff7043; margin-top: 0; border:none;" data-i18n="pm_title">プレーヤーをえらぶ</h2>
+            <p style="font-size: 0.9rem; color: #888; line-height: 1.5;" data-i18n-html="pm_hint">
+                <b>ひらがな</b>　でにゅうりょくしてね<br>
+                みんなが見るなまえです<br>
+                ていねいなことばをつかってね
+            </p>
+
+            <div class="add-player-form">
+                <input type="text" id="input-new-player" class="input-name" placeholder="なまえ (ひらがな 12もじ)" maxlength="12" data-i18n-placeholder="pm_placeholder">
+                <button id="btn-add-player" class="btn btn-success" style="border-radius:10px;" data-i18n="btn_add">ついか</button>
+            </div>
+
+            <ul id="player-list-ul" class="player-list">
+                </ul>
+
+            <button id="btn-close-player-manager" class="btn" data-i18n="btn_close">とじる</button>
+        </div>
+`;
+document.getElementById('container').innerHTML = (GAME.gameLayerHTML || _GAME_LAYER_HTML) + (GAME.howtoHTML || _HOWTO_HTML) + `
+    <!-- ==================== TITLE ==================== -->
+    <div id="title-screen" class="intro">${GAME.titleHTML || _TITLE_INNER_HTML}</div>
 
     <!-- ==================== RUN SELECT ==================== -->
     <div id="run-select-screen" class="screen hidden">
@@ -153,19 +187,7 @@ document.getElementById('container').innerHTML = (GAME.gameLayerHTML || _GAME_LA
 
     <div id="run-end-screen" class="hidden"></div>
 
-    <div id="settings-screen" class="hidden">
-        <div class="overlay-content" style="width: 380px;">
-            <h2 style="color: #7e57c2; margin-top: 0; border:none;" data-i18n="settings_title">⚙ 設定</h2>
-            ${GAME.settingsExtraHTML || ''}
-            <p style="font-size:0.9rem; color:#888; margin-bottom:16px;" data-i18n="settings_sub">言語 / Language</p>
-            <div style="display:flex; flex-direction:column; gap:10px;">
-                <button id="lang-btn-simple" class="btn lang-btn" onclick="selectLanguage('simple')" data-i18n="lang_simple">かんたんなにほんご</button>
-                <button id="lang-btn-ja"     class="btn lang-btn" onclick="selectLanguage('ja')"     data-i18n="lang_ja">日本語</button>
-                <button id="lang-btn-en"     class="btn lang-btn" onclick="selectLanguage('en')"     data-i18n="lang_en">English</button>
-            </div>
-            <button id="btn-close-settings" class="btn" style="margin-top:20px;" data-i18n="btn_close">とじる</button>
-        </div>
-    </div>
+    <div id="settings-screen" class="hidden">${GAME.settingsHTML || _SETTINGS_INNER_HTML}</div>
 
     <div id="ranking-screen" class="screen hidden">
         <div class="rs-top">
@@ -188,26 +210,7 @@ document.getElementById('container').innerHTML = (GAME.gameLayerHTML || _GAME_LA
         </div>
     </div>
 
-    <div id="player-manager-overlay" class="hidden">
-        <div class="overlay-content" style="width: 400px;">
-            <h2 style="color: #ff7043; margin-top: 0; border:none;" data-i18n="pm_title">プレーヤーをえらぶ</h2>
-            <p style="font-size: 0.9rem; color: #888; line-height: 1.5;" data-i18n-html="pm_hint">
-                <b>ひらがな</b>　でにゅうりょくしてね<br>
-                みんなが見るなまえです<br>
-                ていねいなことばをつかってね
-            </p>
-
-            <div class="add-player-form">
-                <input type="text" id="input-new-player" class="input-name" placeholder="なまえ (ひらがな 12もじ)" maxlength="12" data-i18n-placeholder="pm_placeholder">
-                <button id="btn-add-player" class="btn btn-success" style="border-radius:10px;" data-i18n="btn_add">ついか</button>
-            </div>
-
-            <ul id="player-list-ul" class="player-list">
-                </ul>
-
-            <button id="btn-close-player-manager" class="btn" data-i18n="btn_close">とじる</button>
-        </div>
-    </div>
+    <div id="player-manager-overlay" class="hidden">${GAME.playerManagerHTML || _PLAYER_MGR_INNER_HTML}</div>
 
     <!-- ブラウザ標準alert()の代替 -->
     <div id="custom-alert-overlay" class="simple-overlay hidden">
