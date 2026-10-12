@@ -150,17 +150,17 @@ function processAttack(cardIdx, cakeIdx) {
     if (next > UNIT_MAX) next -= UNIT_MAX; else if (next === UNIT_MAX) one = true;
     state.cakes[cakeIdx] = next;
     const cx = cakeX(cakeIdx) + CAKE / 2, cy = CAKE_Y + CAKE / 2;
-    burst(cx, cy, '#edc96a', 14);
+    burst(cx, cy, '#ffd24a', 14);
     if (one) {
-        fxText(cx, cy - 40, T('particle_whole'), '#e89a8a', 42);   // ちょうど「1」(ホール)
-        burst(cx, cy, '#e394a8', 22);
+        fxText(cx, cy - 40, T('particle_whole'), '#ff9a7a', 42);   // ちょうど「1」(ホール)
+        burst(cx, cy, '#7cbaf0', 22);
         state.wholes++;                                            // ホール: このステージのスコア +20%
-        fxText(cx, cy - 90, '×' + (1 + WHOLE_RATE * state.wholes).toFixed(1), '#e8bc5a', 38);
+        fxText(cx, cy - 90, '×' + (1 + WHOLE_RATE * state.wholes).toFixed(1), '#ffc43a', 38);
     }
     if (raw >= UNIT_MAX && !state.apGot[cakeIdx]) {                // 12時をまわった(ちょうど でも こえても): ケーキ1つにつき ステージで1回 AP +1
         state.apGot[cakeIdx] = true;
         state.ap += AP_WHOLE_HEAL;
-        setTimeout(() => fxText(cx, cy + 10, 'AP +' + AP_WHOLE_HEAL, '#ff4a7a', 40), 150);
+        setTimeout(() => fxText(cx, cy + 10, 'AP +' + AP_WHOLE_HEAL, '#2a68b0', 40), 150);
     }
     state.cards[cardIdx] = makeCard(cardIdx);
     state.cards[cardIdx]._fresh = true;
