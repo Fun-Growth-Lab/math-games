@@ -116,9 +116,12 @@ function startRound(n) {
     state.stageStartScore = state.score;
     const types = CONFIG.cardTypes;                         // 1〜n(n=ちょうど1)
     state.targetVal = types[getRandomInt(0, types.length - 1)];      // ターゲットの大きさ
-    // ターゲットの倍率(×2〜×5)。1ステージ目は かならず ×2
+    // ターゲットの倍率(×2〜×5)。1ステージ目は かならず ×2、さいしゅうステージは かならず いちばんよい(×5)
     state.targetMul = TARGET_TIERS[0].mul; state.targetTier = 0;
-    if (n > 1) {
+    if (n >= CONFIG.maxRound) {
+        const t = TARGET_TIERS.length - 1;
+        state.targetMul = TARGET_TIERS[t].mul; state.targetTier = t;
+    } else if (n > 1) {
         let r = Math.random() * TARGET_TIERS.reduce((a, t) => a + t.w, 0);
         for (let i = 0; i < TARGET_TIERS.length; i++) { r -= TARGET_TIERS[i].w; if (r < 0) { state.targetMul = TARGET_TIERS[i].mul; state.targetTier = i; break; } }
     }
@@ -225,7 +228,8 @@ function roundClear() {
     const others = [];
     for (let v = 1; v <= UNIT_MAX; v++) if (v !== form) others.push(v);
     const pick = others.length ? others[getRandomInt(0, others.length - 1)] : 0;
-    state.roundUp = [{ v: form, lv: FORM_UP_CLEAR }];
+    const upLv = Math.max(1, Math.min(FORM_UP_MAX, Math.floor(total / FORM_UP_PER)));     // 点数しだい: 100台=+1, 200台=+2 … さいだい +5
+    state.roundUp = [{ v: form, lv: upLv }];
     if (pick) state.roundUp.push({ v: pick, lv: FORM_UP_RANDOM });
     state.roundUp.forEach(u => { state.formLv[u.v] = (state.formLv[u.v] || 0) + u.lv; });
     state.ap += heal;
