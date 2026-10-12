@@ -11,6 +11,10 @@ const DIVISIONS = [3, 4, 5, 6, 7, 8, 9, 10];
 //   ターゲットボーナス: ターゲットの大きさでそろえたら ×2 / ×3 / ×4 / ×5 (4だんかい)。はずれは ×1
 const BASE_PTS = 100;
 const WHOLE_RATE = 0.2;
+// 「かたち」(そろえた大きさ)ごとの基本点: Lvが1上がるごとに +20。ステージクリアで、そろえたかたちが +2Lv、ほかのかたち1つ(ランダム)が +1Lv
+const FORM_LV_PTS = 20;
+const FORM_UP_CLEAR = 2;
+const FORM_UP_RANDOM = 1;
 const TARGET_TIERS = [                 // 出る確率(%)は 昔の 70/15/10/5。1ステージ目は かならず いちばん下
     { mul: 2, w: 70, key: 'target_chance', color: '#ffe27a' },        // チャンス
     { mul: 3, w: 15, key: 'target_good', color: '#ffb35a' },          // グッドチャンス

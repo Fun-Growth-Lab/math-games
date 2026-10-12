@@ -4,7 +4,7 @@
 //   ケーキは3つ(難易度なし)。全部の大きさをそろえて「できあがり」ボタンを押すとステージクリア。
 //   APはカードを使う・手札をチェンジするたびに1へる(0でゲームオーバー)。ステージクリアでAP回復。
 //   ホール(ちょうど「1」)を作ると、そのステージのスコアが +20%。ケーキが12時をまわる(1に とどく・こえる)と、ケーキ1つにつき ステージで1回だけ AP+1。
-//   点数 = 基本点100 × ホールボーナス × ターゲットボーナス(チャンス×2 / グッド×3 / ビッグ×4 / スーパー×5)。
+//   点数 = 基本点(かたちごと 100+20×Lv) × ホールボーナス × ターゲットボーナス(チャンス×2 / グッド×3 / ビッグ×4 / スーパー×5)。
 // 画面の寸法(ゲームエリア 720x720)。ケーキの数(CAKE_N)によって大きさが変わる
 let CAKE_N = 3, CAKE = 210, CAKE_Y = 151, CAKE_GAP = 14, LAB_Y = 369, LAB_W = 124, PILL_H = 96, PILL_F = 2.3;
 function setLayout(n) {
@@ -122,6 +122,7 @@ function startRound(n) {
         let r = Math.random() * TARGET_TIERS.reduce((a, t) => a + t.w, 0);
         for (let i = 0; i < TARGET_TIERS.length; i++) { r -= TARGET_TIERS[i].w; if (r < 0) { state.targetMul = TARGET_TIERS[i].mul; state.targetTier = i; break; } }
     }
+    if (n === 1 || !state.formLv) state.formLv = Array(UNIT_MAX + 1).fill(0);   // かたち(1/n〜n/n)ごとの Lv。RUNのあいだ つづく
     state.wholes = 0;                                       // このステージで作ったホールの数
     const start = types.filter(v => v < UNIT_MAX);          // はじめのケーキは ちょうど1でない大きさ
     do { state.cakes = Array.from({ length: CAKE_N }, () => start[getRandomInt(0, start.length - 1)]); }
@@ -136,6 +137,25 @@ function startRound(n) {
     document.getElementById('game-area').style.setProperty('--sc', STAGE_THEMES[Math.min(n, STAGE_COUNT) - 1].c);
 }
 
+function formPts(v) { return BASE_PTS + FORM_LV_PTS * ((state.formLv && state.formLv[v]) || 0); }
+// 左パネルの「きほんてん」表: かたち(ケーキの図)ごとの基本点。Lvが上がると ふえる。いつも見える
+function renderForms() {
+    const box = document.getElementById('form-grid');
+    if (!box || !state.formLv) return;
+    const sig = state.formLv.join(',') + '|' + UNIT_MAX + '|' + state.targetVal + '|' + currentLang;
+    if (FC.fsig === sig) return;
+    FC.fsig = sig;
+    let h = '';
+    for (let v = 1; v <= UNIT_MAX; v++) {
+        const lv = state.formLv[v] || 0;
+        const d = document.createElement('div'); d.innerHTML = cakeSVG(UNIT_MAX); paintCake(d.firstElementChild, v, UNIT_MAX);
+        const p = fracParts(v);
+        const name = v === UNIT_MAX ? '1' : p.n + '/' + p.d;
+        h += '<div class="fm-chip' + (v === state.targetVal ? ' tgt' : '') + (lv ? ' up' : '') + '" style="--cc:' + sizeColor(v) + '"><div class="fm-pie">' + d.innerHTML + '</div><div class="fm-txt"><span class="fm-n">' + name + '</span><b class="fm-pts">' + formPts(v) + '</b></div>' + (lv ? '<em class="fm-lv">Lv' + lv + '</em>' : '') + '</div>';
+    }
+    box.className = 'form-grid n' + UNIT_MAX;
+    box.innerHTML = h;
+}
 function aligned() { const c = state.cakes; return c.length > 0 && c[0] > 0 && c.every(v => v === c[0]); }
 
 // ============================================================
@@ -195,10 +215,19 @@ function roundClear() {
     const hit = state.cakes[0] === state.targetVal;                           // ターゲットの大きさでそろった
     const holeMul = 1 + WHOLE_RATE * state.wholes;                            // ホールボーナス
     const tMul = hit ? state.targetMul : 1;                                   // ターゲットボーナス
-    const total = Math.round(BASE_PTS * holeMul * tMul);                      // 基本点 × ホール × ターゲット
+    const form = state.cakes[0];                                              // そろえたかたち
+    const base = formPts(form);                                               // かたちの基本点(100 + 20×Lv)
+    const total = Math.round(base * holeMul * tMul);                          // 基本点 × ホール × ターゲット
     const heal = CONFIG.apHeal;
-    state.roundBase = BASE_PTS; state.roundHole = holeMul; state.roundTarget = tMul; state.roundTier = state.targetTier; state.roundWholes = state.wholes; state.roundHit = hit;
+    state.roundBase = base; state.roundHole = holeMul; state.roundTarget = tMul; state.roundTier = state.targetTier; state.roundWholes = state.wholes; state.roundHit = hit;
     state.roundHeal = heal;
+    // かたちのLvアップ: そろえたかたち +2Lv / ほかのかたち(ランダム1つ) +1Lv
+    const others = [];
+    for (let v = 1; v <= UNIT_MAX; v++) if (v !== form) others.push(v);
+    const pick = others.length ? others[getRandomInt(0, others.length - 1)] : 0;
+    state.roundUp = [{ v: form, lv: FORM_UP_CLEAR }];
+    if (pick) state.roundUp.push({ v: pick, lv: FORM_UP_RANDOM });
+    state.roundUp.forEach(u => { state.formLv[u.v] = (state.formLv[u.v] || 0) + u.lv; });
     state.ap += heal;
     noteBestPlay(total);
     state.score += total;
@@ -408,6 +437,7 @@ function updateUI() {
         fcScore.textContent = state.score;
         if (!first && state.score > 0) { fcScore.classList.remove('bump'); void fcScore.offsetWidth; fcScore.classList.add('bump'); }
     }
+    renderForms();
     // ホールボーナス: ホールの数と 倍率
     const hn = document.getElementById('disp-hole-count'), hm = document.getElementById('disp-hole-mul');
     if (hn) { hn.textContent = state.wholes; hm.textContent = '×' + (1 + WHOLE_RATE * state.wholes).toFixed(1); }
