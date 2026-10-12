@@ -3,8 +3,8 @@
 // ルールは元のぶんすうと同じ: 3つのケーキに手札の分数カードをのせてたし、3つの大きさをぴったりそろえればラウンドクリア。
 //   ケーキは「24分のいくつ」で持つ(24=ちょうど1)。1をこえたらのこりだけが残る。
 //   APはカードを使う・手札をチェンジするたびに1へる(0でゲームオーバー)。ステージクリアでAP回復。全10ステージ。
-//   ホール(ちょうど「1」)を作るたびに、ターゲットが1まい増える(カンドラ)。同じ大きさがかさなると ×まい数。
-//   点数: ケーキ1つ100点(3つで300点)。ターゲットに当たるごとに、そのステージのスコアの50%を足す。クリアでコインがもらえ、ショップで能力アップ。
+//   ホール(ちょうど「1」)を作るたびに、そのステージのスコアが +10%(3こで×1.3)。
+//   点数 = 基本点100 × ホールボーナス × ターゲットボーナス(×2/×3/×4。3だんかい)。ステージクリアでAP回復。
 // 画面の寸法(ゲームエリア 720x720)
 const CAKE = 208, CAKE_Y = 198, CAKE_GAP = 16;
 function cakeX(i) { return (720 - (3 * CAKE + 2 * CAKE_GAP)) / 2 + i * (CAKE + CAKE_GAP); }
@@ -12,7 +12,7 @@ const LAB_Y = CAKE_Y + CAKE + 6;                       // 大きさの札
 const HAND_W = 116, HAND_H = 140, HAND_GAP = 14, HAND_Y = 552, HAND_L = 20, HAND_AREA = 680;   // 手札はケーキの真下に近づけて、横はば いっぱいに並べる
 
 Object.assign(state, {
-    ap: 10, cakes: [0, 0, 0], targets: [], coins: 0, run: null,
+    ap: 10, cakes: [0, 0, 0], targetVal: 0, targetMul: 2, wholes: 0,
     phase: 'IDLE', tutorial: false, lastEq: '',
     roundBase: 0, roundHeal: 0, endBase: 0, apBonus: 0
 });
@@ -67,10 +67,10 @@ function backToTitle() {
 
 function initGame() {
     state.score = 0; state.bestPlay = 0; state.stage = 1; state.runMode = false; state.stageStartScore = 0; state.stageScores = []; state.tutorial = false;
-    state.ap = CONFIG.startAp || 10; state.cakes = [0, 0, 0]; state.targets = [];
-    state.coins = 0; state.run = { healUp: 0, healFrac: 0, spiceLv: 0, shapes: {}, favs: {}, favUses: 0, bought: [] }; state.cards = []; state.dragInfo = null; state.lastEq = '';
+    state.ap = CONFIG.startAp || 10; state.cakes = [0, 0, 0];
+    state.wholes = 0; state.cards = []; state.dragInfo = null; state.lastEq = '';
     state.inputLocked = false; state.phase = 'IDLE';
-    state.endBase = 0; state.apBonus = 0; state.roundHits = 0; state.roundCakePts = 0; state.roundTargetPts = 0; state.roundShape = false; state.roundSub = 0; state.roundCoins = 0;
+    state.endBase = 0; state.apBonus = 0; state.roundBase = 0; state.roundHole = 1; state.roundTarget = 1; state.roundWholes = 0; state.roundHit = false;
     state.width = 720; state.height = 720; canvas.width = 720; canvas.height = 720;
     hideAllOverlays();
     clearFcLayer();
@@ -104,7 +104,14 @@ function startRound(n) {
     state.lastEq = '';
     state.stageStartScore = state.score;
     const types = CONFIG.cardTypes;                         // 1〜n(n=ちょうど1)
-    state.targets = [types[getRandomInt(0, types.length - 1)]];   // 最初のターゲット1まい。ホールを作るたびに増える
+    state.targetVal = types[getRandomInt(0, types.length - 1)];      // ターゲットの大きさ
+    // ターゲットの倍率(×2/×3/×4)。1ステージ目は かならず ×2
+    state.targetMul = TARGET_TIERS[0].mul;
+    if (n > 1) {
+        let r = Math.random() * TARGET_TIERS.reduce((a, t) => a + t.w, 0);
+        for (const t of TARGET_TIERS) { r -= t.w; if (r < 0) { state.targetMul = t.mul; break; } }
+    }
+    state.wholes = 0;                                       // このステージで作ったホールの数
     const start = types.filter(v => v < UNIT_MAX);          // はじめのケーキは ちょうど1でない大きさ
     do { state.cakes = [0, 1, 2].map(() => start[getRandomInt(0, start.length - 1)]); }
     while (state.cakes[0] === state.cakes[1] && state.cakes[1] === state.cakes[2]);
@@ -131,13 +138,13 @@ function processAttack(cardIdx, cakeIdx) {
     if (next > UNIT_MAX) next -= UNIT_MAX; else if (next === UNIT_MAX) one = true;
     state.lastEq = `${fracText(cur)} + ${fracText(c.val)} = ${fracText(raw)}` + (raw > UNIT_MAX ? ` → ${fracText(next)}` : '');
     state.cakes[cakeIdx] = next;
-    if (state.run && state.run.favs[c.val]) state.run.favUses++;   // おきにいりカード: 使うたび 最終スコアの倍率が上がる
     const cx = cakeX(cakeIdx) + CAKE / 2, cy = CAKE_Y + CAKE / 2;
     burst(cx, cy, '#ffd24a', 14);
     if (one) {
         fxText(cx, cy - 40, T('particle_whole'), '#ff8a7a', 42);   // ちょうど「1」(ホール)
         burst(cx, cy, '#ff8fb0', 22);
-        addTarget();                                               // カンドラ: ターゲットが1まい増える
+        state.wholes++;                                            // ホール: このステージのスコア +10%
+        fxText(cx, cy - 90, '×' + (1 + WHOLE_RATE * state.wholes).toFixed(1), '#ffb724', 38);
     }
     state.cards[cardIdx] = makeCard(cardIdx);
     state.cards[cardIdx]._fresh = true;
@@ -145,13 +152,6 @@ function processAttack(cardIdx, cakeIdx) {
     updateUI();
     if (aligned()) { state.phase = 'CLEAR_WAIT'; setTimeout(roundClear, 500); }
     else checkGameOver();
-}
-// ホールを作ったら、ターゲットを1まい足す(同じ大きさもありえる=かさなると ×2)
-function addTarget() {
-    const types = CONFIG.cardTypes, v = types[getRandomInt(0, types.length - 1)];
-    state.targets.push(v);
-    const dup = state.targets.filter(x => x === v).length;
-    fxText(360, 330, T(dup > 1 ? 'particle_target_dup' : 'particle_target_add', { n: dup }), '#ff4a7a', 34);
 }
 function changeHand() {
     if (state.ap <= 0 || !canPlay()) return;
@@ -170,23 +170,13 @@ function checkGameOver() {
 
 function roundClear() {
     if (state.screen !== 'PLAYING') return;
-    const size = state.cakes[0], R = state.run;
-    const cakePts = CAKE_PTS * 3;
-    const hits = state.targets.filter(v => v === size).length;                // 当たったターゲットのまい数
-    const rate = TARGET_RATE + 0.05 * R.spiceLv;                              // ターゲット1まいで +50%(スパイスで +5%ずつ)
-    const subtotal = cakePts;
-    const targetPts = Math.round(subtotal * rate * hits);
-    const shapeMul = R.shapes[size] ? 1.1 : 1;                                // かたちマスター
-    const total = Math.round((subtotal + targetPts) * shapeMul);
-    const coins = coinsFor(total);
-    // おかわりAP: 1Lvごとに +0.5(はんぱは持ちこして、たまったら +1)
-    const healAcc = (R.healFrac || 0) + 0.5 * R.healUp;
-    const heal = CONFIG.apHeal + Math.floor(healAcc);
-    R.healFrac = healAcc - Math.floor(healAcc);
-    state.roundHits = hits; state.roundCakePts = cakePts;
-    state.roundTargetPts = targetPts; state.roundShape = shapeMul > 1; state.roundSub = subtotal;
-    state.roundCoins = coins; state.roundHeal = heal;
-    state.coins += coins;
+    const hit = state.cakes[0] === state.targetVal;                           // ターゲットの大きさでそろった
+    const holeMul = 1 + WHOLE_RATE * state.wholes;                            // ホールボーナス
+    const tMul = hit ? state.targetMul : 1;                                   // ターゲットボーナス
+    const total = Math.round(BASE_PTS * holeMul * tMul);                      // 基本点 × ホール × ターゲット
+    const heal = CONFIG.apHeal;
+    state.roundBase = BASE_PTS; state.roundHole = holeMul; state.roundTarget = tMul; state.roundWholes = state.wholes; state.roundHit = hit;
+    state.roundHeal = heal;
     state.ap += heal;
     noteBestPlay(total);
     state.score += total;
@@ -194,8 +184,7 @@ function roundClear() {
     state.inputLocked = true;
     updateUI();
     fxText(360, 330, T('particle_ap_gain', { n: heal }), '#ffb066', 44);
-    if (hits > 0) fxText(360, 280, T('particle_target_bonus'), '#ffe27a', 40);
-    fxText(360, 380, '+' + coins + T('coin_unit'), '#ffb724', 40);
+    if (hit) fxText(360, 280, T('particle_target_bonus') + ' ×' + state.targetMul, '#ffe27a', 40);
     confetti();
     document.querySelectorAll('.fc-cake').forEach(el => el.classList.add('matched'));
     setTimeout(() => {
@@ -214,8 +203,7 @@ function finishRun(cleared) {
     if (state.stageScores[state.stage - 1] === undefined) state.stageScores[state.stage - 1] = 0;
     state.endBase = state.score;
     state.apBonus = Math.max(0, state.ap) * AP_BONUS_PTS;
-    state.favMul = 1 + 0.03 * (state.run ? state.run.favUses : 0);              // おきにいりカードの倍率
-    const total = Math.round((state.endBase + state.apBonus) * state.favMul);
+    const total = state.endBase + state.apBonus;
     state.score = total;
     updateUI();
     const key = starKey(state.star);
@@ -364,33 +352,7 @@ function renderFc() {
     area.classList.toggle('danger', state.screen === 'PLAYING' && state.ap <= 3 && state.ap > 0);
 }
 
-// 左パネルの「もちもの」: ショップで買った能力アップを、絵(アイコン)で見せる
-function itemIcon(kind, v) {
-    if (kind === 'heal') return '<span class="ic-ap">AP<b>+</b></span>';
-    if (kind === 'spice') return '<span class="ic-spice"><b>%</b></span>';
-    if (kind === 'shape') {
-        const d = document.createElement('div'); d.innerHTML = cakeSVG(UNIT_MAX); paintCake(d.firstElementChild, v, UNIT_MAX);
-        return `<span class="ic-cake">${d.innerHTML}</span>`;
-    }
-    return `<span class="ic-card" style="--cc:${sizeColor(v)}">${fracHTML(v)}</span>`;
-}
-function renderItems() {
-    const el = document.getElementById('disp-items'), R = state.run;
-    if (!el) return;
-    const l = [];
-    if (R) {
-        if (R.healUp) l.push(['heal', 0, 'Lv' + R.healUp]);
-        if (R.spiceLv) l.push(['spice', 0, 'Lv' + R.spiceLv]);
-        Object.keys(R.shapes).forEach(v => l.push(['shape', +v, '×1.1']));
-        Object.keys(R.favs).forEach(v => l.push(['fav', +v, '+3%']));
-    }
-    const sig = JSON.stringify(l) + UNIT_MAX;
-    if (el._sig === sig) return;
-    el._sig = sig;
-    el.innerHTML = l.length ? l.map(([k, v, t]) => `<div class="it it-${k}">${itemIcon(k, v)}<em>${t}</em></div>`).join('') : `<span class="it-none">${T('items_none')}</span>`;
-}
 function updateUI() {
-    renderItems();
     const ap = document.getElementById('disp-ap');
     ap.textContent = state.ap;
     ap.classList.toggle('low', state.ap <= 3);
@@ -400,33 +362,27 @@ function updateUI() {
         fcScore.textContent = state.score;
         if (!first && state.score > 0) { fcScore.classList.remove('bump'); void fcScore.offsetWidth; fcScore.classList.add('bump'); }
     }
-    // コイン・最終スコアの倍率
-    const ce = document.getElementById('disp-coins'), me = document.getElementById('disp-mult');
-    if (ce) { ce.textContent = state.coins; me.textContent = '×' + (1 + 0.03 * (state.run ? state.run.favUses : 0)).toFixed(2); }
-    // ターゲット: ケーキの絵で見せる。同じ大きさは1つにまとめて ×まい数。場所に合わせて大きさを決める(スクロールなし)
-    const spice = state.run ? state.run.spiceLv : 0;
-    const sig = state.targets.join(',') + '|' + UNIT_MAX + '|' + spice;
+    // ホール: 作った数とスコアの倍率
+    const hm = document.getElementById('disp-hole-mul');
+    if (hm) {
+        hm.textContent = '×' + (1 + WHOLE_RATE * state.wholes).toFixed(1);
+        const hc = document.getElementById('disp-hole-cakes');
+        if (hc._n !== state.wholes) {
+            hc._n = state.wholes;
+            hc.innerHTML = state.wholes ? '<i></i>'.repeat(Math.min(state.wholes, 12)) + (state.wholes > 12 ? '<b>+</b>' : '') : '<span class="h0">0</span>';
+        }
+    }
+    // ターゲット: ケーキの絵と分数。ばいりつ(×2/×3/×4)は 色で3だんかい
+    const sig = state.targetVal + '|' + state.targetMul + '|' + UNIT_MAX;
     if (FC.tsig !== sig) {
-        const prevN = FC.tn || 0;
-        FC.tsig = sig; FC.tn = state.targets.length;
-        const uniq = [], cnt = {};
-        state.targets.forEach(v => { if (!(v in cnt)) { cnt[v] = 0; uniq.push(v); } cnt[v]++; });
+        FC.tsig = sig;
+        const v = state.targetVal;
+        const d = document.createElement('div'); d.innerHTML = cakeSVG(UNIT_MAX); paintCake(d.firstElementChild, v, UNIT_MAX);
         const grid = document.getElementById('target-grid');
-        const last = state.targets[state.targets.length - 1];
-        const k = uniq.length, cols = k <= 1 ? 1 : k <= 4 ? 2 : k <= 9 ? 3 : 4, rows = Math.ceil(k / cols), gap = 8;
-        const W = 224, H = grid.clientHeight || 270;
-        const cw = Math.floor((W - gap * (cols - 1)) / cols), ch = Math.floor((H - gap * (rows - 1)) / rows);
-        const cake = Math.max(34, Math.min(cw - 10, Math.floor((ch - 22) / 1.5), 150));
-        const fs = Math.max(15, Math.round(cake * 0.27));
-        grid.className = 'tc-grid';
-        grid.style.gridTemplateColumns = `repeat(${cols}, ${cw}px)`;
-        grid.innerHTML = uniq.map(v => {
-            const d = document.createElement('div'); d.innerHTML = cakeSVG(UNIT_MAX); paintCake(d.firstElementChild, v, UNIT_MAX);
-            const isNew = state.targets.length > prevN && prevN > 0 && v === last;
-            return `<div class="tc-card${isNew ? ' new' : ''}${cnt[v] > 1 ? ' dup' : ''}" style="--cc:${sizeColor(v)}">${cnt[v] > 1 ? `<b class="tc-x" style="font-size:${Math.max(15, Math.round(fs * 0.9))}px">×${cnt[v]}</b>` : ''}<div class="tc-cake" style="width:${cake}px;height:${cake}px">${d.innerHTML}</div><div class="tc-fr" style="font-size:${fs}px">${fracHTML(v)}</div></div>`;
-        }).join('');
-        const hint = document.getElementById('disp-target-rate');
-        if (hint) hint.textContent = '+' + Math.round((TARGET_RATE + 0.05 * spice) * 100) + '%';
+        grid.innerHTML = `<div class="tc-card new" style="--cc:${sizeColor(v)}"><div class="tc-cake">${d.innerHTML}</div><div class="tc-fr">${fracHTML(v)}</div></div>`;
+        const area = document.getElementById('card-target');
+        area.className = 'fc-tarea tier-' + state.targetMul;
+        document.getElementById('disp-target-rate').textContent = '×' + state.targetMul;
     }
 }
 function gameLoop() {

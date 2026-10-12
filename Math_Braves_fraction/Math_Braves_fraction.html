@@ -18,14 +18,14 @@
     <link rel="stylesheet" href="../braves-common.css?v=20261221">
     <link rel="stylesheet" href="../fgl-felt.css?v=2">
     <link rel="stylesheet" href="fraction-ui.css?v=15">
-    <link rel="stylesheet" href="fraction-game.css?v=13">
+    <link rel="stylesheet" href="fraction-game.css?v=14">
     <script src="../tutorial-engine.js"></script>
 </head>
 <body>
 
 <div id="container"></div>
 
-<script src="fraction-config.js?v=20261310"></script>
+<script src="fraction-config.js?v=20261340"></script>
 <script>
 // ---- このゲーム(固有)の設定 ----
 // RUN = ケーキの分割数(3〜10)。DIVISIONS(fraction-config.js)と同じ順番
@@ -88,12 +88,11 @@ const GAME = {
         return 'polygon(' + pts.join(',') + ')';
     },
     // ステージクリアの画面: きそてん・コンボばいりつ・AP回復
-    clearRows: (st, stageScore) => `<div><span>${T('fc_cakepts')}</span><b>${state.roundCakePts}</b></div>`
-        + (state.roundHits ? `<div><span>${T('fc_target_bonus')} ×${state.roundHits}</span><b>+${state.roundTargetPts}</b></div>` : '')
-        + (state.roundShape ? `<div><span>${T('fc_shape')}</span><b>×1.1</b></div>` : '')
-        + `<div><span>${T('fc_heal')}</span><b>+${state.roundHeal}</b></div>`
-        + `<div><span>${T('fc_coin')}</span><b>+${state.roundCoins}</b></div>`,
-    endBreakdown: () => `${T('fc_end_score')} ${state.endBase} ＋ ${T('fc_end_ap')} ${state.apBonus}` + (state.favMul > 1 ? ` ×${state.favMul.toFixed(2)}` : ''),
+    clearRows: (st, stageScore) => `<div><span>${T('fc_base')}</span><b>${state.roundBase}</b></div>`
+        + `<div><span>${T('fc_hole')} ${state.roundWholes}</span><b>×${state.roundHole.toFixed(1)}</b></div>`
+        + `<div><span>${T('fc_target_bonus')}</span><b>${state.roundHit ? '×' + state.roundTarget : '×1'}</b></div>`
+        + `<div><span>${T('fc_heal')}</span><b>+${state.roundHeal}</b></div>`,
+    endBreakdown: () => `${T('fc_end_score')} ${state.endBase} ＋ ${T('fc_end_ap')} ${state.apBonus}`,
     // タイトル: このゲーム専用の作り(いちごピンクのギンガム+ひさし、左にスロット、右に大きさのちがうボタン)
     titleHTML: `
         <div class="ft-bg">
@@ -163,9 +162,10 @@ const GAME = {
                 <div class="sp-lb"><span data-i18n="label_stage" data-noemo>ステージ</span><b class="rt-num" id="disp-difficulty-label"></b></div>
                 <div class="rt-list" id="sp-route"></div>
             </div>
-            <div class="sp-card sp-items">
-                <div class="sp-lb"><span data-i18n="label_items" data-noemo>もちもの</span></div>
-                <div class="it-list" id="disp-items"></div>
+            <div class="sp-card sp-hole">
+                <div class="sp-lb"><span data-i18n="label_whole" data-noemo>ホール</span><b class="hole-mul" id="disp-hole-mul">×1.0</b></div>
+                <div class="hole-cakes" id="disp-hole-cakes"></div>
+                <div class="hole-note" data-i18n="whole_hint">ちょうど「1」を つくるたび +10%</div>
             </div>
             <button id="btn-howto" class="sp-btn"><i class="ico" data-ico="book"></i><span data-i18n="btn_howto" data-noemo>あそびかた</span></button>
             <button id="btn-to-title" class="sp-btn red hidden title-menu-btn"><i class="ico" data-ico="home"></i><span data-i18n="btn_to_title">タイトルへ もどる</span></button>
@@ -183,13 +183,9 @@ const GAME = {
                 <div class="sp-card sp-scorecard">
                     <div class="sp-lb"><i class="ico" data-ico="trophy"></i><span data-i18n="label_total_score" data-noemo>ごうけい スコア</span></div>
                     <div id="disp-total-score" class="sp-score">0</div>
-                    <div class="fc-sub">
-                        <span class="fc-coin"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#ffd24a" stroke="#b07200" stroke-width="2"/><circle cx="12" cy="12" r="6.5" fill="none" stroke="#e8a317" stroke-width="1.5"/></svg><b id="disp-coins">0</b></span>
-                        <span class="fc-mul"><span data-i18n="label_final_mul" data-noemo>最終ばいりつ</span> <b id="disp-mult">×1.00</b></span>
-                    </div>
                 </div>
                 <div class="fc-tarea" id="card-target">
-                    <div class="tc-lb"><span data-i18n="label_target" data-noemo>ターゲット</span><b id="disp-target-rate">+50%</b></div>
+                    <div class="tc-lb"><span data-i18n="label_target" data-noemo>ターゲット</span><b id="disp-target-rate">×2</b></div>
                     <div class="tc-grid" id="target-grid"></div>
                 </div>
                 <button id="btn-change" class="fc-change"><b data-i18n="fc_change">チェンジ</b><small data-i18n="fc_change_sub">(AP -1)</small></button>
@@ -206,18 +202,18 @@ const GAME = {
             target_chance: "チャンス", target_good: "グッドチャンス", target_big: "ビッグチャンス", target_supergood: "スーパービッグチャンス",
             fc_eq_placeholder: "カードを ケーキに のせて たしざん！", fc_change: "チェンジ", fc_change_sub: "(AP -1)",
             particle_whole: "ホール！", particle_ap_gain: "AP +{n}", particle_target_bonus: "ターゲットボーナス！",
-            particle_perfect: "ぴったり！", particle_perfect_all: "パーフェクト！", top_ok: "ぴったり", tc_plus: "+スコア", fc_perfect: "ぴったり トッピング", fc_cakepts: "ケーキ 3こ", fc_toppings: "トッピング", fc_shape: "かたちマスター", fc_coin: "コイン", label_final_mul: "最終ばいりつ", fc_target_bonus: "ターゲットボーナス",
+            particle_perfect: "ぴったり！", particle_perfect_all: "パーフェクト！", top_ok: "ぴったり", tc_plus: "+スコア", fc_perfect: "ぴったり トッピング", fc_hole: "ホールボーナス", fc_target_bonus: "ターゲットボーナス", label_whole: "ホール", whole_hint: "ちょうど「1」を つくるたび +10%",
             label_items: "もちもの", items_none: "ショップで ゲット",
             tag_cake: "ケーキ", tag_hand: "てふだ",
             particle_target_add: "ターゲットが ふえた！", particle_target_dup: "ターゲット ×{n}！", target_hint: "ホールを つくると ふえる！", diff_master: "めいじん", diff_legend: "でんせつ",
             fc_log_change: "手札を チェンジ (AP −1)", fc_log_clear: "ステージクリア！ <b>+{n}</b>",
-            fc_hits: "あたった ターゲット", fc_hits_unit: "まい", fc_base: "きそてん", fc_rate: "コンボ倍率", fc_heal: "AP回復", fc_end_score: "スコア", fc_end_ap: "APボーナス",
+            fc_hits: "あたった ターゲット", fc_hits_unit: "まい", fc_base: "きほんてん", fc_rate: "コンボ倍率", fc_heal: "AP回復", fc_end_score: "スコア", fc_end_ap: "APボーナス",
             howto_p1: "1. <strong>カード</strong>を <strong>ケーキ</strong>にのせて、<br>ぶんすうを たしていこう。",
             howto_p2: "2. <strong>「1」をこえる</strong>と、のこりが つぎの数に。<br>(例: 5/4 は 1/4 になる)",
-            howto_p3: "3. <strong>3つの ケーキ</strong>の 大きさを ぴったり<br>そろえるとクリア！ ケーキを <strong>ホール(ちょうど1)</strong>に<br>するたびに <strong>ターゲット</strong>が ふえるよ。",
+            howto_p3: "3. <strong>3つの ケーキ</strong>の 大きさを ぴったり<br>そろえるとクリア！ <strong>100点</strong>。",
             howto_p4: "4. カードを使う・チェンジすると <strong>AP</strong> が 1へる。<br>0になると まけ。クリアすると AP回復。",
-            howto_p5: "5. ケーキは1つ <strong>100点</strong>(3つで300点)。<br>クリアすると <strong>コイン</strong>がもらえるよ。",
-            howto_p6: "6. <strong>ターゲット</strong>の大きさでそろえると、<br>スコアの <strong>50%</strong>が もらえる(かさなると ふえる)。<br>コインは <strong>ショップ</strong>で 能力アップに使おう。",
+            howto_p5: "5. ケーキを <strong>ホール(ちょうど1)</strong>に<br>するたび スコアが <strong>+10%</strong>。<br>(3こで ×1.3)",
+            howto_p6: "6. <strong>ターゲット</strong>の大きさでそろえると<br><strong>×2 ×3 ×4</strong>！ <strong>ステージ7</strong>まで クリア。",
         },
         simple: {
             subject_badge: "ぶんすう", title_plaque: "ぶんすうスロット",
@@ -228,18 +224,18 @@ const GAME = {
             target_chance: "チャンス", target_good: "グッドチャンス", target_big: "ビッグチャンス", target_supergood: "スーパービッグチャンス",
             fc_eq_placeholder: "カードを ケーキに のせて たしざん！", fc_change: "チェンジ", fc_change_sub: "(AP -1)",
             particle_whole: "ホール！", particle_ap_gain: "AP +{n}", particle_target_bonus: "ターゲットボーナス！",
-            particle_perfect: "ぴったり！", particle_perfect_all: "パーフェクト！", top_ok: "ぴったり", tc_plus: "+スコア", fc_perfect: "ぴったり トッピング", fc_cakepts: "ケーキ 3こ", fc_toppings: "トッピング", fc_shape: "かたちマスター", fc_coin: "コイン", label_final_mul: "最終ばいりつ", fc_target_bonus: "ターゲットボーナス",
+            particle_perfect: "ぴったり！", particle_perfect_all: "パーフェクト！", top_ok: "ぴったり", tc_plus: "+スコア", fc_perfect: "ぴったり トッピング", fc_hole: "ホールボーナス", fc_target_bonus: "ターゲットボーナス", label_whole: "ホール", whole_hint: "ちょうど「1」を つくるたび +10%",
             label_items: "もちもの", items_none: "ショップで ゲット",
             tag_cake: "ケーキ", tag_hand: "てふだ",
             particle_target_add: "ターゲットが ふえた！", particle_target_dup: "ターゲット ×{n}！", target_hint: "ホールを つくると ふえる！", diff_master: "めいじん", diff_legend: "でんせつ",
             fc_log_change: "てふだを チェンジ (AP −1)", fc_log_clear: "ステージクリア！ <b>+{n}</b>",
-            fc_hits: "あたった ターゲット", fc_hits_unit: "まい", fc_base: "きそてん", fc_rate: "コンボばいりつ", fc_heal: "APかいふく", fc_end_score: "スコア", fc_end_ap: "APボーナス",
+            fc_hits: "あたった ターゲット", fc_hits_unit: "まい", fc_base: "きほんてん", fc_rate: "コンボばいりつ", fc_heal: "APかいふく", fc_end_score: "スコア", fc_end_ap: "APボーナス",
             howto_p1: "1. <strong>カード</strong>を <strong>ケーキ</strong>に のせて、<br>ぶんすうを たしていこう。",
             howto_p2: "2. <strong>「1」を こえる</strong>と、のこりが つぎの かずに。<br>(れい: 5/4 は 1/4に なる)",
-            howto_p3: "3. <strong>3つの ケーキ</strong>の おおきさを ぴったり<br>そろえると クリア！ ケーキを <strong>ホール(ちょうど1)</strong>に<br>するたびに <strong>ターゲット</strong>が ふえるよ。",
+            howto_p3: "3. <strong>3つの ケーキ</strong>の おおきさを ぴったり<br>そろえると クリア！ <strong>100てん</strong>。",
             howto_p4: "4. カードを つかう・チェンジすると <strong>AP</strong>が 1へる。<br>0に なると まけ。クリアすると APかいふく。",
-            howto_p5: "5. ケーキは1つ <strong>100てん</strong>(3つで300てん)。<br>クリアすると <strong>コイン</strong>が もらえるよ。",
-            howto_p6: "6. <strong>ターゲット</strong>の おおきさで そろえると、<br>スコアの <strong>50%</strong>が もらえる(かさなると ふえる)。<br>コインは <strong>ショップ</strong>で つかおう。",
+            howto_p5: "5. ケーキを <strong>ホール(ちょうど1)</strong>に<br>するたび スコアが <strong>+10%</strong>。<br>(3こで ×1.3)",
+            howto_p6: "6. <strong>ターゲット</strong>の おおきさで そろえると<br><strong>×2 ×3 ×4</strong>！ <strong>ステージ7</strong>まで クリア。",
         },
         en: {
             subject_badge: "Fractions", title_plaque: "Fraction Slots",
@@ -250,18 +246,18 @@ const GAME = {
             target_chance: "Chance", target_good: "Good Chance", target_big: "Big Chance", target_supergood: "Super Big Chance",
             fc_eq_placeholder: "Drop a card on a cake to add!", fc_change: "Change", fc_change_sub: "(AP -1)",
             particle_whole: "Whole!", particle_ap_gain: "AP +{n}", particle_target_bonus: "Target Bonus!",
-            particle_perfect: "Perfect!", particle_perfect_all: "All Perfect!", top_ok: "Fit!", tc_plus: "+Score", fc_perfect: "Perfect toppings", fc_cakepts: "3 cakes", fc_toppings: "Toppings", fc_shape: "Shape Master", fc_coin: "Coins", label_final_mul: "Final rate", fc_target_bonus: "Target bonus",
+            particle_perfect: "Perfect!", particle_perfect_all: "All Perfect!", top_ok: "Fit!", tc_plus: "+Score", fc_perfect: "Perfect toppings", fc_hole: "Whole bonus", fc_target_bonus: "Target bonus", label_whole: "Wholes", whole_hint: "Each whole (exactly 1): +10%",
             label_items: "Items", items_none: "Buy in the shop",
             tag_cake: "Cakes", tag_hand: "Hand",
             particle_target_add: "A new target!", particle_target_dup: "Target x{n}!", target_hint: "Make a whole to add one!", diff_master: "Master", diff_legend: "Legend",
             fc_log_change: "Changed the hand (AP −1)", fc_log_clear: "Stage clear! <b>+{n}</b>",
-            fc_hits: "Targets hit", fc_hits_unit: "", fc_base: "Base Pts", fc_rate: "Combo Rate", fc_heal: "AP Restored", fc_end_score: "Score", fc_end_ap: "AP Bonus",
+            fc_hits: "Targets hit", fc_hits_unit: "", fc_base: "Base pts", fc_rate: "Combo Rate", fc_heal: "AP Restored", fc_end_score: "Score", fc_end_ap: "AP Bonus",
             howto_p1: "1. Drop a <strong>card</strong> on a <strong>cake</strong><br>to add its fraction.",
             howto_p2: "2. Going <strong>over \"1\"</strong> leaves only the extra.<br>(e.g. 5/4 becomes 1/4)",
-            howto_p3: "3. Make <strong>all 3 cakes</strong> the same size to clear!<br>Every <strong>whole</strong> you make adds a <strong>target</strong>.",
+            howto_p3: "3. Make <strong>all 3 cakes</strong> the same size<br>to clear! <strong>100 points</strong>.",
             howto_p4: "4. Using or changing cards costs <strong>1 AP</strong>.<br>At 0 AP you lose. Clearing restores AP.",
-            howto_p5: "5. Each cake is <strong>100 pts</strong> (300 for three).<br>Clearing a stage earns <strong>coins</strong>.",
-            howto_p6: "6. Matching a <strong>target</strong> size adds <strong>50%</strong><br>of the stage score (stacks).<br>Spend coins in the <strong>shop</strong>.",
+            howto_p5: "5. Each <strong>whole</strong> (exactly 1) you make<br>adds <strong>+10%</strong> to the score (3 = ×1.3).",
+            howto_p6: "6. Match the <strong>target</strong> size for<br><strong>×2 ×3 ×4</strong>! Clear <strong>7 stages</strong>.",
         },
     },
 };
@@ -281,8 +277,7 @@ DIVISIONS.forEach((n) => {
 <script src="../fgl-name.js?v=20261223"></script>
 <script src="../braves-common.js?v=20261223"></script>
 <script src="fraction-art.js?v=20261330"></script>
-<script src="fraction.js?v=20261331"></script>
-<script src="fraction-shop.js?v=7"></script>
+<script src="fraction.js?v=20261340"></script>
 <script src="../braves-run.js?v=20261224"></script>
 <script>
 // ============================================================
@@ -304,7 +299,7 @@ function startTutorial() {
         state.cards = [[1, 2], [2, 1], [3, 3]].map(([v, s], i) => { const c = makeCard(i, 3); c.val = v; return c; });
     };
     state.cakes = [1, 2, 2];
-    state.targets = [2];
+    state.targetVal = 2; state.targetMul = 2; state.wholes = 0;
     setHand(); updateUI();
     const CV = '#gameCanvas';
     const cv = (x, y, w, h) => ({ sel: CV, rect: [x, y, w, h], of: [720, 720], pad: 6 });
