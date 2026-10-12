@@ -17,7 +17,7 @@
     <link rel="stylesheet" href="../fgl-hero.css?v=12">
     <link rel="stylesheet" href="../braves-common.css?v=20261221">
     <link rel="stylesheet" href="../fgl-felt.css?v=2">
-    <link rel="stylesheet" href="fraction-ui.css?v=11">
+    <link rel="stylesheet" href="fraction-ui.css?v=12">
     <style>
         /* ストロベリーピンク×クリーム。--h は共通CSSの色相(たしざん=220, ひきざん=352, かけざん=150/172, わりざん=268, しょうすう=192) */
         :root { --h: 330; --led: #ffb3d1; --led-soft: rgba(255,179,209,0.45); }
@@ -78,7 +78,7 @@
 
 <div id="container"></div>
 
-<script src="fraction-config.js?v=20261263"></script>
+<script src="fraction-config.js?v=20261270"></script>
 <script>
 // ---- このゲーム(固有)の設定 ----
 // RUN = ケーキの分割数(3〜10)。DIVISIONS(fraction-config.js)と同じ順番
@@ -90,7 +90,7 @@ const GAME = {
     keys: { lang: 'mb_frac_lang', lastStar: 'mb_frac_last_star', ranking: d => `math_braves_frac_ranking_v3_${d}`, clearCount: d => `math_braves_frac_clears_v3_${d}` },
     stageCount: 7,
     stageThemes: [{ c: '#ffe27a' }, { c: '#ffb3c8' }, { c: '#ff6f8f' }, { c: '#c98a5a' }, { c: '#ffd24a' }, { c: '#a8e08a' }, { c: '#ff8ad0' }],
-    starMax: 5,                                            // ★1〜★3 + シークレット ★4・★5
+    starMax: 3,                                            // ★1〜★3(シークレット★4・★5は いまは出さない。仕組みは GAME.starMax=5 で復活)
     starKey: (n, ri) => 'D' + DIVISIONS[ri] + '_STAR' + n,   // ランキング・クリアは RUN(分割数)×難易度ごとに分ける
     // 0=ホールケーキ 1=ひときれ 2=いちご 3=カップケーキ 4=3/4のケーキ 5=おさら
     titleBots: [],
@@ -141,8 +141,10 @@ const GAME = {
         return 'polygon(' + pts.join(',') + ')';
     },
     // ステージクリアの画面: きそてん・コンボばいりつ・AP回復
-    clearRows: (st, stageScore) => `<div><span>${T('fc_hits')}</span><b>${state.roundHits}${T('fc_hits_unit')}</b></div>`
-        + `<div><span>${T('fc_base')}</span><b>${state.roundBase}</b></div>`
+    clearRows: (st, stageScore) => `<div><span>${T('fc_perfect')}</span><b>${state.roundPerfect} / 3</b></div>`
+        + `<div><span>${T('fc_cakepts')}</span><b>${state.roundCakePts}</b></div>`
+        + (state.roundBonus ? `<div><span>${T('fc_perfect_bonus')}</span><b>+${state.roundBonus}</b></div>` : '')
+        + (state.roundHits ? `<div><span>${T('fc_target_bonus')} ×${state.roundHits}</span><b>+${state.roundSub * state.roundHits}</b></div>` : '')
         + `<div><span>${T('fc_heal')}</span><b>+${state.roundHeal}</b></div>`,
     endBreakdown: () => `${T('fc_end_score')} ${state.endBase} ＋ ${T('fc_end_ap')} ${state.apBonus}`,
     // タイトル: このゲーム専用の作り(いちごピンクのギンガム+ひさし、左にスロット、右に大きさのちがうボタン)
@@ -251,15 +253,16 @@ const GAME = {
             target_chance: "チャンス", target_good: "グッドチャンス", target_big: "ビッグチャンス", target_supergood: "スーパービッグチャンス",
             fc_eq_placeholder: "カードを ケーキに のせて たしざん！", fc_change: "チェンジ", fc_change_sub: "(AP -1)",
             particle_whole: "ホール！", particle_ap_gain: "AP +{n}", particle_target_bonus: "ターゲットボーナス！",
+            particle_perfect: "ぴったり！", particle_perfect_all: "パーフェクト！", top_ok: "ぴったり", tc_plus: "+スコア", fc_perfect: "ぴったり トッピング", fc_cakepts: "ケーキの てん", fc_perfect_bonus: "パーフェクトボーナス", fc_target_bonus: "ターゲットボーナス",
             particle_target_add: "ターゲットが ふえた！", particle_target_dup: "ターゲット ×{n}！", target_hint: "ホールを つくると ふえる！", diff_master: "めいじん", diff_legend: "でんせつ",
             fc_log_change: "手札を チェンジ (AP −1)", fc_log_clear: "ステージクリア！ <b>+{n}</b>",
             fc_hits: "あたった ターゲット", fc_hits_unit: "まい", fc_base: "きそてん", fc_rate: "コンボ倍率", fc_heal: "AP回復", fc_end_score: "スコア", fc_end_ap: "APボーナス",
-            howto_p1: "1. <strong>カード</strong>を <strong>ケーキ</strong>にのせて、<br>ぶんすうを たしていこう。",
+            howto_p1: "1. <strong>カード</strong>を <strong>ケーキ</strong>にのせて、<br>ぶんすうを たしていこう。<br>カードの <strong>トッピング(サクランボ)</strong>も のるよ。",
             howto_p2: "2. <strong>「1」をこえる</strong>と、のこりが つぎの数に。<br>(例: 5/4 は 1/4 になる)",
             howto_p3: "3. <strong>3つの ケーキ</strong>の 大きさを ぴったり<br>そろえるとクリア！ ケーキを <strong>ホール(ちょうど1)</strong>に<br>するたびに <strong>ターゲット</strong>が ふえるよ。",
-            howto_p4: "4. カードを つかう・チェンジすると <strong>AP</strong> が 1へる。<br>0になると まけ。クリアすると AP回復。",
-            howto_p5: "5. <strong>ターゲット</strong>の大きさで そろえると 1まい 200点！<br>かさなると ×2。当たらなければ 100点。",
-            howto_p6: "6. <strong>ステージ7</strong>まで クリアしよう。<br>のこりの <strong>AP</strong>は ボーナス点になるよ。",
+            howto_p4: "4. カードを使う・チェンジすると <strong>AP</strong> が 1へる。<br>0になると まけ。クリアすると AP回復。",
+            howto_p5: "5. ケーキの下の <strong>トッピングの数</strong>が、ケーキの<br><strong>○こ分</strong>の 倍数ぴったりなら <strong>パーフェクト</strong>！<br>1つ300点(ふつうは100点)。3つなら +100。",
+            howto_p6: "6. <strong>ターゲット</strong>の大きさでそろえると、<br>そのステージの点を もう1回ずつ もらえる(×2, ×3…)。<br><strong>ステージ7</strong>まで クリアしよう。",
         },
         simple: {
             subject_badge: "ぶんすう", title_plaque: "ぶんすうスロット",
@@ -270,15 +273,16 @@ const GAME = {
             target_chance: "チャンス", target_good: "グッドチャンス", target_big: "ビッグチャンス", target_supergood: "スーパービッグチャンス",
             fc_eq_placeholder: "カードを ケーキに のせて たしざん！", fc_change: "チェンジ", fc_change_sub: "(AP -1)",
             particle_whole: "ホール！", particle_ap_gain: "AP +{n}", particle_target_bonus: "ターゲットボーナス！",
+            particle_perfect: "ぴったり！", particle_perfect_all: "パーフェクト！", top_ok: "ぴったり", tc_plus: "+スコア", fc_perfect: "ぴったり トッピング", fc_cakepts: "ケーキの てん", fc_perfect_bonus: "パーフェクトボーナス", fc_target_bonus: "ターゲットボーナス",
             particle_target_add: "ターゲットが ふえた！", particle_target_dup: "ターゲット ×{n}！", target_hint: "ホールを つくると ふえる！", diff_master: "めいじん", diff_legend: "でんせつ",
             fc_log_change: "てふだを チェンジ (AP −1)", fc_log_clear: "ステージクリア！ <b>+{n}</b>",
             fc_hits: "あたった ターゲット", fc_hits_unit: "まい", fc_base: "きそてん", fc_rate: "コンボばいりつ", fc_heal: "APかいふく", fc_end_score: "スコア", fc_end_ap: "APボーナス",
-            howto_p1: "1. <strong>カード</strong>を <strong>ケーキ</strong>に のせて、<br>ぶんすうを たしていこう。",
+            howto_p1: "1. <strong>カード</strong>を <strong>ケーキ</strong>に のせて、<br>ぶんすうを たしていこう。<br>カードの <strong>トッピング(サクランボ)</strong>も のるよ。",
             howto_p2: "2. <strong>「1」を こえる</strong>と、のこりが つぎの かずに。<br>(れい: 5/4 は 1/4に なる)",
             howto_p3: "3. <strong>3つの ケーキ</strong>の おおきさを ぴったり<br>そろえると クリア！ ケーキを <strong>ホール(ちょうど1)</strong>に<br>するたびに <strong>ターゲット</strong>が ふえるよ。",
             howto_p4: "4. カードを つかう・チェンジすると <strong>AP</strong>が 1へる。<br>0に なると まけ。クリアすると APかいふく。",
-            howto_p5: "5. <strong>ターゲット</strong>の おおきさで そろえると 1まい 200てん！<br>かさなると ×2。あたらなければ 100てん。",
-            howto_p6: "6. <strong>ステージ7</strong>まで クリアしよう。<br>のこりの <strong>AP</strong>は ボーナスてんに なるよ。",
+            howto_p5: "5. ケーキの したの <strong>トッピングの かず</strong>が、ケーキの<br><strong>○こぶん</strong>の ばいすうぴったりなら <strong>パーフェクト</strong>！<br>1つ300てん(ふつうは100てん)。3つなら +100。",
+            howto_p6: "6. <strong>ターゲット</strong>の おおきさで そろえると、<br>その ステージの てんを もう1かいずつ もらえる(×2, ×3…)。<br><strong>ステージ7</strong>まで クリアしよう。",
         },
         en: {
             subject_badge: "Fractions", title_plaque: "Fraction Slots",
@@ -289,15 +293,16 @@ const GAME = {
             target_chance: "Chance", target_good: "Good Chance", target_big: "Big Chance", target_supergood: "Super Big Chance",
             fc_eq_placeholder: "Drop a card on a cake to add!", fc_change: "Change", fc_change_sub: "(AP -1)",
             particle_whole: "Whole!", particle_ap_gain: "AP +{n}", particle_target_bonus: "Target Bonus!",
+            particle_perfect: "Perfect!", particle_perfect_all: "All Perfect!", top_ok: "Fit!", tc_plus: "+Score", fc_perfect: "Perfect toppings", fc_cakepts: "Cake points", fc_perfect_bonus: "Perfect bonus", fc_target_bonus: "Target bonus",
             particle_target_add: "A new target!", particle_target_dup: "Target x{n}!", target_hint: "Make a whole to add one!", diff_master: "Master", diff_legend: "Legend",
             fc_log_change: "Changed the hand (AP −1)", fc_log_clear: "Stage clear! <b>+{n}</b>",
             fc_hits: "Targets hit", fc_hits_unit: "", fc_base: "Base Pts", fc_rate: "Combo Rate", fc_heal: "AP Restored", fc_end_score: "Score", fc_end_ap: "AP Bonus",
-            howto_p1: "1. Drop a <strong>card</strong> on a <strong>cake</strong><br>to add its fraction.",
+            howto_p1: "1. Drop a <strong>card</strong> on a <strong>cake</strong><br>to add its fraction.<br>The card topping (cherry) goes on too.",
             howto_p2: "2. Going <strong>over \"1\"</strong> leaves only the extra.<br>(e.g. 5/4 becomes 1/4)",
             howto_p3: "3. Make <strong>all 3 cakes</strong> the same size to clear!<br>Every <strong>whole</strong> you make adds a <strong>target</strong>.",
             howto_p4: "4. Using or changing cards costs <strong>1 AP</strong>.<br>At 0 AP you lose. Clearing restores AP.",
-            howto_p5: "5. Each matching <strong>target</strong> is 200 points!<br>Duplicates multiply. No match is 100.",
-            howto_p6: "6. Clear all <strong>7 stages</strong>.<br>Leftover <strong>AP</strong> becomes bonus points.",
+            howto_p5: "5. If the <strong>toppings</strong> under a cake are an exact<br>multiple of its size (<strong>pieces</strong>) it is <strong>Perfect</strong>!<br>300 pts each (100 otherwise). All 3: +100.",
+            howto_p6: "6. Matching a <strong>target</strong> size adds the stage score<br>again for each target (x2, x3...).<br>Clear all <strong>7 stages</strong>.",
         },
     },
 };
@@ -317,7 +322,7 @@ DIVISIONS.forEach((n) => {
 <script src="../fgl-name.js?v=20261223"></script>
 <script src="../braves-common.js?v=20261223"></script>
 <script src="fraction-art.js?v=20261261"></script>
-<script src="fraction.js?v=20261264"></script>
+<script src="fraction.js?v=20261271"></script>
 <script src="../braves-run.js?v=20261223"></script>
 <script>
 // ============================================================
@@ -340,12 +345,14 @@ function startTutorial() {
     };
     state.cakes = [1, 2, 2];
     state.targets = [2];
+    state.tops = [1, 2, 2];
     setHand(); updateUI();
     const CV = '#gameCanvas';
     const cv = (x, y, w, h) => ({ sel: CV, rect: [x, y, w, h], of: [720, 720], pad: 6 });
     // 手順どおりの操作だけ許すための、ぴったりの範囲(余白なし)
     const rect0 = (x, y, w, h) => ({ sel: CV, rect: [x, y, w, h], of: [720, 720], pad: 0 });
-    const tableR = () => cv(12, 152, 696, 322);
+    const tableR = () => cv(12, 152, 696, 340);
+    const topR = () => cv(12, 432, 696, 56);
     const handR = () => cv(HAND_L - 6, HAND_Y - 14, HAND_AREA + 12, HAND_H + 28);
     const chgR = '#btn-change';
     const chgP = '#btn-change';
@@ -358,6 +365,10 @@ function startTutorial() {
             ja: '3つのケーキがあるよ。それぞれ大きさがちがうね（1/4、1/2 など）。この3つを「ぜんぶ同じ大きさ」にするのが目的だよ！',
             easy: '3つのケーキがあるよ。それぞれおおきさがちがうね（1/4、1/2 など）。この3つを「ぜんぶおなじおおきさ」にするのがもくてきだよ！',
             en: 'There are three cakes of different sizes (1/4, 1/2 …). Your goal is to make all three the SAME size!' } },
+        { type: 'say', target: topR, pos: 'top', text: {
+            ja: 'ケーキの下の数字は「トッピング」の数。カードをのせるたびに1つ増えるよ。ケーキの大きさ（○こ分）の倍数ぴったりになると「ぴったり！」で300点（ふつうは100点）。3つともぴったりだと +100！',
+            easy: 'ケーキのしたのかずは「トッピング」のかず。カードをのせるたびに1つふえるよ。ケーキのおおきさ（○こぶん）のばいすうぴったりになると「ぴったり！」で300てん（ふつうは100てん）。3つともぴったりだと +100！',
+            en: 'The number under each cake is its toppings. Each card adds one. If it is an exact multiple of the cake size (pieces), it is Perfect: 300 pts (100 otherwise). All three Perfect: +100!' } },
         { type: 'say', target: handR, pos: 'top', text: {
             ja: 'これが手札の分数カード。カードをケーキにドラッグしてのせると、その分数がケーキに足されるよ。',
             easy: 'これがてふだのぶんすうカード。カードをケーキにドラッグしてのせると、そのぶんすうがケーキにたされるよ。',

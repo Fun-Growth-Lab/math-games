@@ -4,22 +4,26 @@
 //   ケーキは「24分のいくつ」で持つ(24=ちょうど1)。1をこえたらのこりだけが残る。
 //   APはカードを使う・手札をチェンジするたびに1へる(0でゲームオーバー)。ステージクリアでAP回復。全10ステージ。
 //   ホール(ちょうど「1」)を作るたびに、ターゲットが1まい増える(カンドラ)。同じ大きさがかさなると ×まい数。
-//   点数: ターゲットに当たったまい数 × 200点。1まいも当たらなければ100点。最後にのこりAP×100のボーナス。
+//   トッピング: カード1まいにつき1つ。のせるたびにケーキの下の数がふえる。ケーキの大きさ(○こ分)の倍数なら「ぴったり」。
+//   点数: ケーキ1つ100点(ぴったりなら300点)。3つともぴったりなら+100。ターゲットに当たったら その点をもう1回ずつ足す。最後にのこりAP×100。
 // ステージ制RUN(ラウンド=ステージ。★で しょきゅう/ちゅうきゅう/じょうきゅう)の画面は braves-run.js が受け持つ。
 
 // 画面の寸法(ゲームエリア 720x720)
-const CAKE = 206, CAKE_Y = 162, CAKE_GAP = 20;
+const CAKE = 206, CAKE_Y = 160, CAKE_GAP = 20;
 function cakeX(i) { return (720 - (3 * CAKE + 2 * CAKE_GAP)) / 2 + i * (CAKE + CAKE_GAP); }
 const LAB_Y = CAKE_Y + CAKE + 4;                       // 大きさの札
-const HAND_W = 104, HAND_H = 140, HAND_GAP = 16, HAND_Y = 506, HAND_L = 20, HAND_AREA = 680;   // 手札はケーキの真下に近づけて、横はば いっぱいに並べる
+const HAND_W = 104, HAND_H = 140, HAND_GAP = 16, HAND_Y = 522, HAND_L = 20, HAND_AREA = 680;   // 手札はケーキの真下に近づけて、横はば いっぱいに並べる
 
 Object.assign(state, {
-    ap: 10, cakes: [0, 0, 0], targets: [],
+    ap: 10, cakes: [0, 0, 0], tops: [0, 0, 0], targets: [],
     phase: 'IDLE', tutorial: false, lastEq: '',
     roundBase: 0, roundHeal: 0, endBase: 0, apBonus: 0
 });
 
 function getRandomInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+// トッピング(サクランボ)の絵
+const TOP_ICO = '<svg viewBox="0 0 24 24"><path d="M12 4Q14 10 17 12M12 4Q10 10 8 14" stroke="#3a8a2a" stroke-width="1.8" fill="none" stroke-linecap="round"/><circle cx="8" cy="17" r="5.2" fill="#e8344e" stroke="#a81830" stroke-width="1.2"/><circle cx="17.5" cy="15" r="4.6" fill="#e8344e" stroke="#a81830" stroke-width="1.2"/><circle cx="6.2" cy="15.2" r="1.3" fill="#fff" opacity=".75"/></svg>';
 
 // ---- ステージ制RUNとの受けわたし ----
 function stageClearTime(st) { return 0; }
@@ -68,9 +72,9 @@ function backToTitle() {
 
 function initGame() {
     state.score = 0; state.bestPlay = 0; state.stage = 1; state.runMode = false; state.stageStartScore = 0; state.stageScores = []; state.tutorial = false;
-    state.ap = CONFIG.startAp || 10; state.cakes = [0, 0, 0]; state.targets = []; state.cards = []; state.dragInfo = null; state.lastEq = '';
+    state.ap = CONFIG.startAp || 10; state.cakes = [0, 0, 0]; state.tops = [0, 0, 0]; state.targets = []; state.cards = []; state.dragInfo = null; state.lastEq = '';
     state.inputLocked = false; state.phase = 'IDLE';
-    state.endBase = 0; state.apBonus = 0; state.roundHits = 0;
+    state.endBase = 0; state.apBonus = 0; state.roundHits = 0; state.roundPerfect = 0; state.roundCakePts = 0; state.roundBonus = 0; state.roundSub = 0;
     state.width = 720; state.height = 720; canvas.width = 720; canvas.height = 720;
     hideAllOverlays();
     clearFcLayer();
@@ -108,6 +112,7 @@ function startRound(n) {
     const start = types.filter(v => v < UNIT_MAX);          // はじめのケーキは ちょうど1でない大きさ
     do { state.cakes = [0, 1, 2].map(() => start[getRandomInt(0, start.length - 1)]); }
     while (state.cakes[0] === state.cakes[1] && state.cakes[1] === state.cakes[2]);
+    state.tops = [0, 1, 2].map(() => getRandomInt(1, TOP_INIT_MAX));   // はじめから のっているトッピング
     if (n === 1 || !state.cards.length) fillHand();
     state.phase = 'PLAY';
     clearFcLayer(true);
@@ -131,6 +136,7 @@ function processAttack(cardIdx, cakeIdx) {
     if (next > UNIT_MAX) next -= UNIT_MAX; else if (next === UNIT_MAX) one = true;
     state.lastEq = `${fracText(cur)} + ${fracText(c.val)} = ${fracText(raw)}` + (raw > UNIT_MAX ? ` → ${fracText(next)}` : '');
     state.cakes[cakeIdx] = next;
+    state.tops[cakeIdx]++;                       // カード1まいにつき トッピング1つ
     const cx = cakeX(cakeIdx) + CAKE / 2, cy = CAKE_Y + CAKE / 2;
     burst(cx, cy, '#ffd24a', 14);
     if (one) {
@@ -169,11 +175,16 @@ function checkGameOver() {
 
 function roundClear() {
     if (state.screen !== 'PLAYING') return;
-    const hits = state.targets.filter(v => v === state.cakes[0]).length;     // 当たったターゲットのまい数
-    const base = hits > 0 ? hits * TARGET_PTS : NOHIT_PTS;
-    const total = base;
-    state.roundHits = hits;
-    state.roundBase = base; state.roundHeal = CONFIG.apHeal;
+    const size = state.cakes[0];
+    const perfect = state.tops.map(t => t > 0 && t % size === 0);              // トッピングが「ケーキの大きさ」の倍数ぴったり
+    const nPerfect = perfect.filter(Boolean).length;
+    const cakePts = perfect.reduce((sum, p) => sum + (p ? CAKE_PERFECT_PTS : CAKE_PTS), 0);
+    const bonus = nPerfect === 3 ? PERFECT_BONUS : 0;
+    const hits = state.targets.filter(v => v === size).length;                // 当たったターゲットのまい数
+    const sub = cakePts + bonus;
+    const total = sub * (1 + hits);                                           // ターゲット1まいごとに、同じ点をもう1回
+    state.roundHits = hits; state.roundPerfect = nPerfect; state.roundCakePts = cakePts; state.roundBonus = bonus; state.roundSub = sub;
+    state.roundBase = sub; state.roundHeal = CONFIG.apHeal;
     state.ap += CONFIG.apHeal;
     noteBestPlay(total);
     state.score += total;
@@ -181,7 +192,9 @@ function roundClear() {
     state.inputLocked = true;
     updateUI();
     fxText(360, 330, T('particle_ap_gain', { n: CONFIG.apHeal }), '#ffb066', 44);
-    if (hits > 0) fxText(360, 270, T('particle_target_bonus'), '#ffe27a', 40);
+    perfect.forEach((p, i) => { if (p) fxText(cakeX(i) + CAKE / 2, CAKE_Y + 70, T('particle_perfect'), '#ffd24a', 34); });
+    if (nPerfect === 3) fxText(360, 250, T('particle_perfect_all'), '#ff4a7a', 44);
+    if (hits > 0) fxText(360, 300, T('particle_target_bonus'), '#ffe27a', 40);
     confetti();
     document.querySelectorAll('.fc-cake').forEach(el => el.classList.add('matched'));
     setTimeout(() => {
@@ -222,12 +235,13 @@ function fcInit() {
     for (let i = 0; i < 3; i++) {
         h += `<div class="fc-cake" data-i="${i}" style="left:${cakeX(i)}px;top:${CAKE_Y}px;width:${CAKE}px;height:${CAKE}px">${cakeSVG(CONFIG.gridDiv)}</div>`;
         h += `<div class="fc-lab" data-i="${i}" style="left:${cakeX(i) + CAKE / 2 - 54}px;top:${LAB_Y}px"></div>`;
+        h += `<div class="fc-top" data-i="${i}" style="left:${cakeX(i) + CAKE / 2 - 70}px;top:${LAB_Y + 66}px"></div>`;
     }
     h += `<div class="fc-hbox" style="left:${HAND_L - 6}px;top:${HAND_Y - 14}px;width:${HAND_AREA + 12}px;height:${HAND_H + 28}px"></div>`;
     h += `<div class="bl-hint" style="display:none"></div>`;
     layer.innerHTML = h;
     FC.eq = layer.querySelector('.fc-eq'); FC.eqSpan = FC.eq.querySelector('span');
-    FC.cakes = Array.from(layer.querySelectorAll('.fc-cake')); FC.labs = Array.from(layer.querySelectorAll('.fc-lab'));
+    FC.cakes = Array.from(layer.querySelectorAll('.fc-cake')); FC.labs = Array.from(layer.querySelectorAll('.fc-lab')); FC.tops = Array.from(layer.querySelectorAll('.fc-top'));
     FC.chg = document.getElementById('btn-change'); FC.hint = layer.querySelector('.bl-hint');
     FC.hand = [];
     FC.ready = true;
@@ -304,6 +318,14 @@ function renderFc() {
         if (el._v !== v) { el._v = v; paintCake(el.firstElementChild, v, CONFIG.gridDiv); FC.labs[i].innerHTML = `<div class="pill">${fracHTML(v)}</div>`; }
         el.classList.toggle('over', i === ov);
         FC.labs[i].classList.toggle('over', i === ov);
+        // トッピングの数(ケーキの大きさの倍数ならぴったり=強調)
+        const tp = FC.tops[i], tv = state.tops[i], ok = tv > 0 && v > 0 && tv % v === 0;
+        const sg = tv + '|' + ok;
+        if (tp._sg !== sg) {
+            tp._sg = sg;
+            tp.className = 'fc-top' + (ok ? ' ok' : '');
+            tp.innerHTML = `<span class="tpi">${TOP_ICO}</span><b>× ${tv}</b>${ok ? `<em>${T('top_ok')}</em>` : ''}`;
+        }
     }
     // チェンジのボタン(右パネルの下)
     FC.chg.disabled = state.ap <= 0 || state.phase !== 'PLAY' || state.inputLocked;
@@ -319,7 +341,7 @@ function renderFc() {
             el.addEventListener('animationend', () => { el._popping = false; el.classList.remove('pop'); });
             el._card = c; FC.hand[i] = el;
             el.style.width = c.w + 'px'; el.style.height = c.h + 'px';
-            el.innerHTML = `<div class="nm">${fracHTML(c.val)}</div>`;
+            el.innerHTML = `<div class="tpi">${TOP_ICO}</div><div class="nm">${fracHTML(c.val)}</div>`;
             document.getElementById('bl').appendChild(el);
             el._popping = true; el.classList.add('pop');
         }
@@ -370,7 +392,7 @@ function updateUI() {
         grid.innerHTML = uniq.map(v => {
             const d = document.createElement('div'); d.innerHTML = cakeSVG(UNIT_MAX); paintCake(d.firstElementChild, v, UNIT_MAX);
             const isNew = state.targets.length > prevN && prevN > 0 && v === last;
-            return `<div class="tc-card${isNew ? ' new' : ''}${cnt[v] > 1 ? ' dup' : ''}">${cnt[v] > 1 ? `<b class="tc-x">×${cnt[v]}</b>` : ''}<div class="tc-cake">${d.innerHTML}</div><div class="tc-fr">${fracHTML(v)}</div><div class="tc-pts">${TARGET_PTS * cnt[v]}${T('unit_pts')}</div></div>`;
+            return `<div class="tc-card${isNew ? ' new' : ''}${cnt[v] > 1 ? ' dup' : ''}">${cnt[v] > 1 ? `<b class="tc-x">×${cnt[v]}</b>` : ''}<div class="tc-cake">${d.innerHTML}</div><div class="tc-fr">${fracHTML(v)}</div><div class="tc-pts">${T('tc_plus')}${cnt[v] > 1 ? ' ×' + cnt[v] : ''}</div></div>`;
         }).join('');
     }
 }
