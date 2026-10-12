@@ -1,7 +1,7 @@
 // ぶんすうスロットの設定。braves-common.js より先に読み込む。
 // ケーキは「n分割」(RUNで決まる: 3〜10)。大きさは「nぶんのいくつ」の整数で持つ(UNIT_MAX = n = ちょうど1)。
 //   RUN(分割数)は 3,4,5,6,7,8,9,10 の8つ。10をこえる分割は 計算がたいへんなので つくらない。
-//   難易度は ケーキの数: ★1=3つ / ★2=4つ / ★3=5つ(シークレット★4・★5は いまは出さない)。
+//   ケーキは 3つ。難易度は いまは なし(★は1つだけ)。
 //   全7ステージ。ケーキの大きさをそろえて「できあがり」ボタンを押すとステージクリア。
 let UNIT_MAX = 4;                      // いま遊んでいるRUNの分割数(RUNをはじめるときに入れかわる)
 const DIVISIONS = [3, 4, 5, 6, 7, 8, 9, 10];
@@ -29,13 +29,13 @@ const AP_HEAL = {
 };
 const STAGE_TOTAL = 7;
 
-// 難易度ごとのちがい: ケーキの数(手札は3まい・APは10スタートで共通)
+// 難易度なし: ケーキ3つ・手札3まい・APは10スタート(★2〜5は ひとまず ★1と同じ)
 const STAR_TUNING = {
     1: { cakes: 3, handSize: 3, startAp: 10 },
-    2: { cakes: 4, handSize: 3, startAp: 10 },
-    3: { cakes: 5, handSize: 3, startAp: 10 },
-    4: { cakes: 5, handSize: 3, startAp: 10 },
-    5: { cakes: 5, handSize: 3, startAp: 10 },
+    2: { cakes: 3, handSize: 3, startAp: 10 },
+    3: { cakes: 3, handSize: 3, startAp: 10 },
+    4: { cakes: 3, handSize: 3, startAp: 10 },
+    5: { cakes: 3, handSize: 3, startAp: 10 },
 };
 // star(1〜5)と分割数 div から ゲームの設定をつくる。cardTypes は「1/n 〜 n/n」(n/n=ちょうど1 は手札には出ない)
 function fracPreset(star, div) {

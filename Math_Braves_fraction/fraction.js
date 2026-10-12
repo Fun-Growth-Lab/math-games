@@ -1,7 +1,7 @@
 // ぶんすう(ケーキづくり)の本体。
 // 見た目はDOM(#bl)で描き、入力は透明なcanvasが受ける。座標はゲームエリア内のpx(720x720)。
 //   ケーキは「n分割のいくつ」で持つ(n=UNIT_MAX=ちょうど1)。1をこえたらのこりだけが残る。
-//   ケーキの数は難易度で3/4/5つ。全部の大きさをそろえて「できあがり」ボタンを押すとステージクリア。
+//   ケーキは3つ(難易度なし)。全部の大きさをそろえて「できあがり」ボタンを押すとステージクリア。
 //   APはカードを使う・手札をチェンジするたびに1へる(0でゲームオーバー)。ステージクリアでAP回復。
 //   ホール(ちょうど「1」)を作ると、そのステージのスコアが +20%。ケーキが12時をまわる(1に とどく・こえる)と、ケーキ1つにつき ステージで1回だけ AP+1。
 //   点数 = 基本点100 × ホールボーナス × ターゲットボーナス(チャンス×2 / グッド×3 / ビッグ×4 / スーパー×5)。
@@ -39,7 +39,7 @@ function updateStageLabel() {
     const n = Math.min(state.stage, STAGE_COUNT);
     document.getElementById('disp-difficulty-label').textContent = `${n} / ${STAGE_COUNT}`;
     document.getElementById('sp-run').textContent = T('run_' + RUN_LIST[runSelIdx].id + '_name');
-    document.getElementById('sp-diff').textContent = '★'.repeat(state.star) + ' ' + T(['diff_easy', 'diff_normal', 'diff_hard'][state.star - 1]);
+    document.getElementById('sp-diff').textContent = STAR_MAX > 1 ? '★'.repeat(state.star) + ' ' + T(['diff_easy', 'diff_normal', 'diff_hard'][state.star - 1]) : '';
     let h = '';
     for (let k = 1; k <= STAGE_COUNT; k++) h += `<div class="rt ${k < n ? 'done' : (k === n ? 'now' : '')}${k === STAGE_COUNT ? ' last' : ''}" style="--rc:${STAGE_THEMES[k - 1].c}"><b class="no">${k}</b></div>`;
     document.getElementById('sp-route').innerHTML = h;
