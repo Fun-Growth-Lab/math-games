@@ -16,8 +16,8 @@
             item_heal: 'おかわりAP', desc_heal: 'クリアの AP回復が +0.5(2回で +1)',
             item_spice: 'ターゲットスパイス', desc_spice: 'ターゲットの ボーナスが +5%',
             item_charge: 'APチャージ', desc_charge: 'いますぐ AP が +3',
-            item_shape: 'かたちマスター', desc_shape: 'この大きさで そろうと スコア ×1.1(ずっと)',
-            item_fav: 'おきにいりカード', desc_fav: 'この カードを つかうたび 最終スコア +3%',
+            item_shape: 'かたちマスター', desc_shape: 'この大きさで そろうと ×1.1',
+            item_fav: 'おきにいりカード', desc_fav: 'つかうたび 最終スコア +3%',
             coin_unit: 'コイン',
         },
         en: {
@@ -26,8 +26,8 @@
             item_heal: 'Extra AP', desc_heal: '+0.5 AP on stage clear (carries over)',
             item_spice: 'Target Spice', desc_spice: 'Target bonus +5%',
             item_charge: 'AP Charge', desc_charge: '+3 AP right now',
-            item_shape: 'Shape Master', desc_shape: 'Stage score ×1.1 when cakes match this size',
-            item_fav: 'Favorite Card', desc_fav: 'Each use of this card: final score +3%',
+            item_shape: 'Shape Master', desc_shape: '×1.1 when cakes match this size',
+            item_fav: 'Favorite Card', desc_fav: 'Each use: final score +3%',
             coin_unit: ' coins',
         },
     };

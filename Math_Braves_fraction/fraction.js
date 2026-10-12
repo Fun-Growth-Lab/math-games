@@ -6,10 +6,10 @@
 //   ホール(ちょうど「1」)を作るたびに、ターゲットが1まい増える(カンドラ)。同じ大きさがかさなると ×まい数。
 //   点数: ケーキ1つ100点(3つで300点)。ターゲットに当たるごとに、そのステージのスコアの50%を足す。クリアでコインがもらえ、ショップで能力アップ。
 // 画面の寸法(ゲームエリア 720x720)
-const CAKE = 206, CAKE_Y = 160, CAKE_GAP = 20;
+const CAKE = 212, CAKE_Y = 190, CAKE_GAP = 16;
 function cakeX(i) { return (720 - (3 * CAKE + 2 * CAKE_GAP)) / 2 + i * (CAKE + CAKE_GAP); }
-const LAB_Y = CAKE_Y + CAKE + 4;                       // 大きさの札
-const HAND_W = 104, HAND_H = 140, HAND_GAP = 16, HAND_Y = 482, HAND_L = 20, HAND_AREA = 680;   // 手札はケーキの真下に近づけて、横はば いっぱいに並べる
+const LAB_Y = CAKE_Y + CAKE + 6;                       // 大きさの札
+const HAND_W = 116, HAND_H = 144, HAND_GAP = 14, HAND_Y = 542, HAND_L = 20, HAND_AREA = 680;   // 手札はケーキの真下に近づけて、横はば いっぱいに並べる
 
 Object.assign(state, {
     ap: 10, cakes: [0, 0, 0], targets: [], coins: 0, run: null,
@@ -236,9 +236,9 @@ function fcInit() {
     let h = `<div class="fc-eq ph"><span></span></div><div class="fc-table"></div>`;
     for (let i = 0; i < 3; i++) {
         h += `<div class="fc-cake" data-i="${i}" style="left:${cakeX(i)}px;top:${CAKE_Y}px;width:${CAKE}px;height:${CAKE}px">${cakeSVG(CONFIG.gridDiv)}</div>`;
-        h += `<div class="fc-lab" data-i="${i}" style="left:${cakeX(i) + CAKE / 2 - 54}px;top:${LAB_Y}px"></div>`;
+        h += `<div class="fc-lab" data-i="${i}" style="left:${cakeX(i) + CAKE / 2 - 60}px;top:${LAB_Y}px"></div>`;
     }
-    h += `<div class="fc-hbox" style="left:${HAND_L - 6}px;top:${HAND_Y - 14}px;width:${HAND_AREA + 12}px;height:${HAND_H + 28}px"></div>`;
+    h += `<div class="fc-hbox" style="left:${HAND_L - 6}px;top:${HAND_Y - 16}px;width:${HAND_AREA + 12}px;height:${HAND_H + 34}px"></div>`;
     h += `<div class="bl-hint" style="display:none"></div>`;
     layer.innerHTML = h;
     FC.eq = layer.querySelector('.fc-eq'); FC.eqSpan = FC.eq.querySelector('span');
@@ -362,7 +362,24 @@ function renderFc() {
     area.classList.toggle('danger', state.screen === 'PLAYING' && state.ap <= 3 && state.ap > 0);
 }
 
+// 左パネルの「もちもの」: ショップで買った能力アップの一覧
+function renderItems() {
+    const el = document.getElementById('disp-items'), R = state.run;
+    if (!el) return;
+    const l = [];
+    if (R) {
+        if (R.healUp) l.push(['heal', `${T('item_heal')} Lv${R.healUp}`]);
+        if (R.spiceLv) l.push(['spice', `${T('item_spice')} Lv${R.spiceLv}`]);
+        Object.keys(R.shapes).forEach(v => l.push(['shape', `${T('item_shape')} ${fracText(+v)}`]));
+        Object.keys(R.favs).forEach(v => l.push(['fav', `${T('item_fav')} ${fracText(+v)}`]));
+    }
+    const sig = JSON.stringify(l) + currentLang;
+    if (el._sig === sig) return;
+    el._sig = sig;
+    el.innerHTML = l.length ? l.map(([k, t]) => `<i class="it it-${k}">${t}</i>`).join('') : `<span class="it-none">${T('items_none')}</span>`;
+}
 function updateUI() {
+    renderItems();
     const ap = document.getElementById('disp-ap');
     ap.textContent = state.ap;
     ap.classList.toggle('low', state.ap <= 3);
@@ -376,7 +393,7 @@ function updateUI() {
     const ce = document.getElementById('disp-coins'), me = document.getElementById('disp-mult');
     if (ce) { ce.textContent = state.coins; me.textContent = '×' + (1 + 0.03 * (state.run ? state.run.favUses : 0)).toFixed(2); }
     // ターゲット(カードをならべる。同じ大きさは1まいにまとめて ×まい数)
-    const sig = state.targets.join(',') + '|' + UNIT_MAX;
+    const sig = state.targets.join(',') + '|' + UNIT_MAX + '|' + (state.run ? state.run.spiceLv : 0);
     if (FC.tsig !== sig) {
         const prevN = FC.tn || 0;
         FC.tsig = sig; FC.tn = state.targets.length;
@@ -384,11 +401,13 @@ function updateUI() {
         state.targets.forEach(v => { if (!(v in cnt)) { cnt[v] = 0; uniq.push(v); } cnt[v]++; });
         const grid = document.getElementById('target-grid');
         const last = state.targets[state.targets.length - 1];
-        grid.className = 'tc-grid ' + (uniq.length <= 1 ? 'n1' : uniq.length <= 4 ? 'n4' : 'n9');
+        const kind = uniq.length <= 1 ? 'n1' : uniq.length <= 4 ? 'n4' : 'n9';
+        grid.className = 'tc-grid ' + kind;
         grid.innerHTML = uniq.map(v => {
-            const d = document.createElement('div'); d.innerHTML = cakeSVG(UNIT_MAX); paintCake(d.firstElementChild, v, UNIT_MAX);
+            const d = document.createElement('div');
+            if (kind === 'n1') { d.innerHTML = cakeSVG(UNIT_MAX); paintCake(d.firstElementChild, v, UNIT_MAX); }   // ターゲットが1まいのときだけ ケーキの絵も出す
             const isNew = state.targets.length > prevN && prevN > 0 && v === last;
-            return `<div class="tc-card${isNew ? ' new' : ''}${cnt[v] > 1 ? ' dup' : ''}">${cnt[v] > 1 ? `<b class="tc-x">×${cnt[v]}</b>` : ''}<div class="tc-cake">${d.innerHTML}</div><div class="tc-fr">${fracHTML(v)}</div><div class="tc-pts">${T('tc_plus')}${cnt[v] > 1 ? ' ×' + cnt[v] : ''}</div></div>`;
+            return `<div class="tc-card${isNew ? ' new' : ''}${cnt[v] > 1 ? ' dup' : ''}">${cnt[v] > 1 ? `<b class="tc-x">×${cnt[v]}</b>` : ''}${kind === 'n1' ? `<div class="tc-cake">${d.innerHTML}</div>` : ''}<div class="tc-fr">${fracHTML(v)}</div><div class="tc-pts">+${Math.round((TARGET_RATE + 0.05 * (state.run ? state.run.spiceLv : 0)) * 100 * cnt[v])}%</div></div>`;
         }).join('');
     }
 }
