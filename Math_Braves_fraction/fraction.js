@@ -3,7 +3,7 @@
 //   ケーキは「n分割のいくつ」で持つ(n=UNIT_MAX=ちょうど1)。1をこえたらのこりだけが残る。
 //   ケーキの数は難易度で3/4/5つ。全部の大きさをそろえて「できあがり」ボタンを押すとステージクリア。
 //   APはカードを使う・手札をチェンジするたびに1へる(0でゲームオーバー)。ステージクリアでAP回復。
-//   ホール(ちょうど「1」)を作ると、そのステージのスコアが +20%。ケーキ1つにつき ステージで1回だけ AP+1。
+//   ホール(ちょうど「1」)を作ると、そのステージのスコアが +20%。ケーキが12時をまわる(1に とどく・こえる)と、ケーキ1つにつき ステージで1回だけ AP+1。
 //   点数 = 基本点100 × ホールボーナス × ターゲットボーナス(チャンス×2 / グッド×3 / ビッグ×4 / スーパー×5)。
 // 画面の寸法(ゲームエリア 720x720)。ケーキの数(CAKE_N)によって大きさが変わる
 let CAKE_N = 3, CAKE = 210, CAKE_Y = 151, CAKE_GAP = 14, LAB_Y = 369, LAB_W = 124, PILL_H = 96, PILL_F = 2.3;
@@ -156,11 +156,11 @@ function processAttack(cardIdx, cakeIdx) {
         burst(cx, cy, '#ff8fb0', 22);
         state.wholes++;                                            // ホール: このステージのスコア +20%
         fxText(cx, cy - 90, '×' + (1 + WHOLE_RATE * state.wholes).toFixed(1), '#ffb724', 38);
-        if (!state.apGot[cakeIdx]) {                               // ケーキ1つにつき ステージで1回だけ AP +1
-            state.apGot[cakeIdx] = true;
-            state.ap += AP_WHOLE_HEAL;
-            setTimeout(() => fxText(cx, cy - 10, 'AP +' + AP_WHOLE_HEAL, '#ff4a7a', 40), 150);
-        }
+    }
+    if (raw >= UNIT_MAX && !state.apGot[cakeIdx]) {                // 12時をまわった(ちょうど でも こえても): ケーキ1つにつき ステージで1回 AP +1
+        state.apGot[cakeIdx] = true;
+        state.ap += AP_WHOLE_HEAL;
+        setTimeout(() => fxText(cx, cy + 10, 'AP +' + AP_WHOLE_HEAL, '#ff4a7a', 40), 150);
     }
     state.cards[cardIdx] = makeCard(cardIdx);
     state.cards[cardIdx]._fresh = true;
