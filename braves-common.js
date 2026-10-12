@@ -1181,25 +1181,31 @@ function renderRankScreen() {
     };
     seg('rk-seg-kind', [['score', T('rank_kind_score')], ['hand', T('rank_kind_hand')]], rkKind).querySelectorAll('button').forEach(b =>
         bindBtn(b, () => { rkKind = b.dataset.v; renderRankScreen(); loadRankRows(); }));
-    seg('rk-seg-star', [[0, T('rank_star_all')]].concat([1, 2, 3].map(k => [k, '★'.repeat(k)])), rkStar).querySelectorAll('button').forEach(b =>
+    seg('rk-seg-star', [[0, T('rank_star_all')]].concat(rkStarList().map(k => [k, '★'.repeat(k)])), rkStar).querySelectorAll('button').forEach(b =>
         bindBtn(b, () => { rkStar = parseInt(b.dataset.v, 10); renderRankScreen(); loadRankRows(); }));
     seg('rk-seg-tab', [['WORLD', T('rank_tab_world')], ['LOCAL', T('rank_tab_local')]], state.rankingMode).querySelectorAll('button').forEach(b =>
         bindBtn(b, () => { state.rankingMode = b.dataset.v; renderRankScreen(); loadRankRows(); }));
     const col = (k, cls) => `<span class="${cls || ''}">${T(k)}</span>`;
     document.getElementById('rk-head').innerHTML = col('rk_col_rank') + col('rk_col_name') + col('rk_col_star', 'c') + col('rk_col_result', 'c') + col('rk_col_score', 'r') + col('rk_col_date', 'r');
 }
+// ランキングに出す★の一覧(シークレットは そのRUNで ひとつ前をクリアしたら出る)
+function rkStarList() {
+    const max = (typeof STAR_MAX === 'number') ? STAR_MAX : 3, l = [];
+    for (let k = 1; k <= max; k++) if (typeof starVisible !== 'function' || starVisible(k, rkRunIdx)) l.push(k);
+    return l;
+}
 async function loadRankRows() {
     const list = document.getElementById('rk-list'), mySeq = ++rkSeq;
-    const stars = rkStar ? [rkStar] : [1, 2, 3];
+    const stars = rkStar ? [rkStar] : rkStarList();
     let rows;
     if (state.rankingMode === 'WORLD') {
         list.innerHTML = `<li class="rk-loading">${T('rank_loading')}</li>`;
         if (!window.fetchOnlineRanking) return;
-        const parts = await Promise.all(stars.map(async k => { const r = await window.fetchOnlineRanking(starKey(k), rkStar ? 20 : 10, rkKind === 'hand' ? HAND_GAME_ID() : undefined); return (r || []).map(x => Object.assign({ star: k }, x)); }));
+        const parts = await Promise.all(stars.map(async k => { const r = await window.fetchOnlineRanking(starKey(k, rkRunIdx), rkStar ? 20 : 10, rkKind === 'hand' ? HAND_GAME_ID() : undefined); return (r || []).map(x => Object.assign({ star: k }, x)); }));
         if (mySeq !== rkSeq) return;       // 読み込み中に切りかえられたら古い結果は捨てる
         rows = [].concat.apply([], parts);
     } else {
-        rows = [].concat.apply([], stars.map(k => getLocalRanking((rkKind === 'hand' ? 'HAND_' : '') + starKey(k)).map(x => Object.assign({ star: k }, x))));
+        rows = [].concat.apply([], stars.map(k => getLocalRanking((rkKind === 'hand' ? 'HAND_' : '') + starKey(k, rkRunIdx)).map(x => Object.assign({ star: k }, x))));
     }
     rows.sort((a, b) => b.score - a.score);
     renderRankRows(rows.slice(0, 20));

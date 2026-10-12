@@ -7,6 +7,8 @@
 // ステージ数。★ごとに変わるゲーム(わりざん)は GAME.stageCountFor(star) を用意すると、RUNを始めるときに入れかわる
 let STAGE_COUNT = GAME.stageCount || 7;
 function stageCountFor(star) { return GAME.stageCountFor ? GAME.stageCountFor(star) : (GAME.stageCount || 7); }
+// 難易度(★)の数。GAME.starMax=5 なら ★4・★5 は「ひとつ前をクリアしたら あらわれる」シークレット
+const STAR_MAX = GAME.starMax || 3;
 const STAR_LOCK = false;      // true にすると、★は1つ前をクリアすると開く。今は ★を自由に選べる
 
 // ステージごとの世界。bgf=通常戦の背景に重ねるフィルター(haikei_1を色変え)、bossf=ボス戦(haikei_2を色変え)
@@ -88,11 +90,14 @@ function buildTitleDecor() {
 // ---- 進み具合（★のクリア）と画面遷移 ----
 const LAST_STAR_KEY = GAME.keys.lastStar;
 let selStar = 1;
-try { selStar = Math.max(1, Math.min(3, parseInt(localStorage.getItem(LAST_STAR_KEY), 10) || 1)); } catch (e) {}
-function starKey(n) { return 'STAR' + n; }
-function starCleared(n) { return getClearCount(starKey(n)) > 0; }
+try { selStar = Math.max(1, Math.min(STAR_MAX, parseInt(localStorage.getItem(LAST_STAR_KEY), 10) || 1)); } catch (e) {}
+// ri = RUNの番号(省くと いま選んでいるRUN)。GAME.starKey があれば RUNごとに記録を分ける
+function starKey(n, ri) { return GAME.starKey ? GAME.starKey(n, ri === undefined ? runSelIdx : ri) : 'STAR' + n; }
+function starCleared(n, ri) { return getClearCount(starKey(n, ri)) > 0; }
 function starUnlocked(n) { return !STAR_LOCK || n === 1 || starCleared(n - 1); }
-function maxClearedStar() { let m = 0; for (let n = 1; n <= 3; n++) if (starCleared(n)) m = n; return m; }     // クリアした いちばん高い★(0=まだ)
+function starVisible(n, ri) { return n <= 3 || starCleared(n - 1, ri); }      // ★4以上は ひとつ前をクリアしたら あらわれる
+function diffName(n) { return T(['diff_easy', 'diff_normal', 'diff_hard', 'diff_master', 'diff_legend'][n - 1]); }
+function maxClearedStar(ri) { let m = 0; for (let n = 1; n <= STAR_MAX; n++) if (starCleared(n, ri)) m = n; return m; }     // クリアした いちばん高い★(0=まだ)
 const CROWN_SVG = '<svg viewBox="0 0 64 50" aria-hidden="true"><path d="M6 40 L9 13 L23 27 L32 7 L41 27 L55 13 L58 40 Z" fill="var(--c1)" stroke="var(--c3)" stroke-width="3" stroke-linejoin="round"/><rect x="6" y="39" width="52" height="9" rx="3" fill="var(--c2)" stroke="var(--c3)" stroke-width="3"/><circle cx="9" cy="12" r="4.5" fill="var(--c4)" stroke="var(--c3)" stroke-width="2"/><circle cx="32" cy="6" r="4.5" fill="var(--c4)" stroke="var(--c3)" stroke-width="2"/><circle cx="55" cy="12" r="4.5" fill="var(--c4)" stroke="var(--c3)" stroke-width="2"/><path d="M13 24 L15 18" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity="0.7"/></svg>';
 function bestScore(n) { const l = getLocalRanking(starKey(n)); return l.length ? l[0].score : 0; }
 function runSelectVisible() { return !document.getElementById('run-select-screen').classList.contains('hidden'); }
@@ -116,6 +121,7 @@ function pcard(n, left, top, rot, extra) {
     return `<div class="pc" style="left:${left}px;top:${top}px;transform:rotate(${rot || 0}deg);background:${pcardBg(n)};${extra || ''}">${n}</div>`;
 }
 function runArt(id) {
+    if (GAME.runArtFor) { const h = GAME.runArtFor(id); if (h) return h; }
     const sp = (ch, l, t, s, d) => `<div class="spark" style="left:${l}px;top:${t}px;font-size:${s}px;animation-delay:${d || 0}s">${ch}</div>`;
     const white = 'background:linear-gradient(#fff,#dfe8ff);color:#2d3d78;border-color:#c9d3f0;';
     const rn = GAME.runArtNums || [4, 6, 10];       // RUNカードに浮かべる数字(しょうすうは小数)
@@ -137,7 +143,7 @@ function renderRunSelect() {
     const cur = RUN_LIST[runSelIdx];
     document.getElementById('rs-strip').innerHTML = RUN_LIST.map((r, i) => {
         // クリアした いちばん高い難易度を、RUNカードの王冠(銅・銀・金)で見せる
-        const mc = r.locked ? 0 : maxClearedStar();
+        const mc = r.locked ? 0 : maxClearedStar(i);
         return `<div class="rs-card${i === runSelIdx ? ' sel' : ''}${r.locked ? ' locked' : ''}" style="--c:${r.color}" data-idx="${i}">
             <div class="rs-tab">${T('run_' + r.id + '_name')}</div>
             ${mc ? `<div class="rs-medal m${mc}">${CROWN_SVG}</div>` : ''}
@@ -157,9 +163,9 @@ function renderRunSelect() {
     const best = bestScore(selStar);
     document.getElementById('rs-desc').innerHTML = T('run_' + cur.id + '_desc') +
         (best && !cur.locked ? `　<span class="ds-best">${T('best_label', { n: best })}</span>` : '');
-    document.getElementById('star-row').innerHTML = [1, 2, 3].map(n => {
+    document.getElementById('star-row').innerHTML = Array.from({ length: STAR_MAX }, (_, i) => i + 1).filter(n => starVisible(n)).map(n => {
         const locked = !starUnlocked(n);
-        return `<button class="star-btn${n === selStar ? ' active' : ''}${locked ? ' locked' : ''}${starCleared(n) ? ' cleared' : ''}" data-star="${n}">${n === selStar ? `<em class="pick">▶ ${T('rs_picked')}</em>` : ''}${'★'.repeat(n)}<small>${locked ? `<span class="ico" style="width:.85em;height:.85em;vertical-align:-.1em">${ICO.lock}</span> ` : (starCleared(n) ? '✔ ' : '')}${T(['diff_easy', 'diff_normal', 'diff_hard'][n - 1])}</small></button>`;
+        return `<button class="star-btn${n === selStar ? ' active' : ''}${locked ? ' locked' : ''}${starCleared(n) ? ' cleared' : ''}" data-star="${n}">${n === selStar ? `<em class="pick">▶ ${T('rs_picked')}</em>` : ''}${'★'.repeat(n)}<small>${locked ? `<span class="ico" style="width:.85em;height:.85em;vertical-align:-.1em">${ICO.lock}</span> ` : (starCleared(n) ? '✔ ' : '')}${diffName(n)}</small></button>`;
     }).join('');
     document.querySelectorAll('#star-row .star-btn').forEach(el => {
         bindBtn(el, () => {
@@ -240,7 +246,7 @@ function showRunEnd(cleared, finalScore, isNewRecord, timeBonus, maxScoreBonus, 
     const pts = T('unit_pts');
     const title = cleared ? T('end_clear_title') : T('gameover_title');
     const ribbon = Array.from(title).map((ch, i) => `<span style="--i:${i}">${ch}</span>`).join('');
-    const diffName = T(['diff_easy', 'diff_normal', 'diff_hard'][state.star - 1]);
+    const diffNm = diffName(state.star);
     const journey = Array.from({ length: STAGE_COUNT }, (_, i) => {
         const n = i + 1;
         const ok = cleared ? true : n < state.stage;
@@ -257,7 +263,7 @@ function showRunEnd(cleared, finalScore, isNewRecord, timeBonus, maxScoreBonus, 
     const breakdown = GAME.endBreakdown ? GAME.endBreakdown(cleared, finalScore, timeBonus, maxScoreBonus)
         : [bdItem(T('bd_attack'), state.score), bdItem(T('bd_time'), timeBonus), bdItem(T('bd_best'), maxScoreBonus)].concat(clearBonus ? [bdItem(T('bd_clear'), clearBonus)] : []).join('<span class="bdp">＋</span>');
     const stars = cleared
-        ? `<div class="end-stars">${[1, 2, 3].map(n => `<b class="${n <= state.star ? '' : 'off'}" style="--i:${n}">★</b>`).join('')}<em>${diffName}</em></div>`
+        ? `<div class="end-stars">${Array.from({ length: Math.max(3, state.star) }, (_, i) => i + 1).map(n => `<b class="${n <= state.star ? '' : 'off'}" style="--i:${n}">★</b>`).join('')}<em>${diffNm}</em></div>`
         : '';
     const badges = cleared && runFirstClear ? `<span>${T('end_new_medal')}</span>` : '';
     el.className = cleared ? '' : 'over';
@@ -265,7 +271,7 @@ function showRunEnd(cleared, finalScore, isNewRecord, timeBonus, maxScoreBonus, 
         <div class="end-rays"></div><div class="end-confetti">${confetti}</div>
         <div class="end-box${cleared ? '' : ' over'}">
             <div class="end-ribbon">${ribbon}</div>
-            <div class="end-run"><span class="rn">${T('run_normal_name')}</span>${cleared ? '' : `<span>${'★'.repeat(state.star)}　${diffName}</span>`}</div>
+            <div class="end-run"><span class="rn">${T('run_' + RUN_LIST[runSelIdx].id + '_name')}</span>${cleared ? '' : `<span>${'★'.repeat(state.star)}　${diffNm}</span>`}</div>
             ${stars}
             <div class="end-badges">${badges}</div>
             <div class="end-stats">

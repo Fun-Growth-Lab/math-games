@@ -3,9 +3,9 @@
 // ルールは元のぶんすうと同じ: 3つのケーキに手札の分数カードをのせてたし、3つの大きさをぴったりそろえればラウンドクリア。
 //   ケーキは「24分のいくつ」で持つ(24=ちょうど1)。1をこえたらのこりだけが残る。
 //   APはカードを使う・手札をチェンジするたびに1へる(0でゲームオーバー)。ステージクリアでAP回復。全10ステージ。
-//   点数: ターゲットの大きさでそろえたらターゲットの点、それ以外は100点。クリア時にのこりAP×100のボーナス。
+//   ホール(ちょうど「1」)を作るたびに、ターゲットが1まい増える(カンドラ)。同じ大きさがかさなると ×まい数。
+//   点数: ターゲットに当たったまい数 × 200点。1まいも当たらなければ100点。最後にのこりAP×100のボーナス。
 // ステージ制RUN(ラウンド=ステージ。★で しょきゅう/ちゅうきゅう/じょうきゅう)の画面は braves-run.js が受け持つ。
-const STAR_PRESETS = { 1: PRESET_EASY, 2: PRESET_NORMAL, 3: PRESET_HARD };
 
 // 画面の寸法(ゲームエリア 720x720)
 const CAKE = 206, CAKE_Y = 162, CAKE_GAP = 20;
@@ -14,7 +14,7 @@ const LAB_Y = CAKE_Y + CAKE + 4;                       // 大きさの札
 const HAND_W = 104, HAND_H = 140, HAND_GAP = 16, HAND_Y = 506, HAND_L = 20, HAND_AREA = 680;   // 手札はケーキの真下に近づけて、横はば いっぱいに並べる
 
 Object.assign(state, {
-    ap: 10, cakes: [0, 0, 0], targetValue: 0, targetBase: 200, targetKey: 'target_chance', targetColor: '#fff',
+    ap: 10, cakes: [0, 0, 0], targets: [],
     phase: 'IDLE', tutorial: false, lastEq: '',
     roundBase: 0, roundHeal: 0, endBase: 0, apBonus: 0
 });
@@ -39,7 +39,8 @@ function startRun(star) {
     if (!starUnlocked(star)) return;
     state.star = star;
     state.difficulty = starKey(star);
-    CONFIG = Object.assign({}, STAR_PRESETS[star]);
+    UNIT_MAX = DIVISIONS[runSelIdx];                 // RUN = ケーキの分割数
+    CONFIG = fracPreset(star, UNIT_MAX);
     STAGE_COUNT = CONFIG.maxRound;
     initGame();
     state.runMode = true;
@@ -67,9 +68,9 @@ function backToTitle() {
 
 function initGame() {
     state.score = 0; state.bestPlay = 0; state.stage = 1; state.runMode = false; state.stageStartScore = 0; state.stageScores = []; state.tutorial = false;
-    state.ap = 10; state.cakes = [0, 0, 0]; state.cards = []; state.dragInfo = null; state.lastEq = '';
+    state.ap = CONFIG.startAp || 10; state.cakes = [0, 0, 0]; state.targets = []; state.cards = []; state.dragInfo = null; state.lastEq = '';
     state.inputLocked = false; state.phase = 'IDLE';
-    state.endBase = 0; state.apBonus = 0;
+    state.endBase = 0; state.apBonus = 0; state.roundHits = 0;
     state.width = 720; state.height = 720; canvas.width = 720; canvas.height = 720;
     hideAllOverlays();
     clearFcLayer();
@@ -77,7 +78,7 @@ function initGame() {
     ui.title.classList.add('hidden');
     ui.btnToTitle.classList.remove('hidden');
     ui.rightPanelContent.classList.remove('invisible');
-    document.getElementById('target-cake').innerHTML = cakeSVG(CONFIG.gridDiv);
+    FC.tsig = null;
     startLoop();
 }
 
@@ -102,18 +103,10 @@ function fillHand() {
 function startRound(n) {
     state.lastEq = '';
     state.stageStartScore = state.score;
-    const types = CONFIG.cardTypes;
-    state.targetValue = types[getRandomInt(0, types.length - 1)];
-    // ターゲットの点数(1ラウンド目はかならず200)
-    let pts = 200, key = 'target_chance', col = '#ffffff';
-    if (n > 1) {
-        const r = Math.random();
-        if (r < 0.05) { pts = 500; key = 'target_supergood'; col = '#e8a0ff'; }
-        else if (r < 0.15) { pts = 400; key = 'target_big'; col = '#ff8a7a'; }
-        else if (r < 0.30) { pts = 300; key = 'target_good'; col = '#ffe27a'; }
-    }
-    state.targetBase = pts; state.targetKey = key; state.targetColor = col;
-    do { state.cakes = [0, 1, 2].map(() => types[getRandomInt(0, types.length - 1)]); }
+    const types = CONFIG.cardTypes;                         // 1〜n(n=ちょうど1)
+    state.targets = [types[getRandomInt(0, types.length - 1)]];   // 最初のターゲット1まい。ホールを作るたびに増える
+    const start = types.filter(v => v < UNIT_MAX);          // はじめのケーキは ちょうど1でない大きさ
+    do { state.cakes = [0, 1, 2].map(() => start[getRandomInt(0, start.length - 1)]); }
     while (state.cakes[0] === state.cakes[1] && state.cakes[1] === state.cakes[2]);
     if (n === 1 || !state.cards.length) fillHand();
     state.phase = 'PLAY';
@@ -143,6 +136,7 @@ function processAttack(cardIdx, cakeIdx) {
     if (one) {
         fxText(cx, cy - 40, T('particle_whole'), '#ff8a7a', 42);   // ちょうど「1」(ホール)
         burst(cx, cy, '#ff8fb0', 22);
+        addTarget();                                               // カンドラ: ターゲットが1まい増える
     }
     state.cards[cardIdx] = makeCard(cardIdx);
     state.cards[cardIdx]._fresh = true;
@@ -150,6 +144,13 @@ function processAttack(cardIdx, cakeIdx) {
     updateUI();
     if (aligned()) { state.phase = 'CLEAR_WAIT'; setTimeout(roundClear, 500); }
     else checkGameOver();
+}
+// ホールを作ったら、ターゲットを1まい足す(同じ大きさもありえる=かさなると ×2)
+function addTarget() {
+    const types = CONFIG.cardTypes, v = types[getRandomInt(0, types.length - 1)];
+    state.targets.push(v);
+    const dup = state.targets.filter(x => x === v).length;
+    fxText(360, 330, T(dup > 1 ? 'particle_target_dup' : 'particle_target_add', { n: dup }), '#ff4a7a', 34);
 }
 function changeHand() {
     if (state.ap <= 0 || !canPlay()) return;
@@ -168,9 +169,10 @@ function checkGameOver() {
 
 function roundClear() {
     if (state.screen !== 'PLAYING') return;
-    const isTarget = state.cakes[0] === state.targetValue;
-    const base = isTarget ? state.targetBase : 100;
+    const hits = state.targets.filter(v => v === state.cakes[0]).length;     // 当たったターゲットのまい数
+    const base = hits > 0 ? hits * TARGET_PTS : NOHIT_PTS;
     const total = base;
+    state.roundHits = hits;
     state.roundBase = base; state.roundHeal = CONFIG.apHeal;
     state.ap += CONFIG.apHeal;
     noteBestPlay(total);
@@ -179,7 +181,7 @@ function roundClear() {
     state.inputLocked = true;
     updateUI();
     fxText(360, 330, T('particle_ap_gain', { n: CONFIG.apHeal }), '#ffb066', 44);
-    if (isTarget) fxText(360, 270, T('particle_target_bonus'), '#ffe27a', 40);
+    if (hits > 0) fxText(360, 270, T('particle_target_bonus'), '#ffe27a', 40);
     confetti();
     document.querySelectorAll('.fc-cake').forEach(el => el.classList.add('matched'));
     setTimeout(() => {
@@ -326,7 +328,7 @@ function renderFc() {
             c.targetX = tx; c.targetY = HAND_Y;
             c.x += (c.targetX - c.x) * 0.2; c.y += (c.targetY - c.y) * 0.2;
         }
-        const cls = 'hc fc-hc t' + (c.val >= 18 ? 4 : c.val >= 12 ? 3 : c.val >= 6 ? 2 : 1) + (c.isDragging ? ' dragging' : '') + (el._popping ? ' pop' : '');
+        const cls = 'hc fc-hc t' + (c.val / UNIT_MAX >= 0.75 ? 4 : c.val / UNIT_MAX >= 0.5 ? 3 : c.val / UNIT_MAX >= 0.25 ? 2 : 1) + (c.isDragging ? ' dragging' : '') + (el._popping ? ' pop' : '');
         if (el._cls !== cls) { el._cls = cls; el.className = cls; }
         el.style.transform = `translate(${c.x}px,${c.y}px)`;
     }
@@ -355,15 +357,21 @@ function updateUI() {
         fcScore.textContent = state.score;
         if (!first && state.score > 0) { fcScore.classList.remove('bump'); void fcScore.offsetWidth; fcScore.classList.add('bump'); }
     }
-    // ターゲット
-    const tn = document.getElementById('disp-target-type');
-    tn.textContent = T(state.targetKey); tn.style.color = state.targetColor;
-    document.getElementById('disp-target-pts').textContent = state.targetBase + T('unit_pts');
-    const tc = document.getElementById('target-cake'), sv = tc.firstElementChild;
-    if (sv && sv._tv !== state.targetValue) {
-        sv._tv = state.targetValue;
-        paintCake(sv, state.targetValue, CONFIG.gridDiv);
-        document.getElementById('label-target').innerHTML = fracHTML(state.targetValue);
+    // ターゲット(カードをならべる。同じ大きさは1まいにまとめて ×まい数)
+    const sig = state.targets.join(',') + '|' + UNIT_MAX;
+    if (FC.tsig !== sig) {
+        const prevN = FC.tn || 0;
+        FC.tsig = sig; FC.tn = state.targets.length;
+        const uniq = [], cnt = {};
+        state.targets.forEach(v => { if (!(v in cnt)) { cnt[v] = 0; uniq.push(v); } cnt[v]++; });
+        const grid = document.getElementById('target-grid');
+        const last = state.targets[state.targets.length - 1];
+        grid.className = 'tc-grid ' + (uniq.length <= 1 ? 'n1' : uniq.length <= 4 ? 'n4' : 'n9');
+        grid.innerHTML = uniq.map(v => {
+            const d = document.createElement('div'); d.innerHTML = cakeSVG(UNIT_MAX); paintCake(d.firstElementChild, v, UNIT_MAX);
+            const isNew = state.targets.length > prevN && prevN > 0 && v === last;
+            return `<div class="tc-card${isNew ? ' new' : ''}${cnt[v] > 1 ? ' dup' : ''}">${cnt[v] > 1 ? `<b class="tc-x">×${cnt[v]}</b>` : ''}<div class="tc-cake">${d.innerHTML}</div><div class="tc-fr">${fracHTML(v)}</div><div class="tc-pts">${TARGET_PTS * cnt[v]}${T('unit_pts')}</div></div>`;
+        }).join('');
     }
 }
 function gameLoop() {

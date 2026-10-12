@@ -3,7 +3,7 @@
 ICO.cake = _svg('<path d="M4 20h16"/><path d="M5 20v-7h14v7"/><path d="M5 13c1.5 0 1.5-1.5 3-1.5s1.5 1.5 3 1.5 1.5-1.5 3-1.5 1.5 1.5 3 1.5"/><path d="M12 11V7"/><path d="M12 6.2c-.9-.9-.9-1.6 0-2.7.9 1.1.9 1.8 0 2.7z"/>');
 initIcons();
 
-// ---- 数の表し方(24分のいくつ) ----
+// ---- 数の表し方(n分割の いくつ。n = UNIT_MAX) ----
 function gcd(a, b) { return b === 0 ? a : gcd(b, a % b); }
 function fracParts(val) { const d = gcd(val, UNIT_MAX); return { n: val / d, d: UNIT_MAX / d }; }
 function fracText(val) { if (val === UNIT_MAX) return '1'; const p = fracParts(val); return `${p.n}/${p.d}`; }
@@ -27,33 +27,34 @@ function ringPath(r0, r1, a0, a1) {
 
 // ケーキの大きさごとの クリームの色(同じ大きさは同じ色。1=金のホール)
 function cakeColor(val) {
+    const r = val / UNIT_MAX;
     if (val === UNIT_MAX) return '#ffd45c';
-    if (val >= 18) return '#ff7fa6';
-    if (val >= 12) return '#b7714f';
-    if (val >= 6) return '#ffc6d8';
+    if (r >= 0.75) return '#ff7fa6';
+    if (r >= 0.5) return '#b7714f';
+    if (r >= 0.25) return '#ffc6d8';
     return '#fff0b8';
 }
 
 // 上から見た ケーキ1つ(24きれ + 切り目 + 切り目ごとの いちご)。大きさは paintCake で変える
 function cakeSVG(div, uid) {
-    const k = UNIT_MAX / div, sc = div <= 4 ? 1.5 : div <= 8 ? 1.15 : 0.82, rr = div <= 4 ? 55 : div <= 8 ? 59 : 63;
+    const k = UNIT_MAX / div, ST = 360 / UNIT_MAX, sc = div <= 4 ? 1.5 : div <= 8 ? 1.15 : 0.9, rr = div <= 4 ? 55 : div <= 8 ? 59 : 63;
     let h = `<svg viewBox="0 0 200 200" class="ck"><circle cx="100" cy="100" r="98" class="pl"/><circle cx="100" cy="100" r="91" class="bd"/>`;
     for (let i = 0; i < UNIT_MAX; i++) {
-        const a0 = -90 + i * 15, a1 = a0 + 15.4;
+        const a0 = -90 + i * ST, a1 = a0 + ST + 0.4;
         h += `<g class="sl" data-i="${i}"><path class="tp" d="${wedgePath(90, a0, a1)}"/><path class="rm" d="${ringPath(76, 90, a0, a1)}"/></g>`;
     }
     for (let p = 0; p < div; p++) {
-        const mid = -90 + (p + 0.5) * k * 15, [x, y] = pt(100, 100, rr, mid);
+        const mid = -90 + (p + 0.5) * k * ST, [x, y] = pt(100, 100, rr, mid);
         h += `<g class="sb" data-p="${p}">${STRAWB(x.toFixed(1), y.toFixed(1), sc)}</g>`;
     }
     for (let i = 0; i < div; i++) {
-        const [x2, y2] = pt(100, 100, 91, -90 + i * k * 15);
+        const [x2, y2] = pt(100, 100, 91, -90 + i * k * ST);
         h += `<line x1="100" y1="100" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" class="gl"/>`;
     }
     h += `<circle cx="100" cy="100" r="9" class="ct"/></svg>`;
     return h;
 }
-// ケーキの絵を 大きさ val(24分のいくつ)に合わせる
+// ケーキの絵を 大きさ val(n分割のいくつ)に合わせる
 function paintCake(el, val, div) {
     const k = UNIT_MAX / div;
     el.style.setProperty('--ck', cakeColor(val));

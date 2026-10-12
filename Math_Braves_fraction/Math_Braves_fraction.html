@@ -17,7 +17,7 @@
     <link rel="stylesheet" href="../fgl-hero.css?v=12">
     <link rel="stylesheet" href="../braves-common.css?v=20261221">
     <link rel="stylesheet" href="../fgl-felt.css?v=2">
-    <link rel="stylesheet" href="fraction-ui.css?v=7">
+    <link rel="stylesheet" href="fraction-ui.css?v=11">
     <style>
         /* ストロベリーピンク×クリーム。--h は共通CSSの色相(たしざん=220, ひきざん=352, かけざん=150/172, わりざん=268, しょうすう=192) */
         :root { --h: 330; --led: #ffb3d1; --led-soft: rgba(255,179,209,0.45); }
@@ -78,19 +78,20 @@
 
 <div id="container"></div>
 
-<script src="fraction-config.js?v=20261040"></script>
+<script src="fraction-config.js?v=20261263"></script>
 <script>
 // ---- このゲーム(固有)の設定 ----
-const RUN_LIST = [
-    { id: 'normal', color: '#e0507c' },
-    { id: 'locked', color: '#7d7f92', locked: true },
-];
+// RUN = ケーキの分割数(3〜10)。DIVISIONS(fraction-config.js)と同じ順番
+const RUN_COLORS = ['#e0507c', '#e8704a', '#d9962a', '#6fb83a', '#2fb59a', '#3a8fe0', '#8a6ae8', '#d05ac8'];
+const RUN_LIST = DIVISIONS.map((n, i) => ({ id: 'd' + n, color: RUN_COLORS[i], div: n }));
 const FRAC = (n, d) => `<span class="fr"><i>${n}</i><i>${d}</i></span>`;
 const GAME = {
     sbGame: 'math_braves_fraction',
-    keys: { lang: 'mb_frac_lang', lastStar: 'mb_frac_last_star', ranking: d => `math_braves_frac_ranking_v2_${d}`, clearCount: d => `math_braves_frac_clears_v2_${d}` },
-    stageCount: 10,
-    stageThemes: [{ c: '#ffe27a' }, { c: '#ffb3c8' }, { c: '#ff6f8f' }, { c: '#c98a5a' }, { c: '#ff9a4a' }, { c: '#ffd24a' }, { c: '#a8e08a' }, { c: '#7ad0f0' }, { c: '#b890f0' }, { c: '#ff8ad0' }],
+    keys: { lang: 'mb_frac_lang', lastStar: 'mb_frac_last_star', ranking: d => `math_braves_frac_ranking_v3_${d}`, clearCount: d => `math_braves_frac_clears_v3_${d}` },
+    stageCount: 7,
+    stageThemes: [{ c: '#ffe27a' }, { c: '#ffb3c8' }, { c: '#ff6f8f' }, { c: '#c98a5a' }, { c: '#ffd24a' }, { c: '#a8e08a' }, { c: '#ff8ad0' }],
+    starMax: 5,                                            // ★1〜★3 + シークレット ★4・★5
+    starKey: (n, ri) => 'D' + DIVISIONS[ri] + '_STAR' + n,   // ランキング・クリアは RUN(分割数)×難易度ごとに分ける
     // 0=ホールケーキ 1=ひときれ 2=いちご 3=カップケーキ 4=3/4のケーキ 5=おさら
     titleBots: [],
     // タイトルの主役: 大きな数字カードの扇(まん中の金のカードが答え)と演算のバッジ
@@ -104,7 +105,7 @@ const GAME = {
         for (let i = 0; i < 14; i++) h += '<div class="hv" style="left:' + (74 + i * 44) + 'px;top:306px;width:14px;height:14px;border-radius:50%;background:' + (i % 2 ? '#fff3b0' : '#ff8ab0') + ';box-shadow:0 0 10px 3px rgba(255,230,140,.9)"></div>';
         [70, 280, 490].forEach((x) => {
             h += '<div class="hv" style="left:' + x + 'px;top:338px;width:190px;height:190px;box-sizing:border-box;border-radius:22px;background:linear-gradient(#fffaf3,#f1dfc6);border:6px solid #ffe58a;box-shadow:inset 0 0 18px rgba(120,60,20,.35), 0 0 20px 4px rgba(255,226,122,.75)"></div>';
-            h += '<div class="hv" style="left:' + (x + 6) + 'px;top:344px;width:178px;height:178px;filter:drop-shadow(0 6px 4px rgba(0,0,0,.35))">' + ck(12) + '</div>';
+            h += '<div class="hv" style="left:' + (x + 6) + 'px;top:344px;width:178px;height:178px;filter:drop-shadow(0 6px 4px rgba(0,0,0,.35))">' + ck(2) + '</div>';
             h += '<div class="hv" style="left:' + (x + 45) + 'px;top:538px;width:100px;height:44px;border-radius:14px;background:#fff;border:3px solid #ffb3d1;box-shadow:0 4px 0 rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:900;color:#8a2a52">1/2</div>';
         });
         // レバー
@@ -112,8 +113,18 @@ const GAME = {
         return h + FH.star('✦', 20, 300, 30, 0) + FH.star('✧', 740, 590, 26, 0.8);
     },
     runArt: { shape: 0, color: '#ffb3c8' },
-    runArtNums: [FRAC(1, 4), FRAC(1, 2), FRAC(3, 4)],
-    runArtLayout: [[2, 58, -12], [58, 88, 7], [160, 8, 10]],
+    // RUNカード(ランキングの小さなカードも)の絵: n分割のケーキと「1/n」のカード
+    runArtFor: (id) => {
+        const r = RUN_LIST.find(x => x.id === id);
+        if (!r) return null;
+        const n = r.div, ST = 360 / n;
+        let w = '';
+        for (let i = 0; i < n; i++) w += '<path d="' + wedgePath(90, -90 + i * ST, -90 + (i + 1) * ST) + '" fill="' + (i % 2 ? '#ffc6d8' : '#fff0f5') + '" stroke="#e58aa8" stroke-width="2"/>';
+        const cherry = (a) => { const [x, y] = pt(100, 100, 56, a); return STRAWB(x.toFixed(1), y.toFixed(1), n <= 5 ? 1.5 : 1.1); };
+        const svg = '<svg viewBox="0 0 200 200" style="position:absolute;left:58px;top:2px;width:148px;height:148px;filter:drop-shadow(0 6px 3px rgba(150,40,80,.35))"><circle cx="100" cy="100" r="98" fill="#fff" stroke="#e4d3c6" stroke-width="3"/>' + w + cherry(-90 + ST / 2) + cherry(-90 + ST * 1.5) + '</svg>';
+        const card = (txt, l, t, rot, gold) => '<div class="pc" style="left:' + l + 'px;top:' + t + 'px;transform:rotate(' + rot + 'deg);width:56px;height:70px;background:' + (gold ? 'linear-gradient(160deg,#fff4b0,#ffc93d 55%,#e8a317);color:#7a2a00;border-color:#b57a00' : 'linear-gradient(#fff,#ffe6ee);color:#8a2a52;border-color:#e58aa8') + '">' + FRAC(1, n) + '</div>';
+        return '<div class="rs-art"><div class="rsa-floor"></div>' + svg + card('', 6, 66, -12, false) + card('', 168, 8, 10, true) + '</div>';
+    },
     titleNums: [FRAC(1, 4), FRAC(1, 2), FRAC(3, 4), FRAC(1, 3), FRAC(2, 3), FRAC(1, 6), FRAC(5, 8), FRAC(1, 8)],
     // タイトルのかざり: クリームのドーム(カップケーキ屋さんの屋根)のシルエット
     titleSkyline: (seed, lo, hi, step) => {
@@ -130,7 +141,8 @@ const GAME = {
         return 'polygon(' + pts.join(',') + ')';
     },
     // ステージクリアの画面: きそてん・コンボばいりつ・AP回復
-    clearRows: (st, stageScore) => `<div><span>${T('fc_base')}</span><b>${state.roundBase}</b></div>`
+    clearRows: (st, stageScore) => `<div><span>${T('fc_hits')}</span><b>${state.roundHits}${T('fc_hits_unit')}</b></div>`
+        + `<div><span>${T('fc_base')}</span><b>${state.roundBase}</b></div>`
         + `<div><span>${T('fc_heal')}</span><b>+${state.roundHeal}</b></div>`,
     endBreakdown: () => `${T('fc_end_score')} ${state.endBase} ＋ ${T('fc_end_ap')} ${state.apBonus}`,
     // タイトル: このゲーム専用の作り(いちごピンクのギンガム+ひさし、左にスロット、右に大きさのちがうボタン)
@@ -220,14 +232,11 @@ const GAME = {
                     <div class="sp-lb"><i class="ico" data-ico="trophy"></i><span data-i18n="label_total_score" data-noemo>ごうけい スコア</span></div>
                     <div id="disp-total-score" class="sp-score">0</div>
                 </div>
-                <div class="fc-tcard" id="card-target">
+                <div class="fc-tarea" id="card-target">
                     <div class="tc-lb" data-i18n="label_target" data-noemo>ターゲット</div>
-                    <div class="tc-type" id="disp-target-type"></div>
-                    <div class="tc-cake" id="target-cake"></div>
-                    <div class="tc-fr" id="label-target"></div>
-                    <div class="tc-pts" id="disp-target-pts">200</div>
+                    <div class="tc-note" data-i18n="target_hint">ホールを つくると ふえる！</div>
+                    <div class="tc-grid n1" id="target-grid"></div>
                 </div>
-                <div class="sp-spacer"></div>
                 <button id="btn-change" class="fc-change"><b data-i18n="fc_change">チェンジ</b><small data-i18n="fc_change_sub">(AP -1)</small></button>
             </div>
         </div>
@@ -235,70 +244,81 @@ const GAME = {
     strings: {
         ja: {
             subject_badge: "ぶんすう", title_plaque: "ぶんすうスロット",
-            run_normal_desc: "3つの ケーキを ぴったり そろえて、10ステージを クリアしよう！",
-            stage_name_1: "ステージ 1", stage_name_2: "ステージ 2", stage_name_3: "ステージ 3", stage_name_4: "ステージ 4", stage_name_5: "ステージ 5", stage_name_6: "ステージ 6", stage_name_7: "ステージ 7", stage_name_8: "ステージ 8", stage_name_9: "ステージ 9", stage_name_10: "ステージ 10",
+            stage_name_1: "ステージ 1", stage_name_2: "ステージ 2", stage_name_3: "ステージ 3", stage_name_4: "ステージ 4", stage_name_5: "ステージ 5", stage_name_6: "ステージ 6", stage_name_7: "ステージ 7",
             stage_word: "STAGE", rank_stage_prefix: "R", stage_log: "<b>ステージ{n}</b> {name}", final_title: "ファイナルステージ！",
             label_stage: "ステージ", stage_clear_title: "ステージ{n} クリア！", sc_stage_score: "このステージの スコア", btn_next_stage: "ステージ{n}へ ▶", end_reached: "とうたつ ステージ",
             label_ap: "のこりAP", label_target: "ターゲット",
             target_chance: "チャンス", target_good: "グッドチャンス", target_big: "ビッグチャンス", target_supergood: "スーパービッグチャンス",
             fc_eq_placeholder: "カードを ケーキに のせて たしざん！", fc_change: "チェンジ", fc_change_sub: "(AP -1)",
             particle_whole: "ホール！", particle_ap_gain: "AP +{n}", particle_target_bonus: "ターゲットボーナス！",
+            particle_target_add: "ターゲットが ふえた！", particle_target_dup: "ターゲット ×{n}！", target_hint: "ホールを つくると ふえる！", diff_master: "めいじん", diff_legend: "でんせつ",
             fc_log_change: "手札を チェンジ (AP −1)", fc_log_clear: "ステージクリア！ <b>+{n}</b>",
-            fc_base: "きそてん", fc_rate: "コンボ倍率", fc_heal: "AP回復", fc_end_score: "スコア", fc_end_ap: "APボーナス",
+            fc_hits: "あたった ターゲット", fc_hits_unit: "まい", fc_base: "きそてん", fc_rate: "コンボ倍率", fc_heal: "AP回復", fc_end_score: "スコア", fc_end_ap: "APボーナス",
             howto_p1: "1. <strong>カード</strong>を <strong>ケーキ</strong>にのせて、<br>ぶんすうを たしていこう。",
             howto_p2: "2. <strong>「1」をこえる</strong>と、のこりが つぎの数に。<br>(例: 5/4 は 1/4 になる)",
-            howto_p3: "3. <strong>3つの ケーキ</strong>の 大きさを ぴったり<br>そろえるとクリア！ <strong>ターゲット</strong>の大きさなら高得点。",
+            howto_p3: "3. <strong>3つの ケーキ</strong>の 大きさを ぴったり<br>そろえるとクリア！ ケーキを <strong>ホール(ちょうど1)</strong>に<br>するたびに <strong>ターゲット</strong>が ふえるよ。",
             howto_p4: "4. カードを つかう・チェンジすると <strong>AP</strong> が 1へる。<br>0になると まけ。クリアすると AP回復。",
-            howto_p5: "5. <strong>ターゲット</strong>の大きさで そろえると 高得点！<br>ターゲットでなければ 100点。",
-            howto_p6: "6. <strong>ステージ10</strong>まで クリアしよう。<br>のこりの <strong>AP</strong>は ボーナス点になるよ。",
+            howto_p5: "5. <strong>ターゲット</strong>の大きさで そろえると 1まい 200点！<br>かさなると ×2。当たらなければ 100点。",
+            howto_p6: "6. <strong>ステージ7</strong>まで クリアしよう。<br>のこりの <strong>AP</strong>は ボーナス点になるよ。",
         },
         simple: {
             subject_badge: "ぶんすう", title_plaque: "ぶんすうスロット",
-            run_normal_desc: "3つの ケーキを ぴったり そろえて、10ステージを クリアしよう！",
-            stage_name_1: "ステージ 1", stage_name_2: "ステージ 2", stage_name_3: "ステージ 3", stage_name_4: "ステージ 4", stage_name_5: "ステージ 5", stage_name_6: "ステージ 6", stage_name_7: "ステージ 7", stage_name_8: "ステージ 8", stage_name_9: "ステージ 9", stage_name_10: "ステージ 10",
+            stage_name_1: "ステージ 1", stage_name_2: "ステージ 2", stage_name_3: "ステージ 3", stage_name_4: "ステージ 4", stage_name_5: "ステージ 5", stage_name_6: "ステージ 6", stage_name_7: "ステージ 7",
             stage_word: "STAGE", rank_stage_prefix: "R", stage_log: "<b>ステージ{n}</b> {name}", final_title: "ファイナルステージ！",
             label_stage: "ステージ", stage_clear_title: "ステージ{n} クリア！", sc_stage_score: "この ステージの スコア", btn_next_stage: "ステージ{n}へ ▶", end_reached: "とうたつ ステージ",
             label_ap: "のこりAP", label_target: "ターゲット",
             target_chance: "チャンス", target_good: "グッドチャンス", target_big: "ビッグチャンス", target_supergood: "スーパービッグチャンス",
             fc_eq_placeholder: "カードを ケーキに のせて たしざん！", fc_change: "チェンジ", fc_change_sub: "(AP -1)",
             particle_whole: "ホール！", particle_ap_gain: "AP +{n}", particle_target_bonus: "ターゲットボーナス！",
+            particle_target_add: "ターゲットが ふえた！", particle_target_dup: "ターゲット ×{n}！", target_hint: "ホールを つくると ふえる！", diff_master: "めいじん", diff_legend: "でんせつ",
             fc_log_change: "てふだを チェンジ (AP −1)", fc_log_clear: "ステージクリア！ <b>+{n}</b>",
-            fc_base: "きそてん", fc_rate: "コンボばいりつ", fc_heal: "APかいふく", fc_end_score: "スコア", fc_end_ap: "APボーナス",
+            fc_hits: "あたった ターゲット", fc_hits_unit: "まい", fc_base: "きそてん", fc_rate: "コンボばいりつ", fc_heal: "APかいふく", fc_end_score: "スコア", fc_end_ap: "APボーナス",
             howto_p1: "1. <strong>カード</strong>を <strong>ケーキ</strong>に のせて、<br>ぶんすうを たしていこう。",
             howto_p2: "2. <strong>「1」を こえる</strong>と、のこりが つぎの かずに。<br>(れい: 5/4 は 1/4に なる)",
-            howto_p3: "3. <strong>3つの ケーキ</strong>の おおきさを ぴったり<br>そろえると クリア！ <strong>ターゲット</strong>の おおきさなら こうとくてん。",
+            howto_p3: "3. <strong>3つの ケーキ</strong>の おおきさを ぴったり<br>そろえると クリア！ ケーキを <strong>ホール(ちょうど1)</strong>に<br>するたびに <strong>ターゲット</strong>が ふえるよ。",
             howto_p4: "4. カードを つかう・チェンジすると <strong>AP</strong>が 1へる。<br>0に なると まけ。クリアすると APかいふく。",
-            howto_p5: "5. <strong>ターゲット</strong>の おおきさで そろえると こうとくてん！<br>ターゲットでなければ 100てん。",
-            howto_p6: "6. <strong>ステージ10</strong>まで クリアしよう。<br>のこりの <strong>AP</strong>は ボーナスてんに なるよ。",
+            howto_p5: "5. <strong>ターゲット</strong>の おおきさで そろえると 1まい 200てん！<br>かさなると ×2。あたらなければ 100てん。",
+            howto_p6: "6. <strong>ステージ7</strong>まで クリアしよう。<br>のこりの <strong>AP</strong>は ボーナスてんに なるよ。",
         },
         en: {
             subject_badge: "Fractions", title_plaque: "Fraction Slots",
-            run_normal_desc: "Match all three cakes exactly and clear 10 stages!",
-            stage_name_1: "Stage 1", stage_name_2: "Stage 2", stage_name_3: "Stage 3", stage_name_4: "Stage 4", stage_name_5: "Stage 5", stage_name_6: "Stage 6", stage_name_7: "Stage 7", stage_name_8: "Stage 8", stage_name_9: "Stage 9", stage_name_10: "Stage 10",
+            stage_name_1: "Stage 1", stage_name_2: "Stage 2", stage_name_3: "Stage 3", stage_name_4: "Stage 4", stage_name_5: "Stage 5", stage_name_6: "Stage 6", stage_name_7: "Stage 7",
             stage_word: "STAGE", rank_stage_prefix: "R", stage_log: "<b>Stage {n}</b> {name}", final_title: "Final Stage!",
             label_stage: "Stage", stage_clear_title: "Stage {n} Clear!", sc_stage_score: "Score this stage", btn_next_stage: "To Stage {n} ▶", end_reached: "Stage reached",
             label_ap: "AP Left", label_target: "Target",
             target_chance: "Chance", target_good: "Good Chance", target_big: "Big Chance", target_supergood: "Super Big Chance",
             fc_eq_placeholder: "Drop a card on a cake to add!", fc_change: "Change", fc_change_sub: "(AP -1)",
             particle_whole: "Whole!", particle_ap_gain: "AP +{n}", particle_target_bonus: "Target Bonus!",
+            particle_target_add: "A new target!", particle_target_dup: "Target x{n}!", target_hint: "Make a whole to add one!", diff_master: "Master", diff_legend: "Legend",
             fc_log_change: "Changed the hand (AP −1)", fc_log_clear: "Stage clear! <b>+{n}</b>",
-            fc_base: "Base Pts", fc_rate: "Combo Rate", fc_heal: "AP Restored", fc_end_score: "Score", fc_end_ap: "AP Bonus",
+            fc_hits: "Targets hit", fc_hits_unit: "", fc_base: "Base Pts", fc_rate: "Combo Rate", fc_heal: "AP Restored", fc_end_score: "Score", fc_end_ap: "AP Bonus",
             howto_p1: "1. Drop a <strong>card</strong> on a <strong>cake</strong><br>to add its fraction.",
             howto_p2: "2. Going <strong>over \"1\"</strong> leaves only the extra.<br>(e.g. 5/4 becomes 1/4)",
-            howto_p3: "3. Make <strong>all 3 cakes</strong> exactly the same size to clear!<br>Matching the <strong>target</strong> size scores more.",
+            howto_p3: "3. Make <strong>all 3 cakes</strong> the same size to clear!<br>Every <strong>whole</strong> you make adds a <strong>target</strong>.",
             howto_p4: "4. Using or changing cards costs <strong>1 AP</strong>.<br>At 0 AP you lose. Clearing restores AP.",
-            howto_p5: "5. Matching the <strong>target</strong> size scores more!<br>Otherwise it is 100 points.",
-            howto_p6: "6. Clear all <strong>10 stages</strong>.<br>Leftover <strong>AP</strong> becomes bonus points.",
+            howto_p5: "5. Each matching <strong>target</strong> is 200 points!<br>Duplicates multiply. No match is 100.",
+            howto_p6: "6. Clear all <strong>7 stages</strong>.<br>Leftover <strong>AP</strong> becomes bonus points.",
         },
     },
 };
 </script>
+<script>
+// RUN(分割数)ごとの名前・説明
+DIVISIONS.forEach((n) => {
+    const S = GAME.strings;
+    S.ja['run_d' + n + '_name'] = n + 'ぶんかつ'; S.simple['run_d' + n + '_name'] = n + 'ぶんかつ'; S.en['run_d' + n + '_name'] = n + ' Slices';
+    S.ja['run_d' + n + '_short'] = 'ケーキを ' + n + 'つに わけるよ'; S.simple['run_d' + n + '_short'] = 'ケーキを ' + n + 'つに わけるよ'; S.en['run_d' + n + '_short'] = 'Cakes cut in ' + n;
+    S.ja['run_d' + n + '_desc'] = 'ケーキを ' + n + 'こに わけた ぶんすうで、3つの ケーキを そろえて 7ステージを クリアしよう！';
+    S.simple['run_d' + n + '_desc'] = 'ケーキを ' + n + 'こに わけた ぶんすうで、3つの ケーキを そろえて 7ステージを クリアしよう！';
+    S.en['run_d' + n + '_desc'] = 'Cut into ' + n + ' pieces. Match all three cakes and clear 7 stages!';
+});
+</script>
 <script src="../fgl-hero.js?v=12"></script>
 <script src="../fgl-name.js?v=20261223"></script>
 <script src="../braves-common.js?v=20261223"></script>
-<script src="fraction-art.js?v=20261251"></script>
-<script src="fraction.js?v=20261250"></script>
-<script src="../braves-run.js?v=20261221"></script>
+<script src="fraction-art.js?v=20261261"></script>
+<script src="fraction.js?v=20261264"></script>
+<script src="../braves-run.js?v=20261223"></script>
 <script>
 // ============================================================
 // チュートリアル（練習プレイ）
@@ -308,17 +328,18 @@ const GAME = {
 function startTutorial() {
     FGLTutorial.begin({ root: '#container', getLang: () => currentLang });
     state.star = 1; state.difficulty = 'STAR1';
-    CONFIG = Object.assign({}, PRESET_EASY);
+    UNIT_MAX = 4;
+    CONFIG = fracPreset(1, 4);
     STAGE_COUNT = CONFIG.maxRound;
     initGame();
     state.tutorial = true;
     startStage(1);
-    // 手順どおりに進むよう、ケーキと手札を決めた値にする(24分の値: 6=1/4, 12=1/2, 18=3/4)
+    // 手順どおりに進むよう、ケーキと手札を決めた値にする(4分割の値: 1=1/4, 2=1/2, 3=3/4)
     const setHand = () => {
-        state.cards = [[6, 2], [12, 1], [18, 3]].map(([v, s], i) => { const c = makeCard(i, 3); c.val = v; return c; });
+        state.cards = [[1, 2], [2, 1], [3, 3]].map(([v, s], i) => { const c = makeCard(i, 3); c.val = v; return c; });
     };
-    state.cakes = [6, 12, 12];
-    state.targetValue = 12; state.targetBase = 200; state.targetKey = 'target_chance'; state.targetColor = '#ffffff';
+    state.cakes = [1, 2, 2];
+    state.targets = [2];
     setHand(); updateUI();
     const CV = '#gameCanvas';
     const cv = (x, y, w, h) => ({ sel: CV, rect: [x, y, w, h], of: [720, 720], pad: 6 });
@@ -347,7 +368,7 @@ function startTutorial() {
             easy: 'てふだがあわないときは、「チェンジ」ボタンでカードをひきなおせるよ（APが1へる）。おしてみよう！',
             en: "If your cards don't fit, the 'Change' button redraws them (costs 1 AP). Press it!" } },
         { type: 'run', fn: () => { setHand(); updateUI(); } },
-        { type: 'do', target: () => cv(12, 152, 696, 560), pos: 'top', until: () => state.cakes[0] === 12,
+        { type: 'do', target: () => cv(12, 152, 696, 560), pos: 'top', until: () => state.cakes[0] === 2,
           only: { from: card0P, to: cake0P, hint: {
             ja: '手札の「1/4」のカードを、左のいちばん小さいケーキ（1/4）にドラッグしてのせてみよう！',
             easy: 'てふだの「1/4」のカードを、ひだりのいちばんちいさいケーキ（1/4）にドラッグしてのせてみよう！',

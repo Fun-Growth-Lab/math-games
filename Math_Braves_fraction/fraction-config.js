@@ -1,7 +1,26 @@
-// ぶんすうの設定(★ごとの手札・カード・ケーキの切り目・AP回復)。braves-common.js より先に読み込む。
-// ルールは元のぶんすうと同じ: 大きさは「24分の○」で持つ(24=ちょうど1)。10ラウンド、APは10からスタート。
-//   しょきゅう(★1)=4等分(1/4きざみ)、ちゅうきゅう(★2)=8等分(1/8きざみ)、じょうきゅう(★3)=12等分(1/12きざみ)
-const UNIT_MAX = 24;
-const PRESET_EASY = { label: "しょきゅう", handSize: 3, cardTypes: [6, 12, 18, 24], gridDiv: 4, apHeal: 2, maxRound: 10 };
-const PRESET_NORMAL = { label: "ちゅうきゅう", handSize: 4, cardTypes: [3, 6, 9, 12, 15, 18, 21, 24], gridDiv: 8, apHeal: 3, maxRound: 10 };
-const PRESET_HARD = { label: "じょうきゅう", handSize: 5, cardTypes: [2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24], gridDiv: 12, apHeal: 4, maxRound: 10 };
+// ぶんすうスロットの設定。braves-common.js より先に読み込む。
+// ケーキは「n分割」(RUNで決まる: 3〜10)。大きさは「nぶんのいくつ」の整数で持つ(UNIT_MAX = n = ちょうど1)。
+//   RUN(分割数)は 3,4,5,6,7,8,9,10 の8つ。難易度は ★1〜★3 と、シークレットの ★4・★5。
+//   全7ステージ。ステージをクリアするとAP回復。ホール(ちょうど1)を作るたびにターゲットが1まい増える。
+let UNIT_MAX = 4;                      // いま遊んでいるRUNの分割数(RUNをはじめるときに入れかわる)
+const DIVISIONS = [3, 4, 5, 6, 7, 8, 9, 10];
+const TARGET_PTS = 200;                // ターゲット1まいの点数(同じ大きさがかさなると ×まい数)
+const NOHIT_PTS = 100;                 // ターゲットに当たらなかったときの きそてん
+const STAGE_TOTAL = 7;
+
+// 難易度ごとのちがい(★1〜★5)。いまは すべて同じ。のこりAPなどのちがいは あとで決める
+const STAR_TUNING = {
+    1: { handSize: 4, startAp: 10, apHeal: 3 },
+    2: { handSize: 4, startAp: 10, apHeal: 3 },
+    3: { handSize: 4, startAp: 10, apHeal: 3 },
+    4: { handSize: 4, startAp: 10, apHeal: 3 },
+    5: { handSize: 4, startAp: 10, apHeal: 3 },
+};
+// star(1〜5)と分割数 div から ゲームの設定をつくる。cardTypes は「1/n 〜 n/n」(n/n=ちょうど1 は手札には出ない)
+function fracPreset(star, div) {
+    const t = STAR_TUNING[star] || STAR_TUNING[1];
+    const types = []; for (let v = 1; v <= div; v++) types.push(v);
+    return Object.assign({ label: '', cardTypes: types, gridDiv: div, maxRound: STAGE_TOTAL }, t);
+}
+// 共通部品(braves-common.js)が最初に参照する設定。RUNをはじめるときに fracPreset で上書きされる
+const PRESET_EASY = fracPreset(1, 4), PRESET_NORMAL = fracPreset(2, 4), PRESET_HARD = fracPreset(3, 4);
