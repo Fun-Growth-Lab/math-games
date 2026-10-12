@@ -163,7 +163,7 @@ function renderRunSelect() {
     });
     centerRunStrip();
     const best = bestScore(selStar);
-    document.getElementById('rs-desc').innerHTML = T('run_' + cur.id + '_desc') +
+    document.getElementById('rs-desc').innerHTML = ((cur.locked && GAME.lockedHint) ? GAME.lockedHint(runSelIdx) : T('run_' + cur.id + '_desc')) +
         (best && !cur.locked ? `　<span class="ds-best">${T('best_label', { n: best })}</span>` : '');
     document.getElementById('star-row').innerHTML = SINGLE_STAR ? '' : Array.from({ length: STAR_MAX }, (_, i) => i + 1).filter(n => starVisible(n)).map(n => {
         const locked = !starUnlocked(n);

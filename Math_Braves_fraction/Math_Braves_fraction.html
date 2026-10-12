@@ -30,7 +30,11 @@
 // ---- このゲーム(固有)の設定 ----
 // RUN = ケーキの分割数(3〜10)。DIVISIONS(fraction-config.js)と同じ順番
 const RUN_COLORS = ['#3f8fe0', '#2fb59a', '#6fb83a', '#e0a020', '#f08a3a', '#8a6ae8', '#3a9bd0', '#5a7ad8'];
-const RUN_LIST = DIVISIONS.map((n, i) => ({ id: 'd' + n, color: RUN_COLORS[i], div: n }));
+// RUNは じゅんばんに ひらく: ひとつ前のRUNを クリアすると つぎが あそべる(さいしょは 3ぶんかつだけ)
+const RUN_LIST = DIVISIONS.map((n, i) => ({
+    id: 'd' + n, color: RUN_COLORS[i], div: n,
+    get locked() { return i > 0 && !(getClearCount('D' + DIVISIONS[i - 1] + '_STAR1') > 0); },
+}));
 const FRAC = (n, d) => `<span class="fr"><i>${n}</i><i>${d}</i></span>`;
 const GAME = {
     sbGame: 'math_braves_fraction',
@@ -60,6 +64,8 @@ const GAME = {
         return h + FH.star('✦', 20, 300, 30, 0) + FH.star('✧', 740, 590, 26, 0.8);
     },
     runArt: { shape: 0, color: '#d6e8fa' },
+    // まだ あそべない RUN の説明: ひとつ前を クリアすると ひらく
+    lockedHint: (i) => T('run_unlock_hint', { n: DIVISIONS[i - 1] }),
     // RUNカード(ランキングの小さなカードも)の絵: n分割のケーキと「1/n」のカード
     runArtFor: (id) => {
         const r = RUN_LIST.find(x => x.id === id);
@@ -70,7 +76,8 @@ const GAME = {
         const cherry = (a) => { const [x, y] = pt(100, 100, 56, a); return STRAWB(x.toFixed(1), y.toFixed(1), n <= 5 ? 1.5 : 1.1); };
         const svg = '<svg viewBox="0 0 200 200" style="position:absolute;left:58px;top:2px;width:148px;height:148px;filter:drop-shadow(0 6px 3px rgba(150,40,80,.35))"><circle cx="100" cy="100" r="98" fill="#fff" stroke="#e4d3c6" stroke-width="3"/>' + w + cherry(-90 + ST / 2) + cherry(-90 + ST * 1.5) + '</svg>';
         const card = (txt, l, t, rot, gold) => '<div class="pc" style="left:' + l + 'px;top:' + t + 'px;transform:rotate(' + rot + 'deg);width:56px;height:70px;background:' + (gold ? 'linear-gradient(160deg,#fff4b0,#ffc93d 55%,#e8a317);color:#7a3a10;border-color:#b57a00' : 'linear-gradient(#fff,#eaf3fd);color:#2f4a6a;border-color:#bcd8f2') + '">' + FRAC(1, n) + '</div>';
-        return '<div class="rs-art"><div class="rsa-floor"></div>' + svg + card('', 6, 66, -12, false) + card('', 168, 8, 10, true) + '</div>';
+        const lock = r.locked ? '<div style="position:absolute;left:88px;top:52px;width:64px;height:64px;color:#fff;filter:drop-shadow(0 3px 3px rgba(20,40,80,.5))">' + ICO.lock + '</div>' : '';
+        return '<div class="rs-art"><div class="rsa-floor"></div>' + svg + card('', 6, 66, -12, false) + card('', 168, 8, 10, true) + lock + '</div>';
     },
     titleNums: [FRAC(1, 4), FRAC(1, 2), FRAC(3, 4), FRAC(1, 3), FRAC(2, 3), FRAC(1, 6), FRAC(5, 8), FRAC(1, 8)],
     // タイトルのかざり: クリームのドーム(カップケーキ屋さんの屋根)のシルエット
@@ -300,13 +307,16 @@ DIVISIONS.forEach((n) => {
     S.simple['run_d' + n + '_desc'] = 'ケーキを ' + n + 'こに わけた ぶんすうで、3つの ケーキを そろえて 7ステージを クリアしよう！';
     S.en['run_d' + n + '_desc'] = 'Cut into ' + n + ' pieces. Match all three cakes and clear 7 stages!';
 });
+GAME.strings.ja.run_unlock_hint = '{n}ぶんかつを クリアすると あそべるよ！';
+GAME.strings.simple.run_unlock_hint = '{n}ぶんかつを クリアすると あそべるよ！';
+GAME.strings.en.run_unlock_hint = 'Clear the {n}-slice RUN to unlock this one!';
 </script>
 <script src="../fgl-hero.js?v=12"></script>
 <script src="../fgl-name.js?v=20261223"></script>
 <script src="../braves-common.js?v=20261223"></script>
 <script src="fraction-art.js?v=20261430"></script>
 <script src="fraction.js?v=20261442"></script>
-<script src="../braves-run.js?v=20261442"></script>
+<script src="../braves-run.js?v=20261443"></script>
 <script>
 // ============================================================
 // チュートリアル（練習プレイ）
