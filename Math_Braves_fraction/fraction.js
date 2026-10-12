@@ -1,38 +1,25 @@
 // ぶんすう(ケーキづくり)の本体。
 // 見た目はDOM(#bl)で描き、入力は透明なcanvasが受ける。座標はゲームエリア内のpx(720x720)。
 // ルールは元のぶんすうと同じ: 3つのケーキに手札の分数カードをのせてたし、3つの大きさをぴったりそろえればラウンドクリア。
-//   ケーキは「24分のいくつ」で持つ(24=ちょうど1)。1をこえたらのこりだけが残る。ちょうど1にするとコンボ(倍率+0.5)。
-//   APはカードを使う・手札をチェンジするたびに1へる(0でゲームオーバー)。ラウンドクリアでAP回復。全10ラウンド。
+//   ケーキは「24分のいくつ」で持つ(24=ちょうど1)。1をこえたらのこりだけが残る。
+//   APはカードを使う・手札をチェンジするたびに1へる(0でゲームオーバー)。ステージクリアでAP回復。全10ステージ。
+//   点数: ターゲットの大きさでそろえたらターゲットの点、それ以外は100点。クリア時にのこりAP×100のボーナス。
 // ステージ制RUN(ラウンド=ステージ。★で しょきゅう/ちゅうきゅう/じょうきゅう)の画面は braves-run.js が受け持つ。
 const STAR_PRESETS = { 1: PRESET_EASY, 2: PRESET_NORMAL, 3: PRESET_HARD };
 
 // 画面の寸法(ゲームエリア 720x720)
-const CAKE = 206, CAKE_Y = 98, CAKE_GAP = 20;
+const CAKE = 206, CAKE_Y = 162, CAKE_GAP = 20;
 function cakeX(i) { return (720 - (3 * CAKE + 2 * CAKE_GAP)) / 2 + i * (CAKE + CAKE_GAP); }
 const LAB_Y = CAKE_Y + CAKE + 4;                       // 大きさの札
-const HAND_W = 88, HAND_H = 124, HAND_GAP = 14, HAND_Y = 556, HAND_L = 24, HAND_AREA = 502;
-const CHG = { x: 548, y: 590, w: 150, h: 70 };         // チェンジのボタン
+const HAND_W = 104, HAND_H = 140, HAND_GAP = 16, HAND_Y = 506, HAND_L = 20, HAND_AREA = 680;   // 手札はケーキの真下に近づけて、横はば いっぱいに並べる
 
 Object.assign(state, {
     ap: 10, cakes: [0, 0, 0], targetValue: 0, targetBase: 200, targetKey: 'target_chance', targetColor: '#fff',
-    combo: 0, roundCoins: 0, phase: 'IDLE', tutorial: false, lastEq: '',
-    roundBase: 0, roundRate: 1, roundHeal: 0, endBase: 0, apBonus: 0
+    phase: 'IDLE', tutorial: false, lastEq: '',
+    roundBase: 0, roundHeal: 0, endBase: 0, apBonus: 0
 });
 
 function getRandomInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
-
-// ---- ログ ----
-function addLog(html) {
-    const el = document.getElementById('battle-log-entries');
-    if (!el) return;
-    Array.from(el.children).forEach(c => c.classList.remove('latest'));
-    const div = document.createElement('div');
-    div.className = 'lg latest';
-    div.innerHTML = emo(html);
-    el.appendChild(div);
-    while (el.children.length > 15) el.removeChild(el.firstChild);
-    el.scrollTop = el.scrollHeight;
-}
 
 // ---- ステージ制RUNとの受けわたし ----
 function stageClearTime(st) { return 0; }
@@ -45,7 +32,7 @@ function updateStageLabel() {
     document.getElementById('sp-run').textContent = T('run_' + RUN_LIST[runSelIdx].id + '_name');
     document.getElementById('sp-diff').textContent = '★'.repeat(state.star) + ' ' + T(['diff_easy', 'diff_normal', 'diff_hard'][state.star - 1]);
     let h = '';
-    for (let k = 1; k <= STAGE_COUNT; k++) h += `<div class="rt ${k < n ? 'done' : (k === n ? 'now' : '')}${k === STAGE_COUNT ? ' last' : ''}" style="--rc:${STAGE_THEMES[k - 1].c}"><b class="no">${k}</b><span class="nm">${stageName(k)}</span></div>`;
+    for (let k = 1; k <= STAGE_COUNT; k++) h += `<div class="rt ${k < n ? 'done' : (k === n ? 'now' : '')}${k === STAGE_COUNT ? ' last' : ''}" style="--rc:${STAGE_THEMES[k - 1].c}"><b class="no">${k}</b></div>`;
     document.getElementById('sp-route').innerHTML = h;
 }
 function startRun(star) {
@@ -81,12 +68,11 @@ function backToTitle() {
 function initGame() {
     state.score = 0; state.bestPlay = 0; state.stage = 1; state.runMode = false; state.stageStartScore = 0; state.stageScores = []; state.tutorial = false;
     state.ap = 10; state.cakes = [0, 0, 0]; state.cards = []; state.dragInfo = null; state.lastEq = '';
-    state.combo = 0; state.roundCoins = 0; state.inputLocked = false; state.phase = 'IDLE';
+    state.inputLocked = false; state.phase = 'IDLE';
     state.endBase = 0; state.apBonus = 0;
     state.width = 720; state.height = 720; canvas.width = 720; canvas.height = 720;
     hideAllOverlays();
     clearFcLayer();
-    const log = document.getElementById('battle-log-entries'); if (log) log.innerHTML = '';
     state.screen = 'PLAYING';
     ui.title.classList.add('hidden');
     ui.btnToTitle.classList.remove('hidden');
@@ -104,10 +90,8 @@ function handX(i, n) {
 function makeCard(i, n) {
     const types = CONFIG.cardTypes.filter(v => v !== UNIT_MAX);
     const val = types[getRandomInt(0, types.length - 1)];
-    const r = Math.random();
-    const stars = r >= 0.90 ? 3 : r >= 0.60 ? 2 : 1;      // ⭐ 1〜3(60%/30%/10%)
     const x = handX(i, n);
-    return { val: val, stars: stars, x: x, y: HAND_Y, w: HAND_W, h: HAND_H, targetX: x, targetY: HAND_Y, isDragging: false };
+    return { val: val, x: x, y: HAND_Y, w: HAND_W, h: HAND_H, targetX: x, targetY: HAND_Y, isDragging: false };
 }
 function fillHand() {
     state.cards = [];
@@ -116,7 +100,7 @@ function fillHand() {
 
 // ---- ラウンド ----
 function startRound(n) {
-    state.combo = 0; state.roundCoins = 0; state.lastEq = '';
+    state.lastEq = '';
     state.stageStartScore = state.score;
     const types = CONFIG.cardTypes;
     state.targetValue = types[getRandomInt(0, types.length - 1)];
@@ -138,7 +122,6 @@ function startRound(n) {
     updateStageLabel();
     updateUI();
     document.getElementById('game-area').style.setProperty('--sc', STAGE_THEMES[Math.min(n, STAGE_COUNT) - 1].c);
-    addLog(T('stage_log', { n: n, name: stageName(n) }));
 }
 
 function aligned() { const c = state.cakes; return c[0] === c[1] && c[1] === c[2] && c[0] > 0; }
@@ -155,16 +138,12 @@ function processAttack(cardIdx, cakeIdx) {
     if (next > UNIT_MAX) next -= UNIT_MAX; else if (next === UNIT_MAX) one = true;
     state.lastEq = `${fracText(cur)} + ${fracText(c.val)} = ${fracText(raw)}` + (raw > UNIT_MAX ? ` → ${fracText(next)}` : '');
     state.cakes[cakeIdx] = next;
-    state.roundCoins += c.stars;
     const cx = cakeX(cakeIdx) + CAKE / 2, cy = CAKE_Y + CAKE / 2;
     burst(cx, cy, '#ffd24a', 14);
-    fxText(cx, cy - 20, `+${c.stars}⭐`, '#ffe27a', 30);
     if (one) {
-        state.combo++;
-        fxText(cx, cy - 70, T('particle_combo', { n: state.combo }), '#ff8a7a', 42);
+        fxText(cx, cy - 40, T('particle_whole'), '#ff8a7a', 42);   // ちょうど「1」(ホール)
         burst(cx, cy, '#ff8fb0', 22);
     }
-    addLog(state.lastEq);
     state.cards[cardIdx] = makeCard(cardIdx);
     state.cards[cardIdx]._fresh = true;
     state.ap--;
@@ -177,7 +156,6 @@ function changeHand() {
     state.ap--;
     fillHand();
     state.cards.forEach(c => { c._fresh = true; burst(c.x + c.w / 2, c.y + c.h / 2, '#f4c6d4', 6); });
-    addLog(T('fc_log_change'));
     updateUI();
     checkGameOver();
 }
@@ -191,10 +169,9 @@ function checkGameOver() {
 function roundClear() {
     if (state.screen !== 'PLAYING') return;
     const isTarget = state.cakes[0] === state.targetValue;
-    const base = (isTarget ? state.targetBase : 100) + state.roundCoins * 10;
-    const rate = 1 + state.combo * 0.5;
-    const total = Math.floor(base * rate);
-    state.roundBase = base; state.roundRate = rate; state.roundHeal = CONFIG.apHeal;
+    const base = isTarget ? state.targetBase : 100;
+    const total = base;
+    state.roundBase = base; state.roundHeal = CONFIG.apHeal;
     state.ap += CONFIG.apHeal;
     noteBestPlay(total);
     state.score += total;
@@ -204,7 +181,6 @@ function roundClear() {
     fxText(360, 330, T('particle_ap_gain', { n: CONFIG.apHeal }), '#ffb066', 44);
     if (isTarget) fxText(360, 270, T('particle_target_bonus'), '#ffe27a', 40);
     confetti();
-    addLog(T('fc_log_clear', { n: total }));
     document.querySelectorAll('.fc-cake').forEach(el => el.classList.add('matched'));
     setTimeout(() => {
         if (state.screen !== 'PLAYING') return;
@@ -245,14 +221,12 @@ function fcInit() {
         h += `<div class="fc-cake" data-i="${i}" style="left:${cakeX(i)}px;top:${CAKE_Y}px;width:${CAKE}px;height:${CAKE}px">${cakeSVG(CONFIG.gridDiv)}</div>`;
         h += `<div class="fc-lab" data-i="${i}" style="left:${cakeX(i) + CAKE / 2 - 54}px;top:${LAB_Y}px"></div>`;
     }
-    h += `<div class="fc-stats"><div class="st"><i class="gs"></i><b id="fc-coins">0</b></div><div class="st cb"><span id="fc-combo-lb"></span><b id="fc-combo">0</b></div></div>`;
     h += `<div class="fc-hbox" style="left:${HAND_L - 6}px;top:${HAND_Y - 14}px;width:${HAND_AREA + 12}px;height:${HAND_H + 28}px"></div>`;
-    h += `<div class="fc-chg" style="left:${CHG.x}px;top:${CHG.y}px;width:${CHG.w}px;height:${CHG.h}px"><b></b><small></small></div>`;
     h += `<div class="bl-hint" style="display:none"></div>`;
     layer.innerHTML = h;
     FC.eq = layer.querySelector('.fc-eq'); FC.eqSpan = FC.eq.querySelector('span');
     FC.cakes = Array.from(layer.querySelectorAll('.fc-cake')); FC.labs = Array.from(layer.querySelectorAll('.fc-lab'));
-    FC.chg = layer.querySelector('.fc-chg'); FC.hint = layer.querySelector('.bl-hint');
+    FC.chg = document.getElementById('btn-change'); FC.hint = layer.querySelector('.bl-hint');
     FC.hand = [];
     FC.ready = true;
 }
@@ -303,7 +277,7 @@ function overCake(c) {
     const cx = c.x + c.w / 2, cy = c.y + c.h / 2;
     for (let i = 0; i < 3; i++) {
         const x = cakeX(i);
-        if (cx >= x - 6 && cx <= x + CAKE + 6 && cy >= CAKE_Y - 6 && cy <= LAB_Y + 90) return i;
+        if (cx >= x - 6 && cx <= x + CAKE + 6 && cy >= CAKE_Y - 6 && cy <= LAB_Y + 110) return i;
     }
     return -1;
 }
@@ -329,16 +303,8 @@ function renderFc() {
         el.classList.toggle('over', i === ov);
         FC.labs[i].classList.toggle('over', i === ov);
     }
-    // ⭐とコンボ
-    document.getElementById('fc-coins').textContent = state.roundCoins;
-    document.getElementById('fc-combo').textContent = state.combo;
-    const cl = T('fc_combo');
-    const cle = document.getElementById('fc-combo-lb');
-    if (cle._t !== cl) { cle._t = cl; cle.textContent = cl; }
-    // チェンジのボタン
-    const cb = FC.chg.querySelector('b'), cs = FC.chg.querySelector('small');
-    if (cb._t !== T('fc_change')) { cb._t = T('fc_change'); cb.textContent = T('fc_change'); cs.textContent = T('fc_change_sub'); }
-    FC.chg.classList.toggle('off', state.ap <= 0 || state.phase !== 'PLAY');
+    // チェンジのボタン(右パネルの下)
+    FC.chg.disabled = state.ap <= 0 || state.phase !== 'PLAY' || state.inputLocked;
     // 手札
     const n = state.cards.length;
     for (let i = 0; i < Math.max(n, FC.hand.length); i++) {
@@ -351,7 +317,7 @@ function renderFc() {
             el.addEventListener('animationend', () => { el._popping = false; el.classList.remove('pop'); });
             el._card = c; FC.hand[i] = el;
             el.style.width = c.w + 'px'; el.style.height = c.h + 'px';
-            el.innerHTML = `<div class="stars">${'<i class="gs"></i>'.repeat(c.stars)}</div><div class="nm">${fracHTML(c.val)}</div>`;
+            el.innerHTML = `<div class="nm">${fracHTML(c.val)}</div>`;
             document.getElementById('bl').appendChild(el);
             el._popping = true; el.classList.add('pop');
         }
@@ -420,7 +386,6 @@ function canPlay() { return state.screen === 'PLAYING' && state.phase === 'PLAY'
 function onDown(e) {
     if (!canPlay()) return;
     const pos = getEventPos(e);
-    if (pos.x >= CHG.x && pos.x <= CHG.x + CHG.w && pos.y >= CHG.y && pos.y <= CHG.y + CHG.h) { changeHand(); return; }
     if (state.ap <= 0) return;
     for (let i = 0; i < state.cards.length; i++) {
         const c = state.cards[i];
@@ -452,3 +417,4 @@ window.addEventListener('mouseup', onUp);
 canvas.addEventListener('touchstart', (e) => { e.preventDefault(); onDown(e); }, { passive: false });
 canvas.addEventListener('touchmove', (e) => { e.preventDefault(); onMove(e); }, { passive: false });
 canvas.addEventListener('touchend', (e) => { e.preventDefault(); onUp(e); }, { passive: false });
+document.getElementById('btn-change').addEventListener('click', () => { if (canPlay()) changeHand(); });

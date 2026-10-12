@@ -14,7 +14,7 @@ function fracHTML(val) {
 }
 
 // ---- いちご・ケーキの かたち ----
-const STRAWB = (x, y, s) => `<g transform="translate(${x} ${y}) scale(${s})"><path d="M0 -7C6 -9 11 -2 8 4C6 9 0 12 0 12C0 12 -6 9 -8 4C-11 -2 -6 -9 0 -7Z" fill="#e8344e" stroke="#a81830" stroke-width="1"/><path d="M-5 -8 0 -12 5 -8 2 -6 0 -9 -2 -6Z" fill="#37b24d"/><g fill="#ffe0a8"><circle cx="-3" cy="0" r="1"/><circle cx="3" cy="1" r="1"/><circle cx="0" cy="5" r="1"/><circle cx="-2.5" cy="7.5" r=".8"/><circle cx="2.5" cy="6.5" r=".8"/></g></g>`;
+const STRAWB = (x, y, s) => `<g transform="translate(${x} ${y}) scale(${s})"><path d="M0 -3Q3 -11 9 -13" stroke="#3a8a2a" stroke-width="1.6" fill="none" stroke-linecap="round"/><circle cx="0" cy="2" r="7" fill="#e8344e" stroke="#a81830" stroke-width="1"/><circle cx="-2.4" cy="-0.6" r="1.8" fill="#fff" opacity=".75"/></g>`;
 function pt(cx, cy, r, deg) { const a = deg * Math.PI / 180; return [cx + r * Math.cos(a), cy + r * Math.sin(a)]; }
 function wedgePath(r, a0, a1) {
     const [x0, y0] = pt(100, 100, r, a0), [x1, y1] = pt(100, 100, r, a1);
@@ -29,9 +29,9 @@ function ringPath(r0, r1, a0, a1) {
 function cakeColor(val) {
     if (val === UNIT_MAX) return '#ffd45c';
     if (val >= 18) return '#ff7fa6';
-    if (val >= 12) return '#ffa24a';
-    if (val >= 6) return '#ffe14d';
-    return '#8bd36a';
+    if (val >= 12) return '#b7714f';
+    if (val >= 6) return '#ffc6d8';
+    return '#fff0b8';
 }
 
 // 上から見た ケーキ1つ(24きれ + 切り目 + 切り目ごとの いちご)。大きさは paintCake で変える
