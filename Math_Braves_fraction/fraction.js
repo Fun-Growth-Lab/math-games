@@ -186,7 +186,7 @@ function roundClear() {
     const topSum = state.tops.reduce((a, b) => a + b, 0);
     const cakePts = CAKE_PTS * 3, topPts = topSum * TOP_PTS;
     const hits = state.targets.filter(v => v === size).length;                // 当たったターゲットのまい数
-    const rate = TARGET_RATE + 0.1 * R.spiceLv;                               // ターゲット1まいで +50%(スパイスで +10%ずつ)
+    const rate = TARGET_RATE + 0.05 * R.spiceLv;                              // ターゲット1まいで +50%(スパイスで +5%ずつ)
     const subtotal = cakePts + topPts;
     const targetPts = Math.round(subtotal * rate * hits);
     const shapeMul = R.shapes[size] ? 1.1 : 1;                                // かたちマスター

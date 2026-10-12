@@ -1,26 +1,22 @@
 // ぶんすうスロットの ショップ。ステージクリアのあと(最後のステージのあとは出さない)に ひらく。
 // コインで能力アップを買う。品物は6つ(固定4 + その回の「かたち」「おきにいり」)。そのうち1つは半額セール。
-//   たね      : カードに トッピングが のりやすくなる(Lv1〜5)
-//   おかわり  : ステージクリアのAP回復 +1(Lv1〜5)
-//   スパイス  : ターゲットのボーナス +10%(Lv1〜5)
+//   たね      : カードに トッピングが のりやすくなる(Lv1〜10)
+//   おかわり  : ステージクリアのAP回復 +1(Lv1〜10)
+//   スパイス  : ターゲットのボーナス +5%(Lv1〜10)
+// 値段は定額(Lvが上がっても変わらない)。
 //   チャージ  : いますぐ AP +3(なんども買える)
 //   かたち    : ケーキが その大きさでそろったとき、そのステージのスコア ×1.1(ずっと)
 //   おきにいり: そのカードを使うたび、最終スコアの倍率 +3%(ずっと)
 (function () {
-    const LV_MAX = 5;
-    const PRICE = {
-        seed: [4, 6, 8, 10, 12],
-        heal: [6, 8, 10, 12, 14],
-        spice: [8, 10, 12, 14, 16],
-        charge: 4, shape: 8, fav: 6,
-    };
+    const LV_MAX = 10;
+    const PRICE = { seed: 3, heal: 10, spice: 5, charge: 8, shape: 8, fav: 6 };   // すべて定額
     const S = {
         ja: {
             shop_title: 'ケーキやさんの ショップ', shop_coins: 'コイン', shop_next: 'つぎの ステージへ ▶', shop_sale: 'セール!', shop_max: 'MAX', shop_owned: 'もっている',
             shop_buy: 'かう', shop_short: 'コインが たりない', shop_have: 'もちもの', shop_none: 'まだ なにも もっていません',
             item_seed: 'トッピングの たね', desc_seed: 'カードに トッピングが のりやすくなる',
             item_heal: 'おかわりAP', desc_heal: 'ステージクリアの AP回復が +1',
-            item_spice: 'ターゲットスパイス', desc_spice: 'ターゲットの ボーナスが +10%',
+            item_spice: 'ターゲットスパイス', desc_spice: 'ターゲットの ボーナスが +5%',
             item_charge: 'APチャージ', desc_charge: 'いますぐ AP が +3',
             item_shape: 'かたちマスター', desc_shape: 'この大きさで そろうと スコア ×1.1(ずっと)',
             item_fav: 'おきにいりカード', desc_fav: 'この カードを つかうたび 最終スコア +3%',
@@ -31,7 +27,7 @@
             shop_buy: 'Buy', shop_short: 'Not enough coins', shop_have: 'Your items', shop_none: 'Nothing yet',
             item_seed: 'Topping Seeds', desc_seed: 'Cards get more toppings',
             item_heal: 'Extra AP', desc_heal: '+1 AP restored on stage clear',
-            item_spice: 'Target Spice', desc_spice: 'Target bonus +10%',
+            item_spice: 'Target Spice', desc_spice: 'Target bonus +5%',
             item_charge: 'AP Charge', desc_charge: '+3 AP right now',
             item_shape: 'Shape Master', desc_shape: 'Stage score ×1.1 when cakes match this size',
             item_fav: 'Favorite Card', desc_fav: 'Each use of this card: final score +3%',
@@ -48,9 +44,9 @@
     // この回の品物をつくる
     function makeItems() {
         const R = state.run, n = UNIT_MAX, items = [];
-        items.push({ id: 'seed', lv: R.topLv, price: PRICE.seed[R.topLv], max: R.topLv >= LV_MAX });
-        items.push({ id: 'heal', lv: R.healUp, price: PRICE.heal[R.healUp], max: R.healUp >= LV_MAX });
-        items.push({ id: 'spice', lv: R.spiceLv, price: PRICE.spice[R.spiceLv], max: R.spiceLv >= LV_MAX });
+        items.push({ id: 'seed', lv: R.topLv, price: PRICE.seed, max: R.topLv >= LV_MAX });
+        items.push({ id: 'heal', lv: R.healUp, price: PRICE.heal, max: R.healUp >= LV_MAX });
+        items.push({ id: 'spice', lv: R.spiceLv, price: PRICE.spice, max: R.spiceLv >= LV_MAX });
         items.push({ id: 'charge', price: PRICE.charge });
         // かたち(大きさ1/n〜n/n のうち まだ持っていないもの)と、おきにいり(カードの値 1/n〜(n-1)/n)
         const shapes = []; for (let v = 1; v <= n; v++) if (!R.shapes[v]) shapes.push(v);
@@ -106,11 +102,12 @@
         else if (it.id === 'fav') { R.favs[it.value] = true; it.sold = true; }
         if (it.id === 'seed' || it.id === 'heal' || it.id === 'spice') {
             // Lvの上がる品物は、同じ回に続けて買えるように 値段と状態をつくりなおす
-            const lvKey = { seed: 'topLv', heal: 'healUp', spice: 'spiceLv' }[it.id], lv = R[lvKey], tbl = PRICE[it.id];
-            it.lv = lv; it.max = lv >= LV_MAX; it.price = it.max ? 0 : tbl[lv];
+            const lvKey = { seed: 'topLv', heal: 'healUp', spice: 'spiceLv' }[it.id], lv = R[lvKey];
+            it.lv = lv; it.max = lv >= LV_MAX;
+            it.price = PRICE[it.id];                  // 定額(セールは買ったら終わり。次からは定価)
             it.sale = false;
         }
-        if (it.id === 'charge') it.price = PRICE.charge;
+        if (it.id === 'charge') { it.price = PRICE.charge; it.sale = false; }
         updateUI();
         render();
     }
