@@ -3,7 +3,7 @@
 // ルールは元のぶんすうと同じ: 3つのケーキに手札の分数カードをのせてたし、3つの大きさをぴったりそろえればラウンドクリア。
 //   ケーキは「24分のいくつ」で持つ(24=ちょうど1)。1をこえたらのこりだけが残る。
 //   APはカードを使う・手札をチェンジするたびに1へる(0でゲームオーバー)。ステージクリアでAP回復。全10ステージ。
-//   ホール(ちょうど「1」)を作るたびに、そのステージのスコアが +10%(3こで×1.3)。
+//   ホール(ちょうど「1」)を作るたびに、そのステージのスコアが +20%(3こで×1.6)。
 //   点数 = 基本点100 × ホールボーナス × ターゲットボーナス(×2/×3/×4。3だんかい)。ステージクリアでAP回復。
 // 画面の寸法(ゲームエリア 720x720)
 const CAKE = 208, CAKE_Y = 198, CAKE_GAP = 16;
@@ -70,7 +70,7 @@ function initGame() {
     state.ap = CONFIG.startAp || 10; state.cakes = [0, 0, 0];
     state.wholes = 0; state.cards = []; state.dragInfo = null; state.lastEq = '';
     state.inputLocked = false; state.phase = 'IDLE';
-    state.endBase = 0; state.apBonus = 0; state.roundBase = 0; state.roundHole = 1; state.roundTarget = 1; state.roundWholes = 0; state.roundHit = false;
+    state.endBase = 0; state.apBonus = 0; state.roundBase = 0; state.roundHole = 1; state.roundTarget = 1; state.roundTier = 0; state.roundWholes = 0; state.roundHit = false;
     state.width = 720; state.height = 720; canvas.width = 720; canvas.height = 720;
     hideAllOverlays();
     clearFcLayer();
@@ -106,10 +106,10 @@ function startRound(n) {
     const types = CONFIG.cardTypes;                         // 1〜n(n=ちょうど1)
     state.targetVal = types[getRandomInt(0, types.length - 1)];      // ターゲットの大きさ
     // ターゲットの倍率(×2/×3/×4)。1ステージ目は かならず ×2
-    state.targetMul = TARGET_TIERS[0].mul;
+    state.targetMul = TARGET_TIERS[0].mul; state.targetTier = 0;
     if (n > 1) {
         let r = Math.random() * TARGET_TIERS.reduce((a, t) => a + t.w, 0);
-        for (const t of TARGET_TIERS) { r -= t.w; if (r < 0) { state.targetMul = t.mul; break; } }
+        for (let i = 0; i < TARGET_TIERS.length; i++) { r -= TARGET_TIERS[i].w; if (r < 0) { state.targetMul = TARGET_TIERS[i].mul; state.targetTier = i; break; } }
     }
     state.wholes = 0;                                       // このステージで作ったホールの数
     const start = types.filter(v => v < UNIT_MAX);          // はじめのケーキは ちょうど1でない大きさ
@@ -143,7 +143,7 @@ function processAttack(cardIdx, cakeIdx) {
     if (one) {
         fxText(cx, cy - 40, T('particle_whole'), '#ff8a7a', 42);   // ちょうど「1」(ホール)
         burst(cx, cy, '#ff8fb0', 22);
-        state.wholes++;                                            // ホール: このステージのスコア +10%
+        state.wholes++;                                            // ホール: このステージのスコア +20%
         fxText(cx, cy - 90, '×' + (1 + WHOLE_RATE * state.wholes).toFixed(1), '#ffb724', 38);
     }
     state.cards[cardIdx] = makeCard(cardIdx);
@@ -175,7 +175,7 @@ function roundClear() {
     const tMul = hit ? state.targetMul : 1;                                   // ターゲットボーナス
     const total = Math.round(BASE_PTS * holeMul * tMul);                      // 基本点 × ホール × ターゲット
     const heal = CONFIG.apHeal;
-    state.roundBase = BASE_PTS; state.roundHole = holeMul; state.roundTarget = tMul; state.roundWholes = state.wholes; state.roundHit = hit;
+    state.roundBase = BASE_PTS; state.roundHole = holeMul; state.roundTarget = tMul; state.roundTier = state.targetTier; state.roundWholes = state.wholes; state.roundHit = hit;
     state.roundHeal = heal;
     state.ap += heal;
     noteBestPlay(total);
@@ -184,7 +184,7 @@ function roundClear() {
     state.inputLocked = true;
     updateUI();
     fxText(360, 330, T('particle_ap_gain', { n: heal }), '#ffb066', 44);
-    if (hit) fxText(360, 280, T('particle_target_bonus') + ' ×' + state.targetMul, '#ffe27a', 40);
+    if (hit) fxText(360, 280, T(TARGET_TIERS[state.targetTier].key) + '！', TARGET_TIERS[state.targetTier].color, 44);
     confetti();
     document.querySelectorAll('.fc-cake').forEach(el => el.classList.add('matched'));
     setTimeout(() => {
@@ -373,7 +373,7 @@ function updateUI() {
         }
     }
     // ターゲット: ケーキの絵と分数。ばいりつ(×2/×3/×4)は 色で3だんかい
-    const sig = state.targetVal + '|' + state.targetMul + '|' + UNIT_MAX;
+    const sig = state.targetVal + '|' + state.targetMul + '|' + UNIT_MAX + '|' + currentLang;
     if (FC.tsig !== sig) {
         FC.tsig = sig;
         const v = state.targetVal;
@@ -382,7 +382,7 @@ function updateUI() {
         grid.innerHTML = `<div class="tc-card new" style="--cc:${sizeColor(v)}"><div class="tc-cake">${d.innerHTML}</div><div class="tc-fr">${fracHTML(v)}</div></div>`;
         const area = document.getElementById('card-target');
         area.className = 'fc-tarea tier-' + state.targetMul;
-        document.getElementById('disp-target-rate').textContent = '×' + state.targetMul;
+        document.getElementById('disp-target-name').innerHTML = T(TARGET_TIERS[state.targetTier].key).replace(/^スーパー/, 'スーパー<br>');
     }
 }
 function gameLoop() {

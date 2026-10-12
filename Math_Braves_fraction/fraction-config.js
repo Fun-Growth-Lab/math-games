@@ -6,12 +6,14 @@ let UNIT_MAX = 4;                      // いま遊んでいるRUNの分割数(R
 const DIVISIONS = [3, 4, 5, 6, 7, 8, 9, 10];
 // 点数 = 基本点 × ホールボーナス × ターゲットボーナス
 //   基本点: 3つそろえて 100点
-//   ホールボーナス: ホール(ちょうど1)を作るたびに +10%(3こで ×1.3)
+//   ホールボーナス: ホール(ちょうど1)を作るたびに +20%(3こで ×1.6)
 //   ターゲットボーナス: ターゲットの大きさでそろえたら ×2 / ×3 / ×4 (3だんかい)。はずれは ×1
 const BASE_PTS = 100;
-const WHOLE_RATE = 0.1;
-const TARGET_TIERS = [                 // [ばいりつ, 出る確率(%)] 1ステージ目は かならず ×2
-    { mul: 2, w: 70 }, { mul: 3, w: 20 }, { mul: 4, w: 10 },
+const WHOLE_RATE = 0.2;
+const TARGET_TIERS = [                 // [ばいりつ, 出る確率(%), 名前の文言キー] 1ステージ目は かならず いちばん下
+    { mul: 2, w: 70, key: 'target_chance', color: '#ffe27a' },        // チャンス
+    { mul: 3, w: 20, key: 'target_big', color: '#ff8a7a' },           // ビッグチャンス
+    { mul: 4, w: 10, key: 'target_supergood', color: '#e8a0ff' },     // スーパービッグチャンス
 ];
 const AP_BONUS_PTS = 5;                // クリア・ゲームオーバー時の のこりAP 1つにつき
 // ステージクリアのAP回復(RUN=分割数ごと)。ボットで「ふつう(手札4枚)で ほぼ全員クリアできる」手数を測って決めた
@@ -19,11 +21,11 @@ const AP_BONUS_PTS = 5;                // クリア・ゲームオーバー時�
 const AP_HEAL_BY_DIV = { 3: 1, 4: 2, 5: 2, 6: 2, 7: 3, 8: 3, 9: 3, 10: 3 };
 const STAGE_TOTAL = 7;
 
-// 難易度ごとのちがい。のこりAPはすべて同じ(10)で、手札のまい数をかえる(やさしい5・ふつう4・むずかしい3)。
+// 難易度ごとのちがい。いまは すべて同じ(手札3まい・APは10スタート)。ちがいは あとで決める。
 //   ★4・★5(シークレット)は いまは出さない(GAME.starMax=3)。あとで決める
 const STAR_TUNING = {
-    1: { handSize: 5, startAp: 10 },
-    2: { handSize: 4, startAp: 10 },
+    1: { handSize: 3, startAp: 10 },
+    2: { handSize: 3, startAp: 10 },
     3: { handSize: 3, startAp: 10 },
     4: { handSize: 3, startAp: 10 },
     5: { handSize: 3, startAp: 10 },
