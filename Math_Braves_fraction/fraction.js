@@ -71,7 +71,7 @@ function backToTitle() {
 function initGame() {
     state.score = 0; state.bestPlay = 0; state.stage = 1; state.runMode = false; state.stageStartScore = 0; state.stageScores = []; state.tutorial = false;
     state.ap = CONFIG.startAp || 10; state.cakes = [0, 0, 0]; state.tops = [0, 0, 0]; state.targets = [];
-    state.coins = 0; state.run = { topLv: 0, healUp: 0, spiceLv: 0, shapes: {}, favs: {}, favUses: 0, bought: [] }; state.cards = []; state.dragInfo = null; state.lastEq = '';
+    state.coins = 0; state.run = { topLv: 0, healUp: 0, healFrac: 0, spiceLv: 0, shapes: {}, favs: {}, favUses: 0, bought: [] }; state.cards = []; state.dragInfo = null; state.lastEq = '';
     state.inputLocked = false; state.phase = 'IDLE';
     state.endBase = 0; state.apBonus = 0; state.roundHits = 0; state.roundCakePts = 0; state.roundTopSum = 0; state.roundTopPts = 0; state.roundTargetPts = 0; state.roundShape = false; state.roundSub = 0; state.roundCoins = 0;
     state.width = 720; state.height = 720; canvas.width = 720; canvas.height = 720;
@@ -192,7 +192,10 @@ function roundClear() {
     const shapeMul = R.shapes[size] ? 1.1 : 1;                                // かたちマスター
     const total = Math.round((subtotal + targetPts) * shapeMul);
     const coins = coinsFor(total);
-    const heal = CONFIG.apHeal + R.healUp;
+    // おかわりAP: 1Lvごとに +0.5(はんぱは持ちこして、たまったら +1)
+    const healAcc = (R.healFrac || 0) + 0.5 * R.healUp;
+    const heal = CONFIG.apHeal + Math.floor(healAcc);
+    R.healFrac = healAcc - Math.floor(healAcc);
     state.roundHits = hits; state.roundCakePts = cakePts; state.roundTopSum = topSum; state.roundTopPts = topPts;
     state.roundTargetPts = targetPts; state.roundShape = shapeMul > 1; state.roundSub = subtotal;
     state.roundCoins = coins; state.roundHeal = heal;
@@ -223,7 +226,7 @@ function finishRun(cleared) {
     ui.btnToTitle.classList.add('hidden');
     if (state.stageScores[state.stage - 1] === undefined) state.stageScores[state.stage - 1] = 0;
     state.endBase = state.score;
-    state.apBonus = Math.max(0, state.ap) * 100;
+    state.apBonus = Math.max(0, state.ap) * AP_BONUS_PTS;
     state.favMul = 1 + 0.03 * (state.run ? state.run.favUses : 0);              // おきにいりカードの倍率
     const total = Math.round((state.endBase + state.apBonus) * state.favMul);
     state.score = total;

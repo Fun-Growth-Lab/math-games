@@ -9,6 +9,7 @@ const DIVISIONS = [3, 4, 5, 6, 7, 8, 9, 10];
 const CAKE_PTS = 100;
 const TOP_PTS = 10;
 const TARGET_RATE = 0.5;
+const AP_BONUS_PTS = 20;               // クリア・ゲームオーバー時の のこりAP 1つにつき
 const TOP_LV_MAX = 10;
 const TOP_WEIGHTS = (function () {     // トッピング 0,1,2,3個 の出やすさ(たねのLv0〜10。Lv0=[40,30,20,10]、Lv10=[0,10,40,50]へ少しずつ)
     const a = [40, 30, 20, 10], b = [0, 10, 40, 50], out = [];

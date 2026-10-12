@@ -1,7 +1,7 @@
 // ぶんすうスロットの ショップ。ステージクリアのあと(最後のステージのあとは出さない)に ひらく。
 // コインで能力アップを買う。品物は6つ(固定4 + その回の「かたち」「おきにいり」)。そのうち1つは半額セール。
 //   たね      : カードに トッピングが のりやすくなる(Lv1〜10)
-//   おかわり  : ステージクリアのAP回復 +1(Lv1〜10)
+//   おかわり  : ステージクリアのAP回復 +0.5(Lv1〜10。はんぱは持ちこして、たまったら+1)
 //   スパイス  : ターゲットのボーナス +5%(Lv1〜10)
 // 値段は定額(Lvが上がっても変わらない)。
 //   チャージ  : いますぐ AP +3(なんども買える)
@@ -15,7 +15,7 @@
             shop_title: 'ケーキやさんの ショップ', shop_coins: 'コイン', shop_next: 'つぎの ステージへ ▶', shop_sale: 'セール!', shop_max: 'MAX', shop_owned: 'もっている',
             shop_buy: 'かう', shop_short: 'コインが たりない', shop_have: 'もちもの', shop_none: 'まだ なにも もっていません',
             item_seed: 'トッピングの たね', desc_seed: 'カードに トッピングが のりやすくなる',
-            item_heal: 'おかわりAP', desc_heal: 'ステージクリアの AP回復が +1',
+            item_heal: 'おかわりAP', desc_heal: 'クリアの AP回復が +0.5(2回で +1)',
             item_spice: 'ターゲットスパイス', desc_spice: 'ターゲットの ボーナスが +5%',
             item_charge: 'APチャージ', desc_charge: 'いますぐ AP が +3',
             item_shape: 'かたちマスター', desc_shape: 'この大きさで そろうと スコア ×1.1(ずっと)',
@@ -26,7 +26,7 @@
             shop_title: 'Cake Shop', shop_coins: 'Coins', shop_next: 'Next Stage ▶', shop_sale: 'SALE!', shop_max: 'MAX', shop_owned: 'Owned',
             shop_buy: 'Buy', shop_short: 'Not enough coins', shop_have: 'Your items', shop_none: 'Nothing yet',
             item_seed: 'Topping Seeds', desc_seed: 'Cards get more toppings',
-            item_heal: 'Extra AP', desc_heal: '+1 AP restored on stage clear',
+            item_heal: 'Extra AP', desc_heal: '+0.5 AP on stage clear (carries over)',
             item_spice: 'Target Spice', desc_spice: 'Target bonus +5%',
             item_charge: 'AP Charge', desc_charge: '+3 AP right now',
             item_shape: 'Shape Master', desc_shape: 'Stage score ×1.1 when cakes match this size',
