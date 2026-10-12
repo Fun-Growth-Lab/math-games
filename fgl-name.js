@@ -122,6 +122,20 @@
         return { ok: true, name, reason: '' };
     }
 
+    // いま遊んでいる言語(各ゲームの currentLang などを見る。なければ <html lang>)
+    function autoLang() {
+        const ok = (l) => typeof l === 'string' && /^(ja|en|simple|easy|ja_easy|kana)/i.test(l);
+        let l = '';
+        try { if (typeof currentLang !== 'undefined' && ok(currentLang)) l = currentLang; } catch (e) {}
+        if (!l) try { if (typeof curLang !== 'undefined' && ok(curLang)) l = curLang; } catch (e) {}
+        if (!l) try { if (typeof lang !== 'undefined' && ok(lang)) l = lang; } catch (e) {}
+        if (!l) try { if (typeof LANG !== 'undefined' && ok(LANG)) l = LANG; } catch (e) {}
+        if (!l) try { if (typeof gameLang !== 'undefined' && ok(gameLang)) l = gameLang; } catch (e) {}
+        if (!l) l = document.documentElement.lang || 'ja';
+        if (/^en/i.test(l)) return 'en';
+        if (/easy|simple|kana/i.test(l)) return 'simple';
+        return 'ja';
+    }
     const MSG = {
         empty:    { ja: 'なまえを にゅうりょくしてね', simple: 'なまえを にゅうりょくしてね', en: 'Please enter a name.' },
         too_long: { ja: '12もじ いないで いれてね', simple: '12もじ いないで いれてね', en: 'Please use 12 characters or fewer.' },
@@ -131,8 +145,23 @@
     };
     function message(reason, lang) {
         const m = MSG[reason] || MSG.ng;
-        const k = lang === 'en' ? 'en' : (lang === 'simple' || lang === 'ja_easy') ? 'simple' : 'ja';
+        const l = lang || autoLang();
+        const k = /^en/i.test(l) ? 'en' : /easy|simple|kana/i.test(l) ? 'simple' : 'ja';
         return m[k];
+    }
+    // 入力欄の下に、赤い小さなメッセージを3.5秒だけ出す(ゲームに専用の表示がないとき用)
+    function showError(inputEl, text) {
+        if (!inputEl || !inputEl.parentNode) return;
+        let el = inputEl._fglErr;
+        if (!el) {
+            el = document.createElement('div');
+            el.style.cssText = 'color:#e5392a;font-size:0.9rem;font-weight:800;line-height:1.3;margin:4px 0 0;text-align:center;font-family:inherit;';
+            inputEl.parentNode.insertBefore(el, inputEl.nextSibling);
+            inputEl._fglErr = el;
+        }
+        el.textContent = text;
+        clearTimeout(el._t);
+        el._t = setTimeout(() => { el.textContent = ''; }, 3500);
     }
 
     function isBlocked(name) { const s = clean(name); return !!s && (hasPii(s) || hasNg(s)); }
@@ -146,5 +175,5 @@
         return cs.length > 16 ? cs.slice(0, 16).join('') : s;
     }
 
-    window.FGLName = { MAX, validate, message, isBlocked, display, _fold: variants };
+    window.FGLName = { MAX, validate, message, showError, isBlocked, display, _fold: variants };
 })();

@@ -556,6 +556,7 @@ html:not(.fgt-ready) #title-screen > p,
 html:not(.fgt-ready) #title-screen > button,
 html:not(.fgt-ready) #title-screen > a{visibility:hidden!important}</style>
 <script id="fgt-failsafe">setTimeout(function(){document.documentElement.classList.add("fgt-ready")},4000);</script>
+<script src="../fgl-name.js?v=20261224"></script>
 </head>
 <body>
 <div id="container">
@@ -599,7 +600,7 @@ html:not(.fgt-ready) #title-screen > a{visibility:hidden!important}</style>
       <!-- world: player name area -->
       <div id="rank-login-area" class="hidden" style="margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:8px">
         <span style="font-size:0.82rem;color:#888" data-i18n="rank.name.label">なまえ：</span>
-        <input id="rank-player-name" type="text" maxlength="16" placeholder="ななしさん"
+        <input id="rank-player-name" type="text" maxlength="12" placeholder="ななしさん"
           style="font-size:20px;padding:4px 10px;border:1.5px solid #ccc;border-radius:8px;width:130px;font-family:inherit" data-i18n-placeholder="rank.name.placeholder">
         <button onclick="savePlayerName()" style="font-size:0.8rem;padding:4px 12px;border:none;border-radius:8px;background:#2a80c0;color:#fff;cursor:pointer;font-family:inherit;font-weight:700" data-i18n="rank.name.save">保存</button>
       </div>
@@ -3049,8 +3050,10 @@ function getPlayerName() {
   return localStorage.getItem(PLAYER_NAME_KEY) || 'ななしさん';
 }
 function savePlayerName() {
-  const val = document.getElementById('rank-player-name').value.trim();
-  if (val) { localStorage.setItem(PLAYER_NAME_KEY, val); }
+  const inp = document.getElementById('rank-player-name');
+  const v = FGLName.validate(inp.value);     // 文字と数字なら何語でもOK・12文字まで(共通の fgl-name.js)
+  if (v.ok) { localStorage.setItem(PLAYER_NAME_KEY, v.name); }
+  else if (v.reason !== 'empty') { FGLName.showError(inp, FGLName.message(v.reason)); }
 }
 
 function saveRankEntry(floor, score, diff) {
@@ -7087,7 +7090,7 @@ function buildDiceFace(face, num) {
       body: JSON.stringify({
         game:        'iriscraft',
         difficulty:  difficulty   || 'normal',
-        player_name: name         || 'ななしさん',
+        player_name: FGLName.display(name || 'ななしさん', 'ななしさん'),
         point_score: floor        || 0,
         stage_score: score        || 0,
         turns:       0,
@@ -7115,7 +7118,7 @@ function buildDiceFace(face, num) {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       return data.map(r => ({
-        name:  r.player_name,
+        name:  FGLName.display(r.player_name),
         floor: r.point_score,
         score: r.stage_score,
         date:  r.created_at ? new Date(r.created_at).toLocaleDateString('ja-JP') : ''

@@ -396,6 +396,7 @@
     </script>
 
     <script src="../tutorial-engine.js"></script>
+<script src="../fgl-name.js?v=20261224"></script>
 </head>
 <body>
 
@@ -512,7 +513,7 @@
             <h2 style="font-size:32px;" data-i18n="pm_title">あそぶひとの なまえ</h2>
             <div id="player-list" class="player-list"></div>
             <div style="margin-top:20px;">
-                <input type="text" id="new-player-name" maxlength="8" placeholder="ひらがな8もじ" data-i18n-placeholder="pm_placeholder" style="padding:10px; font-size:20px; border-radius:10px; border:2px solid #ccc; width:200px; text-align:center;">
+                <input type="text" id="new-player-name" maxlength="12" placeholder="なまえ (12もじまで)" data-i18n-placeholder="pm_placeholder" style="padding:10px; font-size:20px; border-radius:10px; border:2px solid #ccc; width:200px; text-align:center;">
                 <button class="btn btn-secondary" onclick="PlayerManager.addPlayer()" data-i18n="btn_add">ついか</button>
                 <div id="name-error" style="color:#E53935; height:24px; margin-top:5px;"></div>
             </div>
@@ -602,7 +603,7 @@ const STRINGS = {
         title_logo: 'ナンバー\nブリック',
         pm_none_selected: 'プレーヤーを えらんでください', label_selected_player: 'せんたくちゅう: {name}',
         btn_start: 'はじめる', btn_tutorial: '🔰 チュートリアル', btn_player_select: 'プレーヤーを えらぶ', btn_ranking: 'ランキング', btn_settings: '⚙ 設定', btn_index: 'INDEXへ',
-        pm_title: 'あそぶひとの なまえ', pm_placeholder: 'ひらがな8もじ', btn_add: 'ついか', btn_confirm_back: 'けっていして もどる',
+        pm_title: 'あそぶひとの なまえ', pm_placeholder: 'なまえ (12もじまで)', btn_add: 'ついか', btn_confirm_back: 'けっていして もどる',
         err_hiragana_only: 'ひらがなと「ー」のみ', err_too_long: '8もじ いないで', err_duplicate: 'とうろくずみ です', err_max_players: '5にん までです',
         confirm_delete_player: '{name}さんを けしますか？',
         diff_prompt: 'むずかしさを えらんでね', diff_easy: 'やさしい (3x3)', diff_normal: 'ふつう (4x4)', diff_hard: 'むずかしい (5x5)', btn_back: 'もどる',
@@ -638,7 +639,7 @@ const STRINGS = {
         title_logo: 'ナンバー\nブリック',
         pm_none_selected: 'プレーヤーを えらんでください', label_selected_player: 'せんたくちゅう: {name}',
         btn_start: 'はじめる', btn_tutorial: '🔰 チュートリアル', btn_player_select: 'プレーヤーを えらぶ', btn_ranking: 'ランキング', btn_settings: '⚙ せってい', btn_index: 'INDEXへ',
-        pm_title: 'あそぶひとの なまえ', pm_placeholder: 'ひらがな8もじ', btn_add: 'ついか', btn_confirm_back: 'けっていして もどる',
+        pm_title: 'あそぶひとの なまえ', pm_placeholder: 'なまえ (12もじまで)', btn_add: 'ついか', btn_confirm_back: 'けっていして もどる',
         err_hiragana_only: 'ひらがなと「ー」だけ', err_too_long: '8もじ いないで', err_duplicate: 'とうろくずみ です', err_max_players: '5にん までです',
         confirm_delete_player: '{name}さんを けしますか？',
         diff_prompt: 'なんいどを えらんでね', diff_easy: 'やさしい (3x3)', diff_normal: 'ふつう (4x4)', diff_hard: 'むずかしい (5x5)', btn_back: 'もどる',
@@ -674,7 +675,7 @@ const STRINGS = {
         title_logo: 'Number\nBrick',
         pm_none_selected: 'Please select a player', label_selected_player: 'Selected: {name}',
         btn_start: 'Start', btn_tutorial: '🔰 Tutorial', btn_player_select: 'Select Player', btn_ranking: 'Ranking', btn_settings: '⚙ Settings', btn_index: 'To INDEX',
-        pm_title: "Player's Name", pm_placeholder: 'Hiragana, up to 8', btn_add: 'Add', btn_confirm_back: 'Confirm & Back',
+        pm_title: "Player's Name", pm_placeholder: 'Name (up to 12)', btn_add: 'Add', btn_confirm_back: 'Confirm & Back',
         err_hiragana_only: 'Hiragana and "ー" only', err_too_long: 'Up to 8 characters', err_duplicate: 'Already registered', err_max_players: 'Up to 5 players',
         confirm_delete_player: 'Delete {name}?',
         diff_prompt: 'Choose a Difficulty', diff_easy: 'Easy (3x3)', diff_normal: 'Normal (4x4)', diff_hard: 'Hard (5x5)', btn_back: 'Back',
@@ -769,9 +770,9 @@ class PlayerManager {
         let players = this.getPlayers();
         errorDiv.textContent = "";
 
-        if (!name) return;
-        if (!/^[ぁ-んー]+$/.test(name)) { errorDiv.textContent = T('err_hiragana_only'); return; }
-        if (name.length > 8) { errorDiv.textContent = T('err_too_long'); return; }
+        const v = FGLName.validate(name);     // 文字と数字なら何語でもOK・12文字まで(共通の fgl-name.js)
+        if (!v.ok) { if (v.reason !== 'empty') errorDiv.textContent = FGLName.message(v.reason); return; }
+        name = v.name;
         if (players.includes(name)) { errorDiv.textContent = T('err_duplicate'); return; }
         if (players.length >= CONFIG.MAX_PLAYERS) { errorDiv.textContent = T('err_max_players'); return; }
         
@@ -1025,7 +1026,7 @@ const Game = {
                         const dt = new Date(d.created_at);
                         dateStr = `${dt.getFullYear()}/${dt.getMonth()+1}/${dt.getDate()}`;
                     }
-                    return { name: d.player_name, stage: d.stage_score, avgTime: (d.turns || 0) / 100, date: dateStr };
+                    return { name: FGLName.display(d.player_name), stage: d.stage_score, avgTime: (d.turns || 0) / 100, date: dateStr };
                 });
                 this.renderRankingTable(mapped);
             } catch (e) {
@@ -1683,7 +1684,7 @@ const Game = {
                 keepalive: true,
                 body: JSON.stringify({
                     game: 'number_brick_v2',
-                    player_name: this.currentPlayer,
+                    player_name: FGLName.display(this.currentPlayer),
                     point_score: stage,
                     stage_score: stage,
                     // turnsは整数カラムのため、小数第2位まで保持できるよう100倍した「センチ秒」の整数で保存する

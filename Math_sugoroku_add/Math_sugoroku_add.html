@@ -345,6 +345,7 @@
         .clear-count-label { background: #fff6dc; border: 2px solid #f0d9a0; color: #8a5a10; font-size: 18px; padding: 5px 16px; }
     </style>
     <script src="../tutorial-engine.js"></script>
+<script src="../fgl-name.js?v=20261224"></script>
 </head>
 <body>
 
@@ -448,9 +449,9 @@
                     <div id="new-player-form" class="hidden">
                         <h3 style="color:#FF7043; margin-top:0; font-size:24px;" data-i18n="player.newform.title">あたらしく登録する</h3>
                         <div id="name-input-container">
-                            <input type="text" id="nickname-input" placeholder="おなまえ (8もじまで)" maxlength="8" data-i18n-placeholder="nickname.placeholder">
+                            <input type="text" id="nickname-input" placeholder="おなまえ (12もじまで)" maxlength="12" data-i18n-placeholder="nickname.placeholder">
                         </div>
-                        <p style="font-size:16px; color:#E64A19; font-weight:bold;" data-i18n="nickname.hint">※ひらがな と 「ー」 だけ つかえます</p>
+                        <p style="font-size:16px; color:#E64A19; font-weight:bold;" data-i18n="nickname.hint">※もじと すうじで かけます</p>
                         <div id="char-grid"></div>
                         <button class="btn btn-yellow" onclick="registerPlayer()" style="width:200px; margin-top:15px;" data-i18n="btn.register">とうろくする</button>
                     </div>
@@ -639,7 +640,7 @@
             try {
                 const res = await fetch(`${_b}/rankings`, {
                     method:'POST', headers:_h, keepalive:true,
-                    body: JSON.stringify({game:'math_sugoroku_add', difficulty:difficulty||'normal', player_name:name||'ゲスト', point_score:Math.round(score)||0})
+                    body: JSON.stringify({game:'math_sugoroku_add', difficulty:difficulty||'normal', player_name: FGLName.display(name || 'ゲスト', 'ゲスト'), point_score:Math.round(score)||0})
                 });
                 if (!res.ok) { const t=await res.text(); throw new Error(`HTTP ${res.status}: ${t}`); }
             } catch(e) { console.error('Ranking save error:', e); }
@@ -651,7 +652,7 @@
                 const res = await fetch(`${_b}/rankings?${q}`, {headers:_rh});
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const data = await res.json();
-                return data.map(r=>({uid:'', name:r.player_name, score:r.point_score, date:r.created_at?_fmtDate(new Date(r.created_at)):''}));
+                return data.map(r=>({uid:'', name:FGLName.display(r.player_name), score:r.point_score, date:r.created_at?_fmtDate(new Date(r.created_at)):''}));
             } catch(e) { console.error('Ranking load error:', e); return null; }
         };
     })();
@@ -665,56 +666,6 @@
             });
         }
 
-        // NGワードリスト（ひらがな）
-        const NG_WORDS_HIRAGANA = [
-            'しね', 'しぬ', 'しに', 'ころす', 'ころせ', 'さつがい', 'くたばれ',
-            'じさつ', 'ぎさつ', 'つるす', 'れんたん', 'しにたい',
-            'てろ', 'てろりすと', 'ばくは', 'ばくだん', 'ほうか',
-            'はんざい', 'ごうとう', 'ゆうかい', 'かんきん', 'おそう',
-            'やくざ', 'ぼうりょく', 'はんぐれ', 'ちんぴら', 'まふぃあ',
-            'たいま', 'まやく', 'かくせいざい', 'しゃぶ', 'どらっぐ', 'こかいん',
-            'へろいん', 'えくすたしー', 'だっぽう', 'きめせく',
-            'いじめ', 'ぎゃくたい',
-            'ばか', 'あほ', 'まぬけ', 'きちがい', 'き違い',
-            'うざい', 'うざ', 'きもい', 'きも', 'きしょい', 'きえろ',
-            'くず', 'ごみ', 'ごみむし', 'かす', 'ざこ', 'ぜつ',
-            'ぶす', 'でぶ', 'はげ', 'ちび', 'でっぱ', 'いなかもの',
-            'うじ', 'はいぼく', 'まけいぬ', 'おつむ', 'のうたりん',
-            'ていのう', 'ちしょう', 'しょうがい', 'がいじ', 'かたわ', 'びっこ',
-            'めくら', 'つんぼ', 'おし', 'どじん', 'えた', 'ひにん',
-            'たひ', 'たひね',
-            'うせろ', 'だまれ',
-            'ちんちん', 'ちんこ', 'ちんぽ', 'ちんか', 'まら', 'さお',
-            'まんこ', 'まんしゅう', 'まんげ', 'われめ', 'おまた',
-            'くり', 'くりとりす', 'いんしん', 'いんかく', 'びらびら',
-            'こうがん', 'たまきん', 'きんたま', 'ふぐり',
-            'おっぱい', 'ちち', 'にゅうりん', 'にゅうとう', 'きょにゅう', 'ひんにゅう',
-            'けつ', 'あなる', 'こうもん', 'けつのあな',
-            'えろ', 'えっち', 'すけべ', 'へんたい', 'むっつり', 'しこ',
-            'せっくす', 'せいこう', 'まぐわい', 'そうにゅう', 'はめる',
-            'おなにー', 'じい', 'しこしこ', 'ふぇら', 'ぱいずり', 'くんに',
-            'いらま', 'しっしん', 'なかだし', 'ごっくん', 'ぶっかけ',
-            'しおふき', 'ぜっちょう', 'いく', 'いかせろ', 'あえぎ',
-            'どうてい', 'しょじょ', 'やりまん', 'やりちん', 'びっち',
-            'せふれ', 'ぱこ', 'ぱこぱこ', 'わいせつ', 'ろり', 'しょた', 'ぺど',
-            'きんしん', 'じゅうかん', 'りょうじょく', 'らんこう', 'すかんと',
-            'のーぱん', 'ぱんちら',
-            'れいぷ', 'ごうかん', 'ちかん', 'とうさつ', 'のぞき', 'ろしゅつ',
-            'ふうぞく', 'そーぷ', 'へるす', 'でりへる', 'ぴんさろ', 'いめくら',
-            'あだると', 'えーぶい', 'えぶい', 'ぽるの', 'うらびでお', 'むしゅうせい',
-            'えんこう', 'えんじょ', 'うり', 'かいしゅん', 'ばいしゅん',
-            'ぱぱかつ', 'ままかつ', 'うりせん',
-            'うんこ', 'うんち', 'くそ', 'げり', 'べん', 'ふん',
-            'しっこ', 'しょんべん', 'にょう', 'ほうにょう',
-            'へ', 'おなら', 'げろ', 'たん',
-            'うんえい', 'こうしき', 'すたっふ', 'かんり', 'ぱとろーる',
-            'じえむ', 'げーむますたー', 'ますたー', 'あどみん', 'しすてむ',
-            'さーばー', 'あかばん', 'ばん', 'ちーと', 'ちーたー', 'ばぐ',
-            'らいん', 'かかお', 'すかいぷ', 'いんすた', 'ついったー', 'でぃすこ',
-            'でんわ', 'ばんごう', 'けいたい', 'あどれす', 'めあど', 'じゅうしょ',
-            'あお', 'あいたい', 'まちあわせ', 'ほてる', 'らぶほ', 'おふかい',
-            'ぱすわーど', 'ぱす', 'あかうんと', 'こじんじょうほう'
-        ];
 
         // ============================================================
         //  I18N（かんたんなにほんご／日本語／English）
@@ -748,8 +699,8 @@
                 'player.select.title': 'プレーヤーをえらぶか、あたらしくつくる',
                 'player.slot.empty': 'あき',
                 'player.newform.title': 'あたらしく登録する',
-                'nickname.placeholder': 'おなまえ (8もじまで)',
-                'nickname.hint': '※ひらがな と 「ー」 だけ つかえます',
+                'nickname.placeholder': 'おなまえ (12もじまで)',
+                'nickname.hint': '※もじと すうじで かけます',
                 'btn.register': 'とうろくする',
                 'settings.title': '⚙ せってい',
                 'settings.sub': '言語 / Language',
@@ -849,8 +800,8 @@
                 'player.select.title': 'プレーヤーをえらぶか、あたらしくつくる',
                 'player.slot.empty': 'あき',
                 'player.newform.title': 'あたらしく登録する',
-                'nickname.placeholder': 'おなまえ (8もじまで)',
-                'nickname.hint': '※ひらがな と 「ー」 だけ つかえます',
+                'nickname.placeholder': 'おなまえ (12もじまで)',
+                'nickname.hint': '※もじと すうじで かけます',
                 'btn.register': 'とうろくする',
                 'settings.title': '⚙ 設定',
                 'settings.sub': '言語 / Language',
@@ -950,8 +901,8 @@
                 'player.select.title': 'Choose a Player or Create New',
                 'player.slot.empty': 'Empty',
                 'player.newform.title': 'Register New Player',
-                'nickname.placeholder': 'Name (up to 8 chars)',
-                'nickname.hint': '※Hiragana and 「ー」 only',
+                'nickname.placeholder': 'Name (up to 12 chars)',
+                'nickname.hint': '※Letters and numbers only',
                 'btn.register': 'Register',
                 'settings.title': '⚙ Settings',
                 'settings.sub': '言語 / Language',
@@ -1350,12 +1301,9 @@
         }
 
         function registerPlayer() {
-            const inputName = document.getElementById("nickname-input").value.trim();
-            if (!inputName) { showCustomAlert(T('alert.entername')); return; }
-            if (!/^[ぁ-んー]+$/.test(inputName)) { showCustomAlert(T('alert.hiraganaonly')); return; }
-            for (const ng of NG_WORDS_HIRAGANA) {
-                if (inputName.includes(ng)) { showCustomAlert(T('alert.ngword')); return; }
-            }
+            const v = FGLName.validate(document.getElementById("nickname-input").value);     // 文字と数字なら何語でもOK・12文字まで(共通の fgl-name.js)
+            if (!v.ok) { showCustomAlert(v.reason === 'empty' ? T('alert.entername') : FGLName.message(v.reason)); return; }
+            const inputName = v.name;
             if (!selectedCharForNew) { showCustomAlert(T('alert.selectchar')); return; }
             
             players[targetSlotIndex] = { name: inputName, char: selectedCharForNew };

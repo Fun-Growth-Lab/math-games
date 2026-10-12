@@ -815,6 +815,7 @@
             pointer-events:none;
         }
     </style>
+<script src="../fgl-name.js?v=20261224"></script>
 </head>
 <body>
 <div id="container">
@@ -1104,7 +1105,7 @@
     <div id="player-mgr" class="hidden">
         <div class="ov-box" style="width:430px;">
             <div class="ov-title">👤 プレーヤーを選ぶ</div>
-            <p class="ov-desc">ひらがなで入力してね（最大12文字）</p>
+            <p class="ov-desc">名前を入力してね（最大12文字）</p>
             <div class="add-form">
                 <input type="text" id="name-inp" class="name-inp" placeholder="なまえをにゅうりょく" maxlength="12">
                 <button class="btn btn-green btn-sm" onclick="addPlayer()">追加</button>
@@ -1343,7 +1344,7 @@
             body: JSON.stringify({
                 game:        'arithmetica',
                 difficulty:  difficulty  || 'easy',
-                player_name: name        || 'ななしさん',
+                player_name: FGLName.display(name || 'ななしさん', 'ななしさん'),
                 point_score: pointScore  || 0,
                 stage_score: stageScore  || 0,
                 turns:       turns       || 0,
@@ -1370,7 +1371,7 @@
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
             return data.map(r => ({
-                name:       r.player_name,
+                name:       FGLName.display(r.player_name),
                 className:  r.class_name,
                 score:      r.stage_score,
                 pointScore: r.point_score,
@@ -1582,7 +1583,7 @@ const STRINGS = {
     traitDesc_riskWhiff:'スキルが1つも発動しなかった次のターン、発動したスキルの効果量+25%',
     // Player manager
     playerMgrTitle:'👤 プレーヤーを選ぶ',
-    playerMgrDesc:'ひらがなで入力してね（最大12文字）',
+    playerMgrDesc:'名前を入力してね（最大12文字）',
     playerMgrPlaceholder:'なまえをにゅうりょく',
     playerMgrAdd:'追加',
     playerMgrClose:'とじる',
@@ -1890,7 +1891,7 @@ const STRINGS = {
     traitName_riskWhiff:'からぶりじょうとう',
     traitDesc_riskWhiff:'スキルが1つもはつどうしなかったつぎのターン、はつどうしたスキルのこうかりょう+25%',
     playerMgrTitle:'👤 プレーヤーをえらぶ',
-    playerMgrDesc:'ひらがなでにゅうりょくしてね（さいだい12もじ）',
+    playerMgrDesc:'なまえを にゅうりょくしてね（さいだい12もじ）',
     playerMgrPlaceholder:'なまえをにゅうりょく',
     playerMgrAdd:'ついか',
     playerMgrClose:'とじる',
@@ -2183,7 +2184,7 @@ const STRINGS = {
     traitName_riskWhiff:'Rebound',
     traitDesc_riskWhiff:'On the turn after a turn with no skill trigger, the next triggered skill\'s effect +25%',
     playerMgrTitle:'👤 Choose Player',
-    playerMgrDesc:'Enter name in hiragana (max 12 chars)',
+    playerMgrDesc:'Enter your name (max 12 chars)',
     playerMgrPlaceholder:'Enter name',
     playerMgrAdd:'Add',
     playerMgrClose:'Close',
@@ -2659,7 +2660,6 @@ const ENEMY_LIST = [
 const ALL_ENEMY_SKILLS = ENEMY_LIST.filter(e=>e.easySkill).map(e=>e.easySkill);
 const SUITS = ['♥','♦','♠','♣'];
 const SC    = { '♥':'s-heart','♦':'s-diamond','♠':'s-spade','♣':'s-club' };
-const NG    = ['しね','ばか','あほ','うざ','きも'];
 
 // ============================================================
 // DIFFICULTIES & CLASS DEFINITIONS
@@ -2956,10 +2956,10 @@ function refreshPDisp() {
 }
 function addPlayer() {
     const inp = document.getElementById('name-inp');
-    const name = inp.value.trim();
-    if (!name) return;
-    if (name.length>12) { showInfoPopup(t('nameTooLong')); return; }
-    if (NG.some(w=>name.includes(w))) { showInfoPopup(t('nameNgWord')); return; }
+    // 文字と数字なら何語でもOK・12文字まで・NGワード/個人情報は不可(共通の fgl-name.js)
+    const v = FGLName.validate(inp.value);
+    if (!v.ok) { if (v.reason !== 'empty') showInfoPopup(FGLName.message(v.reason)); return; }
+    const name = v.name;
     const pl = getPlayers();
     if (pl.includes(name)) { showInfoPopup(t('nameDuplicate')); return; }
     pl.push(name); savePlayers(pl); setCurP(name);
