@@ -1,6 +1,5 @@
 // ぶんすうスロットの ショップ。ステージクリアのあと(最後のステージのあとは出さない)に ひらく。
 // コインで能力アップを買う。品物は6つ(固定4 + その回の「かたち」「おきにいり」)。そのうち1つは半額セール。
-//   たね      : カードに トッピングが のりやすくなる(Lv1〜10)
 //   おかわり  : ステージクリアのAP回復 +0.5(Lv1〜10。はんぱは持ちこして、たまったら+1)
 //   スパイス  : ターゲットのボーナス +5%(Lv1〜10)
 // 値段は定額(Lvが上がっても変わらない)。
@@ -9,12 +8,11 @@
 //   おきにいり: そのカードを使うたび、最終スコアの倍率 +3%(ずっと)
 (function () {
     const LV_MAX = 10;
-    const PRICE = { seed: 3, heal: 10, spice: 5, charge: 8, shape: 8, fav: 6 };   // すべて定額
+    const PRICE = { heal: 10, spice: 5, charge: 8, shape: 8, fav: 6 };   // すべて定額
     const S = {
         ja: {
             shop_title: 'ケーキやさんの ショップ', shop_coins: 'コイン', shop_next: 'つぎの ステージへ ▶', shop_sale: 'セール!', shop_max: 'MAX', shop_owned: 'もっている',
             shop_buy: 'かう', shop_short: 'コインが たりない', shop_have: 'もちもの', shop_none: 'まだ なにも もっていません',
-            item_seed: 'トッピングの たね', desc_seed: 'カードに トッピングが のりやすくなる',
             item_heal: 'おかわりAP', desc_heal: 'クリアの AP回復が +0.5(2回で +1)',
             item_spice: 'ターゲットスパイス', desc_spice: 'ターゲットの ボーナスが +5%',
             item_charge: 'APチャージ', desc_charge: 'いますぐ AP が +3',
@@ -25,7 +23,6 @@
         en: {
             shop_title: 'Cake Shop', shop_coins: 'Coins', shop_next: 'Next Stage ▶', shop_sale: 'SALE!', shop_max: 'MAX', shop_owned: 'Owned',
             shop_buy: 'Buy', shop_short: 'Not enough coins', shop_have: 'Your items', shop_none: 'Nothing yet',
-            item_seed: 'Topping Seeds', desc_seed: 'Cards get more toppings',
             item_heal: 'Extra AP', desc_heal: '+0.5 AP on stage clear (carries over)',
             item_spice: 'Target Spice', desc_spice: 'Target bonus +5%',
             item_charge: 'AP Charge', desc_charge: '+3 AP right now',
@@ -44,7 +41,6 @@
     // この回の品物をつくる
     function makeItems() {
         const R = state.run, n = UNIT_MAX, items = [];
-        items.push({ id: 'seed', lv: R.topLv, price: PRICE.seed, max: R.topLv >= LV_MAX });
         items.push({ id: 'heal', lv: R.healUp, price: PRICE.heal, max: R.healUp >= LV_MAX });
         items.push({ id: 'spice', lv: R.spiceLv, price: PRICE.spice, max: R.spiceLv >= LV_MAX });
         items.push({ id: 'charge', price: PRICE.charge });
@@ -52,7 +48,8 @@
         const shapes = []; for (let v = 1; v <= n; v++) if (!R.shapes[v]) shapes.push(v);
         const favs = []; for (let v = 1; v < n; v++) if (!R.favs[v]) favs.push(v);
         const pick = (a) => a[Math.floor(Math.random() * a.length)];
-        if (shapes.length) items.push({ id: 'shape', value: pick(shapes), price: PRICE.shape });
+        // かたちマスターは 2つ ならべる(ちがう大きさ)
+        for (let k = 0; k < 2 && shapes.length; k++) { const v = pick(shapes); shapes.splice(shapes.indexOf(v), 1); items.push({ id: 'shape', value: v, price: PRICE.shape }); }
         if (favs.length) items.push({ id: 'fav', value: pick(favs), price: PRICE.fav });
         // 半額セール(買えるものから1つ)
         const sale = items.filter(it => !it.max);
@@ -61,7 +58,6 @@
     }
     function owned() {
         const R = state.run, l = [];
-        if (R.topLv) l.push(`${T('item_seed')} Lv${R.topLv}`);
         if (R.healUp) l.push(`${T('item_heal')} Lv${R.healUp}`);
         if (R.spiceLv) l.push(`${T('item_spice')} Lv${R.spiceLv}`);
         Object.keys(R.shapes).forEach(v => l.push(`${T('item_shape')} ${fracText(+v)}`));
@@ -94,15 +90,14 @@
         const it = pool[i], R = state.run;
         if (!it || it.sold || it.max || state.coins < it.price) return;
         state.coins -= it.price;
-        if (it.id === 'seed') R.topLv++;
-        else if (it.id === 'heal') R.healUp++;
+        if (it.id === 'heal') R.healUp++;
         else if (it.id === 'spice') R.spiceLv++;
         else if (it.id === 'charge') { state.ap += 3; updateUI(); }
         else if (it.id === 'shape') { R.shapes[it.value] = true; it.sold = true; }
         else if (it.id === 'fav') { R.favs[it.value] = true; it.sold = true; }
-        if (it.id === 'seed' || it.id === 'heal' || it.id === 'spice') {
+        if (it.id === 'heal' || it.id === 'spice') {
             // Lvの上がる品物は、同じ回に続けて買えるように 値段と状態をつくりなおす
-            const lvKey = { seed: 'topLv', heal: 'healUp', spice: 'spiceLv' }[it.id], lv = R[lvKey];
+            const lvKey = { heal: 'healUp', spice: 'spiceLv' }[it.id], lv = R[lvKey];
             it.lv = lv; it.max = lv >= LV_MAX;
             it.price = PRICE[it.id];                  // 定額(セールは買ったら終わり。次からは定価)
             it.sale = false;
