@@ -7553,35 +7553,61 @@ const HERO_CLASS_STRENGTH_FACTOR = { // [ステージ2の倍率, ステージ7�
 // 　ステージ2〜7の目標：5% / 5% / 8% / 12% / 22% / 35%（終盤ほど手ごわい。人数が増えたぶん、1体あたりは大きく下げる必要があった）
 // ※魔物の経験値は人数に反比例させて総量を変えていない（heroKillXp）ので、魔物の成長は旧テストプレイのまま。進化の石の増加ぶんは、魔物を1〜10%強くして織り込んだ。
 // 進化の強化の圧縮(EVOLUTION_STAGE_STAT_SCALE)と装備の縮小(MATERIAL_TIER_MULT5)を反映して、2回目の測定をした値（1回目からの変化は約5%以内）
-// 【ステージごとの強さは、ステージ番号nの2次関数にのせる】
-// 以前は測定値をステージごとにバラバラの表で持っていたが、ステージを1つ調整するたびに隣のステージとの段差ができたため、
-// 「勇者1体あたりの強さの倍率」は常にステージ番号nの多項式（下のHERO_STAGE_STRENGTH_POLY）で決める。調整するときは係数だけを直す。
-//   倍率(n) = c0 + c1·n + c2·n²
-// 【係数の求め方】テストプレイ3回分の実データのダンジョンを再現して（本物の戦闘処理で何百回も戦わせて）、勇者が勝つ確率を測り、
-// プレイヤーが「ここまではいい感じ」と言ったS1〜S5の倍率（0.81/0.78/0.72/0.66/0.60）に、S6・S7を次の測定で足した点に2次関数を当てはめた。
-//  ・S6：倍率0.587では勇者の勝率が約30%（2回のダンジョンで一致）で手ごわすぎたため、0.55（約8%〜22%）に
-//  ・S7：倍率0.626だと、魔物の弱めのダンジョンでは勇者の勝率が100%（勇者が圧勝）。0.47で約35%（強いダンジョンでは0%）。
-//    S7のダンジョンの強さはプレイヤーごとの差がとても大きく（0.5で勇者勝率が約70%と0%）、1つの倍率ではどちらにも合わない。弱めの側に合わせた
-// 当てはめ後の倍率：S1〜S7＝0.82/0.77/0.72/0.67/0.61/0.54/0.47（最大のずれ0.01）。人数が増えるぶん、1体あたりを下げる形になっている
-const HERO_STAGE_STRENGTH_POLY = [0.8569, -0.0387, -0.0023]; // c0, c1, c2
-function heroStageStrengthTrim(stageNum){
-    return HERO_STAGE_STRENGTH_POLY.reduce((sum, c, k) => sum + c * Math.pow(stageNum, k), 0);
+// 【勇者の総合戦闘力は、「迷宮の強さがステージごとにどう伸びるか」の関数にのせる】
+// ① 迷宮の強さ（プレイヤーの出撃魔物の総合戦闘力）。総合戦闘力は √（全員のHP合計 × 全員の攻撃力の合計）で測る
+//    （攻撃力は物理・魔法の高いほう。装備込み）。テストプレイ4回分（洞窟・全クリア1回、S5/S7で全滅3回。全ステージ分）の出撃魔物から求め、
+//    ステージごとの平均（幾何平均）を、ステージ番号nの2次関数に当てはめた。最大のずれは約10%。
+//      実測の平均：S1〜S7 ＝ 83 / 196 / 320 / 634 / 928 / 1432 / 1846　→　関数：81 / 179 / 358 / 617 / 956 / 1375 / 1874
+//    ※魔物の数は部屋の定員（約33体）で頭打ちになるため、S4以降の伸びは1体ごとのLv・進化・装備で決まっている
+// ② 勇者側の総合戦闘力 ＝ 迷宮の強さの関数 × HERO_TEAM_POWER_RATIO。プレイヤーの実際のダンジョンに合わせて勇者を強くはしない
+//    （強いダンジョンを作った努力が報われなくなるため）。ステージごとの強さはこの関数だけで決まる。
+// ③ 勇者1体あたりの倍率（heroStageStrengthTrim）は、「勇者の人数（2→24体）と、基準編成（剣士・アーチャー・プリースト・盾騎士）の
+//    補正前の強さ」から、②の総合戦闘力になるように逆算する。人数やLvの式を変えても、総合戦闘力は変わらない。
+// 【比率の決め方】テストプレイの魔物をそのまま再現して実際の戦闘処理で戦わせ、S1〜S5が「いい感じ」だった従来の強さに近く、
+//    S6・S7が少し強かった（勇者が勝ちすぎた）。従来のステージ1体あたりの倍率は S1〜S7＝0.82/0.77/0.72/0.67/0.61/0.54/0.47 で、
+//    比率は 0.63/0.48/0.35/0.35/0.40/0.44/0.48 と、S6・S7だけ上がっていた。S3〜S5の比率（約0.35〜0.40）に近い0.36に統一した
+//    （S3・S4はほぼ従来どおり、S5は約10%、S6は約18%、S7は約24%、1体あたりが弱くなる。S1・S2は人数が少ないので、より弱くなる）。
+const DUNGEON_POWER_POLY = [62.14, -21.58, 40.06]; // c0, c1, c2：迷宮の強さ(n) = c0 + c1·n + c2·n²
+const HERO_TEAM_POWER_RATIO = 0.36; // 勇者の総合戦闘力 ÷ 迷宮の総合戦闘力
+const HERO_REFERENCE_PARTY = ['swordsman', 'archer', 'priest', 'shield_knight']; // 倍率を求めるときの基準編成（人数ぶん順に繰り返す）
+function dungeonPowerAtStage(stageNum){
+    return DUNGEON_POWER_POLY.reduce((sum, c, k) => sum + c * Math.pow(stageNum, k), 0);
 }
-function heroClassStrengthFactor(classKey, stageNum){
+// 職ごとの強さのそろえ（HERO_CLASS_STRENGTH_FACTOR。ステージ1は補正しない）。ステージごとの倍率は含まない
+function heroClassFactorRaw(classKey, stageNum){
     const f = HERO_CLASS_STRENGTH_FACTOR[classKey];
-    if (stageNum < 2) return heroStageStrengthTrim(stageNum); // ステージ1は職ごとの補正なし（全職共通の倍率だけ）
-    if (!f) return 1;
+    if (!f || stageNum < 2) return 1;
     const t = Math.min(1, (stageNum-2) / (STAGE_FINAL-2));
-    return Math.exp(Math.log(f[0]) + (Math.log(f[1])-Math.log(f[0])) * t) * heroStageStrengthTrim(stageNum);
+    return Math.exp(Math.log(f[0]) + (Math.log(f[1])-Math.log(f[0])) * t);
 }
-// 勇者の戦闘開始時のステータス（HPは2倍、攻撃系は人数に反比例する補正。ステージ・職ごとに決まる）。上の職ごとの強さのそろえを掛けた値
-function heroBattleStats(classKey, stageNum, lvMult){
+function heroStatsWithFactor(classKey, stageNum, lvMult, factor){
     const cls = heroClassInfo(classKey);
     const st = tierStats(...lerpHeroTier(cls, stageNum, lvMult));
     const offenseMult = heroOffenseMult(stageNum);
-    const f = heroClassStrengthFactor(classKey, stageNum);
     // lerpHeroTierは比率を保つため小数のまま補間しているので、ここで整数に丸めてHP表示の小数点を防ぐ
-    return { hp: Math.round(st.hp*HERO_HP_MULT*f), atk: Math.round(st.atk*offenseMult*f), def: Math.round(st.def*offenseMult*f), magAtk: Math.round(st.magAtk*offenseMult*f), magDef: Math.round(st.magDef*offenseMult*f) };
+    return { hp: Math.round(st.hp*HERO_HP_MULT*factor), atk: Math.round(st.atk*offenseMult*factor), def: Math.round(st.def*offenseMult*factor),
+        magAtk: Math.round(st.magAtk*offenseMult*factor), magDef: Math.round(st.magDef*offenseMult*factor) };
+}
+const heroStageTrimCache = {};
+function heroStageStrengthTrim(stageNum){
+    if (heroStageTrimCache[stageNum]===undefined){
+        let hp = 0, atk = 0;
+        const count = heroCountForStage(stageNum);
+        for (let i=0;i<count;i++){
+            const key = HERO_REFERENCE_PARTY[i % HERO_REFERENCE_PARTY.length];
+            const b = heroStatsWithFactor(key, stageNum, 1, heroClassFactorRaw(key, stageNum));
+            hp += b.hp; atk += Math.max(b.atk, b.magAtk);
+        }
+        heroStageTrimCache[stageNum] = HERO_TEAM_POWER_RATIO * dungeonPowerAtStage(stageNum) / Math.sqrt(hp * atk);
+    }
+    return heroStageTrimCache[stageNum];
+}
+function heroClassStrengthFactor(classKey, stageNum){
+    return heroClassFactorRaw(classKey, stageNum) * heroStageStrengthTrim(stageNum);
+}
+// 勇者の戦闘開始時のステータス（HPは2倍、攻撃系は人数に反比例する補正。ステージ・職ごとに決まる）。上の職ごとの強さのそろえを掛けた値
+function heroBattleStats(classKey, stageNum, lvMult){
+    return heroStatsWithFactor(classKey, stageNum, lvMult, heroClassStrengthFactor(classKey, stageNum));
 }
 // ストーリーの固定パーティごとの組み合わせの相性で、エリアによって強さがずれる（職ごとの補正では拾えない分）。
 // 人数は2〜24体なので、パーティの職を順番に繰り返して並べたもの（例：6体なら 剣士・アーチャー・A・B・剣士・アーチャー）を、
