@@ -45,18 +45,13 @@ const _GAME_LAYER_HTML = `
                     <div class="sp-lb"><i class="ico" data-ico="medal"></i><span data-i18n="label_max_score" data-noemo>さいだい スコア</span></div>
                     <div id="disp-max-score" class="sp-best">0</div>
                 </div>
-                <div class="sp-card">
-                    <div class="sp-lb"><i class="ico" data-ico="sword"></i><span data-i18n="lh_title">さいごの こうげき</span></div>
-                    <div class="sp-formula">
-                        <div class="t"><i class="ico" data-ico="sword"></i><b id="lh-a">–</b><span data-i18n="calc_t1">カード</span></div><div class="x">×</div>
-                        <div class="t"><i class="ico" data-ico="star"></i><b id="lh-b">–</b><span data-i18n="calc_t2">ほし</span></div><div class="x">×</div>
-                        <div class="t"><i class="ico" data-ico="hash"></i><b id="lh-c">–</b><span data-i18n="calc_t3">黄色の数字</span></div>
-                    </div>
-                    <div class="sp-eq">＝ <b id="lh-d">–</b> <span data-i18n="lh_dmg">ダメージ</span></div>
+                <div class="sp-card sp-coin">
+                    <div class="sp-lb"><i class="cn"></i><span data-i18n="label_coins" data-noemo>コイン</span></div>
+                    <div id="disp-coins" class="sp-coins">0</div>
                 </div>
-                <div class="sp-card sp-log">
-                    <div class="sp-lb"><i class="ico" data-ico="list"></i><span data-i18n="panel_battle_log" data-noemo>バトルログ</span></div>
-                    <div id="battle-log-entries"></div>
+                <div class="sp-card sp-powers">
+                    <div class="sp-lb"><i class="ico" data-ico="star"></i><span data-i18n="label_power" data-noemo>つよさ</span></div>
+                    <div id="disp-powers"></div>
                 </div>
             </div>
         </div>

@@ -15,7 +15,7 @@
     <title>たしざんカードバトル - Fun & Growth Lab</title>
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../fgl-hero.css?v=12">
-    <link rel="stylesheet" href="../braves-common.css?v=20261221">
+    <link rel="stylesheet" href="../braves-common.css?v=20261226">
     <style>
         .mon.boss { --c:#ff4d4d; }
         /* ロボのパーツ(150x150の箱に描いて縮小する。ボスは190x190) */
@@ -44,7 +44,6 @@ const PRESET_EASY = {
     enemyMin: 10, enemyMax: 15,
     bossMin: 10, bossMax: 18,
     enemyCount: 10, bossHP: 800,
-    initialTime: 10, timeRecovery: 5,
     gemProb: [30, 25, 20, 15, 10],
     hpBase: 45, hpStep: 10
 };
@@ -55,7 +54,6 @@ const PRESET_NORMAL = {
     enemyMin: 13, enemyMax: 18,
     bossMin: 13, bossMax: 21,
     enemyCount: 10, bossHP: 1050,
-    initialTime: 10, timeRecovery: 5,
     gemProb: [30, 25, 20, 15, 10],
     hpBase: 60, hpStep: 13
 };
@@ -66,13 +64,16 @@ const PRESET_HARD = {
     enemyMin: 16, enemyMax: 21,
     bossMin: 16, bossMax: 24,
     enemyCount: 10, bossHP: 1280,
-    initialTime: 10, timeRecovery: 5,
     gemProb: [30, 25, 20, 15, 10],
     hpBase: 70, hpStep: 16
 };
 
-const STAGE_CLEAR_TIME = { 1: [9, 10], 2: [7, 8], 3: [6, 7] };   // ステージ1〜2をクリアしたときの回復(★ごと)。3ステージのRUNをボットで測って決めた
-const BOSS_MIN_SCALE = { 1: 0.6, 2: 0.7, 3: 0.7 };   // ステージ1のボスHP(最後のステージのボスHPに対する割合)
+const ENEMY_ATK = {   // てきの こうげき力(1回の ダメージ)。n=ふつうのてき / b=ボス。ステージごとに nStep / bStep ずつ ふえる(四捨五入)。ボットで クリア率を測って決めた値(★1〜3 = 約62/23/9%)
+    1: { n: 1.1, nStep: 1.1, b: 1.8, bStep: 1.8 },
+    2: { n: 3.1, nStep: 1.2, b: 5, bStep: 1.9 },
+    3: { n: 4.25, nStep: 1.2, b: 6.8, bStep: 1.9 },
+};
+const BOSS_MIN_SCALE = { 1: 0.5, 2: 0.5, 3: 0.5 };   // ステージ1のボスHP(最後のステージのボスHPに対する割合)
 const ENEMY_COLORS = [
     { body:'#9b59b6', dark:'#7d3c98' },
     { body:'#3498db', dark:'#1a5276' },
@@ -94,11 +95,10 @@ const ROBOTS = [
 ];
 const ROBOT_BOSS = `<div class="ab" style="left:2px;top:50px;width:44px;height:60px;border-radius:14px;background:linear-gradient(135deg,#6f7fa8,#3a4668);box-shadow:0 8px 0 rgba(0,0,0,.25)"></div><div class="ab" style="left:144px;top:50px;width:44px;height:60px;border-radius:14px;background:linear-gradient(135deg,#6f7fa8,#3a4668);box-shadow:0 8px 0 rgba(0,0,0,.25)"></div><div class="ab" style="left:6px;top:100px;width:36px;height:70px;border-radius:12px;background:linear-gradient(#8a98bd,#4a577a)"></div><div class="ab" style="left:148px;top:100px;width:36px;height:70px;border-radius:12px;background:linear-gradient(#8a98bd,#4a577a)"></div><div class="ab rbm" style="left:32px;top:20px;width:126px;height:140px;border-radius:22px;background:linear-gradient(135deg,#d6dff5,#7d8fbe 55%,#4b5a86)"></div><div class="ab" style="left:50px;top:4px;width:12px;height:30px;background:#ff5d5d;border-radius:6px;box-shadow:0 0 12px #ff5d5d"></div><div class="ab" style="left:128px;top:4px;width:12px;height:30px;background:#ff5d5d;border-radius:6px;box-shadow:0 0 12px #ff5d5d"></div><div class="rbv" style="left:46px;top:42px;width:98px;height:70px;border-radius:16px;background:linear-gradient(#3a0a0a,#1a0505);border-color:#5a2a2a;box-shadow:inset 0 0 16px rgba(255,60,60,.5)"></div><div class="ab" style="left:60px;top:62px;width:28px;height:20px;background:#ff4d4d;box-shadow:0 0 12px #ff4d4d;clip-path:polygon(0 0,100% 40%,100% 100%,0 60%)"></div><div class="ab" style="left:102px;top:62px;width:28px;height:20px;background:#ff4d4d;box-shadow:0 0 12px #ff4d4d;clip-path:polygon(100% 0,0 40%,0 100%,100% 60%)"></div><div class="rbl" style="left:66px;top:94px;width:58px;height:6px;background:#ff4d4d;box-shadow:0 0 10px #ff4d4d"></div><div class="ab" style="left:60px;top:124px;width:70px;height:22px;border-radius:11px;background:#2b344d"></div>`;
 const GAME = {
-    stageCount: 3,                  // 1RUN=3ステージ(敵2体→ボス ×3)
-    clearBonus: 500,                // クリアしたRUNの得点に足すボーナス(九九ポーカーと同じ+500)
-    stagePick: [1, 4, 7],           // 世界(名前・色)は 元の7つのうち 1・4・7 番目を使う
-    sbGame: 'math_braves_addition_v2',
-    keys: { lang: 'mb_add_lang', lastStar: 'mb_add_last_star', ranking: d => `math_braves_ranking_v4_${d}`, clearCount: d => `math_braves_clears_v4_${d}` },
+    stageCount: 7,                  // 1RUN=7ステージ(各ステージ: 敵2体→ボス)。HP制: ステージクリアで ぜんかいふく→ショップ
+    clearBonus: 1000,               // クリアしたRUNの得点に足すボーナス
+    sbGame: 'math_braves_addition_v3',
+    keys: { lang: 'mb_add_lang', lastStar: 'mb_add_last_star', ranking: d => `math_braves_ranking_v5_${d}`, clearCount: d => `math_braves_clears_v5_${d}` },
     titleBots: [[4, 24, 545, 1.0, '#f1c40f'], [0, 1130, 545, 1.0, '#e74c3c']],
     // タイトルの主役: 大きな数字カードの扇(まん中の金のカードが答え)と演算のバッジ
     // タイトルの主役: 「3」と「7」のカードが合わさって「10」の光になり、10のまとカードをもつロボにぶつかる
@@ -125,13 +125,15 @@ const GAME = {
                 "calc_t3": "まとの数字",
                 "bl_cap": "⬆ まとカードと おなじ数字を つくって ぶつけよう！",
                 "hint_over": "99を こえちゃう",
-                "howto_p2": "2. カードを <strong>かさねる</strong>と かずが たされ<br>カードの <strong>⚔️</strong> が ふえるよ。<br>⚔️が おおいほど ダメージが アップ！<br>かさねると <strong>のこり じかん</strong>が へるよ。",
+                "howto_p2": "2. カードを <strong>かさねる</strong>と かずが たされ<br>カードの <strong>⚔️</strong> が ふえるよ。<br>⚔️が おおいほど ダメージが アップ！<br>かさねると <strong>てきが こうげき</strong>して、<strong>HP</strong>が へるよ。",
                 "howto_p3": "3. <strong>ダメージ = ⚔️ × ⭐ × かず</strong><br>まとカードの <strong>⭐</strong> が おおいほど<br>ダメージが たかくなるよ。",
-                "howto_p6": "6. <strong>ボス</strong>を たおすと ステージクリア！<br>3つの ステージを クリアして<br>ラスボスを たおそう！",
+                "howto_p4": "4. いらないカードは したの <strong>すてば</strong> へ。<br>すてても <strong>てきが こうげき</strong>してくるよ。<br>（てきに こうげきした ときは こないよ）",
+                "howto_p5": "5. てきに ダメージを あたえると<br>おなじ数の <strong>コイン</strong>が もらえるよ。<br>ステージクリアで <strong>HPが ぜんかいふく</strong>して<br><strong>ショップ</strong>で どうぐが かえるよ。",
+                "howto_p6": "6. <strong>ボス</strong>を たおすと ステージクリア！<br>7つの ステージを クリアして<br>ラスボスを たおそう！",
                 "title_subtitle": "- たしざんカードバトル -",
                 "damage_log": "⚔️×{stack} × ⭐×{gem} × <b>{val}</b> = <b style=\"color:#ffd24a\">{damage} ダメージ</b>",
                 "title_plaque": "たしざんカードバトル",
-                "run_normal_desc": "3つのステージを進んで、ラスボスをたおそう！",
+                "run_normal_desc": "7つのステージを進んで、ラスボスをたおそう！",
                 "stage_name_1": "はじまりの工場",
                 "stage_name_2": "ネオンのみなと",
                 "stage_name_3": "ゆうやけの鉄橋",
@@ -145,13 +147,15 @@ const GAME = {
                 "calc_t3": "まとの かず",
                 "bl_cap": "⬆ まとカードと おなじ かずを つくって ぶつけよう！",
                 "hint_over": "99を こえちゃう",
-                "howto_p2": "2. カードを <strong>かさねる</strong>と かずが たされ<br>カードの <strong>⚔️</strong> が ふえるよ。<br>⚔️が おおいほど ダメージが アップ！<br>かさねると <strong>のこり じかん</strong>が へるよ。",
+                "howto_p2": "2. カードを <strong>かさねる</strong>と かずが たされ<br>カードの <strong>⚔️</strong> が ふえるよ。<br>⚔️が おおいほど ダメージが アップ！<br>かさねると <strong>てきが こうげき</strong>して、<strong>HP</strong>が へるよ。",
                 "howto_p3": "3. <strong>ダメージ = ⚔️ × ⭐ × かず</strong><br>まとカードの <strong>⭐</strong> が おおいほど<br>ダメージが たかくなるよ。",
-                "howto_p6": "6. <strong>ボス</strong>を たおすと ステージクリア！<br>3つの ステージを クリアして<br>ラスボスを たおそう！",
+                "howto_p4": "4. いらないカードは したの <strong>すてば</strong> へ。<br>すてても <strong>てきが こうげき</strong>してくるよ。<br>（てきに こうげきした ときは こないよ）",
+                "howto_p5": "5. てきに ダメージを あたえると<br>おなじ かずの <strong>コイン</strong>が もらえるよ。<br>ステージクリアで <strong>HPが ぜんかいふく</strong>して<br><strong>ショップ</strong>で どうぐが かえるよ。",
+                "howto_p6": "6. <strong>ボス</strong>を たおすと ステージクリア！<br>7つの ステージを クリアして<br>ラスボスを たおそう！",
                 "title_subtitle": "- たしざんカードバトル -",
                 "damage_log": "⚔️×{stack} × ⭐×{gem} × <b>{val}</b> = <b style=\"color:#ffd24a\">{damage} ダメージ</b>",
                 "title_plaque": "たしざんカードバトル",
-                "run_normal_desc": "3つの ステージを すすんで、ラスボスを たおそう！",
+                "run_normal_desc": "7つの ステージを すすんで、ラスボスを たおそう！",
                 "stage_name_1": "はじまりの こうじょう",
                 "stage_name_2": "ネオンの みなと",
                 "stage_name_3": "ゆうやけの てっきょう",
@@ -165,13 +169,15 @@ const GAME = {
                 "calc_t3": "Number",
                 "bl_cap": "⬆ Make the same number as a target card and hit it!",
                 "hint_over": "Over 99!",
-                "howto_p2": "2. <strong>Stacking</strong> cards adds up the numbers<br>and increases the card's <strong>⚔️</strong>.<br>More ⚔️ means more damage!<br>Stacking also uses up <strong>time</strong>.",
+                "howto_p2": "2. <strong>Stacking</strong> cards adds up the numbers<br>and increases the card's <strong>⚔️</strong>.<br>More ⚔️ means more damage!<br>Stacking lets the enemy <strong>attack</strong>, and you lose <strong>HP</strong>.",
                 "howto_p3": "3. <strong>Damage = ⚔️ × ⭐ × number</strong><br>The more <strong>⭐</strong> a target card has,<br>the higher the damage.",
-                "howto_p6": "6. Defeat the <strong>boss</strong> to clear the stage!<br>Clear all 3 stages and beat<br>the final boss!",
+                "howto_p4": "4. Drag unwanted cards to the <strong>discard area</strong>.<br>Discarding also lets the enemy <strong>attack</strong>.<br>(No attack when you hit an enemy.)",
+                "howto_p5": "5. Dealing damage earns the same number of <strong>coins</strong>.<br>Clearing a stage <strong>fully heals your HP</strong><br>and opens the <strong>shop</strong>.",
+                "howto_p6": "6. Defeat the <strong>boss</strong> to clear the stage!<br>Clear all 7 stages and beat<br>the final boss!",
                 "title_subtitle": "- Addition Card Battle -",
                 "damage_log": "⚔️×{stack} × ⭐×{gem} × <b>{val}</b> = <b style=\"color:#ffd24a\">{damage} DMG</b>",
                 "title_plaque": "Addition Card Battle",
-                "run_normal_desc": "Clear 3 stages and beat the final boss!",
+                "run_normal_desc": "Clear 7 stages and beat the final boss!",
                 "stage_name_1": "Starter Factory",
                 "stage_name_2": "Neon Harbor",
                 "stage_name_3": "Sunset Bridge",
@@ -185,9 +191,9 @@ const GAME = {
 </script>
 <script src="../fgl-hero.js?v=12"></script>
 <script src="../fgl-name.js?v=20261223"></script>
-<script src="../braves-common.js?v=20261223"></script>
-<script src="../braves-battle.js?v=20261008"></script>
-<script src="../braves-run.js?v=20261221"></script>
+<script src="../braves-common.js?v=20261226"></script>
+<script src="../braves-battle.js?v=20261226"></script>
+<script src="../braves-run.js?v=20261226"></script>
 <script>
 function startTutorial() {
     FGLTutorial.begin({ root: '#container', getLang: () => currentLang });
@@ -213,7 +219,8 @@ function startTutorial() {
     // 手順どおりの操作だけ許すための、ぴったりの範囲(余白なし)
     const cardP = (c) => ({ sel: CV, rect: [c.baseX, c.baseY, c.width, c.height], of: [canvas.width, canvas.height], pad: 0 });
     const yellowP = (i) => () => { const r = state.enemies[0].getCardRect(i); return { sel: CV, rect: [r.x, r.y, r.w, r.h], of: [canvas.width, canvas.height], pad: 0 }; };
-    const timeR = () => cv(16, 16, 88, 88);
+    const hpR = () => cv(10, 8, 246, 70);
+    const coinR = '.sp-coin';
     const discardR = () => cv(0, state.height * 0.87, state.width, state.height * 0.13);
     const settle = () => FGLTutorial.wait(() => !state.dragInfo && !state.flyingCards.length && !state.inputLocked, 6000);
     FGLTutorial.run([
@@ -255,14 +262,18 @@ function startTutorial() {
             easy: '10のカードを、まとカード「10」にドラッグしてぶつけよう！',
             en: 'Drag your 10 card onto the target "10" card!' } },
         { type: 'run', fn: settle },
-        { type: 'say', target: timeR, pos: 'bottom', text: {
-            ja: '大ダメージ！ ここは「のこり時間」。カードを使うたびに1へって、0になるとゲームオーバー。てきをたおすと時間が回復するよ。',
-            easy: 'だいダメージ！ ここは「のこりじかん」。カードをつかうたびに1へって、0になるとゲームオーバー。てきをたおすとじかんがかいふくするよ。',
-            en: 'Big damage! This is the time left. Every card you use costs 1, and at 0 it\'s game over. Defeating an enemy restores time.' } },
+        { type: 'say', target: hpR, pos: 'bottom', text: {
+            ja: '大ダメージ！ ここは あなたの「HP」。カードを重ねたり捨てたりするたびに、てきが こうげきしてきて HP が へるよ。0になるとゲームオーバー！ ステージをクリアすると ぜんかいふくするよ。',
+            easy: 'だいダメージ！ ここは あなたの「HP」。カードをかさねたり すてたりするたびに、てきが こうげきしてきて HP が へるよ。0になるとゲームオーバー！ ステージをクリアすると ぜんかいふくするよ。',
+            en: 'Big damage! This is your HP. Every time you stack or discard a card, the enemy attacks and your HP drops. At 0 it\'s game over! Clearing a stage fully restores it.' } },
         { type: 'say', target: discardR, pos: 'top', text: {
-            ja: 'いらないカードは、下のグレーの場所にドラッグして捨てられるよ（時間は1へる）。手札を入れかえたいときに使おう。',
-            easy: 'いらないカードは、したのグレーのばしょにドラッグしてすてられるよ（じかんは1へる）。てふだをいれかえたいときにつかおう。',
-            en: 'Drag unwanted cards to the gray area at the bottom to discard them (costs 1 time). Use it to swap your hand.' } }]);
+            ja: 'いらないカードは、下のグレーの場所にドラッグして捨てられるよ（てきの こうげきを うけるよ）。手札を入れかえたいときに使おう。てきに こうげきしたときは、てきの こうげきは こないよ。',
+            easy: 'いらないカードは、したのグレーのばしょにドラッグしてすてられるよ（てきの こうげきを うけるよ）。てふだをいれかえたいときにつかおう。てきにこうげきしたときは、てきのこうげきは こないよ。',
+            en: 'Drag unwanted cards to the gray area at the bottom to discard them (the enemy will attack). Use it to swap your hand. When you hit an enemy, it does not attack back.' } },
+        { type: 'say', target: coinR, pos: 'top', text: {
+            ja: 'てきに あたえた ダメージと おなじ数の「コイン」が もらえるよ。ステージをクリアすると「ショップ」が ひらいて、コインで こうげきアップ・ガード・さいだいHPアップの どうぐが かえるよ！',
+            easy: 'てきに あたえた ダメージと おなじかずの「コイン」が もらえるよ。ステージをクリアすると「ショップ」が ひらいて、コインで こうげきアップ・ガード・さいだいHPアップの どうぐが かえるよ！',
+            en: 'You earn coins equal to the damage you deal. When you clear a stage the shop opens, and you can spend coins on attack boosts, guard and max HP!' }}]);
 }
 </script>
 </body>

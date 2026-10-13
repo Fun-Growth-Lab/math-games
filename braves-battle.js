@@ -7,6 +7,70 @@ function getEnemyConfig(type) {
 }
 
 
+// ===== HP制+ショップ(たしざん/ひきざん) =====
+// 「残り時間」のかわりに「じぶんのHP」。手札をかさねる/すてるたびに、てきが こうげきしてくる(ガードで ふせげる)。
+// てきを たおすと、あたえたダメージと おなじ数の「コイン」がもらえ、ステージクリアで HP が ぜんかいふくして ショップが ひらく。
+const PLAYER_HP = 100;           // はじめのHP(ステージをクリアすると ぜんかいふく)
+const HP_UP = 20;                // 「さいだいHPアップ」1つぶん
+const GUARD_CAP = 0.7;           // ガードの かくりつの うえげん
+const SHOP_PRICE = Object.assign({ hp: 500, atk: 300, guard: 250 }, GAME.shopPrice || {});   // hp: さいだいHP+20 / atk: こうげき+10%ごと / guard: ガード5%ごと
+const SHOP_SALE = 0.7;           // 5つのうち1つだけ 30%オフ
+const SHOP_ITEMS = (() => {
+    const l = [{ id: 'hp', kind: 'hp', n: 1 }];
+    for (let i = 1; i <= 10; i++) l.push({ id: 'a' + i, kind: 'atk', n: i });       // こうげき +10%〜+100%
+    for (let i = 1; i <= 10; i++) l.push({ id: 'g' + i, kind: 'guard', n: i });     // ガード 5%〜50%
+    return l;
+})();
+function shopItemPrice(it) { return it.kind === 'hp' ? SHOP_PRICE.hp : it.kind === 'atk' ? SHOP_PRICE.atk * it.n : SHOP_PRICE.guard * it.n; }
+
+(function addBattleStrings() {
+    const S = {
+        ja: {
+            label_hp: 'HP', label_coins: 'コイン', label_power: 'つよさ',
+            pw_atk: 'こうげき +{n}%', pw_guard: 'ガード {n}%', pw_hp: 'さいだいHP {n}', pw_none: 'まだ なし',
+            guard_text: 'ガード！',
+            shop_title: 'ショップ', shop_sub: 'コインで どうぐを かおう！ 1つだけ 30%オフ！',
+            shop_hp_name: 'さいだいHP +{n}', shop_hp_desc: 'さいだいHPが {n} ふえる',
+            shop_atk_name: 'こうげき +{n}%', shop_atk_desc: 'ダメージが {n}% あがる',
+            shop_guard_name: 'ガード {n}%', shop_guard_desc: 'てきの こうげきを {n}% の かくりつで ふせぐ',
+            shop_sale: '30%オフ', shop_buy: 'かう', shop_sold: 'かった！', shop_short: 'コインが たりない', shop_next: 'つぎの ステージへ ▶',
+            shop_have: 'もっている コイン', shop_stage: 'ステージ {n} クリア！',
+            sc_hp_full: 'HP', sc_hp_full_v: 'ぜんかいふく！', sc_coins: 'もっている コイン',
+            btn_next_stage: 'ショップへ ▶',
+            bd_time: 'のこりHP',
+        },
+        simple: {
+            label_hp: 'HP', label_coins: 'コイン', label_power: 'つよさ',
+            pw_atk: 'こうげき +{n}%', pw_guard: 'ガード {n}%', pw_hp: 'さいだいHP {n}', pw_none: 'まだ なし',
+            guard_text: 'ガード！',
+            shop_title: 'ショップ', shop_sub: 'コインで どうぐを かおう！ 1つだけ 30%オフ！',
+            shop_hp_name: 'さいだいHP +{n}', shop_hp_desc: 'さいだいHPが {n} ふえる',
+            shop_atk_name: 'こうげき +{n}%', shop_atk_desc: 'ダメージが {n}% あがる',
+            shop_guard_name: 'ガード {n}%', shop_guard_desc: 'てきの こうげきを {n}% の かくりつで ふせぐ',
+            shop_sale: '30%オフ', shop_buy: 'かう', shop_sold: 'かった！', shop_short: 'コインが たりない', shop_next: 'つぎの ステージへ ▶',
+            shop_have: 'もっている コイン', shop_stage: 'ステージ {n} クリア！',
+            sc_hp_full: 'HP', sc_hp_full_v: 'ぜんかいふく！', sc_coins: 'もっている コイン',
+            btn_next_stage: 'ショップへ ▶',
+            bd_time: 'のこりHP',
+        },
+        en: {
+            label_hp: 'HP', label_coins: 'Coins', label_power: 'Power-ups',
+            pw_atk: 'Attack +{n}%', pw_guard: 'Guard {n}%', pw_hp: 'Max HP {n}', pw_none: 'None yet',
+            guard_text: 'Guard!',
+            shop_title: 'Shop', shop_sub: 'Spend your coins! One item is 30% off!',
+            shop_hp_name: 'Max HP +{n}', shop_hp_desc: 'Max HP goes up by {n}',
+            shop_atk_name: 'Attack +{n}%', shop_atk_desc: 'Damage goes up by {n}%',
+            shop_guard_name: 'Guard {n}%', shop_guard_desc: '{n}% chance to block an enemy attack',
+            shop_sale: '30% OFF', shop_buy: 'Buy', shop_sold: 'Bought!', shop_short: 'Not enough coins', shop_next: 'Next Stage ▶',
+            shop_have: 'Your coins', shop_stage: 'Stage {n} clear!',
+            sc_hp_full: 'HP', sc_hp_full_v: 'Fully restored!', sc_coins: 'Your coins',
+            btn_next_stage: 'To the Shop ▶',
+            bd_time: 'HP left',
+        },
+    };
+    Object.keys(S).forEach(l => { if (STRINGS[l]) Object.assign(STRINGS[l], S[l]); });
+})();
+
 class Card {
     constructor(slotIndex) {
         this.slotIndex = slotIndex;
@@ -190,7 +254,13 @@ function initGame() {
     state.score = 0;
     state.lastScore = 0;
     state.maxScore = 0;
-    state.time = CONFIG.initialTime;
+    state.maxHp = PLAYER_HP;       // HP制: ステージクリアで ぜんかいふく。ショップで さいだいHPが ふえる
+    state.hp = PLAYER_HP;
+    state.coins = 0;               // コイン(あたえたダメージと おなじ数だけ もらえる)
+    state.atkBonus = 0;            // ショップで かった こうげきアップの ごうけい(0.3 = +30%)
+    state.guard = 0;               // ショップで かった ガードの かくりつの ごうけい
+    state.hpBought = 0;            // さいだいHPアップを かった数
+    state.time = 0;
     state.stage = 1;
     state.normalKills = 0;
     state.runMode = false;
@@ -215,6 +285,7 @@ function initGame() {
     state.battleLog = [];
     clearBattleLog();
     resetLastHit();
+    SP.powerSig = '';
 
     hideAllOverlays();
     clearBattleLayer();
@@ -261,7 +332,6 @@ function refillEnemies() {
         state.bossSpawned = true;
         state.bossTurnCount = 0;
         setBattleBackground(true);
-        addBattleLog(T('boss_appear'));
         updateUI();
         return;
     }
@@ -274,7 +344,7 @@ function refillEnemies() {
     }
 }
 
-const SP = { enemySig: '', scoreSig: -1 };
+const SP = { enemySig: '', scoreSig: -1, coinSig: -1, powerSig: '' };
 function updateUI() {
     ui.playerNameDisplay.textContent = state.playerName;
     document.getElementById('sp-av').textContent = Array.from(state.playerName || '?')[0];
@@ -299,46 +369,40 @@ function updateUI() {
     }
     ui.maxScore.textContent = state.maxScore;
     ui.totalScore.textContent = state.score;
+    const coinEl = document.getElementById('disp-coins');
+    if (coinEl && SP.coinSig !== state.coins) {
+        if (SP.coinSig >= 0 && state.coins > SP.coinSig) { coinEl.classList.remove('bump'); void coinEl.offsetWidth; coinEl.classList.add('bump'); }
+        SP.coinSig = state.coins; coinEl.textContent = state.coins;
+    }
+    updatePowerUI();
     if (SP.scoreSig !== state.score) {
         if (SP.scoreSig >= 0 && state.score > SP.scoreSig) { ui.totalScore.classList.remove('bump'); void ui.totalScore.offsetWidth; ui.totalScore.classList.add('bump'); }
         SP.scoreSig = state.score;
     }
 }
 
-function consumeTime() {
-    if (state.isGameClearProcessing || state.inputLocked) return;
-
-    state.time--;
-    state.totalConsumedTime++; 
-    if (state.time < 0) state.time = 0;
-    
-    updateUI();
-
-    if (state.time === 0 && !state.isGameOverProcessing) {
-        state.isGameOverProcessing = true;
-        state.inputLocked = true;
-        setTimeout(() => {
-            if (state.screen === 'PLAYING') {
-                gameOver();
-            }
-        }, 500); 
-    }
+// 買った どうぐ(つよさ)の 表示
+function powerLines() {
+    const l = [];
+    if (state.atkBonus > 0) l.push(T('pw_atk', { n: Math.round(state.atkBonus * 100) }));
+    if (state.guard > 0) l.push(T('pw_guard', { n: Math.round(state.guard * 100) }));
+    if (state.hpBought > 0) l.push(T('pw_hp', { n: state.maxHp }));
+    return l;
 }
-
-function addTime(amount) {
-    if (state.isGameClearProcessing) return;
-    state.time += amount;
-    const effectX = 62;
-    const effectY = 150; 
-    state.particles.push(new Particle(effectX, effectY, T('time_bonus_particle', {amount}), '#2ecc71', 'text'));
-    updateUI();
+function updatePowerUI() {
+    const el = document.getElementById('disp-powers');
+    if (!el) return;
+    const l = powerLines(), sig = l.join('|') + '#' + currentLang;
+    if (SP.powerSig === sig) return;
+    SP.powerSig = sig;
+    el.innerHTML = l.length ? l.map(t => `<div class="pw">${t}</div>`).join('') : `<div class="pw none">${T('pw_none')}</div>`;
 }
 
 function scoreParticleFontSize(damage) {
     return Math.min(66, Math.floor(26 + Math.sqrt(damage) * 1.5));
 }
 
-// ── バトルログ ──────────────────────────────
+// ── バトルログ(右のパネルはなくしたので、あれば出す・なければ何もしない) ──
 function addBattleLog(html) {
     const el = document.getElementById('battle-log-entries');
     if (!el) return;
@@ -355,39 +419,31 @@ function clearBattleLog() {
     if (el) el.innerHTML = '';
 }
 
-// ── ボス攻撃 ────────────────────────────────
-function bossDamageTime() {
-    if (state.isGameClearProcessing || state.inputLocked) return;
-    state.time = Math.max(0, state.time - 1);
-    updateUI();
-    if (state.time === 0 && !state.isGameOverProcessing) {
-        state.isGameOverProcessing = true;
-        state.inputLocked = true;
-        setTimeout(() => { if (state.screen === 'PLAYING') gameOver(); }, 500);
-    }
-}
-function triggerBossAttack() {
-    if (!state.boss || state.boss.isDefeated || state.isGameClearProcessing || state.inputLocked) return;
-    state.bossAttackEffect = 16;
-    fxBossFlash();
-    bossDamageTime();
-    addBattleLog(T('boss_attack_log'));
-    // ダメージ受けエフェクト（パーティクル）
-    state.particles.push(new Particle(state.width / 2, state.height / 2, '💥', '#ef5350', 'text', 48));
-}
-
-function drawHUD(ctx) {
-    ctx.textAlign = 'center';
-
-    // のこり（上部に詰めて表示）
-    ctx.fillStyle = '#666';
-    ctx.font = '800 15px "M PLUS Rounded 1c"';
-    ctx.textBaseline = 'alphabetic';
-    ctx.fillText(T('canvas_time_left'), state.width / 2, 26);
-
-    ctx.fillStyle = state.time <= 3 ? '#ef5350' : '#555';
-    ctx.font = '800 58px "M PLUS Rounded 1c"';
-    ctx.fillText(state.time, state.width / 2, 82);
+// ── てきの こうげき ────────────────────────────
+// 手札を「かさねる」「すてる」たびに、いまのてきが こうげきしてくる(てきを こうげきしたときは こない)。
+// ガードのかくりつに あたると、ダメージは 0。HPが 0 になると ゲームオーバー
+function enemyAttack() {
+    if (state.isGameClearProcessing || state.isGameOverProcessing || state.screen !== 'PLAYING') return;
+    const foe = state.enemies.find(e => !e.isDefeated);
+    if (!foe) return;
+    setTimeout(() => {   // 自分の動きを見せてから こうげき
+        if (state.screen !== 'PLAYING' || state.isGameClearProcessing || state.isGameOverProcessing || foe.isDefeated) return;
+        const dmg = Math.max(1, (foe.isBoss ? CONFIG.atkBoss : CONFIG.atkNormal) || (foe.isBoss ? 6 : 4));
+        if (state.guard > 0 && Math.random() < state.guard) {
+            fxHpNote(T('guard_text'), '#4fc3f7');
+            if (BL.hpBox) { BL.hpBox.classList.remove('guard'); void BL.hpBox.offsetWidth; BL.hpBox.classList.add('guard'); }
+            if (foe._mon) { foe._mon.classList.remove('atk'); void foe._mon.offsetWidth; foe._mon.classList.add('atk'); }
+            return;
+        }
+        state.hp = Math.max(0, state.hp - dmg);
+        fxHurt(dmg, foe);
+        updateUI();
+        if (state.hp <= 0 && !state.isGameOverProcessing) {
+            state.isGameOverProcessing = true;
+            state.inputLocked = true;
+            setTimeout(() => { if (state.screen === 'PLAYING') gameOver(); }, 700);
+        }
+    }, 140);
 }
 
 function getEventPos(e) {
@@ -476,7 +532,7 @@ function onUp(e) {
             const checkVal = enemy.values[hitJ];
             if (card.value === checkVal) {
                 const gemCount = enemy.gemCounts[hitJ];
-                const damage   = GAME.rules.damage(card, gemCount, checkVal);
+                const damage   = Math.round(GAME.rules.damage(card, gemCount, checkVal) * (1 + state.atkBonus));   // ショップの こうげきアップ
 
                 // 手札カードがまとカードへ突っ込むエフェクト
                 const tRect = enemy.getCardRect(hitJ);
@@ -487,18 +543,16 @@ function onUp(e) {
                 ));
 
                 enemy.hitFrames = 16;
-                showLastHit(card.stackCount, gemCount, GAME.rules.damageNumber(checkVal), damage);
                 state.score += damage;
+                state.coins += damage;                 // コイン = あたえたダメージ(スコア)と おなじ数
                 state.lastScore = damage;
                 if (damage > state.maxScore) state.maxScore = damage;
-                addBattleLog(T('damage_log', {stack: card.stackCount, gem: gemCount, val: checkVal, damage}));
 
                 const scoreFs = scoreParticleFontSize(damage);
                 state.particles.push(new Particle(enemy.x + enemy.width / 2, enemy.y, `+${damage}`, '#ffca28', 'text', scoreFs));
                 state.particles.push(new Particle(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, "", "#ef5350", "circle"));
 
-                state.cards[idx] = null;
-                if (state.time > 0) state.time -= 1;
+                state.cards[idx] = null;                // こうげきは ただ(てきの こうげきは こない)
 
                 enemy.hp -= damage;
 
@@ -507,7 +561,6 @@ function onUp(e) {
                     enemy.isDefeated = true;
                 } else {
                     enemy.reroll(hitJ);
-                    if (enemy.isBoss) addTime(3);
                 }
                 actionDone = true;
             }
@@ -531,7 +584,7 @@ function onUp(e) {
                     target.value = newValue;
                     target.stackCount += card.stackCount;
                     state.cards[idx] = null;
-                    consumeTime();
+                    enemyAttack();                  // かさねるたびに、てきが こうげき
                     actionDone = true;
                     state.particles.push(new Particle(target.x + target.width/2, target.y + target.height/2, "", "#29b6f6", "circle"));
                 }
@@ -544,7 +597,7 @@ function onUp(e) {
         if (cy > state.height * 0.87) {
             state.forbiddenValue = state.cards[idx].value;
             state.cards[idx] = null;
-            consumeTime();
+            enemyAttack();                          // すてるたびに、てきが こうげき
             actionDone = true;
         }
     }
@@ -553,14 +606,6 @@ function onUp(e) {
         refillCards();
         refillEnemies();
         updateUI();
-        // ボスが生きていればターンカウント（２ターンに１回攻撃）
-        if (state.boss && !state.boss.isDefeated && !state.isGameClearProcessing) {
-            state.bossTurnCount++;
-            if (state.bossTurnCount >= 2) {
-                state.bossTurnCount = 0;
-                setTimeout(() => triggerBossAttack(), 350);
-            }
-        }
     } else {
         card.isDragging = false;
     }
@@ -591,7 +636,7 @@ function gameLoop() {
     // HP スムーズアニメーション（displayHp → hp へ徐々に近づける）
     state.enemies.forEach(enemy => {
         if (enemy.displayHp > enemy.hp) {
-            const speed = Math.max(1, (enemy.displayHp - enemy.hp) * 0.07);
+            const speed = Math.max(3, (enemy.displayHp - enemy.hp) * 0.3, enemy.maxHp / 40);   // ゲージは 0.3 秒ほどで 減りきる
             enemy.displayHp -= speed;
             if (enemy.displayHp < enemy.hp) enemy.displayHp = enemy.hp;
         }
@@ -613,11 +658,10 @@ function gameLoop() {
                     const idx = state.enemies.indexOf(deadEnemy);
                     if (idx >= 0) state.enemies.splice(idx, 1);
                     state.boss = null;
-                    setTimeout(() => { onBossDefeated(); }, 900);
-                }, 500);
+                    setTimeout(() => { onBossDefeated(); }, 450);
+                }, 250);
             } else {
                 state.enemies.splice(i, 1);
-                addTime(CONFIG.timeRecovery);
                 state.defeatedCount++;
                 state.normalKills++;
                 refillEnemies();
@@ -653,16 +697,18 @@ function gameLoop() {
 // しばり(RUNの種類)は骨格ができてから増やす予定。今は「ふつう」だけ。
 const STAR_PRESETS = { 1: PRESET_EASY, 2: PRESET_NORMAL, 3: PRESET_HARD };
 const STAGE_ENEMIES = 2;      // 1ステージの通常の敵の数
-// ステージクリアでもらえる残り時間(★ごと・ステージが進むほど増える)。ボット・シミュレーションで「ザコは序盤1撃→後半は複数回」「ボスは4〜9回」「AP残りはギリギリ」になるよう決めた値。ルールを変えたら測り直す
-
-// ステージ st をクリアしたときにもらえる残り時間(RUN共通のステージ演出から呼ばれる)
-function stageClearTime(st) { return STAGE_CLEAR_TIME[state.star][st - 1]; }
+// てきの こうげき力(ENEMY_ATK はゲーム側で定義: n=ふつうのてき / nStep=ステージごとの増え方 / b=ボス / bStep)。ボット・シミュレーションで クリア率を測って決めた値。ルールを変えたら測り直す
 
 function configForStage(star, stage) {
     const base = STAR_PRESETS[star] || PRESET_NORMAL;
     const lo = BOSS_MIN_SCALE[star] || 0.3;
     const bossScale = lo + (1 - lo) * (stage - 1) / (STAGE_COUNT - 1);   // ボスのHPはステージごとに増えて、最後は元のボスHP
-    return Object.assign({}, base, { bossHP: Math.max(50, Math.round(base.bossHP * bossScale / 10) * 10) });
+    const a = (typeof ENEMY_ATK !== 'undefined' && ENEMY_ATK[star]) || { n: 4, nStep: 0.4, b: 6, bStep: 0.7 };
+    return Object.assign({}, base, {
+        bossHP: Math.max(50, Math.round(base.bossHP * bossScale / 10) * 10),
+        atkNormal: Math.max(1, Math.round(a.n + a.nStep * (stage - 1))),
+        atkBoss: Math.max(1, Math.round(a.b + a.bStep * (stage - 1))),
+    });
 }
 
 let loopActive = false;
@@ -708,7 +754,8 @@ function onBossDefeated() {
     const stageScore = state.score - state.stageStartScore;
     state.stageScores[st - 1] = stageScore;
     if (st >= STAGE_COUNT) { gameClear(); return; }
-    state.time += stageClearTime(st);
+    state.hp = state.maxHp;                  // ステージクリアで HP ぜんかいふく
+    if (BL.hpBox) { BL.hpBox.classList.remove('heal'); void BL.hpBox.offsetWidth; BL.hpBox.classList.add('heal'); }
     updateUI();
     showStageClear(st, stageScore);
 }
@@ -718,7 +765,7 @@ function finishRun(cleared) {
     state.screen = cleared ? 'CLEAR' : 'GAMEOVER';
     ui.btnToTitle.classList.add('hidden');
     if (!cleared) state.stageScores[state.stage - 1] = state.score - state.stageStartScore;
-    const timeBonus = state.time * 100;
+    const timeBonus = state.hp * 10;         // のこりHPボーナス(HPが多いほど たかい)
     const maxScoreBonus = state.maxScore * 2;
     const clearBonus = cleared ? (GAME.clearBonus || 0) : 0;      // クリアボーナス(GAME.clearBonus。九九ポーカーと同じく、クリアした RUN の得点に足す)
     const finalScore = state.score + timeBonus + maxScoreBonus + clearBonus;
@@ -735,7 +782,7 @@ function gameClear() { finishRun(true); }
 // ============================================================
 // canvasは「入力を受けるだけ」の透明な面。見た目はすべて #bl の中のDOM(CSS)で描く。
 // 座標は今までのcanvasと同じ(ゲームエリア内のpx)なので、当たり判定・チュートリアルの位置指定はそのまま使える。
-const BL = { layer: null, lane: null, cap: null, capTx: null, ap: null, apNum: null, apLb: null, hint: null, trash: null, trashTx: null, hand: [], lastTime: -1, lastLane: '' };
+const BL = { layer: null, lane: null, cap: null, capTx: null, hpBox: null, hpFl: null, hpNm: null, hpLb: null, hint: null, trash: null, trashTx: null, hand: [], lastHp: -1, lastLane: '' };
 function initBattleLayer() {
     const area = document.getElementById('game-area');
     const layer = document.createElement('div');
@@ -744,7 +791,7 @@ function initBattleLayer() {
         <div class="bl-lane"></div>
         <div class="bl-cap"><b></b></div>
         <div class="bl-trash"><span class="ic">${ICO.trash}</span><span class="tx"></span></div>
-        <div class="bl-ap"><span class="lb"></span><span class="nm">0</span></div>
+        <div class="bl-hp"><div class="hl"><span class="lb"></span><span class="nm">0</span></div><div class="bar"><div class="fl"></div></div></div>
         <div class="bl-hint" style="display:none"></div>`;
     area.insertBefore(layer, canvas);
     BL.layer = layer;
@@ -753,17 +800,18 @@ function initBattleLayer() {
     BL.capTx = BL.cap.querySelector('b');
     BL.trash = layer.querySelector('.bl-trash');
     BL.trashTx = BL.trash.querySelector('.tx');
-    BL.ap = layer.querySelector('.bl-ap');
-    BL.apLb = BL.ap.querySelector('.lb');
-    BL.apNum = BL.ap.querySelector('.nm');
-    BL.ap.addEventListener('animationend', (e) => { if (e.animationName === 'apGain') BL.ap.classList.remove('gain'); });
+    BL.hpBox = layer.querySelector('.bl-hp');
+    BL.hpLb = BL.hpBox.querySelector('.lb');
+    BL.hpNm = BL.hpBox.querySelector('.nm');
+    BL.hpFl = BL.hpBox.querySelector('.fl');
+    BL.hpBox.addEventListener('animationend', (e) => { if (/^hp(Hurt|Guard|Heal)$/.test(e.animationName)) BL.hpBox.classList.remove('hurt', 'guard', 'heal'); });
     BL.hint = layer.querySelector('.bl-hint');
 }
 function clearBattleLayer() {
     if (!BL.layer) return;
     BL.layer.querySelectorAll('.hc, .en, .fx-t, .fx-r, .fx-fly, .bl-flash').forEach(el => el.remove());
     BL.hand = [];
-    BL.lastTime = -1;
+    BL.lastHp = -1;
     BL.hint.style.display = 'none';
 }
 
@@ -775,10 +823,11 @@ function cardInner(n, w, v) {
 function showLastHit(a, b, c, d) {
     [a, b, c, d].forEach((v, i) => {
         const el = document.getElementById('lh-' + 'abcd'[i]);
+        if (!el) return;
         el.textContent = v; el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump');
     });
 }
-function resetLastHit() { ['a', 'b', 'c', 'd'].forEach(k => { document.getElementById('lh-' + k).textContent = '–'; }); }
+function resetLastHit() { ['a', 'b', 'c', 'd'].forEach(k => { const el = document.getElementById('lh-' + k); if (el) el.textContent = '–'; }); }
 function dragHint(c) {
     const cx = c.x + c.width / 2, cy = c.y + c.height / 2;
     for (const e of state.enemies) {
@@ -787,7 +836,7 @@ function dragHint(c) {
             const r = e.getCardRect(j);
             if (cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h) {
                 if (!GAME.rules.canAttack(c)) return { cls: 'bad', text: T('hint_stack') };
-                if (c.value === e.values[j]) return { cls: 'hit', text: T('hint_hit', { n: GAME.rules.damage(c, e.gemCounts[j], e.values[j]) }) };
+                if (c.value === e.values[j]) return { cls: 'hit', text: T('hint_hit', { n: Math.round(GAME.rules.damage(c, e.gemCounts[j], e.values[j]) * (1 + state.atkBonus)) }) };
                 return { cls: 'bad', text: T('hint_bad') };
             }
         }
@@ -902,14 +951,14 @@ function renderBattle() {
     const trashTop = state.height * 0.87;
     if (BL.trash._top !== trashTop) { BL.trash._top = trashTop; BL.trash.style.top = trashTop + 'px'; }
     if (BL.trashTx.textContent !== T('canvas_discard_hint')) BL.trashTx.textContent = T('canvas_discard_hint');
-    // 残り時間(AP)
-    if (BL.apLb.textContent !== T('canvas_time_left')) BL.apLb.textContent = T('canvas_time_left');
-    if (BL.apNum.textContent !== String(state.time)) {
-        BL.apNum.textContent = state.time;
-        if (BL.lastTime >= 0 && state.time > BL.lastTime) { BL.ap.classList.remove('gain'); void BL.ap.offsetWidth; BL.ap.classList.add('gain'); }
-        BL.lastTime = state.time;
-    }
-    BL.ap.classList.toggle('low', state.time <= 3);
+    // じぶんの HP
+    if (BL.hpLb.textContent !== T('label_hp')) BL.hpLb.textContent = T('label_hp');
+    const hpTxt = `${state.hp} / ${state.maxHp}`;
+    if (BL.hpNm.textContent !== hpTxt) BL.hpNm.textContent = hpTxt;
+    const hpPct = Math.max(0, Math.min(1, state.hp / state.maxHp));
+    BL.hpFl.style.width = (hpPct * 100).toFixed(1) + '%';
+    BL.hpBox.classList.toggle('low', hpPct <= 0.3);
+    BL.hpBox.classList.toggle('mid', hpPct > 0.3 && hpPct <= 0.6);
     // 手札
     const drag = state.cards.find(c => c && c.isDragging) || null;
     const hint = drag ? dragHint(drag) : null;
@@ -995,6 +1044,29 @@ function fxFlyCard(f) {
     }, 20);
     setTimeout(() => el.remove(), 420);
 }
+// HPの箱の上に ひとこと(「-5」「ガード！」)を出す
+function fxHpNote(text, color) {
+    if (!BL.layer || !BL.hpBox) return;
+    const el = document.createElement('div');
+    el.className = 'fx-t';
+    const r = BL.hpBox.offsetLeft, t = BL.hpBox.offsetTop;
+    el.style.cssText = `left:${r + 70}px;top:${t + 104}px;font-size:34px;color:${color};`;
+    el.textContent = text;
+    el.addEventListener('animationend', () => el.remove());
+    BL.layer.appendChild(el);
+}
+// てきの こうげきを うけた: てきが とびかかる・HPの箱が ゆれる・画面が ちょっと赤くなる
+function fxHurt(dmg, foe) {
+    fxHpNote('-' + dmg, '#ff6b5e');
+    if (BL.hpBox) { BL.hpBox.classList.remove('hurt'); void BL.hpBox.offsetWidth; BL.hpBox.classList.add('hurt'); }
+    if (foe && foe._mon) { foe._mon.classList.remove('atk'); void foe._mon.offsetWidth; foe._mon.classList.add('atk'); }
+    if (BL.layer) {
+        const el = document.createElement('div');
+        el.className = 'bl-hurt';
+        el.addEventListener('animationend', () => el.remove());
+        BL.layer.appendChild(el);
+    }
+}
 function fxBossFlash() {
     if (!BL.layer) return;
     const el = document.createElement('div');
@@ -1004,3 +1076,94 @@ function fxBossFlash() {
     BL.layer.appendChild(el);
 }
 
+// ============================================================
+//  ショップ(ステージクリアのあと)
+// ============================================================
+// 5つの どうぐが ランダムに ならび、1つだけ 30%オフ。コイン(=あたえたダメージ)で買う。同じ種類は 何回でも買えて、効果は たし算で ふえる。
+GAME.hideNextStage = true;                                   // ステージクリアの画面に「つぎは〜」を出さない
+GAME.clearHTML = (st, stageScore) => {
+    const pts = T('unit_pts');
+    return `<div><span>${T('sc_stage_score')}</span><b>${stageScore}${pts}</b></div>` +
+        `<div><span>${T('sc_hp_full')}</span><b>${T('sc_hp_full_v')}</b></div>` +
+        `<div><span>${T('sc_coins')}</span><b>${state.coins}</b></div>` +
+        `<div class="big"><span>${T('result_total_score')}</span><b>${state.score}${pts}</b></div>`;
+};
+GAME.beforeNextStage = (cb) => openShop(cb);
+
+const MBS_ICON = {
+    hp: '<svg viewBox="0 0 48 48"><path d="M24 42C10 32 5 25 5 17.5 5 11.6 9.4 7 15 7c3.600 0 7 1.800 9 5 2-3.200 5.400-5 9-5 5.600 0 10 4.600 10 10.500C43 25 38 32 24 42z" fill="currentColor"/></svg>',
+    atk: '<svg viewBox="0 0 48 48"><g transform="rotate(40 24 24)"><path d="M24 2l6 7v22H18V9z" fill="currentColor"/><path d="M9 31h30v5H9z" fill="currentColor"/><path d="M20.5 36h7v8h-7z" fill="currentColor"/><circle cx="24" cy="46" r="2.6" fill="currentColor"/><path d="M24 7v22" stroke="rgba(255,255,255,0.6)" stroke-width="2.4"/></g></svg>',
+    guard: '<svg viewBox="0 0 48 48"><path d="M24 4l16 6v12c0 10-7 17-16 22C15 39 8 32 8 22V10z" fill="currentColor"/><path d="M24 12v26" stroke="rgba(255,255,255,0.55)" stroke-width="3"/></svg>',
+};
+let shopState = null;     // { list:[{it, price, sold}], saleIdx, cb }
+function shopPick() {
+    // ガードは うえげんに ついたら 出さない
+    let pool = SHOP_ITEMS.filter(it => !(it.kind === 'guard' && state.guard >= GUARD_CAP - 1e-9));
+    const picked = [];
+    while (picked.length < 5 && pool.length) {
+        const i = Math.floor(Math.random() * pool.length);
+        picked.push(pool.splice(i, 1)[0]);
+    }
+    const saleIdx = Math.floor(Math.random() * picked.length);
+    return picked.map((it, i) => ({ it, sale: i === saleIdx, price: Math.round(shopItemPrice(it) * (i === saleIdx ? SHOP_SALE : 1) / 10) * 10, sold: false }));
+}
+function shopNames(it) {
+    if (it.kind === 'hp') return { name: T('shop_hp_name', { n: HP_UP }), desc: T('shop_hp_desc', { n: HP_UP }), big: '+' + HP_UP };
+    if (it.kind === 'atk') return { name: T('shop_atk_name', { n: it.n * 10 }), desc: T('shop_atk_desc', { n: it.n * 10 }), big: '+' + (it.n * 10) + '%' };
+    return { name: T('shop_guard_name', { n: it.n * 5 }), desc: T('shop_guard_desc', { n: it.n * 5 }), big: (it.n * 5) + '%' };
+}
+function renderShop() {
+    const el = document.getElementById('mb-shop');
+    if (!el || !shopState) return;
+    const cards = shopState.list.map((x, i) => {
+        const nm = shopNames(x.it);
+        const can = !x.sold && state.coins >= x.price;
+        const priceHtml = x.sale ? `<s>${shopItemPrice(x.it)}</s><b>${x.price}</b>` : `<b>${x.price}</b>`;
+        return `<div class="mbs-card k-${x.it.kind}${x.sold ? ' sold' : ''}" data-i="${i}">
+            ${x.sale ? `<div class="mbs-sale">${T('shop_sale')}</div>` : ''}
+            <div class="mbs-ic">${MBS_ICON[x.it.kind]}<span class="big ${x.it.kind}">${nm.big}</span></div>
+            <div class="mbs-nm">${nm.name}</div>
+            <div class="mbs-ds">${nm.desc}</div>
+            <div class="mbs-pr"><span class="cn"></span>${priceHtml}</div>
+            <button class="mbs-buy" data-i="${i}" ${can ? '' : 'disabled'}>${x.sold ? T('shop_sold') : (can ? T('shop_buy') : T('shop_short'))}</button>
+        </div>`;
+    }).join('');
+    const pw = powerLines();
+    el.innerHTML = `<div class="mbs-box">
+        <div class="mbs-ribbon">${T('shop_title')}</div>
+        <div class="mbs-sub">${T('shop_stage', { n: state.stage })}　${T('shop_sub')}</div>
+        <div class="mbs-top">
+            <div class="mbs-coins"><span class="cn"></span><span class="lb">${T('shop_have')}</span><b>${state.coins}</b></div>
+            <div class="mbs-pw">${pw.length ? pw.map(t => `<span>${t}</span>`).join('') : `<span class="none">${T('pw_none')}</span>`}</div>
+        </div>
+        <div class="mbs-row">${cards}</div>
+        <button class="mbs-next" id="mbs-next">${T('shop_next')}</button>
+    </div>`;
+    el.querySelectorAll('.mbs-buy').forEach(b => bindBtn(b, () => shopBuy(parseInt(b.dataset.i, 10))));
+    bindBtn(document.getElementById('mbs-next'), closeShop);
+}
+function shopBuy(i) {
+    if (!shopState) return;
+    const x = shopState.list[i];
+    if (!x || x.sold || state.coins < x.price) return;
+    state.coins -= x.price; x.sold = true;
+    if (x.it.kind === 'hp') { state.maxHp += HP_UP; state.hp = state.maxHp; state.hpBought++; }
+    else if (x.it.kind === 'atk') state.atkBonus = Math.round((state.atkBonus + x.it.n * 0.1) * 100) / 100;
+    else state.guard = Math.min(GUARD_CAP, Math.round((state.guard + x.it.n * 0.05) * 100) / 100);
+    updateUI();
+    renderShop();
+}
+function openShop(cb) {
+    let el = document.getElementById('mb-shop');
+    if (!el) { el = document.createElement('div'); el.id = 'mb-shop'; document.getElementById('container').appendChild(el); }
+    shopState = { list: shopPick(), cb };
+    renderShop();
+    el.classList.remove('hidden');
+}
+function closeShop() {
+    const el = document.getElementById('mb-shop');
+    if (el) el.classList.add('hidden');
+    const cb = shopState && shopState.cb;
+    shopState = null;
+    if (cb) cb();
+}

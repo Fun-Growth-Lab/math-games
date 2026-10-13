@@ -223,7 +223,9 @@ function showStageClear(st, stageScore) {
         (GAME.clearRows ? GAME.clearRows(st, stageScore) : `<div><span>${T('sc_time_bonus')}</span><b>+${stageClearTime(st)}</b></div>` +
         `<div><span>${T('sc_time_now')}</span><b>${state.time}</b></div>`) +
         `<div class="big"><span>${T('result_total_score')}</span><b>${state.score}${pts}</b></div>`;
-    document.getElementById('sc-next').textContent = T('sc_next', { name: stageName(st + 1) });
+    const scNext = document.getElementById('sc-next');
+    scNext.style.display = GAME.hideNextStage ? 'none' : '';       // ゲームによっては「つぎは〜」を出さない
+    scNext.textContent = GAME.hideNextStage ? '' : T('sc_next', { name: stageName(st + 1) });
     document.getElementById('sc-go').textContent = T('btn_next_stage', { n: st + 1 });
     document.getElementById('stage-clear').classList.remove('hidden');
 }
