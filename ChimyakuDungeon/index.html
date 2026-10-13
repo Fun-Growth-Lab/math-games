@@ -817,6 +817,9 @@
         #battle-heroes-list { max-height: 180px; overflow-y:auto; padding-right:2px; }
         .hero-hp-row { display:flex; align-items:center; gap:6px; font-size: 0.78rem; margin-bottom: 5px; }
         .hero-hp-row.dead { opacity: 0.4; text-decoration: line-through; }
+        /* 名前の列とHPの数字の列は固定幅にして、どの行もHPバーの長さをそろえる */
+        .hero-hp-name { flex:0 0 8.4em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .hero-hp-num { flex:0 0 4.6em; text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
         .hero-hp-track { flex:1; height:6px; background: rgba(0,0,0,0.4); border-radius:3px; overflow:hidden; }
         .hero-hp-fill { height:100%; background: var(--teal); }
         /* 戦闘中の右下パネル：戦況サマリー・活躍ランキング・できごとログ（残りの高さいっぱいに使う） */
@@ -5095,6 +5098,11 @@ function monsterIconHtml(sp, sizePx){
     if (!imgFile) return `<span class="monster-icon-thumb-emoji" style="font-size:${size}px;">${sp.emoji}</span>`;
     return `<span class="monster-icon-thumb" style="width:${size}px; height:${size}px; background-image:url('images/mamono/${imgFile}');"></span>`;
 }
+// 魔王の小さなアイコン。魔物のmonsterIconHtmlと同じ大きさ指定にそろえる（指定しないとCSSの既定サイズになり、同じ一覧に並べると魔王だけ小さくなる）
+function demonLordIconHtml(sizePx){
+    const size = sizePx || 20;
+    return `<span class="monster-icon-thumb" style="width:${size}px; height:${size}px; background-image:url('images/mamono/demon_lord.png');"></span>`;
+}
 // 総合戦闘力ランクのバッジ（SS〜G）。個体ごとの★（得意/不得意）とは別に、種族・Lvを含めた強さを一目で見せる
 function rankBadgeHtml(m){
     const rank = combatRank(m);
@@ -5409,7 +5417,7 @@ function getHealableUnits(){
     }));
     if (demonLordCell && demonLordCell.hp!==undefined && demonLordCell.hp<demonLordCell.maxHp){
         list.push({ ref:demonLordCell, kind:'demonlord', id:null, label: ui('demonlord_label'),
-            iconHtml: `<span class="monster-icon-thumb" style="background-image:url('images/mamono/demon_lord.png');"></span>` });
+            iconHtml: demonLordIconHtml() });
     }
     return list;
 }
@@ -7524,7 +7532,7 @@ function heroPreviewSpriteHtml(classKey, gender, emoji){
 // これが全職で0（±0.03以内）になるよう倍率を反復して求めた。倍率全体の水準は、補正前の平均戦績と一致するよう保ってある（＝ステージ全体の難しさは変えない）。
 // 職ごとの倍率はステージが進むにつれてほぼ滑らかに変わる（盾・回復は序盤より終盤のほうが相対的に強く、物理アタッカーはその逆）ため、
 // 測定値をステージ2〜7で一次式(対数)に当てはめ、ステージ2の値とステージ7の値のあいだを対数補間して使う。
-// その職がまだ登場しないステージの値は使われない（外挿）。ステージ1は職ごとの補正をしない（全職共通の倍率HERO_STAGE_STRENGTH_TRIM[1]だけ）
+// その職がまだ登場しないステージの値は使われない（外挿）。ステージ1は職ごとの補正をしない（全職共通の倍率heroStageStrengthTrim(1)だけ）
 const HERO_CLASS_STRENGTH_FACTOR = { // [ステージ2の倍率, ステージ7の倍率]
     swordsman: [0.91, 1.18],
     archer: [0.93, 1.19],
@@ -7545,18 +7553,28 @@ const HERO_CLASS_STRENGTH_FACTOR = { // [ステージ2の倍率, ステージ7�
 // 　ステージ2〜7の目標：5% / 5% / 8% / 12% / 22% / 35%（終盤ほど手ごわい。人数が増えたぶん、1体あたりは大きく下げる必要があった）
 // ※魔物の経験値は人数に反比例させて総量を変えていない（heroKillXp）ので、魔物の成長は旧テストプレイのまま。進化の石の増加ぶんは、魔物を1〜10%強くして織り込んだ。
 // 進化の強化の圧縮(EVOLUTION_STAGE_STAT_SCALE)と装備の縮小(MATERIAL_TIER_MULT5)を反映して、2回目の測定をした値（1回目からの変化は約5%以内）
-// 【序盤の再調整】新しいテストプレイ（洞窟・ステージ4で全滅）のダンジョン（魔物19〜21体・部屋4つ・平均Lv2.4）は、上の「強めのダンジョン」より
-// ずっと小さい標準的なもの。これを再現して測ると、勇者が勝つ確率が S1/S2/S3/S4 = 約60/7/48/95% で、序盤が「ちょっと強い」状態だった（実際のテストプレイでも勇者がS1〜3で全滅しながらS4で負けた）。
-// そこでステージ1〜4を、この標準的なダンジョンで 約28/9/14/30% になるように弱めた（ステージ5以降は標準的なダンジョンの実データがまだないので据え置き）
-// 【S5以降の再調整】別のテストプレイ（洞窟・S5で全滅。魔物27体・部屋5つ・平均Lv3.4）を再現して測ると、S5の勇者勝率は約60%（S4は約11%）で、
-// S4→S5で急に手ごわくなりすぎていた。S5を標準的なダンジョンで約25%にそろえ（0.63→0.56）、データのないS6・S7も同じ割合(約0.88倍)で弱めた
-const HERO_STAGE_STRENGTH_TRIM = { 1:0.84, 2:0.82, 3:0.70, 4:0.68, 5:0.56, 6:0.44, 7:0.35 };
+// 【ステージごとの強さは、ステージ番号nの3次関数にのせる】
+// 以前は測定値をステージごとにバラバラの表で持っていたが、ステージを1つ調整するたびに隣のステージとの段差ができたため、
+// 「勇者1体あたりの強さの倍率」は常にステージ番号nの多項式（下のHERO_STAGE_STRENGTH_POLY）で決める。調整するときは係数だけを直す。
+//   倍率(n) = c0 + c1·n + c2·n² + c3·n³
+// 【係数の求め方】テストプレイ2回分の実データのダンジョンを再現して（本物の戦闘処理で何百回も戦わせて）、勇者が勝つ確率が目標に
+// なる倍率をステージごとに測り、その点を3次関数に最小二乗で当てはめた。
+//  ・1回目（洞窟・S5で全滅。魔物27体・部屋5つ）：S4の倍率0.68で「いい感じ」、S5の倍率0.63では勇者の勝率が約60%で手ごわすぎた
+//  ・2回目（洞窟・全クリア。魔物55体・部屋6つ）：S5〜S7の倍率0.56/0.44/0.35では勇者の勝率が0%で、楽勝になった
+//    （S7で勝率35%にするには倍率0.63、S6で26%には0.59、S5で18%には0.67ほど。S2〜S4は0.71/0.91/0.72）
+//  ・2つのダンジョンの強さがかなり違う（S5で勇者勝率が約55%と約4%）ため、中間をとった。曲線は S1〜S4で0.81→0.66と下がり、
+//    S5〜S7は0.60前後で横ばい（S7は魔物が最も強くなる終盤なので、2回目の実データに合わせて少し戻す）
+// 当てはめ後の勇者勝率：1回目のダンジョンでS4/S5＝約4%/約54%、2回目のS5/S6/S7＝約4%/約26%/約36%
+const HERO_STAGE_STRENGTH_POLY = [0.7929, 0.0490, -0.0347, 0.00347]; // c0, c1, c2, c3
+function heroStageStrengthTrim(stageNum){
+    return HERO_STAGE_STRENGTH_POLY.reduce((sum, c, k) => sum + c * Math.pow(stageNum, k), 0);
+}
 function heroClassStrengthFactor(classKey, stageNum){
     const f = HERO_CLASS_STRENGTH_FACTOR[classKey];
-    if (stageNum < 2) return HERO_STAGE_STRENGTH_TRIM[stageNum] || 1; // ステージ1は職ごとの補正なし（全職共通の倍率だけ）
+    if (stageNum < 2) return heroStageStrengthTrim(stageNum); // ステージ1は職ごとの補正なし（全職共通の倍率だけ）
     if (!f) return 1;
     const t = Math.min(1, (stageNum-2) / (STAGE_FINAL-2));
-    return Math.exp(Math.log(f[0]) + (Math.log(f[1])-Math.log(f[0])) * t) * (HERO_STAGE_STRENGTH_TRIM[stageNum] || 1);
+    return Math.exp(Math.log(f[0]) + (Math.log(f[1])-Math.log(f[0])) * t) * heroStageStrengthTrim(stageNum);
 }
 // 勇者の戦闘開始時のステータス（HPは2倍、攻撃系は人数に反比例する補正。ステージ・職ごとに決まる）。上の職ごとの強さのそろえを掛けた値
 function heroBattleStats(classKey, stageNum, lvMult){
@@ -7714,15 +7732,15 @@ function renderHeroList(){
     const heroNames = battleHeroNames.length===battleHeroes.length ? battleHeroNames : numberedHeroNames(battleHeroes.map(h => h.storyKey ? STORY_SPEAKERS[h.storyKey].name_ja : uif('hero_label', h.id)));
     wrap.innerHTML = battleHeroes.map((h, i) => `
         <div class="hero-hp-row${h.alive?'':' dead'}">
-            <span>${h.emoji} ${escapeHtml(heroNames[i])}（${escapeHtml(heroClassInfo(h.heroClassKey).name_ja)}）</span>
+            <span class="hero-hp-name">${h.emoji} ${escapeHtml(heroNames[i])}</span>
             <div class="hero-hp-track"><div class="hero-hp-fill" style="width:${Math.max(0,h.hp/h.maxHp*100)}%"></div></div>
-            <span>${Math.max(0,Math.round(h.hp))}/${Math.round(h.maxHp)}</span>
+            <span class="hero-hp-num">${Math.max(0,Math.round(h.hp))}/${Math.round(h.maxHp)}</span>
         </div>
     `).join('') + (demonLordUnit ? `
         <div class="hero-hp-row${demonLordUnit.alive?'':' dead'}">
-            <span><span class="monster-icon-thumb" style="background-image:url('images/mamono/demon_lord.png');"></span> ${ui('demonlord_label')}</span>
+            <span class="hero-hp-name">${demonLordIconHtml(18)} ${ui('demonlord_label')}</span>
             <div class="hero-hp-track"><div class="hero-hp-fill" style="background:var(--danger); width:${Math.max(0,demonLordUnit.hp/demonLordUnit.maxHp*100)}%"></div></div>
-            <span>${Math.max(0,Math.round(demonLordUnit.hp))}/${Math.round(demonLordUnit.maxHp)}</span>
+            <span class="hero-hp-num">${Math.max(0,Math.round(demonLordUnit.hp))}/${Math.round(demonLordUnit.maxHp)}</span>
         </div>` : '');
 }
 
@@ -7745,7 +7763,7 @@ function renderBattleStatus(){
         .filter(e => e.dealt>0).sort((a,b) => b.dealt-a.dealt).slice(0,3);
     setHtmlIfChanged(document.getElementById('battle-ranking'), ranked.length===0 ? `<div class="battle-rank-empty">${ui('battle_rank_empty')}</div>` : ranked.map((e,i) => {
         const isDl = !!e.m.isDemonLord;
-        const icon = isDl ? `<span class="monster-icon-thumb" style="width:22px; height:22px; background-image:url('images/mamono/demon_lord.png');"></span>` : monsterIconHtml(speciesInfo(e.m.speciesKey), 22);
+        const icon = isDl ? demonLordIconHtml(22) : monsterIconHtml(speciesInfo(e.m.speciesKey), 22);
         const name = isDl ? ui('demonlord_label') : speciesInfo(e.m.speciesKey).name_ja;
         return `<div class="battle-rank-row"><span class="battle-rank-no">${i+1}</span>${icon}<span class="battle-rank-name">${escapeHtml(name)} <small>Lv.${monsterLevel(e.m.xp||0)}</small></span><span class="battle-rank-dmg">${Math.round(e.dealt)}<small> dmg</small></span></div>`;
     }).join(''));
@@ -8860,7 +8878,7 @@ function stageLootCardsHtml(){
 function levelUpCardHtml(levelUpList){
     if (levelUpList.length===0) return '';
     const chips = levelUpList.map(({m, fromLevel, toLevel}) => {
-        const icon = m.isDemonLord ? `<span class="monster-icon-thumb" style="background-image:url('images/mamono/demon_lord.png');"></span>` : monsterIconHtml(speciesInfo(m.speciesKey), 36);
+        const icon = m.isDemonLord ? demonLordIconHtml(36) : monsterIconHtml(speciesInfo(m.speciesKey), 36);
         const name = m.isDemonLord ? ui('demonlord_label') : monsterDisplayName(m);
         return scChipHtml(icon, escapeHtml(name), 0, uif('levelup_arrow_label', fromLevel, toLevel));
     }).join('');
