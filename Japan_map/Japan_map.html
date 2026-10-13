@@ -243,6 +243,7 @@ const STRINGS = {
         rank_h_time: "タイム",
         rank_h_date: "日付",
         rank_guest: "ゲスト",
+        rank_loading: "よみこみちゅう…",
         correct_suffix: "問",
         sec_suffix: "秒",
         countdown_hint: "ここにクイズがでるよ",
@@ -307,6 +308,7 @@ const STRINGS = {
         rank_h_time: "タイム",
         rank_h_date: "ひづけ",
         rank_guest: "ゲスト",
+        rank_loading: "よみこみちゅう…",
         correct_suffix: "もん",
         sec_suffix: "びょう",
         countdown_hint: "ここに クイズが でるよ",
@@ -371,6 +373,7 @@ const STRINGS = {
         rank_h_time: "Time",
         rank_h_date: "Date",
         rank_guest: "Guest",
+        rank_loading: "Loading…",
         correct_suffix: "",
         sec_suffix: "s",
         countdown_hint: "The quiz appears here",
@@ -542,6 +545,7 @@ const ctx = canvas.getContext('2d');
 
 let titleImg = new Image();
 titleImg.src = "images/title.png";
+titleImg.onload = function () { requestRedraw(); };
 
 function init() {
     window.addEventListener('resize', resize);
@@ -578,9 +582,11 @@ function resize() {
     // 正しく中央寄せできない環境があるため、flexに頼らずJSでleft/topを絶対座標指定する
     canvas.style.left = `${winW / 2 - canvas.width / 2}px`;
     canvas.style.top = `${winH / 2 - canvas.height / 2}px`;
+    requestRedraw();
 }
 
 function handleInput(e) {
+    requestRedraw();
     const rect = canvas.getBoundingClientRect();
     let x = -1, y = -1;
     if (e.type === 'mousedown') {
@@ -901,35 +907,65 @@ function startTutorial() {
 }
 
 // タイトル以外の画面にも、タイトルの背景絵(クイズ番組)をうっすら敷く。選択・ランキング画面は白い大きなパネルの上に出す
-function drawScreenBg() {
-    if (gameState === 'title') return;
-    if (titleImg && titleImg.complete && titleImg.naturalWidth !== 0) ctx.drawImage(titleImg, 0, 0, BASE_W, BASE_H);
-    const panel = (gameState === 'level_select' || gameState === 'player_select' || gameState === 'ranking' || gameState === 'result');
-    ctx.fillStyle = panel ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.80)';
-    ctx.fillRect(0, 0, BASE_W, BASE_H);
+let bgCache = null, bgCacheKey = '';
+function paintScreenBg(c, panel) {
+    if (titleImg && titleImg.complete && titleImg.naturalWidth !== 0) c.drawImage(titleImg, 0, 0, BASE_W, BASE_H);
+    c.fillStyle = panel ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.80)';
+    c.fillRect(0, 0, BASE_W, BASE_H);
     if (panel) {
-        ctx.save();
-        ctx.shadowColor = 'rgba(40,70,20,0.35)'; ctx.shadowBlur = 36; ctx.shadowOffsetY = 12;
-        ctx.beginPath(); ctx.roundRect(24, 24, BASE_W - 48, BASE_H - 48, 44);
-        ctx.fillStyle = 'rgba(255,255,255,0.93)'; ctx.fill();
-        ctx.restore();
-        ctx.beginPath(); ctx.roundRect(24, 24, BASE_W - 48, BASE_H - 48, 44); ctx.strokeStyle = '#8fd16a'; ctx.lineWidth = 8; ctx.stroke();
+        c.save();
+        c.shadowColor = 'rgba(40,70,20,0.35)'; c.shadowBlur = 36; c.shadowOffsetY = 12;
+        c.beginPath(); c.roundRect(24, 24, BASE_W - 48, BASE_H - 48, 44);
+        c.fillStyle = 'rgba(255,255,255,0.93)'; c.fill();
+        c.restore();
+        c.beginPath(); c.roundRect(24, 24, BASE_W - 48, BASE_H - 48, 44); c.strokeStyle = '#8fd16a'; c.lineWidth = 8; c.stroke();
     }
 }
-
-function gameLoop() {
+function drawScreenBg() {
+    if (gameState === 'title') return;
+    const panel = (gameState === 'level_select' || gameState === 'player_select' || gameState === 'ranking' || gameState === 'result');
+    const imgOk = !!(titleImg && titleImg.complete && titleImg.naturalWidth !== 0);
+    const key = [canvas.width, canvas.height, panel ? 1 : 0, imgOk ? 1 : 0].join('|');
+    if (!bgCache || bgCacheKey !== key) {
+        // 画面と同じ大きさの見えない canvas に、1回だけ描いておく(この間も同じ座標系: BASE_W x BASE_H を scale 倍)
+        bgCache = document.createElement('canvas');
+        bgCache.width = canvas.width; bgCache.height = canvas.height;
+        const c = bgCache.getContext('2d');
+        c.scale(scale, scale);
+        paintScreenBg(c, panel);
+        bgCacheKey = key;
+    }
     ctx.save();
-    ctx.scale(scale, scale);
-    ctx.clearRect(0, 0, BASE_W, BASE_H);
-    drawScreenBg();
-    if (gameState === 'title') drawTitle();
-    else if (gameState === 'player_select') drawPlayerSelect();
-    else if (gameState === 'level_select') drawLevelSelect();
-    else if (gameState === 'ranking') drawRanking();
-    else if (gameState === 'countdown') drawCountdown();
-    else if (gameState === 'playing' || gameState === 'waiting') drawQuiz();
-    else if (gameState === 'result') drawResult();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);     // 倍率なしで、そのまま貼る
+    ctx.drawImage(bgCache, 0, 0);
     ctx.restore();
+}
+
+// 描きなおしが必要になったら呼ぶ(入力・通信の完了・画面サイズの変化など)。
+// タイトル・選択・ランキング・けっかの画面は時間で動かないので、毎フレーム(60回/秒)描くと、
+// ボタンの影やぼかし(shadowBlur)で端末が重くなり、タップへの反応が遅れる。必要なときだけ描く
+let needRedraw = true, lastDrawAt = 0;
+function requestRedraw() { needRedraw = true; }
+const LIVE_STATES = ['countdown', 'playing', 'waiting'];   // 時間が進む画面は毎フレーム描く
+
+function gameLoop(now) {
+    now = now || performance.now();
+    // 念のため、入力などで要求が漏れても 0.25 秒以内にはかならず描きなおす
+    if (LIVE_STATES.indexOf(gameState) >= 0 || needRedraw || now - lastDrawAt > 250) {
+        needRedraw = false; lastDrawAt = now;
+        ctx.save();
+        ctx.scale(scale, scale);
+        ctx.clearRect(0, 0, BASE_W, BASE_H);
+        drawScreenBg();
+        if (gameState === 'title') drawTitle();
+        else if (gameState === 'player_select') drawPlayerSelect();
+        else if (gameState === 'level_select') drawLevelSelect();
+        else if (gameState === 'ranking') drawRanking();
+        else if (gameState === 'countdown') drawCountdown();
+        else if (gameState === 'playing' || gameState === 'waiting') drawQuiz();
+        else if (gameState === 'result') drawResult();
+        ctx.restore();
+    }
     requestAnimationFrame(gameLoop);
 }
 
@@ -1142,6 +1178,7 @@ function drawRanking() {
     const cols = [120, 350, 660, 870, 1040];
     const headers = [T('rank_h_rank'), T('rank_h_name'), T('rank_h_correct'), T('rank_h_time'), T('rank_h_date')];
     headers.forEach((h, i) => drawText(h, startX + cols[i], startY, 24, "bold", "#78c850"));
+    if (rankingLoading && rankingTab === 'world') drawText(T('rank_loading'), startX + 580, startY + 180, 36, "bold", "#8d7d6a");
     rankingData.filter(d => d.level == rankingLv && d.mode == rankingMode).slice(0, 10).forEach((d, i) => {
         const py = startY + 50 + i * rowH;
         const name = d.name || T('rank_guest');
@@ -1267,6 +1304,7 @@ async function saveScore(time) {
             })
         });
         console.log("Score saved to Supabase!");
+        clearRankingCache();
     } catch(e) {
         console.error("Error saving score:", e);
     }
@@ -1276,51 +1314,89 @@ function formatDate(dt) {
     return `${dt.getFullYear()}/${dt.getMonth()+1}/${dt.getDate()}`;
 }
 
+// 世界ランキングは「モード|難易度」ごとに覚えておく。難易度を切りかえたとき、通信を待たずにすぐ表を見せるため
+const rankingCache = {};
+const rankingInflight = {};
+let rankingLoading = false;     // いま表示している世界ランキングを、まだ読み込んでいる最中(表の代わりに「読み込み中」を出す)
+function clearRankingCache() { Object.keys(rankingCache).forEach(k => delete rankingCache[k]); }
+
+async function loadWorldRows(lv, mode) {
+    const params = new URLSearchParams({
+        game: 'eq.japan_map',
+        difficulty: 'eq.' + String(lv),
+        class_name: 'eq.' + mode,
+        order: 'point_score.desc,turns.asc',
+        limit: '20',
+        select: 'player_name,point_score,turns,stage_score,created_at'
+    });
+    const res = await fetch(window._sb.b + '/rankings?' + params.toString(), { headers: window._sb.rh });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const rows = await res.json();
+    return rows.map(d => {
+        // DECIMAL_CUTOFF以降に保存された記録のみ、stage_scoreに小数第2位の端数が入っている
+        const hasDecimal = new Date(d.created_at) >= DECIMAL_CUTOFF;
+        return {
+            name: FGLName.display(d.player_name),
+            correct: d.point_score,
+            time: hasDecimal ? (d.turns || 0) + (d.stage_score || 0) / 100 : (d.turns || 0),
+            timeHasDecimal: hasDecimal,
+            level: lv,
+            mode: mode,
+            date: formatDate(new Date(d.created_at))
+        };
+    });
+}
+
+// そのモードの、ほかの難易度も先に読んでおく(次に押したとき、待たずに出せる)
+function prefetchRanking(mode) {
+    [2, 4, 8, 47].forEach(lv => {
+        if (mode === 'region' && lv === 47) return;
+        const key = mode + '|' + lv;
+        if (lv === rankingLv || rankingCache[key] || rankingInflight[key]) return;
+        rankingInflight[key] = true;
+        loadWorldRows(lv, mode).then(rows => {
+            rankingCache[key] = rows;
+            // 読み込み中に、その難易度を開いていたら、そのまま表に出す
+            if (gameState === 'ranking' && rankingTab === 'world' && rankingMode === mode && rankingLv === lv) {
+                rankingData = rows; rankingLoading = false;
+            }
+            requestRedraw();
+        }).catch(e => { console.error('Ranking prefetch error:', e); })
+          .then(() => { delete rankingInflight[key]; });
+    });
+}
+
 async function fetchRanking() {
     // 連続で難易度・タブ等を切り替えたとき、後から返ってきた古い通信結果が
-    // 最新の選択結果を上書きしてしまう（＝反応が重い・遅れて見える）のを防ぐガード
+    // 最新の選択結果を上書きしてしまうのを防ぐガード
     const seq = ++rankingFetchSeq;
+    const lv = rankingLv, mode = rankingMode;
     if (rankingTab === 'local') {
         let localScores = JSON.parse(localStorage.getItem('japan_map_scores') || '[]');
-        const data = localScores
-            .filter(d => d.level === rankingLv && d.mode === rankingMode)
+        rankingData = localScores
+            .filter(d => d.level === lv && d.mode === mode)
             .sort((a,b) => (b.correct !== a.correct) ? b.correct - a.correct : a.time - b.time)
             .map(d => ({...d, timeHasDecimal: true, date: d.date ? formatDate(new Date(d.date)) : "-"}));
-        if (seq === rankingFetchSeq) rankingData = data;
-    } else {
-        // Supabase (World)
-        try {
-            const params = new URLSearchParams({
-                game: 'eq.japan_map',
-                difficulty: 'eq.' + String(rankingLv),
-                class_name: 'eq.' + rankingMode,
-                order: 'point_score.desc,turns.asc',
-                limit: '20',
-                select: 'player_name,point_score,turns,stage_score,created_at'
-            });
-            const res = await fetch(window._sb.b + '/rankings?' + params.toString(), {
-                headers: window._sb.rh
-            });
-            const rows = await res.json();
-            if (seq !== rankingFetchSeq) return; // より新しいリクエストが後から発行済みなので破棄
-            rankingData = rows.map(d => {
-                // DECIMAL_CUTOFF以降に保存された記録のみ、stage_scoreに小数第2位の端数が入っている
-                const hasDecimal = new Date(d.created_at) >= DECIMAL_CUTOFF;
-                return {
-                    name: FGLName.display(d.player_name),
-                    correct: d.point_score,
-                    time: hasDecimal ? (d.turns || 0) + (d.stage_score || 0) / 100 : (d.turns || 0),
-                    timeHasDecimal: hasDecimal,
-                    level: rankingLv,
-                    mode: rankingMode,
-                    date: formatDate(new Date(d.created_at))
-                };
-            });
-        } catch(e) {
-            console.error("Ranking Error:", e);
-            if (seq === rankingFetchSeq) rankingData = [];
-        }
+        rankingLoading = false;
+        requestRedraw();
+        return;
     }
+    // Supabase (World)
+    const key = mode + '|' + lv;
+    if (rankingCache[key]) { rankingData = rankingCache[key]; rankingLoading = false; }   // 覚えている分は、すぐ見せる(その間に最新を取りなおす)
+    else { rankingData = []; rankingLoading = true; }
+    requestRedraw();
+    prefetchRanking(mode);
+    try {
+        const rows = await loadWorldRows(lv, mode);
+        rankingCache[key] = rows;
+        if (seq !== rankingFetchSeq) return; // より新しいリクエストが後から発行済みなので破棄
+        rankingData = rows; rankingLoading = false;
+    } catch(e) {
+        console.error("Ranking Error:", e);
+        if (seq === rankingFetchSeq) { if (!rankingCache[key]) rankingData = []; rankingLoading = false; }
+    }
+    requestRedraw();
 }
 
 init();
