@@ -7553,19 +7553,17 @@ const HERO_CLASS_STRENGTH_FACTOR = { // [ステージ2の倍率, ステージ7�
 // 　ステージ2〜7の目標：5% / 5% / 8% / 12% / 22% / 35%（終盤ほど手ごわい。人数が増えたぶん、1体あたりは大きく下げる必要があった）
 // ※魔物の経験値は人数に反比例させて総量を変えていない（heroKillXp）ので、魔物の成長は旧テストプレイのまま。進化の石の増加ぶんは、魔物を1〜10%強くして織り込んだ。
 // 進化の強化の圧縮(EVOLUTION_STAGE_STAT_SCALE)と装備の縮小(MATERIAL_TIER_MULT5)を反映して、2回目の測定をした値（1回目からの変化は約5%以内）
-// 【ステージごとの強さは、ステージ番号nの3次関数にのせる】
+// 【ステージごとの強さは、ステージ番号nの2次関数にのせる】
 // 以前は測定値をステージごとにバラバラの表で持っていたが、ステージを1つ調整するたびに隣のステージとの段差ができたため、
 // 「勇者1体あたりの強さの倍率」は常にステージ番号nの多項式（下のHERO_STAGE_STRENGTH_POLY）で決める。調整するときは係数だけを直す。
-//   倍率(n) = c0 + c1·n + c2·n² + c3·n³
-// 【係数の求め方】テストプレイ2回分の実データのダンジョンを再現して（本物の戦闘処理で何百回も戦わせて）、勇者が勝つ確率が目標に
-// なる倍率をステージごとに測り、その点を3次関数に最小二乗で当てはめた。
-//  ・1回目（洞窟・S5で全滅。魔物27体・部屋5つ）：S4の倍率0.68で「いい感じ」、S5の倍率0.63では勇者の勝率が約60%で手ごわすぎた
-//  ・2回目（洞窟・全クリア。魔物55体・部屋6つ）：S5〜S7の倍率0.56/0.44/0.35では勇者の勝率が0%で、楽勝になった
-//    （S7で勝率35%にするには倍率0.63、S6で26%には0.59、S5で18%には0.67ほど。S2〜S4は0.71/0.91/0.72）
-//  ・2つのダンジョンの強さがかなり違う（S5で勇者勝率が約55%と約4%）ため、中間をとった。曲線は S1〜S4で0.81→0.66と下がり、
-//    S5〜S7は0.60前後で横ばい（S7は魔物が最も強くなる終盤なので、2回目の実データに合わせて少し戻す）
-// 当てはめ後の勇者勝率：1回目のダンジョンでS4/S5＝約4%/約54%、2回目のS5/S6/S7＝約4%/約26%/約36%
-const HERO_STAGE_STRENGTH_POLY = [0.7929, 0.0490, -0.0347, 0.00347]; // c0, c1, c2, c3
+//   倍率(n) = c0 + c1·n + c2·n²
+// 【係数の求め方】テストプレイ3回分の実データのダンジョンを再現して（本物の戦闘処理で何百回も戦わせて）、勇者が勝つ確率を測り、
+// プレイヤーが「ここまではいい感じ」と言ったS1〜S5の倍率（0.81/0.78/0.72/0.66/0.60）に、S6・S7を次の測定で足した点に2次関数を当てはめた。
+//  ・S6：倍率0.587では勇者の勝率が約30%（2回のダンジョンで一致）で手ごわすぎたため、0.55（約8%〜22%）に
+//  ・S7：倍率0.626だと、魔物の弱めのダンジョンでは勇者の勝率が100%（勇者が圧勝）。0.47で約35%（強いダンジョンでは0%）。
+//    S7のダンジョンの強さはプレイヤーごとの差がとても大きく（0.5で勇者勝率が約70%と0%）、1つの倍率ではどちらにも合わない。弱めの側に合わせた
+// 当てはめ後の倍率：S1〜S7＝0.82/0.77/0.72/0.67/0.61/0.54/0.47（最大のずれ0.01）。人数が増えるぶん、1体あたりを下げる形になっている
+const HERO_STAGE_STRENGTH_POLY = [0.8569, -0.0387, -0.0023]; // c0, c1, c2
 function heroStageStrengthTrim(stageNum){
     return HERO_STAGE_STRENGTH_POLY.reduce((sum, c, k) => sum + c * Math.pow(stageNum, k), 0);
 }
@@ -8727,6 +8725,10 @@ function endBattle(outcome){
     battleCurrentActor = null;
     repEndBattle(outcome); // テストプレイデータ：ユニットごとの成績を確定（stageを進める前に呼ぶ）
     gamePhase = 'result';
+    // 迎撃ボタンを押したときのセーブ（迎撃前の状態）が残っていると、負けた／エリアをクリアした後に更新して「つづきから」を選んだとき、
+    // 勝敗が決まる前に戻ってしまう。ゲームオーバー・エリアクリアでは続きの迷宮が無いので、ここで捨てる（勝って次のステージへ進む場合は、
+    // proceedNextStageの最後で新しい状態を保存し直す）
+    if (!(outcome==='victory' && stage<STAGE_FINAL)) clearGameSave();
     const titleEl = document.getElementById('battle-result-title');
     const msgEl = document.getElementById('battle-result-msg');
     const actionsEl = document.getElementById('battle-result-actions');
@@ -8840,6 +8842,7 @@ function proceedNextStage(){
         levelUps: battleLevelUps.map(({m, fromLevel, toLevel}) => `${m.isDemonLord ? 'DL' : m.speciesKey+'#'+m.id}:${fromLevel}->${toLevel}`),
         drops: { stone: dropKeys('stone'), monster: dropKeys('monster'), equip: dropKeys('equip') } });
     processNextRankUp();
+    saveGameState(); // 勝利後の建設フェーズの状態をすぐ保存する（ここで更新しても、報酬を受け取った後から再開できる）
 }
 // 種類ごとのカード1枚分（アイコン＋名前＋個数バッジを小さなチップとして並べる）
 function scCardHtml(titleKey, chipsHtml, wide){
@@ -9426,7 +9429,9 @@ function renderUnitIcons(){
     }
 
     if (inBattle){
-        battleHeroes.filter(h=>h.alive && h.state!=='pending').forEach(h => {
+        // まだマスの位置が決まっていない勇者（入口で行き先が空くのを待っている間は r,c が -1 のまま）は描かない。
+        // 描くと座標(-1,-1)＝マップの左上の外側に、勇者が多いときにちらちら映る
+        battleHeroes.filter(h=>h.alive && h.state!=='pending' && h.r>=0 && h.c>=0).forEach(h => {
             const key = 'unit-h'+h.id;
             activeIds.add(key);
             let el = document.getElementById(key);
