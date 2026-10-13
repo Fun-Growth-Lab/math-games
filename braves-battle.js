@@ -41,6 +41,7 @@ function itemEffect(it) { return it.kind === 'hp' ? HP_UP : it.kind === 'atk' ? 
         ja: {
             label_hp: 'HP', label_coins: 'コイン', label_power: 'そうび',
             pw_atk: 'こうげき +{n}%', pw_guard: 'ガード {n}%', pw_hp: 'さいだいHP {n}', pw_none: 'まだ なし',
+            pw_total_atk: 'ごうけい こうげき +{n}%', pw_total_guard: 'ごうけい ガード {n}%',
             guard_text: 'ガード！',
             it_hp: 'いのちのハート',
             it_atk_1: '木の剣', it_atk_2: 'どうの剣', it_atk_3: 'てつの剣', it_atk_4: 'はがねの剣', it_atk_5: 'ひかりの剣',
@@ -56,6 +57,7 @@ function itemEffect(it) { return it.kind === 'hp' ? HP_UP : it.kind === 'atk' ? 
         simple: {
             label_hp: 'HP', label_coins: 'コイン', label_power: 'そうび',
             pw_atk: 'こうげき +{n}%', pw_guard: 'ガード {n}%', pw_hp: 'さいだいHP {n}', pw_none: 'まだ なし',
+            pw_total_atk: 'ごうけい こうげき +{n}%', pw_total_guard: 'ごうけい ガード {n}%',
             guard_text: 'ガード！',
             it_hp: 'いのちの ハート',
             it_atk_1: 'きの けん', it_atk_2: 'どうの けん', it_atk_3: 'てつの けん', it_atk_4: 'はがねの けん', it_atk_5: 'ひかりの けん',
@@ -71,6 +73,7 @@ function itemEffect(it) { return it.kind === 'hp' ? HP_UP : it.kind === 'atk' ? 
         en: {
             label_hp: 'HP', label_coins: 'Coins', label_power: 'Gear',
             pw_atk: 'Attack +{n}%', pw_guard: 'Guard {n}%', pw_hp: 'Max HP {n}', pw_none: 'None yet',
+            pw_total_atk: 'Total Attack +{n}%', pw_total_guard: 'Total Guard {n}%',
             guard_text: 'Guard!',
             it_hp: 'Heart of Life',
             it_atk_1: 'Wooden Sword', it_atk_2: 'Bronze Sword', it_atk_3: 'Iron Sword', it_atk_4: 'Steel Sword', it_atk_5: 'Light Sword',
@@ -399,14 +402,6 @@ function updateUI() {
     }
 }
 
-// 買った そうびの 合計(ショップの上と、右のパネルの まとめ)
-function powerLines() {
-    const l = [];
-    if (state.atkBonus > 0) l.push(T('pw_atk', { n: Math.round(state.atkBonus * 100) }));
-    if (state.guard > 0) l.push(T('pw_guard', { n: Math.round(state.guard * 100) }));
-    if (state.hpBought > 0) l.push(T('pw_hp', { n: state.maxHp }));
-    return l;
-}
 // そうびの絵(剣・盾は 木→どう→てつ→はがね→ひかり で 色がかわる)
 const TIER_COL = ['#b98552', '#d98a3a', '#9aa5b8', '#4f86d6', '#f2c029'];
 function equipSvg(kind, n) {
@@ -427,8 +422,12 @@ function updatePowerUI() {
     (state.equip || []).forEach(e => { const g = groups.find(x => x.kind === e.kind && x.n === e.n); if (g) g.c++; else groups.push({ kind: e.kind, n: e.n, c: 1 }); });
     // 剣・盾は 強い順、ハートは さいごに
     groups.sort((a, b) => (a.kind === 'hp') - (b.kind === 'hp') || (a.kind !== b.kind ? (a.kind === 'atk' ? -1 : 1) : b.n - a.n));
-    const sum = powerLines();
-    el.innerHTML = (sum.length ? `<div class="pws">${sum.map(t => `<span>${t}</span>`).join('')}</div>` : `<div class="pw none">${T('pw_none')}</div>`) +
+    const eq = state.equip || [];
+    const sum = [];
+    if (eq.filter(e => e.kind === 'atk').length >= 2) sum.push(T('pw_total_atk', { n: Math.round(state.atkBonus * 100) }));
+    if (eq.filter(e => e.kind === 'guard').length >= 2) sum.push(T('pw_total_guard', { n: Math.round(state.guard * 100) }));
+    el.innerHTML = (eq.length ? '' : `<div class="pw none">${T('pw_none')}</div>`) +
+        (sum.length ? `<div class="pws">${sum.map(t => `<span>${t}</span>`).join('')}</div>` : '') +
         groups.map(g => {
             const it = { kind: g.kind, n: g.n };
             return `<div class="eq k-${g.kind}"><div class="ic">${equipSvg(g.kind, g.n)}</div><div class="tx"><b>${itemName(it)}${g.c > 1 ? ` ×${g.c}` : ''}</b><span>${itemEffectText(it)}</span></div></div>`;
