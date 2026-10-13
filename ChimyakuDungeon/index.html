@@ -2119,7 +2119,8 @@ const UI_TEXT = {
     battle_result_gameclear_title: { ja: '🏆 ゲームクリア！', ja_easy: '🏆 ゲームクリア！', en: '🏆 Game Clear!' },
     battle_result_gameclear_msg: { ja: '最終侵攻の勇者たちを撃退した！迷宮の勝利です！', ja_easy: 'さいごの ゆうしゃたちを げきたいした！めいきゅうの かちだよ！', en: 'The final wave of heroes was repelled! The dungeon is victorious!' },
     btn_next_stage: { ja: '次のステージへ', ja_easy: 'つぎの ステージへ', en: 'Next Stage' },
-    btn_retry_stage: { ja: n => `🔁 ステージ${n}の最初からやり直す`, ja_easy: n => `🔁 ステージ${n}の はじめから やりなおす`, en: n => `🔁 Retry Stage ${n}` },
+    btn_retry_area: { ja: '🔁 このエリアをもう一度やり直す', ja_easy: '🔁 この エリアを もういちど やりなおす', en: '🔁 Retry This Area' },
+    btn_restart_story: { ja: '📖 ストーリーの最初から始める', ja_easy: '📖 ストーリーの さいしょから はじめる', en: '📖 Restart the Story' },
     btn_restart_dungeon: { ja: '🔄 ステージ1から作り直す', ja_easy: '🔄 ステージ1から つくりなおす', en: '🔄 Rebuild from Stage 1' },
     demonlord_here_label: { ja: '👑 この部屋に魔王がいます', ja_easy: '👑 この へやに まおうが いるよ', en: '👑 The Demon Lord is here' },
 
@@ -3114,7 +3115,7 @@ function restoreGameFromData(data){
 function resetRunLeftovers(){
     clearTimeout(battleTimer); battleTimer = null;
     battleHeroes = []; demonLordUnit = null; roomBattleQueues = {}; battleGlobalTick = -1; nextHeroSpawnIndex = 0;
-    battleEvents = []; battleHeroNames = []; battleBreachedRooms = {}; stageRetrySnapshot = null;
+    battleEvents = []; battleHeroNames = []; battleBreachedRooms = {};
     battleSpeed = 1; battlePaused = false; battleCurrentActor = null; pendingBattleHeroPreview = [];
     rankUpQueue = []; pendingRankUp = null; pendingStageIncome = { vit:0, mana:0 };
     battleEvolutions = []; battleLevelUps = []; lastAutoHealInfo = null;
@@ -7587,18 +7588,6 @@ function chooseSkillReward(key){
     document.getElementById('skill-reward-modal').classList.add('hidden');
 }
 
-// このステージの迎撃ボタンを押した時点の迷宮（JSON文字列）。負けたとき、ここへ戻してやり直せるようにする
-let stageRetrySnapshot = null;
-function retryCurrentStage(){
-    document.getElementById('battle-result-modal').classList.add('hidden');
-    if (!stageRetrySnapshot){ startNewDungeon(); return; }
-    const keepReport = runReport; // テストプレイデータは、やり直しても前の戦闘の記録を残す
-    restoreGameFromData(JSON.parse(stageRetrySnapshot));
-    if (keepReport){
-        runReport = keepReport; runReport.outcome = 'in_progress'; runReport.retries = (runReport.retries||0) + 1;
-    }
-    saveGameState(); // 負けたときに破棄したセーブを、やり直しの状態で書き直す
-}
 let battleHeroes = [];
 let roomBattleQueues = {}; // roomId -> このtickで消化する行動キュー（部屋ごとに独立して同時進行させる）
 let battleGlobalTick = -1; // battleStep()が呼ばれるたびに+1。0,12,24...で次の波が湧く
@@ -7799,7 +7788,6 @@ function requestStartBattle(){
 function closeBattleConfirm(){ document.getElementById('battle-confirm-modal').classList.add('hidden'); }
 function confirmStartBattle(){
     saveGameState(); // 迎撃ボタンを押したとき（建設フェーズ最後の状態を保存。復元時はここに戻る）
-    stageRetrySnapshot = JSON.stringify(buildSaveData()); // 負けたときに「このステージをやり直す」ための、迎撃前の状態（保存しなくても、この画面では使える）
     closeBattleConfirm();
     startBattle();
 }
@@ -8952,8 +8940,8 @@ function endBattle(outcome){
         actionsEl.innerHTML = `
             <button class="btn btn-gold btn-sm" onclick="openScoreModal()">${ui('btn_score')}</button>
             <button class="btn btn-gold btn-sm" onclick="openBalanceReportModal()">${ui('btn_balance_report')}</button>
-            ${stageRetrySnapshot ? `<button class="btn btn-primary btn-sm" onclick="retryCurrentStage()">${uif('btn_retry_stage', stage)}</button>` : ''}
-            <button class="btn btn-danger btn-sm" onclick="closeBattleResultAndRestart()">${ui('btn_restart_dungeon')}</button>
+            <button class="btn btn-primary btn-sm" onclick="closeBattleResultAndRestart()">${ui('btn_retry_area')}</button>
+            ${playMode==='story' ? `<button class="btn btn-danger btn-sm" onclick="restartStoryFromBeginning()">${ui('btn_restart_story')}</button>` : ''}
             <button class="btn btn-sm" onclick="closeBattleResultToTitle()">${ui('btn_back_title2')}</button>
         `;
     }
@@ -9089,6 +9077,11 @@ function closeBattleResultAndGoNextArea(){
     currentAreaIndex = storyAreaIndex;
     startNewDungeon();
     startStoryScene(currentAreaIndex);
+}
+// 負けたあと：ストーリーの最初（第一話の最初のエリア）から始め直す。難易度は選び直せる（難易度選択で決めた時点で進行状況を初期化）
+function restartStoryFromBeginning(){
+    document.getElementById('battle-result-modal').classList.add('hidden');
+    openDifficultySelect(true);
 }
 function closeBattleResultToTitle(){
     document.getElementById('battle-result-modal').classList.add('hidden');
@@ -9230,7 +9223,7 @@ function buildBalanceReportText(){
     const label = { clear:'ゲームクリア', gameover:'ゲームオーバー', in_progress:'（途中）' }[R.outcome] || R.outcome;
     const mins = Math.round(((R.endedAt||Date.now()) - R.startedAt)/6000)/10;
     out.push(`# アビスラビリンス テストプレイデータ v${BALANCE_REPORT_VERSION}`);
-    out.push(`結果: ${label} / 最終ステージ: ${last.stage} / 戦闘回数: ${R.battles.length} / プレイ時間: 約${mins}分 / 開始: ${new Date(R.startedAt).toLocaleString('ja-JP')} / preset: ${R.preset} / 難易度: ${(R.difficulty||'hard').toUpperCase()}${R.retries ? ' / やり直し: '+R.retries+'回' : ''}`);
+    out.push(`結果: ${label} / 最終ステージ: ${last.stage} / 戦闘回数: ${R.battles.length} / プレイ時間: 約${mins}分 / 開始: ${new Date(R.startedAt).toLocaleString('ja-JP')} / preset: ${R.preset} / 難易度: ${(R.difficulty||'hard').toUpperCase()}`);
     out.push('略語: dealt=与ダメージ(オーバーキル除く) taken=被ダメージ dP/dM=物理/魔法で与えた分 pw=攻防魔攻魔防の装備込み合計 q=個体差倍率の平均(1.0が標準) lv=レベル stg=進化段階 rt=部屋タイプ(null=ストック) down=戦闘不能になったtick(nullは最後まで生存) hp0/hpEnd=戦闘前/後のHP bornStage/bornLv=生まれたステージ/そのときのLv');
 
     // 1. ステージ別サマリー
