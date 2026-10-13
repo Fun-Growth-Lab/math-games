@@ -13,62 +13,69 @@ function getEnemyConfig(type) {
 const PLAYER_HP = 100;           // はじめのHP(ステージをクリアすると ぜんかいふく)
 const HP_UP = 20;                // 「さいだいHPアップ」1つぶん
 const GUARD_CAP = 0.7;           // ガードの かくりつの うえげん
-const SHOP_PRICE = Object.assign({ hp: 500, atk: 300, guard: 250 }, GAME.shopPrice || {});   // hp: さいだいHP+20 / atk: こうげき+10%ごと / guard: ガード5%ごと
-const SHOP_SALE = 0.7;           // 5つのうち1つだけ 30%オフ
+// 値段: hp=いのちのハート / sword=剣(1だんあたり) / shield=盾(1だんあたり)。剣は +20%ずつ、盾は ガード10%ずつ、どちらも 5だん
+const SHOP_PRICE = Object.assign({ hp: 500, sword: 600, shield: 500 }, GAME.shopPrice || {});
+const SHOP_SALE = 0.7;           // 3つのうち1つだけ 30%オフ
+const SHOP_P = { hp: 0.2, atk: 0.4, guard: 0.4 };   // ショップに ならぶ確率: さいだいHP 20% / 剣 40% / 盾 40%
 const SHOP_ITEMS = (() => {
     const l = [{ id: 'hp', kind: 'hp', n: 1 }];
-    for (let i = 1; i <= 10; i++) l.push({ id: 'a' + i, kind: 'atk', n: i });       // こうげき +10%〜+100%
-    for (let i = 1; i <= 10; i++) l.push({ id: 'g' + i, kind: 'guard', n: i });     // ガード 5%〜50%
+    for (let i = 1; i <= 5; i++) l.push({ id: 'a' + i, kind: 'atk', n: i });       // こうげき +20%〜+100%
+    for (let i = 1; i <= 5; i++) l.push({ id: 'g' + i, kind: 'guard', n: i });     // ガード 10%〜50%
     return l;
 })();
-function shopItemPrice(it) { return it.kind === 'hp' ? SHOP_PRICE.hp : it.kind === 'atk' ? SHOP_PRICE.atk * it.n : SHOP_PRICE.guard * it.n; }
+function shopItemPrice(it) { return it.kind === 'hp' ? SHOP_PRICE.hp : it.kind === 'atk' ? SHOP_PRICE.sword * it.n : SHOP_PRICE.shield * it.n; }
+function itemEffect(it) { return it.kind === 'hp' ? HP_UP : it.kind === 'atk' ? it.n * 20 : it.n * 10; }   // さいだいHP / こうげき% / ガード%
 
 (function addBattleStrings() {
     const S = {
         ja: {
-            label_hp: 'HP', label_coins: 'コイン', label_power: 'つよさ',
+            label_hp: 'HP', label_coins: 'コイン', label_power: 'そうび',
             pw_atk: 'こうげき +{n}%', pw_guard: 'ガード {n}%', pw_hp: 'さいだいHP {n}', pw_none: 'まだ なし',
             guard_text: 'ガード！',
-            shop_title: 'ショップ', shop_sub: 'コインで どうぐを かおう！ 1つだけ 30%オフ！',
-            shop_hp_name: 'さいだいHP +{n}', shop_hp_desc: 'さいだいHPが {n} ふえる',
-            shop_atk_name: 'こうげき +{n}%', shop_atk_desc: 'ダメージが {n}% あがる',
-            shop_guard_name: 'ガード {n}%', shop_guard_desc: 'てきの こうげきを {n}% の かくりつで ふせぐ',
+            it_hp: 'いのちのハート',
+            it_atk_1: '木の剣', it_atk_2: 'どうの剣', it_atk_3: 'てつの剣', it_atk_4: 'はがねの剣', it_atk_5: 'ひかりの剣',
+            it_guard_1: '木の盾', it_guard_2: 'どうの盾', it_guard_3: 'てつの盾', it_guard_4: 'はがねの盾', it_guard_5: 'ひかりの盾',
+            ef_hp: 'さいだいHP +{n}', ef_atk: 'こうげき +{n}%', ef_guard: 'ガード {n}%',
+            shop_title: 'ショップ',
             shop_sale: '30%オフ', shop_buy: 'かう', shop_sold: 'かった！', shop_short: 'コインが たりない', shop_next: 'つぎの ステージへ ▶',
-            shop_have: 'もっている コイン', shop_stage: 'ステージ {n} クリア！',
+            shop_have: 'もっている コイン',
             sc_hp_full: 'HP', sc_hp_full_v: 'ぜんかいふく！', sc_coins: 'もっている コイン',
             btn_next_stage: 'ショップへ ▶',
             bd_time: 'のこりHP',
         },
         simple: {
-            label_hp: 'HP', label_coins: 'コイン', label_power: 'つよさ',
+            label_hp: 'HP', label_coins: 'コイン', label_power: 'そうび',
             pw_atk: 'こうげき +{n}%', pw_guard: 'ガード {n}%', pw_hp: 'さいだいHP {n}', pw_none: 'まだ なし',
             guard_text: 'ガード！',
-            shop_title: 'ショップ', shop_sub: 'コインで どうぐを かおう！ 1つだけ 30%オフ！',
-            shop_hp_name: 'さいだいHP +{n}', shop_hp_desc: 'さいだいHPが {n} ふえる',
-            shop_atk_name: 'こうげき +{n}%', shop_atk_desc: 'ダメージが {n}% あがる',
-            shop_guard_name: 'ガード {n}%', shop_guard_desc: 'てきの こうげきを {n}% の かくりつで ふせぐ',
+            it_hp: 'いのちの ハート',
+            it_atk_1: 'きの けん', it_atk_2: 'どうの けん', it_atk_3: 'てつの けん', it_atk_4: 'はがねの けん', it_atk_5: 'ひかりの けん',
+            it_guard_1: 'きの たて', it_guard_2: 'どうの たて', it_guard_3: 'てつの たて', it_guard_4: 'はがねの たて', it_guard_5: 'ひかりの たて',
+            ef_hp: 'さいだいHP +{n}', ef_atk: 'こうげき +{n}%', ef_guard: 'ガード {n}%',
+            shop_title: 'ショップ',
             shop_sale: '30%オフ', shop_buy: 'かう', shop_sold: 'かった！', shop_short: 'コインが たりない', shop_next: 'つぎの ステージへ ▶',
-            shop_have: 'もっている コイン', shop_stage: 'ステージ {n} クリア！',
+            shop_have: 'もっている コイン',
             sc_hp_full: 'HP', sc_hp_full_v: 'ぜんかいふく！', sc_coins: 'もっている コイン',
             btn_next_stage: 'ショップへ ▶',
             bd_time: 'のこりHP',
         },
         en: {
-            label_hp: 'HP', label_coins: 'Coins', label_power: 'Power-ups',
+            label_hp: 'HP', label_coins: 'Coins', label_power: 'Gear',
             pw_atk: 'Attack +{n}%', pw_guard: 'Guard {n}%', pw_hp: 'Max HP {n}', pw_none: 'None yet',
             guard_text: 'Guard!',
-            shop_title: 'Shop', shop_sub: 'Spend your coins! One item is 30% off!',
-            shop_hp_name: 'Max HP +{n}', shop_hp_desc: 'Max HP goes up by {n}',
-            shop_atk_name: 'Attack +{n}%', shop_atk_desc: 'Damage goes up by {n}%',
-            shop_guard_name: 'Guard {n}%', shop_guard_desc: '{n}% chance to block an enemy attack',
+            it_hp: 'Heart of Life',
+            it_atk_1: 'Wooden Sword', it_atk_2: 'Bronze Sword', it_atk_3: 'Iron Sword', it_atk_4: 'Steel Sword', it_atk_5: 'Light Sword',
+            it_guard_1: 'Wooden Shield', it_guard_2: 'Bronze Shield', it_guard_3: 'Iron Shield', it_guard_4: 'Steel Shield', it_guard_5: 'Light Shield',
+            ef_hp: 'Max HP +{n}', ef_atk: 'Attack +{n}%', ef_guard: 'Guard {n}%',
+            shop_title: 'Shop',
             shop_sale: '30% OFF', shop_buy: 'Buy', shop_sold: 'Bought!', shop_short: 'Not enough coins', shop_next: 'Next Stage ▶',
-            shop_have: 'Your coins', shop_stage: 'Stage {n} clear!',
+            shop_have: 'Your coins',
             sc_hp_full: 'HP', sc_hp_full_v: 'Fully restored!', sc_coins: 'Your coins',
             btn_next_stage: 'To the Shop ▶',
             bd_time: 'HP left',
         },
     };
     Object.keys(S).forEach(l => { if (STRINGS[l]) Object.assign(STRINGS[l], S[l]); });
+    if (typeof applyLanguage === 'function') applyLanguage();    // 右のパネルの「そうび」など、あとから足した文言を反映
 })();
 
 class Card {
@@ -260,6 +267,7 @@ function initGame() {
     state.atkBonus = 0;            // ショップで かった こうげきアップの ごうけい(0.3 = +30%)
     state.guard = 0;               // ショップで かった ガードの かくりつの ごうけい
     state.hpBought = 0;            // さいだいHPアップを かった数
+    state.equip = [];              // 買った そうび {kind, n} の ならび(右のパネルに イラストつきで出す)
     state.time = 0;
     state.stage = 1;
     state.normalKills = 0;
@@ -381,7 +389,7 @@ function updateUI() {
     }
 }
 
-// 買った どうぐ(つよさ)の 表示
+// 買った そうびの 合計(ショップの上と、右のパネルの まとめ)
 function powerLines() {
     const l = [];
     if (state.atkBonus > 0) l.push(T('pw_atk', { n: Math.round(state.atkBonus * 100) }));
@@ -389,13 +397,32 @@ function powerLines() {
     if (state.hpBought > 0) l.push(T('pw_hp', { n: state.maxHp }));
     return l;
 }
+// そうびの絵(剣・盾は 木→どう→てつ→はがね→ひかり で 色がかわる)
+const TIER_COL = ['#b98552', '#d98a3a', '#9aa5b8', '#4f86d6', '#f2c029'];
+function equipSvg(kind, n) {
+    if (kind === 'hp') return '<svg viewBox="0 0 48 48"><path d="M24 42C10 32 5 25 5 17.5 5 11.6 9.4 7 15 7c3.6 0 7 1.8 9 5 2-3.2 5.4-5 9-5 5.6 0 10 4.6 10 10.5C43 25 38 32 24 42z" fill="#ef5a5a" stroke="rgba(0,0,0,0.3)" stroke-width="1.5"/><path d="M14 14c-2 1-3 3-3 5" stroke="rgba(255,255,255,0.7)" stroke-width="3" stroke-linecap="round" fill="none"/></svg>';
+    const c = TIER_COL[Math.max(0, Math.min(4, n - 1))];
+    if (kind === 'atk') return '<svg viewBox="0 0 48 48"><g transform="rotate(40 24 24)"><path d="M24 1l6.500 7.500V31H17.500V8.500z" fill="' + c + '" stroke="rgba(0,0,0,0.35)" stroke-width="1.5" stroke-linejoin="round"/><path d="M24 6v23" stroke="rgba(255,255,255,0.65)" stroke-width="2.4" stroke-linecap="round"/><path d="M9 31h30v5H9z" fill="#8a5a22" stroke="rgba(0,0,0,0.35)" stroke-width="1.5"/><path d="M20.500 36h7v8h-7z" fill="#5a3d1a"/><circle cx="24" cy="46" r="2.600" fill="#8a5a22"/></g></svg>';
+    return '<svg viewBox="0 0 48 48"><path d="M24 3l17 6.500v12.500c0 10.500-7.500 18-17 23C14.500 40 7 32.500 7 22V9.500z" fill="' + c + '" stroke="rgba(0,0,0,0.35)" stroke-width="1.5" stroke-linejoin="round"/><path d="M24 11l10 4v7c0 6.500-4.500 11-10 14-5.500-3-10-7.500-10-14v-7z" fill="rgba(255,255,255,0.3)"/><path d="M24 3v42" stroke="rgba(0,0,0,0.2)" stroke-width="1.5"/></svg>';
+}
+function itemName(it) { return it.kind === 'hp' ? T('it_hp') : T('it_' + it.kind + '_' + it.n); }
+function itemEffectText(it) { return T('ef_' + it.kind, { n: itemEffect(it) }); }
 function updatePowerUI() {
     const el = document.getElementById('disp-powers');
     if (!el) return;
-    const l = powerLines(), sig = l.join('|') + '#' + currentLang;
+    const sig = (state.equip || []).map(e => e.kind + e.n).join(',') + '#' + state.maxHp + '#' + currentLang;
     if (SP.powerSig === sig) return;
     SP.powerSig = sig;
-    el.innerHTML = l.length ? l.map(t => `<div class="pw">${t}</div>`).join('') : `<div class="pw none">${T('pw_none')}</div>`;
+    const groups = [];
+    (state.equip || []).forEach(e => { const g = groups.find(x => x.kind === e.kind && x.n === e.n); if (g) g.c++; else groups.push({ kind: e.kind, n: e.n, c: 1 }); });
+    // 剣・盾は 強い順、ハートは さいごに
+    groups.sort((a, b) => (a.kind === 'hp') - (b.kind === 'hp') || (a.kind !== b.kind ? (a.kind === 'atk' ? -1 : 1) : b.n - a.n));
+    const sum = powerLines();
+    el.innerHTML = (sum.length ? `<div class="pws">${sum.map(t => `<span>${t}</span>`).join('')}</div>` : `<div class="pw none">${T('pw_none')}</div>`) +
+        groups.map(g => {
+            const it = { kind: g.kind, n: g.n };
+            return `<div class="eq k-${g.kind}"><div class="ic">${equipSvg(g.kind, g.n)}</div><div class="tx"><b>${itemName(it)}${g.c > 1 ? ` ×${g.c}` : ''}</b><span>${itemEffectText(it)}</span></div></div>`;
+        }).join('');
 }
 
 function scoreParticleFontSize(damage) {
@@ -552,7 +579,7 @@ function onUp(e) {
                 state.particles.push(new Particle(enemy.x + enemy.width / 2, enemy.y, `+${damage}`, '#ffca28', 'text', scoreFs));
                 state.particles.push(new Particle(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, "", "#ef5350", "circle"));
 
-                state.cards[idx] = null;                // こうげきは ただ(てきの こうげきは こない)
+                state.cards[idx] = null;
 
                 enemy.hp -= damage;
 
@@ -561,6 +588,7 @@ function onUp(e) {
                     enemy.isDefeated = true;
                 } else {
                     enemy.reroll(hitJ);
+                    enemyAttack();                  // こうげきも 1手: たおせなかったら、てきが こうげきしてくる
                 }
                 actionDone = true;
             }
@@ -697,17 +725,19 @@ function gameLoop() {
 // しばり(RUNの種類)は骨格ができてから増やす予定。今は「ふつう」だけ。
 const STAR_PRESETS = { 1: PRESET_EASY, 2: PRESET_NORMAL, 3: PRESET_HARD };
 const STAGE_ENEMIES = 2;      // 1ステージの通常の敵の数
-// てきの こうげき力(ENEMY_ATK はゲーム側で定義: n=ふつうのてき / nStep=ステージごとの増え方 / b=ボス / bStep)。ボット・シミュレーションで クリア率を測って決めた値。ルールを変えたら測り直す
+// てきの こうげき力(ENEMY_ATK はゲーム側で定義)。ボット・シミュレーションで クリア率を測って決めた値。ルールを変えたら測り直す
 
 function configForStage(star, stage) {
     const base = STAR_PRESETS[star] || PRESET_NORMAL;
     const lo = BOSS_MIN_SCALE[star] || 0.3;
     const bossScale = lo + (1 - lo) * (stage - 1) / (STAGE_COUNT - 1);   // ボスのHPはステージごとに増えて、最後は元のボスHP
-    const a = (typeof ENEMY_ATK !== 'undefined' && ENEMY_ATK[star]) || { n: 4, nStep: 0.4, b: 6, bStep: 0.7 };
+    // ENEMY_ATK[★] = { n: [ステージ1〜7のふつうの敵], b: [ステージ1〜7のボス] }(1回の こうげきの ダメージ)
+    const a = (typeof ENEMY_ATK !== 'undefined' && ENEMY_ATK[star]) || { n: [2, 2, 3, 4, 5, 5, 6], b: [3, 4, 5, 6, 7, 8, 9] };
+    const at = (arr, i) => arr[Math.min(arr.length - 1, i)];
     return Object.assign({}, base, {
         bossHP: Math.max(50, Math.round(base.bossHP * bossScale / 10) * 10),
-        atkNormal: Math.max(1, Math.round(a.n + a.nStep * (stage - 1))),
-        atkBoss: Math.max(1, Math.round(a.b + a.bStep * (stage - 1))),
+        atkNormal: Math.max(1, at(a.n, stage - 1)),
+        atkBoss: Math.max(1, at(a.b, stage - 1)),
     });
 }
 
@@ -1090,51 +1120,42 @@ GAME.clearHTML = (st, stageScore) => {
 };
 GAME.beforeNextStage = (cb) => openShop(cb);
 
-const MBS_ICON = {
-    hp: '<svg viewBox="0 0 48 48"><path d="M24 42C10 32 5 25 5 17.5 5 11.6 9.4 7 15 7c3.600 0 7 1.800 9 5 2-3.200 5.400-5 9-5 5.600 0 10 4.600 10 10.500C43 25 38 32 24 42z" fill="currentColor"/></svg>',
-    atk: '<svg viewBox="0 0 48 48"><g transform="rotate(40 24 24)"><path d="M24 2l6 7v22H18V9z" fill="currentColor"/><path d="M9 31h30v5H9z" fill="currentColor"/><path d="M20.5 36h7v8h-7z" fill="currentColor"/><circle cx="24" cy="46" r="2.6" fill="currentColor"/><path d="M24 7v22" stroke="rgba(255,255,255,0.6)" stroke-width="2.4"/></g></svg>',
-    guard: '<svg viewBox="0 0 48 48"><path d="M24 4l16 6v12c0 10-7 17-16 22C15 39 8 32 8 22V10z" fill="currentColor"/><path d="M24 12v26" stroke="rgba(255,255,255,0.55)" stroke-width="3"/></svg>',
-};
-let shopState = null;     // { list:[{it, price, sold}], saleIdx, cb }
+let shopState = null;     // { list:[{it, price, sale, sold}], cb }
 function shopPick() {
-    // ガードは うえげんに ついたら 出さない
-    let pool = SHOP_ITEMS.filter(it => !(it.kind === 'guard' && state.guard >= GUARD_CAP - 1e-9));
+    // 3つ: さいだいHP 20% / 剣 40% / 盾 40%(おなじ品は 2つ ならばない)。ガードは うえげんに ついたら 盾を出さない
+    const guardFull = state.guard >= GUARD_CAP - 1e-9;
     const picked = [];
-    while (picked.length < 5 && pool.length) {
-        const i = Math.floor(Math.random() * pool.length);
-        picked.push(pool.splice(i, 1)[0]);
+    let tries = 0;
+    while (picked.length < 3 && tries++ < 300) {
+        const r = Math.random();
+        let kind = r < SHOP_P.hp ? 'hp' : r < SHOP_P.hp + SHOP_P.atk ? 'atk' : 'guard';
+        if (kind === 'guard' && guardFull) kind = 'atk';
+        const pool = SHOP_ITEMS.filter(it => it.kind === kind && !picked.includes(it));
+        if (!pool.length) continue;
+        picked.push(pool[Math.floor(Math.random() * pool.length)]);
     }
     const saleIdx = Math.floor(Math.random() * picked.length);
     return picked.map((it, i) => ({ it, sale: i === saleIdx, price: Math.round(shopItemPrice(it) * (i === saleIdx ? SHOP_SALE : 1) / 10) * 10, sold: false }));
-}
-function shopNames(it) {
-    if (it.kind === 'hp') return { name: T('shop_hp_name', { n: HP_UP }), desc: T('shop_hp_desc', { n: HP_UP }), big: '+' + HP_UP };
-    if (it.kind === 'atk') return { name: T('shop_atk_name', { n: it.n * 10 }), desc: T('shop_atk_desc', { n: it.n * 10 }), big: '+' + (it.n * 10) + '%' };
-    return { name: T('shop_guard_name', { n: it.n * 5 }), desc: T('shop_guard_desc', { n: it.n * 5 }), big: (it.n * 5) + '%' };
 }
 function renderShop() {
     const el = document.getElementById('mb-shop');
     if (!el || !shopState) return;
     const cards = shopState.list.map((x, i) => {
-        const nm = shopNames(x.it);
         const can = !x.sold && state.coins >= x.price;
         const priceHtml = x.sale ? `<s>${shopItemPrice(x.it)}</s><b>${x.price}</b>` : `<b>${x.price}</b>`;
         return `<div class="mbs-card k-${x.it.kind}${x.sold ? ' sold' : ''}" data-i="${i}">
             ${x.sale ? `<div class="mbs-sale">${T('shop_sale')}</div>` : ''}
-            <div class="mbs-ic">${MBS_ICON[x.it.kind]}<span class="big ${x.it.kind}">${nm.big}</span></div>
-            <div class="mbs-nm">${nm.name}</div>
-            <div class="mbs-ds">${nm.desc}</div>
+            <div class="mbs-ic">${equipSvg(x.it.kind, x.it.n)}</div>
+            <div class="mbs-nm">${itemName(x.it)}</div>
+            <div class="mbs-ef">${itemEffectText(x.it)}</div>
             <div class="mbs-pr"><span class="cn"></span>${priceHtml}</div>
             <button class="mbs-buy" data-i="${i}" ${can ? '' : 'disabled'}>${x.sold ? T('shop_sold') : (can ? T('shop_buy') : T('shop_short'))}</button>
         </div>`;
     }).join('');
-    const pw = powerLines();
     el.innerHTML = `<div class="mbs-box">
         <div class="mbs-ribbon">${T('shop_title')}</div>
-        <div class="mbs-sub">${T('shop_stage', { n: state.stage })}　${T('shop_sub')}</div>
         <div class="mbs-top">
             <div class="mbs-coins"><span class="cn"></span><span class="lb">${T('shop_have')}</span><b>${state.coins}</b></div>
-            <div class="mbs-pw">${pw.length ? pw.map(t => `<span>${t}</span>`).join('') : `<span class="none">${T('pw_none')}</span>`}</div>
         </div>
         <div class="mbs-row">${cards}</div>
         <button class="mbs-next" id="mbs-next">${T('shop_next')}</button>
@@ -1147,9 +1168,10 @@ function shopBuy(i) {
     const x = shopState.list[i];
     if (!x || x.sold || state.coins < x.price) return;
     state.coins -= x.price; x.sold = true;
+    state.equip.push({ kind: x.it.kind, n: x.it.n });
     if (x.it.kind === 'hp') { state.maxHp += HP_UP; state.hp = state.maxHp; state.hpBought++; }
-    else if (x.it.kind === 'atk') state.atkBonus = Math.round((state.atkBonus + x.it.n * 0.1) * 100) / 100;
-    else state.guard = Math.min(GUARD_CAP, Math.round((state.guard + x.it.n * 0.05) * 100) / 100);
+    else if (x.it.kind === 'atk') state.atkBonus = Math.round((state.atkBonus + x.it.n * 0.2) * 100) / 100;
+    else state.guard = Math.min(GUARD_CAP, Math.round((state.guard + x.it.n * 0.1) * 100) / 100);
     updateUI();
     renderShop();
 }
