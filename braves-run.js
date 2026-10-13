@@ -167,7 +167,7 @@ function renderRunSelect() {
         (best && !cur.locked ? `　<span class="ds-best">${T('best_label', { n: best })}</span>` : '');
     document.getElementById('star-row').innerHTML = SINGLE_STAR ? '' : Array.from({ length: STAR_MAX }, (_, i) => i + 1).filter(n => starVisible(n)).map(n => {
         const locked = !starUnlocked(n);
-        return `<button class="star-btn${n === selStar ? ' active' : ''}${locked ? ' locked' : ''}${starCleared(n) ? ' cleared' : ''}" data-star="${n}">${n === selStar ? `<em class="pick">▶ ${T('rs_picked')}</em>` : ''}${'★'.repeat(n)}<small>${locked ? `<span class="ico" style="width:.85em;height:.85em;vertical-align:-.1em">${ICO.lock}</span> ` : (starCleared(n) ? '✔ ' : '')}${diffName(n)}</small></button>`;
+        return `<button class="star-btn${n === selStar ? ' active' : ''}${locked ? ' locked' : ''}${starCleared(n) ? ' cleared' : ''}${n === 4 ? ' secret4' : (n === 5 ? ' secret5' : '')}" data-star="${n}">${n === selStar ? `<em class="pick">▶ ${T('rs_picked')}</em>` : ''}${'★'.repeat(n)}<small>${locked ? `<span class="ico" style="width:.85em;height:.85em;vertical-align:-.1em">${ICO.lock}</span> ` : (starCleared(n) ? '✔ ' : '')}${diffName(n)}</small></button>`;
     }).join('');
     document.querySelectorAll('#star-row .star-btn').forEach(el => {
         bindBtn(el, () => {
@@ -181,7 +181,7 @@ function renderRunSelect() {
     // ひらいているRUNを、すべて★3でクリアしたら、まん中の上に バッジを出す
     const mb = document.getElementById('ds-master-badge');
     mb.innerHTML = `<span class="rs-medal m3 mini">${CROWN_SVG}</span>${T('master_badge')}`;
-    mb.classList.toggle('hidden', !(RUN_LIST.some(r => !r.locked) && !SINGLE_STAR && starCleared(STAR_MAX)));
+    mb.classList.toggle('hidden', !(RUN_LIST.some(r => !r.locked) && !SINGLE_STAR && starCleared(Math.min(STAR_MAX, 3))));   // バッジは ★3クリアで(★4・★5は シークレット)
     document.getElementById('rs-prev').disabled = runSelIdx <= 0;
     document.getElementById('rs-next').disabled = runSelIdx >= RUN_LIST.length - 1;
 }

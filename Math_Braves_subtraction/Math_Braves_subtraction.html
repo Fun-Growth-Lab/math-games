@@ -15,7 +15,7 @@
     <title>ひきざんカードバトル - Fun & Growth Lab</title>
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../fgl-hero.css?v=12">
-    <link rel="stylesheet" href="../braves-common.css?v=20261231">
+    <link rel="stylesheet" href="../braves-common.css?v=20261232">
     <style>
         :root { --h:352; --led:#ffd24a; --led-soft:rgba(255,210,74,0.4); }
         .mon { --c:#e2394e; --d:#a31a33; }
@@ -76,12 +76,36 @@ const PRESET_HARD = {
     hpBase: 65, hpStep: 15
 };
 
-const ENEMY_ATK = {   // てきの こうげき力(1回の ダメージ)。n=ふつうのてき / b=ボス。左から ステージ1〜7。ボットで クリア率を測って決めた値(★1〜3 = ボット約63/34/16%・ボスの必殺技あり)
+// シークレット★4(名人): ★3と同じ数字の範囲で、てきのHPが ふえる(攻撃力は ENEMY_ATK)
+const PRESET_MASTER = {
+    label: "名人",
+    handMin: 1, handMax: 20,
+    enemyMin: 0, enemyMax: 15,
+    bossMin: 10, bossMax: 15,
+    enemyCount: 10, bossHP: 740,
+    gemProb: [30, 25, 20, 15, 10],
+    hpBase: 81, hpStep: 19
+};
+
+// シークレット★5(伝説): ★3と同じ数字の範囲で、てきのHPが ふえる(攻撃力は ENEMY_ATK)
+const PRESET_LEGEND = {
+    label: "伝説",
+    handMin: 1, handMax: 20,
+    enemyMin: 0, enemyMax: 15,
+    bossMin: 10, bossMax: 15,
+    enemyCount: 10, bossHP: 890,
+    gemProb: [30, 25, 20, 15, 10],
+    hpBase: 98, hpStep: 23
+};
+
+const ENEMY_ATK = {   // てきの こうげき力(1回の ダメージ)。n=ふつうのてき / b=ボス。左から ステージ1〜7。ボットで クリア率を測って決めた値(★4名人=ボット約10%・★5伝説=約5%。★1〜3 = ボット約63/34/16%・ボスの必殺技あり)
     1: { n: [1,1,2,2,4,4,6], b: [1,2,3,3,4,5,6] },
     2: { n: [1,2,3,3,3,4,6], b: [2,2,3,4,5,5,8] },
     3: { n: [1,2,3,3,5,6,6], b: [3,3,3,5,5,6,7] },
+    4: { n: [1,1,2,3,4,5,6], b: [2,2,3,4,5,6,8] },
+    5: { n: [1,1,2,2,3,5,7], b: [2,2,3,4,5,6,9] },
 };
-const BOSS_MIN_SCALE = { 1: 0.5, 2: 0.5, 3: 0.5 };   // ステージ1のボスHP(最後のステージのボスHPに対する割合)
+const BOSS_MIN_SCALE = { 1: 0.5, 2: 0.5, 3: 0.5, 4: 0.5, 5: 0.5 };   // ステージ1のボスHP(最後のステージのボスHPに対する割合)
 const ENEMY_COLORS = [
     { body:'#e2394e', dark:'#a31a33' },
     { body:'#f07a2a', dark:'#b4500f' },
@@ -103,6 +127,7 @@ const ROBOTS = [
 ];
 const ROBOT_BOSS = `<div class="ab rd" style="left:8px;top:50px;width:174px;height:130px;clip-path:polygon(10% 0,90% 0,100% 100%,0 100%);opacity:.75"></div><div class="ab dk" style="left:54px;top:140px;width:30px;height:44px;border-radius:8px"></div><div class="ab dk" style="left:106px;top:140px;width:30px;height:44px;border-radius:8px"></div><div class="ab sh" style="left:2px;top:76px;width:38px;height:70px;border-radius:18px"></div><div class="ab sh" style="left:150px;top:76px;width:38px;height:70px;border-radius:18px"></div><div class="ab rd" style="left:40px;top:84px;width:110px;height:70px;border-radius:20px"></div><div class="ab gd" style="left:80px;top:100px;width:30px;height:30px;border-radius:50%"></div><div class="ab sh" style="left:44px;top:22px;width:102px;height:78px;border-radius:22px"></div><div class="ab scr" style="left:54px;top:40px;width:82px;height:44px;border-radius:14px"></div><div class="ab " style="left:64px;top:50px;width:20px;height:22px;background:#ff4d4d;box-shadow:0 0 12px #ff4d4d;clip-path:polygon(0 0,100% 40%,100% 100%,0 60%)"></div><div class="ab " style="left:106px;top:50px;width:20px;height:22px;background:#ff4d4d;box-shadow:0 0 12px #ff4d4d;clip-path:polygon(100% 0,0 40%,0 100%,100% 60%)"></div><div class="ab gd" style="left:46px;top:-6px;width:98px;height:36px;clip-path:polygon(0 100%,0 20%,22% 55%,50% 0,78% 55%,100% 20%,100% 100%)"></div>`;
 const GAME = {
+    starMax: 5,                     // ★1〜3 + シークレット★4(名人)・★5(伝説)。ひとつ前をクリアすると あらわれる
     stageCount: 7,                  // 1RUN=7ステージ(各ステージ: 敵2体→ボス)。HP制: ステージクリアで ぜんかいふく→ショップ
     clearBonus: 1000,               // クリアしたRUNの得点に足すボーナス
     sbGame: 'math_braves_subtraction_v3',
@@ -205,8 +230,8 @@ const GAME = {
 <script src="../fgl-hero.js?v=12"></script>
 <script src="../fgl-name.js?v=20261223"></script>
 <script src="../braves-common.js?v=20261227"></script>
-<script src="../braves-battle.js?v=20261231"></script>
-<script src="../braves-run.js?v=20261227"></script>
+<script src="../braves-battle.js?v=20261232"></script>
+<script src="../braves-run.js?v=20261232"></script>
 <script>
 function startTutorial() {
     FGLTutorial.begin({ root: '#container', getLang: () => currentLang });

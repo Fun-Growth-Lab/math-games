@@ -50,7 +50,7 @@ function itemEffect(it) { return it.kind === 'hp' ? HP_UP : it.kind === 'coin' ?
 (function addBattleStrings() {
     const S = {
         ja: {
-            label_hp: 'HP', label_coins: 'コイン', label_power: 'そうび',
+            label_hp: 'HP', label_coins: 'コイン', label_power: 'そうび', diff_master: '名人', diff_legend: '伝説',
             pw_atk: 'こうげき +{n}%', pw_guard: 'ガード {n}%', pw_hp: 'さいだいHP {n}', pw_none: 'まだ なし',
             guard_text: 'ガード！',
             it_hp: 'いのちのハート', it_coin: 'きんのおまもり', it_potion: 'ポーション', it_dance: 'つるぎのまい',
@@ -68,7 +68,7 @@ function itemEffect(it) { return it.kind === 'hp' ? HP_UP : it.kind === 'coin' ?
             bd_time: 'のこりHP',
         },
         simple: {
-            label_hp: 'HP', label_coins: 'コイン', label_power: 'そうび',
+            label_hp: 'HP', label_coins: 'コイン', label_power: 'そうび', diff_master: 'めいじん', diff_legend: 'でんせつ',
             pw_atk: 'こうげき +{n}%', pw_guard: 'ガード {n}%', pw_hp: 'さいだいHP {n}', pw_none: 'まだ なし',
             guard_text: 'ガード！',
             it_hp: 'いのちの ハート', it_coin: 'きんの おまもり', it_potion: 'ポーション', it_dance: 'つるぎの まい',
@@ -86,7 +86,7 @@ function itemEffect(it) { return it.kind === 'hp' ? HP_UP : it.kind === 'coin' ?
             bd_time: 'のこりHP',
         },
         en: {
-            label_hp: 'HP', label_coins: 'Coins', label_power: 'Gear',
+            label_hp: 'HP', label_coins: 'Coins', label_power: 'Gear', diff_master: 'Master', diff_legend: 'Legend',
             pw_atk: 'Attack +{n}%', pw_guard: 'Guard {n}%', pw_hp: 'Max HP {n}', pw_none: 'None yet',
             guard_text: 'Guard!',
             it_hp: 'Heart of Life', it_coin: 'Gold Charm', it_potion: 'Potion', it_dance: 'Sword Dance',
@@ -770,6 +770,8 @@ function gameLoop() {
 // 残り時間(AP)と手札はステージをまたいで引きつぐ。★1〜3で手札/敵の数字の範囲とHPが変わる。
 // しばり(RUNの種類)は骨格ができてから増やす予定。今は「ふつう」だけ。
 const STAR_PRESETS = { 1: PRESET_EASY, 2: PRESET_NORMAL, 3: PRESET_HARD };
+if (typeof PRESET_MASTER !== 'undefined') STAR_PRESETS[4] = PRESET_MASTER;     // シークレット★4(名人)
+if (typeof PRESET_LEGEND !== 'undefined') STAR_PRESETS[5] = PRESET_LEGEND;     // シークレット★5(伝説)
 const STAGE_ENEMIES = 2;      // 1ステージの通常の敵の数
 // てきの こうげき力(ENEMY_ATK はゲーム側で定義)。ボット・シミュレーションで クリア率を測って決めた値。ルールを変えたら測り直す
 
@@ -794,7 +796,7 @@ function updateStageLabel() {
     const n = Math.min(state.stage, STAGE_COUNT);
     ui.difficultyLabel.textContent = `${n} / ${STAGE_COUNT}`;
     document.getElementById('sp-run').textContent = T('run_' + RUN_LIST[runSelIdx].id + '_name');
-    document.getElementById('sp-diff').textContent = '★'.repeat(state.star) + ' ' + T(['diff_easy', 'diff_normal', 'diff_hard'][state.star - 1]);
+    document.getElementById('sp-diff').textContent = '★'.repeat(state.star) + ' ' + diffName(state.star);
     let h = '';
     for (let k = 1; k <= STAGE_COUNT; k++) h += `<div class="rt ${k < n ? 'done' : (k === n ? 'now' : '')}${k === STAGE_COUNT ? ' last' : ''}" style="--rc:${STAGE_THEMES[k - 1].c}"><b class="no">${k}</b><span class="nm">${stageName(k)}</span></div>`;
     document.getElementById('sp-route').innerHTML = h;
