@@ -16,7 +16,17 @@ const GUARD_CAP = 0.7;           // ガードの かくりつの うえげん
 // 値段: hp=いのちのハート / sword=剣(1だんあたり) / shield=盾(1だんあたり)。剣は +20%ずつ、盾は ガード10%ずつ、どちらも 5だん
 const SHOP_PRICE = Object.assign({ hp: 500, sword: 600, shield: 500 }, GAME.shopPrice || {});
 const SHOP_SALE = 0.7;           // 3つのうち1つだけ 30%オフ
-const SHOP_P = { hp: 0.2, atk: 0.4, guard: 0.4 };   // ショップに ならぶ確率: さいだいHP 20% / 剣 40% / 盾 40%
+const SHOP_P = { hp: 0.2, atk: 0.4, guard: 0.4 };   // ショップに ならぶ確率: さいだいHP 20% / 剣 40% / 盾 40%(さいだいHPは どのショップでも 20%)
+// 剣・盾の「段(1〜5)」の出やすさ。ステージが すすむほど 強い段が出やすい(重み。左から 段1〜5)。
+// 並び=ステージ1〜6をクリアしたあとの 6回のショップ。平均の段は およそ 1.5 → 2.0 → 2.7 → 3.4 → 3.9 → 4.2
+const SHOP_TIER_W = GAME.shopTierWeights || [
+    [60, 30, 8, 2, 0],      // ステージ1のあと
+    [38, 36, 18, 7, 1],     // 2
+    [20, 32, 30, 14, 4],    // 3
+    [8, 22, 32, 28, 10],    // 4
+    [3, 10, 27, 38, 22],    // 5
+    [1, 5, 20, 39, 35],     // 6
+];
 const SHOP_ITEMS = (() => {
     const l = [{ id: 'hp', kind: 'hp', n: 1 }];
     for (let i = 1; i <= 5; i++) l.push({ id: 'a' + i, kind: 'atk', n: i });       // こうげき +20%〜+100%
@@ -1109,7 +1119,7 @@ function fxBossFlash() {
 // ============================================================
 //  ショップ(ステージクリアのあと)
 // ============================================================
-// 5つの どうぐが ランダムに ならび、1つだけ 30%オフ。コイン(=あたえたダメージ)で買う。同じ種類は 何回でも買えて、効果は たし算で ふえる。
+// 3つの どうぐが ならび、1つだけ 30%オフ。コイン(=あたえたダメージ)で買う。同じ種類は 何回でも買えて、効果は たし算で ふえる。ステージが すすむほど 強い剣・盾が ならびやすい。
 GAME.hideNextStage = true;                                   // ステージクリアの画面に「つぎは〜」を出さない
 GAME.clearHTML = (st, stageScore) => {
     const pts = T('unit_pts');
@@ -1123,7 +1133,9 @@ GAME.beforeNextStage = (cb) => openShop(cb);
 let shopState = null;     // { list:[{it, price, sale, sold}], cb }
 function shopPick() {
     // 3つ: さいだいHP 20% / 剣 40% / 盾 40%(おなじ品は 2つ ならばない)。ガードは うえげんに ついたら 盾を出さない
+    // 剣・盾の段は、いまの ステージに あわせた重み(SHOP_TIER_W)で えらぶ
     const guardFull = state.guard >= GUARD_CAP - 1e-9;
+    const w = SHOP_TIER_W[Math.max(0, Math.min(SHOP_TIER_W.length, state.stage) - 1)];
     const picked = [];
     let tries = 0;
     while (picked.length < 3 && tries++ < 300) {
@@ -1132,7 +1144,10 @@ function shopPick() {
         if (kind === 'guard' && guardFull) kind = 'atk';
         const pool = SHOP_ITEMS.filter(it => it.kind === kind && !picked.includes(it));
         if (!pool.length) continue;
-        picked.push(pool[Math.floor(Math.random() * pool.length)]);
+        const wt = pool.map(it => it.kind === 'hp' ? 1 : (w[it.n - 1] || 0));
+        let x = Math.random() * wt.reduce((a, b) => a + b, 0), k = 0;
+        while (k < pool.length - 1 && x >= wt[k]) { x -= wt[k]; k++; }
+        picked.push(pool[k]);
     }
     const saleIdx = Math.floor(Math.random() * picked.length);
     return picked.map((it, i) => ({ it, sale: i === saleIdx, price: Math.round(shopItemPrice(it) * (i === saleIdx ? SHOP_SALE : 1) / 10) * 10, sold: false }));
