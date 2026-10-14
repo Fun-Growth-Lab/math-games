@@ -309,7 +309,7 @@ const STRINGS = {
         btn_close: 'とじる',
         game_clear_title: '🎉 ゲームクリア！ 🎉', game_over_title: 'ゲームオーバー！',
         label_score_colon: 'スコア: ', label_tens_colon: '10をつくった回数: ', label_boss_defeated_colon: 'BOSS撃破: {a} / {b}',
-        rank_title: 'ランキング (TOP 10)', rank_tab_local: 'ローカル', rank_tab_world: 'ワールド (ネット)',
+        rank_title: 'ランキング (TOP 30)', rank_tab_local: 'ローカル', rank_tab_world: 'ワールド (ネット)',
         rank_empty: 'データがありません', rank_loading_or_empty: '読み込み中 または データなし', pts_suffix: ' 点',
         boss_appear: '{emoji} BOSS 登場！', boss_defeat: '{emoji} 撃破！',
         settings_title: '⚙ 設定', settings_sub: '言語 / Language', lang_simple: 'かんたんなにほんご', lang_ja: '日本語', lang_en: 'English',
@@ -363,7 +363,7 @@ const STRINGS = {
         btn_close: 'とじる',
         game_clear_title: '🎉 ゲームクリア！ 🎉', game_over_title: 'ゲームオーバー！',
         label_score_colon: 'スコア: ', label_tens_colon: '10を つくった かいすう: ', label_boss_defeated_colon: 'BOSSたおした: {a} / {b}',
-        rank_title: 'ランキング (TOP 10)', rank_tab_local: 'ローカル', rank_tab_world: 'ワールド (ネット)',
+        rank_title: 'ランキング (TOP 30)', rank_tab_local: 'ローカル', rank_tab_world: 'ワールド (ネット)',
         rank_empty: 'データが ありません', rank_loading_or_empty: 'よみこみちゅう または データなし', pts_suffix: ' てん',
         boss_appear: '{emoji} BOSS とうじょう！', boss_defeat: '{emoji} たおした！',
         settings_title: '⚙ せってい', settings_sub: '言語 / Language', lang_simple: 'かんたんなにほんご', lang_ja: '日本語', lang_en: 'English',
@@ -417,7 +417,7 @@ const STRINGS = {
         btn_close: 'Close',
         game_clear_title: '🎉 GAME CLEAR! 🎉', game_over_title: 'GAME OVER!',
         label_score_colon: 'Score: ', label_tens_colon: 'Tens Made: ', label_boss_defeated_colon: 'Bosses Beaten: {a} / {b}',
-        rank_title: 'Ranking (TOP 10)', rank_tab_local: 'Local', rank_tab_world: 'World (Online)',
+        rank_title: 'Ranking (TOP 30)', rank_tab_local: 'Local', rank_tab_world: 'World (Online)',
         rank_empty: 'No data', rank_loading_or_empty: 'Loading or no data', pts_suffix: ' pt',
         boss_appear: '{emoji} BOSS Appeared!', boss_defeat: '{emoji} Defeated!',
         settings_title: '⚙ Settings', settings_sub: '言語 / Language', lang_simple: 'かんたんなにほんご', lang_ja: '日本語', lang_en: 'English',
@@ -549,6 +549,8 @@ const Game = (function() {
     
     // ランキング用
     let rankingData = [];
+    let rankingPage = 0;          // ランキングの ページ(0=1〜10位 / 1=11〜20位 / 2=21〜30位)
+    const RANK_PER_PAGE = 10;
     let rankingScope = 'world';
     let rankingTab = 'easy'; 
     
@@ -1966,10 +1968,11 @@ const Game = (function() {
             if(rankingScope === 'world') msg = T('rank_loading_or_empty');
             ctx.fillText(msg, BASE_WIDTH/2, 400);
         } else {
-            rankingData.forEach((d, i) => {
-                ctx.fillStyle = i < 3 ? "#E65100" : "#5D4037";
+            rankingData.slice(rankingPage * RANK_PER_PAGE, (rankingPage + 1) * RANK_PER_PAGE).forEach((d, i) => {
+                const no = rankingPage * RANK_PER_PAGE + i;
+                ctx.fillStyle = no < 3 ? "#E65100" : "#5D4037";
                 ctx.textAlign = "left";
-                ctx.fillText(`${i+1}. ${d.name}`, 300, startY + i*rowH);
+                ctx.fillText(`${no+1}. ${d.name}`, 300, startY + i*rowH);
                 ctx.textAlign = "right";
                 ctx.fillText(`${d.score}${T('pts_suffix')}`, 980, startY + i*rowH);
                 if (d.date) {
@@ -1984,6 +1987,13 @@ const Game = (function() {
             });
         }
         drawButton(BASE_WIDTH/2, 685, 200, 50, T('btn_back'), "#B0BEC5");
+        // 11位以下が あるときは ページの ボタン(1-10 / 11-20 / 21-30)
+        if (rankingData.length > RANK_PER_PAGE) {
+            for (let p = 0; p * RANK_PER_PAGE < rankingData.length && p < 3; p++) {
+                const on = rankingPage === p;
+                drawButton(BASE_WIDTH/2 + 220 + p * 130, 685, 120, 50, `${p * RANK_PER_PAGE + 1}-${Math.min(30, (p + 1) * RANK_PER_PAGE)}`, on ? "#4285F4" : "#E0E0E0", on ? "#FFF" : "#9E9E9E");
+            }
+        }
     }
 
     function drawSettings() {
@@ -2248,6 +2258,9 @@ const Game = (function() {
     
     function checkRankingClick(x, y) {
         if(isBtnClicked(x, y, BASE_WIDTH/2, 685, 200, 50)) { currentState = STATE.TITLE; return; }
+        for (let p = 0; p < 3; p++) {   // ページの ボタン
+            if (p * RANK_PER_PAGE < rankingData.length && isBtnClicked(x, y, BASE_WIDTH/2 + 220 + p * 130, 685, 120, 50)) { rankingPage = p; return; }
+        }
         const scopeY = 100;
         if(isBtnClicked(x, y, BASE_WIDTH/2 - 150, scopeY, 280, 42)) { if(rankingScope !== 'local') { rankingScope = 'local'; updateRankingView(); } }
         else if(isBtnClicked(x, y, BASE_WIDTH/2 + 150, scopeY, 280, 42)) { if(rankingScope !== 'world') { rankingScope = 'world'; updateRankingView(); } }
@@ -2324,13 +2337,14 @@ const Game = (function() {
     
     function updateRankingView() {
         rankingData = [];
+        rankingPage = 0;
         if(rankingScope === 'local') fetchLocalRanking(rankingTab);
         else fetchWorldRanking(rankingTab);
     }
 
     function fetchLocalRanking(diff) {
         let localScores = JSON.parse(localStorage.getItem('tasuten_scores') || "[]");
-        rankingData = localScores.filter(d => d.difficulty === diff).sort((a, b) => b.score - a.score).slice(0, 10);
+        rankingData = localScores.filter(d => d.difficulty === diff).sort((a, b) => b.score - a.score).slice(0, 30);
     }
     
     function fetchWorldRanking(diff) {
@@ -2340,7 +2354,7 @@ const Game = (function() {
             'game': 'eq.tasu_ten',
             'difficulty': 'eq.' + diff,
             'order': 'point_score.desc',
-            'limit': '10'
+            'limit': '30'
         });
         fetch(window._sb.b + '/rankings?' + params.toString(), { headers: window._sb.rh })
             .then(res => { if(!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })

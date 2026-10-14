@@ -525,6 +525,8 @@ let answeredCodes = [];
 let wrongCodes = [];
 
 let rankingTab = 'world';
+let rankingPage = 0;          // ランキングの ページ(0=1〜10位 / 1=11〜20位 / 2=21〜30位)
+const RANK_PER_PAGE = 10;
 let rankingMode = 'name';
 let rankingLv = 4;
 let rankingData = [];
@@ -696,6 +698,12 @@ function handleInput(e) {
             if (x > 780 && x < 880) { rankingLv = 4; fetchRanking(); }
             if (x > 890 && x < 990) { rankingLv = 8; fetchRanking(); }
             if (rankingMode !== 'region' && x > 1000 && x < 1120) { rankingLv = 47; fetchRanking(); }
+        }
+        if (y > 810 && y < 870) {   // ページの ボタン
+            const cnt = rankingData.filter(d => d.level == rankingLv && d.mode == rankingMode).slice(0, 30).length;
+            for (let p = 0; p < 3; p++) {
+                if (x > 1000 + p * 130 && x < 1120 + p * 130 && p * RANK_PER_PAGE < cnt) { rankingPage = p; requestRedraw(); }
+            }
         }
         if (x > 700 && x < 900 && y > 780 && y < 860) gameState = 'title';
     } else if (gameState === 'playing') {
@@ -1179,10 +1187,11 @@ function drawRanking() {
     const headers = [T('rank_h_rank'), T('rank_h_name'), T('rank_h_correct'), T('rank_h_time'), T('rank_h_date')];
     headers.forEach((h, i) => drawText(h, startX + cols[i], startY, 24, "bold", "#78c850"));
     if (rankingLoading && rankingTab === 'world') drawText(T('rank_loading'), startX + 580, startY + 180, 36, "bold", "#8d7d6a");
-    rankingData.filter(d => d.level == rankingLv && d.mode == rankingMode).slice(0, 10).forEach((d, i) => {
+    const rankRows = rankingData.filter(d => d.level == rankingLv && d.mode == rankingMode).slice(0, 30);
+    rankRows.slice(rankingPage * RANK_PER_PAGE, (rankingPage + 1) * RANK_PER_PAGE).forEach((d, i) => {
         const py = startY + 50 + i * rowH;
         const name = d.name || T('rank_guest');
-        drawText(i + 1, startX + cols[0], py, 26, "", "#000000");
+        drawText(rankingPage * RANK_PER_PAGE + i + 1, startX + cols[0], py, 26, "", "#000000");
         drawText(name, startX + cols[1], py, 26, "", "#000000");
         drawText(`${d.correct || 0}${T('correct_suffix')}`, startX + cols[2], py, 26, "", "#000000");
         const timeText = d.timeHasDecimal ? parseFloat(d.time).toFixed(2) : String(Math.round(d.time));
@@ -1190,6 +1199,13 @@ function drawRanking() {
         drawText(d.date || "-", startX + cols[4], py, 20, "", "#666666");
     });
     drawButton(700, 810, 200, 60, T('result_to_title'), "#c1e1c1", 26, "#000");
+    // 11位以下が あるときは、ページの ボタン(1〜10位 / 11〜20位 / 21〜30位)を出す
+    if (rankRows.length > RANK_PER_PAGE) {
+        for (let p = 0; p * RANK_PER_PAGE < rankRows.length && p < 3; p++) {
+            const on = rankingPage === p;
+            drawButton(1000 + p * 130, 810, 120, 60, `${p * RANK_PER_PAGE + 1}-${Math.min(30, (p + 1) * RANK_PER_PAGE)}`, on ? "#5bc0de" : "#e2f0d9", 22, on ? "#fff" : "#8d7d6a");
+        }
+    }
 }
 
 function drawResult() {
@@ -1326,7 +1342,7 @@ async function loadWorldRows(lv, mode) {
         difficulty: 'eq.' + String(lv),
         class_name: 'eq.' + mode,
         order: 'point_score.desc,turns.asc',
-        limit: '20',
+        limit: '30',
         select: 'player_name,point_score,turns,stage_score,created_at'
     });
     const res = await fetch(window._sb.b + '/rankings?' + params.toString(), { headers: window._sb.rh });
@@ -1367,6 +1383,7 @@ function prefetchRanking(mode) {
 }
 
 async function fetchRanking() {
+    rankingPage = 0;     // タブ・難易度を かえたら 1〜10位に もどす
     // 連続で難易度・タブ等を切り替えたとき、後から返ってきた古い通信結果が
     // 最新の選択結果を上書きしてしまうのを防ぐガード
     const seq = ++rankingFetchSeq;

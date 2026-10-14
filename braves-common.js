@@ -1101,7 +1101,7 @@ function saveScore(difficulty, score, stage, cleared) {
     const entry = { score, name: state.playerName, date: dateStr, stage: stage || 0, clear: !!cleared };
     ranking.push(entry);
     ranking.sort((a, b) => b.score - a.score);
-    ranking = ranking.slice(0, 10);
+    ranking = ranking.slice(0, 30);
 
     localStorage.setItem(key, JSON.stringify(ranking));
 
@@ -1130,7 +1130,7 @@ function saveBestPlay(difficulty, stage, cleared) {
     const now = new Date();
     ranking.push({ score, name: state.playerName, date: `${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()}`, stage: stage || 0, clear: !!cleared });
     ranking.sort((a, b) => b.score - a.score);
-    localStorage.setItem(getRankingKey(hkey), JSON.stringify(ranking.slice(0, 10)));
+    localStorage.setItem(getRankingKey(hkey), JSON.stringify(ranking.slice(0, 30)));
     if (window.currentUser && window.saveOnlineScore) {
         window.saveOnlineScore(window.currentUser.uid, state.playerName, difficulty, score, stage, cleared ? 'クリア' : 'ステージ' + stage, HAND_GAME_ID());
     }
@@ -1196,14 +1196,14 @@ async function loadRankRows() {
     if (state.rankingMode === 'WORLD') {
         list.innerHTML = `<li class="rk-loading">${T('rank_loading')}</li>`;
         if (!window.fetchOnlineRanking) return;
-        const parts = await Promise.all(stars.map(async k => { const r = await window.fetchOnlineRanking(starKey(k, rkRunIdx), rkStar ? 20 : 10, rkKind === 'hand' ? HAND_GAME_ID() : undefined); return (r || []).map(x => Object.assign({ star: k }, x)); }));
+        const parts = await Promise.all(stars.map(async k => { const r = await window.fetchOnlineRanking(starKey(k, rkRunIdx), 30, rkKind === 'hand' ? HAND_GAME_ID() : undefined); return (r || []).map(x => Object.assign({ star: k }, x)); }));
         if (mySeq !== rkSeq) return;       // 読み込み中に切りかえられたら古い結果は捨てる
         rows = [].concat.apply([], parts);
     } else {
         rows = [].concat.apply([], stars.map(k => getLocalRanking((rkKind === 'hand' ? 'HAND_' : '') + starKey(k, rkRunIdx)).map(x => Object.assign({ star: k }, x))));
     }
     rows.sort((a, b) => b.score - a.score);
-    renderRankRows(rows.slice(0, 20));
+    renderRankRows(rows.slice(0, 30));
 }
 function renderRankRows(rows) {
     const list = document.getElementById('rk-list');

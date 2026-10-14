@@ -327,8 +327,10 @@ function startGame(diff) {
 let rankingState = {
     difficulty: 0,
     mode: 'world',
+    page: 0,          // 0=1〜10位 / 1=11〜20位 / 2=21〜30位
     data: []
 };
+const RANK_PER_PAGE = 10;
 
 // --- Logic ---
 
@@ -1024,6 +1026,7 @@ function saveScore() {
 }
 
 async function loadRanking(diff, mode) {
+    rankingState.page = 0;
     rankingState.data = [];
     
     if (mode === 'local') {
@@ -1048,8 +1051,8 @@ async function loadRanking(diff, mode) {
             return (b.gold || 0) - (a.gold || 0);
         });
         
-        // 上位10件を表示用に整形
-        rankingState.data = filtered.slice(0, 10).map(d => ({
+        // 上位30件を表示用に整形
+        rankingState.data = filtered.slice(0, 30).map(d => ({
             name: d.name || "Unknown",
             floor: d.floor,
             gold: (d.gold !== undefined) ? d.gold : 0,
@@ -1065,7 +1068,7 @@ async function loadRanking(diff, mode) {
                 game: 'eq.typing_saga',
                 difficulty: 'eq.' + diffLabel,
                 order: 'point_score.desc,stage_score.desc',
-                limit: '10',
+                limit: '30',
                 select: 'player_name,point_score,stage_score,created_at'
             });
             const res = await fetch(window._sb.b + '/rankings?' + params.toString(), {
@@ -1374,14 +1377,15 @@ function drawRanking() {
     if (rankingState.data.length === 0) {
         drawText("データがありません", 480, 340, 24, "#ccc", "center");
     } else {
-        rankingState.data.forEach((d, i) => {
+        rankingState.data.slice(rankingState.page * RANK_PER_PAGE, (rankingState.page + 1) * RANK_PER_PAGE).forEach((d, i) => {
+            const no = rankingState.page * RANK_PER_PAGE + i;
             const y = 205 + i * 38;
             let rankColor = "#fff";
-            if (i===0) rankColor = "#ffd700";
-            else if (i===1) rankColor = "#c0c0c0";
-            else if (i===2) rankColor = "#cd7f32";
+            if (no===0) rankColor = "#ffd700";
+            else if (no===1) rankColor = "#c0c0c0";
+            else if (no===2) rankColor = "#cd7f32";
 
-            drawText(`${i+1}`, 120, y, 20, rankColor, "center");
+            drawText(`${no+1}`, 120, y, 20, rankColor, "center");
             drawText(d.name || "Unknown", 200, y, 20, "#fff");
 
             // ★修正: d.score ではなく d.gold を表示
@@ -1394,6 +1398,12 @@ function drawRanking() {
     }
 
     drawMcButton(380, 578, 200, 34, "戻る", "#555", "#fff");
+    // 11位以下が あるときは ページの ボタン(1-10 / 11-20 / 21-30)
+    if (rankingState.data.length > RANK_PER_PAGE) {
+        for (let p = 0; p * RANK_PER_PAGE < rankingState.data.length && p < 3; p++) {
+            drawMcButton(620 + p * 100, 578, 90, 34, `${p * RANK_PER_PAGE + 1}-${Math.min(30, (p + 1) * RANK_PER_PAGE)}`, rankingState.page === p ? "#fbc02d" : "#555", "#fff");
+        }
+    }
 }
 
 function drawTyping() {
@@ -2283,6 +2293,10 @@ canvas.addEventListener('mousedown', e => {
         if (x > 760 && x < 860 && y > 90 && y < 128) {
             rankingState.mode = 'local';
             loadRanking(rankingState.difficulty, rankingState.mode);
+        }
+        // ページ(1-10 / 11-20 / 21-30)
+        for (let p = 0; p < 3; p++) {
+            if (p * RANK_PER_PAGE < rankingState.data.length && x > 620 + p * 100 && x < 710 + p * 100 && y > 578 && y < 612) rankingState.page = p;
         }
         // 戻る
         if (x > 380 && x < 580 && y > 578 && y < 612) {
