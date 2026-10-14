@@ -32,7 +32,9 @@
             --el-attack:  #ff4757; /* ※攻撃の素は廃止。道具の素がこの赤色を引き継いだ（下のel-tool参照） */
             --el-tool:    #ff4757;
         }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+        /* スマホ(Android Chrome)では、クリック処理のある要素をタッチするたびに既定のタップ強調（青い半透明）が出る。
+           会話劇の全画面をタッチするたびに画面が青くなるのを防ぐため、全体で無効にする */
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
         body {
             overflow: hidden;
             background: var(--bg-page);
@@ -892,6 +894,8 @@
         .overlay-corridor { position:absolute; box-sizing:border-box; background: rgba(150,118,80,0.55); border: 2px solid rgba(255,207,107,0.85); pointer-events:none; }
         .overlay-preview { position:absolute; box-sizing:border-box; border-radius: 6px; border: 2px dashed var(--accent); background: rgba(201,210,220,0.18); pointer-events:none; }
         .overlay-preview.invalid { border-color: var(--danger); background: rgba(255,107,94,0.18); }
+        .overlay-preview.invalid { border-style: solid; }
+        .precost-badge.over { border-color: var(--danger); color: var(--danger); }
         .precost-badge {
             position:absolute; transform: translate(-50%,-100%); margin-top:-6px;
             background: rgba(20,14,9,0.92); border: 2px solid var(--gold); color: var(--gold);
@@ -3358,6 +3362,7 @@ function setupGridDom(prebuiltDom){
     gridEl.innerHTML = '';
     gridEl.appendChild(prebuiltDom || buildGridDom(grid));
     gridEl.onclick = onGridClick;
+    gridEl.onpointerdown = onGridPointerDown;
     gridEl.onmousemove = onGridMove;
     gridEl.onmouseleave = () => { hoverCell = null; updateGemFocus(null); renderOverlays(); };
     focusedType = null; gemFocusCache = null; gridEl.__staticSig = null;
@@ -3692,6 +3697,7 @@ function onGridMove(e){
     else if (trapPlaceMode) renderTrapPreview();
 }
 function onGridClick(e){
+    if (Date.now() < roomDragClickBlockUntil){ roomDragClickBlockUntil = 0; return; } // ドラッグで範囲を決めた直後の click
     if (gamePhase==='battle'){
         if (pendingDemonLordSkill) handleBattleSkillTargetClick(e);
         return;
@@ -3734,48 +3740,124 @@ function onGridClick(e){
             renderOverlays();
             return;
         }
-        const rect = normalizeRect(anchorCell, cell);
-        anchorCell = null;
-        const err = validateRoomRect(rect);
-        if (err){
-            // 部屋を作れない場所（他の部屋・通路と重なる、サイズが足りないなど）を終点にクリックした場合は
-            // 再入力を待たず部屋作りごとキャンセルする（誤タップからすぐ抜けられるようにするため）
-            showToast(err);
-            cancelBuild();
-            return;
-        }
-        pendingRect = rect;
-        if (rooms.length===0){
-            const entranceCands = findEntranceCandidates(rect);
-            if (entranceCands.length===0){
-                showToast(ui('err_no_connector'));
-                pendingRect = null;
-                mode = 'placing-rect';
-                updateStatus(ui('status_pick_corner1'));
-                renderOverlays();
-                return;
-            }
-            pendingEntranceCandidates = entranceCands;
-            mode = 'await-entrance-connector';
-            updateStatus(ui('status_pick_entrance'));
-            renderOverlays();
-        } else {
-            const cands = findConnectorCandidates(rect);
-            if (cands.length===0){
-                showToast(ui('err_no_connector'));
-                pendingRect = null;
-                mode = 'placing-rect';
-                updateStatus(ui('status_pick_corner1'));
-                renderOverlays();
-                return;
-            }
-            pendingCandidates = cands;
-            mode = 'await-connector';
-            updateStatus(ui('status_pick_connector'));
-            renderOverlays();
-        }
+        completeRoomRect(cell);
         return;
     }
+}
+// 部屋の範囲の終点が決まったとき（2回目のクリック／ドラッグを離したとき）の処理。anchorCellが起点
+function completeRoomRect(cell){
+    const rect = normalizeRect(anchorCell, cell);
+    anchorCell = null;
+    const err = validateRoomRect(rect);
+    if (err){
+        // 部屋を作れない場所（他の部屋・通路と重なる、サイズが足りないなど）を終点にクリックした場合は
+        // 再入力を待たず部屋作りごとキャンセルする（誤タップからすぐ抜けられるようにするため）
+        showToast(err);
+        cancelBuild();
+        return;
+    }
+    pendingRect = rect;
+    if (rooms.length===0){
+        const entranceCands = findEntranceCandidates(rect);
+        if (entranceCands.length===0){
+            showToast(ui('err_no_connector'));
+            pendingRect = null;
+            mode = 'placing-rect';
+            updateStatus(ui('status_pick_corner1'));
+            renderOverlays();
+            return;
+        }
+        pendingEntranceCandidates = entranceCands;
+        mode = 'await-entrance-connector';
+        updateStatus(ui('status_pick_entrance'));
+        renderOverlays();
+    } else {
+        const cands = findConnectorCandidates(rect);
+        if (cands.length===0){
+            showToast(ui('err_no_connector'));
+            pendingRect = null;
+            mode = 'placing-rect';
+            updateStatus(ui('status_pick_corner1'));
+            renderOverlays();
+            return;
+        }
+        pendingCandidates = cands;
+        mode = 'await-connector';
+        updateStatus(ui('status_pick_connector'));
+        renderOverlays();
+    }
+}
+
+// ---- 部屋の範囲を「押したままドラッグ」で決める（角→角のクリック／タップはそのまま使える） ----
+// 空きマスを押して別のマスまで動かすと、その間が部屋の範囲になり、離した場所が終点になる。
+// 動かさずに離した場合は何もせず、従来どおり直後の click が「1つ目の角」として扱われる
+let roomDrag = null;            // { pointerId, start:{r,c}, active:boolean }
+let roomDragClickBlockUntil = 0; // ドラッグを離した直後に届く click を無視する期限(ms)
+function clampedCellFromPoint(clientX, clientY){
+    const rect = gridEl.getBoundingClientRect();
+    let c = Math.floor((clientX - rect.left) / rect.width * GRID_COLS);
+    let r = Math.floor((clientY - rect.top) / rect.height * GRID_ROWS);
+    c = Math.max(0, Math.min(GRID_COLS-1, c));
+    r = Math.max(ROOM_MIN_ROW, Math.min(GRID_ROWS-1, r));
+    return { r, c };
+}
+function onGridPointerDown(e){
+    if (roomDrag || gamePhase!=='build' || trapPlaceMode || !e.isPrimary) return;
+    if (e.pointerType==='mouse' && e.button!==0) return;
+    // クリックで「部屋づくりを始められる」状態のときだけ（既存の部屋・魔物・魔王の選択中は従来のクリック操作に任せる）
+    const canStart = (mode==='idle' && selectedRoomId===null && selectedMonsterId===null && !demonLordMoveSelected)
+        || (mode==='placing-rect' && !anchorCell);
+    if (!canStart) return;
+    const cell = cellFromEvent(e);
+    if (!cell || cell.r < ROOM_MIN_ROW || occupied[cell.r][cell.c]) return;
+    roomDrag = { pointerId: e.pointerId, start: cell, active: false };
+    window.addEventListener('pointermove', onRoomDragMove);
+    window.addEventListener('pointerup', onRoomDragEnd);
+    window.addEventListener('pointercancel', onRoomDragCancel);
+}
+function endRoomDragListeners(){
+    window.removeEventListener('pointermove', onRoomDragMove);
+    window.removeEventListener('pointerup', onRoomDragEnd);
+    window.removeEventListener('pointercancel', onRoomDragCancel);
+}
+function onRoomDragMove(e){
+    if (!roomDrag || e.pointerId!==roomDrag.pointerId) return;
+    const cell = clampedCellFromPoint(e.clientX, e.clientY);
+    if (!roomDrag.active){
+        if (cell.r===roomDrag.start.r && cell.c===roomDrag.start.c) return; // まだ同じマス＝ただのタップ
+        roomDrag.active = true;
+        beginRoomPlacement();            // 部屋づくりモードに入る（モード・案内・右パネルを更新）
+        anchorCell = roomDrag.start;
+        updateStatus(ui('status_pick_corner2'));
+    }
+    e.preventDefault();
+    hoverCell = cell;
+    renderPlacementPreview();
+}
+function onRoomDragEnd(e){
+    if (!roomDrag || e.pointerId!==roomDrag.pointerId) return;
+    const d = roomDrag;
+    roomDrag = null;
+    endRoomDragListeners();
+    if (!d.active) return; // 動かさなかった→従来のクリック処理に任せる
+    roomDragClickBlockUntil = Date.now() + 500; // 離した直後の click を二重に処理しない
+    const cell = clampedCellFromPoint(e.clientX, e.clientY);
+    if (cell.r===d.start.r && cell.c===d.start.c){
+        // 動かしたあと元のマスに戻して離した：1つ目の角だけ決めた状態（次のタップで終点）にする
+        anchorCell = d.start; hoverCell = null;
+        updateStatus(ui('status_pick_corner2'));
+        renderOverlays();
+        return;
+    }
+    anchorCell = d.start;
+    completeRoomRect(cell);
+}
+function onRoomDragCancel(e){
+    if (!roomDrag || e.pointerId!==roomDrag.pointerId) return;
+    const wasActive = roomDrag.active;
+    roomDrag = null;
+    endRoomDragListeners();
+    if (wasActive) cancelBuild();
 }
 
 function selectConnector(idx){
@@ -9865,14 +9947,16 @@ function renderPlacementPreview(){
     if (mode==='placing-rect' && anchorCell && hoverCell){
         const rect = normalizeRect(anchorCell, hoverCell);
         const err = validateRoomRect(rect);
+        // 部屋だけの建設費が、いまの活力を超えたら枠を赤くする（通路の分はこのあと選ぶので含めない）
+        const over = roomBuildCost(rect.c1-rect.c0+1, rect.r1-rect.r0+1) > vitality;
         const d = document.createElement('div');
-        d.className = 'overlay-preview hover-live' + (err ? ' invalid' : '');
+        d.className = 'overlay-preview hover-live' + ((err || over) ? ' invalid' : '');
         d.style.left = px(rect.c0)+'px'; d.style.top = px(rect.r0)+'px';
         d.style.width = px(rect.c1-rect.c0+1)+'px'; d.style.height = px(rect.r1-rect.r0+1)+'px';
         gridEl.appendChild(d);
         const rw = rect.c1-rect.c0+1, rh = rect.r1-rect.r0+1;
         const badge = document.createElement('div');
-        badge.className = 'precost-badge';
+        badge.className = 'precost-badge' + (over ? ' over' : '');
         badge.style.left = (px(rect.c0) + px(rw)/2) + 'px';
         badge.style.top = px(rect.r0) + 'px';
         badge.textContent = uif('precost_label', roomBuildCost(rw, rh));
