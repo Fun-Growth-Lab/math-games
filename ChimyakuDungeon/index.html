@@ -1206,6 +1206,7 @@
         .btn-build-room { width:100%; margin-bottom:8px; padding:9px 12px; font-size:0.95rem; }
     </style>
 <script src="../fgl-name.js?v=20261224"></script>
+<script src="../tutorial-engine.js?v=20261226"></script>
 </head>
 <body>
 <div id="container">
@@ -1239,6 +1240,7 @@
             <button id="btn-continue" class="btn btn-primary hidden" onclick="continueStory()" data-i18n="btn_continue">▶ つづきから</button>
             <button class="btn btn-primary" id="btn-game-start-btn" onclick="handleStartButtonClick()"><span id="btn-game-start-label" data-i18n="btn_game_start">ストーリーモード</span></button>
             <button id="btn-stage-select" class="btn hidden" data-i18n="btn_stage_select" onclick="openStageSelect()">🗺️ ステージ選択</button>
+            <button id="btn-tutorial" class="btn" data-i18n="btn_tutorial" onclick="startTutorial()">🔰 チュートリアル</button>
             <button id="btn-name-register" class="btn" onclick="openNameRegister()">👤 名前の登録</button>
             <button class="btn" data-i18n="btn_ranking" onclick="openRanking()">🏆 ランキング</button>
             <button class="btn" data-i18n="btn_settings" onclick="openSettings()">⚙️ 設定</button>
@@ -1805,6 +1807,7 @@ const UI_TEXT = {
     player_name_btn: { ja: n => `👤 プレイヤー名：${n}`, ja_easy: n => `👤 プレイヤーめい：${n}`, en: n => `👤 Player: ${n}` },
     btn_ranking: { ja: '🏆 ランキング', en: '🏆 Ranking' },
     btn_settings: { ja: '⚙️ 設定', ja_easy: '⚙️ せってい', en: '⚙️ Settings' },
+    btn_tutorial: { ja: '🔰 チュートリアル', ja_easy: '🔰 チュートリアル', en: '🔰 Tutorial' },
     btn_index: { ja: '🏠 INDEXへ', en: '🏠 Back to INDEX' },
     btn_back_title: { ja: '◀ タイトルへ戻る', ja_easy: '◀ タイトルへ もどる', en: '◀ Back to Title' },
     btn_back_title2: { ja: '◀ タイトル', en: '◀ Title' },
@@ -10132,6 +10135,237 @@ async function saveRecord(){
         msg.textContent = ui('world_submit_fail');
         console.error('saveRecord error:', e);
     }
+}
+
+// ============================================================
+// 🔰 チュートリアル：ヴィオラが、実際に操作させながら「部屋づくり→部屋の強化→魔王の配置→魔物の配置換え→迎撃」を教える。
+// 共通エンジン tutorial-engine.js を使う（チュートリアル中のセーブ・ランキングへの書き込みはエンジンが止める。終了は再読み込み）
+// ============================================================
+const TUT_ROOM = { r0:5, c0:8, r1:8, c1:13 };              // 練習でつくる部屋（活力の素が多い場所）
+const TUT_MAP_ROWS = ['V..E.V', '.V..M.', 'V.E..V', 'M.V.E.']; // 練習用の素の並び。V=活力 M=魔力 E=卵 .=なし（通常より少し多めの活力の素）
+const TUT_MAP_KEYS = { V:'vitality', M:'mana', E:'egg', '.':null };
+function tutGridPx(){ return [GRID_COLS*CELL, GRID_ROWS*CELL]; }
+function tutCell(r, c){ return { sel:'#grid', rect:[c*CELL, r*CELL, CELL, CELL], of:tutGridPx() }; }
+function tutRoomArea(rm){ rm = rm || TUT_ROOM; return { sel:'#grid', rect:[rm.c0*CELL, rm.r0*CELL, (rm.c1-rm.c0+1)*CELL, (rm.r1-rm.r0+1)*CELL], of:tutGridPx() }; }
+// ボタンの表記は実際の辞書から取る（先頭の絵文字は外す）。言語ごとに表記が変わるため、3言語分の文をそれぞれ作る
+function tutLabel(key, lg){
+    const t = UI_TEXT[key];
+    const v = lg==='easy' ? (t.ja_easy || t.ja) : lg==='en' ? (t.en || t.ja) : t.ja;
+    return String(v).replace(/^[^A-Za-z0-9ぁ-んァ-ヶ一-龠]+/, '');
+}
+function tutText(fn){ return { ja: fn('ja', k => tutLabel(k,'ja')), easy: fn('easy', k => tutLabel(k,'easy')), en: fn('en', k => tutLabel(k,'en')) }; }
+// ヴィオラの顔絵（表情）
+function tutFace(name){ return 'images/kao/darkelf_' + name + '.png'; }
+// 練習の途中で「スキップ」されても、あとの手順が成り立つように、足りない状態を補う
+function tutEnsureRoom(){
+    if (rooms.length===0){
+        pendingRect = { r0:TUT_ROOM.r0, c0:TUT_ROOM.c0, r1:TUT_ROOM.r1, c1:TUT_ROOM.c1 };
+        const cand = findEntranceCandidates(pendingRect)[0];
+        pendingEntranceCol = cand.col; pendingCorridorCells = cand.cells;
+        confirmBuild();
+    }
+    const rm = rooms[0];
+    if (rm && !rm.type){ pendingTypeRoomId = rm.id; chooseRoomType('vitality'); roomTypeConfirm(); }
+}
+function tutEnsureUpgrade(){
+    const rm = rooms[0];
+    if (rm && roomAbilityLv(rm, 'vitality') < 2) upgradeRoomAbility(rm.id, 'vitality');
+    document.getElementById('ability-upgrade-modal').classList.add('hidden');
+    pendingAbilityUpgrade = null;
+}
+function tutEnsureDemonLord(){
+    const rm = rooms[0];
+    if (demonLordCell || !rm) return;
+    for (let r=rm.r1; r>=rm.r0; r--) for (let c=rm.c1; c>=rm.c0; c--){
+        if (isDoorwayCell(rm, r, c) || monsterAt(rm.id, r, c)) continue;
+        setDemonLord(rm.id, r, c);
+        return;
+    }
+}
+function tutEnsureBattle(){
+    if (gamePhase!=='build') return;
+    requestStartBattle();
+    confirmStartBattle();
+}
+function startTutorial(){
+    const T = FGLTutorial;
+    T.begin({ root:'#container', getLang: () => currentLang,
+        speaker:{ name:{ ja:'ヴィオラ', easy:'ヴィオラ', en:'Viola' }, img: tutFace('smile') } });
+    // 練習用の設定：最初のエリア（洞窟）・ステージ1。勇者はごく弱くして、かならず守りきれるようにする
+    gameDifficulty = 'easy';
+    difficultyHeroMult = function(){ return 0.8; };
+    playMode = 'practice'; currentAreaIndex = 1;
+    goToBuild(); // 白紙の迷宮（練習なので会話劇は出さない）
+    TUT_MAP_ROWS.forEach((line, i) => {
+        line.split('').forEach((ch, j) => { grid[TUT_ROOM.r0+i][TUT_ROOM.c0+j] = TUT_MAP_KEYS[ch]; });
+    });
+    setupGridDom();
+    renderAll();
+    // 練習中に「Esc／右クリックでもどる」で手順が崩れないよう止める
+    window.addEventListener('keydown', ev => { if (ev.key==='Escape'){ ev.preventDefault(); ev.stopImmediatePropagation(); } }, true);
+    document.getElementById('grid').addEventListener('contextmenu', ev => { ev.preventDefault(); ev.stopImmediatePropagation(); }, true);
+
+    const say = (text, o) => Object.assign({ type:'say', text, face: tutFace('smile') }, o || {});
+    const doIt = (text, until, o) => Object.assign({ type:'do', text, until, face: tutFace('normal'), skipAfter: 30000 }, o || {});
+    const run = fn => ({ type:'run', fn });
+    const roomArea = () => tutRoomArea(rooms[0] || TUT_ROOM);
+    const myMonster = () => monsters.find(m => rooms[0] && m.roomId===rooms[0].id) || null;
+    const monsterEl = () => { const m = myMonster(); return m ? document.getElementById('unit-m'+m.id) : null; };
+    let monsterStart = null;
+    const btnBuild = '.btn-build-room';
+
+    const steps = [
+        // ---- 画面の説明 ----
+        say({ ja:'魔王様、ようこそ！　ここが迷宮をつくる画面です。\n左が地下のマップ、右がコマンド、いちばん上が今のようすです。\nまず全体を見てから、順番にご説明しますね。',
+              easy:'まおうさま、ようこそ！　ここが めいきゅうを つくる がめんです。\nひだりが ちかの マップ、みぎが コマンド、いちばん うえが いまの ようすです。\nまず ぜんぶを みてから、じゅんばんに せつめいしますね。',
+              en:'Welcome, Demon Lord! This is where you build your labyrinth.\nThe map is on the left, the commands are on the right, and your status is at the top.\nTake a look around first, and then I will explain each part.' },
+            { target:null, pos:'middle', overview:true }),
+        say({ ja:'ここは今のようすです。\n「ステージ1/7」は、勇者が攻めてくる7回のうちの1回目、という意味です。\n💠活力は部屋をつくるとき、🔷魔力は部屋のレベルアップや魔物の回復に使います。',
+              easy:'ここは いまの ようすです。\n「ステージ1/7」は、ゆうしゃが せめてくる 7かいの うちの 1かいめ、という いみです。\n💠かつりょくは へやを つくるとき、🔷まりょくは へやの レベルアップや まものの かいふくに つかいます。',
+              en:'This shows your current status.\n"Stage 1/7" means this is the 1st of 7 hero invasions.\n💠 Vitality is used to build rooms. 🔷 Mana is used to level up rooms and heal monsters.' },
+            { target:'#build-screen .bd-hud' }),
+        say({ ja:'これが地下のマップです。光る石は「素」で、黄色は活力、青は魔力、むらさきは召喚、赤は道具の素です。\nたまごは魔物になります。部屋にした場所の素と卵が、その部屋の力になります。',
+              easy:'これが ちかの マップです。ひかる いしは「もと」で、きいろは かつりょく、あおは まりょく、むらさきは しょうかん、あかは どうぐの もとです。\nたまごは まものに なります。へやに した ばしょの もとと たまごが、その へやの ちからに なります。',
+              en:'This is the underground map. The glowing gems are elements: yellow = vitality, blue = mana, purple = summon, red = tool.\nEggs become monsters. The elements and eggs inside a room become that room\'s power.' },
+            { target:'#grid' }),
+        say({ ja:'右はコマンドです。\n「迎撃」で勇者たちを迎え撃ち、「魔物」「アイテム」「回復」で仲間のお世話をします。\nくわしいことは、あとから少しずつ覚えれば大丈夫ですよ。',
+              easy:'みぎは コマンドです。\n「てきを むかえうつ」で ゆうしゃたちを むかえうち、「まもの」「アイテム」「かいふく」で なかまの おせわを します。\nくわしい ことは、あとから すこしずつ おぼえれば だいじょうぶですよ。',
+              en:'The commands are on the right.\nUse "Face the Invaders" to fight the heroes, and "Monsters", "Items" and "Heal" to take care of your allies.\nYou can learn the details little by little later.' },
+            { target:'.bd-side' }),
+
+        // ---- 部屋のつくりかた ----
+        say({ ja:'それでは、部屋をつくってみましょう。\n光っている場所には、黄色い「活力の素」がたくさんあります。\nここを「活力生産部屋」にして、活力をどんどん増やします。',
+              easy:'それでは、へやを つくって みましょう。\nひかっている ばしょには、きいろい「かつりょくの もと」が たくさん あります。\nここを「かつりょく せいさんべや」にして、かつりょくを どんどん ふやします。',
+              en:'Now, let us build a room.\nThe glowing area has many yellow vitality elements.\nWe will make it a Vitality Production Room to earn lots of vitality.' },
+            { target: roomArea, pos:'bottom' }),
+        doIt(tutText((lg, u) => ({
+                ja:`まず「${u('btn_build_room')}」ボタンを押してください。`,
+                easy:`まず「${u('btn_build_room')}」ボタンを おしてください。`,
+                en:`First, press the "${u('btn_build_room')}" button.` })[lg]),
+            () => mode!=='idle', { target: btnBuild, only:{ from: btnBuild } }),
+        doIt({ ja:'光っている左上の角をクリックしてください。\n部屋にしたい四角の、ひとつ目の角です。',
+               easy:'ひかっている ひだりうえの かどを クリックしてください。\nへやに したい しかくの、ひとつめの かどです。',
+               en:'Click the glowing top-left corner.\nThis is the first corner of the room.' },
+            () => anchorCell!==null || mode!=='placing-rect',
+            { target: roomArea, pos:'bottom', only:{ from: tutCell(TUT_ROOM.r0, TUT_ROOM.c0) } }),
+        doIt({ ja:'つぎは、右下の角をクリックします。\nこれで、部屋の広さが決まります。',
+               easy:'つぎは、みぎしたの かどを クリックします。\nこれで、へやの ひろさが きまります。',
+               en:'Next, click the bottom-right corner.\nThis decides the size of the room.' },
+            () => mode!=='placing-rect',
+            { target: roomArea, pos:'bottom', only:{ from: tutCell(TUT_ROOM.r1, TUT_ROOM.c1) } }),
+        doIt({ ja:'つぎに、地上から部屋へ入る通路を選びます。\n数字のついた通路の、どれかをクリックしてください。\n（通路が長いほど、活力がたくさん必要です）',
+               easy:'つぎに、ちじょうから へやへ はいる つうろを えらびます。\nすうじの ついた つうろの、どれかを クリックしてください。\n（つうろが ながいほど、かつりょくが たくさん ひつようです）',
+               en:'Next, choose the corridor from the surface to the room.\nClick any of the numbered corridors.\n(The longer the corridor, the more vitality it costs.)' },
+            () => mode==='confirm' || rooms.length>0,
+            { target: () => Array.from(document.querySelectorAll('#grid .overlay-candidate')), pos:'bottom' }),
+        doIt(tutText((lg, u) => ({
+                ja:`建設にかかる活力を確認します。\n部屋の分と通路の分の合計が、活力から引かれます。\n「${u('btn_confirm_build')}」を押してください。`,
+                easy:`けんせつに かかる かつりょくを かくにんします。\nへやの ぶんと つうろの ぶんの ごうけいが、かつりょくから ひかれます。\n「${u('btn_confirm_build')}」を おしてください。`,
+                en:`Check how much vitality the construction costs.\nThe total for the room and the corridor is deducted from your vitality.\nPress "${u('btn_confirm_build')}".` })[lg]),
+            () => rooms.length>0,
+            { target:'#cost-confirm-modal .modal-box', pos:'top', only:{ from:'#cost-confirm-btn' } }),
+        doIt(tutText((lg, u) => ({
+                ja:`部屋のタイプを選びます。\n「${u('roomtype_vitality')}」を押してください。\n活力の素が多いので、とても向いています。`,
+                easy:`へやの タイプを えらびます。\n「${u('roomtype_vitality')}」を おしてください。\nかつりょくの もとが おおいので、とても むいています。`,
+                en:`Choose the type of the room.\nPress "${u('roomtype_vitality')}".\nIt has many vitality elements, so it is a perfect fit.` })[lg]),
+            () => pendingType==='vitality' || (rooms[0] && !!rooms[0].type),
+            { target:'#roomtype-modal .modal-box', pos:'top', only:{ from:'#roomtype-choices .roomtype-btn:first-child' } }),
+        doIt({ ja:'この部屋で手に入る活力の見こみが出ました。\n「はい」を押して、決定します。',
+               easy:'この へやで てに はいる かつりょくの みこみが でました。\n「はい」を おして、きめます。',
+               en:'Here is how much vitality this room will produce.\nPress "Yes" to confirm.' },
+            () => rooms[0] && !!rooms[0].type,
+            { target:'#roomtype-modal .modal-box', pos:'top', only:{ from:'#roomtype-preview .btn-primary' } }),
+        run(() => { tutEnsureRoom(); }),
+        doIt({ ja:'たまごがかえって、魔物たちが生まれました！\nこの魔物たちが、勇者と戦ってくれます。',
+               easy:'たまごが かえって、まものたちが うまれました！\nこの まものたちが、ゆうしゃと たたかって くれます。',
+               en:'The eggs hatched and monsters were born!\nThese monsters will fight the heroes for you.' },
+            () => document.getElementById('hatch-result-modal').classList.contains('hidden'),
+            { target:'#hatch-result-modal .modal-box', pos:'top', face: tutFace('grin'), only:{ from:'#hatch-result-modal .btn-primary' } }),
+
+        // ---- 部屋の強化 ----
+        say({ ja:'これが部屋のようすです。部屋のレベルと、生み出せる活力、中にいる魔物が見られます。\n活力は、勇者を退けるたびに、この部屋から手に入ります。',
+              easy:'これが へやの ようすです。へやの レベルと、うみだせる かつりょく、なかに いる まものが みられます。\nかつりょくは、ゆうしゃを しりぞける たびに、この へやから てに はいります。',
+              en:'This is the room\'s status. You can see its level, the vitality it produces, and the monsters inside.\nYou earn this vitality from the room each time you repel the heroes.' },
+            { target:'#room-detail-panel' }),
+        doIt({ ja:'部屋は、レベルを上げると、もっと活力を生み出します。\n「Lvアップ」ボタンを押してみましょう。\n（マップの部屋に出る ▲ は、いまレベルアップできる印です）',
+               easy:'へやは、レベルを あげると、もっと かつりょくを うみだします。\n「Lvアップ」ボタンを おして みましょう。\n（マップの へやに でる ▲ は、いま レベルアップできる しるしです）',
+               en:'Leveling up a room makes it produce more vitality.\nPress the "Level Up" button.\n(The ▲ on a room means it can be leveled up now.)' },
+            () => !document.getElementById('ability-upgrade-modal').classList.contains('hidden') || (rooms[0] && roomAbilityLv(rooms[0],'vitality')>=2),
+            { target:'#room-detail-body .ability-block .btn', only:{ from:'#room-detail-body .ability-block .btn' } }),
+        doIt({ ja:'レベルアップに使う分と、上がったあとの量を確認します。\n今回は魔力を使いますよ。「はい」を押してください。',
+               easy:'レベルアップに つかう ぶんと、あがった あとの りょうを かくにんします。\nこんかいは まりょくを つかいますよ。「はい」を おしてください。',
+               en:'Check the cost and the result of the level up.\nThis time it uses mana. Press "Yes".' },
+            () => rooms[0] && roomAbilityLv(rooms[0],'vitality')>=2,
+            { target:'#ability-upgrade-modal .modal-box', pos:'top', only:{ from:'#ability-upgrade-modal .btn-primary' } }),
+        run(() => { tutEnsureUpgrade(); deselectRoom(); }), // 右下のコマンド（魔王の配置など）が見えるよう、部屋の詳細を閉じる
+
+        // ---- 魔王の配置 ----
+        say({ ja:'つぎは、魔王様ご自身の配置です。\n魔王様は、迷宮でいちばん頼れる戦士です。\nただし、魔王様がたおされると負けてしまうので、置き場所はよく考えてくださいね。',
+              easy:'つぎは、まおうさまご じしんの はいちです。\nまおうさまは、めいきゅうで いちばん たよれる せんしです。\nただし、まおうさまが たおされると まけてしまうので、おきばしょは よく かんがえてくださいね。',
+              en:'Next, place yourself, my lord.\nThe Demon Lord is the strongest fighter in the labyrinth.\nBut if you fall, the game is lost, so choose your spot carefully.' },
+            { target:'#dl-footer-widget' }),
+        doIt({ ja:'魔王様のアイコンを、部屋の中へドラッグしてください。\n通路の入口のマス以外なら、どこでもかまいません。',
+               easy:'まおうさまの アイコンを、へやの なかへ ドラッグしてください。\nつうろの いりぐちの マスいがいなら、どこでも かまいません。',
+               en:'Drag the Demon Lord icon into the room.\nAny square will do, except the square at the corridor entrance.' },
+            () => !!demonLordCell,
+            { target: ['#dl-footer-drag', roomArea], only:{ from:'#dl-footer-drag', to: roomArea } }),
+        run(() => { tutEnsureDemonLord(); }),
+
+        // ---- 魔物の配置換え ----
+        say({ ja:'魔物の役目は、近くで戦う「近」、少し離れて戦う「中」、遠くから魔法を使う「長」です。\n前で戦う魔物は入口の近く、後ろの魔物は奥に置きましょう。',
+              easy:'まものの やくめは、ちかくで たたかう「近」、すこし はなれて たたかう「中」、とおくから まほうを つかう「長」です。\nまえで たたかう まものは いりぐちの ちかく、うしろの まものは おくに おきましょう。',
+              en:'Monsters have roles: close-range (近), mid-range (中) and long-range magic (長).\nPut front-line monsters near the entrance and back-line ones deeper inside.' },
+            { target: roomArea, pos:'bottom' }),
+        doIt({ ja:'光っている魔物をクリックして選び、動かしたい先の空いているマスをクリックしてください。\nドラッグでも動かせます。',
+               easy:'ひかっている まものを クリックして えらび、うごかしたい さきの あいている マスを クリックしてください。\nドラッグでも うごかせます。',
+               en:'Click the glowing monster to select it, then click an empty square to move it there.\nYou can also drag it.' },
+            () => { const m = myMonster(); return !!m && !!monsterStart && (m.r!==monsterStart.r || m.c!==monsterStart.c); },
+            { target: [monsterEl, roomArea], pos:'bottom',
+              before: () => { const m = myMonster(); monsterStart = m ? { r:m.r, c:m.c } : null; },
+              only:{ tap:true, from: monsterEl, to: roomArea } }),
+
+        // ---- 迎撃 ----
+        say({ ja:'いいですね！　これで迷宮の準備ができました。\n戦いに勝つたびに活力や魔力が手に入るので、部屋を増やしたり、魔物を育てたりして、もっと強い迷宮にしていきましょう。',
+              easy:'いいですね！　これで めいきゅうの じゅんびが できました。\nたたかいに かつ たびに かつりょくや まりょくが てに はいるので、へやを ふやしたり、まものを そだてたりして、もっと つよい めいきゅうに していきましょう。',
+              en:'Wonderful! Your labyrinth is ready.\nEach victory earns you vitality and mana, so build more rooms and train your monsters to make it even stronger.' },
+            { target:null, pos:'middle', face: tutFace('grin') }),
+        doIt(tutText((lg, u) => ({
+                ja:`準備ができたら、「${u('btn_start_battle')}」を押してください。\nいよいよ勇者たちが攻めてきますよ！`,
+                easy:`じゅんびが できたら、「${u('btn_start_battle')}」を おしてください。\nいよいよ ゆうしゃたちが せめてきますよ！`,
+                en:`When you are ready, press "${u('btn_start_battle')}".\nThe heroes are coming!` })[lg]),
+            () => !document.getElementById('battle-confirm-modal').classList.contains('hidden') || gamePhase!=='build',
+            { target:'#btn-start-battle', only:{ from:'#btn-start-battle' }, face: tutFace('surprise') }),
+        doIt({ ja:'これが攻めてくる勇者たちです。\n「はい」を押すと、戦いが始まります。',
+               easy:'これが せめてくる ゆうしゃたちです。\n「はい」を おすと、たたかいが はじまります。',
+               en:'These are the heroes who will attack.\nPress "Yes" to start the battle.' },
+            () => gamePhase!=='build',
+            { target:'#battle-confirm-modal .modal-box', pos:'top', only:{ from:'#battle-confirm-modal .btn-danger' } }),
+        run(() => { tutEnsureBattle(); }),
+        say({ ja:'戦いが始まりました！\n勇者たちは入口から入ってきます。魔物たちと魔王様が、自動で戦ってくれます。\nここで、勇者たちと魔王様の体力が見られます。',
+              easy:'たたかいが はじまりました！\nゆうしゃたちは いりぐちから はいってきます。まものたちと まおうさまが、じどうで たたかって くれます。\nここで、ゆうしゃたちと まおうさまの たいりょくが みられます。',
+              en:'The battle has begun!\nThe heroes enter from the entrance. Your monsters and you fight automatically.\nYou can see the health of the heroes and the Demon Lord here.' },
+            { target:'#battle-panel', face: tutFace('surprise') }),
+        doIt({ ja:'戦いが終わるまで、見守りましょう。\n戦いの速さは、ここの「×2」「×5」などのボタンで変えられます。',
+               easy:'たたかいが おわるまで、みまもりましょう。\nたたかいの はやさは、ここの「×2」「×5」などの ボタンで かえられます。',
+               en:'Let us watch until the battle ends.\nYou can change the speed with the "×2" and "×5" buttons here.' },
+            () => gamePhase!=='battle',
+            { target:'#battle-speed-controls', pos:'bottom', skipAfter: 120000 }),
+        run(() => T.wait(() => document.querySelector('.modal-backdrop:not(.hidden)') !== null, 4000)),
+        say({ ja:'戦いが終わると、活力や魔力などのごほうびがもらえて、次のステージへ進みます。\nステージ7まで守りきれば、このエリアは制圧です！',
+              easy:'たたかいが おわると、かつりょくや まりょくなどの ごほうびが もらえて、つぎの ステージへ すすみます。\nステージ7まで まもりきれば、この エリアは せいあつです！',
+              en:'When the battle ends, you receive rewards such as vitality and mana, and move on to the next stage.\nHold out until Stage 7 to conquer this area!' },
+            { target: () => document.querySelector('.modal-backdrop:not(.hidden) .modal-box'), face: tutFace('grin') }),
+    ];
+    T.run(steps, { onFinish: () => {
+        clearTimeout(battleTimer);
+        document.querySelectorAll('.modal-backdrop').forEach(el => el.classList.add('hidden'));
+        T.complete({
+            title:{ ja:'🎉 チュートリアル完了！', easy:'🎉 チュートリアル かんりょう！', en:'🎉 Tutorial Complete!' },
+            body:{ ja:'これで基本はバッチリです！\n魔物を育てて、すてきな迷宮をつくってくださいね、魔王様。',
+                   easy:'これで きほんは バッチリです！\nまものを そだてて、すてきな めいきゅうを つくってくださいね、まおうさま。',
+                   en:'You have got the basics down!\nTrain your monsters and build a wonderful labyrinth, my lord.' }
+        });
+    } });
 }
 
 // ============================================================

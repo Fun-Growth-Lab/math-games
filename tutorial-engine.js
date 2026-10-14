@@ -23,7 +23,7 @@
     let cfg = { root: null, getLang: function () { return 'ja'; } };
     let rootEl = null;
     let layer = null, blockers = [], hole = null, dim = null, cap = null, capText = null,
-        capBtn = null, capSkip = null, capCount = null, exitBtn = null, capWarn = null;
+        capBtn = null, capSkip = null, capCount = null, exitBtn = null, capWarn = null, capFace = null, capName = null;
     const rings = [];
     let active = false;
     let steps = [], idx = 0, pollTimer = null, skipTimer = null, relayoutTimer = null;
@@ -87,6 +87,15 @@
             '.fgl-tut-ring.to{border:4px dashed #ffffff;box-shadow:0 0 12px 3px rgba(255,255,255,0.8);animation:none;}',
             '@keyframes fglTutRing{0%,100%{opacity:1}50%{opacity:.45}}',
             '.fgl-tut-count{position:absolute;right:16px;top:8px;font-size:15px;color:#c9b27a;font-weight:700;}',
+            // 話し手(顔絵＋名前)つきの吹き出し：顔絵を左に置き、文は左そろえにする
+            '.fgl-tut-face{display:none;position:absolute;left:18px;top:50%;transform:translateY(-50%);width:104px;height:104px;box-sizing:border-box;border-radius:50%;',
+            'border:3px solid #ffd24a;background:#3a2a52 center/92% no-repeat;box-shadow:0 0 12px rgba(255,210,74,0.5);}',
+            '.fgl-tut-name{display:none;font-size:17px;font-weight:800;color:#ffd24a;margin:0 0 4px;text-align:left;}',
+            '.fgl-tut-cap.has-face{width:900px;padding-left:144px;text-align:left;min-height:122px;}',
+            '.fgl-tut-cap.has-face .fgl-tut-face,.fgl-tut-cap.has-face .fgl-tut-name{display:block;}',
+            '.fgl-tut-cap.has-face .fgl-tut-row{justify-content:flex-start;}',
+            '.fgl-tut-cap.has-face.side{padding-left:92px;min-height:0;}',
+            '.fgl-tut-cap.has-face.side .fgl-tut-face{width:64px;height:64px;left:14px;top:20px;transform:none;}',
             '.fgl-tut-exit{position:absolute;right:14px;top:12px;pointer-events:auto;font-family:inherit;font-size:18px;font-weight:800;',
             'padding:6px 18px;border:2px solid #ffd24a;border-radius:999px;cursor:pointer;color:#ffd24a;background:rgba(24,18,10,0.92);z-index:5;}'
         ].join('');
@@ -202,6 +211,8 @@
         cap = document.createElement('div'); cap.className = 'fgl-tut-cap';
         capCount = document.createElement('div'); capCount.className = 'fgl-tut-count'; cap.appendChild(capCount);
         capWarn = document.createElement('div'); capWarn.className = 'fgl-tut-warn'; cap.appendChild(capWarn);
+        capFace = document.createElement('div'); capFace.className = 'fgl-tut-face'; cap.appendChild(capFace);
+        capName = document.createElement('div'); capName.className = 'fgl-tut-name'; cap.appendChild(capName);
         capText = document.createElement('p'); capText.className = 'fgl-tut-text'; cap.appendChild(capText);
         const row = document.createElement('div'); row.className = 'fgl-tut-row';
         capBtn = document.createElement('button'); capBtn.className = 'fgl-tut-btn'; capBtn.type = 'button';
@@ -492,6 +503,13 @@
             layer.style.display = 'block';
             exitBtn.textContent = pick(UI.exit);
             capText.textContent = pick(s.text);
+            // 話し手(begin の speaker={name,img})。ステップに face(画像のURL)があればその表情にする。img が無ければ従来どおり
+            const spk = cfg.speaker, faceUrl = s.face || (spk && spk.img);
+            if (faceUrl) {
+                cap.classList.add('has-face');
+                capFace.style.backgroundImage = 'url("' + faceUrl + '")';
+                capName.textContent = spk && spk.name ? pick(spk.name) : '';
+            } else { cap.classList.remove('has-face'); capName.textContent = ''; }
             capWarn.classList.remove('on'); downAt = null;
             capCount.textContent = s.noCount ? '' : (s.no || '');
             if (s.type === 'say') {
@@ -525,7 +543,7 @@
     /* ---------- 公開API ---------- */
     // チュートリアル開始の準備(書き込みガード・root設定)
     T.begin = function (opts) {
-        cfg = { root: opts.root, getLang: opts.getLang || cfg.getLang, exitPos: opts.exitPos || 'right', keepClear: opts.keepClear || null };
+        cfg = { root: opts.root, getLang: opts.getLang || cfg.getLang, exitPos: opts.exitPos || 'right', keepClear: opts.keepClear || null, speaker: opts.speaker || null };
         rootEl = (typeof opts.root === 'string') ? document.querySelector(opts.root) : opts.root;
         if (!rootEl) { console.error('FGLTutorial: root not found'); return; }
         injectCss();
