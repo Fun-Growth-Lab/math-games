@@ -827,6 +827,35 @@
         .ss-cell-state { font-size: 0.8rem; font-weight: 800; color: #b9a98f; min-height: 1.2em; }
         .ss-cell-state.cleared { color: #ffd866; }
         .ss-cell-go { font-size: 0.8rem; font-weight: 800; color: #b9a98f; letter-spacing: 1px; }
+        /* 最終侵攻（ステージ8）の出撃カットイン */
+        #cutin-overlay { position:absolute; inset:0; z-index:2000; cursor:pointer; overflow:hidden; }
+        #cutin-overlay.hidden { display:none; }
+        .ci-dim { position:absolute; inset:0; background:radial-gradient(ellipse at 50% 55%, rgba(50,0,8,0.82), rgba(0,0,0,0.95)); }
+        .ci-band {
+            position:absolute; left:-6%; right:-6%; top:50%; height:290px; margin-top:-120px; transform:skewY(-3deg);
+            background:linear-gradient(90deg, rgba(20,0,6,0), rgba(130,12,26,0.95) 14%, rgba(34,4,12,0.97) 62%, rgba(20,0,6,0));
+            border-top:4px solid #ffd866; border-bottom:4px solid #ffd866; box-shadow:0 0 30px rgba(255,60,60,0.45);
+        }
+        .ci-face { position:absolute; left:80px; top:70px; width:470px; height:470px; object-fit:contain; filter:drop-shadow(0 12px 18px rgba(0,0,0,0.75)); }
+        .ci-face.pop { animation:ciPop .28s ease-out; }
+        .ci-body { position:absolute; left:590px; right:70px; top:218px; text-align:left; }
+        .ci-boss { display:inline-block; padding:2px 14px; border-radius:6px; background:#d8202c; color:#fff; font-weight:900; letter-spacing:4px; font-size:0.95rem; box-shadow:0 0 12px rgba(255,60,60,0.7); }
+        .ci-name { font-size:1.7rem; font-weight:800; letter-spacing:6px; color:#ffd866; margin:6px 0 10px; text-shadow:0 2px 6px #000; }
+        .ci-text { font-size:2.5rem; font-weight:800; line-height:1.4; color:#fff; text-shadow:0 3px 10px #000, 0 0 18px rgba(255,80,80,0.5); }
+        .ci-next { position:absolute; right:84px; top:470px; font-size:1.6rem; color:#ffd866; animation:storyNextBlink 1.1s ease-in-out infinite; }
+        .ci-final {
+            display:none; position:absolute; left:0; right:0; top:50%; margin-top:-70px; text-align:center;
+            font-size:5rem; font-weight:900; letter-spacing:10px; color:#fff; text-shadow:0 0 28px rgba(255,60,60,0.95), 0 5px 0 #7a0a12, 0 8px 18px #000;
+        }
+        #cutin-overlay.finale .ci-final { display:block; animation:ciSlam .45s cubic-bezier(.2,1.4,.4,1); }
+        #cutin-overlay.finale .ci-face, #cutin-overlay.finale .ci-body, #cutin-overlay.finale .ci-next { opacity:0.18; }
+        #cutin-overlay.play .ci-band { animation:ciBand .32s ease-out; }
+        #cutin-overlay.play .ci-dim { animation:ciFade .3s ease-out; }
+        @keyframes ciBand { from { transform:skewY(-3deg) scaleX(0); } to { transform:skewY(-3deg) scaleX(1); } }
+        @keyframes ciFade { from { opacity:0; } to { opacity:1; } }
+        @keyframes ciPop { from { transform:translateX(-40px) scale(0.92); opacity:0; } to { transform:none; opacity:1; } }
+        @keyframes ciSlam { from { transform:scale(2.4); opacity:0; } to { transform:scale(1); opacity:1; } }
+        .boss-tag { margin-left:6px; padding:0 7px; border-radius:6px; background:#d8202c; color:#fff; font-size:0.72rem; font-weight:900; letter-spacing:1px; vertical-align:2px; }
         /* ステージ表示の難易度チップ */
         .hud-diff { display:inline-block; font-size:0.66rem; font-weight:900; padding:0 6px; margin-right:5px; border-radius:8px; color:#fff; letter-spacing:0.5px; vertical-align:1px; }
         .hud-diff-easy { background:#3f8a4d; } .hud-diff-normal { background:#3c6fb0; } .hud-diff-hard { background:#b0443c; }
@@ -1410,6 +1439,20 @@
         </div>
     </div>
 
+    <!-- ==================== 出撃カットイン（ステージ8のボス勇者のひとりしゃべり） ==================== -->
+    <div id="cutin-overlay" class="hidden" onclick="advanceBossCutin()">
+        <div class="ci-dim"></div>
+        <div class="ci-band"></div>
+        <img id="ci-face" class="ci-face" alt="">
+        <div class="ci-body">
+            <div class="ci-boss" data-i18n="boss_tag">ボス</div>
+            <div class="ci-name" id="ci-name"></div>
+            <div class="ci-text" id="ci-text"></div>
+        </div>
+        <div class="ci-next">▶</div>
+        <div class="ci-final" data-i18n="cutin_final">最後の戦い！</div>
+    </div>
+
     <!-- ==================== STAGE TITLE CARD（会話劇からダンジョン画面へのつなぎ） ==================== -->
     <div id="stage-title-overlay" class="hidden" onclick="finishStageTitleCard()">
         <div class="stage-title-num" id="stage-title-num"></div>
@@ -1967,6 +2010,7 @@
                 game:        'eq.chimyaku_dungeon',
                 difficulty:  `eq.${difficulty || 'hard'}`,
                 point_score: 'gt.0',
+                class_name:  'eq.第一話v2',   // ステージ8・細かいスコアの版（旧版の記録は混ぜない）
                 order:       'point_score.desc,stage_score.desc,turns.asc',
                 limit:       '10'
             });
@@ -2302,6 +2346,21 @@ const UI_TEXT = {
     evolve_stone_name: { ja: name => `${name}の石`, ja_easy: name => `${name}の いし`, en: name => `${name} Stone` },
     evolution_result_title: { ja: name => `✨ ${name}に進化した！`, ja_easy: name => `✨ ${name}に しんかした！`, en: name => `✨ Evolved into ${name}!` },
     btn_score: { ja: '🏆 成績', ja_easy: '🏆 せいせき', en: '🏆 Score' },
+    boss_tag: { ja: 'ボス', ja_easy: 'ボス', en: 'BOSS' },
+    cutin_final: { ja: '最後の戦い！', ja_easy: 'さいごの たたかい！', en: 'FINAL BATTLE!' },
+    battle_confirm_final_title: { ja: n => `ステージ ${n} ― 最後の侵攻！`, ja_easy: n => `ステージ ${n} ― さいごの しんこう！`, en: n => `Stage ${n} - The Final Invasion!` },
+    score_vit_total: { ja: '合計生産活力', ja_easy: 'つくった かつりょく', en: 'Total Vitality Produced' },
+    score_mana_total: { ja: '合計生産魔力', ja_easy: 'つくった まりょく', en: 'Total Mana Produced' },
+    score_power: { ja: '総合戦闘力（魔物＋魔王）', ja_easy: 'ぜんぶの つよさ（まもの＋まおう）', en: 'Total Combat Power' },
+    score_speed: { ja: '速さ（かかったターン数）', ja_easy: 'はやさ（かかった ターンすう）', en: 'Speed (Turns Taken)' },
+    score_kills: { ja: '倒した勇者の数', ja_easy: 'たおした ゆうしゃの かず', en: 'Heroes Defeated' },
+    score_area_clear: { ja: 'エリア制圧ボーナス', ja_easy: 'エリア せいあつ ボーナス', en: 'Area Clear Bonus' },
+    score_area_total: { ja: 'このエリアの得点', ja_easy: 'この エリアの とくてん', en: 'Area Score' },
+    score_story_total: { ja: 'ストーリー通算', ja_easy: 'ストーリーの ごうけい', en: 'Story Total' },
+    score_turns_label: { ja: n => `${n}ターン`, ja_easy: n => `${n}ターン`, en: n => `${n} turns` },
+    result_score_note: { ja: (a, t) => `このエリアの得点 ${a}点（ストーリー通算 ${t}点）`, ja_easy: (a, t) => `この エリアの とくてん ${a}てん（ごうけい ${t}てん）`, en: (a, t) => `Area score ${a} pts (Story total ${t} pts)` },
+    result_final_score_note: { ja: t => `ストーリー通算の得点 ${t}点（全エリア制圧ボーナス込み）`, ja_easy: t => `ストーリーの ごうけい ${t}てん（ぜんぶ せいあつ ボーナス こみ）`, en: t => `Story total ${t} pts (incl. full-clear bonus)` },
+    result_score_note_area: { ja: a => `このエリアの得点 ${a}点`, ja_easy: a => `この エリアの とくてん ${a}てん`, en: a => `Area score ${a} pts` },
     score_modal_title: { ja: '📊 成績', ja_easy: '📊 せいせき', en: '📊 Score' },
     score_monster_count: { ja: 'モンスターの数', ja_easy: 'モンスターの かず', en: 'Monster Count' },
     score_avg_level: { ja: 'モンスターの平均レベル', ja_easy: 'モンスターの へいきん レベル', en: 'Average Monster Level' },
@@ -3077,8 +3136,9 @@ function renderPlayerNameList(){
 // ランキング画面
 // ============================================================
 // 難易度ごとのランキング。ポイント＝到達したステージ数×100（全エリア制圧で＋1000）。同点は到達ステージ→戦闘回数の少ない順
-const RANK_KEY_PREFIX = 'chimyakuDungeonRanking_';
-const STORY_NAME_LABEL = '第一話'; // ランキングに添えるストーリー名（話が増えたら区別するため）
+const RANK_KEY_PREFIX = 'chimyakuDungeonRanking_v2_'; // 得点の計算を変えた（ステージ8・細かいスコア）ので、旧版の記録とは分ける
+let lastSubmittedScore = 0;
+const STORY_NAME_LABEL = '第一話v2'; // ランキングに添えるストーリー名（話が増えたら区別するため）
 function getLocalRanking(diff){
     try { return JSON.parse(localStorage.getItem(RANK_KEY_PREFIX + diff) || '[]'); } catch (e){ return []; }
 }
@@ -3096,9 +3156,11 @@ function saveLocalScore(diff, entry){
 async function submitStoryRun(){
     if (storyRunBest<=0) return 'none';
     const stages = storyRunBest, battles = storyRunBattles, diff = gameDifficulty;
-    const score = stages*100 + (storyCleared && stages>=AREA_TYPES.length*STAGE_FINAL ? 1000 : 0);
+    const fullClear = storyCleared && stages>=AREA_TYPES.length*STAGE_FINAL;
+    const score = storyRunScore + storyRunPartial + (fullClear ? SCORE_COEF.fullClear : 0);
+    lastSubmittedScore = score;
     const now = new Date();
-    storyRunBest = 0; storyRunBattles = 0;
+    storyRunBest = 0; storyRunBattles = 0; storyRunScore = 0; storyRunPartial = 0;
     saveStoryProgress();
     saveLocalScore(diff, { name: getCurPlayerName(), score, stages, battles, dateIso: now.toISOString(), date: now.toLocaleDateString('ja-JP') });
     try {
@@ -3410,6 +3472,7 @@ function startPracticeArea(areaIdx){
 }
 function startNewDungeon(){
     clearGameSave(); // 新しく始める＝これまでのセーブは無効（この後の各種操作で改めて保存される）
+    areaStats = freshAreaStats(); // このエリア（1つの迷宮）の得点の集計は新しくする
     generateMap();
     rooms = []; corridors = []; monsters = []; traps = []; entranceCol = null; demonLordRoomId = null; demonLordCell = null;
     vitality = STARTING_VITALITY;
@@ -3444,6 +3507,7 @@ function restoreGameFromData(data){
     nextRoomId = data.nextRoomId || 1; nextCorridorId = data.nextCorridorId || 1;
     nextMonsterId = data.nextMonsterId || 1; nextTrapId = data.nextTrapId || 1;
     demonLordSkillLevels = data.demonLordSkillLevels || {};
+    areaStats = Object.assign(freshAreaStats(), data.areaStats || {});
     rooms.forEach(ensureRoomSpecialAbilities); // 特殊能力スロットの仕様変更（Lv1〜5）に旧セーブを合わせる
     goTo('build-screen');
     enterBuildScreen();
@@ -3502,7 +3566,7 @@ function buildSaveData(){
         entranceCol, demonLordRoomId, demonLordCell,
         inventory, nextInventoryId, stoneInventory,
         nextRoomId, nextCorridorId, nextMonsterId, nextTrapId,
-        demonLordSkillLevels,
+        demonLordSkillLevels, areaStats,
     };
 }
 function saveGameState(){
@@ -7158,6 +7222,8 @@ const DIFFICULTIES = {
 const DIFFICULTY_ORDER = ['easy', 'normal', 'hard', 'master', 'legend'];
 let storyRunBest = 0;     // 今回のストーリーで到達した最大のステージ数（(エリア番号−1)×7＋クリアしたステージ）。ランキングの記録
 let storyRunBattles = 0;  // 今回のストーリーで行った戦闘の回数（負けも数える。少ないほど上位）
+let storyRunScore = 0;    // 今回のストーリーで、制圧したエリアの得点の合計（ランキングの点数）
+let storyRunPartial = 0;  // いま挑戦中のエリアで、負けたときまでに取れた最良の得点（制圧したら storyRunScore へ移して0に戻す）
 let storyClearedBy = {}; // 難易度ごとの、ストーリー（全エリア）クリア記録。{easy:true,...}
 let gameDifficulty = 'hard'; // いま遊んでいる難易度。保存データに無い（難易度ができる前の）データはHARD扱い
 let storyDemonLordXp = 0; // 魔王の経験値。エリアをクリアするたびに記録し、次のエリアの最初の魔王へ引き継ぐ（ストーリーモードだけ）
@@ -7173,10 +7239,12 @@ function loadStoryProgress(){
         if (d.clearedBy && typeof d.clearedBy==='object') storyClearedBy = d.clearedBy;
         storyRunBest = Math.max(0, parseInt(d.runBest,10)||0);
         storyRunBattles = Math.max(0, parseInt(d.runBattles,10)||0);
+        storyRunScore = Math.max(0, parseInt(d.runScore,10)||0);
+        storyRunPartial = Math.max(0, parseInt(d.runPartial,10)||0);
     } catch(e){ /* 読み込めなければ初期状態のまま */ }
 }
 function saveStoryProgress(){
-    try { localStorage.setItem(STORY_SAVE_KEY, JSON.stringify({ areaIndex: storyAreaIndex, cleared: storyCleared, demonLordXp: storyDemonLordXp, difficulty: gameDifficulty, clearedBy: storyClearedBy, runBest: storyRunBest, runBattles: storyRunBattles })); } catch(e){}
+    try { localStorage.setItem(STORY_SAVE_KEY, JSON.stringify({ areaIndex: storyAreaIndex, cleared: storyCleared, demonLordXp: storyDemonLordXp, difficulty: gameDifficulty, clearedBy: storyClearedBy, runBest: storyRunBest, runBattles: storyRunBattles, runScore: storyRunScore, runPartial: storyRunPartial })); } catch(e){}
 }
 loadStoryProgress();
 
@@ -7680,7 +7748,9 @@ function finishStageTitleCard(){
 // ============================================================
 // 戦闘フェーズ（風来のシレン風：1ターンずつ敵味方が自動で行動する）
 // ============================================================
-const STAGE_FINAL = 7; // 最終侵攻。ここの勇者を倒すとゲームクリア
+const STAGE_FINAL = 8; // 最終侵攻（ボス勇者）。ここの勇者を倒すと、そのエリアを制圧（最後のエリアならゲームクリア）
+// 通常の勇者のステータスは、ステージ1〜7の間で tierStart→tierEnd を補間する。ステージ8（ボス戦）は別の式なので、補間の終点は7のまま
+const HERO_TIER_LAST_STAGE = 7;
 // 勇者の表示Lv：侵攻ステージ番号をそのままLv（線形：1,2,3,4,5,6,7）にする。
 // 以前はステージ数の2乗（1,4,9,…,49）にしていたが、終盤に向けた強さの伸びは「人数の増加」で表現する方針に変えた。
 // ステータスは、このLvに対して線形に伸びる（tierStart〜tierEndを、Lv1〜Lv7の間で線形補間する）
@@ -7689,7 +7759,8 @@ function heroDisplayLevel(stageNum){ return Math.pow(stageNum, HERO_DISPLAY_LEVE
 // ステージごとの勇者の総数：2→3→4→6→10→16→24体。終盤ほど加速度的に増やす（合計65体）。
 // 終盤は進化の石（勇者1体を倒すたびに確率でドロップ）が圧倒的に足りなくなっていたため、人数を増やして供給も増やす。
 // 人数が多いほど戦闘の処理は重くなるが、勇者のステータスはLvに対して線形に伸びるだけにして、総戦力を人数で伸ばす
-const HERO_COUNT_BY_STAGE = [2, 3, 4, 6, 10, 16, 24];
+// ステージ8は「ボス勇者1人＋お供2人」の3人（最終侵攻。ボスのHPは大きく、攻撃も強い。BOSS_ENCOUNTER／bossTeamStatsを参照）
+const HERO_COUNT_BY_STAGE = [2, 3, 4, 6, 10, 16, 24, 3];
 function heroCountForStage(stageNum){ return HERO_COUNT_BY_STAGE[Math.min(Math.max(stageNum,1), HERO_COUNT_BY_STAGE.length) - 1]; }
 // 勇者のクラス定義。
 // tierStart/tierEndは侵攻1・侵攻7でのステータス（1〜10ランク値、モンスターと同じtierStats換算を使う）。
@@ -7770,7 +7841,7 @@ function heroSkillTriggers(hero){
 // 序盤の強さを比率で下げているため、整数に丸めず小数（2桁）のまま補間する（丸めると比率が崩れる）
 // lvMultは勇者1人ごとのLvの個体差（1.0＝そのステージの標準Lv。buildBattleHeroPreviewで抽選）
 function lerpHeroTier(cls, stageNum, lvMult){
-    const lv = heroDisplayLevel(stageNum) * (lvMult===undefined ? 1 : lvMult), lvStart = heroDisplayLevel(1), lvFinal = heroDisplayLevel(STAGE_FINAL);
+    const lv = heroDisplayLevel(stageNum) * (lvMult===undefined ? 1 : lvMult), lvStart = heroDisplayLevel(1), lvFinal = heroDisplayLevel(HERO_TIER_LAST_STAGE);
     // 標準Lvのときは0〜1の範囲。最終ステージで標準より高いLvの個体は、直線の延長で最大1.25まで伸ばす（頭打ちにするとLv表示だけ高くて強さが同じになるため）。
     // ランク値の上限10は、標準Lvの範囲(t<=1)ではtierEndが10以下なので効かず、延長部分だけ外れる
     const t = Math.max(0, Math.min(1.25, (lv-lvStart) / (lvFinal-lvStart)));
@@ -8036,6 +8107,14 @@ function buildBattleHeroPreview(){
     const heroCount = heroCountForStage(stage);
     const partyKeys = STORY_PARTY[currentAreaIndex];
     const list = [];
+    // 最終侵攻（ステージ8）：そのエリアのボス勇者＋お供2人
+    if (stage>=STAGE_FINAL && BOSS_ENCOUNTER[currentAreaIndex]){
+        const e = BOSS_ENCOUNTER[currentAreaIndex];
+        return [e.boss].concat(e.escorts).map((storyKey, i) => {
+            const sp = STORY_SPEAKERS[storyKey];
+            return { classKey: sp.hero.classKey, gender: sp.hero.gender, storyKey, lvMult: 1, isBoss: i===0 };
+        });
+    }
     // ストーリー連動：そのエリアの会話劇に出てくる仲間が、決まった順番で侵攻してくる（ランダムではない）
     if (partyKeys){
         for (let i=0;i<heroCount;i++){
@@ -8127,7 +8206,7 @@ function dungeonPowerAtStage(stageNum){
 function heroClassFactorRaw(classKey, stageNum){
     const f = HERO_CLASS_STRENGTH_FACTOR[classKey];
     if (!f || stageNum < 2) return 1;
-    const t = Math.min(1, (stageNum-2) / (STAGE_FINAL-2));
+    const t = Math.min(1, (stageNum-2) / (HERO_TIER_LAST_STAGE-2));
     return Math.exp(Math.log(f[0]) + (Math.log(f[1])-Math.log(f[0])) * t);
 }
 function heroStatsWithFactor(classKey, stageNum, lvMult, factor){
@@ -8176,7 +8255,39 @@ const STORY_PARTY_TRIM = {
 // 実際に侵攻してくる編成（classKeyの配列）の戦闘開始時ステータス。lvMults：勇者ごとのLv個体差（省略時は全員1.0）。areaIdx：エリア番号（省略時は補正なし）
 // ※以前はここで「編成全体の戦力(HP合計×攻撃合計)を一定にそろえる」補正をしていたが、その指標では魔法系の遠距離職や
 // 回復・盾の実際の強さを測れず、職による偏りを直せなかったため、職ごとの実測補正(heroBattleStats)に置き換えた
+// ---- ステージ8（最終侵攻）：エリアごとの「ボス勇者＋お供2人」 ----
+// ボスは先頭。6エリアそれぞれ別のジョブ（城だけは物語上の「勇者」＝女剣士）。お供はそのエリアの仲間から選ぶ
+const BOSS_ENCOUNTER = {
+    1: { boss:'swordsman',   escorts:['priest', 'shield'] },       // 洞窟：男剣士
+    2: { boss:'archer_f',    escorts:['swordsman', 'bard'] },      // 森：女アーチャー
+    3: { boss:'icemage',     escorts:['archer', 'priest'] },       // 泉：氷の魔導士
+    4: { boss:'firemage',    escorts:['swordsman', 'darkmage'] },  // 山：炎の魔導士
+    5: { boss:'ninja',       escorts:['swordsman', 'archer'] },    // 街：くのいち
+    6: { boss:'swordsman_f', escorts:['thunder', 'swordsman'] },   // 城：女勇者
+};
+// ボスの強さ。HPと攻撃を「お供の何倍か」で決め、チーム全体の総合戦闘力（√(HP合計×攻撃合計)）が
+// 他のステージと同じ式（迷宮の強さの関数×HERO_TEAM_POWER_RATIO）に BOSS_POWER_BONUS を掛けた値になるよう、全体の倍率を求める。
+// 実戦シミュレーションの測り方：テストプレイのステージ7の迷宮（データ8・8b）に、ステージ7と同じ総合戦闘力の編成（ボス＋お供2人）を当てて、
+// 勝率を24人のステージ7（勇者の勝率 約55〜60%）に合わせる。実際のステージ8では迷宮の強さの関数が1.31倍になるぶん、そのまま強くなる。
+// 結果：ボス編成のほうが同じ総合戦闘力でわずかに強く出るので、全体を0.85倍（BOSS_POWER_BONUS）。
+// 職・仲間の組み合わせでエリアごとに強さがずれるため、エリアごとの補正（BOSS_AREA_TRIM）で6エリアの勝率をそろえた（60〜64%、ばらつき±0.07）
+const BOSS_HP_MULT = 6, BOSS_ATK_MULT = 1.5, BOSS_DEF_MULT = 1.2;
+const BOSS_POWER_BONUS = 0.85;
+const BOSS_AREA_TRIM = { 1:0.90, 2:0.84, 3:1.03, 4:1.24, 5:0.80, 6:0.94 };
+// classKeys[0]がボス、以降がお供
+function bossTeamStats(classKeys, stageNum, areaIdx){
+    const bases = classKeys.map(k => heroStatsWithFactor(k, stageNum, 1, heroClassFactorRaw(k, stageNum)));
+    let hp = 0, atk = 0;
+    bases.forEach((b, i) => { hp += b.hp * (i===0 ? BOSS_HP_MULT : 1); atk += Math.max(b.atk, b.magAtk) * (i===0 ? BOSS_ATK_MULT : 1); });
+    const f = BOSS_POWER_BONUS * (BOSS_AREA_TRIM[areaIdx] || 1) * HERO_TEAM_POWER_RATIO * dungeonPowerAtStage(stageNum) / Math.sqrt(hp * atk) * difficultyHeroMult();
+    return bases.map((b, i) => {
+        const boss = i===0, a = boss ? BOSS_ATK_MULT : 1, d = boss ? BOSS_DEF_MULT : 1;
+        return { hp: Math.round(b.hp*f*(boss ? BOSS_HP_MULT : 1)), atk: Math.round(b.atk*f*a), def: Math.round(b.def*f*d),
+                 magAtk: Math.round(b.magAtk*f*a), magDef: Math.round(b.magDef*f*d) };
+    });
+}
 function heroTeamBattleStats(classKeys, stageNum, lvMults, areaIdx){
+    if (stageNum>=STAGE_FINAL) return bossTeamStats(classKeys, stageNum, areaIdx);
     const c = ((STORY_PARTY_TRIM[areaIdx] || {})[stageNum]) || 1;
     return classKeys.map((k, i) => {
         const b = heroBattleStats(k, stageNum, lvMults ? lvMults[i] : undefined);
@@ -8195,7 +8306,7 @@ function heroPreviewCardHtml(entry, displayName){
     return `<div class="monster-picker-btn static">
         ${heroPreviewSpriteHtml(entry.classKey, entry.gender, cls.emoji)}
         <span class="monster-picker-name">${escapeHtml(displayName || (entry.storyKey ? STORY_SPEAKERS[entry.storyKey].name_ja : cls.name_ja))}</span>
-        <span class="monster-picker-meta"><b class="hero-preview-lv">Lv.${heroLevelOf(stage, entry.lvMult)}</b></span>
+        <span class="monster-picker-meta"><b class="hero-preview-lv">Lv.${heroLevelOf(stage, entry.lvMult)}</b>${entry.isBoss ? `<span class="boss-tag">${ui('boss_tag')}</span>` : ''}</span>
     </div>`;
 }
 function requestStartBattle(){
@@ -8204,7 +8315,7 @@ function requestStartBattle(){
     if (rooms.length===0){ showToast(ui('err_no_rooms_battle')); return; }
     if (demonLordRoomId===null || !demonLordCell){ showToast(ui('err_no_demonlord')); return; }
     pendingBattleHeroPreview = buildBattleHeroPreview();
-    document.getElementById('battle-confirm-stage-title').textContent = uif('battle_confirm_stage_title', stage);
+    document.getElementById('battle-confirm-stage-title').textContent = uif(stage>=STAGE_FINAL ? 'battle_confirm_final_title' : 'battle_confirm_stage_title', stage);
     const previewNames = numberedHeroNames(pendingBattleHeroPreview.map(e => e.storyKey ? STORY_SPEAKERS[e.storyKey].name_ja : heroClassInfo(e.classKey).name_ja));
     document.getElementById('battle-confirm-hero-grid').innerHTML = pendingBattleHeroPreview.map((e, i) => heroPreviewCardHtml(e, previewNames[i])).join('');
     document.getElementById('battle-confirm-modal').classList.remove('hidden');
@@ -8213,7 +8324,53 @@ function closeBattleConfirm(){ document.getElementById('battle-confirm-modal').c
 function confirmStartBattle(){
     saveGameState(); // 迎撃ボタンを押したとき（建設フェーズ最後の状態を保存。復元時はここに戻る）
     closeBattleConfirm();
-    startBattle();
+    // 最終侵攻は、侵入の前にボス勇者のカットイン（ひとりしゃべり）を入れてから始める
+    if (stage>=STAGE_FINAL && BOSS_CUTIN[currentAreaIndex]) showBossCutin(currentAreaIndex, startBattle);
+    else startBattle();
+}
+
+// ============================================================
+// 最終侵攻（ステージ8）の出撃カットイン：侵入の前に、そのエリアのボス勇者がひとりでしゃべる。クリックで1行ずつ進む
+// ============================================================
+const BOSS_CUTIN = {
+    1: { speaker:'swordsman',   lines:[ { face:'normal',   text:'魔王よ、遊びは終わりだ' }, { face:'angry',    text:'いくぞ！！' } ] },
+    2: { speaker:'archer_f',    lines:[ { face:'normal',   text:'ここまで来れば、もう逃がさないわ' }, { face:'grin',     text:'森の風に乗せて……その胸を、射抜いてみせる！' } ] },
+    3: { speaker:'icemage',     lines:[ { face:'normal',   text:'あなたの迷宮、すべて凍らせてあげる' }, { face:'angry',    text:'わたしの氷は、そう簡単には溶けないわよ！' } ] },
+    4: { speaker:'firemage',    lines:[ { face:'smile',    text:'えへへ……手加減は、もうおしまい！' }, { face:'grin',     text:'ぜんぶ、まるごと燃やしてあげる！！' } ] },
+    5: { speaker:'ninja',       lines:[ { face:'normal',   text:'影から影へ。もう、逃げ場はないよ' }, { face:'grin',     text:'忍びの本気、見せてあげる！' } ] },
+    6: { speaker:'swordsman_f', lines:[ { face:'normal',   text:'魔王。これが、最後の戦いよ' }, { face:'angry',    text:'人間界の平和は、私が守る！' }, { face:'grin', text:'――いくわよ！！' } ] },
+};
+let cutinState = null;
+function showBossCutin(areaIdx, onDone){
+    const c = BOSS_CUTIN[areaIdx];
+    if (!c){ onDone(); return; }
+    cutinState = { c, idx:0, onDone, finishing:false };
+    const el = document.getElementById('cutin-overlay');
+    el.classList.remove('hidden', 'finale');
+    el.classList.remove('play'); void el.offsetWidth; el.classList.add('play'); // 入場アニメを毎回やり直す
+    document.getElementById('ci-name').textContent = STORY_SPEAKERS[c.speaker].name_ja;
+    renderCutinLine();
+}
+function renderCutinLine(){
+    const c = cutinState.c, l = c.lines[cutinState.idx];
+    const face = document.getElementById('ci-face');
+    face.src = storyFaceUrl(c.speaker, l.face);
+    face.classList.remove('pop'); void face.offsetWidth; face.classList.add('pop');
+    document.getElementById('ci-text').textContent = l.text;
+}
+function advanceBossCutin(){
+    if (!cutinState || cutinState.finishing) return;
+    cutinState.idx++;
+    if (cutinState.idx < cutinState.c.lines.length){ renderCutinLine(); return; }
+    // 最後のセリフのあと：「最後の戦い！」を見せてから侵攻を始める
+    cutinState.finishing = true;
+    document.getElementById('cutin-overlay').classList.add('finale');
+    setTimeout(() => {
+        const done = cutinState.onDone;
+        cutinState = null;
+        document.getElementById('cutin-overlay').classList.add('hidden');
+        done();
+    }, 1300);
 }
 
 // 戦闘中だけ意味を持つ状態（バフ・状態異常・スキル使用回数・積み重ね・溜め）をリセットする。
@@ -8248,7 +8405,7 @@ function startBattle(){
         const classKey = heroPreview[i].classKey;
         const cls = heroClassInfo(classKey);
         const { hp, atk, def, magAtk, magDef } = teamStats[i];
-        battleHeroes.push({ id:i+1, priority:i+1, heroClassKey:classKey, gender: heroPreview[i].gender, storyKey: heroPreview[i].storyKey || null,
+        battleHeroes.push({ id:i+1, priority:i+1, heroClassKey:classKey, gender: heroPreview[i].gender, storyKey: heroPreview[i].storyKey || null, isBoss: !!heroPreview[i].isBoss,
             hp, maxHp:hp, atk, def, magAtk, magDef,
             alive:true, r:-1, c:-1, emoji:cls.emoji, statusEffects:[], buffs:[], skillUses:0, shotTarget:null, chargeTurns:0,
             state:'pending', roomId:null, behavior:null,
@@ -8312,7 +8469,7 @@ function renderHeroList(){
     const heroNames = battleHeroNames.length===battleHeroes.length ? battleHeroNames : numberedHeroNames(battleHeroes.map(h => h.storyKey ? STORY_SPEAKERS[h.storyKey].name_ja : uif('hero_label', h.id)));
     wrap.innerHTML = battleHeroes.map((h, i) => `
         <div class="hero-hp-row${h.alive?'':' dead'}">
-            <span class="hero-hp-name">${h.emoji} ${escapeHtml(heroNames[i])}</span>
+            <span class="hero-hp-name">${h.isBoss ? '👑' : h.emoji} ${escapeHtml(heroNames[i])}</span>
             <div class="hero-hp-track"><div class="hero-hp-fill" style="width:${Math.max(0,h.hp/h.maxHp*100)}%"></div></div>
             <span class="hero-hp-num">${Math.max(0,Math.round(h.hp))}/${Math.round(h.maxHp)}</span>
         </div>
@@ -9320,6 +9477,14 @@ function endBattle(outcome){
     battleCurrentActor = null;
     repEndBattle(outcome); // テストプレイデータ：ユニットごとの成績を確定（stageを進める前に呼ぶ）
     gamePhase = 'result';
+    // 得点の集計：かかったターン数・倒した勇者の数・（勝てば）到達ステージと速さのボーナス
+    {
+        const turns = Math.max(0, battleGlobalTick + 1);
+        areaStats.turns += turns;
+        areaStats.kills += battleHeroes.filter(h => !h.alive).length;
+        if (outcome==='victory'){ areaStats.cleared = stage; areaStats.speed += speedBonusFor(stage, turns); }
+        if (outcome==='victory' && stage>=STAGE_FINAL) areaStats.areaCleared = true;
+    }
     // 迎撃ボタンを押したときのセーブ（迎撃前の状態）が残っていると、負けた／エリアをクリアした後に更新して「つづきから」を選んだとき、
     // 勝敗が決まる前に戻ってしまう。ゲームオーバー・エリアクリアでは続きの迷宮が無いので、ここで捨てる（勝って次のステージへ進む場合は、
     // proceedNextStageの最後で新しい状態を保存し直す）
@@ -9328,6 +9493,8 @@ function endBattle(outcome){
     if (playMode==='story'){
         storyRunBattles++;
         if (outcome==='victory') storyRunBest = Math.max(storyRunBest, (currentAreaIndex-1)*STAGE_FINAL + stage);
+        if (areaStats.areaCleared){ storyRunScore += computeAreaScore().total; storyRunPartial = 0; }          // エリア制圧：このエリアの得点を確定する
+        else if (outcome!=='victory'){ storyRunPartial = Math.max(storyRunPartial, computeAreaScore().total); } // 負けた：ここまでの得点を（やり直しの最良として）残す
         saveStoryProgress();
     }
     const btnScore = { label: ui('btn_score'), onclick: 'openScoreModal()', cls: 'btn-gold btn-sm' };
@@ -9343,7 +9510,7 @@ function endBattle(outcome){
             if (demonLordCell) storyDemonLordXp = Math.max(storyDemonLordXp, demonLordCell.xp||0); // 魔王のLvは次のエリアへ引き継ぐ
             saveStoryProgress();
         }
-        const base = { sub: uif('battle_result_areaclear_title', areaName), main: uif('stage_clear_main', stage) };
+        const base = { sub: uif('battle_result_areaclear_title', areaName), main: uif('stage_clear_main', stage), note: areaScoreNote() };
         if (playMode==='story' && !isLastArea){
             // エリア制圧。次のエリアへ進む（完全クリアではないのでエピローグは出さない）
             showBattleResult({ ...base, msg: ui('battle_result_areaclear_msg'),
@@ -9369,7 +9536,7 @@ function endBattle(outcome){
         proceedNextStage();
         return;
     }
-    showBattleResult({ defeat:true, sub:'😈', main: ui('battle_result_defeat_title'), msg: ui('battle_result_defeat_msg'),
+    showBattleResult({ defeat:true, sub:'😈', main: ui('battle_result_defeat_title'), msg: ui('battle_result_defeat_msg'), note: areaScoreNote(),
         primary: [{ label: ui('btn_retry_area'), onclick: 'closeBattleResultAndRestart()' }],
         secondary: [ ...(playMode==='story' ? [{ label: ui('btn_restart_story'), onclick: 'restartStoryFromBeginning()', cls: 'btn-danger btn-sm' }] : []), btnScore, btnTitle ] });
 }
@@ -9381,9 +9548,15 @@ function playEndingThenGameClear(){
     document.getElementById('battle-result-modal').classList.add('hidden');
     startStoryEnding(() => showGameClearResult());
 }
+// 結果ポップアップの下に出す「このエリアの得点（ストーリー通算）」
+function areaScoreNote(){
+    const t = computeAreaScore().total;
+    return playMode==='story' ? uif('result_score_note', t, storyRunScore + storyRunPartial) : uif('result_score_note_area', t);
+}
 function showGameClearResult(){
     const unlocked = DIFFICULTY_ORDER.filter(k => DIFFICULTIES[k].unlockedBy===gameDifficulty && storyClearedBy[gameDifficulty]);
-    const noteBase = unlocked.length ? uif('diff_unlocked_msg', ui('diff_'+unlocked[0]+'_name')) : '';
+    // ストーリー通算の得点（ランキングに登録した点数。全エリア制圧ボーナス込み）
+    const noteBase = (unlocked.length ? uif('diff_unlocked_msg', ui('diff_'+unlocked[0]+'_name')) + '　' : '') + uif('result_final_score_note', lastSubmittedScore);
     showBattleResult({
         sub: '🏆', main: ui('battle_result_gameclear_title'), msg: ui('battle_result_gameclear_msg'), note: noteBase,
         primary: [{ label: ui('btn_play_again'), onclick: 'playStoryAgain()' }],
@@ -9437,6 +9610,7 @@ function proceedNextStage(){
     });
     vitality += vitGain;
     mana += manaGain;
+    areaStats.vit += vitGain; areaStats.mana += manaGain; // 得点用：生産した活力・魔力の合計（回復で使った分は引かない）
     const manaBeforeAutoHeal = mana;
     autoHealIfEnabled(); // 自動回復ONなら、この収入分の魔力でHPの低いモンスターから自動的に回復させる
     // 実際に回復が行われた場合のみ記録する（ステージクリア後の最後のポップアップで表示するため）
@@ -9789,45 +9963,47 @@ function buildBalanceReportText(){
 // ざっくり合わせてある（正式なバランス調整の対象ではなく、まずは比較できる1つの数字を出すための暫定値）
 // ============================================================
 const SCORE_COEF = {
-    monsterCount: 10, avgLevel: 50, equipCount: 20, maxDamage: 2,
-    vitProduction: 0.5, manaProduction: 0.5, summonCapacity: 50, toolCapacity: 50,
-    demonLordLevel: 100, roomCount: 50, stageReached: 200,
+    stage: 100,       // 到達（勝って進んだ）ステージ1つにつき
+    vit: 0.4,         // 合計生産活力 1につき
+    mana: 0.6,        // 合計生産魔力 1につき（活力より得にくいので重め）
+    power: 1.5,       // 総合戦闘力（全魔物＋魔王の powerScore の合計）1につき
+    kill: 15,         // 倒した勇者1人につき
+    speed: 3,         // 基準ターンより速く勝った分、1ターンにつき
+    areaClear: 500,   // エリアを制圧したとき
+    fullClear: 3000,  // 6エリアすべて制圧したとき（ストーリー通算に加える）
 };
-function computeClearScore(){
-    const monsterCount = monsters.length;
-    const avgLevel = monsterCount>0 ? monsters.reduce((s,m) => s+(m.level||0), 0)/monsterCount : 0;
-    const equipCount = inventory.length + monsters.filter(m=>m.equippedItem).length;
-    let vitProduction = 0, manaProduction = 0, summonCapacity = 0, toolCapacity = 0;
-    rooms.forEach(room => {
-        if (!room.type) return;
-        const prod = computeRoomProduction(room, room.type);
-        vitProduction += prod.vit; manaProduction += prod.mana;
-        summonCapacity += roomOutputExpected(room, 'summon');
-        toolCapacity += roomOutputExpected(room, 'tool');
-    });
-    const demonLordLevel = demonLordCell ? (demonLordCell.level||1) : 0;
-    const stageReached = Math.min(stage, STAGE_FINAL);
+// ステージごとの基準ターン数（実戦シミュレーションで、テストプレイの迷宮4つに勝った平均：27/71/118/151/220/304/314/199）。
+// これより速く勝つと、縮めたターン数ぶん加点する
+const TURN_PAR = [0, 30, 70, 115, 150, 220, 300, 310, 200];
+function speedBonusFor(stageNum, turns){ return Math.max(0, (TURN_PAR[stageNum] || 150) - turns) * SCORE_COEF.speed; }
+function freshAreaStats(){ return { vit:0, mana:0, turns:0, kills:0, speed:0, cleared:0, areaCleared:false }; }
+let areaStats = freshAreaStats(); // いま挑戦中のエリア（1つの迷宮）の集計
+// このエリアの得点（細かい内訳つき）。総合戦闘力は「いまの」魔物と魔王で数える（武器・防具・進化・召喚の成果はこれに含まれる）
+function computeAreaScore(){
+    const a = areaStats;
+    const power = Math.round(monsters.reduce((sum, m) => sum + powerScore(m), 0) + (demonLordCell ? powerScore(demonLordCell) : 0));
     const items = [
-        { labelKey:'score_monster_count', raw: monsterCount, coef: SCORE_COEF.monsterCount },
-        { labelKey:'score_avg_level', raw: Math.round(avgLevel*10)/10, coef: SCORE_COEF.avgLevel },
-        { labelKey:'score_equip_count', raw: equipCount, coef: SCORE_COEF.equipCount },
-        { labelKey:'score_max_damage', raw: maxDamageDealtEver, coef: SCORE_COEF.maxDamage },
-        { labelKey:'score_vit_production', raw: vitProduction, coef: SCORE_COEF.vitProduction },
-        { labelKey:'score_mana_production', raw: manaProduction, coef: SCORE_COEF.manaProduction },
-        { labelKey:'score_summon_capacity', raw: Math.round(summonCapacity*10)/10, coef: SCORE_COEF.summonCapacity },
-        { labelKey:'score_tool_capacity', raw: Math.round(toolCapacity*10)/10, coef: SCORE_COEF.toolCapacity },
-        { labelKey:'score_demon_lord_level', raw: demonLordLevel, coef: SCORE_COEF.demonLordLevel },
-        { labelKey:'score_room_count', raw: rooms.length, coef: SCORE_COEF.roomCount },
-        { labelKey:'score_stage_reached', raw: stageReached, coef: SCORE_COEF.stageReached },
+        { labelKey:'score_stage_reached', calc:`${a.cleared} × ${SCORE_COEF.stage}`,  points: a.cleared * SCORE_COEF.stage },
+        { labelKey:'score_vit_total',     calc:`${a.vit} × ${SCORE_COEF.vit}`,        points: a.vit * SCORE_COEF.vit },
+        { labelKey:'score_mana_total',    calc:`${a.mana} × ${SCORE_COEF.mana}`,      points: a.mana * SCORE_COEF.mana },
+        { labelKey:'score_power',         calc:`${power} × ${SCORE_COEF.power}`,      points: power * SCORE_COEF.power },
+        { labelKey:'score_speed',         calc:uif('score_turns_label', a.turns),     points: a.speed },
+        { labelKey:'score_kills',         calc:`${a.kills} × ${SCORE_COEF.kill}`,     points: a.kills * SCORE_COEF.kill },
     ];
-    items.forEach(it => { it.points = Math.round(it.raw*it.coef); });
-    const total = items.reduce((sum,it) => sum+it.points, 0);
-    return { items, total };
+    if (a.areaCleared) items.push({ labelKey:'score_area_clear', calc:'', points: SCORE_COEF.areaClear });
+    items.forEach(it => { it.points = Math.round(it.points); });
+    return { items, total: items.reduce((sum, it) => sum + it.points, 0) };
 }
 function openScoreModal(){
-    const { items, total } = computeClearScore();
-    const rows = items.map(it => `<div class="score-item-row"><span>${ui(it.labelKey)}</span><span class="score-item-calc">${it.raw} × ${it.coef}</span><b>${it.points}</b></div>`).join('');
-    document.getElementById('score-modal-body').innerHTML = rows + `<div class="score-total-row"><span>${ui('score_total_label')}</span><b>${total}</b></div>`;
+    const { items, total } = computeAreaScore();
+    const rows = items.map(it => `<div class="score-item-row"><span>${ui(it.labelKey)}</span><span class="score-item-calc">${it.calc}</span><b>${it.points}</b></div>`).join('');
+    let extra = '';
+    if (playMode==='story'){
+        const pending = areaStats.areaCleared ? 0 : total; // 制圧済みのエリアは、すでに通算に入っている
+        extra = `<div class="score-item-row"><span>${ui('score_story_total')}</span><span class="score-item-calc"></span><b>${storyRunScore + Math.max(storyRunPartial, pending)}</b></div>`;
+    }
+    document.getElementById('score-modal-body').innerHTML = rows
+        + `<div class="score-total-row"><span>${ui('score_area_total')}</span><b>${total}</b></div>` + extra;
     document.getElementById('score-modal').classList.remove('hidden');
 }
 function closeScoreModal(){ document.getElementById('score-modal').classList.add('hidden'); }
@@ -10535,9 +10711,9 @@ function startTutorial(){
               easy:'まおうさま、ようこそ！　ここが めいきゅうを つくる がめんです。\nひだりが ちかの マップ、みぎが コマンド、いちばん うえが いまの ようすです。\nまず ぜんぶを みてから、じゅんばんに せつめいしますね。',
               en:'Welcome, Demon Lord! This is where you build your labyrinth.\nThe map is on the left, the commands are on the right, and your status is at the top.\nTake a look around first, and then I will explain each part.' },
             { target:null, pos:'middle', overview:true }),
-        say({ ja:'ここは今のようすです。\n「ステージ1/7」は、勇者が攻めてくる7回のうちの1回目、という意味です。\n💠活力は部屋をつくるとき、🔷魔力は部屋のレベルアップや魔物の回復に使います。',
-              easy:'ここは いまの ようすです。\n「ステージ1/7」は、ゆうしゃが せめてくる 7かいの うちの 1かいめ、という いみです。\n💠かつりょくは へやを つくるとき、🔷まりょくは へやの レベルアップや まものの かいふくに つかいます。',
-              en:'This shows your current status.\n"Stage 1/7" means this is the 1st of 7 hero invasions.\n💠 Vitality is used to build rooms. 🔷 Mana is used to level up rooms and heal monsters.' },
+        say({ ja:'ここは今のようすです。\n「ステージ1/8」は、勇者が攻めてくる8回のうちの1回目、という意味です。\n💠活力は部屋をつくるとき、🔷魔力は部屋のレベルアップや魔物の回復に使います。',
+              easy:'ここは いまの ようすです。\n「ステージ1/8」は、ゆうしゃが せめてくる 8かいの うちの 1かいめ、という いみです。\n💠かつりょくは へやを つくるとき、🔷まりょくは へやの レベルアップや まものの かいふくに つかいます。',
+              en:'This shows your current status.\n"Stage 1/8" means this is the 1st of 8 hero invasions.\n💠 Vitality is used to build rooms. 🔷 Mana is used to level up rooms and heal monsters.' },
             { target:'#build-screen .bd-hud' }),
         say({ ja:'これが地下のマップです。光る石は「素」で、黄色は活力、青は魔力、むらさきは召喚、赤は道具の素です。\nたまごは魔物になります。部屋にした場所の素と卵が、その部屋の力になります。',
               easy:'これが ちかの マップです。ひかる いしは「もと」で、きいろは かつりょく、あおは まりょく、むらさきは しょうかん、あかは どうぐの もとです。\nたまごは まものに なります。へやに した ばしょの もとと たまごが、その へやの ちからに なります。',
@@ -10666,9 +10842,9 @@ function startTutorial(){
             () => gamePhase!=='battle',
             { target:'#battle-speed-controls', pos:'bottom', skipAfter: 120000 }),
         run(() => T.wait(() => document.querySelector('.modal-backdrop:not(.hidden)') !== null, 4000)),
-        say({ ja:'戦いが終わると、活力や魔力などのごほうびがもらえて、次のステージへ進みます。\nステージ7まで守りきれば、このエリアは制圧です！',
-              easy:'たたかいが おわると、かつりょくや まりょくなどの ごほうびが もらえて、つぎの ステージへ すすみます。\nステージ7まで まもりきれば、この エリアは せいあつです！',
-              en:'When the battle ends, you receive rewards such as vitality and mana, and move on to the next stage.\nHold out until Stage 7 to conquer this area!' },
+        say({ ja:'戦いが終わると、活力や魔力などのごほうびがもらえて、次のステージへ進みます。\nステージ8まで守りきれば、このエリアは制圧です！',
+              easy:'たたかいが おわると、かつりょくや まりょくなどの ごほうびが もらえて、つぎの ステージへ すすみます。\nステージ8まで まもりきれば、この エリアは せいあつです！',
+              en:'When the battle ends, you receive rewards such as vitality and mana, and move on to the next stage.\nHold out until Stage 8 to conquer this area!' },
             { target: () => document.querySelector('.modal-backdrop:not(.hidden) .modal-box'), face: tutFace('grin') }),
     ];
     T.run(steps, { onFinish: () => {
@@ -10744,6 +10920,7 @@ document.addEventListener('keydown', (ev) => {
     const isOpen = (id) => !document.getElementById(id).classList.contains('hidden');
     if (isOpen('story-overlay')){ ev.preventDefault(); advanceStory(); return; }
     if (isOpen('stage-title-overlay')){ ev.preventDefault(); finishStageTitleCard(); return; }
+    if (isOpen('cutin-overlay')){ ev.preventDefault(); advanceBossCutin(); return; }
     if (isOpen('roomtype-modal')){
         if (!document.getElementById('roomtype-preview').classList.contains('hidden')){ ev.preventDefault(); roomTypeConfirm(); }
         return;
