@@ -3,7 +3,7 @@
 //   FGLTitle.mount({
 //     host: '#title-screen',                 // 既存のタイトル画面(この中に重ねる)
 //     hue: 200,                              // 色相(ロゴのふち・サブボタンの色)
-//     bg: 'linear-gradient(...)' ,           // 背景(省略すると、ホストのもとの背景(イラスト)をそのまま使う)
+//     bg: 'linear-gradient(...)' ,           // 背景(省略すると、fgl-title-boot.js の FGLBoot.title の bg を使う。それも無ければ ホストのもとの背景)
 //     tag: 'FUN & GROWTH LAB',               // いちばん上の小さな字
 //     name: { ja:'..', simple:'..', en:'..' }, // 大きな題名
 //     sub:  { ja:'..', simple:'..', en:'..' }, // 題名の下の小さな説明(何のゲームかを一言で)
@@ -75,7 +75,7 @@
                     return '<div class="fgt-card' + (i === gold ? ' gold' : '') + (k < 0 ? ' l' : k > 0 ? ' r' : '') + '" style="--r:' + (k * 12) + 'deg;--x:' + (k * step) + 'px;--y:' + (Math.abs(k) * 22 + (k === 0 ? 0 : 6)) + 'px;z-index:' + (10 - Math.abs(k)) + ';--fs:' + fs + 'rem"><b>' + c + '</b></div>';
                 }).join('') + '<div class="fgt-op">' + (cfg.op || '＋') + '</div></div>';
             })() : (cfg.heroHTML ? '<div class="hv-layer">' + (typeof cfg.heroHTML === 'function' ? cfg.heroHTML() : cfg.heroHTML) + '</div>' : '');
-            root.innerHTML = (cfg.bg ? '<div class="fgt-bg" style="background:' + cfg.bg + '"></div>' : '') + '<div class="fgt-shade"></div><div class="fgt-stage">'
+            root.innerHTML = ((cfg.bg || (window.FGLBoot && window.FGLBoot.cfg && window.FGLBoot.cfg.bg)) ? '<div class="fgt-bg" style="background:' + (cfg.bg || window.FGLBoot.cfg.bg) + '"></div>' : '') + '<div class="fgt-shade"></div><div class="fgt-stage">'
                 + '<div class="fgt-tag"></div><div class="fgt-name"></div><div class="fgt-sub"><span></span></div>' + hero
                 + '<div class="fgt-menu"><button class="fgt-btn primary"></button><div class="fgt-row"></div></div></div>';
             host.appendChild(root);
