@@ -9,6 +9,8 @@
 //     sub:  { ja:'..', simple:'..', en:'..' }, // 題名の下の小さな説明(何のゲームかを一言で)
 //     cards: ['3','7','10','9','6'], gold: 2, op: '＋',   // 主役のカードの扇(省略可)。まん中の金のカードが「答え」
 //     lang: () => currentLang,               // 'ja' | 'simple' | 'en'
+//     skin: 'space',                         // ボタンの見た目(space|cafe|water|dungeon|digital|cloud。fgl-title.css)
+//     art: true,                             // 背景いっぱいの絵(盤面入り)。題名をうえ、ボタンを下に寄せる
 //     fill: true,                            // ホストの中身がぜんぶ absolute で、ホスト自身の高さが0になるとき
 //     hide: ['.title-box'],                  // もとのタイトルで かくす部分(省略するとホストの中身ぜんぶ)
 //     buttons: { start: '#btn-start'(関数でもよい: 「つづきから」があるときに切りかえる), row: [{ sel: '#btn-tutorial', ico: 'help' }, ...] }
@@ -27,17 +29,26 @@
     const strip = (t) => String(t || '').replace(/^[^\p{L}\p{N}]+/u, '').trim();
     const pick = (o, lang) => (o && typeof o === 'object') ? (o[lang] !== undefined ? o[lang] : (lang === 'simple' && o.ja !== undefined ? o.ja : (o.ja !== undefined ? o.ja : ''))) : (o || '');
 
-    function ensureFont() {
-        if (document.getElementById('fgt-font')) return;
-        const l = document.createElement('link');
-        l.id = 'fgt-font'; l.rel = 'stylesheet';
-        l.href = 'https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap';
-        document.head.appendChild(l);
+    // スキンごとに使う字(Google Fonts)。ボタンの雰囲気を ゲームに合わせる
+    const SKIN_FONT = { space: 'DotGothic16', cafe: 'DotGothic16', water: 'Zen+Maru+Gothic:wght@700;900', dungeon: 'Dela+Gothic+One', digital: 'Orbitron:wght@700;900', cloud: 'Hachi+Maru+Pop' };
+    function ensureFont(skin) {
+        if (!document.getElementById('fgt-font')) {
+            const l = document.createElement('link');
+            l.id = 'fgt-font'; l.rel = 'stylesheet';
+            l.href = 'https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap';
+            document.head.appendChild(l);
+        }
+        if (skin && SKIN_FONT[skin] && !document.getElementById('fgt-font-' + skin)) {
+            const l = document.createElement('link');
+            l.id = 'fgt-font-' + skin; l.rel = 'stylesheet';
+            l.href = 'https://fonts.googleapis.com/css2?family=' + SKIN_FONT[skin] + '&display=swap';
+            document.head.appendChild(l);
+        }
     }
 
     window.FGLTitle = {
         mount: function (cfg) {
-            ensureFont();
+            ensureFont(cfg.skin);
             const host = document.querySelector(cfg.host);
             if (!host) return null;
             host.classList.add('fgt-host');
@@ -48,6 +59,8 @@
             const root = document.createElement('div');
             root.className = 'fgt fgt-in';
             if (cfg.layout === 'column') root.classList.add('col');
+            if (cfg.art) root.classList.add('art', cfg.art === 'low' ? 'art-low' : 'art');            // 背景いっぱいの絵(盤面入り)用: 題名をうえ・ボタンを下に寄せる
+            if (cfg.skin) root.classList.add('sk-' + cfg.skin); // ボタンの見た目(スキン)
             root.style.setProperty('--fh', cfg.hue === undefined ? 200 : cfg.hue);
             if (cfg.title && typeof FH !== 'undefined' && FH.applyTitleColors) FH.applyTitleColors(root, cfg.title);   // 題名の色(FH.PAL のどれか)
             const lang = () => { try { return cfg.lang ? (cfg.lang() || 'ja') : 'ja'; } catch (e) { return 'ja'; } };
@@ -110,7 +123,7 @@
                 if (nameEl._t !== text) {
                     nameEl._t = text;
                     const units = Array.from(text).reduce((a, ch) => a + (/[\x20-\x7e]/.test(ch) ? 0.56 : 1.0), 0);
-                    const fs = Math.max(44, Math.min(cfg.layout === 'column' ? 112 : ((cfg.cards || cfg.heroHTML) ? 120 : 132), Math.floor(1040 / (units + 0.4))));
+                    const fs = Math.max(44, Math.min(cfg.art ? 100 : cfg.layout === 'column' ? 112 : ((cfg.cards || cfg.heroHTML) ? 120 : 132), Math.floor(1040 / (units + 0.4))));
                     nameEl.style.fontSize = fs + 'px';
                     nameEl.innerHTML = Array.from(text).map((ch, i) => ch === ' ' ? '<span class="fgt-sp"></span>' : '<span class="fgt-l" data-t="' + ch + '" style="--i:' + (i + 2) + '">' + ch + '</span>').join('');
                     subEl.style.top = (46 + fs + 8) + 'px';
