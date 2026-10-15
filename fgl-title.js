@@ -9,8 +9,8 @@
 //     sub:  { ja:'..', simple:'..', en:'..' }, // 題名の下の小さな説明(何のゲームかを一言で)
 //     cards: ['3','7','10','9','6'], gold: 2, op: '＋',   // 主役のカードの扇(省略可)。まん中の金のカードが「答え」
 //     lang: () => currentLang,               // 'ja' | 'simple' | 'en'
-//     skin: 'space',                         // ボタンの見た目(space|cafe|water|dungeon|digital|cloud。fgl-title.css)
-//     art: true,                             // 背景いっぱいの絵(盤面入り)。題名をうえ、ボタンを下に寄せる
+//     skin: 'board',                         // ボタンの見た目(board=白いボード+まるいバッジのボタン。fgl-title.css)
+//     art: 'compact',                        // 題名をうえ、ボタンを下のまん中に小さくまとめる(背景いっぱいの絵を見せたいとき)。showSub:true で一言も出す
 //     fill: true,                            // ホストの中身がぜんぶ absolute で、ホスト自身の高さが0になるとき
 //     hide: ['.title-box'],                  // もとのタイトルで かくす部分(省略するとホストの中身ぜんぶ)
 //     buttons: { start: '#btn-start'(関数でもよい: 「つづきから」があるときに切りかえる), row: [{ sel: '#btn-tutorial', ico: 'help' }, ...] }
@@ -30,7 +30,7 @@
     const pick = (o, lang) => (o && typeof o === 'object') ? (o[lang] !== undefined ? o[lang] : (lang === 'simple' && o.ja !== undefined ? o.ja : (o.ja !== undefined ? o.ja : ''))) : (o || '');
 
     // スキンごとに使う字(Google Fonts)。ボタンの雰囲気を ゲームに合わせる
-    const SKIN_FONT = { space: 'DotGothic16', cafe: 'DotGothic16', water: 'Zen+Maru+Gothic:wght@700;900', dungeon: 'Dela+Gothic+One', digital: 'Orbitron:wght@700;900', cloud: 'Hachi+Maru+Pop' };
+    const SKIN_FONT = {};   // スキンごとに別の字を使うときは ここに足す(今は board のみで、字は共通)
     function ensureFont(skin) {
         if (!document.getElementById('fgt-font')) {
             const l = document.createElement('link');
@@ -59,7 +59,8 @@
             const root = document.createElement('div');
             root.className = 'fgt fgt-in';
             if (cfg.layout === 'column') root.classList.add('col');
-            if (cfg.art) root.classList.add(cfg.art === 'compact' || cfg.art === 'compact-right' ? 'art-c' : 'art', cfg.art === 'low' ? 'art-low' : 'art', cfg.art === 'compact-right' ? 'art-r' : 'art');            // 背景いっぱいの絵(盤面入り)用: 題名をうえ・ボタンを下に寄せる
+            if (cfg.art) root.classList.add(cfg.art === 'compact' ? 'art-c' : 'art');
+            if (cfg.showSub) root.classList.add('sub-on');      // art:'compact' でも 題名の下の一言を出す(絵のないゲーム用)            // 背景いっぱいの絵(盤面入り)用: 題名をうえ・ボタンを下に寄せる
             if (cfg.skin) root.classList.add('sk-' + cfg.skin); // ボタンの見た目(スキン)
             root.style.setProperty('--fh', cfg.hue === undefined ? 200 : cfg.hue);
             if (cfg.title && typeof FH !== 'undefined' && FH.applyTitleColors) FH.applyTitleColors(root, cfg.title);   // 題名の色(FH.PAL のどれか)
