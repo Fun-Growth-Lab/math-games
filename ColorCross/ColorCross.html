@@ -13,7 +13,7 @@
 </script>
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
 <title>ColorCross - Fun &amp; Growth Lab</title>
-<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800;900&family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet">
 <style>
 :root{
   --text-hi:#3a3a44;
@@ -725,10 +725,60 @@ function rr(x,y,w,h,r,fill,stroke,lw=1){
   if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=lw;ctx.stroke();}
 }
 function tx(s,x,y,sz,col,align='left',bold=false){
-  ctx.font=`${bold?'800':'400'} ${sz}px 'Nunito','M PLUS Rounded 1c',sans-serif`;
+  ctx.font=`${bold?'900':'700'} ${sz}px 'M PLUS Rounded 1c','Nunito',sans-serif`;
   ctx.fillStyle=col;ctx.textAlign=align;ctx.textBaseline='middle';
   ctx.fillText(s,x,y);
 }
+// ---- 見た目の部品(九九ポーカー風): 面 + ふち + 下の「縁(ふち)」で立体に見せる ----
+function _rgb(h){ h=h.replace('#',''); return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)]; }
+function mixCol(a,b,t){ const A=_rgb(a),B=_rgb(b); return '#'+A.map((v,i)=>Math.round(v+(B[i]-v)*t).toString(16).padStart(2,'0')).join(''); }
+function shadeCol(h,k){ return k<0?mixCol(h,'#000000',-k):mixCol(h,'#ffffff',k); }
+function panel3d(x,y,w,h,r,fill,bd,edge,lw=3,depth=6,soft=true){
+  ctx.save();
+  if(soft){ ctx.shadowColor='rgba(70,50,120,0.20)'; ctx.shadowBlur=16; ctx.shadowOffsetY=depth+4; }
+  ctx.beginPath(); ctx.roundRect(x,y+depth,w,h,r); ctx.fillStyle=edge; ctx.fill();
+  ctx.restore();
+  ctx.beginPath(); ctx.roundRect(x,y,w,h,r); ctx.fillStyle=fill; ctx.fill();
+  if(bd){ ctx.lineWidth=lw; ctx.strokeStyle=bd; ctx.stroke(); }
+}
+function ribbon(cx,cy,text,fs,c1,c2,edge,minW=0){
+  ctx.font=`900 ${fs}px 'M PLUS Rounded 1c','Nunito',sans-serif`;
+  const w=Math.max(minW,ctx.measureText(text).width+40), h=fs+16, x=cx-w/2, y=cy-h/2;
+  ctx.beginPath(); ctx.roundRect(x,y+4,w,h,h/2); ctx.fillStyle=edge; ctx.fill();
+  const g=ctx.createLinearGradient(0,y,0,y+h); g.addColorStop(0,c1); g.addColorStop(1,c2);
+  ctx.beginPath(); ctx.roundRect(x,y,w,h,h/2); ctx.fillStyle=g; ctx.fill();
+  ctx.lineWidth=2.5; ctx.strokeStyle='rgba(255,255,255,0.75)'; ctx.stroke();
+  ctx.save(); ctx.shadowColor='rgba(0,0,0,0.25)'; ctx.shadowOffsetY=2; ctx.shadowBlur=0;
+  tx(text,cx,cy+1,fs,'#ffffff','center',true); ctx.restore();
+}
+// 大きめの立体ボタン(面は上下のグラデーション、下に濃い縁)
+function btn3d(x,y,w,h,label,c1,c2,edge,ink,fs){
+  ctx.save();
+  ctx.shadowColor='rgba(60,40,100,0.18)'; ctx.shadowBlur=10; ctx.shadowOffsetY=8;
+  ctx.beginPath(); ctx.roundRect(x,y+5,w,h,h/2.4); ctx.fillStyle=edge; ctx.fill();
+  ctx.restore();
+  const g=ctx.createLinearGradient(0,y,0,y+h); g.addColorStop(0,c1); g.addColorStop(1,c2);
+  ctx.beginPath(); ctx.roundRect(x,y,w,h,h/2.4); ctx.fillStyle=g; ctx.fill();
+  ctx.lineWidth=2.5; ctx.strokeStyle='rgba(255,255,255,0.85)'; ctx.stroke();
+  tx(label,x+w/2,y+h/2+1,fs,ink,'center',true);
+}
+// 数字カード(手札・盤面): 白い面 + 色のふち + 色の縁 + うすい色の地
+function drawNumTile(bx,by,bw,bh,card,sel,fs,depth=5){
+  const joker=card&&card.joker;
+  const base=joker?'#a76bea':COLORS[card.color];
+  const edge=shadeCol(base,-0.30), tint=mixCol(base,'#ffffff',0.86);
+  ctx.save();
+  if(sel){ ctx.shadowColor=SEL_COL; ctx.shadowBlur=20; }
+  ctx.beginPath(); ctx.roundRect(bx,by+depth,bw,bh,15); ctx.fillStyle=edge; ctx.fill();
+  ctx.restore();
+  ctx.beginPath(); ctx.roundRect(bx,by,bw,bh,15); ctx.fillStyle=tint; ctx.fill();
+  ctx.lineWidth=4.5; ctx.strokeStyle=sel?SEL_COL:base; ctx.stroke();
+  const m=Math.max(6,bw*0.07);
+  ctx.beginPath(); ctx.roundRect(bx+m,by+m,bw-m*2,bh-m*2,10); ctx.fillStyle='#ffffff'; ctx.fill();
+  if(joker) tx('🃏',bx+bw/2,by+bh/2+1,fs*0.9,'#7a40c0','center',true);
+  else tx(card.num,bx+bw/2,by+bh/2+2,fs,base,'center',true);
+}
+
 function buildShapePath(cx,cy,r,type){
   ctx.beginPath();
   switch(type){
@@ -782,6 +832,8 @@ function drawMarkShape(cx,cy,r,type,color,alpha=1){
   buildShapePath(cx,cy,r,type);
   ctx.lineWidth=7; ctx.strokeStyle='#ffffff'; ctx.stroke();
   ctx.fillStyle=color; ctx.fill();
+  ctx.save(); ctx.clip(); ctx.fillStyle='rgba(255,255,255,0.28)'; ctx.fillRect(cx-r,cy-r,r*2,r*0.95); ctx.restore();   // 上半分に つや
+  buildShapePath(cx,cy,r,type);
   ctx.lineWidth=2.5; ctx.strokeStyle='rgba(0,0,0,0.30)'; ctx.stroke();
   ctx.restore();
 }
@@ -1278,20 +1330,19 @@ const RIGHT_W=W-RIGHT_X-26;      // 290
 // ============================================================
 function cellXY(r,c){ return {x:GX+c*CELL, y:GY+r*CELL}; }
 function drawBoard(){
-  rr(GX-8,GY-8,GN*CELL+16,GN*CELL+16,16,'#fdfbf6','#c9b8ea',4);
+  panel3d(GX-11,GY-11,GN*CELL+22,GN*CELL+22,26,'#ffffff','#b79cf0','#8e6fd0',5,7);
   for(let r=0;r<GN;r++) for(let c=0;c<GN;c++){
     const {x,y}=cellXY(r,c);
     const selectedMark = G.selMark && G.selMark.r===r && G.selMark.c===c;
     const selectedCard = G.selBoardCard && G.selBoardCard.r===r && G.selBoardCard.c===c;
     const selected = selectedMark||selectedCard;
-    rr(x+3,y+3,CELL-6,CELL-6,8, selected?'#f5edfc':C_CELL, selected?SEL_COL:C_CELL_BDR, selected?3:1.5);
+    rr(x+4,y+4,CELL-8,CELL-8,13, selected?'#efe4ff':'#fbf9ff', selected?SEL_COL:'#e2daf5', selected?4:2);
 
     const cell=G.board[idx(r,c)];
     if(cell&&cell.kind==='mark'){
       drawMarkShape(x+CELL/2,y+CELL/2,CELL*0.33,cell.type,COLORS[cell.color]);
     } else if(cell&&cell.kind==='card'){
-      rr(x+10,y+10,CELL-20,CELL-20,10,'#ffffff', selectedCard?SEL_COL:COLORS[cell.color], selectedCard?4:3.5);
-      tx(cell.num,x+CELL/2,y+CELL/2,42,COLORS[cell.color],'center',true);
+      drawNumTile(x+10,y+8,CELL-20,CELL-20,cell,selectedCard,44,5);
     } else if(cell&&cell.kind==='garbage'){
       drawGarbageBlock(x,y);
     } else if(cell&&cell.kind==='chest'){
@@ -1332,8 +1383,7 @@ function drawBoard(){
       const {x,y}=cellXY(r,c);
       const src=G.board[idx(G.selBoardCard.r,G.selBoardCard.c)];
       ctx.save(); ctx.globalAlpha=0.5;
-      rr(x+10,y+10,CELL-20,CELL-20,10,'#ffffff',COLORS[src.color],3.5);
-      tx(src.num,x+CELL/2,y+CELL/2,42,COLORS[src.color],'center',true);
+      drawNumTile(x+10,y+8,CELL-20,CELL-20,src,false,44,5);
       ctx.restore();
       rr(x+3,y+3,CELL-6,CELL-6,8,null,SEL_COL,2.5);
     }
@@ -1377,8 +1427,7 @@ function drawBoard(){
     if(c){
       ctx.save(); ctx.globalAlpha=0.5;
       const s=CELL-20;
-      rr(drag.curX-s/2,drag.curY-s/2,s,s,10,'#ffffff',COLORS[c.color],3.5);
-      tx(c.num,drag.curX,drag.curY,42,COLORS[c.color],'center',true);
+      drawNumTile(drag.curX-s/2,drag.curY-s/2,s,s,c,false,44,5);
       ctx.restore();
     }
   }
@@ -1386,18 +1435,12 @@ function drawBoard(){
 
 let BR={};
 function drawCardBox(card,bx,by,bw,bh,sel,disabled){
-  rr(bx,by,bw,bh,12,'#ffffff',sel?SEL_COL:'#e4e0da',sel?3:1.5);
   if(disabled) ctx.globalAlpha=0.4;
-  if(card&&card.joker){
-    const inner=Math.min(bw,bh)-24;
-    const grad=ctx.createLinearGradient(bx,by,bx+bw,by+bh);
-    grad.addColorStop(0,'#ff6b6b'); grad.addColorStop(0.5,'#4dabf7'); grad.addColorStop(1,'#4ade80');
-    rr(bx+bw/2-inner/2,by+bh/2-inner/2,inner,inner,10,'#fbfbf8',grad,3);
-    tx('🃏',bx+bw/2,by+bh/2,40,'#7a40c0','center',true);
-  } else if(card){
-    const inner=Math.min(bw,bh)-24;
-    rr(bx+bw/2-inner/2,by+bh/2-inner/2,inner,inner,10,'#fbfbf8',COLORS[card.color],3);
-    tx(card.num,bx+bw/2,by+bh/2,44,COLORS[card.color],'center',true);
+  if(card){
+    const up=sel?-6:0;
+    drawNumTile(bx,by+up,bw,bh,card,sel,58,7);
+  } else {
+    rr(bx,by,bw,bh,15,'#f4f0fb','#d8cdf0',2.5);
   }
   ctx.globalAlpha=1;
 }
@@ -1426,11 +1469,11 @@ function drawTrashIcon(cx,cy,size,color){
 function drawHandRow(){
   // 捨てエリア（手札カードの左）
   const canDiscard=G.selHand>=0||!!G.selBoardCard;
-  rr(DISCARD_X,HAND_Y,SLOT_SIZE,SLOT_SIZE,12, canDiscard?'#fff0f0':'#faf6f4', canDiscard?'#ff8a8a':'#e8ddd8', canDiscard?2.5:1.5);
-  ctx.save(); if(!canDiscard) ctx.globalAlpha=0.55;
-  drawTrashIcon(DISCARD_X+SLOT_SIZE/2,HAND_Y+SLOT_SIZE/2-8,46,'#c05a5a');
+  panel3d(DISCARD_X,HAND_Y,SLOT_SIZE,SLOT_SIZE,15, canDiscard?'#ffe9e7':'#fbf4f2', canDiscard?'#ff8f86':'#e8d4ce', canDiscard?'#d9665c':'#d9c4be', canDiscard?4:3, 7);
+  ctx.save(); if(!canDiscard) ctx.globalAlpha=0.6;
+  drawTrashIcon(DISCARD_X+SLOT_SIZE/2,HAND_Y+SLOT_SIZE/2-10,50,'#c95a58');
   ctx.restore();
-  tx(T('discard.label'),DISCARD_X+SLOT_SIZE/2,HAND_Y+SLOT_SIZE-16,12,'#b08080','center',true);
+  tx(T('discard.label'),DISCARD_X+SLOT_SIZE/2,HAND_Y+SLOT_SIZE-17,14,'#b8605c','center',true);
   BR.discard={x:DISCARD_X,y:HAND_Y,w:SLOT_SIZE,h:SLOT_SIZE};
 
   for(let i=0;i<3;i++){
@@ -1443,33 +1486,33 @@ function drawHandRow(){
   if(drag.active&&drag.mode==='hand'){
     const card=G.hand[drag.handIdx];
     if(card){
-      const inner=SLOT_SIZE-24;
-      rr(drag.curX-inner/2,drag.curY-inner/2,inner,inner,10,'#fbfbf8',COLORS[card.color],3);
-      tx(card.num,drag.curX,drag.curY,44,COLORS[card.color],'center',true);
+      const inner=SLOT_SIZE-14;
+      drawNumTile(drag.curX-inner/2,drag.curY-inner/2,inner,inner,card,true,52,6);
     }
   }
 }
-
 // 中央カラム：NEXT / NEXT NEXT（それぞれ独立コンテナ）+ アイテム・スキルゾーン
 function drawMidPanel(){
-  tx('NEXT', MID_X, 26, 16,'#c0a060','left',true);
-  const boxW=(MID_W-16)/2, boxH=140;
-  // ①NEXT（次に出る）
-  rr(MID_X,44,boxW,boxH,14,'#f8f8f5','#e4e0da',1.5);
-  if(G.nextQueue[0]) drawMarkShape(MID_X+boxW/2,44+boxH/2,44,G.nextQueue[0].type,COLORS[G.nextQueue[0].color]);
-  // ②NEXT NEXT（そのつぎ）
+  const boxW=(MID_W-16)/2, boxH=136;
+  // NEXT: 2つの箱(次に出る・そのつぎ)
+  panel3d(MID_X,52,boxW,boxH,20,'#fbf8ff','#b79cf0','#8e6fd0',3.5,6);
+  if(G.nextQueue[0]) drawMarkShape(MID_X+boxW/2,52+boxH/2,44,G.nextQueue[0].type,COLORS[G.nextQueue[0].color]);
   const nx2=MID_X+boxW+16;
-  rr(nx2,44,boxW,boxH,14,'#f8f8f5','#e4e0da',1.5);
-  if(G.nextQueue[1]){ ctx.save(); ctx.globalAlpha=0.75; drawMarkShape(nx2+boxW/2,44+boxH/2,34,G.nextQueue[1].type,COLORS[G.nextQueue[1].color]); ctx.restore(); }
+  panel3d(nx2,52,boxW,boxH,20,'#fbf8ff','#d2c2f4','#b4a0e0',3.5,6);
+  if(G.nextQueue[1]){ ctx.save(); ctx.globalAlpha=0.8; drawMarkShape(nx2+boxW/2,52+boxH/2,34,G.nextQueue[1].type,COLORS[G.nextQueue[1].color]); ctx.restore(); }
+  ribbon(MID_X+MID_W/2,40,'NEXT',17,'#b48cf5','#8e6fd8','#6a4cb0',130);
 
   // アイテム欄
-  rr(MID_X,214,MID_W,H-214-30,16,'#f8f8f5','#e4e0da',1.5);
+  const top=232, bottom=H-34;
+  panel3d(MID_X,top,MID_W,bottom-top,22,'#fffaf0','#f2b866','#d9923a',3.5,6);
   const discardMode=G.pendingItemDiscard;
   const parenL=currentLang==='en'?' (':'（', parenR=currentLang==='en'?')':'）';
-  tx(discardMode?T('item.discardmode'):T('item.panellabel')+parenL+G.items.length+'/'+MAX_ITEMS+parenR, MID_X+16, 214+20, 13, discardMode?'#e05656':'#c0a060','left',true);
-  const gridY=214+38, gridH=H-30-gridY;
+  const rtext=discardMode?T('item.discardmode'):T('item.panellabel')+parenL+G.items.length+'/'+MAX_ITEMS+parenR;
+  if(discardMode) ribbon(MID_X+MID_W/2,top,rtext,15,'#ff8a80','#e05656','#b03a3a',200);
+  else ribbon(MID_X+MID_W/2,top,rtext,17,'#ffc266','#f09a2a','#c26f10',190);
+  const gridY=top+30, gridH=bottom-gridY-10;
   const cols=2, slotCount=Math.max(MAX_ITEMS,G.items.length), rows=Math.ceil(slotCount/cols);
-  const gap=8;
+  const gap=9;
   const cellW=(MID_W-24-gap)/cols, cellH=Math.min(84,(gridH-gap*(rows-1))/rows);
   for(let i=0;i<slotCount;i++){
     const col=i%cols, row=Math.floor(i/cols);
@@ -1477,111 +1520,105 @@ function drawMidPanel(){
     const item=G.items[i];
     if(item){
       const def=ITEM_DEFS[item];
-      const col=ITEM_COL[def.col]||ITEM_COL.hand;
-      rr(bx,by,cellW,cellH,10, discardMode?'#fff0f0':col.bg, discardMode?'#ff8a8a':col.border,2);
+      const ic=ITEM_COL[def.col]||ITEM_COL.hand;
+      if(discardMode) panel3d(bx,by,cellW,cellH-5,13,'#fff0f0','#ff8a8a','#d96060',2.5,4,false);
+      else panel3d(bx,by,cellW,cellH-5,13,ic.bg,ic.border,shadeCol(ic.border,-0.22),2.5,4,false);
       if(item==='pentaUp'||item==='hexUp'){
         // ⬠⬡は文字だと小サイズで丸つぶれするため、図形アイコン＋矢印で表示する
         const shapeType=item==='pentaUp'?2:3;
         const iconR=11, arrowText='↑';
-        ctx.font=`800 18px 'Nunito','M PLUS Rounded 1c',sans-serif`;
+        ctx.font=`900 19px 'M PLUS Rounded 1c','Nunito',sans-serif`;
         const arrowW=ctx.measureText(arrowText).width;
         const groupW=iconR*2+4+arrowW;
-        const startX=bx+cellW/2-groupW/2, iconY=by+cellH/2-14;
-        drawShapeIcon(startX+iconR, iconY, iconR, shapeType, col.text);
-        tx(arrowText, startX+iconR*2+4+arrowW/2, iconY, 18, col.text, 'center', true);
+        const startX=bx+cellW/2-groupW/2, iconY=by+cellH/2-16;
+        drawShapeIcon(startX+iconR, iconY, iconR, shapeType, ic.text);
+        tx(arrowText, startX+iconR*2+4+arrowW/2, iconY, 19, ic.text, 'center', true);
       } else {
-        tx(itemShort(item), bx+cellW/2, by+cellH/2-14,18,col.text,'center',true);
+        tx(itemShort(item), bx+cellW/2, by+cellH/2-16,19,ic.text,'center',true);
       }
-      tx(itemLabel(item), bx+cellW/2, by+cellH-15,13,col.text,'center',true);
+      tx(itemLabel(item), bx+cellW/2, by+cellH-20,13,ic.text,'center',true);
     } else {
-      rr(bx,by,cellW,cellH,10,'#fbfbf9','#e4e0da',1.5);
+      rr(bx,by,cellW,cellH-5,13,'#fdf8ee','#ecdcc0',2);
     }
     BR[`item${i}`]={x:bx,y:by,w:cellW,h:cellH};
   }
 }
-
 // 右カラム：SCORE(+今回の最高スコア) / TURN / ☆倍率 / ゲームログ / あそびかた / タイトルへ（縦並び）
 function drawRightPanel(){
-  let y=20;
-  // SCORE（コンテナで囲み、今回の最高スコアも大きく表示）
+  let y=18;
+  // SCORE(金): 合計と、今回の最高スコア
   const scoreBoxH=112;
-  rr(RIGHT_X,y,RIGHT_W,scoreBoxH,10,'#fff8ec','#f0dfc0',1.5);
-  tx('SCORE', RIGHT_X+14, y+16, 12,'#c0a060','left',true);
-  tx(G.displayScore.toLocaleString(), RIGHT_X+RIGHT_W/2, y+46, 34,'#3a3a44','center',true);
-  tx(T('score.best'), RIGHT_X+RIGHT_W/2, y+70, 11,'#b0a888','center');
-  tx(G.bestSingleScore.toLocaleString(), RIGHT_X+RIGHT_W/2, y+93, 22,'#d4900a','center',true);
-  y+=scoreBoxH+16;
+  panel3d(RIGHT_X,y,RIGHT_W,scoreBoxH,20,'#fffbe6','#f2c744','#d9a21c',3.5,6);
+  tx('SCORE', RIGHT_X+16, y+20, 14,'#b8860b','left',true);
+  tx(G.displayScore.toLocaleString(), RIGHT_X+RIGHT_W/2, y+54, 40,'#3a3340','center',true);
+  tx(T('score.best')+'  ', RIGHT_X+16, y+90, 13,'#a8926a','left');
+  tx(G.bestSingleScore.toLocaleString(), RIGHT_X+RIGHT_W-16, y+90, 24,'#d48a0a','right',true);
+  y+=scoreBoxH+14;
 
-  rr(RIGHT_X,y,RIGHT_W,54,10,'#f4f6fb','#dde4f2',1.5);
-  tx('TURN', RIGHT_X+14,y+16,12,'#7a90b8','left',true);
-  tx(G.turns, RIGHT_X+RIGHT_W/2,y+37,26,'#3a5a90','center',true);
-  y+=62;
+  // TURN(青)
+  panel3d(RIGHT_X,y,RIGHT_W,52,16,'#f1f7ff','#8fb8f0','#5f8fd0',3,5);
+  tx('TURN', RIGHT_X+16,y+26,14,'#5f86c0','left',true);
+  tx(G.turns, RIGHT_X+RIGHT_W-18,y+27,30,'#3a5a90','right',true);
+  y+=52+13;
 
-  // ⭐カウンター／場の☆の数／👑の数／倍率（それぞれ独立したコンテナ）
+  // ⭐カウンター／場の☆の数／👑の数／倍率（コンボ中は金色に）
   const starCount=countStars();
   const crownCount=countCrowns();
   const mult=currentMultiplier();
   const comboOn=mult>1;
-  const boxBg=comboOn?'#fff2e6':'#f6f4f0', boxBdr=comboOn?'#f0a850':'#e4e0da', boxCol=comboOn?'#d4900a':'#9a9aa6';
+  const boxBg=comboOn?'#fff3e2':'#fbf8ff', boxBdr=comboOn?'#f2a24a':'#cfc2ee', boxEdge=comboOn?'#d77f1a':'#a99ad6', boxCol=comboOn?'#c9780a':'#8070b0';
 
   // ①⭐カウンター（4本バー。0.2秒ごとに1つずつ点灯していく）
-  const starBoxH=60;
-  rr(RIGHT_X,y,RIGHT_W,starBoxH,10, boxBg, boxBdr,1.5);
-  tx(T('star.counter.label'), RIGHT_X+14,y+14,12, boxCol,'left',true);
-  const barCount=4, barGap=8, barW=(RIGHT_W-28-barGap*(barCount-1))/barCount, barH=26, barY=y+22;
+  const starBoxH=62;
+  panel3d(RIGHT_X,y,RIGHT_W,starBoxH,16, boxBg, boxBdr, boxEdge,3,5);
+  tx(T('star.counter.label'), RIGHT_X+16,y+17,13, boxCol,'left',true);
+  const barCount=4, barGap=8, barW=(RIGHT_W-32-barGap*(barCount-1))/barCount, barH=24, barY=y+30;
   const filled=G.starCounterDisplay%4;
   for(let i=0;i<barCount;i++){
-    const bx=RIGHT_X+14+i*(barW+barGap);
-    rr(bx,barY,barW,barH,5, i<filled?'#f0a850':'#ffffff', '#e0c090',1.5);
+    const bx=RIGHT_X+16+i*(barW+barGap);
+    rr(bx,barY,barW,barH,8, i<filled?'#ffb340':'#ffffff', i<filled?'#d98a1a':'#e0c8a0',2);
   }
-  y+=starBoxH+6;
+  y+=starBoxH+11;
 
-  // ②場の☆の数
-  const starCountBoxH=50;
-  rr(RIGHT_X,y,RIGHT_W,starCountBoxH,10, boxBg, boxBdr,1.5);
-  tx(T('star.count.label'), RIGHT_X+14,y+14,12, boxCol,'left',true);
-  tx(starCount, RIGHT_X+RIGHT_W/2,y+35,22, boxCol,'center',true);
-  y+=starCountBoxH+6;
+  // ②場の☆の数・③👑の数: 2つ並べる
+  const halfW=(RIGHT_W-10)/2, smallH=58;
+  panel3d(RIGHT_X,y,halfW,smallH,16, boxBg, boxBdr, boxEdge,3,5);
+  tx(T('star.count.label'), RIGHT_X+halfW/2,y+17,12, boxCol,'center',true);
+  tx(starCount, RIGHT_X+halfW/2,y+41,26, boxCol,'center',true);
+  panel3d(RIGHT_X+halfW+10,y,halfW,smallH,16, boxBg, boxBdr, boxEdge,3,5);
+  tx(T('crown.count.label'), RIGHT_X+halfW+10+halfW/2,y+17,12, boxCol,'center',true);
+  tx(crownCount, RIGHT_X+halfW+10+halfW/2,y+41,26, boxCol,'center',true);
+  y+=smallH+11;
 
-  // ③👑の数
-  const crownBoxH=50;
-  rr(RIGHT_X,y,RIGHT_W,crownBoxH,10, boxBg, boxBdr,1.5);
-  tx(T('crown.count.label'), RIGHT_X+14,y+14,12, boxCol,'left',true);
-  tx(crownCount, RIGHT_X+RIGHT_W/2,y+35,22, boxCol,'center',true);
-  y+=crownBoxH+6;
-
-  // ④倍率（大きく表示）
-  const multBoxH=64;
-  rr(RIGHT_X,y,RIGHT_W,multBoxH,10, boxBg, boxBdr,1.5);
-  tx(T('mult.label'), RIGHT_X+14,y+14,12, boxCol,'left',true);
-  tx('×'+mult.toFixed(1), RIGHT_X+RIGHT_W/2,y+43,30, boxCol,'center',true);
-  y+=multBoxH+12;
+  // ④倍率（大きく）
+  const multBoxH=60;
+  panel3d(RIGHT_X,y,RIGHT_W,multBoxH,16, boxBg, boxBdr, boxEdge,3,5);
+  tx(T('mult.label'), RIGHT_X+16,y+30,14, boxCol,'left',true);
+  tx('×'+mult.toFixed(1), RIGHT_X+RIGHT_W-18,y+31,34, boxCol,'right',true);
+  y+=multBoxH+13;
 
   // ゲームログ
-  tx(T('log.label'), RIGHT_X, y+8, 13,'#c0a060','left',true);
-  y+=20;
-  const logH=H-y-30-96;
-  rr(RIGHT_X,y,RIGHT_W,logH,10,'#fbfbf9','#e4e0da',1.5);
+  const btnH=46, navH=btnH*2+14;
+  const logTop=y+20, logH=H-30-navH-12-logTop;
+  tx(T('log.label'), RIGHT_X+4, y+8, 14,'#a98f60','left',true);
+  panel3d(RIGHT_X,logTop,RIGHT_W,logH,14,'#fffefb','#e6dcc8','#cfc2a8',2.5,4,false);
   ctx.save();
-  ctx.beginPath(); ctx.rect(RIGHT_X,y,RIGHT_W,logH); ctx.clip();
-  const lineH=20;
-  G.log.slice(0,Math.floor(logH/lineH)).forEach((line,i)=>{
+  ctx.beginPath(); ctx.roundRect(RIGHT_X+2,logTop+2,RIGHT_W-4,logH-4,12); ctx.clip();
+  const lineH=21;
+  G.log.slice(0,Math.floor((logH-10)/lineH)).forEach((line,i)=>{
     const isRecent=i<G.actionLogCount;
-    tx(line, RIGHT_X+10, y+14+i*lineH, 12, isRecent?'#3a3a44':'#9a9aa6','left', isRecent);
+    tx(line, RIGHT_X+12, logTop+17+i*lineH, 13, isRecent?'#3a3340':'#a09aa8','left', isRecent);
   });
   ctx.restore();
-  y+=logH+12;
+  y=logTop+logH+12;
 
-  // 下部ナビ
-  BR.howto={x:RIGHT_X,y:y,w:RIGHT_W,h:42};
-  rr(RIGHT_X,y,RIGHT_W,42,10,'#f6f4f0','#e4e0da',1.5);
-  tx(T('nav.howto'),RIGHT_X+RIGHT_W/2,y+21,15,'#8a8a94','center');
-  y+=50;
-  BR.back={x:RIGHT_X,y:y,w:RIGHT_W,h:42};
-  rr(RIGHT_X,y,RIGHT_W,42,10,'#f6f4f0','#e4e0da',1.5);
-  tx(T('nav.totitle'),RIGHT_X+RIGHT_W/2,y+21,15,'#8a8a94','center');
+  // 下部ナビ: あそびかた(白) / タイトルへ(コーラル)
+  BR.howto={x:RIGHT_X,y:y,w:RIGHT_W,h:btnH};
+  btn3d(RIGHT_X,y,RIGHT_W,btnH,T('nav.howto'),'#ffffff','#f1ecfb','#cdbfe8','#5a4a8a',17);
+  y+=btnH+12;
+  BR.back={x:RIGHT_X,y:y,w:RIGHT_W,h:btnH};
+  btn3d(RIGHT_X,y,RIGHT_W,btnH,T('nav.totitle'),'#ff8d85','#f0605a','#c23f3a','#ffffff',17);
 }
-
 let howTo=false;
 // あそびかたの図形×倍率の参考行。⬠⬡は文字だと小サイズで丸つぶれするため図形アイコンで描く
 function drawShapeRefLine(x,y,fontSize){
@@ -1600,9 +1637,9 @@ function drawShapeRefLine(x,y,fontSize){
 }
 function drawHowToScreen(){
   ctx.fillStyle='rgba(30,20,10,0.55)';ctx.fillRect(0,0,W,H);
-  const pw=880, ph=520, px=W/2-pw/2, py=H/2-ph/2;
-  rr(px,py,pw,ph,18,'#ffffff','#f0a850',3);
-  tx(T('howto.title'),W/2,py+40,26,'#d4900a','center',true);
+  const pw=960, ph=520, px=W/2-pw/2, py=H/2-ph/2;
+  panel3d(px,py,pw,ph,28,'#ffffff','#f2b866','#d9923a',4,8);
+  ribbon(W/2,py,T('howto.title'),24,'#ffc266','#f09a2a','#c26f10',260);
   const lines=[
     T('howto.l1'), T('howto.l2'), T('howto.l3'), T('howto.l4'),
     T('howto.l5'), T('howto.l6'), T('howto.l7'),
@@ -1611,34 +1648,30 @@ function drawHowToScreen(){
   lines.forEach((l,i)=>tx(l,W/2-pw/2+30,py+84+i*lineH,15,'#3a3a44','left'));
   // 参考行：⬠⬡は小サイズだと文字が丸つぶれして見えるため、図形アイコンを直接描画する
   drawShapeRefLine(W/2-pw/2+30, py+84+lines.length*lineH, 15);
-  BR.htclose={x:W/2-70,y:py+ph-64,w:140,h:44};
-  rr(W/2-70,py+ph-64,140,44,10,'#f6f4f0','#f0a850',2);
-  tx(T('btn.close'),W/2,py+ph-42,17,'#3a3a44','center',true);
+  BR.htclose={x:W/2-80,y:py+ph-66,w:160,h:48};
+  btn3d(W/2-80,py+ph-66,160,48,T('btn.close'),'#ffffff','#f1ecfb','#cdbfe8','#5a4a8a',18);
 }
 function drawEndPanel(title,titleCol,borderCol){
   const pw=640, ph=350;
   const px=W/2-pw/2, py=H/2-ph/2;
   ctx.fillStyle='rgba(30,20,10,0.5)'; ctx.fillRect(0,0,W,H);
-  rr(px,py,pw,ph,18,'#ffffff',borderCol,3);
-  tx(title, W/2, py+52, 36, titleCol,'center',true);
+  panel3d(px,py,pw,ph,30,'#ffffff','#8fb8f0','#5f8fd0',4,8);
+  tx(title, W/2, py+52, 38, titleCol,'center',true);
   tx('F I N A L  S C O R E', W/2, py+94, 13, '#c0a060','center',true);
   tx(G.finalScore.toLocaleString()+T('unit.pts'), W/2, py+144, 52, '#d4900a','center',true);
   tx(T('endpanel.turnslabel')+'  '+G.turns, W/2, py+184, 16, '#8a8a94','center');
   const btns=[
-    {label:T('endpanel.retry'),bg:'linear-green',key:'retry', x:W/2-205,y:py+216,w:150,h:52},
-    {label:T('endpanel.totitle2'), bg:'linear-gray', key:'title2',x:W/2-40, y:py+216,w:110,h:52},
-    {label:T('endpanel.rank2'),bg:'linear-gold', key:'rank2', x:W/2+90, y:py+216,w:150,h:52},
+    {label:T('endpanel.retry'),bg:'linear-green',key:'retry', x:W/2-215,y:py+240,w:150,h:56},
+    {label:T('endpanel.totitle2'), bg:'linear-gray', key:'title2',x:W/2-50, y:py+240,w:110,h:56},
+    {label:T('endpanel.rank2'),bg:'linear-gold', key:'rank2', x:W/2+75, y:py+240,w:150,h:56},
   ];
   const grad={
-    'linear-green':['#5ddb6e','#28a040'],
-    'linear-gray':['#aaa','#787878'],
-    'linear-gold':['#f5c842','#d4900a'],
+    'linear-green':['#6fe07f','#33b04c','#1f8036'],
+    'linear-gray':['#c7bfe0','#a094c8','#7a6ca8'],
+    'linear-gold':['#ffd466','#f0a830','#c27d10'],
   };
   btns.forEach(({label,bg,key,x,y,w,h})=>{
-    const g=ctx.createLinearGradient(0,y,0,y+h);
-    g.addColorStop(0,grad[bg][0]); g.addColorStop(1,grad[bg][1]);
-    rr(x,y,w,h,12,g,'rgba(0,0,0,0.08)',1);
-    tx(label,x+w/2,y+h/2,17,'#fff','center',true);
+    btn3d(x,y,w,h,label,grad[bg][0],grad[bg][1],grad[bg][2],'#ffffff',18);
     BR[key]={x,y,w,h};
   });
 }
@@ -1646,14 +1679,14 @@ function drawEndPanel(title,titleCol,borderCol){
 function drawJokerPicker(){
   const pw=420, ph=280, px=W/2-pw/2, py=H/2-ph/2;
   ctx.fillStyle='rgba(30,20,10,0.55)'; ctx.fillRect(0,0,W,H);
-  rr(px,py,pw,ph,18,'#ffffff','#a76bea',3);
-  tx(T('joker.picker.title'), W/2, py+34, 18,'#7a40c0','center',true);
+  panel3d(px,py,pw,ph,26,'#ffffff','#b79cf0','#8e6fd0',4,8);
+  tx(T('joker.picker.title'), W/2, py+34, 19,'#7a40c0','center',true);
   const gridX=px+30, gridY=py+56, cellW=(pw-60)/4, cellH=52, gap=8;
   for(let ci=0;ci<3;ci++){
     for(let ni=0;ni<4;ni++){
       const bx=gridX+ni*cellW, by=gridY+ci*(cellH+gap);
-      rr(bx+4,by,cellW-8,cellH,10,'#fbfbf8',COLORS[ci],3);
-      tx(ni+1,bx+cellW/2,by+cellH/2,26,COLORS[ci],'center',true);
+      panel3d(bx+4,by,cellW-8,cellH-4,12,mixCol(COLORS[ci],'#ffffff',0.86),COLORS[ci],shadeCol(COLORS[ci],-0.3),3.5,4,false);
+      tx(ni+1,bx+cellW/2,by+cellH/2-2,28,COLORS[ci],'center',true);
       BR[`jokerpick_${ci}_${ni}`]={x:bx+4,y:by,w:cellW-8,h:cellH};
     }
   }
@@ -1687,33 +1720,35 @@ function drawItemConfirm(){
   const lines=wrapLines(itemConfirmMsg(ic.type), pw-60, fontSize);
   const ph=150+lines.length*lineH;
   const px=W/2-pw/2, py=H/2-ph/2;
-  rr(px,py,pw,ph,18,'#ffffff','#f0a850',3);
-  tx(itemLabel(ic.type), W/2, py+36, 20,'#d4900a','center',true);
+  panel3d(px,py,pw,ph,28,'#ffffff','#f2b866','#d9923a',4,8);
+  tx(itemLabel(ic.type), W/2, py+38, 22,'#c9780a','center',true);
   lines.forEach((l,i)=>tx(l, W/2, py+76+i*lineH, fontSize,'#3a3a44','center'));
   const btnY=py+ph-60;
-  BR.itemConfirmYes={x:W/2-140,y:btnY,w:120,h:44};
-  rr(W/2-140,btnY,120,44,10,'#28a040','#1a7030',2);
-  tx(T('btn.yes'),W/2-80,btnY+22,17,'#fff','center',true);
-  BR.itemConfirmNo={x:W/2+20,y:btnY,w:120,h:44};
-  rr(W/2+20,btnY,120,44,10,'#e05656','#a03030',2);
-  tx(T('btn.no'),W/2+80,btnY+22,17,'#fff','center',true);
+  BR.itemConfirmYes={x:W/2-150,y:btnY,w:130,h:48};
+  btn3d(W/2-150,btnY,130,48,T('btn.yes'),'#6fe07f','#33b04c','#1f8036','#ffffff',18);
+  BR.itemConfirmNo={x:W/2+20,y:btnY,w:130,h:48};
+  btn3d(W/2+20,btnY,130,48,T('btn.no'),'#ff8d85','#f0605a','#c23f3a','#ffffff',18);
 }
 let _bgCache=null;
 function drawBg(){
   if(!_bgCache){
     const c=document.createElement('canvas');c.width=W;c.height=H;const g=c.getContext('2d');
-    const gr=g.createLinearGradient(0,0,W,H);gr.addColorStop(0,'#fff6e6');gr.addColorStop(0.5,'#f0ebff');gr.addColorStop(1,'#ffe8f3');
+    const gr=g.createLinearGradient(0,0,W,H);gr.addColorStop(0,'#fff1d6');gr.addColorStop(0.5,'#ece4ff');gr.addColorStop(1,'#ffdff0');
     g.fillStyle=gr;g.fillRect(0,0,W,H);
-    // 色と形のもよう(うすく)
-    const deco=[[60,90,70,'tri','#ff6b6b'],[1210,70,60,'sq','#4dabf7'],[40,420,50,'cir','#4ade80'],[1230,400,66,'tri','#ffca3a'],[70,650,62,'sq','#a678e8'],[1200,660,54,'cir','#ff8fb5'],[640,690,48,'tri','#4dabf7']];
-    deco.forEach(([x,y,r,t,col])=>{
-      g.save();g.globalAlpha=0.22;g.fillStyle=col;g.translate(x,y);g.rotate((x+y)%7*0.2);
-      g.beginPath();
-      if(t==='cir')g.arc(0,0,r*0.9,0,Math.PI*2);
-      else if(t==='sq')g.roundRect(-r*0.8,-r*0.8,r*1.6,r*1.6,r*0.25);
-      else{g.moveTo(0,-r);g.lineTo(r*0.95,r*0.7);g.lineTo(-r*0.95,r*0.7);g.closePath();}
-      g.fill();g.restore();
-    });
+    // 色と形の もよう(小さく ならべて うすく)
+    const cols=['#ff6b6b','#4dabf7','#4ade80','#ffca3a','#a678e8','#ff8fb5'];
+    let k=0;
+    for(let y=-20;y<H+40;y+=92){
+      for(let x=-30+((Math.floor(y/92)%2)?46:0);x<W+40;x+=92){
+        const t=k%3, col=cols[(k*5+Math.floor(y/92))%cols.length]; k++;
+        g.save();g.globalAlpha=0.13;g.fillStyle=col;g.translate(x,y);g.rotate(((x*7+y*3)%11)*0.12);
+        g.beginPath();
+        if(t===0)g.arc(0,0,15,0,Math.PI*2);
+        else if(t===1)g.roundRect(-14,-14,28,28,6);
+        else{g.moveTo(0,-17);g.lineTo(16,13);g.lineTo(-16,13);g.closePath();}
+        g.fill();g.restore();
+      }
+    }
     _bgCache=c;
   }
   ctx.drawImage(_bgCache,0,0);
