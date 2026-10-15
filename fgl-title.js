@@ -59,7 +59,7 @@
             const root = document.createElement('div');
             root.className = 'fgt fgt-in';
             if (cfg.layout === 'column') root.classList.add('col');
-            if (cfg.art) root.classList.add('art', cfg.art === 'low' ? 'art-low' : 'art');            // 背景いっぱいの絵(盤面入り)用: 題名をうえ・ボタンを下に寄せる
+            if (cfg.art) root.classList.add(cfg.art === 'compact' ? 'art-c' : 'art', cfg.art === 'low' ? 'art-low' : 'art');            // 背景いっぱいの絵(盤面入り)用: 題名をうえ・ボタンを下に寄せる
             if (cfg.skin) root.classList.add('sk-' + cfg.skin); // ボタンの見た目(スキン)
             root.style.setProperty('--fh', cfg.hue === undefined ? 200 : cfg.hue);
             if (cfg.title && typeof FH !== 'undefined' && FH.applyTitleColors) FH.applyTitleColors(root, cfg.title);   // 題名の色(FH.PAL のどれか)
