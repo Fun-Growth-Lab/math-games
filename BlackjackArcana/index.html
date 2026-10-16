@@ -5,7 +5,7 @@
     <script>if(screen.orientation&&screen.orientation.lock){screen.orientation.lock('landscape').catch(function(){});}</script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ブラックジャック・アルカナ - Fun & Growth Lab</title>
-    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800&family=Dela+Gothic+One&family=Yusei+Magic&display=swap" rel="stylesheet">
     <style>
         :root {
             /* 配色「深紅の王家」：黒に近い深緑のcard table風から、深いワインレッド×ゴールドへ変更。
@@ -105,34 +105,21 @@
         .sticky-foot.row { flex-direction: row; justify-content: center; gap: 12px; }
         .sticky-foot.row .btn { margin-top: 0; }
         #title-screen .btn { max-width: 380px; margin-left: auto; margin-right: auto; }
-        /* 「つづきから」がある場合、「はじめから」と横並びにする。行の器（title-box）自体の幅は変えず、
-           2つ並ぶときだけ他の単独ボタン(320px)より少し広い460pxまで使ってよいので、フォントは縮めなくてよい。
-           「つづきから」が無いとき（.hiddenが付いているとき）は、はじめからを単独ボタンと同じ320px幅に戻す。 */
-        .title-start-row { display: flex; gap: 12px; max-width: 460px; margin: 10px auto 0; }
-        .title-start-row .btn { flex: 1; min-width: 0; margin-top: 0; max-width: none; white-space: nowrap; padding: 17px 14px; font-size: 1.3rem; letter-spacing: 3px; border-radius: 16px; }
-        .title-start-row:has(#btn-continue.hidden) { max-width: 380px; }
+        /* タイトルのボタン構成はアリスメティカと同じ形式：
+           セーブあり＝「つづきから／はじめから」の横並び、なし＝大きい「ゲームスタート」。その下に名前・星の祭壇・下段3つ横並び */
+        .title-btns { display: flex; flex-direction: column; align-items: stretch; width: 100%; }
+        #title-screen .title-btns .btn { max-width: none; width: 100%; margin: 0 0 11px; }
+        .title-start-row { display: none; gap: 12px; margin: 0 0 11px; }
+        #title-screen .title-start-row .btn { flex: 1 1 0; width: auto; margin: 0; white-space: nowrap; padding: 17px 14px; font-size: 1.3rem; letter-spacing: 3px; border-radius: 16px; }
+        .btn-start-main { padding: 18px 20px; font-size: 1.75rem; letter-spacing: 6px; border-radius: 18px; }
+        .title-btns-row { display: flex; gap: 10px; width: 100%; }
+        #title-screen .title-btns-row .btn { flex: 1 1 0; width: auto; margin: 0; padding: 12px 8px; font-size: 1.02rem; letter-spacing: 0; white-space: nowrap; }
         /* タイトル画面いっぱいの背景イラスト（title.png）。Math_Braves_additionと同じく等倍の濃さで表示し、
            透け感はボックス側のbackground-color薄め＋backdrop-filterで作る（画像側を薄くする方式だと効果が弱かった） */
         .title-bg-img {
             position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
             z-index: 0; opacity: 1; pointer-events: none;
         }
-        /* タイトル画面の左右の空きスペースに、ランダムなキャラクターイラストを飾る（初代ポケモンのタイトル画面イメージ）。
-           イラストだけを浮かせて置くと不自然なので、カード風の枠で囲む（枠の縦横比は通常カードと違ってよい） */
-        .title-illust-frame {
-            position: absolute; top: 50%; transform: translateY(-50%); z-index: 1;
-            width: 230px; height: 230px; border-radius: 16px; overflow: hidden;
-            border: 5px solid transparent;
-            background-image:
-                radial-gradient(ellipse at 50% 30%, #4a1420 0%, #240b12 60%, #140609 100%),
-                linear-gradient(135deg, #fff3c4 0%, var(--gold-bright) 30%, var(--gold) 60%, #fff3c4 100%);
-            background-origin: border-box; background-clip: padding-box, border-box;
-            box-shadow: 0 12px 30px rgba(0,0,0,0.75);
-        }
-        .title-illust-frame:not(:has(img[src])), .title-illust-frame:has(img[src=""]) { visibility: hidden; }
-        .title-illust-frame-left { left: 40px; }
-        .title-illust-frame-right { right: 40px; }
-        .title-illust { width: 100%; height: 100%; object-fit: cover; display: block; }
         .title-box, .rank-box, .overlay-box, .event-popup-box {
             border: 2px solid rgba(255,214,120,0.6); border-radius: 20px;
             background: linear-gradient(180deg, rgba(74,20,32,0.99) 0%, rgba(40,12,20,0.99) 45%, rgba(24,8,12,0.99) 100%);
@@ -775,8 +762,25 @@
 
         #battle-center {
             flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center;
-            justify-content: center; gap: 6px; padding: 6px 18px; position: relative;
+            justify-content: center; gap: 6px; padding: 6px 18px; position: relative; isolation: isolate;
         }
+        /* 中央の卓：ワイン赤のフェルトの台に金の縁と二重の輪、四すみにスート。上からスポットライトを当てて奥行きを出す */
+        #battle-center::before {
+            content: ''; position: absolute; inset: 8px 10px; z-index: -2; pointer-events: none; border-radius: 30px;
+            border: 2px solid rgba(255,214,120,0.38);
+            background:
+                radial-gradient(ellipse 70% 38% at 50% 0%, rgba(255,226,150,0.26), transparent 72%),
+                radial-gradient(ellipse 80% 70% at 50% 46%, rgba(168,46,72,0.62) 0%, rgba(98,24,42,0.5) 55%, rgba(40,10,18,0.15) 100%),
+                repeating-linear-gradient(45deg, rgba(255,255,255,0.028) 0 2px, transparent 2px 9px),
+                repeating-linear-gradient(-45deg, rgba(0,0,0,0.05) 0 2px, transparent 2px 9px);
+            box-shadow: inset 0 0 0 7px rgba(10,3,6,0.28), inset 0 0 0 8px rgba(255,214,120,0.2), inset 0 0 70px rgba(0,0,0,0.55);
+        }
+        #battle-center::after {
+            content: ''; position: absolute; inset: 16px 20px; z-index: -1; pointer-events: none;
+            background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 500 520'><g fill='none' stroke='%23ffd878' stroke-linecap='round'><ellipse cx='250' cy='260' rx='232' ry='244' stroke-width='2' opacity='.30'/><ellipse cx='250' cy='260' rx='220' ry='232' stroke-width='1' stroke-dasharray='2 9' opacity='.45'/><ellipse cx='250' cy='260' rx='168' ry='178' stroke-width='1' opacity='.16'/><path d='M250 4 L262 18 L250 32 L238 18Z M250 488 L262 502 L250 516 L238 502Z M4 260 L18 248 L32 260 L18 272Z M468 260 L482 248 L496 260 L482 272Z' fill='%23ffd878' stroke='none' opacity='.45'/></g><g font-family='serif' font-size='44' text-anchor='middle' opacity='.26'><text x='56' y='74' fill='%23ffd878'>♠</text><text x='444' y='74' fill='%23ff7a8c'>♥</text><text x='56' y='478' fill='%23ff7a8c'>♦</text><text x='444' y='478' fill='%23ffd878'>♣</text></g></svg>") center / contain no-repeat;
+            animation: arenaGlow 5s ease-in-out infinite;
+        }
+        @keyframes arenaGlow { 0%,100% { opacity: .75; } 50% { opacity: 1; } }
         .cards-row {
             /* カード実寸は394px固定（.big-cardのheightを参照）。カードサイズをアルカナ比率(72:129)に
                統一した際に高さが増えたため、他の行のpadding/gapを詰めて縦の予算を確保している */
@@ -972,6 +976,84 @@
             font-size: 1.7rem; font-weight: 900; color: var(--gold-bright);
             text-shadow: 0 0 16px rgba(244,216,114,0.5); margin-bottom: 8px; line-height: 1.4;
         }
+        /* ==================== イベント画面の見た目（見出し・額縁・本文・スロット） ==================== */
+        .event-popup-box {
+            background:
+                radial-gradient(ellipse 80% 40% at 50% 0%, rgba(255,214,120,0.16), transparent 70%),
+                linear-gradient(180deg, rgba(74,20,32,0.99) 0%, rgba(40,12,20,0.99) 45%, rgba(24,8,12,0.99) 100%);
+            box-shadow: 0 14px 40px rgba(0,0,0,0.8), inset 0 0 0 6px rgba(10,3,6,0.4), inset 0 0 0 7px rgba(255,214,120,0.3), inset 0 1px 0 rgba(255,255,255,0.14);
+            animation: evPopIn .35s cubic-bezier(.2,1.2,.4,1) both;
+        }
+        @keyframes evPopIn { from { opacity: 0; transform: translate(-50%, -46%) scale(.94); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+        /* 見出し：太い丸ゴ（Dela Gothic One）に金色と黒い影、左右に飾り罫 */
+        .event-popup-box .big-announce {
+            display: flex; align-items: center; justify-content: center; gap: 14px;
+            font-family: "Dela Gothic One", "M PLUS Rounded 1c", sans-serif; font-weight: 400; font-size: 1.75rem; letter-spacing: 2px;
+            margin-bottom: 12px; text-shadow: none; color: #ffe08a;
+            filter: drop-shadow(0 2px 0 rgba(10,3,6,0.95)) drop-shadow(0 0 14px rgba(255,200,80,0.45));
+        }
+        .event-popup-box .big-announce::before, .event-popup-box .big-announce::after {
+            content: ''; flex: 0 1 70px; height: 3px; border-radius: 3px;
+            background: linear-gradient(90deg, rgba(255,210,110,0), #ffd866);
+        }
+        .event-popup-box .big-announce::after { transform: scaleX(-1); }
+        .event-illust { border: 3px solid #ffd866; box-shadow: 0 0 0 2px rgba(10,3,6,0.9), 0 8px 22px rgba(0,0,0,0.6), 0 0 26px rgba(255,200,80,0.25); }
+        /* 本文：手書き風の魔法フォント（Yusei Magic）で、物語を読ませる文章に */
+        .ev-body { font-family: "Yusei Magic", "M PLUS Rounded 1c", sans-serif; font-size: 1.3rem; font-weight: 400; color: #fff1d2; margin: 14px 0; line-height: 1.75; text-shadow: 0 1px 3px rgba(0,0,0,0.85); }
+        .ev-body-sm { font-size: 1.15rem; margin: 10px 0; }
+        .event-popup-box .eh-line { font-family: "Dela Gothic One", "M PLUS Rounded 1c", sans-serif; font-weight: 400; letter-spacing: 1px; animation: evLineIn .5s ease both; }
+        @keyframes evLineIn { from { opacity: 0; transform: translateY(8px) scale(.96); } to { opacity: 1; transform: none; } }
+
+        /* ---- 謎のマシン（スロット） ---- */
+        .slot-cabinet {
+            position: relative; margin: 6px auto 8px; padding: 14px 16px 12px; width: 440px; max-width: 100%; box-sizing: border-box;
+            border-radius: 22px; border: 3px solid #ffe08a;
+            background: linear-gradient(180deg, #7a1d34 0%, #4a1020 55%, #2a0912 100%);
+            box-shadow: 0 6px 0 #1a0409, 0 12px 24px rgba(0,0,0,0.6), inset 0 0 0 3px rgba(10,3,6,0.7), inset 0 2px 0 rgba(255,255,255,0.25);
+        }
+        /* 縁のランプ：交互に点滅 */
+        .slot-cabinet::before {
+            content: ''; position: absolute; inset: 5px; border-radius: 17px; pointer-events: none;
+            border: 4px dotted #fff0b0; opacity: .9; animation: slotLamp 1s steps(1) infinite;
+        }
+        @keyframes slotLamp { 0% { border-color: #fff0b0; } 50% { border-color: #ff9ab0; } }
+        .slot-cabinet.spinning::before { animation-duration: .25s; }
+        .slot-cabinet.win { animation: slotWin .5s ease-in-out 3; }
+        .slot-cabinet.lose { animation: slotLose .45s ease-in-out; }
+        @keyframes slotWin { 0%,100% { box-shadow: 0 6px 0 #1a0409, 0 0 0 rgba(255,220,100,0); } 50% { box-shadow: 0 6px 0 #1a0409, 0 0 46px rgba(255,220,100,0.95); } }
+        @keyframes slotLose { 0%,100% { transform: none; } 20% { transform: translateX(-7px); } 40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(3px); } }
+        .slot-marquee { font-family: "Dela Gothic One", sans-serif; font-size: 1.05rem; letter-spacing: 8px; color: #ffe08a; text-shadow: 0 0 10px rgba(255,200,80,0.7), 0 2px 0 #000; margin-bottom: 8px; text-align: center; }
+        .slot-reels { position: relative; display: flex; justify-content: center; gap: 8px; padding: 8px; border-radius: 14px; background: #0c0306; box-shadow: inset 0 0 0 2px #ffd866, inset 0 6px 14px rgba(0,0,0,0.9); }
+        .slot-reel { position: relative; width: 108px; height: 104px; overflow: hidden; border-radius: 8px; background: linear-gradient(180deg, #d9c9a8 0%, #fffaf0 22%, #fffaf0 78%, #d9c9a8 100%); box-shadow: inset 0 0 10px rgba(0,0,0,0.5); }
+        .slot-strip { position: absolute; left: 0; right: 0; top: 0; will-change: transform; }
+        .slot-strip.rolling { filter: blur(2.5px); }
+        .slot-cell { height: 104px; display: flex; align-items: center; justify-content: center; font-size: 3.4rem; line-height: 1; }
+        .slot-cell.seven { font-family: "Dela Gothic One", sans-serif; font-size: 4.2rem; color: #e8202e; -webkit-text-stroke: 3px #7a0a14; paint-order: stroke fill; text-shadow: 3px 3px 0 #ffd866; }
+        /* 当たりの線 */
+        .slot-reels::after { content: ''; position: absolute; left: 4px; right: 4px; top: 50%; height: 3px; margin-top: -1.5px; background: rgba(255,60,80,0.85); box-shadow: 0 0 8px rgba(255,60,80,0.9); pointer-events: none; border-radius: 2px; }
+        .slot-reel.hit { animation: slotHit .35s ease-in-out 4; }
+        @keyframes slotHit { 0%,100% { filter: none; } 50% { filter: brightness(1.25) drop-shadow(0 0 10px #ffe08a); } }
+        .slot-paytable { display: flex; justify-content: center; gap: 6px; margin-top: 9px; flex-wrap: wrap; }
+        .slot-pay { display: inline-flex; align-items: center; gap: 3px; padding: 3px 9px; border-radius: 999px; font-size: 0.88rem; font-weight: 800; color: #fff1d2; background: rgba(0,0,0,0.42); border: 1px solid rgba(255,214,120,0.5); }
+        .slot-pay b { font-family: "Dela Gothic One", sans-serif; font-weight: 400; color: #ffe08a; }
+        .slot-pay .seven-mini { font-family: "Dela Gothic One", sans-serif; color: #ff5060; }
+        .slot-panel { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; margin: 6px 0 4px; }
+        .slot-chips { font-family: "Dela Gothic One", sans-serif; font-size: 1.15rem; color: #ffe08a; }
+        .slot-bet { font-family: "Dela Gothic One", sans-serif; font-size: 1.7rem; color: #fff; min-width: 70px; text-align: center; text-shadow: 0 0 12px rgba(255,200,80,0.6); }
+        .slot-bet-btns { display: flex; gap: 5px; justify-content: center; flex-wrap: wrap; }
+        .slot-bet-btns .btn { width: auto; margin: 0; padding: 7px 12px; font-size: 0.95rem; min-height: 38px; letter-spacing: 0; }
+        .slot-result { min-height: 66px; display: flex; flex-direction: column; align-items: center; justify-content: center; margin: 6px 0 8px; }
+        .slot-result .sr-big { font-family: "Dela Gothic One", sans-serif; font-size: 2rem; letter-spacing: 3px; animation: srPop .55s cubic-bezier(.2,1.6,.4,1) both; }
+        .slot-result .sr-sub { font-family: "Yusei Magic", sans-serif; font-size: 1.15rem; color: #fff1d2; margin-top: 2px; animation: evLineIn .5s .25s ease both; }
+        .slot-result .sr-big.jackpot { font-size: 2.5rem; background: linear-gradient(90deg, #ff5060, #ffe08a, #7fd858, #6ac8ff, #ff5060); background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: srPop .55s cubic-bezier(.2,1.6,.4,1) both, srRainbow 1.4s linear infinite; filter: drop-shadow(0 2px 0 #000); }
+        .slot-result .sr-big.win { color: #ffe08a; text-shadow: 0 0 18px rgba(255,200,80,0.8), 0 3px 0 #000; }
+        .slot-result .sr-big.small { color: #bfe8ff; text-shadow: 0 0 12px rgba(120,200,255,0.6), 0 3px 0 #000; }
+        .slot-result .sr-big.lose { color: #b6a0b8; text-shadow: 0 3px 0 #000; }
+        @keyframes srPop { from { opacity: 0; transform: scale(.3) rotate(-6deg); } to { opacity: 1; transform: none; } }
+        @keyframes srRainbow { to { background-position: 300% 0; } }
+        /* 当たりのときに降るコイン */
+        .slot-coin { position: absolute; top: -30px; font-size: 1.6rem; pointer-events: none; z-index: 30; animation: slotCoinFall linear forwards; }
+        @keyframes slotCoinFall { to { transform: translateY(760px) rotate(540deg); opacity: .85; } }
         .eventskill-sub { font-size: 1.15rem; color: var(--text-main); font-weight: 700; margin-bottom: 8px; }
         .eventskill-desc { font-size: 1rem; color: var(--text-main); font-weight: 700; margin: -4px 0 10px; }
         /* 祝福の泉イベント：前置きは控えめに、効果の行は大きく色分けして目立たせる */
@@ -1023,24 +1105,23 @@
     <!-- ==================== TITLE ==================== -->
     <div id="title-screen">
         <img class="title-bg-img" src="images/title.png" alt="">
-        <div class="title-illust-frame title-illust-frame-left">
-            <img id="title-illust-left" class="title-illust" alt="" onerror="this.parentElement.style.visibility='hidden';">
-        </div>
-        <div class="title-illust-frame title-illust-frame-right">
-            <img id="title-illust-right" class="title-illust" alt="" onerror="this.parentElement.style.visibility='hidden';">
-        </div>
         <div class="title-box">
             <h1 class="title-h1" data-i18n="title.heading">ブラックジャック・アルカナ</h1>
             <p class="title-sub">BLACKJACK ARCANA</p>
-            <div class="title-start-row">
-                <button class="btn btn-gold" data-i18n="title.start" onclick="goToStarterSelect()">はじめから</button>
-                <button id="btn-continue" class="btn btn-gold hidden" data-i18n="title.continue" onclick="continueGame()">▶ つづきから</button>
+            <div class="title-btns">
+                <div id="btn-save-row" class="title-start-row">
+                    <button id="btn-continue" class="btn btn-gold" data-i18n="title.continue" onclick="continueGame()">▶ つづきから</button>
+                    <button class="btn btn-gold" data-i18n="title.start" onclick="goToStarterSelect()">はじめから</button>
+                </div>
+                <button id="btn-start" class="btn btn-gold btn-start-main" data-i18n="title.gamestart" onclick="goToStarterSelect()">ゲームスタート</button>
+                <button id="btn-name-register" class="btn btn-gray" onclick="openNameRegister()">👤 名前の登録</button>
+                <button class="btn btn-crimson" data-i18n="title.altar" onclick="openMetaHub()">🌟 星の祭壇</button>
+                <div class="title-btns-row">
+                    <button class="btn btn-gray" data-i18n="title.ranking" onclick="openRanking()">🏆 ランキング</button>
+                    <button class="btn btn-gray" data-i18n="title.settings" onclick="openSettings()">⚙️ 設定</button>
+                    <button class="btn btn-gray" data-i18n="title.index" onclick="location.href='../index.html'">🏠 INDEXへ</button>
+                </div>
             </div>
-            <button id="btn-name-register" class="btn btn-gray" onclick="openNameRegister()">👤 名前の登録</button>
-            <button class="btn btn-gray" data-i18n="title.altar" onclick="openMetaHub()">🌟 星の祭壇</button>
-            <button class="btn btn-gray" data-i18n="title.ranking" onclick="openRanking()">🏆 ランキング</button>
-            <button class="btn btn-gray" data-i18n="title.settings" onclick="openSettings()">⚙️ 設定</button>
-            <button class="btn btn-gray" data-i18n="title.index" onclick="location.href='../index.html'">🏠 INDEXへ</button>
         </div>
     </div>
 
@@ -1200,7 +1281,7 @@
         <div class="event-popup-box">
             <div class="big-announce" data-i18n="event.fountain.title">⛲ 祝福の泉</div>
             <img class="event-illust" src="images/events/event_1.png" alt="" onerror="this.style.display='none';">
-            <div id="eventhp-body" style="font-size:1.15rem; font-weight:800; color:var(--text-hi); margin:14px 0; line-height:1.7;"></div>
+            <div id="eventhp-body" class="ev-body"></div>
             <button class="btn btn-gold js-enter-next" data-i18n="common.backToMap" onclick="closeEventMaxHp()">▶ マップへもどる</button>
         </div>
     </div>
@@ -1232,7 +1313,7 @@
         <div class="event-popup-box">
             <div class="big-announce" data-i18n="event.treasure.title">📦 宝箱発見！</div>
             <img class="event-illust" src="images/events/event_2.png" alt="" onerror="this.style.display='none';">
-            <div id="eventtreasure-body" style="font-size:1.15rem; font-weight:800; color:var(--text-hi); margin:14px 0; line-height:1.7;"></div>
+            <div id="eventtreasure-body" class="ev-body"></div>
             <button class="btn btn-gold js-enter-next" data-i18n="common.backToMap" onclick="closeEventTreasure()">▶ マップへもどる</button>
         </div>
     </div>
@@ -1242,7 +1323,7 @@
         <div class="event-popup-box">
             <div class="big-announce" id="eventgeneric-title"></div>
             <img class="event-illust" id="eventgeneric-illust" alt="" style="display:none;" onerror="this.style.display='none';">
-            <div id="eventgeneric-body" style="font-size:1.15rem; font-weight:800; color:var(--text-hi); margin:14px 0; line-height:1.7;"></div>
+            <div id="eventgeneric-body" class="ev-body"></div>
             <button id="eventgeneric-close-btn" class="btn btn-gold js-enter-next" data-i18n="common.backToMap" onclick="closeEventGeneric()">▶ マップへもどる</button>
         </div>
     </div>
@@ -1252,7 +1333,7 @@
         <div class="event-popup-box">
             <div class="big-announce" data-i18n="event.sage.title">📖 賢者の書</div>
             <img class="event-illust" src="images/events/event_4.png" alt="" onerror="this.style.display='none';">
-            <div id="eventsage-body" style="font-size:1.05rem; font-weight:800; color:var(--text-hi); margin:10px 0;"></div>
+            <div id="eventsage-body" class="ev-body ev-body-sm"></div>
             <div id="eventsage-card-area" style="display:flex; justify-content:center; gap:14px; flex-wrap:wrap; margin:8px 0;"></div>
             <button class="btn btn-gold js-enter-next" data-i18n="common.backToMap" onclick="closeEventSage()">▶ マップへもどる</button>
         </div>
@@ -1294,19 +1375,27 @@
     <div id="eventmachine-screen" class="hidden">
         <div class="event-popup-box">
             <div class="big-announce" data-i18n="event.machine.title">🎰 謎のマシン</div>
-            <img class="event-illust" src="images/events/event_11.png" alt="" onerror="this.style.display='none';">
-            <p class="settings-desc" data-i18n="event.machine.odds">コインを賭けて回す。0倍／0.5倍／1.5倍／2.0倍／3.0倍がそれぞれ20%で出る！</p>
-            <p class="settings-desc"><span data-i18n="shop.chipsLabel">🪙 しょじ：</span><span id="eventmachine-chips"></span></p>
-            <div style="display:flex; align-items:center; justify-content:center; gap:8px; margin:14px 0; flex-wrap:wrap;">
-                <button class="btn btn-gray btn-sm" style="width:auto;" onclick="adjustMachineBet(-10)">－10</button>
-                <button class="btn btn-gray btn-sm" style="width:auto;" onclick="adjustMachineBet(-5)">－5</button>
-                <button class="btn btn-gray btn-sm" style="width:auto;" onclick="adjustMachineBet(-1)">－1</button>
-                <span id="eventmachine-bet" style="font-size:1.4rem; font-weight:900; color:var(--gold-bright); min-width:80px; text-align:center;">0</span>
-                <button class="btn btn-gray btn-sm" style="width:auto;" onclick="adjustMachineBet(1)">＋1</button>
-                <button class="btn btn-gray btn-sm" style="width:auto;" onclick="adjustMachineBet(5)">＋5</button>
-                <button class="btn btn-gray btn-sm" style="width:auto;" onclick="adjustMachineBet(10)">＋10</button>
+            <div class="slot-cabinet" id="slot-cabinet">
+                <div class="slot-marquee">★ ARCANA SLOT ★</div>
+                <div class="slot-reels">
+                    <div class="slot-reel"><div class="slot-strip" id="slot-strip-0"></div></div>
+                    <div class="slot-reel"><div class="slot-strip" id="slot-strip-1"></div></div>
+                    <div class="slot-reel"><div class="slot-strip" id="slot-strip-2"></div></div>
+                </div>
+                <div class="slot-paytable">
+                    <span class="slot-pay">💀<b>×0</b></span><span class="slot-pay">🍒<b>×0.5</b></span><span class="slot-pay">🔔<b>×1.5</b></span><span class="slot-pay">💎<b>×2</b></span><span class="slot-pay"><span class="seven-mini">7</span><b>×3</b></span>
+                </div>
             </div>
-            <div id="eventmachine-result" style="font-size:1.2rem; font-weight:800; color:var(--text-hi); min-height:1.6em; margin-bottom:10px;"></div>
+            <p class="settings-desc" style="margin:2px 0;" data-i18n="event.machine.odds2">そろった絵がもどってくる倍率！ 5種類がそれぞれ20%</p>
+            <div class="slot-panel">
+                <span class="slot-chips"><span data-i18n="shop.chipsLabel">🪙 しょじ：</span><span id="eventmachine-chips"></span></span>
+            </div>
+            <div class="slot-panel">
+                <div class="slot-bet-btns"><button class="btn btn-gray btn-sm" onclick="adjustMachineBet(-10)">－10</button><button class="btn btn-gray btn-sm" onclick="adjustMachineBet(-5)">－5</button><button class="btn btn-gray btn-sm" onclick="adjustMachineBet(-1)">－1</button></div>
+                <span class="slot-bet" id="eventmachine-bet">0</span>
+                <div class="slot-bet-btns"><button class="btn btn-gray btn-sm" onclick="adjustMachineBet(1)">＋1</button><button class="btn btn-gray btn-sm" onclick="adjustMachineBet(5)">＋5</button><button class="btn btn-gray btn-sm" onclick="adjustMachineBet(10)">＋10</button></div>
+            </div>
+            <div class="slot-result" id="eventmachine-result"></div>
             <button class="btn btn-gold" id="eventmachine-spin-btn" data-i18n="event.machine.pullLever" onclick="spinMachine()">レバーを引く</button>
             <button class="btn btn-gray" data-i18n="common.backToMap" onclick="closeEventMachine()">▶ マップへもどる</button>
         </div>
@@ -1765,6 +1854,7 @@ let currentLang = getLang();
 const I18N = {
     'title.heading': { ja:'ブラックジャック・アルカナ', easy:'ブラックジャック・アルカナ', en:'Blackjack Arcana' },
     'title.start': { ja:'はじめから', easy:'はじめから', en:'New Game' },
+    'title.gamestart': { ja:'ゲームスタート', easy:'ゲームスタート', en:'Game Start' },
     'title.continue': { ja:'▶ つづきから', easy:'▶ つづきから', en:'▶ Continue' },
     'title.nameRegister': { ja:'👤 名前：{name}', easy:'👤 なまえ：{name}', en:'👤 Name: {name}' },
     'title.altar': { ja:'🌟 星の祭壇', easy:'🌟 ほしのさいだん', en:'🌟 Star Altar' },
@@ -2059,6 +2149,12 @@ const I18N = {
     'event.shrine.leveledUp': { ja:'⛩️ スキルレベルアップ！', easy:'⛩️ スキルレベルアップ！', en:'⛩️ Skill Leveled Up!' },
     'event.machine.title': { ja:'🎰 謎のマシン', easy:'🎰 なぞのマシン', en:'🎰 Mystery Machine' },
     'event.machine.odds': { ja:'コインを賭けて回す。0倍／0.5倍／1.5倍／2.0倍／3.0倍がそれぞれ20%で出る！', easy:'コインをかけてまわす。0ばい／0.5ばい／1.5ばい／2.0ばい／3.0ばいが、それぞれ20%ででる！', en:'Bet coins and spin. ×0 / ×0.5 / ×1.5 / ×2.0 / ×3.0 each come up 20% of the time!' },
+    'event.machine.odds2': { ja:'そろった絵がもどってくる倍率！ 5種類がそれぞれ20%', easy:'そろったえが、もどってくるばいりつ！ 5しゅるいが、それぞれ20%', en:'The matched symbol sets your payout! Each of the 5 comes up 20% of the time' },
+    'event.machine.r3': { ja:'大当たり！！', easy:'おおあたり！！', en:'JACKPOT!!' },
+    'event.machine.r2': { ja:'当たり！', easy:'あたり！', en:'WIN!' },
+    'event.machine.r15': { ja:'やったね！', easy:'やったね！', en:'NICE!' },
+    'event.machine.r05': { ja:'ちょっと戻った', easy:'ちょっともどった', en:'A FEW BACK' },
+    'event.machine.r0': { ja:'ハズレ…', easy:'ハズレ…', en:'MISS…' },
     'event.machine.pullLever': { ja:'レバーを引く', easy:'レバーをひく', en:'Pull the Lever' },
     'event.fountain.healed': { ja:'泉の水に癒やされた！', easy:'いずみのみずでいやされた！', en:'The fountain water healed you!' },
     'event.fountain.fullHeal': { ja:'HP完全回復！', easy:'HPぜんかいふく！', en:'HP fully restored!' },
@@ -2990,7 +3086,9 @@ function loadCardSeq(){
 function hasSave(){ try { return !!localStorage.getItem(SAVE_KEY); } catch (e){ return false; } }
 function clearSave(){ try { localStorage.removeItem(SAVE_KEY); } catch (e){} }
 function refreshTitleButtons(){
-    document.getElementById('btn-continue').classList.toggle('hidden', !hasSave());
+    const has = hasSave();
+    document.getElementById('btn-start').style.display = has ? 'none' : '';
+    document.getElementById('btn-save-row').style.display = has ? 'flex' : 'none';
 }
 function autoSaveGame(){
     if (!game) return;
@@ -3282,14 +3380,8 @@ function showScreen(id){
      'stage3clear-screen','clear-screen','over-screen','meta-hub-screen','runstart-equip-screen',
      'cardfusion-screen','cardfusionmaterial-screen','cardfusionconfirm-screen','fusiondiscard-screen'
     ].forEach(s => document.getElementById(s).classList.toggle('hidden', s !== id));
-    if (id === 'title-screen'){ renderTitleIllusts(); refreshTitleButtons(); }
+    if (id === 'title-screen'){ refreshTitleButtons(); }
 }
-// タイトル画面の左右に、ランダムなキャラクターのイラストを飾る（見るたびに抽選し直す）
-function renderTitleIllusts(){
-    document.getElementById('title-illust-left').src = charIllustSrc({ rank: randomRank(), suit: randomSuit() });
-    document.getElementById('title-illust-right').src = charIllustSrc({ rank: randomRank(), suit: randomSuit() });
-}
-
 // ============================================================
 // プレイヤー名の登録・管理（ローカル保存）
 // ============================================================
@@ -4266,30 +4358,119 @@ function openEventFatigue(){
 
 // ---- 謎のマシン：コインを好きなだけ賭け、0/0.5/1.5/2.0/3.0倍がそれぞれ20%で出る（賭けなくてもよい） ----
 let machineBet = 0;
+// スロットの絵柄。倍率ごとに1種類（そろった絵＝もどってくる倍率）。ハズレ(×0)はバラバラの絵が止まる。
+const SLOT_SYMBOLS = [
+    { mult: 0,   ch: '💀' },
+    { mult: 0.5, ch: '🍒' },
+    { mult: 1.5, ch: '🔔' },
+    { mult: 2.0, ch: '💎' },
+    { mult: 3.0, ch: '7', cls: 'seven' }
+];
+const SLOT_CELL_H = 104;
+let machineSpinning = false;
+function slotCellHtml(sym){ return `<div class="slot-cell ${sym.cls || ''}">${sym.ch}</div>`; }
+function slotResetReels(){
+    for (let i = 0; i < 3; i++){
+        const strip = document.getElementById('slot-strip-' + i);
+        strip.style.transition = 'none';
+        strip.style.transform = 'translateY(0)';
+        strip.classList.remove('rolling');
+        strip.innerHTML = slotCellHtml(SLOT_SYMBOLS[(i * 2 + 1) % 5]);
+        strip.parentElement.classList.remove('hit');
+    }
+    document.getElementById('slot-cabinet').classList.remove('spinning', 'win', 'lose');
+    document.querySelectorAll('.slot-coin').forEach(e => e.remove());
+}
 function openEventMachine(){
     machineBet = 0;
+    machineSpinning = false;
     document.getElementById('eventmachine-chips').textContent = game.chips;
     document.getElementById('eventmachine-bet').textContent = machineBet;
-    document.getElementById('eventmachine-result').textContent = '';
+    document.getElementById('eventmachine-result').innerHTML = '';
     document.getElementById('eventmachine-spin-btn').disabled = false;
+    slotResetReels();
     showScreen('eventmachine-screen');
 }
 function adjustMachineBet(delta){
+    if (machineSpinning) return;
     machineBet = Math.max(0, Math.min(game.chips, machineBet + delta));
     document.getElementById('eventmachine-bet').textContent = machineBet;
 }
+function slotShowResult(mult, won, bet){
+    const diff = won - bet;
+    const sign = diff >= 0 ? '+' : '';
+    let cls, head;
+    if (mult >= 3){ cls = 'jackpot'; head = t('event.machine.r3'); }
+    else if (mult >= 2){ cls = 'win'; head = t('event.machine.r2'); }
+    else if (mult >= 1.5){ cls = 'win'; head = t('event.machine.r15'); }
+    else if (mult > 0){ cls = 'small'; head = t('event.machine.r05'); }
+    else { cls = 'lose'; head = t('event.machine.r0'); }
+    const sub = mult === 0 ? t('event.machine.lost') : t('event.machine.won', { mult, n: won, diff: sign + diff });
+    document.getElementById('eventmachine-result').innerHTML = `<div class="sr-big ${cls}">${head}</div><div class="sr-sub">${sub}</div>`;
+}
+function slotCoinShower(count){
+    const box = document.querySelector('#eventmachine-screen .event-popup-box');
+    for (let i = 0; i < count; i++){
+        const c = document.createElement('div');
+        c.className = 'slot-coin';
+        c.textContent = Math.random() < 0.25 ? '✨' : '🪙';
+        c.style.left = (Math.random() * 92 + 2) + '%';
+        c.style.animationDuration = (1.4 + Math.random() * 1.4) + 's';
+        c.style.animationDelay = (Math.random() * 0.8) + 's';
+        box.appendChild(c);
+        setTimeout(() => c.remove(), 3800);
+    }
+}
 function spinMachine(){
-    if (machineBet <= 0) return;
-    const mults = [0, 0.5, 1.5, 2.0, 3.0];
-    const mult = mults[Math.floor(Math.random() * mults.length)];
+    if (machineBet <= 0 || machineSpinning) return;
+    machineSpinning = true;
+    const symIdx = Math.floor(Math.random() * SLOT_SYMBOLS.length);
+    const mult = SLOT_SYMBOLS[symIdx].mult;
     game.chips -= machineBet;
-    const won = Math.round(machineBet * mult);
-    game.chips += won;
-    document.getElementById('eventmachine-chips').textContent = game.chips;
-    document.getElementById('eventmachine-result').textContent = mult === 0
-        ? t('event.machine.lost')
-        : t('event.machine.won', { mult, n: won, diff: (won - machineBet >= 0 ? '+' : '') + (won - machineBet) });
+    const bet = machineBet;
+    const won = Math.round(bet * mult);
+    // 止まる絵：当たりは3つとも同じ絵、ハズレは3つとも違う絵
+    let finals;
+    if (mult === 0){
+        const pool = [0, 1, 2, 3, 4].sort(() => Math.random() - 0.5);
+        finals = [pool[0], pool[1], pool[2]];
+    } else finals = [symIdx, symIdx, symIdx];
     document.getElementById('eventmachine-spin-btn').disabled = true;
+    document.getElementById('eventmachine-result').innerHTML = '';
+    const cab = document.getElementById('slot-cabinet');
+    cab.classList.remove('win', 'lose');
+    cab.classList.add('spinning');
+    document.getElementById('eventmachine-chips').textContent = game.chips;
+    const LEN = 26;
+    const stopMs = [1500, 2100, 2700];
+    for (let i = 0; i < 3; i++){
+        const strip = document.getElementById('slot-strip-' + i);
+        let cells = '';
+        for (let k = 0; k < LEN; k++){
+            const sym = k === LEN - 1 ? SLOT_SYMBOLS[finals[i]] : SLOT_SYMBOLS[Math.floor(Math.random() * 5)];
+            cells += slotCellHtml(sym);
+        }
+        strip.style.transition = 'none';
+        strip.style.transform = 'translateY(0)';
+        strip.innerHTML = cells;
+        void strip.offsetWidth;
+        strip.classList.add('rolling');
+        strip.style.transition = `transform ${stopMs[i]}ms cubic-bezier(.25,.9,.3,1.04)`;
+        strip.style.transform = `translateY(${-(LEN - 1) * SLOT_CELL_H}px)`;
+        setTimeout(() => strip.classList.remove('rolling'), stopMs[i] - 350);
+    }
+    setTimeout(() => {
+        game.chips += won;
+        document.getElementById('eventmachine-chips').textContent = game.chips;
+        cab.classList.remove('spinning');
+        if (mult > 0){
+            cab.classList.add('win');
+            document.querySelectorAll('.slot-reel').forEach(r => r.classList.add('hit'));
+            slotCoinShower(mult >= 3 ? 46 : mult >= 2 ? 30 : mult >= 1.5 ? 20 : 10);
+        } else cab.classList.add('lose');
+        slotShowResult(mult, won, bet);
+        machineSpinning = false;
+    }, stopMs[2] + 150);
 }
 function closeEventMachine(){ returnToMap(); }
 
@@ -5659,7 +5840,6 @@ requestAnimationFrame(scaleContainer);
 setTimeout(scaleContainer, 100);
 setLang(currentLang);
 document.getElementById('container').addEventListener('click', hideSkillDescPopup);
-renderTitleIllusts();
 refreshTitleButtons();
 loadMeta();
 loadCardSeq();
