@@ -303,6 +303,7 @@ const STRINGS = {
         msg_potion_consumed: "装備していた薬を消費した。",
         panel_explore_select: "探索エリア選択",
         stage_line: "Lv.{lv} {name} (最大{floor}階)",
+        stage_floors: "最大{floor}階",
         msg_ap_insufficient2: "APが足りません！",
         msg_potion_advantage: "薬の力で探索が有利になる！",
         msg_explore_start: "{name}の探索を開始した。",
@@ -473,6 +474,7 @@ const STRINGS = {
         msg_potion_consumed: "そうびしていた くすりを つかった。",
         panel_explore_select: "たんさく エリアせんたく",
         stage_line: "Lv.{lv} {name} (さいだい{floor}かい)",
+        stage_floors: "さいだい{floor}かい",
         msg_ap_insufficient2: "APが たりません！",
         msg_potion_advantage: "くすりの ちからで たんさくが ゆうりに なる！",
         msg_explore_start: "{name}の たんさくを かいしした。",
@@ -643,6 +645,7 @@ const STRINGS = {
         msg_potion_consumed: "Used up the equipped potion.",
         panel_explore_select: "Select Exploration Area",
         stage_line: "Lv.{lv} {name} (up to floor {floor})",
+        stage_floors: "Up to floor {floor}",
         msg_ap_insufficient2: "Not enough AP!",
         msg_potion_advantage: "The potion's power gives you an advantage!",
         msg_explore_start: "Started exploring {name}.",
@@ -857,11 +860,10 @@ function getItemColor(master) {
     return '#2c3e50';
 }
 
-function addMessage(msg) {
-    let maxLen = 26;
-    for (let i = 0; i < msg.length; i += maxLen) {
-        gameData.messages.push(msg.substring(i, i + maxLen));
-    }
+// icon を付けると行頭に絵文字が付く。表示幅(360px)で折り返す(単語の途中では切らない)
+function addMessage(msg, icon) {
+    if (icon) msg = icon + ' ' + msg;
+    wrapTextLines(msg, 360, 'bold 16px "M PLUS Rounded 1c"').forEach(l => gameData.messages.push(l));
     if (gameData.messages.length > 10) {
         gameData.messages.splice(0, gameData.messages.length - 10);
     }
@@ -1004,7 +1006,7 @@ function checkLevelUp() {
         gameData.baseStatus.def += upDef;
         gameData.baseStatus.mag += upMag;
 
-        addMessage(T('msg_levelup', {lv: gameData.level, atk: upAtk, def: upDef, mag: upMag}));
+        addMessage(T('msg_levelup', {lv: gameData.level, atk: upAtk, def: upDef, mag: upMag}), '🆙');
         reqExp = getNextExp(gameData.level);
     }
 }
@@ -1040,12 +1042,69 @@ function getRecipeRequirements(targetMaster, rule) {
 // ==========================================
 function addZone(x, y, w, h, onClick) { clickZones.push({ x, y, w, h, onClick }); }
 
-function drawText(text, x, y, size, color, align="left", weight="bold") {
+// maxW を渡すと、その幅に収まるまで文字を小さくする(はみ出し防止)
+function drawText(text, x, y, size, color, align="left", weight="bold", maxW=0) {
     ctx.fillStyle = color;
-    ctx.font = `${weight} ${size}px "M PLUS Rounded 1c"`;
     ctx.textAlign = align;
     ctx.textBaseline = "middle";
+    let s = size;
+    ctx.font = `${weight} ${s}px "M PLUS Rounded 1c"`;
+    if (maxW > 0) {
+        const w = ctx.measureText(text).width;
+        if (w > maxW) {
+            s = Math.max(9, Math.floor(size * maxW / w * 10) / 10);
+            ctx.font = `${weight} ${s}px "M PLUS Rounded 1c"`;
+        }
+    }
     ctx.fillText(text, x, y);
+}
+
+// 幅に収まる複数行に折り返して左揃えで描画(次に描ける Y を返す)
+function drawWrapped(text, x, y, maxW, size, lh, color, weight="bold") {
+    const lines = wrapTextLines(text, maxW, `${weight} ${size}px "M PLUS Rounded 1c"`);
+    lines.forEach((ln, i) => drawText(ln, x, y + i * lh, size, color, 'left', weight));
+    return y + lines.length * lh;
+}
+
+// アイテム種別ごとの絵文字(文字だらけの一覧を絵で見分けられるように)
+const ITEM_ICON = { 1: '⚔️', 2: '🛡️', 3: '🥋', 4: '💍', 5: '🧪', 6: '🧵', 7: '🪵', 8: '🪙', 9: '🔩', 10: '📜' };
+function itemIcon(master) { return ITEM_ICON[master.type] || '📦'; }
+// 装備品・薬は専用の絵、それ以外は絵文字でアイコンを描く
+const ITEM_IMG = { 1: 'buki', 2: 'tate', 3: 'yoroi', 4: 'yubiwa', 5: 'kusuri' };
+function drawItemIcon(master, cx, cy, size) {
+    const k = ITEM_IMG[master.type];
+    if (k) drawImageRect(k, cx - size / 2, cy - size / 2, size, size);
+    else drawText(itemIcon(master), cx, cy + 1, size * 0.85, '#2c3e50', 'center');
+}
+// 一覧の行の背景(1行おきにうすい帯)
+function drawRowBand(x, cy, w, h, idx) {
+    if (idx % 2 === 0) return;
+    ctx.beginPath(); ctx.roundRect(x, cy - h / 2, w, h, 8); ctx.fillStyle = 'rgba(52,152,219,0.07)'; ctx.fill();
+}
+
+// 丸い横ゲージ(0〜1)
+function drawGauge(x, y, w, h, ratio, c1, c2) {
+    ratio = Math.max(0, Math.min(1, ratio));
+    ctx.save();
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, h / 2); ctx.fillStyle = '#d5dbe0'; ctx.fill();
+    ctx.clip();
+    if (ratio > 0) {
+        const g = ctx.createLinearGradient(x, y, x, y + h);
+        g.addColorStop(0, c1); g.addColorStop(1, c2);
+        ctx.fillStyle = g; ctx.fillRect(x, y, Math.max(h, w * ratio), h);
+        ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(x, y + 1, w, h * 0.3);
+    }
+    ctx.restore();
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, h / 2); ctx.strokeStyle = 'rgba(44,62,80,0.55)'; ctx.lineWidth = 2; ctx.stroke();
+}
+
+// 角丸のチップ(材料の過不足などを色で見せる)。描いた幅を返す
+function drawChip(text, x, y, h, bg, fg, size=14) {
+    ctx.font = `bold ${size}px "M PLUS Rounded 1c"`;
+    const w = Math.ceil(ctx.measureText(text).width) + 16;
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, h / 2); ctx.fillStyle = bg; ctx.fill();
+    drawText(text, x + w / 2, y + h / 2 + 1, size, fg, 'center');
+    return w;
 }
 
 // 長い文章をmaxWidthに収まるよう複数行に折り返す（日本語はスペースが無いため1文字単位、
@@ -1054,20 +1113,20 @@ function wrapTextLines(text, maxWidth, font) {
     ctx.save();
     ctx.font = font;
     const str = String(text);
-    const tokens = str.includes(' ') ? str.split(' ') : Array.from(str);
-    const sep = str.includes(' ') ? ' ' : '';
+    // 半角の英数字は「単語＋後ろの空白」でひとかたまり、それ以外(日本語・絵文字)は1文字ずつ
+    const tokens = str.match(/[\x21-\x7E]+ ?| |[^\x00-\x7F]/gu) || [];
     const lines = [];
     let line = '';
     tokens.forEach(tok => {
-        const candidate = line ? line + sep + tok : tok;
-        if (line && ctx.measureText(candidate).width > maxWidth) {
-            lines.push(line);
-            line = tok;
+        const candidate = line + tok;
+        if (line && ctx.measureText(candidate.trimEnd()).width > maxWidth) {
+            lines.push(line.trimEnd());
+            line = tok.trimStart();
         } else {
             line = candidate;
         }
     });
-    if (line) lines.push(line);
+    if (line.trim()) lines.push(line.trimEnd());
     ctx.restore();
     return lines.length ? lines : [''];
 }
@@ -1109,7 +1168,21 @@ function drawBtn(text, x, y, w, h, color, onClick, disabled=false, textColor='#f
     ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 3; ctx.stroke();
 
     let fSize = Math.min(22, Math.floor(h * 0.5));
-    drawText(text, x + w/2, y + h/2 - 1, fSize, disabled ? '#fff' : textColor, 'center');
+    const tColor = disabled ? '#fff' : textColor;
+    ctx.font = `bold ${fSize}px "M PLUS Rounded 1c"`;
+    if (h >= 34 && ctx.measureText(text).width > w - 12) {
+        // 高さに余裕のあるボタンは、小さくするより2行に折り返す
+        const f2 = Math.min(fSize, 15);
+        const ls = wrapTextLines(text, w - 12, `bold ${f2}px "M PLUS Rounded 1c"`);
+        if (ls.length === 2) {
+            drawText(ls[0], x + w/2, y + h/2 - 9, f2, tColor, 'center', 'bold', w - 12);
+            drawText(ls[1], x + w/2, y + h/2 + 8, f2, tColor, 'center', 'bold', w - 12);
+        } else {
+            drawText(text, x + w/2, y + h/2 - 1, fSize, tColor, 'center', 'bold', w - 12);
+        }
+    } else {
+        drawText(text, x + w/2, y + h/2 - 1, fSize, tColor, 'center', 'bold', w - 12);
+    }
     if (!disabled) addZone(x, y, w, h, onClick);
 }
 
@@ -1142,7 +1215,7 @@ function drawPanel(x, y, w, h, title) {
         ctx.fillRect(x, y, w, 46);
         ctx.fillStyle = 'rgba(255,255,255,0.18)';
         ctx.fillRect(x, y, w, 4);
-        drawText(title, x + w/2, y + 23, 24, '#fff', 'center');
+        drawText(title, x + w/2, y + 23, 24, '#fff', 'center', 'bold', w - 40);
     }
 
     ctx.restore();
@@ -1158,7 +1231,7 @@ function unequipItemByUid(uid) {
     for(let k in gameData.equipment) {
         if(gameData.equipment[k] === uid) {
             gameData.equipment[k] = null;
-            addMessage(T('msg_unequipped'));
+            addMessage(T('msg_unequipped'), '📤');
             break;
         }
     }
@@ -1411,21 +1484,24 @@ function drawParchment(x, y, w, h) {
 function renderPlayerSelect() {
     drawImageRect('title', 0, 0, 1280, 720);
     drawParchment(270, 24, 740, 680);
-    drawText(T('player_select_title'), 640, 84, 40, '#7a4410', 'center');
+    drawText(T('player_select_title'), 640, 84, 40, '#7a4410', 'center', 'bold', 640);
 
+    // 行全体を羊皮紙の中央に収める: [開始 330][変更 100][消去 100] (すき間14px) = 558px
+    const rowX = 361, startW = 330, smallW = 100, gap = 14, rowW = startW + gap + smallW + gap + smallW;
     for (let i = 0; i < 5; i++) {
         let py = 150 + i * 70;
         if (i < localPlayers.length) {
-            drawBtn(T('btn_start_with', {name: localPlayers[i]}), 470, py, 340, 50, '#3498db', () => {
+            drawBtn('👤 ' + T('btn_start_with', {name: localPlayers[i]}), rowX, py, startW, 50, '#3498db', () => {
                 currentPlayerName = localPlayers[i]; initializeGame();
             });
-            drawBtn(T('btn_change'), 830, py, 100, 50, '#f39c12', () => {
+            drawBtn('✏️ ' + T('btn_change'), rowX + startW + gap, py, smallW, 50, '#f39c12', () => {
                 showPrompt(T('prompt_new_name'), localPlayers[i], (val) => {
                     handleNameRegistration(val, i);
                 });
             });
-            drawBtn(T('btn_delete'), 950, py, 100, 50, '#e74c3c', () => {
+            drawBtn('🗑️ ' + T('btn_delete'), rowX + startW + gap + smallW + gap, py, smallW, 50, '#e74c3c', () => {
                 activePopup = {
+                    icon: '🗑️',
                     text: T('confirm_delete_player', {name: localPlayers[i]}),
                     subtext: T('confirm_delete_sub'),
                     onYes: () => {
@@ -1435,102 +1511,108 @@ function renderPlayerSelect() {
                 };
             });
         } else if (i === localPlayers.length) {
-            drawBtn(T('btn_register_new'), 470, py, 340, 50, '#2ecc71', () => {
+            drawBtn('➕ ' + T('btn_register_new'), rowX, py, rowW, 50, '#2ecc71', () => {
                 showPrompt(T('prompt_new_name'), "", (val) => {
                     handleNameRegistration(val, -1);
                 });
             });
         } else {
-            drawBtn(T('slot_empty'), 470, py, 340, 50, '#bdc3c7', () => {});
+            drawBtn(T('slot_empty'), rowX, py, rowW, 50, '#bdc3c7', () => {});
         }
     }
 
-    drawBtn(T('btn_start_guest'), 470, 490, 340, 45, '#95a5a6', () => {
+    drawBtn('🎮 ' + T('btn_start_guest'), rowX, 490, rowW, 45, '#95a5a6', () => {
         currentPlayerName = T('guest_name'); initializeGame();
     });
 
-    drawText(T('hiragana_note'), 640, 555, 20, '#e74c3c', 'center');
-    drawBtn(T('btn_back_title'), 540, 620, 200, 50, '#7f8c8d', () => { GAME_STATE = "TITLE"; });
+    // 注意書きは羊皮紙の幅に収まるよう折り返す
+    const noteLines = wrapTextLines(T('hiragana_note'), 640, 'bold 18px "M PLUS Rounded 1c"');
+    noteLines.forEach((ln, i) => drawText(ln, 640, 566 + i * 22, 18, '#c0392b', 'center'));
+    drawBtn(T('btn_back_title'), 520, 626, 240, 50, '#7f8c8d', () => { GAME_STATE = "TITLE"; });
 }
 
 // --- メインUI ---
 function drawStatusPanel(x, y) {
     drawPanel(x, y, 330, 680, T('panel_status'));
-    let cy = y + 70;
-    drawText(T('label_name', {name: currentPlayerName}), x+20, cy, 24, '#2c3e50'); cy += 40;
+    const IW = 290;   // パネル内の文字の最大幅
 
+    drawText('👤 ' + T('label_name', {name: currentPlayerName}), x+20, y+72, 22, '#2c3e50', 'left', 'bold', IW);
+
+    // レベル + 経験値ゲージ
     let reqExp = getNextExp(gameData.level);
     let expLeft = reqExp - gameData.exp;
-    drawText(T('label_lv', {lv: gameData.level}), x+20, cy, 22, '#2c3e50'); cy += 30;
+    drawText(T('label_lv', {lv: gameData.level}), x+20, y+108, 22, '#2c3e50', 'left', 'bold', 110);
+    drawGauge(x+120, y+100, 190, 16, gameData.exp / reqExp, '#7ed6ff', '#2e86de');
+    drawText(T('label_exp_left', {exp: expLeft}), x+20, y+134, 16, '#2c3e50', 'left', 'bold', IW);
 
-    let expStr = T('label_exp_left', {exp: expLeft});
-    let expFontSize = 18;
-    if (expLeft >= 1000000) expFontSize = 14;
-    else if (expLeft >= 100000) expFontSize = 16;
-    drawText(expStr, x+20, cy, expFontSize, '#2c3e50'); cy += 40;
-
-    drawText(T('label_ap', {cur: gameData.ap, max: gameData.maxAp}), x+20, cy, 24, '#d35400'); cy += 40;
-    drawText(T('label_day', {day: gameData.day}), x+20, cy, 24, '#2c3e50'); cy += 50;
+    // AP ゲージ
+    drawText('⚡ ' + T('label_ap', {cur: gameData.ap, max: gameData.maxAp}), x+20, y+170, 22, '#d35400', 'left', 'bold', IW);
+    drawGauge(x+20, y+186, IW, 16, gameData.ap / gameData.maxAp, '#ffd36b', '#f39c12');
+    drawText('📅 ' + T('label_day', {day: gameData.day}), x+20, y+226, 22, '#2c3e50', 'left', 'bold', IW);
 
     let eq = gameData.equipment;
     let wStat = eq.weapon ? getActualStat(getInvItem(eq.weapon)) : 0;
     let atkTotal = wStat + gameData.baseStatus.atk;
-    
+
     let sStat = eq.shield ? getActualStat(getInvItem(eq.shield)) : 0;
     let aStat = eq.armor ? getActualStat(getInvItem(eq.armor)) : 0;
     let defEqTotal = sStat + aStat;
     let defTotal = defEqTotal + gameData.baseStatus.def;
-    
+
     let mStat = eq.accessory ? getActualStat(getInvItem(eq.accessory)) : 0;
     let magTotal = mStat + gameData.baseStatus.mag;
 
-    let atkFSize = atkTotal >= 1000 ? 14 : 18;
-    let defFSize = defTotal >= 1000 ? 14 : 18;
-    let magFSize = magTotal >= 1000 ? 14 : 18;
-
-    drawText(T('label_atk', {total: atkTotal, base: gameData.baseStatus.atk, equip: wStat}), x+20, cy, atkFSize, '#2980b9'); cy += 30;
-    drawText(T('label_def', {total: defTotal, base: gameData.baseStatus.def, equip: defEqTotal}), x+20, cy, defFSize, '#27ae60'); cy += 30;
-    drawText(T('label_mag', {total: magTotal, base: gameData.baseStatus.mag, equip: mStat}), x+20, cy, magFSize, '#8e44ad'); cy += 40;
+    drawText('⚔️ ' + T('label_atk', {total: atkTotal, base: gameData.baseStatus.atk, equip: wStat}), x+20, y+268, 18, '#2980b9', 'left', 'bold', IW);
+    drawText('🛡️ ' + T('label_def', {total: defTotal, base: gameData.baseStatus.def, equip: defEqTotal}), x+20, y+298, 18, '#27ae60', 'left', 'bold', IW);
+    drawText('✨ ' + T('label_mag', {total: magTotal, base: gameData.baseStatus.mag, equip: mStat}), x+20, y+328, 18, '#8e44ad', 'left', 'bold', IW);
 
     const slots = [
         {key:'weapon', icon:'buki'}, {key:'shield', icon:'tate'},
         {key:'armor', icon:'yoroi'}, {key:'accessory', icon:'yubiwa'}, {key:'potion', icon:'kusuri'}
     ];
+    let cy = y + 380;
     slots.forEach(s => {
+        // 枠(装備中は色つき、空きはうすい点線)
+        ctx.beginPath(); ctx.roundRect(x+10, cy-22, 310, 42, 10);
+        ctx.fillStyle = eq[s.key] ? '#eef6fd' : '#f4f6f7'; ctx.fill();
+        ctx.strokeStyle = eq[s.key] ? '#9ec5e8' : '#d5dbe0'; ctx.lineWidth = 2;
+        if (!eq[s.key]) ctx.setLineDash([5, 4]);
+        ctx.stroke(); ctx.setLineDash([]);
+
         let itemStr = T('slot_none');
         let starStr = "";
-        let color = '#7f8c8d';
+        let color = '#95a5a6';
         if(eq[s.key]) {
             let invItem = getInvItem(eq[s.key]);
             let m = getObjById(ITEMS, invItem.itemId);
             let actualStat = getActualStat(invItem);
             let upgStr = (invItem.upgrade || 0) > 0 ? `+${invItem.upgrade}` : "";
-            
+
             if (m.type >= 1 && m.type <= 4) starStr = getEquipRarityStar(invItem.stat, m.stat);
-            
+
             if(m.type === 1) itemStr = `${m.name}${upgStr} (攻${actualStat})`;
             else if(m.type === 2 || m.type === 3) itemStr = `${m.name}${upgStr} (防${actualStat})`;
             else if(m.type === 4) itemStr = `${m.name}${upgStr} (魔${actualStat})`;
             else if(m.type === 5) itemStr = m.name;
             color = getItemColor(m);
         }
-        
-        let iconSize = 24;
-        drawImageRect(s.icon, x+15, cy-12, iconSize, iconSize);
-        let fSize = 18;
-        if (itemStr.length > 12) fSize = 13;
-        drawText(itemStr, x+45, cy-8, fSize, color);
+
+        ctx.save(); if (!eq[s.key]) ctx.globalAlpha = 0.35;
+        drawImageRect(s.icon, x+16, cy-14, 28, 28);
+        ctx.restore();
+        const textMaxW = eq[s.key] ? 195 : 255;
+        drawText(itemStr, x+52, cy-(starStr ? 7 : 0), 18, color, 'left', 'bold', textMaxW);
         if (starStr) {
-            drawText(starStr, x+45, cy+10, 12, color);
+            drawText(starStr, x+52, cy+10, 12, color);
         }
-        
+
         if(eq[s.key]) {
-            drawBtn(T('btn_unequip'), x+270, cy-14, 45, 28, '#e74c3c', () => { unequipItemByUid(eq[s.key]); });
+            drawBtn(T('btn_unequip'), x+252, cy-14, 62, 28, '#e74c3c', () => { unequipItemByUid(eq[s.key]); });
         }
-        cy += 45;
+        cy += 46;
     });
 
-    drawBtn(T('btn_help'), x+20, y+620, 290, 40, '#f39c12', () => { showHelp = true; });
+    drawBtn('❓ ' + T('btn_help'), x+20, y+620, 290, 40, '#f39c12', () => { showHelp = true; });
 }
 
 function drawCenterPanel(x, y) {
@@ -1548,12 +1630,13 @@ function drawCenterPanel(x, y) {
 
     ctx.fillStyle = '#ecf0f1'; ctx.fillRect(x+10, y+240, 390, 250);
     ctx.strokeStyle = '#bdc3c7'; ctx.strokeRect(x+10, y+240, 390, 250);
-    for(let i=0; i<gameData.messages.length; i++) drawText(gameData.messages[i], x+20, y+265 + i*22, 16, '#2c3e50');
+    for(let i=0; i<gameData.messages.length; i++) drawText(gameData.messages[i], x+20, y+265 + i*22, 16, '#2c3e50', 'left', 'bold', 365);
 
     drawBtn(T('btn_explore'), x+20, y+510, 175, 60, '#2ecc71', () => { GAME_STATE = "EXPLORE_SELECT"; });
     drawBtn(T('btn_shop'), x+215, y+510, 175, 60, '#9b59b6', () => { GAME_STATE = "SHOP"; });
     drawBtn(T('btn_rest'), x+20, y+590, 175, 60, '#f1c40f', () => {
         activePopup = {
+            icon: '🌙',
             text: T('confirm_rest'),
             subtext: T('confirm_rest_sub'),
             onYes: () => {
@@ -1563,6 +1646,7 @@ function drawCenterPanel(x, y) {
     });
     drawBtn(T('btn_end'), x+215, y+590, 175, 60, '#7f8c8d', () => {
         activePopup = {
+            icon: '🚪',
             text: T('confirm_end'),
             subtext: T('confirm_end_sub'),
             // 冒険は自動セーブされているため、ランキング登録やセーブ消去は行わず
@@ -1586,7 +1670,7 @@ function drawRightPanel(x, y) {
             if (typeOrder[m1.type] !== typeOrder[m2.type]) return typeOrder[m1.type] - typeOrder[m2.type];
             return a.itemId - b.itemId;
         });
-        addMessage(T('msg_sorted'));
+        addMessage(T('msg_sorted'), '🧹');
     });
 
     cy += 40;
@@ -1619,10 +1703,11 @@ function drawRightPanel(x, y) {
             });
             
             if(lootItems.length === 0) {
-                addMessage(T('msg_no_sellable'));
+                addMessage(T('msg_no_sellable'), '💤');
                 return;
             }
             activePopup = {
+                icon: '💰',
                 text: T('confirm_bulk_sell', {amount: totalVal}),
                 subtext: T('confirm_yes_question'),
                 onYes: () => {
@@ -1630,7 +1715,7 @@ function drawRightPanel(x, y) {
                         gameData.gold += getObjById(ITEMS, inv.itemId).price * inv.count;
                         gameData.inventory = gameData.inventory.filter(i => i.uid !== inv.uid);
                     });
-                    addMessage(T('msg_bulk_sold', {amount: totalVal}));
+                    addMessage(T('msg_bulk_sold', {amount: totalVal}), '💰');
                 }
             };
         });
@@ -1649,9 +1734,10 @@ function renderInventoryList(x, y, cy) {
     let maxPage = Math.max(0, Math.ceil(list.length / itemsPerPage) - 1);
     let pageItems = list.slice(invPage * itemsPerPage, (invPage + 1) * itemsPerPage);
 
-    pageItems.forEach(inv => {
+    pageItems.forEach((inv, rowIdx) => {
         let master = getObjById(ITEMS, inv.itemId);
-        
+        drawRowBand(x + 8, cy, 444, 44, rowIdx);
+
         let isEquip = master.type >= 1 && master.type <= 4;
         let isPotion = master.type === 5;
         
@@ -1669,18 +1755,20 @@ function renderInventoryList(x, y, cy) {
 
         let textColor = getItemColor(master);
 
-        let currentX = x + 15;
-        
-        drawText(nameTxt, currentX, cy-8, 18, textColor);
+        let currentX = x + 44;
+        drawItemIcon(master, x + 27, cy, 26);
+
+        const nameMaxW = isEquip ? 195 : 150;
+        drawText(nameTxt, currentX, cy - (star ? 8 : 0), 18, textColor, 'left', 'bold', nameMaxW);
         if (star) {
             drawText(star, currentX, cy+10, 12, textColor);
         }
 
         if(!isEquip) {
-            drawText(`x${inv.count}`, x + 240, cy, 18, '#2c3e50', 'right');
+            drawText(`x${inv.count}`, x + 238, cy, 18, '#2c3e50', 'right', 'bold', 40);
         }
 
-        drawText(`${master.price}G`, x + 310, cy, 18, '#f39c12', 'right');
+        drawText(`${master.price}G`, x + 312, cy, 18, '#f39c12', 'right', 'bold', 68);
 
         let isEquipped = Object.values(gameData.equipment).includes(inv.uid);
 
@@ -1706,11 +1794,11 @@ function equipItem(inv) {
     let m = getObjById(ITEMS, inv.itemId), key = "";
     if(m.type === 1) key = 'weapon'; if(m.type === 2) key = 'shield';
     if(m.type === 3) key = 'armor'; if(m.type === 4) key = 'accessory'; if(m.type === 5) key = 'potion';
-    if(key) { gameData.equipment[key] = inv.uid; addMessage(T('msg_equipped', {name: m.name})); }
+    if(key) { gameData.equipment[key] = inv.uid; addMessage(T('msg_equipped', {name: m.name}), '🛡️'); }
 }
 
 function sellItem(inv, master) {
-    for(let k in gameData.equipment) { if(gameData.equipment[k] === inv.uid) return addMessage(T('msg_cant_sell_equipped')); }
+    for(let k in gameData.equipment) { if(gameData.equipment[k] === inv.uid) return addMessage(T('msg_cant_sell_equipped'), '🚫'); }
     gameData.gold += master.price; 
     removeItem(inv.itemId, 1);
     if(master.type >= 1 && master.type <= 4) gameData.inventory = gameData.inventory.filter(i => i.uid !== inv.uid);
@@ -1737,45 +1825,55 @@ function renderCraftList(x, y, cy) {
     let maxPage = Math.max(0, Math.ceil(craftableIds.length / itemsPerPage) - 1);
     let pageItems = craftableIds.slice(invPage * itemsPerPage, (invPage + 1) * itemsPerPage);
 
-    pageItems.forEach(targetId => {
+    pageItems.forEach((targetId, rowIdx) => {
         let rule = CRAFT_RULES[targetId];
         let targetMaster = getObjById(ITEMS, targetId);
         let tColor = getItemColor(targetMaster);
-        
-        let reqs = getRecipeRequirements(targetMaster, rule);
-        if (reqs && reqs.baseItem && reqs.matItem) {
-            let cBase = countItem(reqs.baseItem.id);
-            let cMat = countItem(reqs.matItem.id);
-            let canCraft = (cBase >= 1) && (cMat >= reqs.matCount);
-            
-            drawText(targetMaster.name, x+15, cy-15, 20, canCraft ? tColor : '#95a5a6');
-            drawText(`${reqs.baseItem.name}(${cBase}/1) + ${reqs.matItem.name}(${cMat}/${reqs.matCount})`, x+15, cy+15, 16, '#7f8c8d');
-            
-            drawBtn(T('btn_create'), x+350, cy-20, 80, 40, canCraft ? '#3498db' : '#bdc3c7', () => {
-                if(gameData.ap < 1) return addMessage(T('msg_ap_insufficient'));
-                removeItem(reqs.baseItem.id, 1);
-                removeItem(reqs.matItem.id, reqs.matCount);
-                gameData.ap -= 1;
-                addItem(targetId, targetMaster.type <= 4 ? getGaussianStat(targetMaster.stat) : 0, 1);
-                addMessage(T('msg_crafted', {name: targetMaster.name}));
-            }, !canCraft);
-        } else {
-            let m1 = getObjById(ITEMS, rule.mat1Id), m2 = rule.mat2Id ? getObjById(ITEMS, rule.mat2Id) : null;
-            let c1 = countItem(rule.mat1Id), c2 = m2 ? countItem(rule.mat2Id) : 0;
-            let canCraft = (c1 > 0) && (!m2 || c2 > 0);
+        drawRowBand(x + 8, cy, 444, 60, rowIdx);
 
-            drawText(targetMaster.name, x+15, cy-15, 20, canCraft ? tColor : '#95a5a6');
-            drawText(`${m1.name}(${c1}/1)` + (m2 ? ` + ${m2.name}(${c2}/1)` : ""), x+15, cy+15, 16, '#7f8c8d');
-            
-            drawBtn(T('btn_create'), x+350, cy-20, 80, 40, canCraft ? '#3498db' : '#bdc3c7', () => {
-                if(gameData.ap < 1) return addMessage(T('msg_ap_insufficient'));
-                removeItem(rule.mat1Id, 1); if(rule.mat2Id) removeItem(rule.mat2Id, 1);
-                gameData.ap -= 1;
-                addItem(targetId, targetMaster.type <= 4 ? getGaussianStat(targetMaster.stat) : 0, 1);
-                addMessage(T('msg_crafted', {name: targetMaster.name}));
-            }, !canCraft);
+        // 材料を [{master, have, need}] にそろえる(表示も作成処理もこれを使う)
+        let reqs = getRecipeRequirements(targetMaster, rule);
+        let ings = [];
+        if (reqs && reqs.baseItem && reqs.matItem) {
+            ings = [
+                { master: reqs.baseItem, have: countItem(reqs.baseItem.id), need: 1 },
+                { master: reqs.matItem, have: countItem(reqs.matItem.id), need: reqs.matCount }
+            ];
+        } else {
+            ings = [{ master: getObjById(ITEMS, rule.mat1Id), have: countItem(rule.mat1Id), need: 1 }];
+            if (rule.mat2Id) ings.push({ master: getObjById(ITEMS, rule.mat2Id), have: countItem(rule.mat2Id), need: 1 });
         }
-        cy += 65; 
+        let canCraft = ings.every(g => g.have >= g.need);
+
+        // 完成品(絵+名前) → 材料のチップ(足りていれば緑・足りなければ赤)
+        ctx.save(); if (!canCraft) ctx.globalAlpha = 0.55;
+        drawItemIcon(targetMaster, x + 28, cy - 14, 28);
+        ctx.restore();
+        drawText(targetMaster.name, x+50, cy-15, 20, canCraft ? tColor : '#95a5a6', 'left', 'bold', 285);
+
+        let chipFont = 14, chipTexts, totalW;
+        do {
+            chipTexts = ings.map(g => `${itemIcon(g.master)}${g.master.name} ${g.have}/${g.need}`);
+            ctx.font = `bold ${chipFont}px "M PLUS Rounded 1c"`;
+            totalW = chipTexts.reduce((sum, t) => sum + Math.ceil(ctx.measureText(t).width) + 16, 0) + (ings.length - 1) * 16;
+            if (totalW <= 290) break;
+            chipFont--;
+        } while (chipFont > 9);
+        let chipX = x + 15;
+        ings.forEach((g, gi) => {
+            const ok = g.have >= g.need;
+            if (gi > 0) { drawText('＋', chipX + 8, cy + 14, 14, '#7f8c8d', 'center'); chipX += 16; }
+            chipX += drawChip(chipTexts[gi], chipX, cy + 3, 22, ok ? '#d5f5e3' : '#fadbd8', ok ? '#1e8449' : '#c0392b', chipFont);
+        });
+
+        drawBtn('🔨 ' + T('btn_create'), x+350, cy-20, 90, 40, canCraft ? '#3498db' : '#bdc3c7', () => {
+            if(gameData.ap < 1) return addMessage(T('msg_ap_insufficient'), '⚡');
+            ings.forEach(g => removeItem(g.master.id, g.need));
+            gameData.ap -= 1;
+            addItem(targetId, targetMaster.type <= 4 ? getGaussianStat(targetMaster.stat) : 0, 1);
+            addMessage(T('msg_crafted', {name: targetMaster.name}), '🔨');
+        }, !canCraft);
+        cy += 65;
     });
 
     drawText(`${invPage+1} / ${maxPage+1}`, x+230, y+650, 18, '#2c3e50', 'center');
@@ -1792,8 +1890,10 @@ function renderEnhanceList(x, y, cy) {
     let maxPage = Math.max(0, Math.ceil(list.length / itemsPerPage) - 1);
     let pageItems = list.slice(invPage * itemsPerPage, (invPage + 1) * itemsPerPage);
 
-    pageItems.forEach(inv => {
+    pageItems.forEach((inv, rowIdx) => {
         let master = getObjById(ITEMS, inv.itemId);
+        drawRowBand(x + 8, cy, 444, 44, rowIdx);
+        drawItemIcon(master, x + 27, cy, 26);
         let star = getEquipRarityStar(inv.stat, master.stat);
         let upg = inv.upgrade || 0;
         let upgStr = upg > 0 ? `+${upg}` : "";
@@ -1805,23 +1905,28 @@ function renderEnhanceList(x, y, cy) {
         else if(master.type === 2 || master.type === 3) nameTxt += ` (防${actualStat})`;
         else if(master.type === 4) nameTxt += ` (魔${actualStat})`;
 
-        drawText(nameTxt, x + 15, cy-8, 18, getItemColor(master));
+        drawText(nameTxt, x + 44, cy-8, 18, getItemColor(master), 'left', 'bold', 190);
         if (star) {
-            drawText(star, x + 15, cy+10, 12, getItemColor(master));
+            drawText(star, x + 44, cy+10, 12, getItemColor(master));
         }
 
         let cost = master.price * 2;
         let canEnhance = gameData.gold >= cost && upg < 10;
         let costTxt = upg >= 10 ? T('max_label') : `${cost}G`;
 
-        drawText(costTxt, x + 300, cy, 18, '#f39c12', 'right');
+        // 強化レベルを10個の丸で見せる(埋まっている数 = +n)
+        for (let k = 0; k < 10; k++) {
+            ctx.beginPath(); ctx.arc(x + 130 + k * 11, cy + 10, 4, 0, Math.PI * 2);
+            ctx.fillStyle = k < upg ? '#9b59b6' : '#d5dbe0'; ctx.fill();
+        }
+        drawText(costTxt, x + 308, cy, 18, '#f39c12', 'right', 'bold', 70);
 
-        drawBtn(T('tab_enhance'), x+320, cy-15, 120, 30, canEnhance ? '#9b59b6' : '#bdc3c7', () => {
-            if (upg >= 10) return addMessage(T('msg_enhance_max'));
-            if (gameData.gold < cost) return addMessage(T('msg_enhance_nomoney'));
+        drawBtn('⬆️ ' + T('tab_enhance'), x+320, cy-15, 120, 30, canEnhance ? '#9b59b6' : '#bdc3c7', () => {
+            if (upg >= 10) return addMessage(T('msg_enhance_max'), '🚫');
+            if (gameData.gold < cost) return addMessage(T('msg_enhance_nomoney'), '💸');
             gameData.gold -= cost;
             inv.upgrade = upg + 1;
-            addMessage(T('msg_enhanced', {name: master.name}));
+            addMessage(T('msg_enhanced', {name: master.name}), '⬆️');
         }, !canEnhance);
         
         cy += 45; 
@@ -1835,7 +1940,7 @@ function renderEnhanceList(x, y, cy) {
 // --- 探索・お店 ---
 function finishExploration(isClear) {
     if (exploreData && exploreData.gainedExpTotal > 0) {
-        addMessage(T('msg_explore_end_exp', {exp: exploreData.gainedExpTotal}));
+        addMessage(T('msg_explore_end_exp', {exp: exploreData.gainedExpTotal}), '✨');
     }
 
     checkLevelUp();
@@ -1850,7 +1955,7 @@ function finishExploration(isClear) {
                 gameData.inventory = gameData.inventory.filter(i => i.uid !== pUid);
             }
         }
-        addMessage(T('msg_potion_consumed'));
+        addMessage(T('msg_potion_consumed'), '🧪');
     }
     
     if (isClear && exploreData.stage.lv === 7) {
@@ -1885,14 +1990,34 @@ function finishExploration(isClear) {
 
 function renderExploreSelect(x, y) {
     drawPanel(x, y, 410, 680, T('panel_explore_select'));
-    let cy = y + 80;
+    let cy = y + 62;   // 各ステージは「地図の絵 + 名前 + 危険度メーター + 探索ボタン」のカード
     STAGES.forEach(stg => {
         let isUnlock = stg.lv <= gameData.maxStageLv;
         let maxFloor = stg.lv * 5 + 5;
 
-        drawText(T('stage_line', {lv: stg.lv, name: stg.name, floor: maxFloor}), x+20, cy, 18, isUnlock ? '#2c3e50' : '#95a5a6');
-        drawBtn(T('btn_explore'), x+300, cy-15, 90, 40, isUnlock ? '#e74c3c' : '#bdc3c7', () => {
-            if(gameData.ap < 1) return addMessage(T('msg_ap_insufficient2'));
+        ctx.beginPath(); ctx.roundRect(x+14, cy, 382, 68, 12);
+        ctx.fillStyle = isUnlock ? '#f4f9fd' : '#eef0f1'; ctx.fill();
+        ctx.strokeStyle = isUnlock ? '#9ec5e8' : '#d5dbe0'; ctx.lineWidth = 2; ctx.stroke();
+
+        // 地図のサムネイル(未解放は暗くして鍵)
+        ctx.save();
+        ctx.beginPath(); ctx.roundRect(x+22, cy+9, 89, 50, 8); ctx.clip();
+        if (!isUnlock) ctx.globalAlpha = 0.28;
+        drawImageRect('map' + stg.lv, x+22, cy+9, 89, 50);
+        ctx.restore();
+        if (!isUnlock) drawText('🔒', x+66, cy+35, 26, '#2c3e50', 'center');
+
+        drawText(`Lv.${stg.lv} ${stg.name}`, x+120, cy+19, 18, isUnlock ? '#2c3e50' : '#95a5a6', 'left', 'bold', 170);
+        // 危険度メーター(7マス中 Lv 個が色つき。緑→赤)
+        const dangerColors = ['#2ecc71', '#82d33f', '#c6d635', '#f1c40f', '#f39c12', '#e67e22', '#e74c3c'];
+        for (let k = 0; k < 7; k++) {
+            ctx.beginPath(); ctx.roundRect(x+120 + k * 17, cy+34, 14, 10, 3);
+            ctx.fillStyle = k < stg.lv ? (isUnlock ? dangerColors[k] : '#bdc3c7') : '#dde2e5'; ctx.fill();
+        }
+        drawText('🏁 ' + T('stage_floors', {floor: maxFloor}), x+120, cy+54, 14, isUnlock ? '#7f8c8d' : '#aab2b7', 'left', 'bold', 170);
+
+        drawBtn(T('btn_explore'), x+300, cy+14, 86, 40, isUnlock ? '#e74c3c' : '#bdc3c7', () => {
+            if(gameData.ap < 1) return addMessage(T('msg_ap_insufficient2'), '⚡');
             
             let cp = calcCombatPower();
             let n = stg.lv;
@@ -1917,15 +2042,15 @@ function renderExploreSelect(x, y) {
             };
 
             if (gameData.equipment.potion) {
-                addMessage(T('msg_potion_advantage'));
+                addMessage(T('msg_potion_advantage'), '🧪');
             }
-            addMessage(T('msg_explore_start', {name: stg.name}));
+            addMessage(T('msg_explore_start', {name: stg.name}), '🗺️');
 
             GAME_STATE = "EXPLORING";
         }, !isUnlock);
-        cy += 75;
+        cy += 76;
     });
-    drawBtn(T('btn_back'), x+145, y+620, 120, 50, '#7f8c8d', () => { GAME_STATE = "MAIN"; });
+    drawBtn('◀ ' + T('btn_back'), x+135, y+622, 140, 46, '#7f8c8d', () => { GAME_STATE = "MAIN"; });
 }
 
 function renderExploring(x, y) {
@@ -1935,14 +2060,22 @@ function renderExploring(x, y) {
 
     ctx.fillStyle = '#ecf0f1'; ctx.fillRect(x+10, y+240, 390, 250);
     ctx.strokeStyle = '#bdc3c7'; ctx.strokeRect(x+10, y+240, 390, 250);
-    for(let i=0; i<gameData.messages.length; i++) drawText(gameData.messages[i], x+20, y+265 + i*22, 16, '#2c3e50');
+    for(let i=0; i<gameData.messages.length; i++) drawText(gameData.messages[i], x+20, y+265 + i*22, 16, '#2c3e50', 'left', 'bold', 365);
 
-    drawText(T('explore_status_line', {name: exploreData.stage.name, cur: exploreData.currentFloor, max: exploreData.maxFloor}), x+205, y+520, 20, '#2c3e50', 'center');
+    // 階数の進みぐあいをゲージで見せる(5階ごとに目盛り)
+    drawGauge(x+20, y+500, 370, 16, exploreData.currentFloor / exploreData.maxFloor, '#8ee08e', '#27ae60');
+    ctx.strokeStyle = 'rgba(44,62,80,0.35)'; ctx.lineWidth = 1;
+    for (let f = 5; f < exploreData.maxFloor; f += 5) {
+        const tx = x + 20 + 370 * f / exploreData.maxFloor;
+        ctx.beginPath(); ctx.moveTo(tx, y+502); ctx.lineTo(tx, y+514); ctx.stroke();
+    }
+    drawText('🏁', x+386, y+508, 18, '#2c3e50', 'center');
+    drawText(T('explore_status_line', {name: exploreData.stage.name, cur: exploreData.currentFloor, max: exploreData.maxFloor}), x+205, y+534, 18, '#2c3e50', 'center', 'bold', 380);
 
     drawBtn(T('btn_advance'), x+20, y+560, 115, 60, '#3498db', () => advanceFloor(false));
     drawBtn(T('btn_skip'), x+145, y+560, 115, 60, '#e67e22', () => advanceFloor(true));
     drawBtn(T('btn_return'), x+270, y+560, 115, 60, '#95a5a6', () => {
-        addMessage(T('msg_returned'));
+        addMessage(T('msg_returned'), '🏠');
         finishExploration(false);
     });
 }
@@ -1950,13 +2083,13 @@ function renderExploring(x, y) {
 function advanceFloor(isSkip) {
     do {
         if(gameData.ap < 1) {
-            addMessage(T('msg_ap_none_returned'));
+            addMessage(T('msg_ap_none_returned'), '⚡');
             finishExploration(false);
             break;
         }
 
         if(exploreData.currentFloor >= exploreData.maxPossibleFloor) {
-            addMessage(T('msg_too_strong'));
+            addMessage(T('msg_too_strong'), '💦');
             gameData.ap -= 1;
             finishExploration(false);
             break;
@@ -1995,17 +2128,17 @@ function advanceFloor(isSkip) {
                 dropMsgs.push(`${itemMaster.name}×${count}`);
             }
             if(dropMsgs.length > 0) {
-                addMessage(T('msg_got_items', {floor: exploreData.currentFloor, items: dropMsgs.join(currentLang === 'en' ? ', ' : '、')}));
+                addMessage(T('msg_got_items', {floor: exploreData.currentFloor, items: dropMsgs.join(currentLang === 'en' ? ', ' : '、')}), '🎁');
             } else {
-                addMessage(T('msg_nothing_found', {floor: exploreData.currentFloor}));
+                addMessage(T('msg_nothing_found', {floor: exploreData.currentFloor}), '💨');
             }
         } else {
-            addMessage(T('msg_nothing_found', {floor: exploreData.currentFloor}));
+            addMessage(T('msg_nothing_found', {floor: exploreData.currentFloor}), '💨');
         }
 
         if(exploreData.currentFloor >= exploreData.maxFloor) {
-            addMessage(T('msg_stage_cleared', {name: stg.name}));
-            if(gameData.maxStageLv === stg.lv) { gameData.maxStageLv++; addMessage(T('msg_new_area')); }
+            addMessage(T('msg_stage_cleared', {name: stg.name}), '🏆');
+            if(gameData.maxStageLv === stg.lv) { gameData.maxStageLv++; addMessage(T('msg_new_area'), '🔓'); }
             finishExploration(true);
             break;
         }
@@ -2017,9 +2150,9 @@ function renderShop(x, y) {
     drawPanel(x, y, 410, 680, T('panel_shop'));
     drawText(T('label_gold', {gold: gameData.gold}), x+20, y+70, 24, '#f39c12');
 
-    drawBtn(T('tab_common'), x+20, y+100, 50, 30, shopTab==="COMMON" ? '#e67e22' : '#bdc3c7', () => {shopTab="COMMON"; shopPage=0;});
+    drawBtn(T('tab_common'), x+20, y+100, 70, 30, shopTab==="COMMON" ? '#e67e22' : '#bdc3c7', () => {shopTab="COMMON"; shopPage=0;});
     for(let i=1; i<=7; i++) {
-        drawBtn(`Lv${i}`, x+75 + (i-1)*45, y+100, 40, 30, shopTab===`LV${i}` ? '#e67e22' : '#bdc3c7', () => {shopTab=`LV${i}`; shopPage=0;});
+        drawBtn(`Lv${i}`, x+95 + (i-1)*43, y+100, 39, 30, shopTab===`LV${i}` ? '#e67e22' : '#bdc3c7', () => {shopTab=`LV${i}`; shopPage=0;});
     }
 
     let shopItems = ITEMS.filter(i => {
@@ -2038,19 +2171,20 @@ function renderShop(x, y) {
         let isSoldOut = isRecipe && gameData.unlockedRecipes.includes(item.id);
         let canBuy = !isSoldOut && gameData.gold >= item.price;
 
-        let fSize = 18;
-        if (item.name.length >= 15) fSize = 13;
-        else if (item.name.length >= 11) fSize = 15;
+        ctx.save(); if (isSoldOut) ctx.globalAlpha = 0.5;
+        drawItemIcon(item, x + 30, cy, 28);
+        ctx.restore();
+        const nameMaxW = item.type === 9 ? 150 : 250;
+        drawText(item.name, x+54, cy-10, 18, isSoldOut ? '#95a5a6' : getItemColor(item), 'left', 'bold', nameMaxW);
+        drawText(`💰 ${item.price}G`, x+54, cy+13, 16, isSoldOut ? '#95a5a6' : canBuy ? '#e08e0b' : '#e74c3c', 'left', 'bold', nameMaxW);
 
-        drawText(`${item.price}G ${item.name}`, x+15, cy, fSize, isSoldOut ? '#95a5a6' : canBuy ? getItemColor(item) : '#e74c3c');
-        
         let btnX = x+330;
         let btnY = cy-15;
         let btnW = 60;
         let btnH = 35;
 
         if (item.type === 9) {
-            drawText(T('label_owned', {count: countItem(item.id)}), btnX - 10, cy, 14, '#2c3e50', 'right');
+            drawText('🎒 ' + T('label_owned', {count: countItem(item.id)}), btnX - 10, cy, 14, '#2c3e50', 'right', 'bold', 90);
         }
 
         if (isSoldOut) {
@@ -2058,17 +2192,17 @@ function renderShop(x, y) {
         } else {
             drawBtn(T('btn_buy'), btnX, btnY, btnW, btnH, canBuy ? '#3498db' : '#bdc3c7', () => {
                 gameData.gold -= item.price;
-                if(item.type === 10) { gameData.unlockedRecipes.push(item.id); addMessage(T('msg_recipe_learned')); }
-                else { addItem(item.id, 0, 1); addMessage(T('msg_bought', {name: item.name})); }
+                if(item.type === 10) { gameData.unlockedRecipes.push(item.id); addMessage(T('msg_recipe_learned'), '📜'); }
+                else { addItem(item.id, 0, 1); addMessage(T('msg_bought', {name: item.name}), '🛒'); }
             }, !canBuy);
         }
         cy += 65;
     });
 
     drawText(`${shopPage+1} / ${Math.max(0, Math.ceil(shopItems.length/7)-1)+1}`, x+205, y+650, 20, '#2c3e50', 'center');
-    if(shopPage > 0) drawBtn("＜", x+110, y+630, 50, 40, '#34495e', () => shopPage--);
+    if(shopPage > 0) drawBtn("＜", x+130, y+630, 50, 40, '#34495e', () => shopPage--);
     if(shopPage < Math.ceil(shopItems.length/7)-1) drawBtn("＞", x+250, y+630, 50, 40, '#34495e', () => shopPage++);
-    drawBtn(T('btn_back'), x+20, y+630, 80, 40, '#7f8c8d', () => { GAME_STATE = "MAIN"; });
+    drawBtn('◀ ' + T('btn_back'), x+20, y+630, 90, 40, '#7f8c8d', () => { GAME_STATE = "MAIN"; });
 }
 
 // --- リザルト・ランキング・ポップアップ ---
@@ -2144,11 +2278,14 @@ function renderRanking() {
             }
             let clr = d.isClear ? T('result_clear') : T('result_retire');
             let tColor = '#2c3e50';
-            drawText(T('rank_position', {n: rankPage*rankItemsPerPage + idx+1}), tableX+50, cy, 18, tColor, 'center');
-            drawText(d.name, tableX+130, cy, 18, tColor, 'left');
+            const rankNo = rankPage*rankItemsPerPage + idx + 1;
+            const medal = ['🥇','🥈','🥉'][rankNo - 1];
+            if (medal) drawText(medal, tableX+50, cy, 24, tColor, 'center');
+            else drawText(T('rank_position', {n: rankNo}), tableX+50, cy, 18, tColor, 'center', 'bold', 80);
+            drawText(d.name, tableX+130, cy, 18, tColor, 'left', 'bold', 340);
             drawText(T('rank_days_suffix', {n: d.days}), tableX+520, cy, 18, tColor, 'center');
             drawText(`${d.assets} G`, tableX+680, cy, 18, '#f39c12', 'right');
-            drawText(clr, tableX+830, cy, 18, d.isClear ? '#e74c3c' : '#7f8c8d', 'center');
+            drawText(clr, tableX+830, cy, 18, d.isClear ? '#e74c3c' : '#7f8c8d', 'center', 'bold', 120);
             drawText(d.date || "-", tableX+990, cy, 15, '#7f8c8d', 'center');
 
             ctx.strokeStyle = '#bdc3c7'; ctx.lineWidth = 1;
@@ -2168,7 +2305,7 @@ function renderRanking() {
         drawText(rankingTab==="WORLD" && !rankingDataWorld ? T('loading') : T('no_data'), 640, 300, 24, '#2c3e50', 'center');
     }
 
-    drawBtn(T('btn_back_title'), 540, 665, 200, 45, '#2c3e50', () => { GAME_STATE = "TITLE"; });
+    drawBtn(T('btn_back_title'), 520, 648, 240, 42, '#2c3e50', () => { GAME_STATE = "TITLE"; });
 }
 
 function renderSettings() {
@@ -2209,31 +2346,62 @@ function renderSettings() {
     drawBtn(T('btn_close'), px + pw/2 - 100, py + ph - 65, 200, 45, '#7f8c8d', () => { GAME_STATE = "TITLE"; });
 }
 
+// 序盤の進め方は「番号つきカード6枚 + ゴールの帯 + ワンポイント」で見せる
+const HELP_STEP_ICONS = ['🛒', '🛒', '🔨', '🗺️', '💰', '🌙'];
 function renderHelpPopup() {
-    clickZones = []; 
+    clickZones = [];
     ctx.fillStyle = 'rgba(0,0,0,0.6)';
     ctx.fillRect(0,0,1280,720);
-    
+
     let px = 240, py = 40, pw = 800, ph = 640;
     ctx.save();
     ctx.beginPath(); ctx.roundRect(px, py, pw, ph, 15); ctx.clip();
     ctx.fillStyle = '#ecf0f1'; ctx.fill();
     ctx.fillStyle = '#34495e'; ctx.fillRect(px, py, pw, 50);
-    drawText(T('help_title'), px + pw/2, py + 25, 24, '#fff', 'center');
+    drawText('📖 ' + T('help_title'), px + pw/2, py + 25, 24, '#fff', 'center', 'bold', pw - 40);
     ctx.restore();
     ctx.strokeStyle = '#34495e'; ctx.lineWidth = 4;
     ctx.beginPath(); ctx.roundRect(px, py, pw, ph, 15); ctx.stroke();
 
-    let lines = T('help_lines');
-    let fSize = currentLang === 'en' ? 16 : 18;
+    const lines = T('help_lines');
+    const stripNo = t => t.replace(/^[①-⑩]\s*/, '');
+    // lines: [0]見出し [1..6]手順 [7]ゴール [8]空行 [9]ワンポイント見出し [10..]ワンポイント
+    drawText(lines[0], px + 30, py + 72, 18, '#2c3e50', 'left', 'bold', pw - 60);
 
-    let cy = py + 80;
-    for (let line of lines) {
-        drawText(line, px + 30, cy, fSize, '#2c3e50', 'left', 'normal');
-        cy += 28;
+    const cardW = 246, cardH = 104, gapX = 11, gapY = 9, cx0 = px + 25, cy0 = py + 92;
+    for (let i = 0; i < 6; i++) {
+        const cx = cx0 + (i % 3) * (cardW + gapX), cy = cy0 + Math.floor(i / 3) * (cardH + gapY);
+        ctx.beginPath(); ctx.roundRect(cx, cy, cardW, cardH, 12);
+        ctx.fillStyle = '#fff'; ctx.fill();
+        ctx.strokeStyle = '#9ec5e8'; ctx.lineWidth = 2; ctx.stroke();
+        // 番号バッジ
+        ctx.beginPath(); ctx.arc(cx + 22, cy + 22, 14, 0, Math.PI * 2); ctx.fillStyle = '#3498db'; ctx.fill();
+        drawText(String(i + 1), cx + 22, cy + 23, 17, '#fff', 'center');
+        drawText(HELP_STEP_ICONS[i], cx + 54, cy + 22, 26, '#2c3e50', 'center');
+        drawWrapped(stripNo(lines[i + 1] || ''), cx + 12, cy + 54, cardW - 24, 15, 19, '#2c3e50');
+        if (i % 3 < 2) drawText('▶', cx + cardW + gapX / 2, cy + cardH / 2, 14, '#3498db', 'center');
     }
 
-    drawBtn(T('btn_close'), px + pw/2 - 75, py + 570, 150, 50, '#e74c3c', () => { showHelp = false; });
+    // ゴールの帯
+    const gy = cy0 + 2 * cardH + gapY + 10;
+    ctx.beginPath(); ctx.roundRect(px + 25, gy, pw - 50, 38, 19);
+    const gg = ctx.createLinearGradient(px + 25, gy, px + pw - 25, gy);
+    gg.addColorStop(0, '#f5b041'); gg.addColorStop(1, '#e74c3c');
+    ctx.fillStyle = gg; ctx.fill();
+    drawText('🐉 ' + (lines[7] || ''), px + pw / 2, gy + 20, 18, '#fff', 'center', 'bold', pw - 90);
+
+    // ワンポイントアドバイス(行頭の「・」は絵文字に置きかえ)
+    let ty = gy + 60;
+    drawText('💡 ' + (lines[9] || ''), px + 30, ty, 17, '#2c3e50', 'left', 'bold', pw - 60);
+    ty += 22;
+    const tipIcons = ['🪙', '📜', '⭐', '🧪', '💾', '🏆'];
+    for (let i = 10; i < lines.length; i++) {
+        const tip = lines[i].replace(/^・\s*/, '');
+        drawText(tipIcons[i - 10] || '・', px + 40, ty + 9, 15, '#2c3e50', 'center');
+        ty = drawWrapped(tip, px + 58, ty + 9, pw - 100, 15, 19, '#2c3e50', 'normal') - 9 + 4;
+    }
+
+    drawBtn('✖ ' + T('btn_close'), px + pw/2 - 80, py + ph - 66, 160, 48, '#e74c3c', () => { showHelp = false; });
 }
 
 function renderPopup() {
@@ -2249,7 +2417,7 @@ function renderPopup() {
     let msgLayout = null;  // 汎用confirm/alert用
 
     if (activePopup.isClearPopup) {
-        py = 100; ph = 520;
+        py = 70; ph = 580;
     } else if (activePopup.isContinueChoice) {
         const titleFont = 'bold 24px "M PLUS Rounded 1c"';
         const subFont = 'bold 15px "M PLUS Rounded 1c"';
@@ -2262,11 +2430,13 @@ function renderPopup() {
         const subY = titleEndY + 35;
         const subEndY = subY + (subLines.length - 1) * subLH;
         const bigBtnY = subEndY + 45;
-        const cancelY = bigBtnY + 65;
+        const cancelY = bigBtnY + 70;
 
         contLayout = { titleLines, subLines, titleLH, subLH, titleY, subY, bigBtnY, cancelY };
-        ph = cancelY + 40;
+        ph = cancelY + 40 + 30;   // 下ボタン(高さ40+縁5)の下に余白を残す
         py = 360 - ph / 2;
+    } else if (activePopup.isPrompt) {
+        ph = 235;   // 入力欄(固定位置)とボタンがはみ出さない高さ
     } else if (!activePopup.isPrompt) {
         // 汎用のconfirm/alertポップアップ（text + 任意のsubtext）
         const titleFont = 'bold 22px "M PLUS Rounded 1c"';
@@ -2275,7 +2445,8 @@ function renderPopup() {
         const subLines = activePopup.subtext ? wrapTextLines(activePopup.subtext, textMaxW, subFont) : [];
         const titleLH = 28, subLH = 24;
 
-        const titleY = 60;
+        const iconOff = activePopup.icon || activePopup.isAlert ? 52 : 0;   // 大きな絵文字の分だけ下げる
+        const titleY = 60 + iconOff;
         const titleEndY = titleY + (titleLines.length - 1) * titleLH;
         let btnY;
         let subY = 0;
@@ -2288,7 +2459,7 @@ function renderPopup() {
         }
 
         msgLayout = { titleLines, subLines, titleLH, subLH, titleY, subY, btnY };
-        ph = Math.max(200, btnY + 70);
+        ph = Math.max(200, btnY + 75);
         py = 360 - ph / 2;
     }
 
@@ -2301,18 +2472,31 @@ function renderPopup() {
     ctx.beginPath(); ctx.roundRect(px, py, pw, ph, 15); ctx.stroke();
 
     if (activePopup.isClearPopup) {
-        drawText(T('clear_title'), px + pw/2, py + 40, 30, '#f1c40f', 'center', '900');
+        drawText('🎉 ' + T('clear_title') + ' 🎉', px + pw/2, py + 40, 30, '#e1a800', 'center', '900', pw - 60);
         drawImageRect('clear', px + 40, py + 70, 520, 292);
 
-        let cy = py + 390;
-        drawText(T('clear_assets', {assets: activePopup.assets}), px + pw/2, cy, 22, '#f39c12', 'center'); cy += 30;
-        drawText(T('clear_level', {lv: activePopup.level}), px + pw/2, cy, 20, '#2c3e50', 'center'); cy += 30;
-        drawText(T('clear_days', {days: activePopup.days}), px + pw/2, cy, 20, '#2c3e50', 'center'); cy += 40;
+        // 結果は3つのカード(絵文字つき)で見せる
+        const cardW = 170, cardH = 74, cardGap = 15, cardY = py + 378;
+        const cardX0 = px + (pw - (cardW * 3 + cardGap * 2)) / 2;
+        const cards = [
+            { icon: '💰', text: T('clear_assets', {assets: activePopup.assets}), color: '#e08e0b' },
+            { icon: '⭐', text: T('clear_level', {lv: activePopup.level}), color: '#2980b9' },
+            { icon: '📅', text: T('clear_days', {days: activePopup.days}), color: '#27ae60' }
+        ];
+        cards.forEach((c, i) => {
+            const cx0 = cardX0 + i * (cardW + cardGap);
+            ctx.beginPath(); ctx.roundRect(cx0, cardY, cardW, cardH, 12); ctx.fillStyle = '#fff'; ctx.fill();
+            ctx.strokeStyle = c.color; ctx.lineWidth = 3; ctx.stroke();
+            const [lab, ...rest] = c.text.split(': ');   // 「項目名: 値」を2段で見せる
+            drawText(c.icon + ' ' + lab, cx0 + cardW/2, cardY + 20, 14, '#7f8c8d', 'center', 'bold', cardW - 14);
+            drawText(rest.join(': '), cx0 + cardW/2, cardY + 50, 22, c.color, 'center', '900', cardW - 14);
+        });
 
+        let cy = py + 490;
         if (activePopup.saving) {
-            drawText(T('clear_sending'), px + pw/2, cy, 16, '#7f8c8d', 'center');
+            drawText(T('clear_sending'), px + pw/2, cy + 25, 16, '#7f8c8d', 'center', 'bold', pw - 60);
         } else {
-            drawBtn(T('btn_back_title'), px + pw/2 - 100, cy - 20, 200, 50, '#3498db', () => {
+            drawBtn(T('btn_back_title'), px + pw/2 - 110, cy, 220, 50, '#3498db', () => {
                 activePopup = null;
                 GAME_STATE = "TITLE";
             });
@@ -2321,12 +2505,13 @@ function renderPopup() {
         const L = contLayout;
         drawTextLines(L.titleLines, px + pw/2, py + L.titleY, L.titleLH, 24, '#2c3e50');
         drawTextLines(L.subLines, px + pw/2, py + L.subY, L.subLH, 15, '#7f8c8d');
-        drawBtn(T('btn_continue'), px + 40, py + L.bigBtnY, 240, 55, '#3498db', () => {
+        drawBtn('📂 ' + T('btn_continue'), px + 40, py + L.bigBtnY, 240, 55, '#3498db', () => {
             activePopup = null;
             loadGame();
         });
-        drawBtn(T('btn_new_game'), px + pw - 280, py + L.bigBtnY, 240, 55, '#e74c3c', () => {
+        drawBtn('🌱 ' + T('btn_new_game'), px + pw - 280, py + L.bigBtnY, 240, 55, '#e74c3c', () => {
             activePopup = {
+                icon: '⚠️',
                 text: T('confirm_new_game_erase'),
                 onYes: () => { clearSave(); GAME_STATE = "PLAYER_SELECT"; },
                 onNo: () => { activePopup = { isContinueChoice: true }; }
@@ -2334,18 +2519,20 @@ function renderPopup() {
         });
         drawBtn(T('btn_cancel'), px + pw/2 - 75, py + L.cancelY, 150, 40, '#95a5a6', () => { activePopup = null; });
     } else if(activePopup.isPrompt) {
-        drawText(activePopup.text, px + pw/2, py + 40, 22, '#2c3e50', 'center');
+        drawText('✏️ ' + activePopup.text, px + pw/2, py + 40, 22, '#2c3e50', 'center', 'bold', textMaxW);
         if (activePopup.subtext) {
-            drawText(activePopup.subtext, px + pw/2, py + 120, 16, '#e74c3c', 'center');
+            drawText(activePopup.subtext, px + pw/2, py + 130, 16, '#e74c3c', 'center', 'bold', textMaxW);
         }
-        drawBtn(T('btn_confirm'), px + 100, py + 140, 150, 45, '#3498db', () => {
+        drawBtn(T('btn_confirm'), px + 100, py + 155, 150, 45, '#3498db', () => {
             if(activePopup.onYes) activePopup.onYes();
         });
-        drawBtn(T('btn_cancel'), px + 350, py + 140, 150, 45, '#7f8c8d', () => {
+        drawBtn(T('btn_cancel'), px + 350, py + 155, 150, 45, '#7f8c8d', () => {
             if(activePopup.onNo) activePopup.onNo();
         });
     } else {
         const L = msgLayout;
+        const popIcon = activePopup.icon || (activePopup.isAlert ? '⚠️' : '');
+        if (popIcon) drawText(popIcon, px + pw/2, py + 48, 44, '#2c3e50', 'center');
         drawTextLines(L.titleLines, px + pw/2, py + L.titleY, L.titleLH, 22, '#2c3e50');
         drawTextLines(L.subLines, px + pw/2, py + L.subY, L.subLH, 18, '#e74c3c');
 
@@ -2398,7 +2585,7 @@ function loop() {
                 restEffect.phase = 'out';
                 gameData.day++;
                 gameData.ap = gameData.maxAp;
-                addMessage(T('msg_new_day', {day: gameData.day}));
+                addMessage(T('msg_new_day', {day: gameData.day}), '🌅');
                 autoSave();
             }
         } else {
