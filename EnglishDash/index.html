@@ -416,6 +416,11 @@ body { overflow:hidden; background:var(--bg-page); font-family:"M PLUS Rounded 1
 .set-row { display:flex; align-items:center; gap:24px; margin:12px 0; }
 .set-row .lab2 { width:230px; font-size:1.4rem; font-weight:800; color:var(--ink); text-align:right; }
 .set-row .chip { min-width:200px; font-size:1.2rem; }
+.volrow { gap:8px; align-items:center; width:424px; justify-content:flex-start; }
+.volrow .mute { width:62px; height:46px; border-radius:16px; border:3px solid #fff; font-size:1.5rem; cursor:pointer; color:#fff; box-shadow:0 4px 0 rgba(0,0,0,.25); font-family:inherit; margin-right:10px; }
+.volrow .mute.on { background:linear-gradient(#6fb0ff,#3d7ff0); } .volrow .mute.off { background:linear-gradient(#ff8c8c,#ff4d4d); }
+.volrow .bar { width:26px; height:46px; border-radius:10px; border:3px solid #fff; cursor:pointer; box-shadow:0 4px 0 rgba(0,0,0,.2); background:#d9d4e6; padding:0; }
+.volrow .bar.g { background:linear-gradient(#a8f26f,#3fbf2a); } .volrow .bar.y { background:linear-gradient(#ffe27a,#f0a800); } .volrow .bar.o { background:linear-gradient(#ffb06a,#ff6a2e); }
 </style>
 </head>
 <body>
@@ -581,6 +586,7 @@ body { overflow:hidden; background:var(--bg-page); font-family:"M PLUS Rounded 1
       <div class="set-row"><div class="lab2" data-i18n="set_lang"></div><div class="row" id="set-lang"></div></div>
       <div class="set-row"><div class="lab2" data-i18n="set_time"></div><div class="row" id="set-time"></div></div>
       <div class="set-row"><div class="lab2" data-i18n="set_case"></div><div class="row" id="set-case"></div></div>
+      <div class="set-row"><div class="lab2" id="set-sound-lab"></div><div class="row volrow" id="set-vol"></div></div>
     </div>
   </div>
 </div>
@@ -593,6 +599,64 @@ const SAVE_KEY = 'fgl_english_dash';
 const $ = id => document.getElementById(id);
 function lsGet(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } }
 function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+
+// --- 効果音(WebAudioで合成。音声ファイルは使わない)。音量は 0〜10 の11段階(0 = OFF)。保存キーは fgl_english_dash_volume ---
+const SFX = (() => {
+    let ac = null, count = 0, vol = 5, lastVol = 5;
+    try { const v = localStorage.getItem('fgl_english_dash_volume'); if (v !== null) vol = Math.max(0, Math.min(10, parseInt(v, 10) || 0)); } catch (e) {}
+    function audio() {
+        if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } }
+        if (ac.state === 'suspended') ac.resume();
+        return ac;
+    }
+    function tone(freq, t0, dur, type, v0, slideTo) {
+        const a = audio(); if (!a) return;
+        const t = a.currentTime + t0, o = a.createOscillator(), g = a.createGain();
+        o.type = type || 'sine';
+        o.frequency.setValueAtTime(freq, t);
+        if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(Math.max(0.0002, (v0 || 0.12) * Math.pow(vol / 5, 1.4)), t + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        o.connect(g); g.connect(a.destination);
+        o.start(t); o.stop(t + dur + 0.05);
+    }
+    const seq = (notes, step, type, v, len) => notes.forEach((f, i) => tone(f, i * step, len || step * 1.7, type, v));
+    const C5 = 523, E5 = 659, G5 = 784, C6 = 1047, E6 = 1319, G6 = 1568;
+    const sounds = {
+        click: () => tone(720, 0, 0.05, 'triangle', 0.07),
+        type: () => tone(1100, 0, 0.035, 'triangle', 0.06),                       // 正しいキー
+        ok: () => { tone(880, 0, 0.07, 'triangle', 0.1); tone(1319, 0.06, 0.14, 'triangle', 0.1); },   // 1語打てた
+        miss: () => tone(260, 0, 0.16, 'square', 0.07, 150),                      // まちがい
+        hint: () => seq([G5, E5, C5], 0.07, 'sine', 0.1, 0.12),                   // ヒント(HPがへる)
+        error: () => { tone(220, 0, 0.1, 'square', 0.06); tone(165, 0.09, 0.14, 'square', 0.06); },
+        beep: () => tone(660, 0, 0.12, 'square', 0.07),                           // カウントダウン
+        go: () => { tone(988, 0, 0.1, 'square', 0.08); tone(1319, 0.09, 0.28, 'square', 0.08); },
+        star: () => tone(1175, 0, 0.18, 'triangle', 0.1),
+        get: () => seq([784, 988, 1175], 0.06, 'sine', 0.12),
+        coin: () => { tone(988, 0, 0.08, 'square', 0.06); tone(1319, 0.07, 0.18, 'square', 0.06); },
+        fail: () => { tone(400, 0, 0.5, 'sawtooth', 0.07, 90); tone(196, 0.45, 0.45, 'triangle', 0.08, 110); },
+        fanfare: () => { seq([C5, C5, C5, G5, E5, G5, C6], 0.12, 'square', 0.07, 0.19); tone(C6, 0.9, 0.6, 'triangle', 0.1); tone(E6, 0.9, 0.6, 'triangle', 0.08); },
+        perfect: () => { seq([C5, E5, G5, C6], 0.09, 'square', 0.07); tone(G6, 0.4, 0.5, 'triangle', 0.1); seq([C6, E6, G6, C6 * 2], 0.1, 'triangle', 0.08); }
+    };
+    return {
+        play(name) { if (vol <= 0) return; count++; try { if (sounds[name]) sounds[name](); } catch (e) {} },
+        get count() { return count; },
+        get volume() { return vol; },
+        get lastVolume() { return lastVol; },
+        setVolume(n) {   // 聞いて確かめられるよう、0より大きいときは短い音を鳴らす
+            n = Math.max(0, Math.min(10, Math.round(n)));
+            if (vol > 0) lastVol = vol;
+            vol = n;
+            try { localStorage.setItem('fgl_english_dash_volume', String(vol)); } catch (e) {}
+            if (vol > 0) this.play('coin');
+        },
+        unlock() { if (vol > 0) audio(); }
+    };
+})();
+// ボタンをおしたときの音(キーボードの絵のキーは、打つ音が別にあるので除く)。ブラウザの決まりで、最初のタッチ/キーで音を使えるようにする
+document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('button, .gcard, .mcard'); if (b && !b.classList.contains('key')) SFX.play('click'); }, true);
+['pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, () => SFX.unlock(), { capture: true }));
 
 let settings = Object.assign({ lang: 'ja', showTime: true, caseMode: 'lower' }, lsGet(SAVE_KEY + '_settings', {}));
 if (settings.lang !== 'ja' && settings.lang !== 'easy') settings.lang = 'ja';
@@ -632,6 +696,7 @@ const I18N = {
   }
 };
 Object.assign(I18N.ja, {
+    set_sound: '効果音',
     mode_title: 'どちらで あそぶ？', mode_grade: '学年で あそぶ', mode_grade_sub: '小3〜中3・全範囲', mode_theme: 'テーマで あそぶ', mode_theme_sub: '曜日・月・数字・色・動物…',
     theme_title: 'テーマを えらぼう', q_n: '{n}題', lab_theme: 'テーマ', rk_grade: '学年', rk_theme: 'テーマ',
     title_sub: '英単語×タイピング',
@@ -643,6 +708,7 @@ Object.assign(I18N.ja, {
     send_ing: 'ランキングに送信中…', send_ok: 'ランキングに送信したよ！（{name}）', send_ng: '送信できなかったよ', send_retry: 'もういちど送信'
 });
 Object.assign(I18N.easy, {
+    set_sound: 'こうかおん',
     mode_title: 'どちらで あそぶ？', mode_grade: 'がくねんで あそぶ', mode_grade_sub: 'しょう3〜ちゅう3・ぜんはんい', mode_theme: 'テーマで あそぶ', mode_theme_sub: 'ようび・つき・すうじ・いろ・どうぶつ…',
     theme_title: 'テーマを えらぼう', q_n: '{n}もん', lab_theme: 'テーマ', rk_grade: 'がくねん', rk_theme: 'テーマ',
     title_sub: 'えいたんご×タイピング',
@@ -1020,12 +1086,12 @@ function beginPlay() {
     let n = 3;
     const cd = $('countdown'); cd.classList.remove('hidden');
     cd.innerHTML = '<div class="cd-num"></div>';
-    cd.lastChild.textContent = n;
+    cd.lastChild.textContent = n; SFX.play('beep');
     const iv = setInterval(() => {
         if (!G || curScreen !== 'play-screen') { clearInterval(iv); cd.classList.add('hidden'); return; }
         n--;
-        if (n > 0) cd.lastChild.textContent = n;
-        else { clearInterval(iv); cd.classList.add('hidden'); G.running = true; G.t0 = performance.now(); showWord(); tick(); }
+        if (n > 0) { cd.lastChild.textContent = n; SFX.play('beep'); }
+        else { SFX.play('go'); clearInterval(iv); cd.classList.add('hidden'); G.running = true; G.t0 = performance.now(); showWord(); tick(); }
     }, 700);
 }
 function setupPlay() {
@@ -1119,8 +1185,8 @@ function updateKbMode() {
 const HINT_COST = 3;   // ヒントを使うとHPが3へる。HPが3以下のときは、ゲームオーバーになってしまうので使えない
 function useHint() {
     if (!G || !G.running || !G.allow || G.course.guide !== 0 || G.hinted) return;
-    if (MAX_MISS - G.miss <= HINT_COST) { const q = $('q-card'); q.classList.remove('shake'); void q.offsetWidth; q.classList.add('shake'); return; }
-    G.hinted = true; G.wordMiss = true; G.miss += HINT_COST; G.hints++;
+    if (MAX_MISS - G.miss <= HINT_COST) { SFX.play('error'); const q = $('q-card'); q.classList.remove('shake'); void q.offsetWidth; q.classList.add('shake'); return; }
+    G.hinted = true; G.wordMiss = true; G.miss += HINT_COST; G.hints++; SFX.play('hint');
     drawHp(); hitEffect(); renderEn(); updateKbMode();
 }
 function markNext() {
@@ -1137,6 +1203,7 @@ function typeKey(ch) {
         G.typed = next; G.cands = m; G.pos = next.length;
         renderEn();
         if (m.indexOf(next) >= 0) {
+            SFX.play('ok');
             if (!G.wordMiss) G.correct++;
             G.res[G.idx] = G.wordMiss ? 'ng' : 'ok';
             G.idx++;
@@ -1147,9 +1214,9 @@ function typeKey(ch) {
                 finish(false); return;
             }
             showWord();
-        } else markNext();
+        } else { SFX.play('type'); markNext(); }
     } else {
-        G.wordMiss = true; G.miss++; G.typos++;
+        G.wordMiss = true; G.miss++; G.typos++; SFX.play('miss');
         drawHp(); hitEffect(); updateKbMode();
         const q = $('q-card'); q.classList.remove('shake'); void q.offsetWidth; q.classList.add('shake');
         const k = document.querySelector('.key[data-k="' + ch + '"]');
@@ -1219,7 +1286,13 @@ function finish(over) {
     showScreen('result-screen');
     el.className = 'screen' + (over ? ' over' : '');
     endCountUp($('end-v1'), G.correct, 1200, 300);
-    if (!over) submitScore();
+    if (over) SFX.play('fail');
+    else {
+        SFX.play(perfect ? 'perfect' : 'fanfare');
+        for (let i = 0; i < nStar; i++) setTimeout(() => { if (curScreen === 'result-screen') SFX.play('star'); }, 600 + i * 160);
+        if (isNew) setTimeout(() => { if (curScreen === 'result-screen') SFX.play('get'); }, 1300);
+        submitScore();
+    }
 }
 
 // ================= ランキング(コース×ガイド×学年ごと。クリアしたら、タイトルで登録した名前で自動送信) =================
@@ -1244,7 +1317,7 @@ async function submitScore() {
     try {
         await window.saveOnlineScore(savedName(), lastResult);
         registered = true;
-        el.className = 'end-send ok'; el.textContent = t('send_ok', { name: FGLName.display(savedName()) });
+        el.className = 'end-send ok'; el.textContent = t('send_ok', { name: FGLName.display(savedName()) }); SFX.play('coin');
     } catch (e) {
         el.className = 'end-send ng'; el.innerHTML = '';
         el.appendChild(document.createTextNode(t('send_ng')));
@@ -1359,7 +1432,16 @@ function renderWordList() {
 }
 
 // ================= せってい =================
+function renderSound() {
+    const v = SFX.volume;
+    $('set-sound-lab').textContent = t('set_sound') + '　' + v + ' / 10';
+    let h = '<button class="mute ' + (v > 0 ? 'on' : 'off') + '" data-v="mute">' + (v > 0 ? '🔊' : '🔇') + '</button>';
+    for (let i = 0; i < 10; i++) h += '<button class="bar ' + (i < v ? (i < 4 ? 'g' : i < 7 ? 'y' : 'o') : '') + '" data-v="' + (i + 1) + '"></button>';
+    const box = $('set-vol'); box.innerHTML = h;
+    box.querySelectorAll('button').forEach(b => { b.onclick = () => { if (b.dataset.v === 'mute') SFX.setVolume(SFX.volume > 0 ? 0 : (SFX.lastVolume || 5)); else SFX.setVolume(parseInt(b.dataset.v, 10)); renderSound(); }; });
+}
 function renderSettings() {
+    renderSound();
     chipRow($('set-lang'), [{ id: 'ja', label: t('lang_ja') }, { id: 'easy', label: t('lang_easy') }], settings.lang, v => { settings.lang = v; saveSettings(); refreshAll(); }, ['#ff7a45', '#c8470f']);
     chipRow($('set-time'), [{ id: '1', label: t('time_on') }, { id: '0', label: t('time_off') }], settings.showTime ? '1' : '0', v => { settings.showTime = v === '1'; saveSettings(); refreshAll(); }, ['#17b8a6', '#0f8f81']);
     chipRow($('set-case'), [{ id: 'upper', label: t('case_upper') }, { id: 'lower', label: t('case_lower') }], settings.caseMode, v => { settings.caseMode = v; saveSettings(); refreshAll(); }, ['#8a5cf0', '#5b32b0']);
