@@ -184,7 +184,11 @@ const imgs = {};
 function loadImg(key, src, fallbackColor, fallbackText) {
     imgs[key] = { img: new Image(), loaded: false, error: false, color: fallbackColor, text: fallbackText };
     imgs[key].img.onload = () => imgs[key].loaded = true;
-    imgs[key].img.onerror = () => imgs[key].error = true;
+    imgs[key].img.onerror = () => {
+        // 一度だけ読みなおす(通信の一時的な失敗対策)。それでもだめなら代わりの絵を出す
+        if (!imgs[key].retried) { imgs[key].retried = true; setTimeout(() => { imgs[key].img.src = src + '?r=' + Date.now(); }, 1500); }
+        else imgs[key].error = true;
+    };
     imgs[key].img.src = src;
 }
 loadImg('title', 'images/title.png', '#34495e', 'タイトル画像');
@@ -204,21 +208,32 @@ loadImg('yubiwa', 'images/yubiwa.png', '#2980b9', '飾');
 loadImg('kusuri', 'images/kusuri.png', '#2980b9', '薬');
 loadImg('clear', 'images/clear.png', '#f1c40f', 'クリア');
 
+const FALLBACK_ICON = { title: '🏰', map1: '🌲', map2: '⛏️', map3: '🪨', map4: '🏚️', map5: '🏛️', map6: '☁️', map7: '🌋',
+    rest: '🛏️', buki: '⚔️', tate: '🛡️', yoroi: '🥋', yubiwa: '💍', kusuri: '🧪', clear: '🏆' };
 function drawImageRect(key, x, y, w, h) {
-    if (imgs[key] && imgs[key].loaded && !imgs[key].error) {
-        ctx.drawImage(imgs[key].img, x, y, w, h);
-    } else if (imgs[key] && !imgs[key].error) {
+    const im = imgs[key];
+    if (im && im.loaded && !im.error) {
+        ctx.drawImage(im.img, x, y, w, h);
+    } else if (im && !im.error) {
         // 読みこみ中は文字を出さず、ただの黒にする
         ctx.fillStyle = '#000';
         ctx.fillRect(x, y, w, h);
     } else {
-        ctx.fillStyle = imgs[key] ? imgs[key].color : '#7f8c8d';
-        ctx.fillRect(x, y, w, h);
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 30px "M PLUS Rounded 1c"';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(imgs[key] ? imgs[key].text : key, x + w / 2, y + h / 2);
+        // 読みこめなかったときの代わりの絵: 色のグラデーション + 大きな絵文字(+ 大きい場所では名前)
+        const c = im ? im.color : '#7f8c8d';
+        ctx.save();
+        ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+        const g = ctx.createLinearGradient(x, y, x, y + h);
+        g.addColorStop(0, shadeColor(c, 0.18)); g.addColorStop(1, shadeColor(c, -0.3));
+        ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
+        const m = Math.min(w, h);
+        ctx.fillStyle = 'rgba(255,255,255,0.09)';
+        ctx.beginPath(); ctx.arc(x + w * 0.2, y + h * 0.3, m * 0.38, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(x + w * 0.82, y + h * 0.78, m * 0.3, 0, Math.PI * 2); ctx.fill();
+        const big = m >= 120 && im && im.text;
+        drawText(FALLBACK_ICON[key] || '🖼️', x + w / 2, y + h / 2 - (big ? m * 0.08 : 0), m * (big ? 0.42 : 0.7), '#fff', 'center');
+        if (big) drawText(im.text, x + w / 2, y + h - m * 0.14, Math.min(30, m * 0.1), '#fff', 'center', 'bold', w - 20);
+        ctx.restore();
     }
 }
 
@@ -397,7 +412,10 @@ const STRINGS = {
         settings_title: "設定",
         lang_ja: "日本語",
         lang_simple: "かんたんな\nにほんご",
-        lang_en: "English"
+        lang_en: "English",
+        settings_sound: "効果音",
+        sound_on: "ON",
+        sound_off: "OFF"
     },
     simple: {
         title_main: "トレジャー＆クラフト",
@@ -568,7 +586,10 @@ const STRINGS = {
         settings_title: "せってい",
         lang_ja: "日本語",
         lang_simple: "かんたんな\nにほんご",
-        lang_en: "English"
+        lang_en: "English",
+        settings_sound: "こうかおん",
+        sound_on: "ON",
+        sound_off: "OFF"
     },
     en: {
         title_main: "Treasure & Craft",
@@ -739,7 +760,10 @@ const STRINGS = {
         settings_title: "Settings",
         lang_ja: "日本語",
         lang_simple: "かんたんな\nにほんご",
-        lang_en: "English"
+        lang_en: "English",
+        settings_sound: "Sound effects",
+        sound_on: "ON",
+        sound_off: "OFF"
     }
 };
 
@@ -874,7 +898,7 @@ function getItemColor(master) {
 
 // icon を付けると行頭に絵文字が付く。表示幅(360px)で折り返す(単語の途中では切らない)
 function addMessage(msg, icon) {
-    if (icon) msg = icon + ' ' + msg;
+    if (icon) { msg = icon + ' ' + msg; if (MSG_SOUND[icon]) SFX.play(MSG_SOUND[icon]); }
     wrapTextLines(msg, 360, 'bold 16px "M PLUS Rounded 1c"').forEach(l => gameData.messages.push(l));
     if (gameData.messages.length > 10) {
         gameData.messages.splice(0, gameData.messages.length - 10);
@@ -1020,6 +1044,8 @@ function checkLevelUp() {
 
         addMessage(T('msg_levelup', {lv: gameData.level, atk: upAtk, def: upDef, mag: upMag}), '🆙');
         reqExp = getNextExp(gameData.level);
+        fxBanner(`LEVEL UP! Lv.${gameData.level}`, '#ffd54f');
+        fxBurst(575, 150, ['#ffd54f', '#ffffff', '#ff8a65', '#4fc3f7'], 40, 7);
     }
 }
 
@@ -1155,6 +1181,249 @@ function shadeColor(hex, percent) {
     let g = Math.max(0, Math.min(255, ((num >> 8) & 0xFF) + Math.round(255 * percent)));
     let b = Math.max(0, Math.min(255, (num & 0xFF) + Math.round(255 * percent)));
     return '#' + (0x1000000 + r*0x10000 + g*0x100 + b).toString(16).slice(1);
+}
+
+// ==========================================
+// 数字の桁区切り / 効果音 / 演出(エフェクト) / キーボード操作
+// ==========================================
+function fmt(n) {
+    const v = Number(n);
+    return (typeof n === 'string' && isNaN(v)) ? n : v.toLocaleString('en-US');
+}
+
+// --- 効果音(ブラウザ内蔵の音源で合成。設定でON/OFF。音声ファイルは使わない) ---
+const SFX = (() => {
+    let ac = null, count = 0;
+    let on = true;
+    try { on = localStorage.getItem('tc_sound') !== '0'; } catch (e) {}
+    function audio() {
+        if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } }
+        if (ac.state === 'suspended') ac.resume();
+        return ac;
+    }
+    function tone(freq, t0, dur, type, vol, slideTo) {
+        const a = audio(); if (!a) return;
+        const t = a.currentTime + t0, o = a.createOscillator(), g = a.createGain();
+        o.type = type || 'sine';
+        o.frequency.setValueAtTime(freq, t);
+        if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(vol || 0.12, t + 0.012);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        o.connect(g); g.connect(a.destination);
+        o.start(t); o.stop(t + dur + 0.05);
+    }
+    const seq = (notes, step, type, vol, len) => notes.forEach((f, i) => tone(f, i * step, len || step * 1.7, type, vol));
+    const C5 = 523, E5 = 659, G5 = 784, C6 = 1047, E6 = 1319, G6 = 1568;
+    const sounds = {
+        click: () => tone(720, 0, 0.05, 'triangle', 0.07),
+        coin: () => { tone(988, 0, 0.08, 'square', 0.07); tone(1319, 0.07, 0.18, 'square', 0.07); },
+        buy: () => { tone(880, 0, 0.07, 'triangle', 0.1); tone(1175, 0.07, 0.07, 'triangle', 0.1); tone(1568, 0.14, 0.16, 'triangle', 0.1); },
+        craft: () => { tone(220, 0, 0.09, 'square', 0.08); tone(220, 0.12, 0.09, 'square', 0.08); seq([C5, E5, G5, C6], 0.07, 'triangle', 0.11); },
+        enhance: () => tone(440, 0, 0.35, 'sawtooth', 0.07, 1400),
+        equip: () => { tone(300, 0, 0.06, 'square', 0.07); tone(450, 0.06, 0.1, 'square', 0.07); },
+        get: () => seq([784, 988, 1175], 0.06, 'sine', 0.12),
+        miss: () => tone(300, 0, 0.18, 'sine', 0.08, 180),
+        error: () => { tone(220, 0, 0.12, 'square', 0.07); tone(165, 0.1, 0.18, 'square', 0.07); },
+        fail: () => tone(400, 0, 0.45, 'sawtooth', 0.08, 90),
+        recipe: () => seq([E5, G5, C6, E6], 0.08, 'triangle', 0.11),
+        start: () => seq([C5, G5], 0.09, 'triangle', 0.1),
+        day: () => seq([G5, E5, C5], 0.14, 'sine', 0.1, 0.3),
+        unlock: () => seq([C5, E5, G5, C6, E6], 0.07, 'square', 0.07),
+        levelup: () => { seq([C5, E5, G5, C6], 0.09, 'square', 0.08); tone(G6, 0.4, 0.5, 'triangle', 0.1); },
+        fanfare: () => { seq([C5, C5, C5, G5, E5, G5, C6], 0.13, 'square', 0.08, 0.2); tone(C6, 0.95, 0.7, 'triangle', 0.1); tone(E6, 0.95, 0.7, 'triangle', 0.08); }
+    };
+    return {
+        play(name) { if (!on) return; count++; try { if (sounds[name]) sounds[name](); } catch (e) {} },
+        get count() { return count; },
+        get on() { return on; },
+        set(v) { on = !!v; try { localStorage.setItem('tc_sound', on ? '1' : '0'); } catch (e) {} if (on) this.play('click'); },
+        unlock() { if (on) audio(); }
+    };
+})();
+// メッセージの絵文字ごとの効果音
+const MSG_SOUND = { '🔨': 'craft', '🛒': 'buy', '🎁': 'get', '🆙': 'levelup', '🚫': 'error', '⚡': 'error', '💸': 'error', '💤': 'error',
+    '💦': 'fail', '⬆️': 'enhance', '💰': 'coin', '🛡️': 'equip', '📤': 'equip', '🏆': 'fanfare', '🔓': 'unlock', '📜': 'recipe',
+    '🌅': 'day', '💨': 'miss', '🗺️': 'start', '🧹': 'click', '🏠': 'click' };
+
+// --- 演出: 浮かぶ文字・きらきら・バナー・画面ゆれ ---
+const fx = [];
+let fxShakeFrames = 0;
+function fxFloat(text, x, y, color, size, delay) {
+    fx.push({ k: 't', text, x, y, age: -(delay || 0), life: 75, color: color || '#fff', size: size || 22 });
+}
+function fxBurst(x, y, colors, n, speed) {
+    for (let i = 0; i < (n || 18); i++) {
+        const a = Math.random() * Math.PI * 2, v = (0.4 + Math.random()) * (speed || 5);
+        fx.push({ k: 'p', x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 2, age: 0, life: 38 + Math.random() * 20,
+            color: colors[i % colors.length], r: 3 + Math.random() * 4 });
+    }
+}
+function fxBanner(text, color) { fx.push({ k: 'b', text, age: 0, life: 100, color: color || '#f1c40f' }); }
+function fxShake(frames) { fxShakeFrames = frames || 14; }
+function drawFx() {
+    for (let i = fx.length - 1; i >= 0; i--) {
+        const f = fx[i];
+        f.age++;
+        if (f.age > f.life) { fx.splice(i, 1); continue; }
+        if (f.age < 0) continue;
+        ctx.save();
+        if (f.k === 't') {
+            const a = Math.min(1, (f.life - f.age) / 22), y = f.y - f.age * 0.9;
+            ctx.globalAlpha = a; ctx.font = `900 ${f.size}px "M PLUS Rounded 1c"`;
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.lineJoin = 'round'; ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(20,20,30,0.85)';
+            ctx.strokeText(f.text, f.x, y); ctx.fillStyle = f.color; ctx.fillText(f.text, f.x, y);
+        } else if (f.k === 'p') {
+            f.x += f.vx; f.y += f.vy; f.vy += 0.28; f.vx *= 0.98;
+            ctx.globalAlpha = Math.min(1, (f.life - f.age) / 16); ctx.fillStyle = f.color;
+            ctx.translate(f.x, f.y); ctx.rotate(f.age * 0.2);
+            ctx.beginPath();
+            for (let s = 0; s < 8; s++) { const r = s % 2 ? f.r * 0.45 : f.r * 1.3, an = s * Math.PI / 4; ctx.lineTo(Math.cos(an) * r, Math.sin(an) * r); }
+            ctx.closePath(); ctx.fill();
+        } else if (f.k === 'b') {
+            const p = Math.min(1, f.age / 12), sc = 0.4 + 0.6 * (1 - Math.pow(1 - p, 3)) + (f.age < 12 ? 0.15 * Math.sin(p * Math.PI) : 0);
+            ctx.globalAlpha = Math.min(1, (f.life - f.age) / 18);
+            ctx.translate(575, 150); ctx.scale(sc, sc);
+            ctx.font = '900 46px "M PLUS Rounded 1c"'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.lineJoin = 'round'; ctx.lineWidth = 9; ctx.strokeStyle = 'rgba(60,30,0,0.9)';
+            ctx.strokeText(f.text, 0, 0); ctx.fillStyle = f.color; ctx.fillText(f.text, 0, 0);
+        }
+        ctx.restore();
+    }
+}
+
+// --- キーボード操作: 矢印/Tabで選び、Enter/Spaceで押す。Escで戻る/閉じる ---
+const kb = { active: false, x: 640, y: 360 };
+function zoneCenter(z) { return { x: z.x + z.w / 2, y: z.y + z.h / 2 }; }
+function kbCurrent() {
+    let best = null, bd = 1e9;
+    clickZones.forEach(z => { const c = zoneCenter(z), d = Math.hypot(c.x - kb.x, c.y - kb.y); if (d < bd) { bd = d; best = z; } });
+    return best;
+}
+function kbSet(z) { const c = zoneCenter(z); kb.x = c.x; kb.y = c.y; }
+function kbMove(dx, dy) {
+    const cur = kbCurrent(); if (!cur) return;
+    const c = zoneCenter(cur);
+    let best = null, bs = 1e9;
+    clickZones.forEach(z => {
+        if (z === cur) return;
+        const p = zoneCenter(z), vx = p.x - c.x, vy = p.y - c.y;
+        const along = vx * dx + vy * dy; if (along <= 4) return;
+        const across = dx !== 0 ? Math.abs(vy) : Math.abs(vx);
+        const s = along + across * 2.2;
+        if (s < bs) { bs = s; best = z; }
+    });
+    if (best) kbSet(best);
+}
+function kbTab(dir) {
+    const zs = clickZones.slice().sort((a, b) => (Math.round(a.y / 24) - Math.round(b.y / 24)) || (a.x - b.x));
+    if (!zs.length) return;
+    const cur = kbCurrent(), i = zs.indexOf(cur);
+    kbSet(zs[(i + dir + zs.length) % zs.length]);
+}
+function kbBack() {
+    if (showHelp) { showHelp = false; return; }
+    if (activePopup) {
+        if (activePopup.isClearPopup) return;
+        if (activePopup.isPrompt) { if (activePopup.onNo) activePopup.onNo(); return; }
+        const n = activePopup.onNo; activePopup = null; if (n) n(); return;
+    }
+    if (GAME_STATE === 'SHOP' || GAME_STATE === 'EXPLORE_SELECT') GAME_STATE = 'MAIN';
+    else if (['PLAYER_SELECT', 'RANKING', 'SETTINGS'].includes(GAME_STATE)) GAME_STATE = 'TITLE';
+}
+window.addEventListener('keydown', (e) => {
+    if (typeof FGLTutorial !== 'undefined' && FGLTutorial.isActive && FGLTutorial.isActive()) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    SFX.unlock();
+    if (e.target && e.target.id === 'nameInput') {
+        if (e.key === 'Enter' && activePopup && activePopup.isPrompt) { e.preventDefault(); activePopup.onYes(); }
+        else if (e.key === 'Escape') { e.preventDefault(); kbBack(); }
+        return;
+    }
+    const dirs = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+    if (dirs[e.key]) {
+        e.preventDefault();
+        if (!kb.active) { kb.active = true; kbTab(0); return; }
+        kbMove(dirs[e.key][0], dirs[e.key][1]); SFX.play('click');
+    } else if (e.key === 'Tab') {
+        e.preventDefault();
+        if (!kb.active) { kb.active = true; kbTab(0); return; }
+        kbTab(e.shiftKey ? -1 : 1); SFX.play('click');
+    } else if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        if (!kb.active) { kb.active = true; kbTab(0); return; }
+        const z = kbCurrent(); if (z) activateZone(z);
+    } else if (e.key === 'Escape') {
+        e.preventDefault(); kbBack();
+    }
+});
+function drawKbRing() {
+    if (!kb.active) return;
+    const z = kbCurrent(); if (!z) return;
+    const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 160);
+    ctx.save();
+    ctx.lineWidth = 4; ctx.strokeStyle = '#ffeb3b'; ctx.shadowColor = 'rgba(255,200,0,0.9)'; ctx.shadowBlur = 8 + pulse * 8;
+    ctx.beginPath(); ctx.roundRect(z.x - 4, z.y - 4, z.w + 8, z.h + 8, 14); ctx.stroke();
+    ctx.restore();
+}
+// ボタンを押したときの共通処理(クリックもキーボードもここを通る)
+function activateZone(z) {
+    const before = SFX.count;
+    z.onClick();
+    if (SFX.count === before) SFX.play('click');   // 専用の音が鳴らなかったときだけクリック音
+    autoSave();
+}
+
+// 材料を [{master, have, need}] にそろえる。合成の表示・作成処理・お店のレシピ表示で共通
+function getCraftIngredients(targetMaster, rule) {
+    const reqs = getRecipeRequirements(targetMaster, rule);
+    if (reqs && reqs.baseItem && reqs.matItem) {
+        return [
+            { master: reqs.baseItem, have: countItem(reqs.baseItem.id), need: 1 },
+            { master: reqs.matItem, have: countItem(reqs.matItem.id), need: reqs.matCount }
+        ];
+    }
+    const ings = [{ master: getObjById(ITEMS, rule.mat1Id), have: countItem(rule.mat1Id), need: 1 }];
+    if (rule.mat2Id) ings.push({ master: getObjById(ITEMS, rule.mat2Id), have: countItem(rule.mat2Id), need: 1 });
+    return ings;
+}
+// その Lv で「いま作れる数」と「習得済みの数」
+function craftLvInfo(lv) {
+    let ready = 0, known = 0;
+    Object.keys(CRAFT_RULES).forEach(id => {
+        const rule = CRAFT_RULES[id], m = getObjById(ITEMS, Number(id));
+        if (!m || m.lv !== lv || !gameData.unlockedRecipes.includes(rule.recipeId)) return;
+        known++;
+        if (getCraftIngredients(m, rule).every(g => g.have >= g.need)) ready++;
+    });
+    return { ready, known };
+}
+// 材料チップを横に並べる(足りていれば緑・足りなければ赤)。幅に入らなければ文字を小さくする
+function drawIngChips(ings, startX, topY, maxW, h) {
+    h = h || 22;
+    let font = 14, texts, total;
+    do {
+        texts = ings.map(g => `${itemIcon(g.master)}${g.master.name} ${g.have}/${g.need}`);
+        ctx.font = `bold ${font}px "M PLUS Rounded 1c"`;
+        total = texts.reduce((sum, t) => sum + Math.ceil(ctx.measureText(t).width) + 16, 0) + (ings.length - 1) * 16;
+        if (total <= maxW) break;
+        font--;
+    } while (font > 9);
+    let cx = startX;
+    ings.forEach((g, gi) => {
+        const ok = g.have >= g.need;
+        if (gi > 0) { drawText('＋', cx + 8, topY + h / 2 + 1, 14, '#7f8c8d', 'center'); cx += 16; }
+        cx += drawChip(texts[gi], cx, topY, h, ok ? '#d5f5e3' : '#fadbd8', ok ? '#1e8449' : '#c0392b', font);
+    });
+}
+// タブの右上につける丸バッジ
+function drawBadge(text, cx, cy, color) {
+    ctx.font = 'bold 12px "M PLUS Rounded 1c"';
+    const w = Math.max(18, Math.ceil(ctx.measureText(text).width) + 10);
+    ctx.beginPath(); ctx.roundRect(cx - w / 2, cy - 9, w, 18, 9); ctx.fillStyle = color; ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+    drawText(text, cx, cy + 1, 12, '#fff', 'center');
 }
 
 // マウス/タッチの位置(ゲーム座標)。ボタンのホバー・押し込み表現に使う
@@ -1581,7 +1850,7 @@ function drawStatusPanel(x, y) {
     let expLeft = reqExp - gameData.exp;
     drawText(T('label_lv', {lv: gameData.level}), x+20, y+108, 22, '#2c3e50', 'left', 'bold', 110);
     drawGauge(x+120, y+100, 190, 16, gameData.exp / reqExp, '#7ed6ff', '#2e86de');
-    drawText(T('label_exp_left', {exp: expLeft}), x+20, y+134, 16, '#2c3e50', 'left', 'bold', IW);
+    drawText(T('label_exp_left', {exp: fmt(expLeft)}), x+20, y+134, 16, '#2c3e50', 'left', 'bold', IW);
 
     // AP ゲージ
     drawText('⚡ ' + T('label_ap', {cur: gameData.ap, max: gameData.maxAp}), x+20, y+170, 22, '#d35400', 'left', 'bold', IW);
@@ -1698,7 +1967,7 @@ function drawRightPanel(x, y) {
     drawPanel(x, y, 460, 680, T('panel_inventory'));
     let cy = y + 70;
 
-    drawText(T('label_gold', {gold: gameData.gold}), x+20, cy, 24, '#f39c12');
+    drawText(T('label_gold', {gold: fmt(gameData.gold)}), x+20, cy, 24, '#f39c12');
 
     drawBtn(T('btn_sort'), x+360, cy-20, 80, 40, '#0097e6', () => {
         const typeOrder = {1:1, 2:2, 3:3, 4:4, 5:5, 9:6, 6:7, 7:8, 8:9};
@@ -1716,6 +1985,12 @@ function drawRightPanel(x, y) {
     drawBtn(T('tab_all'), x+20, cy, 70, 35, currentInvTab==="ALL" ? '#3498db' : '#bdc3c7', () => {currentInvTab="ALL"; invPage=0;});
     drawBtn(T('tab_craft'), x+95, cy, 70, 35, currentInvTab==="CRAFT" ? '#3498db' : '#bdc3c7', () => {currentInvTab="CRAFT"; invPage=0;});
     drawBtn(T('tab_enhance'), x+170, cy, 70, 35, currentInvTab==="ENHANCE" ? '#3498db' : '#bdc3c7', () => {currentInvTab="ENHANCE"; invPage=0;});
+    if (currentInvTab !== "CRAFT") {
+        let readyAll = 0;
+        for (let l = 1; l <= 7; l++) readyAll += craftLvInfo(l).ready;
+        if (gameData.newRecipeLv && Object.keys(gameData.newRecipeLv).length) drawBadge('!', x + 160, cy + 2, '#e74c3c');
+        else if (readyAll > 0) drawBadge(String(readyAll), x + 160, cy + 2, '#27ae60');
+    }
 
     if(currentInvTab === "ALL") {
         drawBtn(T('btn_bulk_sell'), x+245, cy, 195, 35, '#e67e22', () => {
@@ -1746,14 +2021,14 @@ function drawRightPanel(x, y) {
             }
             activePopup = {
                 icon: '💰',
-                text: T('confirm_bulk_sell', {amount: totalVal}),
+                text: T('confirm_bulk_sell', {amount: fmt(totalVal)}),
                 subtext: T('confirm_yes_question'),
                 onYes: () => {
                     lootItems.forEach(inv => {
                         gameData.gold += getObjById(ITEMS, inv.itemId).price * inv.count;
                         gameData.inventory = gameData.inventory.filter(i => i.uid !== inv.uid);
                     });
-                    addMessage(T('msg_bulk_sold', {amount: totalVal}), '💰');
+                    addMessage(T('msg_bulk_sold', {amount: fmt(totalVal)}), '💰');
                 }
             };
         });
@@ -1773,6 +2048,7 @@ function renderInventoryList(x, y, cy) {
     let pageItems = list.slice(invPage * itemsPerPage, (invPage + 1) * itemsPerPage);
 
     pageItems.forEach((inv, rowIdx) => {
+        const rowY = cy;
         let master = getObjById(ITEMS, inv.itemId);
         drawRowBand(x + 8, cy, 444, 44, rowIdx);
 
@@ -1806,9 +2082,22 @@ function renderInventoryList(x, y, cy) {
             drawText(`x${inv.count}`, x + 238, cy, 18, '#2c3e50', 'right', 'bold', 40);
         }
 
-        drawText(`${master.price}G`, x + 312, cy, 18, '#f39c12', 'right', 'bold', 68);
+        drawText(`${fmt(master.price)}G`, x + 312, cy, 18, '#f39c12', 'right', 'bold', 68);
 
         let isEquipped = Object.values(gameData.equipment).includes(inv.uid);
+
+        // 今つけている装備との差(▲強い / ▼弱い)
+        if (isEquip && !isEquipped) {
+            const curUid = gameData.equipment[{1: 'weapon', 2: 'shield', 3: 'armor', 4: 'accessory'}[master.type]];
+            const curInv = curUid ? getInvItem(curUid) : null;
+            const diff = actualStat - (curInv ? getActualStat(curInv) : 0);
+            const label = diff > 0 ? `▲+${diff}` : diff < 0 ? `▼${diff}` : '＝';
+            drawText(label, x + 112, cy + 10, 13, diff > 0 ? '#27ae60' : diff < 0 ? '#e74c3c' : '#95a5a6', 'left', 'bold', 60);
+        }
+        const sellClick = () => {
+            if (!isEquipped) fxFloat('+' + fmt(master.price) + 'G', x + 395, rowY - 16, '#ffd54f', 20);
+            sellItem(inv, master);
+        };
 
         if(isEquip || isPotion) {
             if(isEquipped) {
@@ -1816,9 +2105,9 @@ function renderInventoryList(x, y, cy) {
             } else {
                 drawBtn(T('btn_equip'), x+320, cy-15, 60, 30, '#2ecc71', () => equipItem(inv));
             }
-            drawBtn(T('btn_sell'), x+390, cy-15, 50, 30, '#e67e22', () => sellItem(inv, master));
+            drawBtn(T('btn_sell'), x+390, cy-15, 50, 30, '#e67e22', sellClick);
         } else {
-            drawBtn(T('btn_sell'), x+360, cy-15, 80, 30, '#e67e22', () => sellItem(inv, master));
+            drawBtn(T('btn_sell'), x+360, cy-15, 80, 30, '#e67e22', sellClick);
         }
         cy += 45; 
     });
@@ -1837,7 +2126,7 @@ function equipItem(inv) {
 
 function sellItem(inv, master) {
     for(let k in gameData.equipment) { if(gameData.equipment[k] === inv.uid) return addMessage(T('msg_cant_sell_equipped'), '🚫'); }
-    gameData.gold += master.price; 
+    gameData.gold += master.price; SFX.play('coin'); 
     removeItem(inv.itemId, 1);
     if(master.type >= 1 && master.type <= 4) gameData.inventory = gameData.inventory.filter(i => i.uid !== inv.uid);
 }
@@ -1850,7 +2139,13 @@ function renderCraftList(x, y, cy) {
             craftTabLevel = i;
             invPage = 0;
         });
+        // バッジ: 新しいレシピ=赤「!」 / 今すぐ作れる数=緑
+        const isNew = gameData.newRecipeLv && gameData.newRecipeLv[i];
+        const info = craftLvInfo(i);
+        if (isNew && craftTabLevel !== i) drawBadge('!', btnX + 46, tabCy + 2, '#e74c3c');
+        else if (info.ready > 0) drawBadge(String(info.ready), btnX + 46, tabCy + 2, '#27ae60');
     }
+    if (gameData.newRecipeLv) delete gameData.newRecipeLv[craftTabLevel];   // 見たら「新」の印は消す
     cy += 65;
 
     let craftableIds = Object.keys(CRAFT_RULES).map(Number).filter(id => {
@@ -1869,18 +2164,9 @@ function renderCraftList(x, y, cy) {
         let tColor = getItemColor(targetMaster);
         drawRowBand(x + 8, cy, 444, 60, rowIdx);
 
+        const rowY = cy;
         // 材料を [{master, have, need}] にそろえる(表示も作成処理もこれを使う)
-        let reqs = getRecipeRequirements(targetMaster, rule);
-        let ings = [];
-        if (reqs && reqs.baseItem && reqs.matItem) {
-            ings = [
-                { master: reqs.baseItem, have: countItem(reqs.baseItem.id), need: 1 },
-                { master: reqs.matItem, have: countItem(reqs.matItem.id), need: reqs.matCount }
-            ];
-        } else {
-            ings = [{ master: getObjById(ITEMS, rule.mat1Id), have: countItem(rule.mat1Id), need: 1 }];
-            if (rule.mat2Id) ings.push({ master: getObjById(ITEMS, rule.mat2Id), have: countItem(rule.mat2Id), need: 1 });
-        }
+        let ings = getCraftIngredients(targetMaster, rule);
         let canCraft = ings.every(g => g.have >= g.need);
 
         // 完成品(絵+名前) → 材料のチップ(足りていれば緑・足りなければ赤)
@@ -1888,21 +2174,7 @@ function renderCraftList(x, y, cy) {
         drawItemIcon(targetMaster, x + 28, cy - 14, 28);
         ctx.restore();
         drawText(targetMaster.name, x+50, cy-15, 20, canCraft ? tColor : '#95a5a6', 'left', 'bold', 285);
-
-        let chipFont = 14, chipTexts, totalW;
-        do {
-            chipTexts = ings.map(g => `${itemIcon(g.master)}${g.master.name} ${g.have}/${g.need}`);
-            ctx.font = `bold ${chipFont}px "M PLUS Rounded 1c"`;
-            totalW = chipTexts.reduce((sum, t) => sum + Math.ceil(ctx.measureText(t).width) + 16, 0) + (ings.length - 1) * 16;
-            if (totalW <= 290) break;
-            chipFont--;
-        } while (chipFont > 9);
-        let chipX = x + 15;
-        ings.forEach((g, gi) => {
-            const ok = g.have >= g.need;
-            if (gi > 0) { drawText('＋', chipX + 8, cy + 14, 14, '#7f8c8d', 'center'); chipX += 16; }
-            chipX += drawChip(chipTexts[gi], chipX, cy + 3, 22, ok ? '#d5f5e3' : '#fadbd8', ok ? '#1e8449' : '#c0392b', chipFont);
-        });
+        drawIngChips(ings, x + 15, cy + 3, 290, 22);
 
         drawBtn('🔨 ' + T('btn_create'), x+350, cy-20, 90, 40, canCraft ? '#3498db' : '#bdc3c7', () => {
             if(gameData.ap < 1) return addMessage(T('msg_ap_insufficient'), '⚡');
@@ -1910,6 +2182,8 @@ function renderCraftList(x, y, cy) {
             gameData.ap -= 1;
             addItem(targetId, targetMaster.type <= 4 ? getGaussianStat(targetMaster.stat) : 0, 1);
             addMessage(T('msg_crafted', {name: targetMaster.name}), '🔨');
+            fxBurst(x + 395, rowY, ['#64b5f6', '#fff176', '#ffffff'], 16, 4.5);
+            fxFloat(itemIcon(targetMaster) + ' ' + targetMaster.name, x + 230, rowY - 22, '#ffffff', 22);
         }, !canCraft);
         cy += 65;
     });
@@ -1943,21 +2217,27 @@ function renderEnhanceList(x, y, cy) {
         else if(master.type === 2 || master.type === 3) nameTxt += ` (防${actualStat})`;
         else if(master.type === 4) nameTxt += ` (魔${actualStat})`;
 
-        drawText(nameTxt, x + 44, cy-8, 18, getItemColor(master), 'left', 'bold', 190);
+        const rowY = cy;
+        drawText(nameTxt, x + 44, cy-8, 18, getItemColor(master), 'left', 'bold', 150);
         if (star) {
             drawText(star, x + 44, cy+10, 12, getItemColor(master));
+        }
+        // 強化レベルを10個の丸で見せる(埋まっている数 = +n)
+        for (let k = 0; k < 10; k++) {
+            ctx.beginPath(); ctx.arc(x + 114 + k * 9, cy + 10, 3.4, 0, Math.PI * 2);
+            ctx.fillStyle = k < upg ? '#9b59b6' : '#d5dbe0'; ctx.fill();
         }
 
         let cost = master.price * 2;
         let canEnhance = gameData.gold >= cost && upg < 10;
-        let costTxt = upg >= 10 ? T('max_label') : `${cost}G`;
-
-        // 強化レベルを10個の丸で見せる(埋まっている数 = +n)
-        for (let k = 0; k < 10; k++) {
-            ctx.beginPath(); ctx.arc(x + 130 + k * 11, cy + 10, 4, 0, Math.PI * 2);
-            ctx.fillStyle = k < upg ? '#9b59b6' : '#d5dbe0'; ctx.fill();
+        // 強化すると数値がどう変わるか(例: 10 → 11)と、かかるお金
+        if (upg >= 10) {
+            drawText(T('max_label'), x + 308, cy, 18, '#9b59b6', 'right', 'bold', 70);
+        } else {
+            const nextStat = Math.floor(inv.stat * (1 + 0.1 * (upg + 1)));
+            drawText(`${actualStat}→${nextStat}`, x + 308, cy - 8, 16, '#27ae60', 'right', 'bold', 70);
+            drawText(`${fmt(cost)}G`, x + 308, cy + 11, 15, gameData.gold >= cost ? '#f39c12' : '#e74c3c', 'right', 'bold', 70);
         }
-        drawText(costTxt, x + 308, cy, 18, '#f39c12', 'right', 'bold', 70);
 
         drawBtn('⬆️ ' + T('tab_enhance'), x+320, cy-15, 120, 30, canEnhance ? '#9b59b6' : '#bdc3c7', () => {
             if (upg >= 10) return addMessage(T('msg_enhance_max'), '🚫');
@@ -1965,8 +2245,10 @@ function renderEnhanceList(x, y, cy) {
             gameData.gold -= cost;
             inv.upgrade = upg + 1;
             addMessage(T('msg_enhanced', {name: master.name}), '⬆️');
+            fxBurst(x + 380, rowY, ['#ce93d8', '#fff176', '#ffffff'], 16, 4.5);
+            fxFloat(`+${upg + 1}`, x + 380, rowY - 18, '#e1bee7', 24);
         }, !canEnhance);
-        
+
         cy += 45; 
     });
 
@@ -2119,6 +2401,7 @@ function renderExploring(x, y) {
 }
 
 function advanceFloor(isSkip) {
+    const fxDrops = {};   // この操作で手に入った物(演出用)
     do {
         if(gameData.ap < 1) {
             addMessage(T('msg_ap_none_returned'), '⚡');
@@ -2128,6 +2411,7 @@ function advanceFloor(isSkip) {
 
         if(exploreData.currentFloor >= exploreData.maxPossibleFloor) {
             addMessage(T('msg_too_strong'), '💦');
+            fxShake(16); fxFloat('💦', 575, 170, '#fff', 54);
             gameData.ap -= 1;
             finishExploration(false);
             break;
@@ -2164,6 +2448,7 @@ function advanceFloor(isSkip) {
                 let itemMaster = getObjById(ITEMS, parseInt(id));
                 addItem(itemMaster.id, 0, count);
                 dropMsgs.push(`${itemMaster.name}×${count}`);
+                fxDrops[itemMaster.id] = (fxDrops[itemMaster.id] || 0) + count;
             }
             if(dropMsgs.length > 0) {
                 addMessage(T('msg_got_items', {floor: exploreData.currentFloor, items: dropMsgs.join(currentLang === 'en' ? ', ' : '、')}), '🎁');
@@ -2177,16 +2462,24 @@ function advanceFloor(isSkip) {
         if(exploreData.currentFloor >= exploreData.maxFloor) {
             addMessage(T('msg_stage_cleared', {name: stg.name}), '🏆');
             if(gameData.maxStageLv === stg.lv) { gameData.maxStageLv++; addMessage(T('msg_new_area'), '🔓'); }
+            fxBurst(575, 140, ['#ffd54f', '#fff59d', '#ff8a65', '#ffffff'], 36, 7);
+            fxBanner('CLEAR!', '#ffd54f');
             finishExploration(true);
             break;
         }
 
     } while(isSkip);
+
+    // 手に入れた物を、地図の上にふわっと浮かべる(スキップのときはまとめて)
+    Object.keys(fxDrops).slice(0, 4).forEach((id, i) => {
+        const m = getObjById(ITEMS, Number(id));
+        fxFloat(`${itemIcon(m)} ${m.name}×${fxDrops[id]}`, 575, 190 + i * 20, '#ffffff', 20, i * 9);
+    });
 }
 
 function renderShop(x, y) {
     drawPanel(x, y, 410, 680, T('panel_shop'));
-    drawText(T('label_gold', {gold: gameData.gold}), x+20, y+70, 24, '#f39c12');
+    drawText(T('label_gold', {gold: fmt(gameData.gold)}), x+20, y+70, 24, '#f39c12');
 
     drawBtn(T('tab_common'), x+20, y+100, 70, 30, shopTab==="COMMON" ? '#e67e22' : '#bdc3c7', () => {shopTab="COMMON"; shopPage=0;});
     for(let i=1; i<=7; i++) {
@@ -2209,12 +2502,23 @@ function renderShop(x, y) {
         let isSoldOut = isRecipe && gameData.unlockedRecipes.includes(item.id);
         let canBuy = !isSoldOut && gameData.gold >= item.price;
 
+        const rowY = cy;
+        // レシピは「何が作れるか(完成品の絵+名前)」と「材料の所持状況」を見せる
+        const tgtId = isRecipe ? Object.keys(CRAFT_RULES).map(Number).find(id => CRAFT_RULES[id].recipeId === item.id) : null;
+        const tgt = tgtId ? getObjById(ITEMS, tgtId) : null;
         ctx.save(); if (isSoldOut) ctx.globalAlpha = 0.5;
-        drawItemIcon(item, x + 30, cy, 28);
+        drawItemIcon(tgt || item, x + 30, tgt ? cy - 8 : cy, 28);
         ctx.restore();
-        const nameMaxW = item.type === 9 ? 150 : 250;
-        drawText(item.name, x+54, cy-10, 18, isSoldOut ? '#95a5a6' : getItemColor(item), 'left', 'bold', nameMaxW);
-        drawText(`💰 ${item.price}G`, x+54, cy+13, 16, isSoldOut ? '#95a5a6' : canBuy ? '#e08e0b' : '#e74c3c', 'left', 'bold', nameMaxW);
+        if (tgt) {
+            drawText(item.name, x+54, cy-16, 17, isSoldOut ? '#95a5a6' : getItemColor(item), 'left', 'bold', 255);
+            ctx.save(); if (isSoldOut) ctx.globalAlpha = 0.5;
+            drawIngChips(getCraftIngredients(tgt, CRAFT_RULES[tgtId]), x + 54, cy + 2, 262, 20);
+            ctx.restore();
+        } else {
+            const nameMaxW = item.type === 9 ? 150 : 250;
+            drawText(item.name, x+54, cy-10, 18, isSoldOut ? '#95a5a6' : getItemColor(item), 'left', 'bold', nameMaxW);
+            drawText(`💰 ${fmt(item.price)}G`, x+54, cy+13, 16, isSoldOut ? '#95a5a6' : canBuy ? '#e08e0b' : '#e74c3c', 'left', 'bold', nameMaxW);
+        }
 
         let btnX = x+330;
         let btnY = cy-15;
@@ -2225,12 +2529,20 @@ function renderShop(x, y) {
             drawText('🎒 ' + T('label_owned', {count: countItem(item.id)}), btnX - 10, cy, 14, '#2c3e50', 'right', 'bold', 90);
         }
 
+        if (tgt && !isSoldOut) {
+            drawText(`💰${fmt(item.price)}G`, btnX + btnW / 2, cy + 30, 14, canBuy ? '#e08e0b' : '#e74c3c', 'center', 'bold', 84);
+        }
         if (isSoldOut) {
             drawBtn(T('btn_soldout'), btnX, btnY, btnW, btnH, '#bdc3c7', () => {}, true);
         } else {
             drawBtn(T('btn_buy'), btnX, btnY, btnW, btnH, canBuy ? '#3498db' : '#bdc3c7', () => {
                 gameData.gold -= item.price;
-                if(item.type === 10) { gameData.unlockedRecipes.push(item.id); addMessage(T('msg_recipe_learned'), '📜'); }
+                fxFloat('-' + fmt(item.price) + 'G', btnX + 30, rowY - 20, '#ff8a80', 20);
+                if(item.type === 10) {
+                    gameData.unlockedRecipes.push(item.id); addMessage(T('msg_recipe_learned'), '📜');
+                    if (tgt) { gameData.newRecipeLv = gameData.newRecipeLv || {}; gameData.newRecipeLv[tgt.lv] = true; }
+                    fxBurst(btnX + 30, rowY, ['#ffd54f', '#fff59d', '#ffffff'], 18, 4.5);
+                }
                 else { addItem(item.id, 0, 1); addMessage(T('msg_bought', {name: item.name}), '🛒'); }
             }, !canBuy);
         }
@@ -2267,7 +2579,7 @@ function finishGame(isClear) {
 function renderResult() {
     ctx.fillStyle = '#ecf0f1'; ctx.fillRect(0,0,1280,720);
     drawText(T('result_title'), 640, 200, 60, '#2c3e50', 'center');
-    drawText(T('result_assets', {assets: calculateTotalAssets()}), 640, 360, 30, '#f39c12', 'center');
+    drawText(T('result_assets', {assets: fmt(calculateTotalAssets())}), 640, 360, 30, '#f39c12', 'center');
     drawText(T('result_processing'), 640, 500, 20, '#7f8c8d', 'center');
 }
 
@@ -2322,7 +2634,7 @@ function renderRanking() {
             else drawText(T('rank_position', {n: rankNo}), tableX+50, cy, 18, tColor, 'center', 'bold', 80);
             drawText(d.name, tableX+130, cy, 18, tColor, 'left', 'bold', 340);
             drawText(T('rank_days_suffix', {n: d.days}), tableX+520, cy, 18, tColor, 'center');
-            drawText(`${d.assets} G`, tableX+680, cy, 18, '#f39c12', 'right');
+            drawText(`${fmt(d.assets)} G`, tableX+680, cy, 18, '#f39c12', 'right', 'bold', 150);
             drawText(clr, tableX+830, cy, 18, d.isClear ? '#e74c3c' : '#7f8c8d', 'center', 'bold', 120);
             drawText(d.date || "-", tableX+990, cy, 15, '#7f8c8d', 'center');
 
@@ -2348,10 +2660,10 @@ function renderRanking() {
 
 function renderSettings() {
     drawImageRect('title', 0, 0, 1280, 720);
-    let px = 340, py = 220, pw = 600, ph = 300;
+    let px = 340, py = 160, pw = 600, ph = 400;
     drawParchment(px, py, pw, ph);
 
-    drawText(T('settings_title'), px + pw/2, py + 45, 30, '#2c3e50', 'center', '900');
+    drawText(T('settings_title'), px + pw/2, py + 45, 30, '#2c3e50', 'center', '900', pw - 60);
 
     const langs = [
         {code: 'ja', key: 'lang_ja', c: '#f39c12'},
@@ -2364,24 +2676,34 @@ function renderSettings() {
         const bx = startX + i * (btnW + gap);
         const by = py + 85;
         const isActive = currentLang === l.code;
-        const color = isActive ? l.c : '#bdc3c7';
-        ctx.beginPath(); ctx.roundRect(bx, by, btnW, btnH, 12);
-        ctx.fillStyle = color; ctx.fill();
-        if (isActive) { ctx.strokeStyle = '#2c3e50'; ctx.lineWidth = 3; ctx.stroke(); }
-        const label = T(l.key);
-        const lines = label.split('\n');
-        const lineH = 22;
-        const startTextY = by + btnH/2 - (lines.length-1)*lineH/2;
-        lines.forEach((line, li) => {
-            drawText(line, bx + btnW/2, startTextY + li*lineH, 18, '#fff', 'center');
-        });
-        addZone(bx, by, btnW, btnH, () => {
+        // 立体ボタン(選ばれている言語は色つき+金のふち、他はグレー)
+        drawBtn('', bx, by, btnW, btnH, isActive ? l.c : '#bdc3c7', () => {
             currentLang = l.code;
             localStorage.setItem('tc_lang', l.code);
         });
+        if (isActive) {
+            ctx.beginPath(); ctx.roundRect(bx - 4, by - 4, btnW + 8, btnH + 8, 16);
+            ctx.strokeStyle = '#c8962e'; ctx.lineWidth = 4; ctx.stroke();
+        }
+        const lines = T(l.key).split('\n');
+        const lineH = 22;
+        const startTextY = by + btnH/2 - (lines.length-1)*lineH/2 - 1;
+        ctx.save();
+        ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowOffsetY = 2; ctx.shadowBlur = 0;
+        lines.forEach((line, li) => {
+            drawText(line, bx + btnW/2, startTextY + li*lineH, 18, isActive ? '#fff' : '#4d5a66', 'center', 'bold', btnW - 16);
+        });
+        ctx.restore();
     });
 
-    drawBtn(T('btn_close'), px + pw/2 - 100, py + ph - 65, 200, 45, '#7f8c8d', () => { GAME_STATE = "TITLE"; });
+    // 効果音 ON/OFF
+    const sy = py + 215;
+    drawText('🔊 ' + T('settings_sound'), px + 70, sy + 24, 24, '#2c3e50', 'left', 'bold', 260);
+    const on = SFX.on;
+    drawBtn(T('sound_on'), px + pw - 70 - 190, sy, 90, 48, on ? '#2ecc71' : '#bdc3c7', () => { SFX.set(true); });
+    drawBtn(T('sound_off'), px + pw - 70 - 90, sy, 90, 48, !on ? '#e74c3c' : '#bdc3c7', () => { SFX.set(false); });
+
+    drawBtn(T('btn_close'), px + pw/2 - 100, py + ph - 75, 200, 48, '#7f8c8d', () => { GAME_STATE = "TITLE"; });
 }
 
 // 序盤の進め方は「番号つきカード6枚 + ゴールの帯 + ワンポイント」で見せる
@@ -2517,7 +2839,7 @@ function renderPopup() {
         const cardW = 170, cardH = 74, cardGap = 15, cardY = py + 378;
         const cardX0 = px + (pw - (cardW * 3 + cardGap * 2)) / 2;
         const cards = [
-            { icon: '💰', text: T('clear_assets', {assets: activePopup.assets}), color: '#e08e0b' },
+            { icon: '💰', text: T('clear_assets', {assets: fmt(activePopup.assets)}), color: '#e08e0b' },
             { icon: '⭐', text: T('clear_level', {lv: activePopup.level}), color: '#2980b9' },
             { icon: '📅', text: T('clear_days', {days: activePopup.days}), color: '#27ae60' }
         ];
@@ -2594,6 +2916,8 @@ function renderPopup() {
 function loop() {
     ctx.clearRect(0, 0, cvs.width, cvs.height);
     clickZones = [];
+    ctx.save();
+    if (fxShakeFrames > 0) { const m = fxShakeFrames * 0.6; ctx.translate((Math.random() - 0.5) * m, (Math.random() - 0.5) * m); fxShakeFrames--; }
     switch(GAME_STATE) {
         case "TITLE": renderTitle(); break;
         case "PLAYER_SELECT": renderPlayerSelect(); break;
@@ -2606,11 +2930,15 @@ function loop() {
         case "SETTINGS": renderSettings(); break;
     }
 
+    drawFx();
+    ctx.restore();
+
     if (showHelp) {
         renderHelpPopup();
     } else if (activePopup) {
         renderPopup();
     }
+    drawKbRing();
 
     if (restEffect.active) {
         ctx.fillStyle = `rgba(0, 0, 0, ${restEffect.alpha})`;
@@ -2654,7 +2982,7 @@ function hitZone(x, y) {
     return null;
 }
 cvs.addEventListener("pointermove", (e) => {
-    const p = toGameXY(e); pointer.x = p.x; pointer.y = p.y;
+    const p = toGameXY(e); pointer.x = p.x; pointer.y = p.y; kb.active = false;
     cvs.style.cursor = hitZone(p.x, p.y) ? 'pointer' : 'default';
 });
 cvs.addEventListener("pointerdown", (e) => { const p = toGameXY(e); pointer.x = p.x; pointer.y = p.y; pointer.down = true; });
@@ -2667,7 +2995,9 @@ cvs.addEventListener("pointerleave", () => { pointer.x = -1; pointer.y = -1; poi
 cvs.addEventListener("click", (e) => {
     const p = toGameXY(e);
     const z = hitZone(p.x, p.y);
-    if (z) { z.onClick(); autoSave(); }
+    SFX.unlock();
+    kb.active = false;
+    if (z) activateZone(z);
 });
 
 requestAnimationFrame(loop);
