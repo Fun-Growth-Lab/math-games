@@ -32,12 +32,20 @@
         } catch(e){console.error('Ranking save error:',e);}
     };
     window.fetchOnlineRanking = async (difficulty) => {
-        try {
-            const q = new URLSearchParams({select:'player_name,point_score,stage_score,turns,created_at',game:'eq.treasure_craft',difficulty:`eq.${difficulty||'normal'}`,point_score:'gt.0',order:'point_score.desc',limit:'30'});
-            const res = await fetch(`${_b}/rankings?${q}`,{headers:_rh});
+        // クリア者は「日数が少ない順 → 総資産が多い順」、未クリアは総資産順。
+        // 総資産だけで並べると、日数をかけて資産を増やす時間稼ぎが有利になるため。
+        const base = {select:'player_name,point_score,stage_score,turns,created_at',game:'eq.treasure_craft',difficulty:`eq.${difficulty||'normal'}`,point_score:'gt.0',limit:'30'};
+        const get = async (extra) => {
+            const res = await fetch(`${_b}/rankings?${new URLSearchParams({...base, ...extra})}`,{headers:_rh});
             if(!res.ok) throw new Error(`HTTP ${res.status}`);
-            const data = await res.json();
-            return data.map(r=>{
+            return res.json();
+        };
+        try {
+            const [clears, others] = await Promise.all([
+                get({turns:'eq.1', stage_score:'gt.0', order:'stage_score.asc,point_score.desc'}),
+                get({turns:'neq.1', order:'point_score.desc'})
+            ]);
+            return clears.concat(others).map(r=>{
                 let dateStr = '';
                 if (r.created_at) {
                     const dt = new Date(r.created_at);
