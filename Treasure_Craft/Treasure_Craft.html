@@ -413,9 +413,7 @@ const STRINGS = {
         lang_ja: "日本語",
         lang_simple: "かんたんな\nにほんご",
         lang_en: "English",
-        settings_sound: "効果音",
-        sound_on: "ON",
-        sound_off: "OFF"
+        settings_sound: "効果音"
     },
     simple: {
         title_main: "トレジャー＆クラフト",
@@ -587,9 +585,7 @@ const STRINGS = {
         lang_ja: "日本語",
         lang_simple: "かんたんな\nにほんご",
         lang_en: "English",
-        settings_sound: "こうかおん",
-        sound_on: "ON",
-        sound_off: "OFF"
+        settings_sound: "こうかおん"
     },
     en: {
         title_main: "Treasure & Craft",
@@ -761,9 +757,7 @@ const STRINGS = {
         lang_ja: "日本語",
         lang_simple: "かんたんな\nにほんご",
         lang_en: "English",
-        settings_sound: "Sound effects",
-        sound_on: "ON",
-        sound_off: "OFF"
+        settings_sound: "Sound effects"
     }
 };
 
@@ -1194,21 +1188,26 @@ function fmt(n) {
 // --- 効果音(ブラウザ内蔵の音源で合成。設定でON/OFF。音声ファイルは使わない) ---
 const SFX = (() => {
     let ac = null, count = 0;
-    let on = true;
-    try { on = localStorage.getItem('tc_sound') !== '0'; } catch (e) {}
+    // 音量は 0〜10 の11段階(0 = OFF)。初期値は5。保存キーは tc_volume
+    let vol = 5, lastVol = 5;
+    try {
+        const v = localStorage.getItem('tc_volume');
+        if (v !== null) vol = Math.max(0, Math.min(10, parseInt(v, 10) || 0));
+        else if (localStorage.getItem('tc_sound') === '0') vol = 0;   // 以前のON/OFF設定を引きつぐ
+    } catch (e) {}
     function audio() {
         if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } }
         if (ac.state === 'suspended') ac.resume();
         return ac;
     }
-    function tone(freq, t0, dur, type, vol, slideTo) {
+    function tone(freq, t0, dur, type, v0, slideTo) {
         const a = audio(); if (!a) return;
         const t = a.currentTime + t0, o = a.createOscillator(), g = a.createGain();
         o.type = type || 'sine';
         o.frequency.setValueAtTime(freq, t);
         if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
         g.gain.setValueAtTime(0.0001, t);
-        g.gain.exponentialRampToValueAtTime(vol || 0.12, t + 0.012);
+        g.gain.exponentialRampToValueAtTime(Math.max(0.0002, (v0 || 0.12) * Math.pow(vol / 5, 1.4)), t + 0.012);
         g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
         o.connect(g); g.connect(a.destination);
         o.start(t); o.stop(t + dur + 0.05);
@@ -1234,17 +1233,25 @@ const SFX = (() => {
         fanfare: () => { seq([C5, C5, C5, G5, E5, G5, C6], 0.13, 'square', 0.08, 0.2); tone(C6, 0.95, 0.7, 'triangle', 0.1); tone(E6, 0.95, 0.7, 'triangle', 0.08); }
     };
     return {
-        play(name) { if (!on) return; count++; try { if (sounds[name]) sounds[name](); } catch (e) {} },
+        play(name) { if (vol <= 0) return; count++; try { if (sounds[name]) sounds[name](); } catch (e) {} },
         get count() { return count; },
-        get on() { return on; },
-        set(v) { on = !!v; try { localStorage.setItem('tc_sound', on ? '1' : '0'); } catch (e) {} if (on) this.play('click'); },
-        unlock() { if (on) audio(); }
+        get volume() { return vol; },
+        get lastVolume() { return lastVol; },
+        // 音量を決める。聞いて確かめられるよう、0より大きいときは短い音を鳴らす
+        setVolume(n) {
+            n = Math.max(0, Math.min(10, Math.round(n)));
+            if (vol > 0) lastVol = vol;
+            vol = n;
+            try { localStorage.setItem('tc_volume', String(vol)); } catch (e) {}
+            if (vol > 0) this.play('coin');
+        },
+        unlock() { if (vol > 0) audio(); }
     };
 })();
 // メッセージの絵文字ごとの効果音
 const MSG_SOUND = { '🔨': 'craft', '🛒': 'buy', '🎁': 'get', '🆙': 'levelup', '🚫': 'error', '⚡': 'error', '💸': 'error', '💤': 'error',
-    '💦': 'fail', '⬆️': 'enhance', '💰': 'coin', '🛡️': 'equip', '📤': 'equip', '🏆': 'fanfare', '🔓': 'unlock', '📜': 'recipe',
-    '🌅': 'day', '💨': 'miss', '🗺️': 'start', '🧹': 'click', '🏠': 'click' };
+    '💦': 'fail', '⬆️': 'enhance', '💰': 'coin', '🏆': 'fanfare', '🔓': 'unlock', '📜': 'recipe',
+    '🌅': 'day', '💨': 'miss', '🗺️': 'start' };
 
 // --- 演出: 浮かぶ文字・きらきら・バナー・画面ゆれ ---
 const fx = [];
@@ -1345,11 +1352,11 @@ window.addEventListener('keydown', (e) => {
     if (dirs[e.key]) {
         e.preventDefault();
         if (!kb.active) { kb.active = true; kbTab(0); return; }
-        kbMove(dirs[e.key][0], dirs[e.key][1]); SFX.play('click');
+        kbMove(dirs[e.key][0], dirs[e.key][1]);
     } else if (e.key === 'Tab') {
         e.preventDefault();
         if (!kb.active) { kb.active = true; kbTab(0); return; }
-        kbTab(e.shiftKey ? -1 : 1); SFX.play('click');
+        kbTab(e.shiftKey ? -1 : 1);
     } else if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
         if (!kb.active) { kb.active = true; kbTab(0); return; }
@@ -1369,9 +1376,7 @@ function drawKbRing() {
 }
 // ボタンを押したときの共通処理(クリックもキーボードもここを通る)
 function activateZone(z) {
-    const before = SFX.count;
-    z.onClick();
-    if (SFX.count === before) SFX.play('click');   // 専用の音が鳴らなかったときだけクリック音
+    z.onClick();   // ボタンを押しただけでは鳴らさない。音は探索・購入・合成など大事な出来事のときだけ
     autoSave();
 }
 
@@ -2660,7 +2665,7 @@ function renderRanking() {
 
 function renderSettings() {
     drawImageRect('title', 0, 0, 1280, 720);
-    let px = 340, py = 160, pw = 600, ph = 400;
+    let px = 340, py = 150, pw = 600, ph = 420;
     drawParchment(px, py, pw, ph);
 
     drawText(T('settings_title'), px + pw/2, py + 45, 30, '#2c3e50', 'center', '900', pw - 60);
@@ -2696,12 +2701,20 @@ function renderSettings() {
         ctx.restore();
     });
 
-    // 効果音 ON/OFF
-    const sy = py + 215;
-    drawText('🔊 ' + T('settings_sound'), px + 70, sy + 24, 24, '#2c3e50', 'left', 'bold', 260);
-    const on = SFX.on;
-    drawBtn(T('sound_on'), px + pw - 70 - 190, sy, 90, 48, on ? '#2ecc71' : '#bdc3c7', () => { SFX.set(true); });
-    drawBtn(T('sound_off'), px + pw - 70 - 90, sy, 90, 48, !on ? '#e74c3c' : '#bdc3c7', () => { SFX.set(false); });
+    // 効果音の音量: 10個のカプセルのバー(0 = OFF)。左のスピーカーでOFF/もどす
+    const vol = SFX.volume;
+    drawText(`🔊 ${T('settings_sound')}　${vol} / 10`, px + pw/2, py + 214, 22, '#2c3e50', 'center', 'bold', pw - 60);
+    const barW = 24, barGap = 8, barH = 40, by = py + 242;
+    const barsW = 10 * barW + 9 * barGap, muteW = 56;
+    const rowX = px + (pw - (muteW + 18 + barsW)) / 2;
+    drawBtn(vol > 0 ? '🔊' : '🔇', rowX, by, muteW, barH, vol > 0 ? '#3498db' : '#e74c3c', () => {
+        if (vol > 0) SFX.setVolume(0); else SFX.setVolume(SFX.lastVolume || 5);
+    }, false, '#fff', 22);
+    for (let i = 0; i < 10; i++) {
+        const filled = i < vol;
+        const c = i < 4 ? '#2ecc71' : i < 7 ? '#f1c40f' : '#e67e22';   // 小さい音は緑、大きくなるほど黄→橙
+        drawBtn('', rowX + muteW + 18 + i * (barW + barGap), by, barW, barH, filled ? c : '#d5dbe0', () => { SFX.setVolume(i + 1); });
+    }
 
     drawBtn(T('btn_close'), px + pw/2 - 100, py + ph - 75, 200, 48, '#7f8c8d', () => { GAME_STATE = "TITLE"; });
 }
