@@ -483,8 +483,10 @@ body { overflow:hidden; background:var(--bg-page); font-family:"M PLUS Rounded 1
 #wl-tabs { margin-top:68px; margin-bottom:8px; flex-wrap:wrap; max-width:1160px; }
 #wl-tabs .chip { min-width:118px; }
 #wl-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:8px; width:1140px; max-height:392px; overflow-y:auto; touch-action:pan-y; padding:4px 6px 8px; }
-.wl-item { border-radius:14px; background:#fff; border:3px solid var(--gc); text-align:center; padding:4px 4px 5px; box-shadow:0 3px 0 var(--gd); }
+#wl-legend { display:flex; gap:26px; justify-content:center; font-size:1rem; font-weight:800; color:var(--ink-dim); margin:0 0 2px; }
+.wl-item { position:relative; border-radius:14px; background:#fff; border:3px solid var(--gc); text-align:center; padding:4px 4px 5px; box-shadow:0 3px 0 var(--gd); }
 .wl-item .e { font-size:1.35rem; font-weight:800; color:var(--gd); line-height:1.2; }
+.wl-item .md { position:absolute; right:3px; top:-1px; font-size:.8rem; line-height:1; filter:drop-shadow(0 1px 0 rgba(0,0,0,.25)); }
 .wl-item .j { font-size:.88rem; font-weight:700; color:var(--ink-dim); line-height:1.2; }
 #wl-note { width:1140px; font-size:.8rem; font-weight:700; color:var(--ink-dim); line-height:1.5; background:rgba(255,255,255,.8); border-radius:14px; padding:6px 14px; margin-top:6px; }
 
@@ -651,6 +653,7 @@ body { overflow:hidden; background:var(--bg-page); font-family:"M PLUS Rounded 1
     <button class="btn back-btn b-pink" data-i18n="btn_back" onclick="showScreen(wlFrom)"></button>
     <div id="wl-kind"></div>
     <div class="row" id="wl-tabs"></div>
+    <div id="wl-legend"></div>
     <div id="wl-grid"></div>
     <div id="wl-note"></div>
   </div>
@@ -712,6 +715,11 @@ const SAVE_KEY = 'fgl_english_dash';
 const $ = id => document.getElementById(id);
 function lsGet(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } }
 function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+
+// --- 単語ごとのバッジ(ミスなしで打てた単語に付く): 2=金(ヒントなしの「ちょうせん」) / 1=銀(「れんしゅう」またはヒントありの「ちょうせん」) ---
+const MEDAL_KEY = 'fgl_english_dash_medals';
+function loadMedals() { const o = lsGet(MEDAL_KEY, null); return (o && typeof o === 'object') ? o : {}; }
+function giveMedal(en, level) { const m = loadMedals(); if ((m[en] | 0) >= level) return; m[en] = level; lsSet(MEDAL_KEY, m); }
 
 // --- 個人の記録(この端末のブラウザだけに保存。1ブラウザに1セーブ) ---
 const STATS_KEY = 'fgl_english_dash_stats';
@@ -890,6 +898,7 @@ Object.assign(I18N.easy, {
     send_ing: 'ランキングに おくっているよ…', send_ok: 'ランキングに おくったよ！（{name}）', send_ng: 'おくれなかったよ', send_retry: 'もういちど おくる'
 });
 Object.assign(I18N.ja, {
+    wl_gold: 'ヒントなしの「ちょうせん」でミスなし', wl_silver: '「れんしゅう」か、ヒントありの「ちょうせん」でミスなし',
     mode_memo: 'れんしゅう', mode_random: 'ちょうせん', mode_memo_d: '答えを見てから 始めるよ', mode_random_d: '答えを見ないで 始めるよ', memo_lab: '👀 れんしゅう', mix_lab: '🏁 ちょうせん',
     sc_course: 'あそびかた', sc_hint: 'ヒント', sc_change: 'かえる ▼', pk_course: 'あそびかたを えらぼう', pk_hint: 'ヒントを えらぼう', hint_lab: 'ヒント', lab_guide: 'ヒント',
     g0: 'ヒントなし', g1: '英語が見える', g2: 'キーも見える', g3: '1文字だけ',
@@ -897,6 +906,7 @@ Object.assign(I18N.ja, {
     badge_std: 'ヒントなしでクリア', wl_note_theme: '【テーマの単語について】テーマの単語は、学年の単語リストから集めています。「ちょうせん」では、20語より多いテーマからランダムに20題が出ます。'
 });
 Object.assign(I18N.easy, {
+    wl_gold: 'ヒントなしの「ちょうせん」で ミスなし', wl_silver: '「れんしゅう」か、ヒントありの「ちょうせん」で ミスなし',
     mode_memo: 'れんしゅう', mode_random: 'ちょうせん', mode_memo_d: 'こたえを みてから はじめるよ', mode_random_d: 'こたえを みないで はじめるよ', memo_lab: '👀 れんしゅう', mix_lab: '🏁 ちょうせん',
     sc_course: 'あそびかた', sc_hint: 'ヒント', sc_change: 'かえる ▼', pk_course: 'あそびかたを えらぼう', pk_hint: 'ヒントを えらぼう', hint_lab: 'ヒント', lab_guide: 'ヒント',
     g0: 'ヒントなし', g1: 'えいごが みえる', g2: 'キーも みえる', g3: '1もじだけ',
@@ -1484,7 +1494,7 @@ function typeKey(ch) {
         renderEn();
         if (m.indexOf(next) >= 0) {
             SFX.play('ok');
-            if (!G.wordMiss) G.correct++;
+            if (!G.wordMiss) { G.correct++; if (!G.tutorial) giveMedal(G.words[G.idx].en, (modeKind(G.course.mode) === 'mix' && G.course.guide === 0) ? 2 : 1); }
             G.res[G.idx] = G.wordMiss ? 'ng' : 'ok';
             G.idx++;
             const q = $('q-card'); q.classList.remove('ok'); void q.offsetWidth; q.classList.add('ok');
@@ -1727,13 +1737,15 @@ function renderWordList() {
     const m = gmeta(wlGrade);
     const grid = $('wl-grid'); grid.style.setProperty('--gc', m.c); grid.style.setProperty('--gd', m.d);
     grid.innerHTML = '';
+    const medals = loadMedals();
     wlist(wlGrade).forEach(w => {
-        const d = document.createElement('div'); d.className = 'wl-item';
-        d.innerHTML = '<div class="e"></div><div class="j"></div>';
-        d.firstChild.textContent = enOf(w.en); d.lastChild.textContent = jaOf(w);
+        const lv = medals[w.en] | 0, d = document.createElement('div'); d.className = 'wl-item';
+        d.innerHTML = '<div class="e"></div><div class="j"></div>' + (lv ? '<span class="md m' + lv + '">' + (lv === 2 ? '🏆' : '⭐') + '</span>' : '');
+        d.querySelector('.e').textContent = enOf(w.en); d.querySelector('.j').textContent = jaOf(w);
         grid.appendChild(d);
     });
     grid.scrollTop = 0;
+    $('wl-legend').innerHTML = '<span>🏆 ' + t('wl_gold') + '</span><span>⭐ ' + t('wl_silver') + '</span>';
     $('wl-note').textContent = th ? t('wl_note_theme') : t('wl_note');
 }
 
