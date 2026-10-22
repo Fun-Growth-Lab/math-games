@@ -99,10 +99,15 @@ body { overflow:hidden; background:var(--bg-page); font-family:"M PLUS Rounded 1
 .arrow-btn { position:absolute; top:130px; width:50px; height:64px; border-radius:16px; border:3px solid #fff; background:linear-gradient(#ffb06a,#ff7a45); color:#fff; font-size:1.8rem; font-weight:800; cursor:pointer; box-shadow:0 4px 0 #d85a26; z-index:3; font-family:inherit; }
 .arrow-btn:disabled { opacity:.3; cursor:default; }
 #gs-prev, #ts-prev { left:0; } #gs-next, #ts-next { right:0; }
-.gcard { position:relative; width:232px; height:296px; flex:none; border-radius:26px; background:#fff; border:5px solid var(--gc); box-shadow:0 6px 0 var(--gd), 0 12px 22px rgba(80,50,20,.18);
+.gcard { position:relative; width:232px; height:316px; flex:none; border-radius:26px; background:#fff; border:5px solid var(--gc); box-shadow:0 6px 0 var(--gd), 0 12px 22px rgba(80,50,20,.18);
     cursor:pointer; transition:transform .25s, box-shadow .25s; overflow:hidden; transform:scale(.93); filter:saturate(.8); }
 .gcard.sel { transform:scale(1.04) translateY(-4px); filter:none; box-shadow:0 6px 0 var(--gd), 0 0 0 6px rgba(255,255,255,.9), 0 0 28px 8px var(--gc); z-index:2; }
-.gbody { position:absolute; left:0; right:0; bottom:0; height:92px; display:flex; flex-direction:column; align-items:center; justify-content:center; background:linear-gradient(var(--gc),var(--gd)); }
+.gbody { position:absolute; left:0; right:0; bottom:0; height:112px; display:flex; flex-direction:column; align-items:center; justify-content:center; background:linear-gradient(var(--gc),var(--gd)); }
+.gprog { margin-top:7px; width:176px; height:14px; border-radius:50px; background:rgba(0,0,0,.32); box-shadow:inset 0 2px 3px rgba(0,0,0,.35); overflow:hidden; display:flex; }
+.gprog i { display:block; height:100%; }
+.gprog .gd { background:linear-gradient(#ffe36a,#f2a900); box-shadow:inset 0 -2px 0 rgba(160,90,0,.35); }
+.gprog .sv { background:linear-gradient(#ffffff,#aebbd2); box-shadow:inset 0 -2px 0 rgba(70,90,130,.3); }
+.gmedal { position:absolute; right:6px; top:4px; font-size:2.1rem; line-height:1; z-index:3; filter:drop-shadow(0 2px 2px rgba(0,0,0,.4)); }
 .gname { font-size:2.25rem; font-weight:800; color:#fff; line-height:1.1; letter-spacing:2px; text-shadow:0 3px 0 rgba(0,0,0,.25); }
 .gname.small { font-size:1.75rem; }
 .gcount { margin-top:4px; font-size:1rem; font-weight:800; color:var(--gd); background:#fff; padding:0 16px; border-radius:50px; }
@@ -1215,13 +1220,24 @@ function renderPick() {
     $('pk-list').innerHTML = h;
     $('pk-list').querySelectorAll('.pk-opt').forEach(el => { el.onclick = () => { if (pickKind === 'course') cur.mode = el.dataset.id; else cur.guide = parseInt(el.dataset.id, 10); closePick(); if (th) renderTheme(); else renderSelect(); }; });
 }
+// RUNカードの進捗バー: 金=🏆(ちょうせん・ヒントなし・ミスなし)の割合、銀=⭐(🏆を除く)の割合。ぜんぶ⭐/ぜんぶ🏆なら、カードの右上にバッジ
+function medalStat(id) {
+    const ws = wlist(id), md = loadMedals(); let g = 0, v = 0;
+    ws.forEach(w => { const l = md[w.en] | 0; if (l >= 2) g++; else if (l === 1) v++; });
+    return { n: ws.length, g, v };
+}
+function progHTML(id) {
+    const st = medalStat(id), n = st.n || 1;
+    const badge = st.n && st.g === st.n ? '🏆' : (st.n && st.g + st.v === st.n ? '⭐' : '');
+    return { bar: '<div class="gprog" title="🏆 ' + st.g + ' ／ ⭐ ' + st.v + ' ／ ' + st.n + '"><i class="gd" style="width:' + (st.g / n * 100) + '%"></i><i class="sv" style="width:' + (st.v / n * 100) + '%"></i></div>', badge: badge ? '<span class="gmedal">' + badge + '</span>' : '' };
+}
 function renderSelect() {
     const strip = $('gs-strip');
     strip.innerHTML = SEL_IDS.map(id => {
-        const m = gmeta(id), on = id === sel.grade;
+        const m = gmeta(id), on = id === sel.grade, pg = progHTML(id);
         return `<div class="gcard${on ? ' sel' : ''}" data-id="${id}" style="--gc:${m.c};--gd:${m.d}">
-            ${artFor(id, m.sample)}
-            <div class="gbody"><div class="gname${settings.lang === 'easy' ? ' small' : ''}">${gfull(id)}</div><button class="gcount" data-wl="${id}">📖 ${t('words_n', { n: wcount(id) })}</button></div></div>`;
+            ${artFor(id, m.sample)}${pg.badge}
+            <div class="gbody"><div class="gname${settings.lang === 'easy' ? ' small' : ''}">${gfull(id)}</div><button class="gcount" data-wl="${id}">📖 ${t('words_n', { n: wcount(id) })}</button>${pg.bar}</div></div>`;
     }).join('');
     strip.querySelectorAll('.gcard').forEach(el => { el.onclick = () => { sel.grade = el.dataset.id; renderSelect(); }; });
     strip.querySelectorAll('.gcount').forEach(el => { el.onclick = e => { e.stopPropagation(); openWordList(el.dataset.wl, 'select-screen'); }; });
@@ -1304,9 +1320,9 @@ function themeArt(id) {
 function renderTheme() {
     const strip = $('ts-strip');
     strip.innerHTML = THEME_IDS.map(id => {
-        const m = THEME_META[id], on = id === selT.grade, nm = gfull(id);
-        return `<div class="gcard${on ? ' sel' : ''}" data-id="${id}" style="--gc:${m.c};--gd:${m.d}">${themeArt(id)}
-            <div class="gbody"><div class="gname${nm.length > 4 ? ' small' : ''}">${nm}</div><button class="gcount" data-wl="${id}">📖 ${t('words_n', { n: themeWords(id).length })}</button></div></div>`;
+        const m = THEME_META[id], on = id === selT.grade, nm = gfull(id), pg = progHTML(id);
+        return `<div class="gcard${on ? ' sel' : ''}" data-id="${id}" style="--gc:${m.c};--gd:${m.d}">${themeArt(id)}${pg.badge}
+            <div class="gbody"><div class="gname${nm.length > 4 ? ' small' : ''}">${nm}</div><button class="gcount" data-wl="${id}">📖 ${t('words_n', { n: themeWords(id).length })}</button>${pg.bar}</div></div>`;
     }).join('');
     strip.querySelectorAll('.gcard').forEach(el => { el.onclick = () => { selT.grade = el.dataset.id; renderTheme(); }; });
     strip.querySelectorAll('.gcount').forEach(el => { el.onclick = e => { e.stopPropagation(); openWordList(el.dataset.wl, 'theme-screen'); }; });
