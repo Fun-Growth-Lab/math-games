@@ -803,6 +803,7 @@
         @keyframes toastIn { 0% { opacity: 0; transform: translate(-50%,-10px); } 12% { opacity: 1; transform: translate(-50%,0); } 80% { opacity: 1; } 100% { opacity: 0; } }
     </style>
     <script src="../fgl-name.js?v=20261223"></script>
+    <script src="../fgl-sfx.js?v=3"></script>
     <script src="../tutorial-engine.js?v=20261225"></script>
 </head>
 <body>
@@ -888,6 +889,8 @@
         <div class="fx-board st-board">
             <div class="fx-label" data-i18n="settings_lang_label">言語</div>
             <div id="settings-lang-options" class="settings-lang-options"></div>
+            <div class="fx-label" style="margin-top:22px">🔊 こうかおん / Sound</div>
+            <div id="sfx-vol"></div>
         </div>
     </div>
 
@@ -1324,6 +1327,8 @@ let currentLang = (function(){
     try { const v = localStorage.getItem(LANG_STORAGE_KEY); return LANGS.includes(v) ? v : 'ja'; }
     catch (e){ return 'ja'; }
 })();
+// 効果音(音量はこのゲームだけ。設定画面から変える)
+const SFX = FGLSfx.create({ key: 'watteepoker' });
 function L(dict){ if (!dict) return ''; return dict[currentLang] || dict.ja || ''; }
 function TF(dict, ...args){ if (!dict) return ''; const fn = dict[currentLang] || dict.ja; return fn ? fn(...args) : ''; }
 function ui(key){ return L(UI_TEXT[key]); }
@@ -1614,7 +1619,7 @@ function applyI18n(){
     renderTitleText();
 }
 const LANG_OPTION_LABELS = { ja: '日本語', ja_easy: 'かんたんなにほんご', en: 'English' };
-function openSettings(){ goTo('settings-screen'); renderSettingsScreen(); }
+function openSettings(){ goTo('settings-screen'); renderSettingsScreen(); FGLSfx.volumeUI('#sfx-vol', SFX); }
 function closeSettings(){ goTo('title-screen'); }
 function renderSettingsScreen(){
     const wrap = document.getElementById('settings-lang-options');
@@ -1627,6 +1632,7 @@ function shackleName(id){ return L(SHACKLE_TEXT[id].name); }
 // 画面切り替え・共通
 // ============================================================
 function goTo(id){
+    SFX.play(id === 'title-screen' ? 'back' : id === 'play-screen' ? 'ok' : 'click');
     document.querySelectorAll('.screen').forEach(el => el.classList.add('hidden'));
     document.getElementById(id).classList.remove('hidden');
     if (id === 'title-screen') playTitleIntro();
@@ -2216,12 +2222,12 @@ function updateSidePanel(){
 }
 function pickAnswer(i){
     if (busy || playSt.over) return;
-    playSt.selected = (playSt.selected === i) ? -1 : i;
+    playSt.selected = (playSt.selected === i) ? -1 : i; SFX.play('select');
     renderPlay();
 }
 function toggleLock(i){
     if (busy || playSt.over || run.shackle.noChange) return;
-    playSt.locked[i] = !playSt.locked[i];
+    playSt.locked[i] = !playSt.locked[i]; SFX.play('toggle');
     renderPlay();
 }
 function cancelPick(){
@@ -2232,7 +2238,7 @@ function cancelPick(){
 function choosePair(x, y){
     const p = playSt;
     if (busy || p.over || p.selected < 0) return;
-    busy = true;
+    busy = true; SFX.play('place');
     const idx = p.selected, card = p.answers[idx];
     // 加わるたびに手札を小さい順にならべる（新しく入った2枚は、ならべたあとの位置で光らせる）
     const items = p.hand.map(v => ({ v, n: false })).concat([{ v: x, n: true }, { v: y, n: true }]);
@@ -2277,7 +2283,7 @@ function doChange(){
     p.newMany = [0, 1, 2].filter(i => !p.locked[i]);
     p.answers = out;
     p.selected = -1;
-    toast(ui('changed_toast'));
+    toast(ui('changed_toast')); SFX.play('swap');
     renderPlay();
 }
 
@@ -2343,6 +2349,9 @@ function finishPlay(){
             else if (uc) { el.classList.add('ura-hit'); el.insertAdjacentHTML('beforeend', `<span class="tag u l">${uraTxt}</span>`); }
         });
         document.getElementById('res-after').style.visibility = 'visible';
+        SFX.play(noRole ? 'miss' : (r.total >= b ? 'bigclear' : 'clear'), Math.min(6, Math.floor(r.total / Math.max(1, b / 6))));
+        if (run.stageScore >= b && !failNow) setTimeout(() => SFX.play('clearstage'), 380);
+        if (failNow) setTimeout(() => SFX.play('wrong'), 300);
         updateSidePanel();
     };
     p.uras.forEach((u, i) => setTimeout(() => {
@@ -2460,6 +2469,7 @@ function showClearPopup(){
         </div>
         <div class="cp-foot"><button class="btn btn-primary btn-sm" onclick="enterShop()">${escapeHtml(ui('btn_to_shop'))}</button></div>`;
     document.getElementById('clear-modal').classList.remove('hidden');
+    SFX.play('coin');
 }
 function enterShop(){
     document.getElementById('clear-modal').classList.add('hidden');
@@ -2512,35 +2522,35 @@ function renderShop(){
 function buyRoleLevel(id){
     const key = 'role-' + id, cost = priceOf(key, roleLvCost());
     if (run.coins < cost || roleLocked(run.shackle, id) || run.lv[id] >= ROLE_LV_MAX) return;
-    run.coins -= cost; run.roleBuys++; run.lv[id]++;
+    run.coins -= cost; run.roleBuys++; run.lv[id]++; SFX.play('buy');
     shopFlash = key;
     renderShop();
 }
 function buyNum(n){
     const key = 'num-' + n, cost = priceOf(key, NUM_LV_COST);
     if (run.coins < cost || numLocked(run.shackle, n) || run.numLv[n] >= NUM_LV_MAX) return;
-    run.coins -= cost; run.numLv[n]++;
+    run.coins -= cost; run.numLv[n]++; SFX.play('buy');
     shopFlash = key;
     renderShop();
 }
 function buySpecial(){
     const cost = priceOf('special', SPECIAL_COST);
     if (run.coins < cost || run.special >= SPECIAL_MAX || run.shackle.noChange) return;
-    run.coins -= cost; run.special++;
+    run.coins -= cost; run.special++; SFX.play('buy');
     shopFlash = 'special';
     renderShop();
 }
 function buyRare(){
     const cost = priceOf('rare', RARE_UP_COST);
     if (run.coins < cost || run.rareUp >= RARE_UP_MAX || rareLocked(run.shackle)) return;
-    run.coins -= cost; run.rareUp++;
+    run.coins -= cost; run.rareUp++; SFX.play('buy');
     shopFlash = 'rare';
     renderShop();
 }
 function buyCoinUp(){
     const cost = priceOf('coin', COIN_UP_COST);
     if (run.coins < cost || (run.coinUp || 0) >= COIN_UP_MAX || coinLocked(run.shackle)) return;
-    run.coins -= cost; run.coinUp = (run.coinUp || 0) + 1;
+    run.coins -= cost; run.coinUp = (run.coinUp || 0) + 1; SFX.play('buy');
     shopFlash = 'coin';
     renderShop();
 }
@@ -2582,15 +2592,15 @@ const HOWTO = [
       t: { ja: 'ステージ', ja_easy: 'ステージ', en: 'Stages' },
       b: { ja: '*3プレー* で1ステージ。合計が *ボーダー* に届いたら *すぐクリア*！ 早いほどコインがふえるよ。*7ステージ* をのりこえよう！', ja_easy: '*3プレー* で 1ステージ。ごうけいが *ボーダー* に とどいたら *すぐクリア*！ はやいほど コインが ふえるよ。*7ステージ* を のりこえよう！', en: '*3 plays* per stage. Reach the *border* and you *clear at once* — the sooner, the more coins! Beat all *7 stages*!' } },
 ];
-function openHowTo(){
+function openHowTo(){ SFX.play('click');
     const em = txt => escapeHtml(txt).replace(/\*(.+?)\*/g, '<b class="em">$1</b>');
     document.getElementById('howto-body').innerHTML = HOWTO.map(h =>
         `<div class="ht-card" style="--hc:${h.c};--hb:${h.bg}"><div class="ht-head">${escapeHtml(L(h.t))}</div><div class="ht-art">${h.art()}</div><div class="ht-body">${em(L(h.b))}</div></div>`).join('');
     document.getElementById('howto-modal').classList.remove('hidden');
 }
-function closeHowTo(){ document.getElementById('howto-modal').classList.add('hidden'); }
-function requestRetire(){ document.getElementById('retire-modal').classList.remove('hidden'); }
-function closeRetireModal(){ document.getElementById('retire-modal').classList.add('hidden'); }
+function closeHowTo(){ SFX.play('back'); document.getElementById('howto-modal').classList.add('hidden'); }
+function requestRetire(){ SFX.play('click'); document.getElementById('retire-modal').classList.remove('hidden'); }
+function closeRetireModal(){ SFX.play('back'); document.getElementById('retire-modal').classList.add('hidden'); }
 function confirmRetire(){
     closeRetireModal();
     run = null; playSt = null;
@@ -2656,6 +2666,7 @@ function endRun(cleared){
     lastEnd = { sid: run.sid, star: run.star, score: run.totalScore, stage: reachedStage, tag, hand: run.bestPlay, role: run.bestRole };
     renderEnd(cleared, { reachedStage, newMedal, unlocked, newBest: run.totalScore > prevBest, newPlay: run.bestPlay > prevPlay });
     document.getElementById('end-modal').classList.remove('hidden');
+    SFX.play(cleared ? 'fanfare' : 'gameover');
     if (RANKING_ENABLED && (run.totalScore > 0 || run.bestPlay > 0)) submitScoreToWorld();
 }
 

@@ -346,6 +346,7 @@
     </style>
     <script src="../tutorial-engine.js?v=20261225"></script>
 <script src="../fgl-name.js?v=20261224"></script>
+<script src="../fgl-sfx.js?v=3"></script>
 </head>
 <body>
 
@@ -980,6 +981,8 @@
         // カードの出し方（'drag'=ドラッグして代入 / 'tap'=タップするだけで即座に代入）
         let cardInputMode = localStorage.getItem('mathSugorokuInputMode') || 'drag';
 
+        // 効果音(音量はこのゲームだけ。設定画面から変える)
+        const SFX = FGLSfx.create({ key: 'sugoroku' });
         function T(key, params) {
             const dict = STRINGS[currentLang] || STRINGS.simple;
             let str = dict[key] !== undefined ? dict[key] : (STRINGS.simple[key] || key);
@@ -1825,7 +1828,7 @@
         let isRouletteStopping = false;
 
         function startRoulette() {
-            gameState = "roulette";
+            gameState = "roulette"; SFX.play('unlock');
             document.getElementById('roulette-screen').classList.remove('hidden');
             document.getElementById('roulette-stop-btn').disabled = false;
             
@@ -1933,6 +1936,7 @@
                 let type = targetDiv.dataset.type;
                 let val = parseInt(targetDiv.dataset.val);
                 let text = targetDiv.innerText;
+                SFX.play(type === "pt" && val < 0 ? 'wrong' : 'item');
 
                 if (type === "pt") {
                     points = Math.max(0, points + val);
@@ -2047,6 +2051,7 @@
         function playCard(index) {
             if (gameState !== "playing" || timeLeft <= 0 || isDisplayingMessage || scrollAnim.active) return;
             let moveVal = hand[index];
+            SFX.play('place');
             timeLeft--;
             
             document.getElementById('drop-zone').innerText = toZenkaku(moveVal);
@@ -2069,14 +2074,14 @@
             if (gameState !== "playing" || gems <= 0 || isDisplayingMessage || scrollAnim.active) return;
             if (type === 'change') {
                 showCustomConfirm(T('confirm.changehand'), () => {
-                    gems--;
+                    gems--; SFX.play('itemuse');
                     hand = []; for(let i=0; i<5; i++) hand.push(getRandomCard());
                     renderHand(true);
                     enqueueMessage(T('msg.handchange'));
                     updateUI();
                 });
             } else if (type === 'time3') {
-                gems--; timeLeft += 3; enqueueMessage(T('msg.time3')); updateUI();
+                gems--; timeLeft += 3; SFX.play('heal'); enqueueMessage(T('msg.time3')); updateUI();
             } else if (type === 'moveAny') {
                 showNumberSelect();
             }
@@ -2090,7 +2095,7 @@
         }
         function useNumber(num) {
             document.getElementById('number-select-screen').classList.add('hidden');
-            gems--;
+            gems--; SFX.play('itemuse');
             updateUI();
             animateMove(currentPos, currentPos + num, num);
         }
@@ -2100,11 +2105,11 @@
             let current = start;
             let count = 0;
             const timer = setInterval(() => {
-                current++; count++; currentPos = current;
+                current++; count++; currentPos = current; SFX.play('select');
                 document.getElementById('hm-current').innerText = toZenkaku(currentPos);
                 
                 if (current % 10 === 0 && current < end && current <= 90) {
-                    points += 100; enqueueMessage(T('msg.pass100', {num: current}));
+                    points += 100; SFX.play('coin'); enqueueMessage(T('msg.pass100', {num: current}));
                 }
                 drawGame();
                 if (current >= GOAL_POS) {
@@ -2115,7 +2120,7 @@
                     else { points += 1000; }
                     msgText.innerText = T('msg.goal');
                     msgText.classList.add("visible");
-                    gameState = "goal_waiting";
+                    gameState = "goal_waiting"; SFX.play('fanfare');
                     const clickHandler = () => {
                         document.removeEventListener('click', clickHandler);
                         document.removeEventListener('touchstart', clickHandler);
@@ -2130,7 +2135,7 @@
                 if (count >= steps) {
                     clearInterval(timer);
                     if (current % 10 === 0 && current <= 90) {
-                        points += 200; enqueueMessage(T('msg.exact200'));
+                        points += 200; SFX.play('clear', 3); enqueueMessage(T('msg.exact200'));
                     }
                     gameState = "playing";
                     handleEvent(current);
@@ -2145,21 +2150,22 @@
                 if (!collectedItems.includes(itemIdx)) {
                     collectedItems.push(itemIdx);
                     document.getElementById(`col-item-${itemIdx}`).classList.add("collected");
-                    enqueueMessage(T('msg.item.got', {icon: ITEMS[itemIdx]}));
+                    enqueueMessage(T('msg.item.got', {icon: ITEMS[itemIdx]})); SFX.play('item');
                 } else { enqueueMessage(T('msg.item.already')); }
                 processMessageQueue();
             } else {
                 switch(type) {
                     case 1:
-                        timeLeft += 3; enqueueMessage(T('msg.tile.time3')); break;
+                        timeLeft += 3; SFX.play('heal'); enqueueMessage(T('msg.tile.time3')); break;
                     case 2:
                         startRoulette(); return; // ルーレット開始（ここでreturnし、ルーレット終了後にprocessMessageを呼ぶ）
                     case 4:
+                        SFX.play('hurt');
                         if(Math.random()<0.5) { timeLeft=Math.max(0, timeLeft-2); enqueueMessage(T('msg.ghost.time')); }
                         else { points=Math.max(0, points-50); enqueueMessage(T('msg.ghost.point')); }
                         break;
                     case 5:
-                        gems++; enqueueMessage(T('msg.gem.got')); break;
+                        gems++; SFX.play('item'); enqueueMessage(T('msg.gem.got')); break;
                     default:
                         processMessageQueue(); return;
                 }
@@ -2235,7 +2241,7 @@
         }
 
         function gameOver() {
-            gameState = "result";
+            gameState = "result"; SFX.play('gameover');
             document.getElementById('btn-how-to-play').style.display = 'none';
             document.getElementById('btn-back-title').style.display = 'none';
             
@@ -2439,6 +2445,16 @@
         window.closeSettings = closeSettings;
         window.selectLanguage = selectLanguage;
         window.selectInputMode = selectInputMode;
+
+        // ボタン音(関数を包んで、画面を開く・もどる・はじめるときだけ鳴らす)
+        FGLSfx.settingsRow(SFX, { before: '#settings-screen .btn-gray' });
+        [['startGame','ok'],['startTutorial','ok'],['showLevelSelect','click'],['hideLevelSelect','back'],['showPlayerSelect','click'],['hidePlayerSelect','back'],
+         ['showHowToPlay','click'],['showFullRanking','click'],['closeRanking','back'],['openSettings','click'],['closeSettings','back'],
+         ['showNumberSelect','click'],['cancelNumberSelect','back'],['stopRoulette','ok'],['selectLanguage','select'],['selectInputMode','select']
+        ].forEach(([fn, snd]) => {
+            const f = window[fn]; if (typeof f !== 'function') return;
+            window[fn] = function () { SFX.play(snd); return f.apply(this, arguments); };
+        });
 
     </script>
 </body>
