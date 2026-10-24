@@ -1155,6 +1155,7 @@
         .world-submit-msg { font-size: 1rem; margin-top: 8px; min-height: 1em; }
     </style>
 <script src="../fgl-name.js?v=20261224"></script>
+<script src="../fgl-sfx.js?v=3"></script>
 </head>
 <body>
 <div id="container">
@@ -1238,6 +1239,10 @@
                     <button id="lang-easy-btn" class="settings-toggle-btn" data-i18n="settings.langEasy" onclick="setLang('easy')">かんたんなにほんご</button>
                     <button id="lang-en-btn" class="settings-toggle-btn" data-i18n="settings.langEn" onclick="setLang('en')">English</button>
                 </div>
+            </div>
+            <div class="settings-section" style="text-align:center">
+                <div class="settings-label">🔊 こうかおん / Sound</div>
+                <div id="sfx-vol"></div>
             </div>
             <button class="btn btn-gray" data-i18n="common.back" onclick="closeSettings()">◀ タイトルへ戻る</button>
         </div>
@@ -3430,6 +3435,7 @@ function suitCountHtml(cards){
 // 画面遷移共通
 // ============================================================
 function showScreen(id){
+    { const sn = { 'title-screen': 'back', 'battle-screen': 'start', 'over-screen': 'gameover', 'clear-screen': 'fanfare', 'shop-screen': 'chest', 'levelup-screen': 'levelup', 'epiphany-screen': 'levelup', 'reveal-screen': 'chest', 'settings-screen': 'click', 'ranking-screen': 'click', 'name-register-screen': 'click', 'starter-select-screen': 'click', 'meta-hub-screen': 'click', 'deckbuilder-screen': 'click', 'cardfusion-screen': 'click' }[id]; if (sn) SFX.play(sn); }
     ['title-screen','name-register-screen','ranking-screen','settings-screen','starter-select-screen','starter-confirm-screen',
      'map-screen','shop-screen','shopscroll-screen','eventhp-screen','eventskill-screen','eventforget-screen','eventtreasure-screen',
      'eventgeneric-screen','eventsage-screen','eventshrine-screen','eventshrineskill-screen','shrineresult-screen','eventmachine-screen',
@@ -3688,7 +3694,9 @@ async function loadAndRenderRanking(){
     }
 }
 
-function openSettings(){ showScreen('settings-screen'); }
+// 効果音(音量はこのゲームだけ。設定画面から変える)
+const SFX = FGLSfx.create({ key: 'blackjackarcana' });
+function openSettings(){ showScreen('settings-screen'); FGLSfx.volumeUI('#sfx-vol', SFX); }
 function closeSettings(){ showScreen('title-screen'); }
 
 // ============================================================
@@ -3871,7 +3879,7 @@ function useItem(id){
     const def = ITEM_DEFS[id];
     if ((game.items[id] || 0) <= 0) return;
     game.items[id]--;
-    const heal = itemHealAmount(def);
+    const heal = itemHealAmount(def); SFX.play('heal');
     game.player.hp = Math.min(game.playerMaxHp, game.player.hp + heal);
     if (game.turn && !game.turn.ended){
         floatText('battle-player-avatar-wrap', `+${heal}`, 'heal');
@@ -4056,7 +4064,7 @@ function buyShopItem(id){
     const offer = getShopOffers().find(o => o.id === id);
     const price = offer ? shopPriceFor(offer) : 0;
     if (!offer || game.chips < price) return;
-    game.chips -= price;
+    game.chips -= price; SFX.play('buy');
     if (offer.id === 'pack'){
         // 敵撃破時のパックと同じ、タップして開ける演出を使う。閉じたらショップへ戻る
         lastOpenedPackCards = generateNormalPack();
@@ -4527,6 +4535,7 @@ function slotShowResult(mult, won, bet){
     document.getElementById('eventmachine-result').innerHTML = `<div class="sr-big ${cls}">${head}</div><div class="sr-sub">${sub}</div>`;
 }
 function slotCoinShower(count){
+    SFX.play('coin'); setTimeout(() => SFX.play('coin'), 140); setTimeout(() => SFX.play('bigclear'), 280);
     const box = document.querySelector('#eventmachine-screen .event-popup-box');
     for (let i = 0; i < count; i++){
         const c = document.createElement('div');
@@ -4541,7 +4550,7 @@ function slotCoinShower(count){
 }
 function spinMachine(){
     if (machineBet <= 0 || machineSpinning) return;
-    machineSpinning = true;
+    machineSpinning = true; SFX.play('start');
     const symIdx = Math.floor(Math.random() * SLOT_SYMBOLS.length);
     const mult = SLOT_SYMBOLS[symIdx].mult;
     game.chips -= machineBet;
@@ -4732,7 +4741,7 @@ function matchEffectText(count, label){
 }
 function showSuitMatchBanner(text){
     const el = document.getElementById('suitmatch-banner');
-    el.textContent = text;
+    el.textContent = text; SFX.play('combo', 2);
     el.classList.remove('hidden');
     if (suitMatchBannerTimer) clearTimeout(suitMatchBannerTimer);
     suitMatchBannerTimer = setTimeout(() => { el.classList.add('hidden'); }, 1300);
@@ -4751,6 +4760,7 @@ function floatText(containerId, text, cls, duration){
 }
 // バースト時、画面を一瞬赤くしつつ揺らす
 function triggerBustEffect(){
+    SFX.play('wrong'); SFX.play('hurt');
     const screen = document.getElementById('battle-screen');
     screen.classList.remove('bust-shake');
     void screen.offsetWidth; // アニメーションを毎回リスタートさせる
@@ -4763,6 +4773,7 @@ function triggerBustEffect(){
 }
 // プレイヤーが敵の攻撃でダメージを受けたとき、アバター周りだけ軽く揺らして赤く光らせる
 function triggerPlayerHitEffect(duration){
+    SFX.play('hurt');
     const wrap = document.getElementById('battle-player-avatar-wrap');
     wrap.classList.remove('player-hit-shake');
     void wrap.offsetWidth;
@@ -4939,6 +4950,7 @@ function doHit(){
         return;
     }
     const card = drawNormalCard();
+    SFX.play('place');
     addToHand(card);
     applyAceChoice(game.turn.hand, game.turn.aceChoice);
     applyOnDrawSkill(card);
@@ -5018,12 +5030,12 @@ function resolveTurn(busted){
         triggerBustEffect();
     } else if (hasAbility(game.enemy, 'evade') && Math.random() < 0.10){
         // すばやい動き：10%でプレイヤーの攻撃そのものを回避する（敵側の効果なので敵のイラスト上に表示）
-        floatText('battle-enemy-avatar-wrap', t('combat.evaded'), 'heal');
+        floatText('battle-enemy-avatar-wrap', t('combat.evaded'), 'heal'); SFX.play('miss');
     } else {
         const { total, mult } = currentMultInfo();
         let dmg = computeDamage(total, mult, game.turn.hand, game.enemy, game.turn.extraDmg);
         if (game.blessingCount > 0) dmg = Math.round(dmg * blessingMult()); // 女神の祝福：重複可（加算で重ねがけ）
-        game.enemy.hp -= dmg;
+        game.enemy.hp -= dmg; SFX.play(mult >= 2 ? 'crit' : 'attack');
         game.stats.totalDamage += dmg;
         floatText('battle-enemy-avatar-wrap', `-${dmg}`, 'enemy-hit', 2400);
         if (game.enemy.hp <= 0){
@@ -5044,7 +5056,7 @@ function resolveTurn(busted){
     if (enemyDefeated){
         // 中央のダメージ表示のあとに「敵を倒した！」が続いて見えるよう、一拍おいてから出す
         setTimeout(() => {
-            document.getElementById('defeat-banner').classList.remove('hidden');
+            document.getElementById('defeat-banner').classList.remove('hidden'); SFX.play('clearstage');
             document.getElementById('battle-next-turn-btn').classList.remove('hidden');
         }, 550);
     } else {
@@ -5961,6 +5973,17 @@ document.getElementById('container').addEventListener('click', hideSkillDescPopu
 refreshTitleButtons();
 loadMeta();
 loadCardSeq();
+</script>
+<script>
+// ボタン音(関数を包んで、はじめる・マップの選択・スタンドなどで音を足す)
+[['newGame','ok'],['continueGame','ok'],['startTutorial','ok'],['confirmStarterSelect','ok'],['chooseMapNode','select'],['doStand','ok'],
+ ['closeRanking','back'],['closeNameRegister','back'],['backToTitleFromStarter','back'],['openRanking','click'],['openNameRegister','click'],['goToStarterSelect','ok'],
+ ['switchRankTab','select'],['cancelDeckBuilder','back'],['confirmDeckBuilder','ok'],['pickRunStartSkill','select'],['toggleDeckCard','select'],['confirmRunStartEquip','ok'],
+ ['doGachaPull','chest'],['doBuyPassive','buy'],['pickEventSkillCard','select'],['pickEventShrineCard','select'],['closeReveal','ok'],['closeItemGet','ok'],['closeLevelUpScreen','ok']
+].forEach(([fn, snd]) => {
+  const f = window[fn]; if (typeof f !== 'function') return;
+  window[fn] = function () { SFX.play(snd); return f.apply(this, arguments); };
+});
 </script>
 </body>
 </html>

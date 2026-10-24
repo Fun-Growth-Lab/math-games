@@ -740,6 +740,7 @@
         #slot-highlight { position:absolute; top:0; left:0; width:100%; height:100%; border-top:2px solid rgba(255,220,80,0.6); border-bottom:2px solid rgba(255,220,80,0.6); pointer-events:none; }
     </style>
 <script src="../fgl-name.js?v=20261224"></script>
+<script src="../fgl-sfx.js?v=3"></script>
 </head>
 <body>
 <div id="container">
@@ -1013,6 +1014,11 @@
                         <button class="seg-btn"         id="input-mode-dbl"    onclick="setInputMode('dbl')">ダブル</button>
                         <button class="seg-btn"         id="input-mode-single" onclick="setInputMode('single')">シングル</button>
                     </div>
+                </div>
+                <!-- 効果音 -->
+                <div class="settings-row">
+                    <span class="settings-lbl">🔊 こうかおん</span>
+                    <div id="sfx-vol"></div>
                 </div>
                 <!-- 自動攻撃 -->
                 <div class="settings-row">
@@ -2431,7 +2437,10 @@ function updateScoreLblText(){
     }
 }
 
+// 効果音(音量はこのゲームだけ。設定画面から変える)
+const SFX = FGLSfx.create({ key: 'arithmetica' });
 function openSettings(){
+    FGLSfx.volumeUI('#sfx-vol', SFX);
     // Sync active state
     ['ja','kana','en'].forEach(l=>{
         const b=document.getElementById('lang-btn-'+l);
@@ -3999,6 +4008,7 @@ function autoPlaceCard(card){
 }
 
 function placeCard(card,slotNum){
+    SFX.play('place');
     if(slotNum===1&&G.s1) G.discard.push(G.s1);
     if(slotNum===2&&G.s2) G.discard.push(G.s2);
     const idx=G.hand.findIndex(c=>c.id===card.id);
@@ -4041,6 +4051,7 @@ function applyPlayerDamage(dmg){
     } else {
         G.pHP=Math.max(0, G.pHP-dmg);
     }
+    SFX.play('hurt');
 }
 
 function doAttack(){
@@ -4056,6 +4067,7 @@ function doAttack(){
 
     // Apply damage to enemy (direct attack)
     const netRes=applyEnemyDamage(res);
+    SFX.play(netRes>=15?'crit':'attack'); setTimeout(()=>SFX.play('hit'),90);
     showDmg(netRes,'enemy-wrap','dmg-enemy');
     shakeEnemy();
     G.discard.push(c1,c2);
@@ -4528,6 +4540,7 @@ function updateScoreLbl(){
 // VICTORY / GAMEOVER
 // ============================================================
 function showVictory(){
+    SFX.play('clearstage');
     _dispCalcS1=null; _dispCalcS2=null; // clear formula display
     _clearTriggeredSkills();
     // Hide enemy illustration during bonus selection
@@ -4577,6 +4590,7 @@ function showVictory(){
     }
 }
 function showGameover(){
+    SFX.play('gameover');
     _dispCalcS1=null; _dispCalcS2=null; // clear formula display
     _clearTriggeredSkills();
     if(tutorialActive){
@@ -4603,6 +4617,7 @@ function rewardOptionCount(){
     return Math.random() < muyokuChance() ? 2 : 3;
 }
 function openCardReward(){
+    SFX.play('chest');
     document.getElementById('victory-overlay').classList.add('hidden');
     // Generate card options once and lock them (anti-reroll)
     if(!G.pendingCardOptions){
@@ -4634,6 +4649,7 @@ function openCardReward(){
 }
 
 function pickRewardCard(card){
+    SFX.play('item');
     document.getElementById('card-rew-overlay').classList.add('hidden');
     G.pendingCardOptions = null;
     const totalCards = G.deck.length + G.discard.length + G.hand.length + (G.s1?1:0) + (G.s2?1:0);
@@ -4744,6 +4760,7 @@ function openSkillReward(){
 let pendingNewSkill = null;
 
 function pickSkill(sk){
+    SFX.play('item');
     document.getElementById('skill-rew-overlay').classList.add('hidden');
     G.pendingSkillOptions = null;
     const finalized = finalizeSkill(sk);
@@ -4790,6 +4807,7 @@ let _slotTimer=null, _slotY=0, _slotSpeed=0, _slotDecel=false;
 const SLOT_ITEM_H=90;
 
 function openPowerUp(){
+    SFX.play('levelup');
     if(!G.pendingPowerUp){
         const opts=['maxhp','initshield','skilllevelup'];
         let pick=opts[rnd(0,2)];
@@ -5033,6 +5051,7 @@ function confirmHandChange(){
 }
 
 function doHandChange(){
+    SFX.play('swap');
     if(G.handChanges <= 0) return;
     if(G.phase !== 'player') return;
     // Return only hand cards to discard (slot cards s1/s2 stay in the formula)
@@ -5997,6 +6016,19 @@ document.getElementById('btn-player').onclick = openPlayerMgr;
 refreshPDisp();
 refreshTitleButtons();
 applyLang();
+</script>
+<script>
+// ボタン音(関数を包んで、画面を開く・もどる・はじめるときだけ鳴らす)
+[['openSettings','click'],['closeSettings','back'],['openRanking','click'],['closeRanking','back'],['openPlayerMgr','click'],['closePlayerMgr','back'],
+ ['openHowTo','click'],['closeHowTo','back'],['startGame','ok'],['startTutorial','ok'],['continueGame','ok'],['confirmCharSelect','ok'],
+ ['openCharSelect','click'],['closeCharSelect','back'],['openMetaHub','click'],['closeMetaHub','back'],['doPullTraitGacha','chest'],['doBuyPassive','buy'],
+ ['doReturnTitle','back'],['nextEnemy','ok'],['openDeckView','click'],['closeDeckView','back'],['openSkillsView','click'],['closeSkillsView','back'],
+ ['switchRankTab','select'],['switchRankDiff','select'],['switchMetaTab','select'],['setInputMode','select'],['setLang','select'],['skipCard','back'],['skipSkill','back'],
+ ['confirmPowerUp','ok'],['doForgetSkill','discard'],['confirmPopupYes','ok'],['confirmPopupNo','back']
+].forEach(([fn, snd]) => {
+  const f = window[fn]; if (typeof f !== 'function') return;
+  window[fn] = function () { SFX.play(snd); return f.apply(this, arguments); };
+});
 </script>
 </body>
 </html>
