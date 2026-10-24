@@ -599,7 +599,7 @@ function onUp(e) {
         if (hitJ >= 0) {
             // ゲームによっては、条件を満たさないカードでは攻撃できない(例: ひきざんは1回かさねてから)
             if (!GAME.rules.canAttack(card)) {
-                state.particles.push(new Particle(cx, cy - 20, T('stack_first'), '#ff8a80', 'text', 26));
+                state.particles.push(new Particle(cx, cy - 20, T('stack_first'), '#ff8a80', 'text', 26)); SFX.play('error');
                 break;
             }
             const checkVal = enemy.values[hitJ];
@@ -616,6 +616,7 @@ function onUp(e) {
                 ));
 
                 enemy.hitFrames = 16;
+                SFX.play(damage >= 200 ? 'crit' : 'attack'); setTimeout(() => SFX.play('hit'), 80);
                 state.score += damage;
                 state.coins += Math.round(damage * (1 + state.coinBonus));   // コイン = あたえたダメージ(スコア)と おなじ数(きんのおまもりで ふえる)
                 state.lastScore = damage;
@@ -631,7 +632,7 @@ function onUp(e) {
 
                 if (enemy.hp <= 0) {
                     enemy.hp = 0;
-                    enemy.isDefeated = true;
+                    enemy.isDefeated = true; setTimeout(() => SFX.play('clear', 3), 120);
                 } else {
                     enemy.reroll(hitJ);
                     enemyAttack();                  // こうげきも 1手: たおせなかったら、てきが こうげきしてくる
@@ -656,7 +657,7 @@ function onUp(e) {
                 const newValue = GAME.rules.merge(target.value, card.value);   // 重ねたあとの数(重ねられないときはnull)
                 if (newValue !== null) {
                     target.value = newValue;
-                    target.stackCount += card.stackCount;
+                    target.stackCount += card.stackCount; SFX.play('merge');
                     state.cards[idx] = null;
                     enemyAttack();                  // かさねるたびに、てきが こうげき
                     actionDone = true;
@@ -669,7 +670,7 @@ function onUp(e) {
 
     if (!actionDone) {
         if (cy > state.height * 0.87) {
-            state.forbiddenValue = state.cards[idx].value;
+            state.forbiddenValue = state.cards[idx].value; SFX.play('discard');
             state.cards[idx] = null;
             enemyAttack();                          // すてるたびに、てきが こうげき
             actionDone = true;
@@ -911,7 +912,7 @@ function useItem(kind) {
         if (state.potions <= 0) return;
         if (state.hp >= state.maxHp) { fxHpNote(T('item_full'), '#aed581'); return; }      // まんたんなら つかわない
         const before = state.hp;
-        state.potions--;
+        state.potions--; SFX.play('heal');
         state.hp = Math.min(state.maxHp, state.hp + POTION_HEAL);
         fxHpNote('+' + (state.hp - before), '#66e08a');
         if (BL.hpBox) { BL.hpBox.classList.remove('heal'); void BL.hpBox.offsetWidth; BL.hpBox.classList.add('heal'); }
@@ -919,7 +920,7 @@ function useItem(kind) {
         if (state.dances <= 0) return;
         const cards = state.cards.filter(c => c);
         if (!cards.length) { fxHpNote(T('item_nocard'), '#ffcc80'); return; }
-        state.dances--;
+        state.dances--; SFX.play('itemuse');
         cards.forEach(c => { c.stackCount += 1; });                                       // てふだ ぜんぶに けん +1
         cards.forEach(c => { const el = BL.hand[c.slotIndex]; if (el) { el.classList.remove('dance'); void el.offsetWidth; el.classList.add('dance'); } });
         if (BL.layer) fxText(state.width / 2, state.height * 0.62, T('dance_text'), '#d1b3ff', 38);
@@ -1188,6 +1189,7 @@ function fxHpNote(text, color) {
 }
 // てきの こうげきを うけた: てきが とびかかる・HPの箱が ゆれる・画面が ちょっと赤くなる
 function fxHurt(dmg, foe) {
+    SFX.play('hurt');
     fxHpNote('-' + dmg, '#ff6b5e');
     if (BL.hpBox) { BL.hpBox.classList.remove('hurt'); void BL.hpBox.offsetWidth; BL.hpBox.classList.add('hurt'); }
     if (foe && foe._mon) { foe._mon.classList.remove('atk'); void foe._mon.offsetWidth; foe._mon.classList.add('atk'); }
@@ -1205,6 +1207,7 @@ function bossChargeFx(foe) {
     foe._el.classList.toggle('charging', c > 0);
     if (foe._chg) foe._chg.textContent = c > 1 ? T('boss_charge2') : T('boss_charge');
     if (c > 0) {
+        SFX.play('warn');
         if (foe._mon) { foe._mon.classList.remove('atk'); void foe._mon.offsetWidth; }
         fxText(foe.x + foe.width / 2, foe.y + foe.height * 0.15, c > 1 ? T('boss_charge2') : T('boss_charge'), '#ff8a65', 30);
     }
@@ -1292,7 +1295,7 @@ function shopBuy(i) {
     if (!x || x.sold || state.coins < x.price) return;
     const own = x.it.kind === 'atk' || x.it.kind === 'guard' ? ownedGear(x.it.kind) : null;
     if (own && own.n >= x.it.n) return;                                   // いまの そうびの ほうが つよい
-    state.coins -= x.price; x.sold = true;
+    state.coins -= x.price; x.sold = true; SFX.play('buy');
     if (own) state.equip = state.equip.filter(e => e.kind !== x.it.kind);   // 古い剣・盾は すてられる
     if (x.it.kind !== 'potion' && x.it.kind !== 'dance') state.equip.push({ kind: x.it.kind, n: x.it.n });   // ポーション・つるぎのまいは そうびに ならない(右下の どうぐボタンで つかう)
     if (x.it.kind === 'hp') { state.maxHp += HP_UP; state.hp = state.maxHp; state.hpBought++; }
@@ -1307,7 +1310,7 @@ function shopBuy(i) {
 function openShop(cb) {
     let el = document.getElementById('mb-shop');
     if (!el) { el = document.createElement('div'); el.id = 'mb-shop'; document.getElementById('container').appendChild(el); }
-    shopState = { list: shopPick(), cb };
+    shopState = { list: shopPick(), cb }; SFX.play('chest');
     renderShop();
     el.classList.remove('hidden');
 }

@@ -282,12 +282,27 @@ document.getElementById('container').innerHTML = (GAME.gameLayerHTML || _GAME_LA
     };
 })();
 
+// ---- 効果音(音量はこのゲームだけ。設定画面から変える。fgl-sfx.js を先に読みこんでおくこと) ----
+const SFX = FGLSfx.create({ key: 'braves_' + GAME.keys.lang });
+// ボタンごとの音(はじめる・決定=ok / もどる=back / 画面を開く=click / 切りかえ=select)
+const BTN_SFX = {
+    ok: '#sc-go,#end-retry,#mbs-next,#dc-j-ok,#item-popup-use,#dc-ch-hand,#dc-ch-field,#btn-yes,#custom-confirm-yes-btn',
+    back: '#end-runselect,#rs-back,#btn-to-title,#btn-index,#dc-ch-cancel,#dc-j-cancel,#item-popup-cancel,#btn-no,#custom-confirm-no-btn',
+    click: '#end-rank,#rs-rank,#btn-howto,#btn-gem,#btn-login,#btn-logout',
+    select: '#rs-prev,#rs-next,#rk-prev,#rk-next,.rs-card,.rk-card,[data-v],[id^="setting-"],#dc-j-minus,#dc-j-plus'
+};
 function bindBtn(btn, callback) {
     if (btn) {
-        btn.addEventListener('click', (e) => { e.preventDefault(); callback(); });
-        btn.addEventListener('touchstart', (e) => { e.preventDefault(); callback(); }, {passive: false});
+        const cb = () => { const sn = FGLSfx.buttonSound(btn, BTN_SFX); if (sn) SFX.play(sn); callback(); };
+        btn.addEventListener('click', (e) => { e.preventDefault(); cb(); });
+        btn.addEventListener('touchstart', (e) => { e.preventDefault(); cb(); }, {passive: false});
     }
 }
+// 設定画面に効果音の音量バーを入れる(画面がそろってから)
+window.addEventListener('load', () => {
+    const host = document.getElementById('sfx-vol');   // 設定画面を作り直しているゲーム(ぶんすう)は、自分で置き場所を決めている
+    if (host) FGLSfx.volumeUI(host, SFX); else FGLSfx.settingsRow(SFX, { before: '#btn-close-settings' });
+});
 
 // ブラウザ標準のalert()/confirm()の代わりに使うゲーム内ポップアップ
 function showCustomAlert(msg, onClose){
@@ -754,6 +769,7 @@ function applyLanguage() {
     if (typeof updateTitleScreenStats === 'function') updateTitleScreenStats();
 }
 function selectLanguage(lang) {
+    SFX.play('select');
     currentLang = lang;
     localStorage.setItem(GAME.keys.lang, lang);
     applyLanguage();

@@ -196,7 +196,7 @@ function checkBingo() {
         const pts = n * 500;
         noteBestPlay(pts);
         state.score += pts; state.roundScore += pts; state.roundBingos += n; state.totalBingos += n;
-        popup(type, 'BINGO!!', pts, true);
+        popup(type, 'BINGO!!', pts, true); setTimeout(() => SFX.play('combo', 3), 250);
         addLog(T('dv_log_bingo', { n: pts }));
     });
 }
@@ -207,7 +207,7 @@ function processAttack(cardIndex, fieldIndex) {
     const divisor = card.value, dividend = fc.value;
     const quotient = Math.floor(dividend / divisor), remainder = dividend % divisor;
     state.equationText = `${dividend} ÷ ${divisor} ＝ ${quotient} ${T('equation_remainder_word')} ${remainder}`;
-    state.ap--;
+    state.ap--; SFX.play('attack');
 
     let isQHit = false, isRHit = false;
     if (quotient >= 1 && quotient <= 9 && !state.quotientPanels[quotient - 1]) {
@@ -220,6 +220,7 @@ function processAttack(cardIndex, fieldIndex) {
     }
 
     enemyHit((isQHit ? 1 : 0) + (isRHit ? 1 : 0));
+    setTimeout(() => SFX.play(isQHit && isRHit ? 'bigclear' : (isQHit || isRHit) ? 'clear' : 'miss', 3), 90);
     let base = 0;
     if (isQHit && isRHit) { base = 300; flash(); }
     else if (isQHit || isRHit) { base = 100; flash(); }
@@ -241,12 +242,12 @@ function processAttack(cardIndex, fieldIndex) {
     checkBingo();
     if (!state.perfectQ && state.quotientPanels.every(p => p)) {
         state.perfectQ = true; state.score += 2000; state.roundScore += 2000; state.roundPerfects++; state.totalPerfects++;
-        popup('Q', T('perfect_text'), 2000, true);
+        popup('Q', T('perfect_text'), 2000, true); setTimeout(() => SFX.play('levelup'), 350);
         addLog(T('dv_log_perfect', { n: 2000 }));
     }
     if (!state.perfectR && state.remainderPanels.every(p => p)) {
         state.perfectR = true; state.score += 2000; state.roundScore += 2000; state.roundPerfects++; state.totalPerfects++;
-        popup('R', T('perfect_text'), 2000, true);
+        popup('R', T('perfect_text'), 2000, true); setTimeout(() => SFX.play('levelup'), 350);
         addLog(T('dv_log_perfect', { n: 2000 }));
     }
 

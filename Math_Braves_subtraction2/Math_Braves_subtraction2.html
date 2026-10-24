@@ -295,6 +295,7 @@
         #change-confirm-overlay .overlay-box { max-width:440px; }
     </style>
     <script src="../tutorial-engine.js"></script>
+<script src="../fgl-sfx.js?v=4"></script>
 </head>
 <body>
 <div id="container">
@@ -687,6 +688,14 @@ const BONUS_DEFS = [
     { key:'gem',  label:'ダイヤ',     icon:'💎', color:'#80deea', borderColor:'rgba(128,222,234,0.55)', bgColor:'rgba(128,222,234,0.13)', mult:1,   isGem:true  }
 ];
 
+// 効果音(音量はこのゲームだけ。設定画面がないので 🔊 ボタンから変える)
+const SFX = FGLSfx.create({ key: 'mb_sub2' });
+FGLSfx.mountButton(SFX, { right: 10, bottom: 10, label: '🔊 こうかおん / Sound' });
+FGLSfx.menuSounds(SFX, {
+    ok: '#btn-start,#btn-easy,#btn-normal,#btn-hard,#btn-round-next,#btn-result-ok,#btn-change-normal,#btn-change-gem',
+    back: '#btn-close-diff,#btn-to-title,#btn-index,#btn-joker-cancel,#btn-change-no',
+    click: '#btn-howto,#btn-player-select,#btn-change,#btn-login,#btn-logout,#btn-rank-local,#btn-rank-world,#btn-add-player'
+});
 function calcBaseScore(n) { return n * 5 + 55; }
 
 // ══════════════════════════════
@@ -946,7 +955,7 @@ function doChange(type) {
         if (g.diamonds <= 0) return;
         g.diamonds--;
     }
-    fillHand();
+    fillHand(); SFX.play('swap');
     updateHUD();
     const label = type === 'gem' ? '💎チェンジ！' : 'チェンジ！';
     spawnTextParticle(420, 380, label, "#ce93d8", 38);
@@ -1169,6 +1178,7 @@ function applyCard(barIdx, cardData) {
     const g = window.game;
     g.bars[barIdx] -= cardData.val;
     g.combo++;
+    SFX.play(g.combo > 1 ? 'combo' : 'place', g.combo - 1);
     updateBars();
     updateHUD();
     updateFormulaZone();
@@ -1222,6 +1232,8 @@ function roundClear() {
     const bonusMsg = [multMsg, gemMsg].filter(Boolean).join('\n');
 
     spawnConfetti();
+    SFX.play(mult >= 2 ? 'bigclear' : mult < 1 ? 'wrong' : 'clearstage');
+    if (gemMsg) setTimeout(() => SFX.play('item'), 350);
     for (let i=0;i<3;i++) document.getElementById(`bar-unit-${i}`).classList.add('matched');
 
     if (mult >= 4)  spawnTextParticle(420, 180, "×4 グレート！！", "#ffd600", 56);
@@ -1256,8 +1268,8 @@ function roundClear() {
 function finishGame(isClear) {
     const g = window.game;
     const titleEl = document.getElementById('result-title');
-    if (isClear) { titleEl.textContent="GAME CLEAR!"; titleEl.style.color="#ffcc02"; spawnConfetti(); }
-    else         { titleEl.textContent="GAME OVER";   titleEl.style.color="#ef9a9a"; }
+    if (isClear) { titleEl.textContent="GAME CLEAR!"; titleEl.style.color="#ffcc02"; spawnConfetti(); SFX.play('fanfare'); }
+    else         { titleEl.textContent="GAME OVER";   titleEl.style.color="#ef9a9a"; SFX.play('gameover'); }
     document.getElementById('res-base-score').textContent = g.score;
     document.getElementById('result-score').textContent   = g.score;
     const isNew = saveScore(g.difficulty, g.score);

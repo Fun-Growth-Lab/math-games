@@ -165,7 +165,7 @@ function openChange() {
 }
 function useGemForHand() {
     if (state.gems <= 0) return;
-    state.gems--;
+    state.gems--; SFX.play('itemuse');
     state.cards.forEach(c => {
         if (c.sealed === 0) {
             const j = Math.random() < 0.02;
@@ -178,7 +178,7 @@ function useGemForHand() {
 }
 function useGemForField() {
     if (state.gems <= 0) return;
-    state.gems--;
+    state.gems--; SFX.play('itemuse');
     const cur = state.disp;
     const from = cur === 0 ? 0 : Math.floor(cur) + 1;      // いま いるところより先のイベントを作りなおす
     const kept = state.events.filter(ev => Math.floor(ev.start) < from);
@@ -222,7 +222,7 @@ function applyCardValue(idx, value) {
     const old = state.ribbon;
     const nv = floatAdd(old, value);
     state.lastEq = `${fmt(old)} + ${fmt(value)} = ${fmt(nv)}`;
-    state.ribbon = nv; state.target = nv; state.anim = true;
+    state.ribbon = nv; state.target = nv; state.anim = true; SFX.play('place');
     state.cards.forEach(c => { if (c.sealed > 0) c.sealed--; });
     state.cards[idx] = makeCard(idx);
     fxText(vx(Math.min(nv, 5)), BAR_Y - 6, `+${fmt(value)}`, '#7ef0ff', 34);
@@ -239,7 +239,7 @@ function checkEvents() {
         const bonus = v * 200;
         noteBestPlay(bonus);
         state.score += bonus;
-        burst(vx(v), BAR_Y + BAR_H / 2, '#FFD700', 28);
+        burst(vx(v), BAR_Y + BAR_H / 2, '#FFD700', 28); SFX.play('clear', v);
         showGameMessage(T('msg_just_bonus', { n: v, pts: bonus }));
         addLog(T('dc_log_just', { n: v, pts: bonus }));
     }
@@ -262,18 +262,18 @@ function triggerEvent(ev) {
         const pts = ev.sub === 'mega_gold' ? 1500 : 500;
         noteBestPlay(pts);
         state.score += pts;
-        burst(px, py, '#FFF59D', 26);
+        burst(px, py, '#FFF59D', 26); SFX.play('coin');
         showGameMessage(T('msg_gold_found', { icon: ev.icon, pts: pts }), () => { ev.cleared = true; });
         addLog(T('dc_log_gold', { icon: ev.icon, pts: pts }));
     } else if (ev.type === 'gem') {
         state.gems++;
-        burst(px, py, '#81D4FA', 26);
+        burst(px, py, '#81D4FA', 26); SFX.play('item');
         showGameMessage(T('msg_gem_found', { icon: ev.icon }), () => { ev.cleared = true; });
         addLog(T('dc_log_gem'));
     } else if (ev.type === 'snack') {
         state.snacks.push(ev.icon);
         state.availSnacks = state.availSnacks.filter(s => s !== ev.icon);
-        burst(px, py, '#F48FB1', 26);
+        burst(px, py, '#F48FB1', 26); SFX.play('item');
         const m = T('msg_snack_found', { icon: ev.icon });
         if (state.snacks.length === SNACK_N) {
             showGameMessage(m);
@@ -281,7 +281,7 @@ function triggerEvent(ev) {
         } else showGameMessage(m, () => { ev.cleared = true; });
         addLog(T('dc_log_snack', { icon: ev.icon }));
     } else if (ev.type === 'enemy') {
-        burst(px, py, '#E57373', 30);
+        burst(px, py, '#E57373', 30); SFX.play('hurt');
         const dragon = ev.sub === 'dragon';
         const sealed = sealCards(dragon ? 2 : 1);
         const all = state.cards.every(c => c.sealed > 0);
@@ -303,11 +303,11 @@ function checkStageClear() {
         state.phase = 'CLEAR_WAIT';
         noteBestPlay(1000);
         state.score += 1000;
-        burst(vx(5), BAR_Y + BAR_H / 2, '#FFD700', 40);
+        burst(vx(5), BAR_Y + BAR_H / 2, '#FFD700', 40); SFX.play('bigclear');
         showGameMessage(T('msg_just_5'), onStageDone);
         addLog(T('dc_log_just5'));
     } else {
-        const dmg = floatSub(v, 5.0);
+        const dmg = floatSub(v, 5.0); SFX.play('hurt');
         state.hp = floatSub(state.hp, dmg);
         updateUI();
         if (state.hp <= 0) {

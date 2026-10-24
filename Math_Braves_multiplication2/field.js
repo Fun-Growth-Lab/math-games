@@ -166,7 +166,7 @@ function mergeCard(card) {
     const f = state.field;
     const before = f.value;
     f.value *= card.value;
-    f.scale = 1.5;
+    f.scale = 1.5; SFX.play('merge');
     fxRing(f.x, f.y, '#ffd24a', 200);
     fxText(f.x, f.y - 80, `×${card.value}`, '#ff8a6a', 40);
     card.value = randHand();
@@ -176,14 +176,14 @@ function mergeCard(card) {
     if (f.value > ATTACK_LINE) triggerAttack();
 }
 function triggerAttack() {
-    state.phase = 'ATTACKING';
+    state.phase = 'ATTACKING'; SFX.play('warn');
     state.actionCount--;
 }
 function applyDamage(damage, resetField = true) {
     if (!state.enemy) return;
     const en = state.enemy;
     en.hp -= damage;
-    en.shake = 20;
+    en.shake = 20; SFX.play(damage >= 300 ? 'crit' : 'attack'); setTimeout(() => SFX.play('hit'), 90);
     state.score += damage;
     if (damage > state.maxDamage) state.maxDamage = damage;
     fxRing(ENEMY_CX, 150, '#ff5a4a', 300);
@@ -207,6 +207,7 @@ function onRoundCleared() {
     const st = state.round;
     state.stageScores[st - 1] = state.score - state.stageStartScore;
     if (state.enemy._el) state.enemy._el.classList.add('dead');
+    setTimeout(() => SFX.play('clear', 3), 150);
     if (st >= MAX_ROUND) {
         setTimeout(() => { if (state.screen === 'PLAYING') finishRun(true); }, 1100);
         return;
@@ -271,7 +272,7 @@ function confirmItemUse(doUse) {
 }
 function useItem(key) {
     if (state.items[key] <= 0) return;
-    state.items[key]--;
+    state.items[key]--; SFX.play('itemuse');
     renderItemList();
     fxText(state.width / 2, 250, T('fd_used', { name: itemName(key) }), '#ffe27a', 36);
     addLog(T('fd_log_item', { icon: itemImgTag(key, 16), name: itemName(key) }));

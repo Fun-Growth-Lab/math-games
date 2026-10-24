@@ -214,6 +214,7 @@ function showStageIntro(n, cb) {
 }
 
 function showStageClear(st, stageScore) {
+    SFX.play('clearstage');
     const th = STAGE_THEMES[st - 1], nx = STAGE_THEMES[st];
     document.getElementById('sc-title').textContent = T('stage_clear_title', { n: st });
     document.getElementById('sc-theme').textContent = stageName(st);
@@ -250,6 +251,7 @@ function endCountUp(el, to, ms, delay) {
     requestAnimationFrame(tick);
 }
 function showRunEnd(cleared, finalScore, isNewRecord, timeBonus, maxScoreBonus, clearBonus) {
+    SFX.play(cleared ? 'fanfare' : 'gameover');
     const el = document.getElementById('run-end-screen');
     const pts = T('unit_pts');
     const title = cleared ? T('end_clear_title') : T('gameover_title');

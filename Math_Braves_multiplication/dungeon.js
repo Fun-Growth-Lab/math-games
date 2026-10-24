@@ -349,6 +349,7 @@ function animateLevelUpBar(newExp, newExpToNext) {
 
 function triggerLevelUp() {
     if (state.screen !== 'PLAYING') return;
+    SFX.play('levelup');
     const overlay = document.getElementById('slot-overlay');
     const reelEl  = document.getElementById('slot-reel');
     const resEl   = document.getElementById('slot-result-text');
@@ -615,6 +616,7 @@ function collectItem(cell) {
     }
 
     state.score += scoreGain; state.time += timeGain;
+    SFX.play(cell.item === 'KEY' ? 'item' : cell.item === 'ITEM_TIME' ? 'heal' : cell.item === 'ITEM_SCORE' ? 'coin' : 'chest');
 
     const pos = getGridPos(cell.row, cell.col);
     const cx = pos.x + pos.w/2; const cy = pos.y + pos.h/2;
@@ -758,6 +760,7 @@ function checkCreatureAttack() {
         }
     });
     if (attacked) {
+        SFX.play('hurt');
         state.damageEffectTimer = 10; updateUI();
         if (state.time === 0 && !state.isGameOverProcessing) {
             state.isGameOverProcessing = true; state.inputLocked = true;
@@ -1172,6 +1175,7 @@ function onUseItemButton(id, cardValue = null) {
 function executeItem(id, targetCell) {
     const inv = state.items.find(i => i.id === id);
     if (!inv || inv.count <= 0) return false;
+    SFX.play('itemuse');
     let consumed = true;
     switch(id) {
         case 1: {
@@ -1680,7 +1684,7 @@ function onUp(e) {
                         state.panelsDestroyed++;
                         if (gain > state.maxSingleScore) state.maxSingleScore = gain;
                         addDungeonLog(T('dlog_panel_break', {color: getNumberColor(cell.value), val: cell.value, n: gain}));
-                        gainExp(gain);
+                        gainExp(gain); SFX.play(gain >= 200 ? 'bigclear' : 'clear', Math.floor(gain / 80));
 
                         setTimeout(() => state.particles.push(new Particle(cx, cy, `+${gain}`, '#ffd54f', 'text')), 0);
                         setTimeout(() => checkPraise(gain, cx, cy), 300);
@@ -1703,7 +1707,7 @@ function onUp(e) {
                         state.particles.push(new Particle(cx, cy+40, `Time+${rec}`, '#66bb6a', 'text'));
                         state.particles.push(new Particle(cx, cy-40, T('particle_defeat'), '#ef5350', 'text'));
                         addDungeonLog(T('dlog_enemy_defeat', {n: gain}));
-                        gainExp(gain);
+                        gainExp(gain); SFX.play(isBoss ? 'clearstage' : 'attack'); setTimeout(() => SFX.play('hit'), 90);
 
                         if (isBoss) {
                             cell.item = 'DOOR';
@@ -1729,7 +1733,7 @@ function onUp(e) {
             if (dist < card.width * 0.8) {
                 target.value = target.value * card.value;
                 target.multiplier = (target.multiplier || 1) * (card.multiplier || 1);
-                target.stackCount += card.stackCount;
+                target.stackCount += card.stackCount; SFX.play('merge');
                 state.cards[idx] = null; consumeTime(); checkCreatureAttack(); actionDone = true;
                 state.particles.push(new Particle(target.x + target.width / 2, target.y + target.height / 2, "x", '#4fc3f7', 'circle'));
                 break;
@@ -1739,7 +1743,7 @@ function onUp(e) {
     if (!actionDone) {
         const tr = state.trashRect;
         if (cx >= tr.x && cx <= tr.x + tr.w && cy >= tr.y && cy <= tr.y + tr.h) {
-            const oldVal = state.cards[idx].value;
+            const oldVal = state.cards[idx].value; SFX.play('discard');
             state.cards[idx] = new Card(idx, oldVal);
             consumeTime(); checkCreatureAttack(); actionDone = true;
         }
