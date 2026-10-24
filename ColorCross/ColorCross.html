@@ -111,6 +111,7 @@ canvas{position:absolute;top:0;left:0;touch-action:none;}
 <script src="../fgl-title-boot.js?v=1"></script>
 <script>FGLBoot.title({ host:'#title-screen', bg:"url('title_parts/key.webp') center / cover no-repeat, #7a5a3a" });</script>
 <script src="../fgl-name.js?v=20261224"></script>
+<script src="../fgl-sfx.js?v=1"></script>
 </head>
 <body>
 <div id="container">
@@ -146,6 +147,8 @@ canvas{position:absolute;top:0;left:0;touch-action:none;}
         <button id="lang-btn-ja"     class="btn3d btn3d-blue lang-btn" onclick="selectLanguage('ja')"     data-i18n="lang.ja">日本語</button>
         <button id="lang-btn-en"     class="btn3d btn3d-blue lang-btn" onclick="selectLanguage('en')"     data-i18n="lang.en">English</button>
       </div>
+      <p style="font-size:0.9rem;color:var(--text-dim);text-align:center;margin:18px 0 8px;" data-i18n="settings.volume">🔊 こうかおん</p>
+      <div id="sfx-vol"></div>
       <div style="text-align:center;margin-top:16px;">
         <button id="btn-close-settings" class="btn3d btn3d-gray" style="min-width:160px;" data-i18n="btn.close">とじる</button>
       </div>
@@ -325,6 +328,7 @@ const STRINGS={
     'btn.settings':'⚙ 設定',
     'btn.toindex':'🏠 INDEXへ',
     'settings.title':'設定',
+    'settings.volume':'🔊 効果音の大きさ',
     'settings.sub':'言語 / Language',
     'lang.simple':'かんたんなにほんご',
     'lang.ja':'日本語',
@@ -412,6 +416,7 @@ const STRINGS={
   simple:{
     'btn.settings':'⚙ せってい',
     'settings.title':'せってい',
+    'settings.volume':'🔊 こうかおんの おおきさ',
     'pm.empty':'まだとうろくされていません',
     'rank.kind.sum':'ごうけいスコア',
     'rank.loading':'よみこみちゅう…',
@@ -462,6 +467,7 @@ const STRINGS={
     'btn.settings':'⚙ Settings',
     'btn.toindex':'🏠 To INDEX',
     'settings.title':'Settings',
+    'settings.volume':'🔊 Sound volume',
     'settings.sub':'言語 / Language',
     'lang.simple':'かんたんなにほんご',
     'lang.ja':'日本語',
@@ -550,6 +556,8 @@ function T(key){
   const dict=STRINGS[currentLang]||STRINGS.ja;
   return dict[key]!==undefined?dict[key]:(STRINGS.ja[key]||key);
 }
+// 効果音(音量はこのゲームだけの設定。設定画面から変えられる)
+const SFX=FGLSfx.create({key:'colorcross'});
 function selectLanguage(lang){
   currentLang=lang;
   localStorage.setItem('cc_lang',lang);
@@ -914,6 +922,7 @@ function placeCard(handIdx,r,c){
   if(card.joker) return; // 色と数字を選ぶまでジョーカーは置けない
   if(G.board[idx(r,c)]) return; // カード／マークがあるマスには置けない
   G.board[idx(r,c)]={kind:'card', color:card.color, num:card.num};
+  SFX.play('place');
   G.hand[handIdx]=makeCard();
   G.selHand=-1;
   G.actionLogCount=0; G.turnScoreAccum=0;
@@ -940,14 +949,17 @@ function moveMark(fr,fc,tr_,tc_){
       G.board[idx(fr,fc)]=null;
       G.board[idx(tr_,tc_)]={kind:'mark', color:dst.color,type:dst.type+1};
       G.flash.push({r:tr_,c:tc_,text:T('flash.merge'),ttl:50,rise:14,col:COLORS[dst.color]});
+      SFX.play('merge');
     } else {
       // 入れ替え
       G.board[idx(fr,fc)]=dst;
       G.board[idx(tr_,tc_)]=src;
+      SFX.play('swap');
     }
   } else {
     G.board[idx(tr_,tc_)]=src;
     G.board[idx(fr,fc)]=null;
+    SFX.play('move');
   }
   G.selMark=null;
   G.flow={stage:'preSpawnEval', spawnCount:merged?2:1};
@@ -957,6 +969,7 @@ function moveMark(fr,fc,tr_,tc_){
 function discardCard(handIdx){
   if(G.pendingChoice) return;
   if(!G.hand[handIdx]) return;
+  SFX.play('discard');
   G.hand[handIdx]=makeCard();
   G.selHand=-1;
   G.actionLogCount=0; G.turnScoreAccum=0;
@@ -975,6 +988,7 @@ function moveBoardCard(fr,fc,tr_,tc_){
   }
   G.board[idx(tr_,tc_)]=src;
   G.board[idx(fr,fc)]=null;
+  SFX.play('move');
   G.selBoardCard=null;
   G.actionLogCount=0; G.turnScoreAccum=0;
   G.flow={stage:'preSpawnEval', spawnCount:1};
@@ -989,6 +1003,7 @@ function swapMarkAndCard(mr,mc,cr,cc){
   if(!cardCell||cardCell.kind!=='card') return;
   G.board[idx(mr,mc)]=cardCell;
   G.board[idx(cr,cc)]=markCell;
+  SFX.play('swap');
   G.selMark=null; G.selBoardCard=null;
   G.actionLogCount=0; G.turnScoreAccum=0;
   G.flow={stage:'preSpawnEval', spawnCount:1};
@@ -999,6 +1014,7 @@ function discardBoardCard(r,c){
   if(G.pendingChoice) return;
   const cell=G.board[idx(r,c)];
   if(!cell||cell.kind!=='card') return;
+  SFX.play('discard');
   G.board[idx(r,c)]=null;
   G.selBoardCard=null;
   G.actionLogCount=0; G.turnScoreAccum=0;
@@ -1011,10 +1027,10 @@ function spawnObstacle(){
   if(!spawnable.length) return;
   const {r,c}=spawnable[randInt(spawnable.length)];
   if(Math.random()<CHEST_CHANCE){
-    G.board[idx(r,c)]={kind:'chest'};
+    G.board[idx(r,c)]={kind:'chest'}; SFX.play('chest');
     G.flash.push({r,c,text:T('flash.chestspawn'),ttl:60,rise:16,col:'#d4900a'});
   } else {
-    G.board[idx(r,c)]={kind:'garbage'};
+    G.board[idx(r,c)]={kind:'garbage'}; SFX.play('garbage');
     G.flash.push({r,c,text:T('flash.garbage'),ttl:60,rise:16,col:'#7a7a86'});
   }
 }
@@ -1048,10 +1064,11 @@ function clearAdjacentObstacles(r,c){
     const cell=G.board[idx(nr,nc)];
     if(cell&&cell.kind==='garbage'){
       G.board[idx(nr,nc)]=null;
+      SFX.play('garbagebreak');
       G.flash.push({r:nr,c:nc,text:T('flash.garbagebreak'),ttl:50,rise:12,col:'#7a7a86'});
     } else if(cell&&cell.kind==='chest'){
       G.board[idx(nr,nc)]=null;
-      addItem(ITEM_TYPES[randInt(ITEM_TYPES.length)]);
+      addItem(ITEM_TYPES[randInt(ITEM_TYPES.length)]); SFX.play('item');
       G.flash.push({r:nr,c:nc,text:T('flash.itemdrop'),ttl:55,rise:14,col:'#a76bea'});
     }
   }
@@ -1075,6 +1092,7 @@ function useItem(index){
   if(G.pendingItemDiscard){
     G.items.splice(index,1);
     G.pendingItemDiscard=false;
+    SFX.play('discard');
     return;
   }
   if(type==='star') return; // ⭐は使用不可。タップしても何も起きず、持っている間ずっと効果が続く
@@ -1125,6 +1143,7 @@ function removeAllGarbage(){
   }
 }
 function applyItemEffect(type){
+  SFX.play('itemuse');
   switch(type){
     case 'cardChange': G.hand=[makeCard(),makeCard(),makeCard()]; break;
     case 'removeTri':    removeMarksByType(0); break; // △
@@ -1153,6 +1172,7 @@ function applyItemEffect(type){
 // スコア倍率は、消す前の盤面にある☆・アイテムの⭐・👑の数で決まる（消される☆自身も数に含む）
 function resolveGroup(r,c,color,num,type,grp){
   const comboMult=currentMultiplier();
+  const sfxDelay=G.actionLogCount*120;   // 同時に消える分は少しずつずらして鳴らす
   let mult=1; for(let i=0;i<grp.length;i++) mult*=MARK_MULT[type];
   const base=num*mult;
   const gained=Math.round(base*comboMult);
@@ -1161,6 +1181,7 @@ function resolveGroup(r,c,color,num,type,grp){
   if(gained>G.bestSingleScore) G.bestSingleScore=gained;
   G.flash.push({r,c,text:'+'+gained.toLocaleString(),ttl:60,rise:16,col:'#d4900a'});
   const isStarGroup=type===MARK_MULT.length-1;
+  setTimeout(()=>SFX.play(isStarGroup?'bigclear':'clear',type),sfxDelay);
   for(const g of grp){ G.board[idx(g.r,g.c)]=null; clearAdjacentObstacles(g.r,g.c); }
   G.board[idx(r,c)]=null;
   clearAdjacentObstacles(r,c); // カード自身が消えたことで隣接するおじゃまブロックも消える
@@ -1181,7 +1202,7 @@ function spawnCrown(){
   const spawnable=emptyCells();
   if(!spawnable.length) return;
   const {r,c}=spawnable[randInt(spawnable.length)];
-  G.board[idx(r,c)]={kind:'crown'};
+  G.board[idx(r,c)]={kind:'crown'}; SFX.play('crown');
   G.flash.push({r,c,text:T('flash.crownspawn'),ttl:60,rise:16,col:'#d4900a'});
 }
 // プレイヤーが選んだグループを消す（1つのカードで複数の消し方が選べる場合）
@@ -1291,6 +1312,7 @@ function triggerGameOver(){
   commitTurnScore();
   G.flow=null;
   G.phase='game_over';
+  SFX.play('gameover');
   finalizeScore();
 }
 function finalizeScore(){
@@ -1795,11 +1817,11 @@ cvs.addEventListener('pointermove',e=>{
 cvs.addEventListener('pointerdown',e=>{
   e.preventDefault();
   const{mx,my}=toXY(e);
-  if(howTo){ if(hit(BR.htclose,mx,my)) howTo=false; return; }
+  if(howTo){ if(hit(BR.htclose,mx,my)){ howTo=false; SFX.play('back'); } return; }
   if(G.phase==='game_over'){
-    if(hit(BR.retry, mx,my)) initGame();
-    else if(hit(BR.title2,mx,my)) showTitle();
-    else if(hit(BR.rank2, mx,my)) showRanking();
+    if(hit(BR.retry, mx,my)){ SFX.play('ok'); initGame(); }
+    else if(hit(BR.title2,mx,my)){ SFX.play('back'); showTitle(); }
+    else if(hit(BR.rank2, mx,my)){ SFX.play('click'); showRanking(); }
     return;
   }
   if(G.phase!=='game') return;
@@ -1808,7 +1830,7 @@ cvs.addEventListener('pointerdown',e=>{
   // アイテム使用の確認中：はい/いいえのみ受け付ける
   if(G.itemConfirm){
     if(hit(BR.itemConfirmYes,mx,my)) confirmItemUse(true);
-    else if(hit(BR.itemConfirmNo,mx,my)) confirmItemUse(false);
+    else if(hit(BR.itemConfirmNo,mx,my)){ SFX.play('back'); confirmItemUse(false); }
     return;
   }
 
@@ -1818,7 +1840,7 @@ cvs.addEventListener('pointerdown',e=>{
     for(let ci=0;ci<3;ci++) for(let ni=0;ni<4;ni++){
       if(hit(BR[`jokerpick_${ci}_${ni}`],mx,my)){
         G.hand[gp.handIdx]={kind:'card', color:ci, num:ni+1};
-        G.jokerPicker=null;
+        G.jokerPicker=null; SFX.play('select');
         return;
       }
     }
@@ -1840,7 +1862,7 @@ cvs.addEventListener('pointerdown',e=>{
 
   // アイテムはいつでも使える（8個を超えて捨てる選択中の場合は、タップしたものを捨てる）
   for(let i=0;i<G.items.length;i++){
-    if(hit(BR[`item${i}`],mx,my)){ useItem(i); return; }
+    if(hit(BR[`item${i}`],mx,my)){ if(!G.pendingItemDiscard&&G.items[i]!=='star') SFX.play('click'); useItem(i); return; }
   }
   if(G.pendingItemDiscard) return; // 捨てるまでは他の操作を受け付けない
 
@@ -1848,14 +1870,14 @@ cvs.addEventListener('pointerdown',e=>{
   for(let i=0;i<3;i++){
     if(G.hand[i]&&hit(BR[`h${i}`],mx,my)){
       if(G.hand[i].joker){ G.jokerPicker={handIdx:i}; return; }
-      G.selHand=i; G.selMark=null; G.selBoardCard=null; drag.active=true; drag.mode='hand'; drag.handIdx=i;
+      G.selHand=i; G.selMark=null; G.selBoardCard=null; SFX.play('select'); drag.active=true; drag.mode='hand'; drag.handIdx=i;
       drag.curX=mx; drag.curY=my; drag.startX=mx; drag.startY=my; drag.pid=e.pointerId;
       cvs.setPointerCapture(e.pointerId);
       return;
     }
   }
-  if(hit(BR.howto,mx,my)){ howTo=!howTo; return; }
-  if(hit(BR.back,mx,my)){ showTitle(); return; }
+  if(hit(BR.howto,mx,my)){ howTo=!howTo; SFX.play('click'); return; }
+  if(hit(BR.back,mx,my)){ SFX.play('back'); showTitle(); return; }
   if(hit(BR.discard,mx,my)){
     if(G.selHand>=0) discardCard(G.selHand);
     else if(G.selBoardCard) discardBoardCard(G.selBoardCard.r,G.selBoardCard.c);
@@ -1871,8 +1893,8 @@ cvs.addEventListener('pointerdown',e=>{
   const cellObj=G.board[idx(cell.r,cell.c)];
   if(G.selHand>=0){
     if(!cellObj){ placeCard(G.selHand,cell.r,cell.c); return; }
-    if(cellObj.kind==='mark'||cellObj.kind==='crown'){ G.selHand=-1; G.selMark={r:cell.r,c:cell.c}; return; } // マーク／クラウンをタップ→そちらの選択に切替
-    if(cellObj.kind==='card'){ G.selHand=-1; G.selBoardCard={r:cell.r,c:cell.c}; return; }
+    if(cellObj.kind==='mark'||cellObj.kind==='crown'){ G.selHand=-1; G.selMark={r:cell.r,c:cell.c}; SFX.play('select'); return; } // マーク／クラウンをタップ→そちらの選択に切替
+    if(cellObj.kind==='card'){ G.selHand=-1; G.selBoardCard={r:cell.r,c:cell.c}; SFX.play('select'); return; }
     return; // おじゃまブロックの上には置けない
   }
   if(G.selMark){
@@ -1904,13 +1926,13 @@ cvs.addEventListener('pointerdown',e=>{
   }
   if(cellObj&&(cellObj.kind==='mark'||cellObj.kind==='crown')){
     // マーク／クラウンをタップ/ドラッグ開始：軽いタップなら選択のみ、ドラッグすればそのまま移動・入れ替え・合体
-    G.selMark={r:cell.r,c:cell.c};
+    G.selMark={r:cell.r,c:cell.c}; SFX.play('select');
     drag.active=true; drag.mode='mark'; drag.markCell={r:cell.r,c:cell.c}; drag.tapDeselect=false;
     drag.curX=mx; drag.curY=my; drag.startX=mx; drag.startY=my; drag.pid=e.pointerId;
     cvs.setPointerCapture(e.pointerId);
   } else if(cellObj&&cellObj.kind==='card'){
     // カードをタップ/ドラッグ開始：軽いタップなら選択のみ、ドラッグすればそのまま移動・すてる
-    G.selBoardCard={r:cell.r,c:cell.c};
+    G.selBoardCard={r:cell.r,c:cell.c}; SFX.play('select');
     drag.active=true; drag.mode='boardCard'; drag.boardCardCell={r:cell.r,c:cell.c}; drag.tapDeselect=false;
     drag.curX=mx; drag.curY=my; drag.startX=mx; drag.startY=my; drag.pid=e.pointerId;
     cvs.setPointerCapture(e.pointerId);
@@ -2166,6 +2188,17 @@ document.getElementById('player-select-btn').addEventListener('click',openPM);
 document.getElementById('btn-close-player-manager').addEventListener('click',()=>document.getElementById('player-manager').classList.add('hidden'));
 document.getElementById('btn-open-settings').addEventListener('click',()=>document.getElementById('settings-screen').classList.remove('hidden'));
 document.getElementById('btn-close-settings').addEventListener('click',()=>document.getElementById('settings-screen').classList.add('hidden'));
+FGLSfx.volumeUI('#sfx-vol',SFX);
+// タイトル・ダイアログのボタン音(はじめる・もどる・えらぶ だけ鳴らす)
+document.addEventListener('click',e=>{
+  const b=e.target.closest&&e.target.closest('button');
+  if(!b||b.closest('.fgs-row')) return;
+  const id=b.id||'';
+  if(id==='btn-start-menu'||id==='btn-tutorial') SFX.play('ok');
+  else if(id.indexOf('btn-close')===0) SFX.play('back');
+  else if(b.classList.contains('rank-toggle-btn')||b.classList.contains('lang-btn')) SFX.play('select');
+  else if(id==='btn-view-ranking'||id==='btn-open-settings'||id==='player-select-btn'||id==='btn-add-player') SFX.play('click');
+});
 document.getElementById('btn-add-player').addEventListener('click',addP);
 document.getElementById('input-new-player').addEventListener('keydown',e=>{if(e.key==='Enter')addP();});
 
