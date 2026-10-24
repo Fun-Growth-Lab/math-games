@@ -877,6 +877,7 @@
         .fe-stat-line { color: var(--text-main); font-size: 0.95rem; font-weight: 800; margin-top: 2px; }
     </style>
 <script src="../fgl-name.js?v=20261224"></script>
+<script src="../fgl-sfx.js?v=3"></script>
 </head>
 <body>
 <div id="container">
@@ -951,6 +952,10 @@
             <div class="settings-section">
                 <div class="settings-label" data-i18n="settings_lang_label">言語</div>
                 <div id="settings-lang-options" class="settings-lang-options"></div>
+            </div>
+            <div class="settings-section">
+                <div class="settings-label">🔊 こうかおん / Sound</div>
+                <div id="sfx-vol"></div>
             </div>
             <button class="btn btn-gray" data-i18n="btn_back_title" onclick="closeSettings()">◀ タイトルへ戻る</button>
         </div>
@@ -1429,6 +1434,7 @@ function closeSettings(){
     document.getElementById('title-screen').classList.remove('hidden');
 }
 function renderSettingsScreen(){
+    FGLSfx.volumeUI('#sfx-vol', SFX);
     document.getElementById('settings-lang-options').innerHTML = LANGS.map(lang =>
         `<button class="settings-lang-btn${lang === currentLang ? ' active' : ''}" onclick="setLanguage('${lang}')">${LANG_OPTION_LABELS[lang]}</button>`
     ).join('');
@@ -3154,6 +3160,7 @@ function tryMoveTo(r,c){
 
     current = { r, c };
     visited.add(k);
+    SFX.play('select');
 
     const gotKeyIdx = findKeyIndexAt(current.r, current.c);
     const atChestIdx = findChestIndexAt(current.r, current.c);
@@ -3161,7 +3168,7 @@ function tryMoveTo(r,c){
     if (gotKeyIdx !== -1 && !keyTaken[gotKeyIdx]){
         keyTaken[gotKeyIdx] = true;
         const gotKey = keys[gotKeyIdx];
-        keyCounts[gotKey.type]++;
+        keyCounts[gotKey.type]++; SFX.play('item');
         setMsg(uif('popup_key_get', gotKey.name));
     } else if (atChestIdx !== -1 && !chestOpened[atChestIdx]){
         const chest = chests[atChestIdx];
@@ -3172,10 +3179,10 @@ function tryMoveTo(r,c){
             floorItemsObtained.push(dropped);
             player.inventory.push(dropped); // 在庫は消えないので、選ばなくても後で合成に使える
             player.score += CHEST_SCORE[chest.type] || 0;
-            setMsg(uif('popup_chest_get', chest.name));
+            setMsg(uif('popup_chest_get', chest.name)); SFX.play('chest');
             if (tutorialActive) tutorialFlags.chest = true;
         } else {
-            setMsg(uif('popup_chest_locked', chest.name));
+            setMsg(uif('popup_chest_locked', chest.name)); SFX.play('error');
         }
     } else if (atDotIdx !== -1 && !dotTaken[atDotIdx]){
         dotTaken[atDotIdx] = true;
@@ -3184,18 +3191,18 @@ function tryMoveTo(r,c){
             const gear = player.gear[special.category];
             gear.plusLevel = Math.min(MAX_PLUS_LEVEL, (gear.plusLevel || 0) + special.amount);
             renderStatus();
-            showDgPopup(`${gear.name}<br>+${special.amount}`, '#ffd24a');
+            showDgPopup(`${gear.name}<br>+${special.amount}`, '#ffd24a'); SFX.play('equip');
         } else if (special && special.type === 'practice'){
             const gear = player.gear[special.category];
             const gearName = gear.name;
             player.gear[special.category] = makeGearItem(gear.defId, gear.category, gear.practice + special.amount, gear.skills, gear.plusLevel);
             renderStatus();
-            showDgPopup(uif('popup_practice_up', gearName, PRACTICE_NAME_TEXT(), special.amount), '#5dade2');
+            showDgPopup(uif('popup_practice_up', gearName, PRACTICE_NAME_TEXT(), special.amount), '#5dade2'); SFX.play('equip');
         } else if (special && special.type === 'heal'){
             const potionTier = findAnyPotionTier(special.tierKey);
             player.potions[potionTier.key] = (player.potions[potionTier.key] || 0) + 1;
             updatePotionButtons();
-            showDgPopup(uif('popup_potion_get', potionTier.name), potionTier.color);
+            showDgPopup(uif('popup_potion_get', potionTier.name), potionTier.color); SFX.play('item');
         }
     }
 
@@ -3236,6 +3243,7 @@ function onReachGoal(){
     if (isPerfect){ player.perfectCount++; player.score += PERFECT_SCORE_BONUS; }
     const levelBefore = player.level;
     const leveledUp = gainExp(expGained);
+    SFX.play(leveledUp ? 'levelup' : 'clearstage');
     renderFloorResult(expGained, leveledUp, levelBefore, player.level, isPerfect);
     document.getElementById('floor-result-overlay').classList.remove('hidden');
     // 経験値はここで確定済みのため、ゴール到達直後の位置はもう保存対象にせず、
@@ -3581,6 +3589,7 @@ function battleTryMoveTo(r,c){
 
     bCurrent = { r, c };
     bVisited.add(k);
+    SFX.play('select');
 
     const markIdx = findBattleMarkIndexAt(r,c);
     if (markIdx !== -1 && !bMarkTaken[markIdx]){
@@ -3619,6 +3628,7 @@ function battleTryMoveTo(r,c){
         }
         bTotal[category] += contribution;
         showComboPopup(bCombo, category, contribution, guardProc, critProc);
+        SFX.play(critProc || guardProc ? 'crit' : 'combo', bCombo);
     } else {
         bCombo = 0;
         bLastMarkCategory = null;
@@ -3776,6 +3786,7 @@ function showDamagePop(side, value, guard, heal){
         el.textContent = value;
         el.style.color = '';
     }
+    SFX.play(heal ? 'heal' : (side === 'enemy' ? 'hit' : 'hurt'));
     el.classList.remove('hidden');
     el.style.animation = 'none';
     void el.offsetWidth; // 強制リフローでアニメーションを再生させる
@@ -4988,6 +4999,22 @@ if (window.visualViewport) window.visualViewport.addEventListener('resize', scal
 applyI18n();
 updateNameRegisterBtn();
 refreshTitleButtons();
+</script>
+<script>
+// 効果音(音量はこのゲームだけ。設定画面から変える)。画面を開く・もどる・はじめる、装備や合成などの関数を包んで音を足す
+const SFX = FGLSfx.create({ key: 'hitofude' });
+[['openSettings','click'],['closeSettings','back'],['openRanking','click'],['closeRanking','back'],['openHowTo','click'],['closeHowTo','back'],
+ ['openNameRegister','click'],['closeNameRegister','back'],['goToJobSelect','click'],['closeJobSelect','back'],['confirmJobSelect','ok'],
+ ['startGame','ok'],['startTutorial','ok'],['continueGame','ok'],['doNewGame','ok'],['returnTitle','back'],['nextFloor','ok'],
+ ['openInventory','click'],['closeInventory','back'],['startBattleFromOrganize','ok'],['switchInvTab','select'],['selectInvItem','select'],
+ ['equipFromInventoryScreen','equip'],['finalizeSynthesis','merge'],['doDisenchantInInventory','discard'],['usePotion','heal'],
+ ['openPotionMenu','click'],['closePotionMenu','back'],['showGameOver','gameover'],['showGameClear','fanfare'],['onEnemyDefeated','clearstage'],
+ ['resolveBattleTurn','attack'],['showEventSpring','heal'],['showEventElfShop','chest'],['showEventBlacksmith','chest'],['showEventDojo','chest'],
+ ['chooseBlacksmithItem','equip'],['chooseDojoItem','equip'],['chooseDojoSkill','item'],['closeFloorEvent','back'],['switchRankTab','select'],['switchRankDiff','select']
+].forEach(([fn, snd]) => {
+  const f = window[fn]; if (typeof f !== 'function') return;
+  window[fn] = function () { SFX.play(snd); return f.apply(this, arguments); };
+});
 </script>
 </body>
 </html>
