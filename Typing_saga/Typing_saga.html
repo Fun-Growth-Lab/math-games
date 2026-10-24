@@ -86,6 +86,7 @@
     <script src="data.js"></script>
     <script src="../tutorial-engine.js?v=20261225"></script>
 <script src="../fgl-name.js?v=20261224"></script>
+<script src="../fgl-sfx.js?v=3"></script>
 </head>
 <body>
 
@@ -143,6 +144,11 @@ let auth = null;
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 ctx.imageSmoothingEnabled = false;
+
+// 効果音(音量はこのゲームだけ。設定画面がないので 🔊 ボタンから変える)
+const SFX = FGLSfx.create({ key: 'typingsaga' });
+FGLSfx.mountButton(SFX, { right: 10, bottom: 10, label: '🔊 こうかおん / Sound' });
+let _sfxScene = null, _sfxTitleState = null;
 
 // 冒険者名入力用のゲーム内テキストボックス(ブラウザのprompt()は使わない)
 const nameTextInput = document.getElementById('name-text-input');
@@ -524,11 +530,35 @@ class TypingEngine {
         }
     }
 }
+// タイピングの音: 正しく打てた=小さな音 / 単語を打ちきった=ピンポン / まちがい=低い音
+{
+    const _handleInput = TypingEngine.prototype.handleInput;
+    TypingEngine.prototype.handleInput = function (key) {
+        const live = gameState.scene === SCENES.TYPING && !gameState.typing.isWaitingForStart && gameState.typing.timeLeft > 0;
+        const b = gameState.typing.inputBuffer, t = this.typedKana, w = this.targetKana;
+        _handleInput.call(this, key);
+        if (!live || key.length !== 1) return;
+        if (w !== this.targetKana) SFX.play('correct');
+        else if (this.typedKana !== t || gameState.typing.inputBuffer !== b) SFX.play('select');
+        else SFX.play('miss');
+    };
+}
 const typingEngine = new TypingEngine();
 
 // --- Main Loop & Update ---
 
 function update() {
+    // 画面(シーン)が切りかわったときの音
+    if (gameState.scene !== _sfxScene) {
+        if (_sfxScene !== null) {
+            const sn = { 0: 'back', 2: 'ok', 3: 'ok', 4: 'start', 6: 'heal', 7: 'chest', 8: 'click', 9: 'click' }[gameState.scene];
+            if (sn) SFX.play(sn);
+        }
+        _sfxScene = gameState.scene; _sfxTitleState = gameState.titleState;
+    } else if (gameState.scene === SCENES.TITLE && gameState.titleState !== _sfxTitleState) {
+        SFX.play(gameState.titleState === 0 ? 'back' : 'click');
+        _sfxTitleState = gameState.titleState;
+    }
     if (gameState.scene === SCENES.TITLE && gameState.warningTimer > 0) {
         gameState.warningTimer--;
         if (gameState.warningTimer <= 0) {
@@ -771,7 +801,7 @@ function updateBattle() {
             const isHit = (Math.random() * 100 < hitRate);
 
             if (!isHit) {
-                spawnFloatingText("MISS", ex, groundY - eSize/1.5, "#aaa", false);
+                spawnFloatingText("MISS", ex, groundY - eSize/1.5, "#aaa", false); SFX.play('miss');
             } else {
                 const totalAtk = p.atk * wAtkVal;
                 const enemyDef = gameState.enemy.def;
@@ -783,13 +813,13 @@ function updateBattle() {
                 let dmg = Math.floor(baseDmg);
                 if (dmg < 1) dmg = 1; 
 
-                gameState.enemy.hp -= dmg;
+                gameState.enemy.hp -= dmg; SFX.play(isCrit ? 'crit' : 'attack');
                 spawnFloatingText(dmg, ex, groundY - eSize/1.5, isCrit ? "#ff5555" : "#ffffff", isCrit);
                 gameState.battle.shake = 10;
             }
             
             if (gameState.enemy.hp <= 0) {
-                gameState.battle.phase = 'win';
+                gameState.battle.phase = 'win'; setTimeout(() => SFX.play('clearstage'), 300);
                 
                 if (gameState.enemy.isBoss) {
                     const f = gameState.currentFloor;
@@ -831,19 +861,19 @@ function updateBattle() {
                 let dmg = Math.floor(baseDmg);
                 if (dmg < 1) dmg = 1; 
                 
-                if (isHalfGuard) spawnFloatingText("GUARD!", px, groundY - pSize/1.2, "#55ffff", false);
+                if (isHalfGuard) { spawnFloatingText("GUARD!", px, groundY - pSize/1.2, "#55ffff", false); SFX.play('guard'); }
                 
-                p.hp -= dmg;
+                p.hp -= dmg; SFX.play('hurt');
                 spawnFloatingText(dmg, px, groundY - pSize/1.2, "#ff5555", true);
                 gameState.battle.flash = 0.5;
             }
 
             if (isFullGuard) {
-                spawnFloatingText("PERFECT!", px, groundY - pSize/1.2, "#ffff55", true);
+                spawnFloatingText("PERFECT!", px, groundY - pSize/1.2, "#ffff55", true); SFX.play('guard');
             }
             
             if (p.hp <= 0) {
-                gameState.battle.phase = 'lose';
+                gameState.battle.phase = 'lose'; setTimeout(() => SFX.play('gameover'), 200);
             } else {
                 gameState.battle.phase = 'playerTurn';
             }
@@ -952,6 +982,7 @@ function spawnFloatingText(text, x, y, color, isBig, lifeTime = 60) {
 }
 
 function gameClear() {
+    SFX.play('fanfare');
     gameState.scene = SCENES.RESULT;
     gameState.resultPhase = 0;
     saveScore();
@@ -2557,7 +2588,7 @@ function handleShopClick(x, y) {
         const by = 90 + i * 55;
         if (x > 50 && x < 700 && y > by && y < by + 45) {
             if (!w.sold && gameState.player.gold >= w.price) {
-                gameState.player.gold -= w.price;
+                gameState.player.gold -= w.price; SFX.play('buy');
                 gameState.player.weapon = w;
                 w.sold = true;
                 
@@ -2575,7 +2606,7 @@ function handleShopClick(x, y) {
         const by = 340 + i * 55;
         if (x > 50 && x < 700 && y > by && y < by + 45) {
             if (!a.sold && gameState.player.gold >= a.price) {
-                gameState.player.gold -= a.price;
+                gameState.player.gold -= a.price; SFX.play('buy');
                 gameState.player.armor = a;
                 a.sold = true; 
                 
@@ -2597,7 +2628,7 @@ function handleShopClick(x, y) {
 
             if (!f.sold && canBuy) {
                 if (f.price > 0) gameState.player.gold -= f.price;
-                f.sold = true;
+                f.sold = true; SFX.play('buy');
 
                 // 階層基準価格 (基本強化用)
                 let basePrice = f.price;

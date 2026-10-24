@@ -95,6 +95,7 @@
     </style>
     <script src="../tutorial-engine.js?v=20261225"></script>
 <script src="../fgl-name.js?v=20261224"></script>
+<script src="../fgl-sfx.js?v=3"></script>
 </head>
 <body>
 
@@ -405,6 +406,7 @@ const STRINGS = {
     }
 };
 
+const SFX = FGLSfx.create({ key: 'japanmap' });   // 効果音(音量はこのゲームだけ。設定ダイアログから変える)
 function T(key, params) {
     const dict = STRINGS[currentLang] || {};
     let s = (key in dict) ? dict[key] : ((key in STRINGS.ja) ? STRINGS.ja[key] : key);
@@ -483,7 +485,8 @@ function showCustomPrompt(message, defaultValue, onSubmit) {
 
 function showLangModal() {
     modalTitle.textContent = T('settings_title');
-    modalMessage.textContent = '';
+    modalMessage.innerHTML = '<div id="jm-vol" style="margin:4px 0 10px"></div>';
+    FGLSfx.volumeUI('#jm-vol', SFX, { label: '🔊 こうかおん / Sound' });
     modalInput.style.display = 'none';
     modalButtons.innerHTML = '';
     const langs = [['ja', 'lang_ja'], ['simple', 'lang_simple'], ['en', 'lang_en']];
@@ -651,7 +654,7 @@ function handleInput(e) {
         if (x > 700 && x < 900 && y > 720 && y < 800) gameState = 'title';
     } else if (gameState === 'level_select') {
         if (x > 1250 && x < 1550 && y > 50 && y < 110) {
-            showTime = !showTime;
+            showTime = !showTime; SFX.play('toggle');
             localStorage.setItem('japan_map_show_time', showTime.toString());
             return;
         }
@@ -725,6 +728,8 @@ function handleInput(e) {
                     }
                 }
                 gameState = 'waiting';
+                const okAns = currentMode === 'region' ? opt.name === questions[currentIdx].region : opt.code === questions[currentIdx].code;
+                SFX.play(okAns ? 'correct' : 'wrong');
             }
         });
     } else if (gameState === 'waiting') {
@@ -766,6 +771,19 @@ function registerPlayer(i, isEdit = false) {
     });
 }
 
+// 画面が切りかわったときのボタン音(もどる=back、ゲームはじめ=ok、ほか=click、けっか=clearstage)
+{
+    const _handleInput = handleInput;
+    handleInput = function (e) {
+        const prev = gameState;
+        _handleInput.call(this, e);
+        if (gameState !== prev) {
+            const s = { title: 'back', level_select: 'click', player_select: 'click', ranking: 'click', countdown: 'ok', result: 'clearstage' }[gameState];
+            if (s) SFX.play(s);
+        }
+    };
+}
+
 function startCountdown(level) {
     currentLevel = level;
     gameState = 'countdown';
@@ -785,6 +803,7 @@ function startCountdown(level) {
     if (countdownTimer) clearInterval(countdownTimer);
     countdownTimer = setInterval(() => {
         countdownVal--;
+        SFX.play(countdownVal > 0 ? 'tick' : 'start');
         if (countdownVal <= 0) {
             clearInterval(countdownTimer);
             startQuiz(currentLevel);
