@@ -13,7 +13,7 @@
     function create(opts) {
         opts = opts || {};
         const storeKey = 'fgl_vol_' + (opts.key || 'game');
-        let ac = null, master = null, count = 0, vol = 5, lastVol = 5;
+        let ac = null, master = null, count = 0, vol = 5, lastVol = 5, gesture = false;
         const lastAt = {};
         try {
             const v = localStorage.getItem(storeKey);
@@ -125,7 +125,7 @@
 
         const api = {
             play(name, arg) {
-                if (vol <= 0) return;
+                if (vol <= 0 || !gesture) return;     // 最初の操作の前は鳴らさない(あとでまとめて鳴るのを防ぐ)
                 const now = Date.now();
                 if (now - (lastAt[name] || 0) < 35) return;       // 同じ音が一瞬に何度も鳴らないように
                 lastAt[name] = now;
@@ -150,7 +150,7 @@
             onChange(f) { (api._onChange = api._onChange || []).push(f); }
         };
         // ブラウザは最初の操作のあとでしか音を出せないので、最初の操作で準備する
-        const once = () => { api.unlock(); };
+        const once = () => { gesture = true; api.unlock(); };
         ['pointerdown', 'keydown', 'touchstart'].forEach(ev => document.addEventListener(ev, once, { capture: true, passive: true }));
         instances.push(api);
         return api;
@@ -226,5 +226,39 @@
         document.addEventListener('pointerdown', (e) => { if (!pop.contains(e.target) && e.target !== fab) pop.classList.add('hide'); }, true);
         return { fab, pop };
     }
-    window.FGLSfx = { create, volumeUI, mountButton, NOTE };
+    // ---- メニューのボタン音(重要ボタンだけ)。タイトル・ダイアログ共通 ----
+    //   ok: はじめる/決定  back: もどる/とじる  select: タブ切替  click: 画面を開く
+    //   o.ok / o.click / o.back / o.select に追加のセレクタを渡せる
+    function buttonSound(b, o) {
+        o = o || {};
+        const m = (sel) => sel && b.matches(sel);
+        const id = b.id || '';
+        if (id === 'btn-start-menu' || id === 'btn-tutorial' || m(o.ok)) return 'ok';
+        if (/^btn-(close|back)/.test(id) || m(o.back)) return 'back';
+        if (b.classList.contains('rank-toggle-btn') || b.classList.contains('lang-btn') || m(o.select)) return 'select';
+        if (/^(btn-view-ranking|btn-view-achievement|btn-open-settings|player-select-btn|btn-add-player)$/.test(id) || m(o.click)) return 'click';
+        return null;
+    }
+    function menuSounds(sfx, o) {
+        document.addEventListener('click', (e) => {
+            const b = e.target.closest && e.target.closest('button,a.btn,a.btn3d');
+            if (!b || b.closest('.fgs-row,.fgs-pop')) return;
+            const n = buttonSound(b, o);
+            if (n) sfx.play(n);
+        });
+    }
+    // 設定画面(#settings-screen)の「とじる」ボタンの手前に 効果音の音量バーを入れる
+    function settingsRow(sfx, o) {
+        style();
+        o = o || {};
+        const close = document.querySelector(o.before || '#btn-close-settings');
+        if (!close) return;
+        const anchor = o.anchor ? document.querySelector(o.anchor) : (close.parentElement.children.length === 1 ? close.parentElement : close);
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'margin:16px 0 4px;text-align:center';
+        wrap.innerHTML = '<p class="fgs-lab" style="margin:0 0 8px;font-size:.9rem;opacity:.85">' + (o.label || '🔊 こうかおん / Sound') + '</p><div class="fgs-host"></div>';
+        anchor.parentNode.insertBefore(wrap, anchor);
+        return volumeUI(wrap.querySelector('.fgs-host'), sfx);
+    }
+    window.FGLSfx = { create, volumeUI, mountButton, menuSounds, buttonSound, settingsRow, NOTE };
 })();

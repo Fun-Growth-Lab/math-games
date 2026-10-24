@@ -226,6 +226,7 @@
 <script src="../fgl-title-boot.js?v=1"></script>
 <script>FGLBoot.title({ host:'#title-screen', bg:"url('title_parts/key.webp') center / cover no-repeat, #0a1030" });</script>
 <script src="../fgl-name.js?v=20261224"></script>
+<script src="../fgl-sfx.js?v=2"></script>
 </head>
 <body>
 
@@ -517,6 +518,7 @@ const STRINGS = {
     },
 };
 let currentLang = localStorage.getItem('modblitz_lang') || 'ja';
+const SFX = FGLSfx.create({ key: 'modulo' });
 function T(key, params) {
     const dict = STRINGS[currentLang] || STRINGS.ja;
     let str = dict[key] !== undefined ? dict[key] : (STRINGS.ja[key] || key);
@@ -1045,7 +1047,7 @@ function checkMatchesAndScore() {
             
             if (state.nextBossIndex < CONFIG.bossThresholds.length && state.matchCount >= CONFIG.bossThresholds[state.nextBossIndex] && !state.bossSpawnPending && !state.bossDefeated && !state.bossSpawnedForCurrentRound && !state.showDangerWarning) {
                 state.nextBossIndex++;
-                state.showDangerWarning = true;
+                state.showDangerWarning = true; SFX.play('warn');
             }
 
             cluster.forEach(pos => {
@@ -1056,9 +1058,9 @@ function checkMatchesAndScore() {
                     const nr = pos.r + dr, nc = pos.c + dc;
                     if(nr>=0 && nr<5 && nc>=0 && nc<5 && !state.board[nr][nc].isMatch) {
                         const t = state.board[nr][nc].type;
-                        if(t === 'JAMMER') { state.board[nr][nc].isMatch = true; const jp=getCellPosition(nr,nc); state.particles.push(new Particle(jp.x+jp.size/2, jp.y+jp.size/2, T('particle_broken'), '#7f8c8d')); }
+                        if(t === 'JAMMER') { state.board[nr][nc].isMatch = true; const jp=getCellPosition(nr,nc); state.particles.push(new Particle(jp.x+jp.size/2, jp.y+jp.size/2, T('particle_broken'), '#7f8c8d')); SFX.play('garbagebreak'); }
                         else if(t === 'BOMB') { bombTriggers.push({r: nr, c: nc}); state.board[nr][nc].isMatch = true; }
-                        else if(t === 'DIAMOND') { state.board[nr][nc].isMatch = true; state.diamonds++; const jp=getCellPosition(nr,nc); state.particles.push(new Particle(jp.x+jp.size/2, jp.y+jp.size/2, T('particle_diamond_get'), '#00ffff')); }
+                        else if(t === 'DIAMOND') { state.board[nr][nc].isMatch = true; state.diamonds++; const jp=getCellPosition(nr,nc); state.particles.push(new Particle(jp.x+jp.size/2, jp.y+jp.size/2, T('particle_diamond_get'), '#00ffff')); SFX.play('item'); }
                         else if(t === 'BOSS') { damagedBosses.add(`${nr},${nc}`); }
                     }
                 });
@@ -1067,7 +1069,7 @@ function checkMatchesAndScore() {
             state.targetNumbers.forEach(t => { if (t === val) { mul *= 2; targetHitCount++; } });
             if (targetHitCount > 0) eCount[val] = (eCount[val] || 0) + 1;
             totalScore += ( (N===3?100:(N===4?200:(N-2)*100)) + state.comboCount*100 ) * mul;
-            if (targetHitCount > 0) state.particles.push(new Particle(1280/2, 720*0.25, T('particle_target_bonus', {mul: mul}), '#2ecc71', 'combo'));
+            if (targetHitCount > 0) state.particles.push(new Particle(1280/2, 720*0.25, T('particle_target_bonus', {mul: mul}), '#2ecc71', 'combo')); SFX.play('coin');
         }
     }
 
@@ -1075,12 +1077,14 @@ function checkMatchesAndScore() {
     state.comboCount++;
     Object.keys(eCount).forEach(k => { const v=parseInt(k); let i=state.targetNumbers.length; while(i--) if(state.targetNumbers[i]===v) state.targetNumbers.splice(i,1); });
     state.score += totalScore; state.actions += 1;
+    SFX.play(state.comboCount > 1 ? 'combo' : 'clear', state.comboCount > 1 ? state.comboCount - 1 : 2);
+    if (totalScore >= 600) setTimeout(() => SFX.play('bigclear'), 160);
     state.particles.push(new Particle(1280/2, 720*0.45, T('particle_score_gain', {n: totalScore}), '#e67e22', 'combo'));
     if (state.comboCount > 1) state.particles.push(new Particle(1280/2, 720*0.35, T('particle_combo', {n: state.comboCount}), '#e74c3c', 'combo'));
 
     damagedBosses.forEach(key => {
         const [r, c] = key.split(',').map(Number);
-        state.board[r][c].hp--;
+        state.board[r][c].hp--; SFX.play('hit');
         const jp=getCellPosition(r,c);
         state.particles.push(new Particle(jp.x+jp.size/2, jp.y+jp.size/2, "-1", '#e74c3c'));
         if (state.board[r][c].hp <= 0) {
@@ -1099,6 +1103,7 @@ function checkMatchesAndScore() {
         let key = `${b.r},${b.c}`;
         if (explodedBombs.has(key)) continue;
         explodedBombs.add(key);
+        SFX.play('attack');
 
         const {x, y, size} = getCellPosition(b.r, b.c); 
         state.particles.push(new Particle(x+size/2, y+size/2, T('particle_explosion'), '#e67e22', 'combo'));
@@ -1208,7 +1213,7 @@ async function handleMatching() {
         }
 
         if(state.bossDefeated && !state.clearedRounds.includes(state.round)) {
-            state.clearedRounds.push(state.round);
+            state.clearedRounds.push(state.round); SFX.play('clearstage');
             if(state.round >= CONFIG.maxRound) {
                 updateUI();
                 if(!state.isClearCounted) { incrementClearCount(state.difficulty); state.isClearCounted = true; }
@@ -1231,6 +1236,7 @@ async function handleMatching() {
 
 async function applyCard(r, c, card) {
     state.inputLocked = true;
+    SFX.play('place');
     let o = state.board[r][c].value; 
     let n = applyModulo(o, card.value); 
     state.board[r][c].value = n;
@@ -1279,6 +1285,7 @@ async function applyCard(r, c, card) {
         }
 
         if (attacked || apReduced) {
+            SFX.play('hurt');
             const canvasEl = document.getElementById('gameCanvas');
             const hudEl = document.getElementById('hud-layer');
             canvasEl.classList.remove('damage-shake');
@@ -1300,6 +1307,7 @@ async function applyCard(r, c, card) {
 function gameOver(clearFlag) {
     if(state.isGameOverProcessing) return;
     state.isGameOverProcessing = true; state.inputLocked = true; const isNew = saveScore(state.difficulty, state.score);
+    SFX.play(clearFlag ? 'fanfare' : 'gameover');
     const res = document.getElementById('game-result');
     const newRecordHtml = isNew ? `<p style="color:#00f0ff; font-weight:bold; font-size:1.2rem;">${T('new_record')}</p>` : '';
     const rankDisabledHtml = !state.isRankEligible ? `<p style="color:#a0aab5;">${T('rank_disabled')}</p>` : '';
@@ -1312,7 +1320,7 @@ function gameOver(clearFlag) {
 }
 
 window.useDiamondAct = function(num) {
-    hideModal('diamond-modal'); 
+    hideModal('diamond-modal'); SFX.play('itemuse');
     state.diamonds--; 
     
     state.specialCard = new HandCard(-1);
@@ -1419,6 +1427,9 @@ document.getElementById('btn-title-index').onclick = () => window.location.href=
 document.getElementById('btn-title-login').onclick = window.handleLogin;
 document.getElementById('btn-title-logout').onclick = window.handleLogout;
 document.getElementById('btn-title-settings').onclick = () => showModal('settings-modal');
+// 効果音(音量はこのゲームだけ。設定画面から変える)
+FGLSfx.settingsRow(SFX, { before: '#settings-modal .btn-gray' });
+FGLSfx.menuSounds(SFX, { ok: '#btn-title-start,#btn-title-tutorial,#btn-diff-easy,#btn-diff-normal,#btn-diff-hard', back: '.btn-gray,#btn-title-index', click: '#btn-title-player,#btn-title-ranking,#btn-title-settings,#btn-title-login', select: '#btn-rank-world,#btn-rank-local' });
 
 let currentRankingMode = 'WORLD';
 

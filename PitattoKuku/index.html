@@ -364,6 +364,7 @@
     </style>
     <script src="../tutorial-engine.js?v=20261225"></script>
 <script src="../fgl-name.js?v=20261224"></script>
+<script src="../fgl-sfx.js?v=2"></script>
 </head>
 <body>
 <div id="container">
@@ -440,6 +441,10 @@
             <div class="settings-section">
                 <div class="settings-label" data-i18n="settings_lang_label">言語</div>
                 <div id="settings-lang-options" class="settings-lang-options"></div>
+            </div>
+            <div class="settings-section">
+                <div class="settings-label">🔊 こうかおん / Sound</div>
+                <div id="sfx-vol"></div>
             </div>
             <button class="btn" data-i18n="btn_back_title" onclick="closeSettings()">◀ タイトルへ戻る</button>
         </div>
@@ -716,7 +721,7 @@ function applyI18n(){
 }
 
 const LANG_OPTION_LABELS = { ja: '日本語', ja_easy: 'かんたんなにほんご', en: 'English' };
-function openSettings(){ goTo('settings-screen'); renderSettingsScreen(); }
+function openSettings(){ goTo('settings-screen'); renderSettingsScreen(); FGLSfx.volumeUI('#sfx-vol', SFX); }
 function closeSettings(){ goTo('title-screen'); }
 function renderSettingsScreen(){
     const wrap = document.getElementById('settings-lang-options');
@@ -726,7 +731,9 @@ function renderSettingsScreen(){
 // ============================================================
 // 画面切り替え
 // ============================================================
+const SFX = FGLSfx.create({ key: 'pitatto' });
 function goTo(id){
+    if (id === 'title-screen') SFX.play('back'); else if (id !== 'play-screen') SFX.play('click');
     document.querySelectorAll('.screen').forEach(el => el.classList.add('hidden'));
     document.getElementById(id).classList.remove('hidden');
     if (id !== 'play-screen') document.getElementById('container').classList.remove('danger');
@@ -968,6 +975,7 @@ function tileAtExcept(row,col,exceptId){
 }
 
 function startGame(){
+    SFX.play('ok');
     currentDan = selectedDan;
     spawnPool = buildSpawnPool(currentDan);
     tiles = [];
@@ -1209,6 +1217,7 @@ function spawnMergeGhost(value, row, col){
 const DIRS = { up:[-1,0], down:[1,0], left:[0,-1], right:[0,1] };
 
 function selectTile(id){
+    SFX.play('select');
     selectedTileId = (selectedTileId===id) ? null : id;
     renderBoard();
 }
@@ -1228,11 +1237,13 @@ function performMove(id, dir){
         cur = { row:nr, col:nc };
     }
     if (!target && cur.row===t.row && cur.col===t.col){
+        SFX.play('error');
         shakeTile(id);
         return;
     }
 
     animating = true;
+    SFX.play('move');
     selectedTileId = null;
     const fromRow = t.row, fromCol = t.col;
     if (target){ t.row = target.row; t.col = target.col; }
@@ -1251,6 +1262,7 @@ function performMove(id, dir){
                 if (idx>=1 && idx<=9) achievedSet.add(idx);
                 checkMagnitudeAchievement(sum);
                 spawnMergeGhost(sum, target.row, target.col);
+                SFX.play(idx >= 7 ? 'bigclear' : 'clear', idx - 1);
                 spawnFloatingScore(sum*sum*10, target.row, target.col);
                 renderBoard();
                 renderChips();
@@ -1258,7 +1270,7 @@ function performMove(id, dir){
                 target.value = sum;
                 tiles = tiles.filter(x => x!==t);
                 renderBoard();
-                pulseTile(target.id);
+                pulseTile(target.id); SFX.play('merge');
             }
         }
         updateHud();
@@ -1369,12 +1381,12 @@ window.addEventListener('keydown', e => {
 });
 
 // ---- あそびかた ----
-function openHowTo(){ document.getElementById('howto-modal').classList.remove('hidden'); }
-function closeHowTo(){ document.getElementById('howto-modal').classList.add('hidden'); }
+function openHowTo(){ SFX.play('click'); document.getElementById('howto-modal').classList.remove('hidden'); }
+function closeHowTo(){ SFX.play('back'); document.getElementById('howto-modal').classList.add('hidden'); }
 
 // ---- リタイア ----
-function requestRetire(){ document.getElementById('retire-modal').classList.remove('hidden'); }
-function closeRetireModal(){ document.getElementById('retire-modal').classList.add('hidden'); }
+function requestRetire(){ SFX.play('click'); document.getElementById('retire-modal').classList.remove('hidden'); }
+function closeRetireModal(){ SFX.play('back'); document.getElementById('retire-modal').classList.add('hidden'); }
 function confirmRetire(){
     closeRetireModal();
     gameEnded = true;
@@ -1384,16 +1396,19 @@ function confirmRetire(){
 // ---- クリア／ゲームオーバー／タイムアップ ----
 function onStageClear(){
     gameEnded = true;
+    SFX.play('fanfare');
     recordRunResult('clear');
     showResult('clear');
 }
 function onGameOver(){
     gameEnded = true;
+    SFX.play('gameover');
     recordRunResult('gameover');
     showResult('gameover');
 }
 function onTimeUp(){
     gameEnded = true;
+    SFX.play('gameover');
     recordRunResult('timeup');
     showResult('timeup');
 }

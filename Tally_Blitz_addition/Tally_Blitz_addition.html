@@ -474,6 +474,7 @@
 <script src="../fgl-title-boot.js?v=1"></script>
 <script>FGLBoot.title({ host:'#title-screen', hide:['.title-box'] });</script>
 <script src="../fgl-name.js?v=20261224"></script>
+<script src="../fgl-sfx.js?v=2"></script>
 </head>
 <body>
 
@@ -867,6 +868,8 @@ const STRINGS = {
     },
 };
 let currentLang = localStorage.getItem('tally_blitz_lang') || 'ja';
+const SFX = FGLSfx.create({ key: 'tally' });
+const BTN_SFX = { ok: '#btn-easy,#btn-normal,#btn-hard', back: '#btn-to-title,#btn-index,#btn-cancel-diamond', click: '#btn-player-name,#btn-how-to-play,#btn-use-diamond,#btn-login,#btn-logout' };
 function T(key, params) {
     const dict = STRINGS[currentLang] || STRINGS.ja;
     let str = dict[key] !== undefined ? dict[key] : (STRINGS.ja[key] || key);
@@ -1406,7 +1409,7 @@ function slideBlock() {
     if(!state.activeBlock || state.inputLocked || state.fastDropping) return;
     const b = state.activeBlock;
     const v = b.values.pop();
-    b.values.unshift(v);
+    b.values.unshift(v); SFX.play('toggle');
     draw();
 }
 
@@ -1414,7 +1417,7 @@ function moveBlock(dir) {
     if(!state.activeBlock || state.inputLocked || state.fastDropping) return;
     const b = state.activeBlock;
     if(canPlace(b.x + dir, b.y, b.rot, b.values)) {
-        b.x += dir;
+        b.x += dir; SFX.play('tick');
         draw(); 
     }
 }
@@ -1429,6 +1432,7 @@ function lockBlock() {
     const b = state.activeBlock;
     state.activeBlock = null; 
     state.fastDropping = false;
+    SFX.play('place');
     
     const landY = Math.round(b.y);
     const cells = getOccupiedCells(b.x, landY, b.rot, b.values.length);
@@ -1448,6 +1452,7 @@ function lockBlock() {
 }
 
 function triggerSpecialEffect(startX, startY) {
+    SFX.play('attack'); setTimeout(() => SFX.play('bigclear'), 120);
     let toClear = new Set(); 
     let queue = [{c: startX, r: startY}];
     toClear.add(`${startX},${startY}`);
@@ -1512,7 +1517,7 @@ async function processTurn(skipRise = false) {
                         const sum = upper + lower;
                         if(sum < 10) {
                             state.grid[r+1][c] = sum; state.grid[r][c] = 0;
-                            spawnParticle(c, r+1, T('particle_merge'), "#3498db"); changeOccurred = true;
+                            spawnParticle(c, r+1, T('particle_merge'), "#3498db"); changeOccurred = true; SFX.play('move');
                         } else if(sum === 10) {
                             state.grid[r+1][c] = 0; state.grid[r][c] = 0;
 
@@ -1529,7 +1534,7 @@ async function processTurn(skipRise = false) {
                                 const tv = state.grid[nr][nc];
                                 if(tv === BLOCK_VAL_OBSTACLE) {
                                     state.grid[nr][nc] = 0;
-                                    spawnParticle(nc, nr, "Break!", "#ff9a9e");
+                                    spawnParticle(nc, nr, "Break!", "#ff9a9e"); SFX.play('garbagebreak');
                                     bonus += 10;
                                 } else if(tv === BLOCK_VAL_SPECIAL) {
                                     triggerSpecialEffect(nc, nr);
@@ -1537,7 +1542,7 @@ async function processTurn(skipRise = false) {
                                 } else if(tv === BLOCK_VAL_DIAMOND) {
                                     state.grid[nr][nc] = 0;
                                     state.diamondStock++;
-                                    spawnParticle(nc, nr, "💎GET!", "#a18cd1");
+                                    spawnParticle(nc, nr, "💎GET!", "#a18cd1"); SFX.play('item');
                                     bonus += 30;
                                 } else if(tv === BLOCK_VAL_BOSS) {
                                     damageBoss(nr, nc);
@@ -1553,13 +1558,14 @@ async function processTurn(skipRise = false) {
                             spawnParticle(2, 3, `+${Math.floor(point)}`, "#f6d365");
                             changeOccurred = true;
                             showComboAnim(state.combo + " COMBO", point);
+                            SFX.play(state.combo > 1 ? 'combo' : 'clear', state.combo > 1 ? state.combo - 1 : 2);
                         } else {
                             let nextVal = BLOCK_VAL_OBSTACLE;
                             if(Math.random() < 0.05) nextVal = BLOCK_VAL_SPECIAL;
 
                             if(lower !== BLOCK_VAL_OBSTACLE && lower !== BLOCK_VAL_SPECIAL &&
                                lower !== BLOCK_VAL_DIAMOND  && lower !== BLOCK_VAL_BOSS) {
-                                state.grid[r+1][c] = nextVal; state.grid[r][c] = sum - 10;
+                                state.grid[r+1][c] = nextVal; state.grid[r][c] = sum - 10; SFX.play('garbage');
                                 spawnParticle(c, r+1, "Over!", "#999"); changeOccurred = true;
                             }
                         }
@@ -1582,7 +1588,7 @@ async function processTurn(skipRise = false) {
     // ボス閾値チェック（runPhysics後に判定）
     if(!state.bossSpawnPending && state.nextBossIndex < state.maxBosses &&
        state.totalTens >= BOSS_THRESHOLDS[state.nextBossIndex]) {
-        state.nextBossIndex++;
+        state.nextBossIndex++; SFX.play('warn');
         // DANGER! 演出
         if(ui.dangerWarning) {
             ui.dangerWarning.classList.remove('hidden');
@@ -2068,10 +2074,11 @@ function damageBoss(r, c) {
     if(!state.bossGrid[r] || !state.bossGrid[r][c]) return;
     const boss = state.bossGrid[r][c];
     boss.hp--;
-    spawnParticle(c, r, "-1", "#e74c3c");
+    spawnParticle(c, r, "-1", "#e74c3c"); SFX.play('hit');
     draw(); updateUI();
 
     if(boss.hp <= 0) {
+        SFX.play('clearstage');
         state.grid[r][c] = 0;
         state.bossGrid[r][c] = null;
         state.bossesDefeated++;
@@ -2099,6 +2106,7 @@ function damageBoss(r, c) {
 }
 
 function gameClear() {
+    SFX.play('fanfare');
     state.screen = 'GAMEOVER'; // ゲームループ停止のため同じ状態を使用
     if(state.timerId) clearTimeout(state.timerId); state.timerId = null;
     ui.controls.classList.add('hidden'); ui.btnToTitle.classList.add('hidden');
@@ -2117,12 +2125,13 @@ function gameClear() {
         </div>
     `;
     ui.result.style.display = 'block';
-    document.getElementById('btn-retry').onclick = () => { ui.result.style.display='none'; startGame(); };
-    document.getElementById('btn-home').onclick  = () => { ui.result.style.display='none'; backToTitle(); };
+    document.getElementById('btn-retry').onclick = () => { SFX.play('ok'); ui.result.style.display='none'; startGame(); };
+    document.getElementById('btn-home').onclick  = () => { SFX.play('back'); ui.result.style.display='none'; backToTitle(); };
 }
 
 // --- Control Handlers ---
 function gameOver() {
+    SFX.play('gameover');
     state.screen = 'GAMEOVER';
     if(state.timerId) clearTimeout(state.timerId); state.timerId = null;
     ui.controls.classList.add('hidden'); ui.btnToTitle.classList.add('hidden');
@@ -2140,8 +2149,8 @@ function gameOver() {
         </div>
     `;
     ui.result.style.display = 'block';
-    document.getElementById('btn-retry').onclick = () => { ui.result.style.display='none'; startGame(); };
-    document.getElementById('btn-home').onclick = () => { ui.result.style.display='none'; backToTitle(); };
+    document.getElementById('btn-retry').onclick = () => { SFX.play('ok'); ui.result.style.display='none'; startGame(); };
+    document.getElementById('btn-home').onclick = () => { SFX.play('back'); ui.result.style.display='none'; backToTitle(); };
 }
 
 function handleStart(diff) {
@@ -2285,7 +2294,7 @@ function countBossesOnBoard() {
 
 function bind(el, fn) {
     if(!el) return;
-    const handler = (e) => { e.preventDefault(); fn(); };
+    const handler = (e) => { e.preventDefault(); const sn = FGLSfx.buttonSound(el, BTN_SFX); if (sn) SFX.play(sn); fn(); };
     el.addEventListener('mousedown', handler);
     el.addEventListener('touchstart', handler, {passive:false});
 }
@@ -2300,7 +2309,7 @@ function hideDiamondPicker() {
 }
 async function useDiamond(number) {
     if(state.diamondStock <= 0 || state.inputLocked || state.screen !== 'PLAYING') return;
-    hideDiamondPicker();
+    hideDiamondPicker(); SFX.play('itemuse');
 
     // そのすうじのブロックが存在するか確認
     let found = false;
@@ -2528,6 +2537,7 @@ bind(document.getElementById('btn-close-settings'), () => {
     ui.mainMenu.classList.remove('hidden');
 });
 
+FGLSfx.settingsRow(SFX);   // 設定画面に効果音の音量バー
 applyLanguage();
 backToTitle();
 </script>

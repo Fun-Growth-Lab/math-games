@@ -156,6 +156,7 @@ canvas{position:absolute;top:0;left:0;touch-action:none;}
 <script>FGLBoot.title({ host:'#title-screen', bg:"url('title_parts/key.webp') center / cover no-repeat, #050a1c" });</script>
 <script src="../fgl-name.js?v=20261224"></script>
 <script src="../fgl-cui.js?v=1"></script>
+<script src="../fgl-sfx.js?v=2"></script>
 </head>
 <body>
 <div id="container">
@@ -495,6 +496,7 @@ const STRINGS={
   },
 };
 let currentLang=localStorage.getItem('ts_lang')||'ja';
+const SFX=FGLSfx.create({key:'trisquare'});
 function T(key){
   const dict=STRINGS[currentLang]||STRINGS.ja;
   return dict[key]!==undefined?dict[key]:(STRINGS.ja[key]||key);
@@ -762,6 +764,7 @@ function checkGameOver(){
   if(G.hand.some((p,i)=>p&&G.placedSinceDiscard[i]>=5)) return;  // いずれかが捨てられる → まだゲームオーバーでない
   if(G.hand.some(p=>p&&anyValid(p))) return;
   G.phase='game_over';
+  setTimeout(()=>SFX.play('gameover'),250);
   onGameOver();
 }
 
@@ -1470,13 +1473,15 @@ function place(hi,ar,ac){
     G.flash.push({r:ar,c:ac,text:'= '+blockScore+'pt',ttl:55,sz:0,col:'#ffe066',delay:42});
   }
 
+  SFX.play('place');
+  if(mp>1) setTimeout(()=>SFX.play('combo',mp-1),140);
   G.placedSinceDiscard=G.placedSinceDiscard.map(c=>Math.min(c+1,5));
   G.hand[hi]=mkPiece();
   G.selHand=-1;
   // ステージクリア: 全セルが完全に埋まっている (t=0+t=1 または t=2+t=3)
   let allFull=true;
   for(let r=0;r<GN&&allFull;r++) for(let c=0;c<GN&&allFull;c++) if(!cellFull(r,c)) allFull=false;
-  if(allFull){ checkStageMilestones(G.stage); startReward(); G.phase='stage_clear'; return; }
+  if(allFull){ setTimeout(()=>SFX.play('clearstage'),200); checkStageMilestones(G.stage); startReward(); G.phase='stage_clear'; return; }
   pickBonusCell();
   checkGameOver();
 }
@@ -1486,6 +1491,7 @@ function place(hi,ar,ac){
 // ============================================================
 function discard(hi){
   if(!G.hand[hi]||G.placedSinceDiscard[hi]<5) return;
+  SFX.play('discard');
   G.hand[hi]=mkPiece();
   G.placedSinceDiscard[hi]=0;  // そのスロットだけリセット: また5ターン待つ
   G.selHand=-1;
@@ -1525,7 +1531,7 @@ cvs.addEventListener('pointerdown',e=>{
   e.preventDefault();
   const{mx,my}=toXY(e);
   // How-to overlay
-  if(howTo){if(hit(BR.htclose,mx,my)) howTo=false; return;}
+  if(howTo){if(hit(BR.htclose,mx,my)){ howTo=false; SFX.play('back'); } return;}
   // Stage clear overlay — 3択カードを直接タップで選択
   if(G.phase==='stage_clear'){
     for(let i=0;i<3;i++){
@@ -1541,6 +1547,7 @@ cvs.addEventListener('pointerdown',e=>{
           G.pieceLevels[defId]+=bonusLvs;
         }
         G.pendingRewardId=defId;
+        SFX.play('item');
         nextStage();
         return;
       }
@@ -1549,9 +1556,9 @@ cvs.addEventListener('pointerdown',e=>{
   }
   // Game over overlay
   if(G.phase==='game_over'){
-    if(hit(BR.retry, mx,my)) startGame();
-    else if(hit(BR.title2,mx,my)) showTitle();
-    else if(hit(BR.rank2, mx,my)) showRanking();
+    if(hit(BR.retry, mx,my)){ SFX.play('ok'); startGame(); }
+    else if(hit(BR.title2,mx,my)){ SFX.play('back'); showTitle(); }
+    else if(hit(BR.rank2, mx,my)){ SFX.play('click'); showRanking(); }
     return;
   }
   if(G.phase!=='game') return;
@@ -1559,7 +1566,7 @@ cvs.addEventListener('pointerdown',e=>{
   // Start drag from hand card
   for(let i=0;i<3;i++){
     if(G.hand[i]&&hit(BR[`h${i}`],mx,my)){
-      G.selHand=i;
+      G.selHand=i; SFX.play('select');
       drag.active=true; drag.handIdx=i;
       drag.curX=mx; drag.curY=my;
       drag.startX=mx; drag.startY=my;
@@ -1572,10 +1579,10 @@ cvs.addEventListener('pointerdown',e=>{
   for(let i=0;i<3;i++){
     if(G.hand[i]&&hit(BR[`r${i}`],mx,my)){
       const p=G.hand[i];
-      p.rot=(p.rot+(p.flipped?3:1))%4; return;
+      p.rot=(p.rot+(p.flipped?3:1))%4; SFX.play('toggle'); return;
     }
     if(G.hand[i]&&hit(BR[`f${i}`],mx,my)){
-      G.hand[i].flipped=!G.hand[i].flipped; return;
+      G.hand[i].flipped=!G.hand[i].flipped; SFX.play('toggle'); return;
     }
   }
   // Discard
@@ -1584,8 +1591,8 @@ cvs.addEventListener('pointerdown',e=>{
     if(db&&db.active&&hit(db,mx,my)){discard(i); return;}
   }
   // Sub-buttons
-  if(hit(BR.howto,mx,my)){howTo=!howTo; return;}
-  if(hit(BR.back, mx,my)){showTitle(); return;}
+  if(hit(BR.howto,mx,my)){howTo=!howTo; SFX.play('click'); return;}
+  if(hit(BR.back, mx,my)){SFX.play('back'); showTitle(); return;}
   // Grid tap → place selected piece
   const cell=toCell(mx,my);
   if(cell&&G.selHand>=0){place(G.selHand,cell.r,cell.c); return;}
@@ -1903,6 +1910,9 @@ document.getElementById('player-select-btn').addEventListener('click',openPM);
 document.getElementById('btn-close-player-manager').addEventListener('click',()=>document.getElementById('player-manager').classList.add('hidden'));
 document.getElementById('btn-open-settings').addEventListener('click',()=>document.getElementById('settings-screen').classList.remove('hidden'));
 document.getElementById('btn-close-settings').addEventListener('click',()=>document.getElementById('settings-screen').classList.add('hidden'));
+// 効果音(音量はこのゲームだけ。設定画面から変える)
+FGLSfx.settingsRow(SFX);
+FGLSfx.menuSounds(SFX,{ok:'#btn-easy,#btn-normal,#btn-hard'});
 document.getElementById('btn-add-player').addEventListener('click',addP);
 document.getElementById('input-new-player').addEventListener('keydown',e=>{if(e.key==='Enter')addP();});
 

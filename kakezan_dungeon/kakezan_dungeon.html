@@ -442,6 +442,7 @@
 <script src="../fgl-title-boot.js?v=1"></script>
 <script>FGLBoot.title({ host:'#title-screen' });</script>
 <script src="../fgl-name.js?v=20261224"></script>
+<script src="../fgl-sfx.js?v=2"></script>
 </head>
 <body>
 
@@ -713,6 +714,10 @@
         },
     };
     let currentLang = localStorage.getItem('kakezan_lang') || 'ja';
+    // 効果音(音量はこのゲームだけ。設定画面から変える)
+    const SFX = FGLSfx.create({ key: 'kakezan' });
+    FGLSfx.settingsRow(SFX, { before: '#settings-screen .btn-index' });
+    FGLSfx.menuSounds(SFX, { ok: '#start-btn-trigger,#tutorial-btn-trigger,#custom-confirm-yes,#difficulty-screen .btn:not(.btn-index)', back: '#custom-confirm-no,.btn-index,.btn-danger', click: '#title-menu .btn,.tab-btn,.diff-btn', select: '.num-btn' });
     function T(key, params) {
         const dict = STRINGS[currentLang] || STRINGS.ja;
         let str = dict[key] !== undefined ? dict[key] : (STRINGS.ja[key] || key);
@@ -1137,7 +1142,7 @@
                 return;
             }
             if (x >= pixelX - 110 && x <= pixelX - 10 && y >= pixelY - 20 && y <= pixelY + 20) {
-                placingState = null; 
+                SFX.play('back'); placingState = null; 
                 return;
             }
             return;
@@ -1146,11 +1151,11 @@
         const reqKeys = getRequiredKeys(level);
         // Changed hitbox to match new button position (offset +220)
         if (x > LAYOUT.mapX + 220 && x < LAYOUT.mapX + 470 && y > LAYOUT.itemY + 80 && y < LAYOUT.itemY + 130) {
-             if(items.keys >= reqKeys) nextStage();
+             if(items.keys >= reqKeys) { SFX.play('ok'); nextStage(); }
         }
         
         if (x > 20 && x < 200 && y > 570 && y < 620) {
-            openRules();
+            SFX.play('click'); openRules();
         }
 
         if (x > 20 && x < 200 && y > 640 && y < 690) {
@@ -1189,7 +1194,7 @@
                 y > LAYOUT.rotateY && y < LAYOUT.rotateY + LAYOUT.rotateH) {
                  const temp = generatedRect.w;
                  generatedRect.w = generatedRect.h;
-                 generatedRect.h = temp;
+                 generatedRect.h = temp; SFX.play('toggle');
                  return;
             }
         }
@@ -1282,6 +1287,7 @@
         // Trash
         if (dropX > LAYOUT.trashX && dropX < LAYOUT.trashX + LAYOUT.trashW &&
             dropY > LAYOUT.trashY && dropY < LAYOUT.trashY + LAYOUT.trashH) {
+            SFX.play('discard');
             if (isDragging.type === 'card') {
                 hand.splice(isDragging.index, 1);
                 replenishHand();
@@ -1308,7 +1314,7 @@
                     else if (term2 === null) pendingJokerSlot = 'term2';
                     else { isDragging = null; return; } // Full
 
-                    document.getElementById('joker-selector').classList.remove('hidden');
+                    document.getElementById('joker-selector').classList.remove('hidden'); SFX.play('item');
                     // Remove card now
                     hand.splice(isDragging.index, 1);
                     replenishHand();
@@ -1317,11 +1323,11 @@
                 } else {
                     // Normal Number
                     if (term1 === null) {
-                        term1 = cardVal;
+                        term1 = cardVal; SFX.play('select');
                         hand.splice(isDragging.index, 1);
                         replenishHand();
                     } else if (term2 === null) {
-                        term2 = cardVal;
+                        term2 = cardVal; SFX.play('select');
                         hand.splice(isDragging.index, 1);
                         replenishHand();
                         startCalculation();
@@ -1363,6 +1369,7 @@
 
     // Logic
     function startCalculation() {
+        SFX.play('merge');
         generatedRect = {
             w: term1,
             h: term2,
@@ -1432,7 +1439,7 @@
         const { rect, gx, gy } = placingState;
 
         if (gx + rect.w > MAP_COLS || gy + rect.h > MAP_ROWS) {
-            showCustomAlert(T('alert_out_of_bounds'));
+            SFX.play('error'); showCustomAlert(T('alert_out_of_bounds'));
             return;
         }
 
@@ -1441,12 +1448,12 @@
                 const tx = gx + x;
                 const ty = gy + y;
                 if (mapData[ty][tx]) {
-                    showCustomAlert(T('alert_occupied'));
+                    SFX.play('error'); showCustomAlert(T('alert_occupied'));
                     return;
                 }
                 const obj = mapObjects.find(o => o.x === tx && o.y === ty);
                 if (obj && (obj.type === 'monster' || obj.type === 'rock')) {
-                    showCustomAlert(T('alert_blocked'));
+                    SFX.play('error'); showCustomAlert(T('alert_blocked'));
                     return;
                 }
             }
@@ -1470,6 +1477,7 @@
             }
         }
         score += scoreAdd;
+        SFX.play(area >= 12 ? 'bigclear' : 'clear', Math.floor(area / 3));
         
         addFloatingText(LAYOUT.mapX + gx*GRID_SIZE + (rect.w*GRID_SIZE)/2 - 30, 
                         LAYOUT.mapY + gy*GRID_SIZE + (rect.h*GRID_SIZE)/2, 
@@ -1481,16 +1489,16 @@
     }
 
     function collectItem(obj) {
-        if (obj.type === 'key') items.keys++;
-        else if (obj.type === 'sword') items.sword++;
-        else if (obj.type === 'pickaxe') items.pickaxe++;
-        else if (obj.type === 'wand') items.wand++;
+        if (obj.type === 'key') { items.keys++; SFX.play('item'); }
+        else if (obj.type === 'sword') { items.sword++; SFX.play('equip'); }
+        else if (obj.type === 'pickaxe') { items.pickaxe++; SFX.play('equip'); }
+        else if (obj.type === 'wand') { items.wand++; SFX.play('equip'); }
         else if (obj.type === 'money') {
-            score += 300;
+            score += 300; SFX.play('coin');
             addFloatingText(LAYOUT.mapX + obj.x*GRID_SIZE, LAYOUT.mapY + obj.y*GRID_SIZE, "+300G", "#fff176");
         }
         else if (obj.type === 'card') {
-            currentDeck += 1;
+            currentDeck += 1; SFX.play('select');
             addFloatingText(LAYOUT.mapX + obj.x*GRID_SIZE, LAYOUT.mapY + obj.y*GRID_SIZE, T('text_card_plus'), "#81c784");
             if (hand.length <= 4) replenishHand();
         }
@@ -1503,12 +1511,12 @@
 
         if (itemType === 'sword' && obj.type === 'monster') {
             mapObjects.splice(objIndex, 1);
-            items.sword--;
+            items.sword--; SFX.play('attack');
             score += 200;
             addFloatingText(LAYOUT.mapX + gx*GRID_SIZE, LAYOUT.mapY + gy*GRID_SIZE, "+200", "#e57373");
         } else if (itemType === 'pickaxe' && obj.type === 'rock') {
             mapObjects.splice(objIndex, 1);
-            items.pickaxe--;
+            items.pickaxe--; SFX.play('garbagebreak');
             score += 100;
             addFloatingText(LAYOUT.mapX + gx*GRID_SIZE, LAYOUT.mapY + gy*GRID_SIZE, "+100", "#90a4ae");
         }
@@ -1517,7 +1525,7 @@
     function useWand() {
         if (items.wand <= 0) return;
         showCustomConfirm(T('confirm_wand'), () => {
-            items.wand--;
+            items.wand--; SFX.play('itemuse');
 
             let removedCount = 0;
             for (let i = mapObjects.length - 1; i >= 0; i--) {
@@ -1538,7 +1546,7 @@
 
     function useAllSwords(count) {
         showCustomConfirm(T('confirm_sword_all'), () => {
-            items.sword -= count;
+            items.sword -= count; SFX.play('attack'); setTimeout(() => SFX.play('bigclear'), 120);
             score += count * 200;
 
             for (let i = mapObjects.length - 1; i >= 0; i--) {
@@ -1553,7 +1561,7 @@
 
     function useAllPickaxes(count) {
         showCustomConfirm(T('confirm_pickaxe_all'), () => {
-            items.pickaxe -= count;
+            items.pickaxe -= count; SFX.play('garbagebreak'); setTimeout(() => SFX.play('bigclear'), 120);
             score += count * 100;
 
             for (let i = mapObjects.length - 1; i >= 0; i--) {
@@ -1584,6 +1592,7 @@
 
     function nextStage() {
         level++;
+        if (level <= 10) SFX.play('clearstage');
         if (level > 10) {
             gameOver(true);
         } else {
@@ -1593,6 +1602,7 @@
     }
 
     function gameOver(cleared) {
+        SFX.play(cleared ? 'fanfare' : 'gameover');
         gameState = cleared ? "CLEARED" : "GAMEOVER";
         document.getElementById('result-modal').classList.remove('hidden');
         document.getElementById('result-title').textContent = cleared ? T('result_clear_title') : T('result_over_title');
