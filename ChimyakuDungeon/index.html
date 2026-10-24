@@ -1409,6 +1409,7 @@
         .btn-build-room { width:100%; margin-bottom:8px; padding:9px 12px; font-size:0.95rem; }
     </style>
 <script src="../fgl-name.js?v=20261224"></script>
+<script src="../fgl-sfx.js?v=3"></script>
 <script src="../tutorial-engine.js?v=20261226"></script>
 </head>
 <body>
@@ -1573,6 +1574,8 @@
             <div class="mn-panel mn-mid">
                 <div class="mn-label" data-i18n="settings_lang_label">言語</div>
                 <div id="settings-lang-options" class="settings-lang-options"></div>
+                <div class="mn-label" style="margin-top:26px">🔊 こうかおん / Sound</div>
+                <div id="sfx-vol"></div>
             </div>
         </div>
     </div>
@@ -2005,6 +2008,10 @@
 
 <script>
 'use strict';
+// 効果音(音量はこのゲームだけ。設定画面から変える)
+const SFX = FGLSfx.create({ key: 'abyss' });
+let _sfxHitAt = 0;
+function sfxHit(n){ const t = Date.now(); if (t - _sfxHitAt < 110) return; _sfxHitAt = t; SFX.play(n); }
 
 // ============================================================
 // I18N
@@ -2721,7 +2728,7 @@ function applyI18n(){
 }
 
 const LANG_OPTION_LABELS = { ja: '日本語', ja_easy: 'かんたんなにほんご', en: 'English' };
-function openSettings(){ goTo('settings-screen'); renderSettingsScreen(); }
+function openSettings(){ goTo('settings-screen'); renderSettingsScreen(); FGLSfx.volumeUI('#sfx-vol', SFX); }
 function closeSettings(){ goTo('title-screen'); }
 function renderSettingsScreen(){
     const wrap = document.getElementById('settings-lang-options');
@@ -2749,6 +2756,7 @@ function rotateTitleBg(){
     titleBgNext = chooseTitleBg(titleBgCurrent);
 }
 function goTo(id){
+    SFX.play(id === 'title-screen' ? 'back' : id === 'build-screen' ? 'ok' : 'click');
     // タイトル画面を開くたびに、背景を別のイラストへ替える（画面が隠れているうちに差し替える）
     if (id==='title-screen' && document.getElementById('title-screen').classList.contains('hidden')) rotateTitleBg();
     document.querySelectorAll('.screen').forEach(el => el.classList.add('hidden'));
@@ -4226,6 +4234,7 @@ function confirmBuild(){
     const cCells = isFirst ? (pendingCorridorCells||[]) : pendingConnector.cells;
     const w = pendingRect.c1-pendingRect.c0+1, h = pendingRect.r1-pendingRect.r0+1;
     const roomId = nextRoomId++;
+    SFX.play('place');
     const elements = tallyElements(pendingRect);
     const { eggs: eggCount, rareEggs: rareEggCount } = tallyEggsAndClear(pendingRect);
     const monsterCapacity = roomMonsterCapacity(area);
@@ -5509,6 +5518,7 @@ function processNextRankUp(){
 // ---- ランクアップのポップアップ（1体ずつ表示。拒否はできない） ----
 let pendingRankUp = null;
 function openRankUpModal(m, sp, candidates){
+    SFX.play('levelup');
     pendingRankUp = { monsterId: m.id };
     const body = document.getElementById('rankup-body');
     if (candidates.length<=1){
@@ -5971,6 +5981,7 @@ function setHealAmountAll(){
 }
 // 最もHPが低いユニットから1ずつ埋めていく（同点なら抽選）。魔力を使い切るか全回復するまで繰り返す
 function healAllUnits(){
+    SFX.play('heal');
     const list = getHealableUnits().map(u=>u.ref);
     let spent = 0;
     while (spent < healAmount){
@@ -6098,6 +6109,7 @@ function placeMonsterInRoomOrStock(m, room){
 // 部屋の卵をすべて即座に孵化させる（部屋の空き数に関わらず全部孵化させ、入りきらない分はストックへ回す）
 function hatchEggsInRoom(room, count){
     if (count<=0) return [];
+    SFX.play('chest');
     const initialXp = xpForLevel(Math.max(1, stage-1)); // モンスターはLv1からスタートする（後のステージほど高いLvから）
     const born = [];
     for (let i=0;i<count;i++){
@@ -6432,6 +6444,7 @@ function autoUseAllStones(){
 }
 // 進化の石を使った直後に、進化後の姿とステータスをまとめて見せる結果ポップアップ
 function openEvolutionResultModal(m){
+    SFX.play('levelup');
     const sp = speciesInfo(m.speciesKey);
     document.getElementById('evolution-result-title').textContent = uif('evolution_result_title', sp.name_ja);
     document.getElementById('evolution-result-body').innerHTML = monsterDetailCoreHtml(m);
@@ -7059,6 +7072,7 @@ function cancelTrapPlacement(){
     updateSidePanelVisibility();
 }
 function placeTrapAt(room, r, c){
+    SFX.play('place');
     const cost = trapKindCost(trapPlaceMode.kind);
     if (vitality<cost){ showToast(ui('err_vitality')); trapPlaceMode = null; updateStatus(''); renderBuildActions(); renderOverlays(); updateSidePanelVisibility(); return; }
     vitality -= cost;
@@ -8278,6 +8292,7 @@ const BOSS_CUTIN = {
 };
 let cutinState = null;
 function showBossCutin(areaIdx, onDone){
+    SFX.play('warn');
     const c = BOSS_CUTIN[areaIdx];
     if (!c){ onDone(); return; }
     cutinState = { c, idx:0, onDone, finishing:false };
@@ -8320,6 +8335,7 @@ function resetBattleTransientState(){
     });
 }
 function startBattle(){
+    SFX.play('warn');
     closeHealIndividualPanel();
     gamePhase = 'battle';
     traps.forEach(t => { t.cooldown = 0; }); // 罠の再使用までのターン数はステージごとにリセットする
@@ -8715,6 +8731,7 @@ function floatingDamageClass(ratio){
 // 戦闘ログの代わりに、被弾したアイコンの真上にダメージ数字を浮かび上がらせて消す
 function showFloatingDamage(side, target, dmg){
     if (dmg<=0) return;
+    sfxHit(side === 'hero' ? 'hit' : 'hurt');
     const ratio = target.maxHp>0 ? dmg/target.maxHp : 0;
     spawnFloatingText(target, Math.round(dmg), floatingDamageClass(ratio));
 }
@@ -9409,6 +9426,7 @@ function showBattleResult(o){
     document.getElementById('battle-result-modal').classList.remove('hidden');
 }
 function endBattle(outcome){
+    SFX.play(outcome==='victory' ? (stage>=STAGE_FINAL ? 'fanfare' : 'clearstage') : 'gameover');
     clearTimeout(battleTimer);
     battleCurrentActor = null;
     repEndBattle(outcome); // テストプレイデータ：ユニットごとの成績を確定（stageを進める前に呼ぶ）
@@ -9611,6 +9629,7 @@ function levelUpCardHtml(levelUpList){
     return scCardHtml('stage_income_ranked_title', chips, true); // レベルアップは数が多くなりがちなので全幅で並べる
 }
 function openStageIncomeModal(vitGain, manaGain, levelUpList){
+    SFX.play('coin');
     document.getElementById('stage-clear-title').textContent = uif('stage_clear_main', stage-1);
     // 増えた分は緑の「▲＋」、減った分（回復に使った魔力）は赤の「▼−」で、増減がひと目で分かるようにする（0はくすんだ色）
     const deltaHtml = (n, up) => n<=0 ? `<span class="delta-zero">0</span>` : `<span class="${up?'delta-up':'delta-down'}">${up?'▲ ＋':'▼ −'}${n}</span>`;
@@ -10887,6 +10906,22 @@ document.addEventListener('keydown', (ev) => {
         if (primary){ ev.preventDefault(); primary.click(); }
         return;
     }
+});
+</script>
+<script>
+// ボタン音(関数を包んで、画面を開く・もどる・はじめるときだけ鳴らす)
+[['openRanking','click'],['closeRanking','back'],['closeSettings','back'],['openNameRegister','click'],['closeNameRegister','back'],['openHowTo','click'],['closeHowTo','back'],
+ ['openDifficultySelect','click'],['closeDifficultySelect','back'],['openStageSelect','click'],['closeStageSelect','back'],
+ ['startStoryMode','ok'],['startPracticeArea','ok'],['startNewDungeon','ok'],['confirmStartOver','ok'],['confirmStartBattle','ok'],
+ ['closeBattleResultAndRestart','ok'],['closeBattleResultAndGoNextArea','ok'],['closeBattleResultToTitle','back'],['confirmReturnTitle','back'],
+ ['openMonsterListModal','click'],['closeMonsterListModal','back'],['openItemInventoryModal','click'],['closeItemInventoryModal','back'],
+ ['openHealModal','click'],['closeHealModal','back'],['openEquipModal','click'],['closeEquipModal','back'],['selectRoom','select'],['selectMonsterCard','select'],
+ ['openMonsterDetailModal','click'],['closeMonsterDetailModal','back'],['openScoreModal','click'],['closeScoreModal','back'],['startTutorial','ok'],
+ ['closeHatchResultModal','ok'],['confirmAbilityUpgrade','buy'],['confirmRankUpChoice','levelup'],['evolveMonsterWithStone','levelup'],['selectConnector','select'],
+ ['confirmItemTargetPick','item'],['selectEquipCandidate','select'],['openRoomTypeSelect','click']
+].forEach(([fn, snd]) => {
+  const f = window[fn]; if (typeof f !== 'function') return;
+  window[fn] = function () { SFX.play(snd); return f.apply(this, arguments); };
 });
 </script>
 </body>
