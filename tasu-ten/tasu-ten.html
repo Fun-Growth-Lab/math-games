@@ -259,6 +259,7 @@
 </div>
 
 <script src="../fgl-cui.js?v=1"></script>
+<script src="../fgl-sfx.js?v=3"></script>
 <script>
 // ============================================================
 //  I18N（かんたんなにほんご／日本語／English）
@@ -428,6 +429,7 @@ const STRINGS = {
     },
 };
 let currentLang = localStorage.getItem('tasuten_lang') || 'ja';
+const SFX = FGLSfx.create({ key: 'tasuten' });
 function T(key, params) {
     const dict = STRINGS[currentLang] || STRINGS.ja;
     let str = dict[key] !== undefined ? dict[key] : (STRINGS.ja[key] || key);
@@ -1109,6 +1111,8 @@ const Game = (function() {
 
             // 演出
             if(pts > 0) {
+                SFX.play(currentChain > 1 ? 'combo' : 'clear', currentChain > 1 ? currentChain - 1 : 2);
+                if(fireworksToExplode.length) setTimeout(() => SFX.play('attack'), 120);
                 setTimeout(() => {
                     effects.push({
                         x: BASE_WIDTH / 2,
@@ -1145,7 +1149,7 @@ const Game = (function() {
     }
     
     function useStarItem(targetVal) {
-        starStock--;
+        starStock--; SFX.play('itemuse');
         let removed = false;
         
         // 指定された数字を全て消去
@@ -1218,7 +1222,7 @@ const Game = (function() {
     function damageBoss(r, c) {
         let boss = grid[r][c];
         if(!boss || boss.type !== 'boss') return;
-        boss.hp--;
+        boss.hp--; SFX.play('hit');
         boss.damageFlash = 20;
         effects.push({
             x: GRID_OFFSET_X + c * CELL_SIZE + CELL_SIZE/2,
@@ -1252,7 +1256,7 @@ const Game = (function() {
             else if(cell.type === 'bag') pts = 1000;
             else if(cell.type === 'diamond') pts = 2000;
             if(pts > 0) {
-                score += pts;
+                score += pts; SFX.play('coin');
                 effects.push({
                     x: GRID_OFFSET_X + c * CELL_SIZE + CELL_SIZE/2,
                     y: GRID_OFFSET_Y + r * CELL_SIZE + CELL_SIZE/2,
@@ -1283,7 +1287,7 @@ const Game = (function() {
         const BOSS_HPS = [5, 7, 9, 11, 13];
         const hp = BOSS_HPS[bIdx] || 5;
         grid[pos.r][pos.c] = { type: 'boss', val: -1, hp: hp, maxHp: hp, bossIndex: bIdx, damageFlash: 0, id: Date.now() + Math.random() };
-        bossSpawnPending = false;
+        bossSpawnPending = false; SFX.play('warn');
         effects.push({
             x: BASE_WIDTH / 2,
             y: BASE_HEIGHT / 2 - 60,
@@ -1294,6 +1298,7 @@ const Game = (function() {
     }
 
     function stageComplete(bossIdx) {
+        SFX.play('clearstage');
         bossesDefeated++;
         currentStage = bossesDefeated + 1;
         const emoji = BOSS_EMOJIS[bossIdx] || '👾';
@@ -1849,6 +1854,7 @@ const Game = (function() {
 
     // あそびかた（ヘルプ）の開閉。中身はHTML/CSS側（#howtoOverlay）で表示する
     function openHowto() {
+        SFX.play('click');
         renderHowto();
         const ov = document.getElementById('howtoOverlay');
         if (ov) ov.classList.add('show');
@@ -1857,6 +1863,7 @@ const Game = (function() {
         isShowingHelp = true;
     }
     function closeHowto() {
+        if (isShowingHelp) SFX.play('back');
         const ov = document.getElementById('howtoOverlay');
         if (ov) ov.classList.remove('show');
         isShowingHelp = false;
@@ -2046,10 +2053,12 @@ const Game = (function() {
             drawButton(BASE_WIDTH/2, l.y, 400, 70, T('lang_' + l.key), isActive ? "#7CB342" : "#fff", isActive ? "#fff" : "#5D4037");
         });
 
+        FGLSfx.drawVolume(ctx, SFX, BASE_WIDTH/2, 548);   // 効果音の音量
         drawButton(BASE_WIDTH/2, 620, 200, 50, T('btn_close'), "#B0BEC5");
     }
 
     function checkSettingsClick(x, y) {
+        if (FGLSfx.clickVolume(SFX, x, y)) return;
         const langs = [
             { key: 'simple', y: 280 },
             { key: 'ja', y: 370 },
@@ -2144,6 +2153,7 @@ const Game = (function() {
 
         if(isShowingHelp) return; // あそびかた表示中は盤面・ボタン操作を無効化（閉じるのはHTML側のボタン）
 
+        const prevState = currentState;
         if(currentState === STATE.TITLE) checkTitleClick(inputState.x, inputState.y);
         else if(currentState === STATE.PLAYER_SELECT) checkPlayerSelectClick(inputState.x, inputState.y);
         else if(currentState === STATE.DIFFICULTY_SELECT) checkDifficultyClick(inputState.x, inputState.y);
@@ -2151,6 +2161,9 @@ const Game = (function() {
         else if(currentState === STATE.GAME_OVER) checkGameOverClick(inputState.x, inputState.y);
         else if(currentState === STATE.RANKING) checkRankingClick(inputState.x, inputState.y);
         else if(currentState === STATE.SETTINGS) checkSettingsClick(inputState.x, inputState.y);
+        // 画面が変わったときのボタン音(戻る=back、ゲーム開始=ok、ほか=click)
+        if(currentState !== prevState && currentState !== STATE.GAME_OVER && currentState !== STATE.ANIMATING)
+            SFX.play(currentState === STATE.TITLE ? 'back' : currentState === STATE.PLAYING ? 'ok' : 'click');
     }
     
     function handleInputMove(e) {
@@ -2170,6 +2183,7 @@ const Game = (function() {
                 if(!grid[r][c]) {
                     grid[r][c] = grid[selectedCell.r][selectedCell.c];
                     grid[selectedCell.r][selectedCell.c] = null;
+                    SFX.play('move');
                     // 移動完了：コンボカウントリセットしてマッチ判定へ
                     currentChain = 0;
                     resolveMatches(true); // true = プレイヤー操作なのでライフ消費あり
@@ -2267,14 +2281,14 @@ const Game = (function() {
 
         // アイテムボタン（右パネル）
         if(starStock > 0 && isBtnClicked(x, y, 1130, 300, 200, 52)) {
-            isSelectingStar = true;
+            isSelectingStar = true; SFX.play('click');
             return;
         }
 
         let c = Math.floor((x - GRID_OFFSET_X) / CELL_SIZE);
         let r = Math.floor((y - GRID_OFFSET_Y) / CELL_SIZE);
         if(r >= 0 && r < GRID_ROWS && c >= 0 && c < GRID_COLS) {
-            if(grid[r][c]) selectedCell = {r, c};
+            if(grid[r][c]) { selectedCell = {r, c}; SFX.play('select'); }
         }
     }
     
@@ -2339,6 +2353,7 @@ const Game = (function() {
     // ------------------ データ保存・ランキング ------------------
     
     function saveScore() {
+        SFX.play(isGameClear ? 'fanfare' : 'gameover');
         const playerName = currentPlayerIndex >= 0 ? players[currentPlayerIndex] : T('guest_name');
         const scoreData = { name: playerName, score: score, difficulty: difficulty, stage: currentStage, date: Date.now() };
         let localScores = JSON.parse(localStorage.getItem('tasuten_scores') || "[]");

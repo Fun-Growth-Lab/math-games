@@ -536,6 +536,7 @@
     </style>
     <script src="../tutorial-engine.js?v=20261225"></script>
 <script src="../fgl-name.js?v=20261224"></script>
+<script src="../fgl-sfx.js?v=2"></script>
 </head>
 <body>
 
@@ -833,6 +834,10 @@ const STRINGS = {
     },
 };
 let currentLang = localStorage.getItem('divmine_lang') || 'ja';
+// 効果音(音量はこのゲームだけ。設定画面から変える)
+const SFX = FGLSfx.create({ key: 'divisionmine' });
+FGLSfx.settingsRow(SFX, { before: '#title-menu-settings .btn-gray' });
+FGLSfx.menuSounds(SFX, { ok: '.btn-green,.btn-normal,.btn-red,.modal-btn.btn-yes', back: '#title-menu-settings .btn-gray,#title-menu-level .btn-gray,#btn-player-back,.modal-btn.btn-no', click: '.btn-blue,.btn-ranking,#title-menu-main .btn-gray' });
 function T(key, params) {
     const dict = STRINGS[currentLang] || STRINGS.ja;
     let str = dict[key] !== undefined ? dict[key] : (STRINGS.ja[key] || key);
@@ -1705,6 +1710,7 @@ class Game {
         if (this.selectedTiles.length === this.divisor) {
             this.collectTiles();
         } else {
+            if (this.selectedTiles.length > 0) SFX.play('back');
             this.selectedTiles.forEach(t => { t.selected = false; t.numOrder = 0; });
             this.selectedTiles = [];
         }
@@ -1717,7 +1723,7 @@ class Game {
             if (Math.abs(tile.r - last.r) + Math.abs(tile.c - last.c) !== 1) return;
         }
         if (this.selectedTiles.length < this.divisor) {
-            tile.selected = true;
+            tile.selected = true; SFX.play('select');
             this.selectedTiles.push(tile);
             tile.numOrder = this.selectedTiles.length;
         }
@@ -1754,7 +1760,7 @@ class Game {
         cy /= this.selectedTiles.length;
 
         if (hasMonster) {
-            this.floatingTexts.push(new FloatingText(cx, cy, "たべられた！", '#ef5350'));
+            this.floatingTexts.push(new FloatingText(cx, cy, "たべられた！", '#ef5350')); SFX.play('hurt');
         } else {
             const multiplier = dwarfCount > 0 ? Math.pow(2, dwarfCount) : 1;
             let earnedAmount = 0;
@@ -1771,6 +1777,8 @@ class Game {
                 this.floatingTexts.push(new FloatingText(cx, cy, `+${count}`, info.color));
             }
             this.score += earnedAmount;
+            SFX.play(multiplier > 1 ? 'bigclear' : 'clear', Math.floor(earnedAmount / 400));
+            if (dwarfCount > 0) setTimeout(() => SFX.play('coin'), 180);
             
             if (multiplier > 1) {
                 this.showGameMessage(`${multiplier}倍GET!`);
@@ -1784,6 +1792,7 @@ class Game {
         this.updateHUD();
 
         if (!hasMonster && treasureCount > 0) {
+            SFX.play('chest');
             // 非同期で再帰呼び出しするために少し遅延
             setTimeout(() => this.processTreasure(treasureCount), 100);
         } else {
@@ -1930,6 +1939,7 @@ class Game {
     }
     
     static stageClear() {
+        SFX.play('clearstage');
         this.resultStep = 1; 
 
         const q = Math.floor(this.dividend / this.divisor);
@@ -1957,6 +1967,7 @@ class Game {
     }
     
     static nextStage() {
+        SFX.play('ok');
         if (this.stage >= this.maxStage) {
             this.finishGame(true);
         } else {
@@ -1967,6 +1978,7 @@ class Game {
     }
     
     static gameOver(reason = "") {
+        SFX.play('gameover');
         this.showScreen('screen-gameover');
         document.getElementById('go-title').textContent = T('game_over_title');
         document.getElementById('go-reason').textContent = reason;
@@ -1975,6 +1987,7 @@ class Game {
 
     static finishGame(isClear) {
         if (isClear) {
+            SFX.play('fanfare');
             this.showScreen('screen-gameover');
             document.getElementById('go-title').textContent = T('all_clear_title');
             document.getElementById('go-reason').textContent = T('congrats');

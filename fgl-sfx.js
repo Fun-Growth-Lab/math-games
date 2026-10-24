@@ -260,5 +260,43 @@
         anchor.parentNode.insertBefore(wrap, anchor);
         return volumeUI(wrap.querySelector('.fgs-host'), sfx);
     }
-    window.FGLSfx = { create, volumeUI, mountButton, menuSounds, buttonSound, settingsRow, NOTE };
+    // ---- canvas描画のゲーム用の音量バー(ミュート + 10段) ----
+    //   毎フレームの描画で FGLSfx.drawVolume(ctx, SFX, 中心x, 中心y) を呼び、
+    //   タップ時に if (FGLSfx.clickVolume(SFX, mx, my)) return; で当たり判定する
+    function drawVolume(ctx, sfx, cx, cy, o) {
+        o = o || {};
+        const bw = o.barW || 26, gap = o.gap || 8, mw = o.muteW || 66, mh = o.h || 52;
+        const total = mw + 20 + 10 * bw + 9 * gap, x0 = cx - total / 2, bot = cy + mh / 2;
+        const v = sfx.volume, rects = [];
+        const rr = (x, y, w, h, r) => { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); };
+        ctx.save();
+        const my = cy - mh / 2;
+        rr(x0, my + 4, mw, mh, 16); ctx.fillStyle = v > 0 ? '#2b5db8' : '#b8352f'; ctx.fill();
+        const g = ctx.createLinearGradient(0, my, 0, my + mh); g.addColorStop(0, v > 0 ? '#7ab6ff' : '#ff9a9a'); g.addColorStop(1, v > 0 ? '#3d7ff0' : '#ff4d4d');
+        rr(x0, my, mw, mh, 16); ctx.fillStyle = g; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = '#fff'; ctx.stroke();
+        ctx.font = '900 ' + Math.round(mh * 0.5) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#fff';
+        ctx.fillText(v > 0 ? '🔊' : '🔇', x0 + mw / 2, cy + 2);
+        rects.push({ x: x0, y: my, w: mw, h: mh, v: 'mute' });
+        for (let i = 0; i < 10; i++) {
+            const h = Math.round(mh * (0.3 + 0.7 * (i + 1) / 10)), x = x0 + mw + 20 + i * (bw + gap), y = bot - h;
+            rr(x, y + 3, bw, h, 7); ctx.fillStyle = i < v ? '#238a3a' : '#9aa3aa'; ctx.fill();
+            const gg = ctx.createLinearGradient(0, y, 0, y + h);
+            if (i < v) { gg.addColorStop(0, '#8ff09a'); gg.addColorStop(1, '#32b34a'); } else { gg.addColorStop(0, '#e8edf0'); gg.addColorStop(1, '#cfd6db'); }
+            rr(x, y, bw, h, 7); ctx.fillStyle = gg; ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = '#fff'; ctx.stroke();
+            rects.push({ x, y: my - 6, w: bw + gap, h: mh + 12, v: i + 1 });
+        }
+        ctx.restore();
+        sfx._vr = rects;
+    }
+    function clickVolume(sfx, mx, my) {
+        const rs = sfx._vr; if (!rs) return false;
+        for (const r of rs) {
+            if (mx >= r.x && mx <= r.x + r.w && my >= r.y && my <= r.y + r.h) {
+                if (r.v === 'mute') sfx.toggleMute(); else sfx.setVolume(r.v);
+                return true;
+            }
+        }
+        return false;
+    }
+    window.FGLSfx = { create, volumeUI, mountButton, menuSounds, buttonSound, settingsRow, drawVolume, clickVolume, NOTE };
 })();
