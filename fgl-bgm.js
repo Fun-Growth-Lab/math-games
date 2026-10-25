@@ -8,8 +8,9 @@
 //  - 最初の操作(タップ・キー)で流れはじめる(ブラウザの決まり)。ゲーム内の画面切り替えでは止まらない。
 //  - 選曲: チェックした曲がランダムに流れる(同じ曲が続けて出ないようにする)。1曲だけなら繰り返す。
 //  - ページ移動(INDEX→ゲームなど)では、曲と再生位置を fgl_bgm_now に覚えて、次のページで続きから流す。
-//  - 「全ゲームに適用」: BGM(音量・選曲)と効果音の音量を、全ゲームの共通設定(fgl_bgm_all / fgl_vol_all)にして、
-//    ゲームごとの設定(fgl_bgm_* / fgl_vol_*)を消す。
+//  - 「全ゲームに適用」は BGM用と効果音用で別々。BGM(音量・選曲)→ fgl_bgm_all、効果音の音量 → fgl_vol_all を共通設定にして、
+//    ゲームごとの設定(fgl_bgm_* / fgl_vol_*)を消す。効果音側のボタンは FGLBgm.sfxApplyUI(host,{sfx,getLang})。
+//  - 選曲は0曲にもできる(全部はずす → BGMは流れない)。
 //  - 音量は 0〜10(0=OFF、初期値5)。タブが隠れたら止めて、戻ったら続ける。
 (function () {
     'use strict';
@@ -31,7 +32,7 @@
             if (typeof o.vol === 'number') r.vol = Math.max(0, Math.min(10, Math.round(o.vol)));
             if (Array.isArray(o.tracks)) {
                 const ids = o.tracks.filter(function (id) { return TRACKS.some(function (t) { return t.id === id; }); });
-                r.tracks = ids.length && ids.length < TRACKS.length ? ids : null;
+                r.tracks = ids.length < TRACKS.length ? ids : null;      // [] = 1曲も選ばない(BGMなし)
             }
         }
         return r;
@@ -65,8 +66,9 @@
         }
         function pick(excl) {
             const list = selected();
+            if (!list.length) return null;
             const pool = list.length > 1 ? list.filter(function (t) { return t.id !== excl; }) : list;
-            return pool[Math.floor(Math.random() * pool.length)] || TRACKS[0];
+            return pool[Math.floor(Math.random() * pool.length)];
         }
         function ramp() {
             clearInterval(fadeTimer);
@@ -86,6 +88,7 @@
         function playTrack(id, o) {
             o = o || {};
             const t = byId(id) || pick(null);
+            if (!t) { a.pause(); cur = null; notify(); return; }
             cur = t.id;
             a.src = BASE + encodeURIComponent(t.file);
             if (o.pos > 1) {
@@ -99,15 +102,15 @@
             let now = null;
             try { now = JSON.parse(localStorage.getItem(K_NOW) || 'null'); } catch (e) {}
             if (now && byId(now.id) && isSel(now.id) && Date.now() - (now.ts || 0) < RESUME_MS) playTrack(now.id, { pos: now.pos });
-            else playTrack(pick(null).id);
+            else { const t = pick(null); if (t) playTrack(t.id); }
         }
         function ensurePlaying() {
-            if (vol <= 0 || !gesture || userPaused || document.hidden) return;
+            if (vol <= 0 || !gesture || userPaused || document.hidden || !selected().length) return;
             if (!cur) startInitial();
             else if (a.paused) tryPlay();
         }
-        a.addEventListener('ended', function () { playTrack(pick(cur).id); });
-        a.addEventListener('error', function () { if (++errCount < 6) setTimeout(function () { playTrack(pick(cur).id); }, 800); });
+        a.addEventListener('ended', function () { const t = pick(cur); if (t) playTrack(t.id); else { cur = null; notify(); } });
+        a.addEventListener('error', function () { if (++errCount < 6) setTimeout(function () { const t = pick(cur); if (t) playTrack(t.id); }, 800); });
         a.addEventListener('playing', function () { errCount = 0; notify(); });
         a.addEventListener('pause', notify);
         const onGesture = function () {
@@ -125,6 +128,7 @@
             get lastVolume() { return lastVol; },
             get tracks() { return TRACKS; },
             get current() { return cur; },
+            get selectedCount() { return selected().length; },
             get playing() { return !a.paused && !a.ended; },
             isSelected: isSel,
             setVolume: function (n) {
@@ -139,11 +143,15 @@
             toggleTrack: function (id) {
                 const cur2 = selected().map(function (t) { return t.id; });
                 const i = cur2.indexOf(id);
-                if (i >= 0) { if (cur2.length <= 1) return; cur2.splice(i, 1); } else cur2.push(id);
+                if (i >= 0) cur2.splice(i, 1); else cur2.push(id);
                 sel = cur2.length >= TRACKS.length ? null : cur2;
-                save(); notify();
+                save();
+                if (!cur2.length) { a.pause(); cur = null; }        // 1曲も選ばないと、BGMは止まる
+                else if (!cur) { userPaused = false; ensurePlaying(); }
+                notify();
             },
-            selectAll: function () { sel = null; save(); notify(); },
+            selectAll: function () { sel = null; save(); if (!cur) { userPaused = false; ensurePlaying(); } notify(); },
+            deselectAll: function () { sel = []; save(); a.pause(); cur = null; notify(); },
             // 試聴: その曲をはじめから流す(流れていれば止める)。そのあとは選んだ曲のランダムにもどる
             togglePreview: function (id) {
                 if (cur === id && !a.paused) { userPaused = true; a.pause(); notify(); return; }
@@ -151,17 +159,21 @@
                 userPaused = false; gesture = true;
                 playTrack(id);
             },
-            next: function () { if (vol === 0) { vol = lastVol || 5; save(); } userPaused = false; gesture = true; playTrack(pick(cur).id); },
+            next: function () { const t = pick(cur); if (!t) return; if (vol === 0) { vol = lastVol || 5; save(); } userPaused = false; gesture = true; playTrack(t.id); },
             onChange: function (f) { listeners.push(f); },
-            // 全ゲームに適用: BGM(音量・選曲)と、効果音の音量を共通設定にして、ゲームごとの設定を消す
-            applyToAll: function (sfx) {
+            // 全ゲームに適用(BGM): 音量と選曲を共通設定にして、ゲームごとのBGM設定を消す
+            applyBgmToAll: function () {
                 try {
                     localStorage.setItem(K_ALL, JSON.stringify({ vol: vol, tracks: sel }));
                     Object.keys(localStorage).forEach(function (k) { if (/^fgl_bgm_/.test(k) && k !== K_ALL && k !== K_NOW) localStorage.removeItem(k); });
-                    if (sfx) {
-                        localStorage.setItem('fgl_vol_all', String(sfx.volume));
-                        Object.keys(localStorage).forEach(function (k) { if (/^fgl_vol_/.test(k) && k !== 'fgl_vol_all') localStorage.removeItem(k); });
-                    }
+                    return true;
+                } catch (e) { return false; }
+            },
+            // 全ゲームに適用(効果音): 効果音の音量を共通設定にして、ゲームごとの効果音設定を消す
+            applySfxToAll: function (sfx) {
+                try {
+                    localStorage.setItem('fgl_vol_all', String(sfx.volume));
+                    Object.keys(localStorage).forEach(function (k) { if (/^fgl_vol_/.test(k) && k !== 'fgl_vol_all') localStorage.removeItem(k); });
                     return true;
                 } catch (e) { return false; }
             }
@@ -177,8 +189,11 @@
         none:    { ja: '（まだ流れていません）', easy: '（まだ ながれていないよ）', en: '(not playing yet)' },
         next:    { ja: '⏭ つぎの曲', easy: '⏭ つぎの きょく', en: '⏭ Next' },
         all:     { ja: '全部えらぶ', easy: 'ぜんぶ えらぶ', en: 'Select all' },
+        clear:   { ja: '全部はずす', easy: 'ぜんぶ はずす', en: 'Clear all' },
+        off:     { ja: '（曲が選ばれていません）', easy: '（きょくが えらばれていないよ）', en: '(no tracks selected)' },
         hint:    { ja: 'チェックした曲がランダムに流れます', easy: 'チェックした きょくが ランダムに ながれるよ', en: 'Checked tracks play in random order' },
-        apply:   { ja: '🌐 全ゲームに適用（BGM・効果音）', easy: '🌐 ぜんぶの ゲームに つかう（BGM・こうかおん）', en: '🌐 Apply to all games (BGM & SFX)' },
+        apply:   { ja: '🌐 BGMを全ゲームに適用', easy: '🌐 BGMを ぜんぶの ゲームに つかう', en: '🌐 Apply BGM to all games' },
+        applySfx:{ ja: '🌐 効果音を全ゲームに適用', easy: '🌐 こうかおんを ぜんぶの ゲームに つかう', en: '🌐 Apply SFX to all games' },
         applied: { ja: '全ゲームに適用しました！', easy: 'ぜんぶの ゲームに つかったよ！', en: 'Applied to all games!' },
         failed:  { ja: '保存できませんでした', easy: 'ほぞん できなかったよ', en: 'Could not save' }
     };
@@ -223,7 +238,7 @@
             const ct = TRACKS.filter(function (t) { return t.id === cur; })[0];
             host.innerHTML =
                 '<div class="fgb"><div class="fgb-h"><div class="fgb-title">' + T('title') + '</div>' +
-                '<div class="fgb-now">' + T('now') + ' ' + (ct ? '♪ ' + esc(ct.title) : T('none')) + '</div>' +
+                '<div class="fgb-now">' + T('now') + ' ' + (ct ? '♪ ' + esc(ct.title) : (bgm.selectedCount === 0 ? T('off') : T('none'))) + '</div>' +
                 '<button type="button" class="fgb-btn" data-a="next">' + T('next') + '</button></div>' +
                 '<div class="fgb-vol"></div>' +
                 '<div class="fgb-list">' + TRACKS.map(function (t) {
@@ -231,7 +246,7 @@
                     return '<div class="fgb-row' + (on ? ' now' : '') + '"><button type="button" class="fgb-pl' + (on && playing ? ' on' : '') + '" data-p="' + t.id + '">' + (on && playing ? '⏸' : '▶') + '</button>' +
                         '<label class="fgb-t"><span>' + esc(t.title) + '</span><input type="checkbox" data-c="' + t.id + '"' + (bgm.isSelected(t.id) ? ' checked' : '') + '></label></div>';
                 }).join('') + '</div>' +
-                '<div class="fgb-foot"><button type="button" class="fgb-btn" data-a="all">' + T('all') + '</button><div class="fgb-hint">' + T('hint') + '</div>' +
+                '<div class="fgb-foot"><button type="button" class="fgb-btn" data-a="all">' + T('all') + '</button><button type="button" class="fgb-btn" data-a="clear">' + T('clear') + '</button><div class="fgb-hint">' + T('hint') + '</div>' +
                 '<button type="button" class="fgb-btn gold" data-a="apply">' + T('apply') + '</button></div>' +
                 '<span class="fgb-msg">' + esc(msg) + '</span></div>';
             if (window.FGLSfx && window.FGLSfx.volumeUI) window.FGLSfx.volumeUI(host.querySelector('.fgb-vol'), bgm);
@@ -243,7 +258,8 @@
                     const a = b.getAttribute('data-a');
                     if (a === 'next') bgm.next();
                     else if (a === 'all') bgm.selectAll();
-                    else if (a === 'apply') { msg = bgm.applyToAll(o.sfx) ? T('applied') : T('failed'); render(); }
+                    else if (a === 'clear') bgm.deselectAll();
+                    else if (a === 'apply') { msg = bgm.applyBgmToAll() ? T('applied') : T('failed'); render(); }
                 };
             });
         }
@@ -251,5 +267,25 @@
         render();
         return render;
     }
-    window.FGLBgm = { create: create, settingsUI: settingsUI, TRACKS: TRACKS };
+    // 効果音の「全ゲームに適用」ボタン(効果音の音量バーの下に置く)
+    function sfxApplyUI(host, o) {
+        style();
+        if (typeof host === 'string') host = document.querySelector(host);
+        if (!host) return null;
+        o = o || {};
+        const bgm = o.bgm || create({ key: o.key });
+        const lang = function () { const l = o.getLang ? o.getLang() : 'ja'; return l === 'ja_easy' ? 'easy' : (l === 'en' ? 'en' : 'ja'); };
+        let msg = '';
+        function render() {
+            host.innerHTML = '<div style="text-align:center;margin-top:10px"><button type="button" class="fgb-btn gold">' + L.applySfx[lang()] + '</button><span class="fgb-msg" style="text-align:center">' + msg + '</span></div>';
+            host.querySelector('button').onclick = function (e) {
+                e.stopPropagation();
+                msg = bgm.applySfxToAll(o.sfx) ? L.applied[lang()] : L.failed[lang()];
+                render();
+            };
+        }
+        render();
+        return render;
+    }
+    window.FGLBgm = { create: create, settingsUI: settingsUI, sfxApplyUI: sfxApplyUI, TRACKS: TRACKS };
 })();
