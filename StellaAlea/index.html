@@ -344,7 +344,9 @@
         .dm-slot.sel::after { content:'▼'; position:absolute; left:50%; top:-26px; transform:translateX(-50%); color: var(--gold); font-size: 1.8rem; text-shadow: 0 2px 0 var(--ol); animation: bounceY .7s ease-in-out infinite alternate; }
         @keyframes bounceY { to { transform: translate(-50%, 6px); } }
         .skm-grid { display:grid; grid-template-columns: repeat(2, 340px); gap: 12px; justify-content:center; margin: 12px 0 14px; padding-top:4px; }
-        .skm-grid .sk { cursor:pointer; text-align:left; }
+        .skm-grid .sk { cursor:pointer; text-align:left; width:340px; }
+        .skm-grid .dragitem { width:340px; }
+        .skm-grid .sk .sk-mid { flex:1; }
         .skm-slot { position:relative; }
         .skm-slot.sel .sk { box-shadow: 0 0 0 4px var(--gold), 0 0 22px 6px rgba(255,201,61,.7); }
         .skm-slot.sel::before { content:'▶'; position:absolute; left:-24px; top:50%; transform:translateY(-50%); color:var(--gold); font-size:1.5rem; text-shadow: 0 2px 0 var(--ol); z-index:2; }
@@ -476,6 +478,7 @@
     </style>
     <script src="../fgl-name.js?v=20261223"></script>
     <script src="../tutorial-engine.js?v=20261225"></script>
+    <script src="../fgl-sfx.js?v=4"></script>
 </head>
 <body>
 <div id="container">
@@ -522,6 +525,7 @@
         <div class="panel" style="padding:26px 44px 30px;text-align:center;position:relative;z-index:2;min-width:520px">
             <div class="ptitle" style="font-size:1.5rem" data-i18n="settings_lang"></div>
             <div id="settings-lang-options" class="lang-opts"></div>
+            <span id="sfx-anchor"></span>
         </div>
     </div>
 
@@ -1148,9 +1152,11 @@ function toast(msg){ const t = document.createElement('div'); t.className = 'toa
 function showAlert(msg){ $('alert-msg').textContent = msg; $('alert-modal').classList.remove('hidden'); }
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 const SCREENS = ['title-screen', 'name-register-screen', 'settings-screen', 'ranking-screen', 'run-select-screen', 'play-screen', 'shop-screen'];
+const SFX = FGLSfx.create({ key: 'stellaalea' });
 function goTo(id){
     SCREENS.forEach(s => $(s).classList.add('hidden'));
     $(id).classList.remove('hidden');
+    SFX.play(id === 'title-screen' ? 'back' : id === 'play-screen' ? 'ok' : 'click');
 }
 
 // ============================================================
@@ -1590,6 +1596,7 @@ const dd = { mode: null, sel: null, st: null };
 function ddKey(t){ return t ? t.kind + ':' + (t.kind === 'slot' ? t.i : (t.kind === 'list' ? t.id : '')) : ''; }
 function ddRender(){ if (dd.mode === 'dice') renderDiceModal(); else renderSkillModal(); }
 function ddApply(src, dst){
+    SFX.play('equip');
     if (dd.mode === 'dice'){
         if (dst.kind !== 'slot') return;
         if (src.kind === 'slot'){ if (src.i !== dst.i){ const t = run.loadout[src.i]; run.loadout[src.i] = run.loadout[dst.i]; run.loadout[dst.i] = t; } }
@@ -1671,6 +1678,7 @@ function ddSelCls(kind, key){ return dd.sel && ddKey(dd.sel) === kind + ':' + ke
 function openDiceModal(){
     run.gachaLast = null;
     if (run.phase !== 'shop' && run.phase !== 'ready') return;
+    SFX.play('click');
     dd.mode = 'dice'; dd.sel = null;
     renderDiceModal();
     $('dice-modal').classList.remove('hidden');
@@ -1683,6 +1691,7 @@ function renderDiceModal(){
 }
 function refreshAfterSet(){ if (!$('shop-screen').classList.contains('hidden')) renderShop(); else renderPlay(); }
 function closeDiceModal(){
+    SFX.play('back');
     dd.mode = null; dd.sel = null;
     $('dice-modal').classList.add('hidden');
     refreshAfterSet();
@@ -1692,6 +1701,7 @@ function closeDiceModal(){
 function openSkillModal(){
     run.gachaLast = null;
     if (run.phase !== 'shop' && run.phase !== 'ready') return;
+    SFX.play('click');
     dd.mode = 'skill'; dd.sel = null;
     run.newSkill = false;
     renderSkillModal();
@@ -1704,6 +1714,7 @@ function renderSkillModal(){
     $('skm-bag').innerHTML = rest.map(id => `<div data-drag="list" data-dz="item" data-id="${id}" class="dragitem${ddSelCls('list', id)}">${skillPanelHtml(id, run.skillLv[id], { cls: 'cp', noId: true })}</div>`).join('');
 }
 function closeSkillModal(){
+    SFX.play('back');
     dd.mode = null; dd.sel = null;
     $('skill-modal').classList.add('hidden');
     refreshAfterSet();
@@ -1712,7 +1723,7 @@ function closeSkillModal(){
 // ---- ふる ----
 function doRoll(){
     if (run.phase !== 'ready') return;
-    run.phase = 'rolling';
+    run.phase = 'rolling'; SFX.play('move');
     const ds = loadoutDice();
     const f = run.forceIdx;
     const r = f ? { idx: f.slice(), v: ds.map((d, i) => d.faces[f[i]]), st: ds.map((d, i) => d.stars[f[i]]) } : rollDice(ds, rnd);
@@ -1725,7 +1736,7 @@ function doRoll(){
     ds.forEach((d, i) => { $('dslot-' + i).innerHTML = rollFace(d); });
     const iv = setInterval(() => { ds.forEach((d, i) => { if (!done[i]) $('dslot-' + i).innerHTML = rollFace(d); }); }, 70);
     ds.forEach((d, i) => setTimeout(() => {
-        done[i] = true;
+        done[i] = true; SFX.play('place');
         $('dslot-' + i).innerHTML = dieFaceHtml(d.faces[r.idx[i]], d.stars[r.idx[i]], 'big land', '', d);
         $('dstrip-' + i).innerHTML = facesHtml(d, 'xl', r.idx[i]);
         if (i === ds.length - 1){ clearInterval(iv); setTimeout(() => showResult(false), 450); }
@@ -1747,7 +1758,7 @@ function clearRerollable(){
 }
 function rerollDie(i){
     if (run.phase !== 'shown' || run.coins < REROLL_COST) return;
-    run.coins -= REROLL_COST; $('hud-coin').textContent = run.coins;
+    run.coins -= REROLL_COST; $('hud-coin').textContent = run.coins; SFX.play('coin'); SFX.play('move');
     run.phase = 'rolling';
     clearRerollable();
     const { r, ds } = run.cur, d = ds[i];
@@ -1778,11 +1789,12 @@ function showResult(instant){
     renderRoleList(res.role);
     const box = $('brk-chips');
     const step = instant ? 0 : 300;
-    const add = h => { box.insertAdjacentHTML('beforeend', h); fitChips(); };
+    const add = h => { box.insertAdjacentHTML('beforeend', h); fitChips(); if (!instant) SFX.play('select'); };
     pieces.forEach((h, i) => { if (instant) add(h); else setTimeout(() => add(h), step * i); });
     res.parts.forEach((p, i) => { const e = $('sk-' + p.id); if (e) setTimeout(() => { e.classList.remove('hit'); void e.offsetWidth; e.classList.add('hit'); }, instant ? 0 : 300 * (2 + i)); });
     setTimeout(() => {
         $('brk-total').innerHTML = `<div class="total-line"><small>${tx('total')}</small>${res.total}</div>`;
+        SFX.play(res.role === 'pinzoro' ? 'fanfare' : res.role === 'zorome' ? 'levelup' : res.role === 'none' ? 'miss' : 'clear', 3);
         run.pending = res.total;
         updateBar();
         run.phase = 'shown';
@@ -1801,6 +1813,7 @@ function fitChips(){
     box.style.transform = w > avail ? `scale(${avail / w})` : 'none';
 }
 function afterResult(){
+    SFX.play('click');
     if (run.phase !== 'shown') return;
     clearRerollable();
     run.total += run.pending;
@@ -1820,7 +1833,7 @@ function afterResult(){
 function openPick(){
     run.offer = offerSkills(rnd);
     renderPick();
-    $('pick-modal').classList.remove('hidden');
+    $('pick-modal').classList.remove('hidden'); SFX.play('chest');
 }
 function renderPick(){
     $('pick-title').innerHTML = `${tx('pick_title')}　<span class="coin-pill" style="font-size:1.3rem;vertical-align:middle"><i style="width:26px;height:26px;font-size:.9rem">$</i>${run.coins}</span>`;
@@ -1835,6 +1848,7 @@ function renderPick(){
     rb.innerHTML = `${tx('reload')} <span class="coin-pill" style="font-size:1.15rem;padding:0 10px 0 5px;box-shadow:none;border-width:3px"><i style="width:22px;height:22px;font-size:.8rem">$</i>${SKILL_RELOAD_COST}</span>`;
 }
 function reloadSkills(){
+    SFX.play('coin');
     if (run.coins < SKILL_RELOAD_COST) return;
     run.coins -= SKILL_RELOAD_COST;
     $('hud-coin').textContent = run.coins;
@@ -1842,6 +1856,7 @@ function reloadSkills(){
     renderPick();
 }
 function pickSkill(id, up){
+    SFX.play('item');
     run.skillLv[id] = Math.min(SKILL_MAX_LV, (run.skillLv[id] || 0) + (up || 1));
     if (run.equipped.indexOf(id) < 0){
         const free = run.equipped.indexOf(null);
@@ -1850,7 +1865,7 @@ function pickSkill(id, up){
     $('pick-modal').classList.add('hidden');
     if (run.gameNo < GAMES_PER_STAGE){ run.gameNo++; beginGame(); return; }
     // ステージクリア
-    run.coins += clearCoins();
+    run.coins += clearCoins(); SFX.play('clearstage');
     enterShop();
     toast(tx('toast_clear', clearCoins()));
 }
@@ -1898,7 +1913,7 @@ function renderShop(){
 }
 function buyGacha(){
     if (run.coins < GACHA_PRICE || run.dice.length >= DICE_CAP) return;
-    run.coins -= GACHA_PRICE;
+    run.coins -= GACHA_PRICE; SFX.play('buy'); setTimeout(() => SFX.play('chest'), 350);
     const d = gachaDie(rnd);
     run.dice.push(d);
     run.gachaLast = d;
@@ -1909,14 +1924,14 @@ function buyRole(id){
     run.gachaLast = null;
     const cost = roleUpPrice(run.roleBuys, id === run.saleRole);
     if (run.coins < cost || run.roleLv[id] >= ROLE_MAX_LV || run.boughtRoles.indexOf(id) >= 0) return;
-    run.coins -= cost; run.roleBuys++; run.roleLv[id]++; run.boughtRoles.push(id);
+    run.coins -= cost; run.roleBuys++; run.roleLv[id]++; run.boughtRoles.push(id); SFX.play('buy');
     renderShop();
 }
 function sellDie(id){
     run.gachaLast = null;
     if (run.dice.length <= LOADOUT){ toast(tx('toast_min_dice')); return; }
     const d = dieById(id); if (!d) return;
-    run.coins += sellValue(d);
+    run.coins += sellValue(d); SFX.play('coin');
     run.dice = run.dice.filter(x => x.id !== id);
     for (let i = 0; i < run.loadout.length; i++){
         if (!dieById(run.loadout[i])){
@@ -1936,6 +1951,7 @@ function goNextStage(){
 // おわり
 // ============================================================
 function endRun(cleared){
+    SFX.play(cleared ? 'fanfare' : 'gameover');
     const p = getProg(run.sid);
     if ((p.best[run.star] || 0) < run.stage) p.best[run.star] = run.stage;
     if (cleared) p.stars[run.star] = true;
@@ -1994,6 +2010,7 @@ scaleContainer(); setTimeout(scaleContainer, 100); setTimeout(scaleContainer, 30
 applyI18n();
 buildTitle();
 updateNameBtn();
+FGLSfx.settingsRow(SFX, { before: '#sfx-anchor', label: '🔊 こうかおん / Sound' });
 if (!RANKING_ENABLED) $('btn-ranking').classList.add('hidden');
 try {
     const allText = Object.values(TX).map(e => (typeof e.ja === 'string' ? e.ja + e.ja_easy + e.en : '')).join('') + '全偶奇素倍和個↑↓×＋：、。！？ステラ・アレアサイコロぐうすうきすう以下上のばい目';
