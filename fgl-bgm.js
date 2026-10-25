@@ -195,7 +195,10 @@
         apply:   { ja: '🌐 BGMを全ゲームに適用', easy: '🌐 BGMを ぜんぶの ゲームに つかう', en: '🌐 Apply BGM to all games' },
         applySfx:{ ja: '🌐 効果音を全ゲームに適用', easy: '🌐 こうかおんを ぜんぶの ゲームに つかう', en: '🌐 Apply SFX to all games' },
         applied: { ja: '全ゲームに適用しました！', easy: 'ぜんぶの ゲームに つかったよ！', en: 'Applied to all games!' },
-        failed:  { ja: '保存できませんでした', easy: 'ほぞん できなかったよ', en: 'Could not save' }
+        failed:  { ja: '保存できませんでした', easy: 'ほぞん できなかったよ', en: 'Could not save' },
+        open:    { ja: '🎵 BGMのせってい', easy: '🎵 BGMの せってい', en: '🎵 BGM Settings' },
+        close:   { ja: '✕ とじる', easy: '✕ とじる', en: '✕ Close' },
+        sfxTitle:{ ja: '🔊 効果音', easy: '🔊 こうかおん', en: '🔊 Sound effects' }
     };
     let styled = false;
     function style() {
@@ -220,6 +223,14 @@
             '.fgb-t input{flex:none;width:22px;height:22px;accent-color:#ffc93d;cursor:pointer}' +
             '.fgb-foot{display:flex;align-items:center;gap:10px;flex-wrap:wrap}' +
             '.fgb-hint{flex:1;font-size:.8rem;opacity:.75;font-weight:700;min-width:120px}' +
+            '.fgb-ov{position:fixed;left:0;top:0;right:0;bottom:0;z-index:2147483000;background:rgba(10,8,38,.82);overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px;box-sizing:border-box;touch-action:manipulation}' +
+            '.fgb-ov.hide{display:none}' +
+            '.fgb-ov-in{max-width:780px;margin:0 auto}' +
+            '.fgb-ov-bar{display:flex;justify-content:flex-end;margin-bottom:8px}' +
+            '.fgb-ov .fgb{margin-bottom:12px}' +
+            '.fgb-ov .fgb-sfx{color:#fff}' +
+            '.fgb-fab{position:fixed;z-index:9000;width:44px;height:44px;border-radius:50%;border:3px solid #fff;font-size:1.2rem;line-height:1;cursor:pointer;color:#fff;background:linear-gradient(#b48cff,#7a4fe0);box-shadow:0 4px 0 rgba(0,0,0,.28),0 6px 14px rgba(0,0,0,.25);padding:0;font-family:inherit;touch-action:manipulation}' +
+            '@media (max-width:600px){.fgb-list{grid-template-columns:1fr}.fgb-h{flex-wrap:wrap;gap:6px 10px}.fgb-now{flex-basis:100%;order:3}}' +
             '.fgb-msg{display:block;margin-top:6px;font-weight:900;font-size:.95rem;color:#7ae8dc;min-height:1.2em}';
         document.head.appendChild(s);
     }
@@ -229,7 +240,7 @@
         if (!host) return null;
         o = o || {};
         const bgm = o.bgm || create({ key: o.key });
-        const lang = function () { const l = o.getLang ? o.getLang() : 'ja'; return l === 'ja_easy' ? 'easy' : (l === 'en' ? 'en' : 'ja'); };
+        const lang = function () { let l = 'ja'; try { if (o.getLang) l = o.getLang(); } catch (e) {} return (l === 'ja_easy' || l === 'simple' || l === 'easy') ? 'easy' : (l === 'en' ? 'en' : 'ja'); };
         const T = function (k) { return L[k][lang()]; };
         const esc = function (t) { return String(t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
         let msg = '';
@@ -274,7 +285,7 @@
         if (!host) return null;
         o = o || {};
         const bgm = o.bgm || create({ key: o.key });
-        const lang = function () { const l = o.getLang ? o.getLang() : 'ja'; return l === 'ja_easy' ? 'easy' : (l === 'en' ? 'en' : 'ja'); };
+        const lang = function () { let l = 'ja'; try { if (o.getLang) l = o.getLang(); } catch (e) {} return (l === 'ja_easy' || l === 'simple' || l === 'easy') ? 'easy' : (l === 'en' ? 'en' : 'ja'); };
         let msg = '';
         function render() {
             host.innerHTML = '<div style="text-align:center;margin-top:10px"><button type="button" class="fgb-btn gold">' + L.applySfx[lang()] + '</button><span class="fgb-msg" style="text-align:center">' + msg + '</span></div>';
@@ -287,5 +298,76 @@
         render();
         return render;
     }
-    window.FGLBgm = { create: create, settingsUI: settingsUI, sfxApplyUI: sfxApplyUI, TRACKS: TRACKS };
+    // ---- 設定画面がないゲーム/狭い設定画面用: 全画面のBGM設定パネル(BGM + 効果音の音量と適用ボタン) ----
+    let panel = null;
+    function openPanel(bgm, o) {
+        style();
+        o = o || {};
+        bgm = bgm || create({ key: o.key });
+        const lang = function () { let l = 'ja'; try { if (o.getLang) l = o.getLang(); } catch (e) {} return (l === 'ja_easy' || l === 'simple' || l === 'easy') ? 'easy' : (l === 'en' ? 'en' : 'ja'); };
+        if (!panel) {
+            const ov = document.createElement('div');
+            ov.className = 'fgb-ov hide';
+            ov.innerHTML = '<div class="fgb-ov-in"><div class="fgb-ov-bar"><button type="button" class="fgb-btn gold" data-x="close"></button></div>' +
+                '<div data-x="bgm"></div><div class="fgb fgb-sfx" data-x="sfxbox"><div class="fgb-title" data-x="sfxt"></div><div data-x="sfxvol" style="margin:8px 0"></div><div data-x="sfxapply"></div></div></div>';
+            document.body.appendChild(ov);
+            const q = function (n) { return ov.querySelector('[data-x="' + n + '"]'); };
+            panel = { ov: ov, q: q, renders: [] };
+            q('close').onclick = function (e) { e.stopPropagation(); ov.classList.add('hide'); };
+            ov.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+            ov.addEventListener('keydown', function (e) { e.stopPropagation(); if (e.key === 'Escape') ov.classList.add('hide'); });
+            const r1 = settingsUI(q('bgm'), { bgm: bgm, sfx: o.sfx, getLang: o.getLang });
+            panel.renders.push(r1);
+            if (o.sfx) {
+                if (window.FGLSfx && window.FGLSfx.volumeUI) panel.renders.push(window.FGLSfx.volumeUI(q('sfxvol'), o.sfx));
+                panel.renders.push(sfxApplyUI(q('sfxapply'), { bgm: bgm, sfx: o.sfx, getLang: o.getLang }));
+            } else q('sfxbox').style.display = 'none';
+        }
+        panel.q('close').textContent = L.close[lang()];
+        panel.q('sfxt').textContent = L.sfxTitle[lang()];
+        panel.renders.forEach(function (r) { if (r) r(); });
+        panel.ov.classList.remove('hide');
+        panel.ov.scrollTop = 0;
+    }
+    // 画面のすみに 🎵 ボタンを置く(押すとBGM設定パネル)。FGLSfx.mountButton の姉妹
+    function mountButton(bgm, o) {
+        style();
+        o = o || {};
+        const fab = document.createElement('button');
+        fab.type = 'button'; fab.className = 'fgb-fab'; fab.setAttribute('aria-label', 'BGM');
+        ['top', 'right', 'bottom', 'left'].forEach(function (k) { if (o[k] !== undefined) fab.style[k] = (typeof o[k] === 'number' ? o[k] + 'px' : o[k]); });
+        const paint = function () { fab.textContent = bgm.volume > 0 && bgm.selectedCount > 0 ? '🎵' : '🔇'; };
+        bgm.onChange(paint); paint();
+        fab.onclick = function (e) { e.stopPropagation(); openPanel(bgm, o); };
+        (o.parent || document.body).appendChild(fab);
+        return fab;
+    }
+    // 設定画面の中に「🎵 BGMのせってい」ボタンを入れる(押すとBGM設定パネル)。o.before=この要素の前に入れる / o.parent=この要素の最後に入れる
+    function settingsButton(bgm, o) {
+        style();
+        o = o || {};
+        const lang = function () { let l = 'ja'; try { if (o.getLang) l = o.getLang(); } catch (e) {} return (l === 'ja_easy' || l === 'simple' || l === 'easy') ? 'easy' : (l === 'en' ? 'en' : 'ja'); };
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'text-align:center;margin:12px 0';
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'fgb-btn gold'; b.style.fontSize = '1.05rem';
+        const paint = function () { b.textContent = L.open[lang()]; };
+        paint();
+        b.onclick = function (e) { e.stopPropagation(); openPanel(bgm, o); };
+        wrap.appendChild(b);
+        const place = function () {
+            const aft = o.after ? document.querySelector(o.after) : null;
+            if (aft && aft.parentNode) { aft.parentNode.insertBefore(wrap, aft.nextSibling); return true; }
+            const ref = o.before ? document.querySelector(o.before) : null;
+            if (ref && ref.parentNode) { const anc = ref.parentElement && ref.parentElement.children.length === 1 && ref.parentElement.parentNode ? ref.parentElement : ref; anc.parentNode.insertBefore(wrap, anc); return true; }
+            const par = o.parent ? document.querySelector(o.parent) : null;
+            if (par) { par.appendChild(wrap); return true; }
+            return false;
+        };
+        place();
+        // 設定画面が作り直されたら入れなおす。言語を切り替えたらラベルも変える
+        setInterval(function () { if (!wrap.isConnected) place(); else if (b.offsetParent) paint(); }, 600);
+        return function () { if (!wrap.isConnected) place(); paint(); };      // 設定画面を開いたとき/言語を切り替えたときに呼ぶと、すぐ入れなおす
+    }
+    window.FGLBgm = { create: create, settingsUI: settingsUI, sfxApplyUI: sfxApplyUI, openPanel: openPanel, mountButton: mountButton, settingsButton: settingsButton, TRACKS: TRACKS };
 })();

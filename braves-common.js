@@ -284,6 +284,7 @@ document.getElementById('container').innerHTML = (GAME.gameLayerHTML || _GAME_LA
 
 // ---- 効果音(音量はこのゲームだけ。設定画面から変える。fgl-sfx.js を先に読みこんでおくこと) ----
 const SFX = FGLSfx.create({ key: 'braves_' + GAME.keys.lang });
+const BGM = FGLBgm.create({ key: 'braves_' + GAME.keys.lang });
 // ボタンごとの音(はじめる・決定=ok / もどる=back / 画面を開く=click / 切りかえ=select)
 const BTN_SFX = {
     ok: '#sc-go,#end-retry,#mbs-next,#dc-j-ok,#item-popup-use,#dc-ch-hand,#dc-ch-field,#btn-yes,#custom-confirm-yes-btn',
@@ -302,6 +303,8 @@ function bindBtn(btn, callback) {
 window.addEventListener('load', () => {
     const host = document.getElementById('sfx-vol');   // 設定画面を作り直しているゲーム(ぶんすう)は、自分で置き場所を決めている
     if (host) FGLSfx.volumeUI(host, SFX); else FGLSfx.settingsRow(SFX, { before: '#btn-close-settings' });
+    // BGM(fgl-bgm.js): 設定画面の「🎵 BGMのせってい」ボタン→パネル
+    FGLBgm.settingsButton(BGM, host ? { after: '#sfx-vol', sfx: SFX, getLang: () => currentLang } : { before: '#btn-close-settings', sfx: SFX, getLang: () => currentLang });
 });
 
 // ブラウザ標準のalert()/confirm()の代わりに使うゲーム内ポップアップ
