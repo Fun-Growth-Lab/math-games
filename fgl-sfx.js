@@ -5,7 +5,7 @@
 //   SFX.volume / SFX.setVolume(0〜10) / SFX.lastVolume / SFX.unlock()
 //   FGLSfx.volumeUI(host, SFX, {label})                  // 設定画面に「ミュート + 10段バー」を置く(DOM)
 //   FGLSfx.mountButton(SFX, {top, right, ...})           // 設定画面がないゲーム用の 🔊 ボタン(押すと音量バー)
-// 音量は 0〜10 の11段階(0 = OFF、初期値5)。トレジャークラフトと同じ段階と音の大きさ。
+// 音量は 0〜10 の11段階(0 = OFF、初期値5)。fgl_vol_all があれば、ゲームごとの設定がないゲームはその音量で始まる(fgl-bgm.js の「全ゲームに適用」)。トレジャークラフトと同じ段階と音の大きさ。
 (function () {
     const instances = [];
     const NOTE = { C4: 262, D4: 294, E4: 330, F4: 349, G4: 392, A4: 440, B4: 494, C5: 523, D5: 587, E5: 659, F5: 698, G5: 784, A5: 880, B5: 988, C6: 1047, D6: 1175, E6: 1319, G6: 1568, C7: 2093 };
@@ -17,7 +17,9 @@
         const lastAt = {};
         try {
             const v = localStorage.getItem(storeKey);
+            const all = localStorage.getItem('fgl_vol_all');   // 「全ゲームに適用」で保存した共通の音量(このゲームの設定がないときに使う)
             if (v !== null) vol = Math.max(0, Math.min(10, parseInt(v, 10) || 0));
+            else if (all !== null) vol = Math.max(0, Math.min(10, parseInt(all, 10) || 0));
             else if (opts.legacyKey) {
                 const o = localStorage.getItem(opts.legacyKey);
                 if (o !== null) vol = Math.max(0, Math.min(10, parseInt(o, 10) || 0));

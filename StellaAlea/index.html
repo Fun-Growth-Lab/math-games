@@ -210,8 +210,10 @@
         .rk-empty span { color:#cbbfff; font-size:1rem; font-weight:700; }
         .rk-loading { text-align:center; padding:30px; font-weight:800; color:#cbbfff; }
         .end-world { min-height:1.3em; margin: -6px 0 8px; font-weight:800; font-size:.95rem; color:#cbbfff; }
+        #name-register-screen, #settings-screen { display:flex; }
+        .set-row { display:flex; gap:20px; align-items:flex-start; position:relative; z-index:2; width:1140px; }
         .lang-opts { display:flex; flex-direction:column; gap:14px; margin-top:6px; }
-        .lang-btn { position:relative; font-family:inherit; font-weight:900; font-size:1.7rem; padding:14px 30px; border-radius:18px; border:4px solid var(--ol); background: linear-gradient(#fff,#e2dbff); color:var(--ink); cursor:pointer; box-shadow: 0 5px 0 var(--ol); }
+        .lang-btn { position:relative; font-family:inherit; font-weight:900; font-size:1.45rem; white-space:nowrap; padding:14px 16px; border-radius:18px; border:4px solid var(--ol); background: linear-gradient(#fff,#e2dbff); color:var(--ink); cursor:pointer; box-shadow: 0 5px 0 var(--ol); }
         .lang-btn:active { transform: translateY(4px); box-shadow:0 1px 0 var(--ol); }
         .lang-btn.active { background: linear-gradient(#ffe27a,var(--gold)); box-shadow: 0 5px 0 var(--ol), 0 0 0 4px #fff, 0 0 22px 6px rgba(255,216,77,.8); }
         .lang-btn em { position:absolute; left:10px; top:-12px; background:#1f2d3d; color:#ffe27a; font-style:normal; font-size:.85rem; padding:0 8px; border-radius:7px; }
@@ -478,7 +480,8 @@
     </style>
     <script src="../fgl-name.js?v=20261223"></script>
     <script src="../tutorial-engine.js?v=20261225"></script>
-    <script src="../fgl-sfx.js?v=4"></script>
+    <script src="../fgl-sfx.js?v=5"></script>
+    <script src="../fgl-bgm.js?v=1"></script>
 </head>
 <body>
 <div id="container">
@@ -519,13 +522,16 @@
     </div>
 
     <!-- ==================== SETTINGS ==================== -->
-    <div id="settings-screen" class="screen hidden" style="flex-direction:column;align-items:center;justify-content:center;">
+    <div id="settings-screen" class="screen hidden" style="flex-direction:column;align-items:center;justify-content:flex-start;padding-top:96px;">
         <div class="starfield"></div>
         <div style="position:absolute;left:20px;right:20px;top:12px;"><div class="rs-top"><button class="rs-mini" onclick="closeSettings()" data-i18n="btn_back_title"></button><div class="rs-plaque" data-i18n="settings_title"></div></div></div>
-        <div class="panel" style="padding:26px 44px 30px;text-align:center;position:relative;z-index:2;min-width:520px">
-            <div class="ptitle" style="font-size:1.5rem" data-i18n="settings_lang"></div>
-            <div id="settings-lang-options" class="lang-opts"></div>
-            <span id="sfx-anchor"></span>
+        <div class="set-row">
+            <div class="panel" style="padding:22px 26px 24px;text-align:center;width:380px;flex:none">
+                <div class="ptitle" style="font-size:1.5rem" data-i18n="settings_lang"></div>
+                <div id="settings-lang-options" class="lang-opts"></div>
+                <span id="sfx-anchor"></span>
+            </div>
+            <div id="bgm-host" style="width:740px"></div>
         </div>
     </div>
 
@@ -1153,6 +1159,8 @@ function showAlert(msg){ $('alert-msg').textContent = msg; $('alert-modal').clas
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 const SCREENS = ['title-screen', 'name-register-screen', 'settings-screen', 'ranking-screen', 'run-select-screen', 'play-screen', 'shop-screen'];
 const SFX = FGLSfx.create({ key: 'stellaalea' });
+const BGM = FGLBgm.create({ key: 'stellaalea' });   // 全ゲーム共通のBGM(music/の13曲)。止まらず流れ続ける
+let bgmRender = null;
 function goTo(id){
     SCREENS.forEach(s => $(s).classList.add('hidden'));
     $(id).classList.remove('hidden');
@@ -1439,7 +1447,7 @@ function setLanguage(lang){
     if (LANGS.indexOf(lang) < 0) return;
     currentLang = lang;
     try { localStorage.setItem(LANG_STORAGE_KEY, lang); } catch (e){}
-    applyI18n(); buildTitle(); updateNameBtn(); renderSettings();
+    applyI18n(); buildTitle(); updateNameBtn(); renderSettings(); if (bgmRender) bgmRender();
 }
 
 // ============================================================
@@ -2011,6 +2019,7 @@ applyI18n();
 buildTitle();
 updateNameBtn();
 FGLSfx.settingsRow(SFX, { before: '#sfx-anchor', label: '🔊 こうかおん / Sound' });
+bgmRender = FGLBgm.settingsUI('#bgm-host', { bgm: BGM, sfx: SFX, getLang: () => currentLang });
 if (!RANKING_ENABLED) $('btn-ranking').classList.add('hidden');
 try {
     const allText = Object.values(TX).map(e => (typeof e.ja === 'string' ? e.ja + e.ja_easy + e.en : '')).join('') + '全偶奇素倍和個↑↓×＋：、。！？ステラ・アレアサイコロぐうすうきすう以下上のばい目';
