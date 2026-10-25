@@ -198,7 +198,8 @@
         failed:  { ja: '保存できませんでした', easy: 'ほぞん できなかったよ', en: 'Could not save' },
         open:    { ja: '🎵 BGMのせってい', easy: '🎵 BGMの せってい', en: '🎵 BGM Settings' },
         close:   { ja: '✕ とじる', easy: '✕ とじる', en: '✕ Close' },
-        sfxTitle:{ ja: '🔊 効果音', easy: '🔊 こうかおん', en: '🔊 Sound effects' }
+        sfxTitle:{ ja: '🔊 効果音', easy: '🔊 こうかおん', en: '🔊 Sound effects' },
+        openSfx: { ja: '🔊 効果音のせってい', easy: '🔊 こうかおんの せってい', en: '🔊 Sound Settings' }
     };
     let styled = false;
     function style() {
@@ -300,6 +301,7 @@
     }
     // ---- 設定画面がないゲーム/狭い設定画面用: 全画面のBGM設定パネル(BGM + 効果音の音量と適用ボタン) ----
     let panel = null;
+    // o.mode = 'sfx' のときは効果音だけ、それ以外はBGMだけを出す(別々のボタンから開く)
     function openPanel(bgm, o) {
         style();
         o = o || {};
@@ -321,8 +323,11 @@
             if (o.sfx) {
                 if (window.FGLSfx && window.FGLSfx.volumeUI) panel.renders.push(window.FGLSfx.volumeUI(q('sfxvol'), o.sfx));
                 panel.renders.push(sfxApplyUI(q('sfxapply'), { bgm: bgm, sfx: o.sfx, getLang: o.getLang }));
-            } else q('sfxbox').style.display = 'none';
+            }
         }
+        const sfxMode = o.mode === 'sfx';
+        panel.q('bgm').style.display = sfxMode ? 'none' : '';
+        panel.q('sfxbox').style.display = sfxMode && o.sfx ? '' : 'none';
         panel.q('close').textContent = L.close[lang()];
         panel.q('sfxt').textContent = L.sfxTitle[lang()];
         panel.renders.forEach(function (r) { if (r) r(); });
@@ -351,10 +356,18 @@
         wrap.style.cssText = 'text-align:center;margin:12px 0';
         const b = document.createElement('button');
         b.type = 'button'; b.className = 'fgb-btn gold'; b.style.fontSize = '1.05rem';
-        const paint = function () { b.textContent = L.open[lang()]; };
+        let b2 = null;
+        const paint = function () { b.textContent = L.open[lang()]; if (b2) b2.textContent = L.openSfx[lang()]; };
         paint();
         b.onclick = function (e) { e.stopPropagation(); openPanel(bgm, o); };
         wrap.appendChild(b);
+        if (o.sfx) {
+            b2 = document.createElement('button');
+            b2.type = 'button'; b2.className = 'fgb-btn gold'; b2.style.cssText = 'font-size:1.05rem;margin-left:10px';
+            b2.onclick = function (e) { e.stopPropagation(); openPanel(bgm, Object.assign({}, o, { mode: 'sfx' })); };
+            wrap.appendChild(b2);
+            paint();
+        }
         const place = function () {
             const aft = o.after ? document.querySelector(o.after) : null;
             if (aft && aft.parentNode) { aft.parentNode.insertBefore(wrap, aft.nextSibling); return true; }
