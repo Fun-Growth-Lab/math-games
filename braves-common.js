@@ -285,7 +285,6 @@ document.getElementById('container').innerHTML = (GAME.gameLayerHTML || _GAME_LA
 // ---- 効果音(音量はこのゲームだけ。設定画面から変える。fgl-sfx.js を先に読みこんでおくこと) ----
 const SFX = FGLSfx.create({ key: 'braves_' + GAME.keys.lang });
 const BGM = FGLBgm.create({ key: 'braves_' + GAME.keys.lang });
-window.addEventListener('load', () => FGLBgm.mountGameButton(BGM, { corner: 'br', sfx: SFX, getLang: () => currentLang }));   // ⚙ 設定(ゲーム中もBGM・効果音の音量を変えられる)
 // ボタンごとの音(はじめる・決定=ok / もどる=back / 画面を開く=click / 切りかえ=select)
 const BTN_SFX = {
     ok: '#sc-go,#end-retry,#mbs-next,#dc-j-ok,#item-popup-use,#dc-ch-hand,#dc-ch-field,#btn-yes,#custom-confirm-yes-btn',
