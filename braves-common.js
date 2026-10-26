@@ -300,6 +300,12 @@ function bindBtn(btn, callback) {
     }
 }
 // 設定画面に効果音の音量バーを入れる(画面がそろってから)
+// ニックネームが未設定のあいだ、名前のボタンに ふわふわ動く吹き出しを出す(fgl-nudge.js)
+window.addEventListener('load', () => {
+    if (!window.FGLNudge) return;
+    const b = document.getElementById('player-select-btn');
+    if (b) FGLNudge.attach(b, { unset: () => { const l = loadPlayers(); return !(getSelectedPlayerIndex() >= 0 && l[getSelectedPlayerIndex()]); }, lang: () => currentLang === 'ja' || currentLang === 'en' ? currentLang : 'simple', dir: 'down' });
+});
 window.addEventListener('load', () => {
     const host = document.getElementById('sfx-vol');   // 設定画面を作り直しているゲーム(ぶんすう)は、自分で置き場所を決めている
     if (host) FGLSfx.volumeUI(host, SFX); else FGLSfx.settingsRow(SFX, { before: '#btn-close-settings' });
