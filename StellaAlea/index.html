@@ -348,6 +348,11 @@
         .brk { width:100%; height:176px; flex:none; display:flex; flex-direction:column; align-items:center; justify-content:center; gap: 8px; }
         .role-banner { font-size: 2.6rem; font-weight: 900; color: var(--gold); text-shadow: 0 3px 0 var(--ol), 0 0 24px rgba(255,201,61,.7); animation: pop .4s ease-out; letter-spacing: 4px; line-height:1; }
         .brk-top { width:100%; display:flex; align-items:center; justify-content:space-between; padding:0 26px; min-height:64px; }
+        .coin-gain { position:absolute; right:14px; top:50%; translate:0 -50%; display:flex; align-items:center; gap:8px; padding:3px 14px 3px 6px; background:rgba(0,0,0,.38); border:3px solid var(--ol); border-radius:16px; box-shadow:0 3px 0 var(--ol); animation:pop .45s ease-out; }
+        .coin-gain i { flex:none; width:34px; height:34px; border-radius:50%; background:radial-gradient(circle at 35% 30%,#fff3a0,#ffc01f); border:3px solid var(--ol); color:#7a4a00; font-style:normal; font-weight:900; display:flex; align-items:center; justify-content:center; }
+        .coin-gain b { font-size:2.1rem; line-height:1; color:var(--gold); text-shadow:0 3px 0 var(--ol); }
+        .coin-gain span { display:flex; flex-direction:column; font-weight:900; font-size:1rem; line-height:1.15; color:#fff; white-space:nowrap; }
+        .coin-gain small { font-size:.8rem; font-weight:800; color:#ffe9a0; }
         .brk-top .role-banner { text-align:left; }
         .role-banner.none { color:#cbbfff; text-shadow: 0 3px 0 var(--ol); }
         .role-banner.big { font-size: 2.8rem; color:#ff9cc3; animation: pop .5s ease-out, shake .6s .4s; }
@@ -368,7 +373,7 @@
         .rr-badge b { font-size:1.15rem; }
         .rr-badge.off { background:#6f6aa0; filter:grayscale(1); opacity:.7; animation:none; }
         @keyframes bounceY2 { to { transform: translateY(-6px); } }
-        .act-row { margin: 10px 0 0; height: 68px; display:flex; align-items:center; gap: 14px; }
+        .act-row { position: relative; width: 100%; justify-content: center; margin: 10px 0 0; height: 68px; display:flex; align-items:center; gap: 14px; }
         .btn-roll { font-size: 2.1rem; padding: 8px 44px; }
         .btn-set { font-size: 1.15rem; padding: 10px 16px; }
 
@@ -1001,9 +1006,13 @@ RUN_ORDER.forEach(id => {
     TARGETS_BY_RUN[id] = sc === 1 ? TARGETS : TARGETS.map(row => row.map((v, i) => niceBorder(v * Math.pow(Array.isArray(sc) ? sc[i] : sc, EARLY_W[i]))));
 });
 function stageTarget(stage, star, sid){ const t = TARGETS_BY_RUN[sid || CUR_SID] || TARGETS; return t[(star || 1) - 1][stage - 1]; }
-// ステージクリアのコイン: 基本15。ボーダーの2倍・4倍・8倍…に届くたびに+5(上限なし。倍々なので増えすぎない)
-function clearBonus(total, border){ return total >= border * 2 ? 5 * Math.floor(Math.log2(total / border)) : 0; }
-function clearCoins(total, border){ return (CLEAR_COIN + (total && border ? clearBonus(total, border) : 0)) * (RULES.coinMul || 1); }
+// ステージクリアのコイン: 固定15(大金持ちRUNは2倍)
+function clearCoins(){ return CLEAR_COIN * (RULES.coinMul || 1); }
+// 高得点ボーナス(1ゲームおわるたびに): 1ゲームのめやす=ボーダー÷3。得点がめやすの2倍・4倍・8倍…に届くたびに+2コイン(倍々なので増えすぎない)
+function gameBonus(score, border){
+    const gb = border / GAMES_PER_STAGE, k = score >= gb * 2 ? Math.floor(Math.log2(score / gb)) : 0, mul = RULES.coinMul || 1;
+    return { gb: Math.round(gb), k, mul, coins: 2 * k * mul };
+}
 // ふりなおしのコスト(このゲームでn回目をふるとき)。Infinity=できない
 function rerollCostAt(done){ return RULES.noReroll ? Infinity : (RULES.firstRerollFree && done === 0 ? 0 : REROLL_COST); }
 function roleUpCost(buys){ return ROLE_COST_BASE + ROLE_COST_STEP * buys; }
@@ -1096,6 +1105,8 @@ const TX = {
     full:         { ja: 'いっぱい！', ja_easy: 'いっぱい！', en: 'Full!' },
     gacha:        { ja: 'ガチャ', ja_easy: 'ガチャ', en: 'Gacha' },
     toast_min_dice: { ja: 'サイコロは3つ以上もっていないといけません', ja_easy: 'サイコロは 3こ いじょう もっていないと だめだよ', en: 'You need at least 3 dice' },
+    gain_bonus:   { ja: 'ボーナス', ja_easy: 'ボーナス', en: 'Bonus' },
+    gain_detail:  { ja: (gb, m, x) => `めやす${gb}の${m}倍いじょう${x > 1 ? ` ×${x}` : ''}`, ja_easy: (gb, m, x) => `めやす${gb}の ${m}ばい いじょう${x > 1 ? ` ×${x}` : ''}`, en: (gb, m, x) => `${m}× the goal (${gb})${x > 1 ? ` ×${x}` : ''}` },
     toast_clear:  { ja: n => `⭐ ステージクリア！ ＋${n}🪙`, ja_easy: n => `⭐ ステージクリア！ ＋${n}🪙`, en: n => `⭐ Stage Clear! +${n}🪙` },
     act_dice:     { ja: '🎲 サイコロ', ja_easy: '🎲 サイコロ', en: '🎲 Dice' },
     act_roll:     { ja: '🎲 ふる！', ja_easy: '🎲 ふる！', en: '🎲 Roll!' },
@@ -1715,7 +1726,7 @@ function stageHtml(ds, r){
 }
 // ---- 1ゲームのはじまり: コインを もらう ----
 function beginGame(){
-    run.coins += GAME_COIN; run.gameRerolls = 0;
+    run.coins += GAME_COIN; run.gameRerolls = 0; run.gameBonus = 0;
     run.phase = 'ready'; run.pending = 0; run.cur = null; run.curRes = null;
     renderPlay();
     bumpCoin();
@@ -1976,11 +1987,18 @@ function showResult(instant){
         SFX.play(res.role === 'pinzoro' ? 'fanfare' : res.role === 'zorome' ? 'levelup' : res.role === 'none' ? 'miss' : 'clear', 3);
         run.pending = res.total;
         updateBar();
+        // 高得点ボーナスはこの場でもらう(ふりなおしで点が変わったら差額だけ動かす)。内訳は得点の横に出す。ボタンは増やさない
+        const gbn = gameBonus(res.total, target());
+        if (gbn.coins !== (run.gameBonus || 0)){
+            run.coins += gbn.coins - (run.gameBonus || 0); run.gameBonus = gbn.coins;
+            $('hud-coin').textContent = run.coins; if (gbn.coins > 0){ bumpCoin(); SFX.play('coin'); }
+        }
+        const gainHtml = gbn.coins > 0 ? `<div class="coin-gain"><i>$</i><b>+${gbn.coins}</b><span>${tx('gain_bonus')}<small>${tx('gain_detail', gbn.gb, 2 ** gbn.k, gbn.mul)}</small></span></div>` : '';
         run.phase = 'shown';
         const cleared = run.total + run.pending >= target();
         const lastGame = run.gameNo >= GAMES_PER_STAGE;
         const label = !lastGame ? tx('next_game') : (cleared ? tx(run.stage === STAGES ? 'clear_final' : 'clear_stage') : tx('see_result'));
-        $('act-row').innerHTML = `<button class="btn ${cleared && lastGame ? 'btn-gold' : 'btn-teal'} btn-roll" style="font-size:1.8rem" onclick="afterResult()">${label}</button>`;
+        $('act-row').innerHTML = `<button class="btn ${cleared && lastGame ? 'btn-gold' : 'btn-teal'} btn-roll" style="font-size:1.8rem" onclick="afterResult()">${label}</button>${gainHtml}`;
         markRerollable();
     }, step * pieces.length + (instant ? 0 : 350));
 }
@@ -2044,7 +2062,7 @@ function pickSkill(id, up){
     $('pick-modal').classList.add('hidden');
     if (run.gameNo < GAMES_PER_STAGE){ run.gameNo++; beginGame(); return; }
     // ステージクリア
-    const gain = clearCoins(run.total, target());
+    const gain = clearCoins();
     run.coins += gain; SFX.play('clearstage');
     enterShop();
     toast(tx('toast_clear', gain));
