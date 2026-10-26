@@ -44,6 +44,7 @@
         el.appendChild(bub);
         let last = null;
         function update() {
+            if (bub.parentNode !== el) el.appendChild(bub);   // 言語切りかえなどでボタンの中身が書きかえられても、吹き出しをつけなおす
             let u = false, lg = 'ja';
             try { u = !!(o.unset ? o.unset() : true); } catch (e) {}
             try { lg = (o.lang && o.lang()) || 'ja'; } catch (e) {}
@@ -53,7 +54,7 @@
                 last = u; bub.classList.toggle('on', u);
                 // 吹き出しの場所をあけるため、まわりの部品(reserve)を少しずらす(上に出すとき=上に、下に出すとき=下に)
                 const rs = o.reserve && o.reserve();
-                if (rs) { rs.style.transition = 'margin .3s ease'; rs.style[bub.classList.contains('down') ? 'marginBottom' : 'marginTop'] = u ? '48px' : ''; }
+                if (rs) { rs.style.transition = 'margin .3s ease'; const prop = bub.classList.contains('down') ? 'margin-bottom' : 'margin-top'; if (u) rs.style.setProperty(prop, '48px', 'important'); else rs.style.removeProperty(prop); }
             }
         }
         update();
