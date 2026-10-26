@@ -21,7 +21,9 @@
     const TRACKS = [
         ['brave', 'Brave Spirit of Japan'], ['jig', 'Countryside Jig'], ['dhol', 'Dhol Ka Dhamaka'], ['dusty', 'Dusty Breakbeat Loop'],
         ['eminor', 'E Minor Loop'], ['neon', 'Neon Night Drive'], ['oddly', 'Oddly Addictive'], ['pixel', 'Pixel Party'],
-        ['racing', 'Racing Loop'], ['seamless', 'Seamless Loop'], ['wheel', 'Spin the Dream Wheel'], ['pop', 'Super Pop'], ['map', 'The Map of Wonders']
+        ['racing', 'Racing Loop'], ['seamless', 'Seamless Loop'], ['wheel', 'Spin the Dream Wheel'], ['pop', 'Super Pop'], ['map', 'The Map of Wonders'],
+        ['aminor', 'A Minor Loop'], ['amen', 'Amen Loop'], ['baroque', 'Baroque Pop Loop'], ['bouncy', 'Bouncy Button Press'],
+        ['cocky', 'Cocky Breakbeat'], ['festival', 'Festival Loop'], ['ryukyu', 'Ryukyu Sun Loop']
     ].map(function (a) { return { id: a[0], title: a[1], file: a[1] + '.mp3' }; });
     const K_ALL = 'fgl_bgm_all', K_NOW = 'fgl_bgm_now', RESUME_MS = 15 * 60 * 1000;
     const gainOf = function (v) { return Math.pow(v / 10, 1.7) * 0.85; };
@@ -70,17 +72,22 @@
             const pool = list.length > 1 ? list.filter(function (t) { return t.id !== excl; }) : list;
             return pool[Math.floor(Math.random() * pool.length)];
         }
+        const FADE_MS = 2500;      // 曲のはじまりは、小さい音からゆっくり大きくする(試聴だけ短く)
+        let fadeLen = FADE_MS;
         function ramp() {
             clearInterval(fadeTimer);
+            const len = fadeLen;
             let t = 0;
             fadeTimer = setInterval(function () {
                 t += 50;
-                a.volume = Math.min(1, gainOf(vol) * Math.min(1, t / 900));
-                if (t >= 900) clearInterval(fadeTimer);
+                const k = Math.min(1, t / len);
+                a.volume = Math.min(1, gainOf(vol) * k * k);
+                if (t >= len) clearInterval(fadeTimer);
             }, 50);
         }
+        // 最初の操作の前でも、ブラウザが許せば(同じサイトを触ったあとなど)そのまま流れる。ダメなら最初の操作で流れはじめる
         function tryPlay() {
-            if (vol <= 0 || !gesture || userPaused || document.hidden) return;
+            if (vol <= 0 || userPaused || document.hidden) return;
             a.volume = 0;
             const p = a.play();
             if (p && p.then) p.then(function () { ramp(); notify(); }).catch(function () {});
@@ -95,6 +102,7 @@
                 const seek = function () { a.removeEventListener('loadedmetadata', seek); try { a.currentTime = o.pos; } catch (e) {} };
                 a.addEventListener('loadedmetadata', seek);
             }
+            fadeLen = o.fast ? 400 : FADE_MS;
             tryPlay();
             notify();
         }
@@ -105,7 +113,7 @@
             else { const t = pick(null); if (t) playTrack(t.id); }
         }
         function ensurePlaying() {
-            if (vol <= 0 || !gesture || userPaused || document.hidden || !selected().length) return;
+            if (vol <= 0 || userPaused || document.hidden || !selected().length) return;
             if (!cur) startInitial();
             else if (a.paused) tryPlay();
         }
@@ -113,12 +121,16 @@
         a.addEventListener('error', function () { if (++errCount < 6) setTimeout(function () { const t = pick(cur); if (t) playTrack(t.id); }, 800); });
         a.addEventListener('playing', function () { errCount = 0; notify(); });
         a.addEventListener('pause', notify);
+        const GEST = ['pointerdown', 'mousedown', 'click', 'keydown', 'touchstart', 'touchend'];
         const onGesture = function () {
             gesture = true;
-            ['pointerdown', 'keydown', 'touchend'].forEach(function (ev) { document.removeEventListener(ev, onGesture, true); });
+            if (!a.paused) { GEST.forEach(function (ev) { document.removeEventListener(ev, onGesture, true); }); return; }
             ensurePlaying();
+            // 再生できたら、この聞き耳は外す(まだ止まっていたら、つぎの操作でもう一度ためす)
+            setTimeout(function () { if (!a.paused || !selected().length || vol <= 0) GEST.forEach(function (ev) { document.removeEventListener(ev, onGesture, true); }); }, 700);
         };
-        ['pointerdown', 'keydown', 'touchend'].forEach(function (ev) { document.addEventListener(ev, onGesture, true); });
+        GEST.forEach(function (ev) { document.addEventListener(ev, onGesture, true); });
+        setTimeout(ensurePlaying, 0);
         document.addEventListener('visibilitychange', function () { if (document.hidden) { saveNow(); a.pause(); } else ensurePlaying(); });
         window.addEventListener('pagehide', saveNow);
         setInterval(saveNow, 1000);
@@ -157,7 +169,7 @@
                 if (cur === id && !a.paused) { userPaused = true; a.pause(); notify(); return; }
                 if (vol === 0) { vol = lastVol || 5; save(); }
                 userPaused = false; gesture = true;
-                playTrack(id);
+                playTrack(id, { fast: true });
             },
             next: function () { const t = pick(cur); if (!t) return; if (vol === 0) { vol = lastVol || 5; save(); } userPaused = false; gesture = true; playTrack(t.id); },
             onChange: function (f) { listeners.push(f); },
@@ -196,6 +208,7 @@
         applySfx:{ ja: '🌐 効果音を全ゲームに適用', easy: '🌐 こうかおんを ぜんぶの ゲームに つかう', en: '🌐 Apply SFX to all games' },
         applied: { ja: '全ゲームに適用しました！', easy: 'ぜんぶの ゲームに つかったよ！', en: 'Applied to all games!' },
         failed:  { ja: '保存できませんでした', easy: 'ほぞん できなかったよ', en: 'Could not save' },
+        gear:    { ja: '⚙ 設定', easy: '⚙ せってい', en: '⚙ Settings' },
         open:    { ja: '🎵 BGMのせってい', easy: '🎵 BGMの せってい', en: '🎵 BGM Settings' },
         close:   { ja: '✕ とじる', easy: '✕ とじる', en: '✕ Close' },
         sfxTitle:{ ja: '🔊 効果音', easy: '🔊 こうかおん', en: '🔊 Sound effects' },
@@ -226,12 +239,14 @@
             '.fgb-hint{flex:1;font-size:.8rem;opacity:.75;font-weight:700;min-width:120px}' +
             '.fgb-ov{position:fixed;left:0;top:0;right:0;bottom:0;z-index:2147483000;background:rgba(10,8,38,.82);overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px;box-sizing:border-box;touch-action:manipulation}' +
             '.fgb-ov.hide{display:none}' +
-            '.fgb-ov-in{max-width:780px;margin:0 auto}' +
-            '.fgb-ov-bar{display:flex;justify-content:flex-end;margin-bottom:8px}' +
+            '.fgb-ov-in{max-width:780px;margin:0 auto;display:flex;flex-direction:column}' +
+            '.fgb-ov-bar{display:flex;justify-content:flex-end;margin-bottom:8px;order:-2}' +
             '.fgb-ov .fgb{margin-bottom:12px}' +
             '.fgb-ov .fgb-sfx{color:#fff}' +
             '.fgb-fab{position:fixed;z-index:9000;width:44px;height:44px;border-radius:50%;border:3px solid #fff;font-size:1.2rem;line-height:1;cursor:pointer;color:#fff;background:linear-gradient(#b48cff,#7a4fe0);box-shadow:0 4px 0 rgba(0,0,0,.28),0 6px 14px rgba(0,0,0,.25);padding:0;font-family:inherit;touch-action:manipulation}' +
             '@media (max-width:600px){.fgb-list{grid-template-columns:1fr}.fgb-h{flex-wrap:wrap;gap:6px 10px}.fgb-now{flex-basis:100%;order:3}}' +
+            '.fgb-gear{position:fixed;z-index:9000;height:34px;padding:0 12px;border-radius:17px;border:2px solid rgba(255,255,255,.9);background:rgba(30,24,70,.82);color:#fff;font-weight:900;font-size:.85rem;line-height:1;font-family:inherit;cursor:pointer;box-shadow:0 3px 0 rgba(0,0,0,.35);white-space:nowrap;touch-action:manipulation;opacity:.88}' +
+            '.fgb-gear.compact{width:34px;padding:0;font-size:1rem}.fgb-gear:hover{opacity:1}.fgb-gear:active{transform:translateY(2px);box-shadow:none}' +
             '.fgb-msg{display:block;margin-top:6px;font-weight:900;font-size:.95rem;color:#7ae8dc;min-height:1.2em}';
         document.head.appendChild(s);
     }
@@ -301,7 +316,7 @@
     }
     // ---- 設定画面がないゲーム/狭い設定画面用: 全画面のBGM設定パネル(BGM + 効果音の音量と適用ボタン) ----
     let panel = null;
-    // o.mode = 'sfx' のときは効果音だけ、それ以外はBGMだけを出す(別々のボタンから開く)
+    // o.mode = 'sfx' のときは効果音だけ、'all' のときは両方、それ以外はBGMだけを出す
     function openPanel(bgm, o) {
         style();
         o = o || {};
@@ -322,12 +337,14 @@
             panel.renders.push(r1);
             if (o.sfx) {
                 if (window.FGLSfx && window.FGLSfx.volumeUI) panel.renders.push(window.FGLSfx.volumeUI(q('sfxvol'), o.sfx));
-                panel.renders.push(sfxApplyUI(q('sfxapply'), { bgm: bgm, sfx: o.sfx, getLang: o.getLang }));
+                if (o.sfxApply !== false) panel.renders.push(sfxApplyUI(q('sfxapply'), { bgm: bgm, sfx: o.sfx, getLang: o.getLang }));   // 自前の効果音のゲームは「全ゲームに適用」なし
             }
         }
         const sfxMode = o.mode === 'sfx';
+        const allMode = o.mode === 'all';
         panel.q('bgm').style.display = sfxMode ? 'none' : '';
-        panel.q('sfxbox').style.display = sfxMode && o.sfx ? '' : 'none';
+        panel.q('sfxbox').style.order = allMode ? '-1' : '0';      // 両方出すときは、すぐ変えられるよう効果音の音量を上に
+        panel.q('sfxbox').style.display = (sfxMode || allMode) && o.sfx ? '' : 'none';
         panel.q('close').textContent = L.close[lang()];
         panel.q('sfxt').textContent = L.sfxTitle[lang()];
         panel.renders.forEach(function (r) { if (r) r(); });
@@ -346,6 +363,98 @@
         fab.onclick = function (e) { e.stopPropagation(); openPanel(bgm, o); };
         (o.parent || document.body).appendChild(fab);
         return fab;
+    }
+    // ゲーム中も画面のすみに「⚙ 設定」ボタンを置く(押すとBGMと効果音の音量・選曲のパネル)。o.corner = 'br'|'bl'|'tr'|'tl'(初期値br)、o.dx/o.dy=すみからの距離px
+    function mountGameButton(bgm, o) {
+        style();
+        o = o || {};
+        const lang = function () { let l = 'ja'; try { if (o.getLang) l = o.getLang(); } catch (e) {} return (l === 'ja_easy' || l === 'simple' || l === 'easy') ? 'easy' : (l === 'en' ? 'en' : 'ja'); };
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'fgb-gear'; b.setAttribute('aria-label', 'settings');
+        const c = o.corner || 'br', dx = o.dx === undefined ? 8 : o.dx, dy = o.dy === undefined ? 8 : o.dy;
+        let compact = false, userPos = false, dragged = false, curKey = '', failAt = 0;
+        const paint = function () { b.textContent = compact ? '⚙' : L.gear[lang()]; b.classList.toggle('compact', compact); };
+        const setXY = function (x, y) { b.style.right = b.style.bottom = ''; b.style.left = Math.round(x) + 'px'; b.style.top = Math.round(y) + 'px'; };
+        // すみ(c)の位置
+        const prefXY = function () {
+            const w = b.offsetWidth, h = b.offsetHeight, W = window.innerWidth, H = window.innerHeight;
+            return [c.charAt(1) === 'l' ? dx : W - w - dx, c.charAt(0) === 't' ? dy : H - h - dy];
+        };
+        // ボタンの下にある、ゲームのボタン・文字・入力を探す
+        const hits = function () {
+            const r = b.getBoundingClientRect();
+            if (!r.width || document.querySelector('.fgb-ov:not(.hide)')) return false;
+            for (let i = 0; i <= 4; i++) for (let j = 0; j <= 1; j++) {
+                const x = Math.min(r.right - 1, Math.max(r.left + 1, r.left + r.width * i / 4)), y = Math.min(r.bottom - 1, Math.max(r.top + 1, r.top + r.height * j));
+                const els = document.elementsFromPoint(x, y);
+                for (let k = 0; k < els.length; k++) {
+                    const e = els[k];
+                    if (e === b || e === document.documentElement || e === document.body) continue;
+                    if (/^(BUTTON|A|INPUT|SELECT|TEXTAREA|LABEL)$/.test(e.tagName) || e.getAttribute('onclick') || getComputedStyle(e).cursor === 'pointer') return true;
+                    for (let n = e.firstChild; n; n = n.nextSibling) if (n.nodeType === 3 && /\S/.test(n.nodeValue)) return true;
+                }
+            }
+            return false;
+        };
+        // 重ならない場所を、すみ→画面のふち(下・上・右・左)の順に探す。なければ小さい⚙だけにして、もう一度探す
+        const search = function () {
+            const W = window.innerWidth, H = window.innerHeight;
+            for (let pass = 0; pass < 2; pass++) {
+                compact = pass === 1; paint();
+                const w = b.offsetWidth, h = b.offsetHeight, cand = [prefXY()];
+                ['br', 'bl', 'tr', 'tl'].forEach(function (k) { cand.push([k.charAt(1) === 'l' ? dx : W - w - dx, k.charAt(0) === 't' ? dy : H - h - dy]); });
+                for (let x = W - w - dx; x >= dx; x -= 24) cand.push([x, H - h - dy]);
+                for (let x = W - w - dx; x >= dx; x -= 24) cand.push([x, dy]);
+                for (let y = H - h - dy; y >= dy; y -= 24) cand.push([W - w - dx, y]);
+                for (let y = H - h - dy; y >= dy; y -= 24) cand.push([dx, y]);
+                for (let i = 0; i < cand.length; i++) { setXY(cand[i][0], cand[i][1]); if (!hits()) return true; }
+            }
+            compact = false; paint(); const p = prefXY(); setXY(p[0], p[1]);
+            return false;
+        };
+        const avoid = function () {
+            if (o.fixed || userPos || document.hidden || document.querySelector('.fgb-ov:not(.hide)')) return;
+            const key = window.innerWidth + 'x' + window.innerHeight;
+            if (!hits()) {
+                // いま好みの場所でなくても、好みの場所があいたらもどる
+                const p = prefXY(), cx = b.offsetLeft, cy = b.offsetTop;
+                if (Math.abs(p[0] - cx) + Math.abs(p[1] - cy) > 4 || compact) {
+                    const sx = b.style.left, sy = b.style.top, sc = compact;
+                    compact = false; paint(); const q = prefXY(); setXY(q[0], q[1]);
+                    if (hits()) { compact = sc; paint(); b.style.left = sx; b.style.top = sy; }
+                }
+                return;
+            }
+            if (Date.now() - failAt < 4000 && key === curKey) return;
+            curKey = key;
+            if (!search()) failAt = Date.now();
+        };
+        paint();
+        { const p = prefXY(); setXY(p[0], p[1]); }
+        // ドラッグで好きな場所へ動かせる。位置はゲームごとに覚える
+        const posKey = 'fgl_gear_' + (o.key || (document.title || 'game'));
+        const putAt = function (fx, fy) {
+            const vw = window.innerWidth, vh = window.innerHeight, w = b.offsetWidth, h = b.offsetHeight;
+            setXY(Math.max(2, Math.min(vw - w - 2, fx * vw - w / 2)), Math.max(2, Math.min(vh - h - 2, fy * vh - h / 2)));
+        };
+        let drag = null;
+        b.addEventListener('pointerdown', function (e) { drag = { x: e.clientX, y: e.clientY, on: false }; dragged = false; });
+        window.addEventListener('pointermove', function (e) {
+            if (!drag) return;
+            if (!drag.on && Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y) > 10) { drag.on = true; dragged = true; userPos = true; }
+            if (drag.on) { e.preventDefault(); putAt(e.clientX / window.innerWidth, e.clientY / window.innerHeight); }
+        }, { passive: false });
+        window.addEventListener('pointerup', function (e) {
+            if (drag && drag.on) { try { localStorage.setItem(posKey, JSON.stringify({ x: e.clientX / window.innerWidth, y: e.clientY / window.innerHeight })); } catch (er) {} }
+            drag = null;
+        });
+        b.style.touchAction = 'none';
+        b.onclick = function (e) { e.stopPropagation(); if (dragged) { dragged = false; return; } openPanel(bgm, Object.assign({}, o, { mode: 'all' })); };
+        (o.parent || document.body).appendChild(b);
+        try { const sp = JSON.parse(localStorage.getItem(posKey) || 'null'); if (sp && typeof sp.x === 'number') { userPos = true; setTimeout(function () { putAt(sp.x, sp.y); }, 0); window.addEventListener('resize', function () { putAt(sp.x, sp.y); }); } } catch (e) {}
+        setInterval(function () { paint(); avoid(); }, 700);
+        setTimeout(avoid, 300);
+        return b;
     }
     // 設定画面の中に「🎵 BGMのせってい」ボタンを入れる(押すとBGM設定パネル)。o.before=この要素の前に入れる / o.parent=この要素の最後に入れる
     function settingsButton(bgm, o) {
@@ -382,5 +491,5 @@
         setInterval(function () { if (!wrap.isConnected) place(); else if (b.offsetParent) paint(); }, 600);
         return function () { if (!wrap.isConnected) place(); paint(); };      // 設定画面を開いたとき/言語を切り替えたときに呼ぶと、すぐ入れなおす
     }
-    window.FGLBgm = { create: create, settingsUI: settingsUI, sfxApplyUI: sfxApplyUI, openPanel: openPanel, mountButton: mountButton, settingsButton: settingsButton, TRACKS: TRACKS };
+    window.FGLBgm = { create: create, settingsUI: settingsUI, sfxApplyUI: sfxApplyUI, openPanel: openPanel, mountButton: mountButton, mountGameButton: mountGameButton, settingsButton: settingsButton, TRACKS: TRACKS };
 })();
