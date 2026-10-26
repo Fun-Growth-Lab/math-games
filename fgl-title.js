@@ -114,6 +114,8 @@
                 el.innerHTML = '<span class="ic">' + (ICO[b.ico] || '') + '</span><span class="lb"></span>';
                 el.addEventListener('click', press(b.canvas || b.down ? b : b.sel));
                 rowEl.appendChild(el);
+                // ニックネームのボタン: 名前が未設定のあいだ、ふわふわ動く吹き出しをつける(fgl-nudge.js。読みこんでいるときだけ)
+                if (b.nudge && window.FGLNudge) FGLNudge.attach(el, { unset: b.nudge.unset, lang: lang, dir: b.nudge.dir || (cfg.art === 'compact' ? 'down' : 'up') });   // 下にまとめたメニュー(compact)は、ほかのボタンにかぶらないよう下に出す
                 return { el: el, b: b, lb: el.querySelector('.lb') };
             });
             let lastLang = null, lastVis = null;
@@ -154,6 +156,8 @@
                 if (!cfg.hide) host.classList.toggle('fgt-all', vis);
                 if (vis && lastVis === false) { root.classList.remove('fgt-in'); void root.offsetWidth; root.classList.add('fgt-in'); }
                 lastVis = vis;
+                // 吹き出しが出ているあいだ、下にまとめたメニューを少し上げて 吹き出しの場所をあける
+                root.classList.toggle('nudge-on', minis.some(function (m) { return m.el._fgn && m.el._fgn.el.classList.contains('on') && m.el._fgn.el.classList.contains('down'); }));
             }
             function fit() {
                 const w = host.clientWidth || window.innerWidth, h = host.clientHeight || window.innerHeight;
