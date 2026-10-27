@@ -158,6 +158,7 @@
                 lastVis = vis;
                 // 吹き出しが出ているあいだ、下にまとめたメニューを少し上げて 吹き出しの場所をあける
                 root.classList.toggle('nudge-on', minis.some(function (m) { return m.el._fgn && m.el._fgn.el.classList.contains('on') && m.el._fgn.el.classList.contains('down'); }));
+                root.classList.toggle('nudge-any', minis.some(function (m) { return m.el._fgn && m.el._fgn.el.classList.contains('on'); }));   // 吹き出しが出ているあいだは、メニューを飾りの絵より前に出す
             }
             function fit() {
                 const w = host.clientWidth || window.innerWidth, h = host.clientHeight || window.innerHeight;
