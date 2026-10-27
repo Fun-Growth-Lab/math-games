@@ -29,9 +29,10 @@
     const gainOf = function (v) { return Math.pow(v / 10, 1.7) * 0.85; };
 
     function normalize(o) {
-        const r = { vol: 5, tracks: null };
+        const r = { vol: 5, tracks: null, mode: 'shuffle' };
         if (o && typeof o === 'object') {
             if (typeof o.vol === 'number') r.vol = Math.max(0, Math.min(10, Math.round(o.vol)));
+            if (o.mode === 'order') r.mode = 'order';
             if (Array.isArray(o.tracks)) {
                 const ids = o.tracks.filter(function (id) { return TRACKS.some(function (t) { return t.id === id; }); });
                 r.tracks = ids.length < TRACKS.length ? ids : null;      // [] = 1曲も選ばない(BGMなし)
@@ -53,15 +54,16 @@
         opts = opts || {};
         const storeKey = 'fgl_bgm_' + (opts.key || 'game');
         const st = load(opts.key || 'game');
-        let vol = st.vol, lastVol = vol > 0 ? vol : 5, sel = st.tracks;     // sel: null=すべて / ['id',...]
+        let vol = st.vol, lastVol = vol > 0 ? vol : 5, sel = st.tracks, mode = st.mode;     // sel: null=すべて / ['id',...]。mode: 'shuffle'=ランダム / 'order'=曲の番号順
         const a = new Audio(); a.preload = 'auto';
+        const hist = [];
         let cur = null, gesture = false, userPaused = false, fadeTimer = null, errCount = 0;
         const listeners = [];
         const notify = function () { listeners.forEach(function (f) { try { f(); } catch (e) {} }); };
         const isSel = function (id) { return !sel || sel.indexOf(id) >= 0; };
         const selected = function () { return TRACKS.filter(function (t) { return isSel(t.id); }); };
         const byId = function (id) { return TRACKS.filter(function (t) { return t.id === id; })[0] || null; };
-        function save() { try { localStorage.setItem(storeKey, JSON.stringify({ vol: vol, tracks: sel })); } catch (e) {} }
+        function save() { try { localStorage.setItem(storeKey, JSON.stringify({ vol: vol, tracks: sel, mode: mode })); } catch (e) {} }
         function saveNow() {
             if (!cur || a.paused) return;
             try { localStorage.setItem(K_NOW, JSON.stringify({ id: cur, pos: a.currentTime || 0, ts: Date.now() })); } catch (e) {}
@@ -69,6 +71,12 @@
         function pick(excl) {
             const list = selected();
             if (!list.length) return null;
+            if (mode === 'order') {                       // 番号順: 選んだ曲のうち、いまの曲の次(さいごはまた最初へ)
+                let k = -1;
+                for (let i = 0; i < TRACKS.length; i++) if (TRACKS[i].id === excl) k = i;
+                for (let j = 1; j <= TRACKS.length; j++) { const t = TRACKS[(k + j) % TRACKS.length]; if (isSel(t.id)) return t; }
+                return list[0];
+            }
             const pool = list.length > 1 ? list.filter(function (t) { return t.id !== excl; }) : list;
             return pool[Math.floor(Math.random() * pool.length)];
         }
@@ -96,6 +104,7 @@
             o = o || {};
             const t = byId(id) || pick(null);
             if (!t) { a.pause(); cur = null; notify(); return; }
+            if (cur && cur !== t.id && !o.noHist) { hist.push(cur); if (hist.length > 50) hist.shift(); }
             cur = t.id;
             a.src = BASE + encodeURIComponent(t.file);
             if (o.pos > 1) {
@@ -142,6 +151,28 @@
             get current() { return cur; },
             get selectedCount() { return selected().length; },
             get playing() { return !a.paused && !a.ended; },
+            get mode() { return mode; },
+            get currentTime() { return a.currentTime || 0; },
+            get duration() { return isFinite(a.duration) ? a.duration : 0; },
+            setMode: function (m) { mode = m === 'order' ? 'order' : 'shuffle'; save(); notify(); },
+            seek: function (t) { if (cur && isFinite(a.duration)) { try { a.currentTime = Math.max(0, Math.min(a.duration, t)); } catch (e) {} } },
+            // 再生/一時停止(いまの曲をつづきから。曲がまだなければ はじめる)
+            toggle: function () {
+                if (vol === 0) { vol = lastVol || 5; save(); }
+                userPaused = false; gesture = true;
+                if (!cur) ensurePlaying();
+                else if (a.paused) tryPlay();
+                else { userPaused = true; a.pause(); notify(); }
+            },
+            // 前の曲(3秒以上たっていたら、いまの曲の頭から。そうでなければ、ひとつ前に流れた曲)
+            prev: function () {
+                if (vol === 0) { vol = lastVol || 5; save(); }
+                userPaused = false; gesture = true;
+                if (cur && a.currentTime > 3) { try { a.currentTime = 0; } catch (e) {} return; }
+                const id = hist.pop();
+                if (id) playTrack(id, { noHist: true });
+                else if (cur) { try { a.currentTime = 0; } catch (e) {} }
+            },
             isSelected: isSel,
             setVolume: function (n) {
                 n = Math.max(0, Math.min(10, Math.round(n)));
@@ -176,7 +207,7 @@
             // 全ゲームに適用(BGM): 音量と選曲を共通設定にして、ゲームごとのBGM設定を消す
             applyBgmToAll: function () {
                 try {
-                    localStorage.setItem(K_ALL, JSON.stringify({ vol: vol, tracks: sel }));
+                    localStorage.setItem(K_ALL, JSON.stringify({ vol: vol, tracks: sel, mode: mode }));
                     Object.keys(localStorage).forEach(function (k) { if (/^fgl_bgm_/.test(k) && k !== K_ALL && k !== K_NOW) localStorage.removeItem(k); });
                     return true;
                 } catch (e) { return false; }

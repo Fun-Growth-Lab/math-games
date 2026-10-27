@@ -6,99 +6,158 @@
 <title>ジュークボックス | Fun & Growth Lab</title>
 <style>
     * { box-sizing: border-box; }
-    html, body { margin: 0; height: 100%; overflow: hidden; }
+    html, body { margin: 0; min-height: 100%; overflow-x: hidden; }
     body {
         font-family: "Hiragino Maru Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
         background: radial-gradient(circle at 50% -10%, #4a3a9e 0%, #231c58 55%, #14103a 100%) fixed;
         color: #fff;
     }
-    /* 画面ぴったり: 上のバー + 操作バー + 曲のグリッド(残り全部) */
-    .app { height: 100vh; height: 100dvh; display: flex; flex-direction: column; padding: 8px 10px 8px; gap: 8px; max-width: 1180px; margin: 0 auto; }
-    .bar { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    /* 画面ぴったり(高さは JS が innerHeight で決める)。曲が入りきらない小さい画面では、下にスクロールできる */
+    .app { width: 100%; max-width: 1180px; margin: 0 auto; min-height: var(--vh, 100vh); display: flex; flex-direction: column; padding: 8px 10px 10px; gap: 8px; }
+    .app > * { min-width: 0; }
+    .top { display: flex; align-items: center; gap: 10px; }
     .btn {
         font-family: inherit; font-weight: 900; border: 3px solid #0a0826; border-radius: 12px; padding: 4px 12px; font-size: .9rem; cursor: pointer;
         background: linear-gradient(#fff, #e2dbff); color: #241c4e; box-shadow: 0 3px 0 #0a0826; white-space: nowrap; text-decoration: none; display: inline-block; line-height: 1.3;
     }
     .btn:active { transform: translateY(3px); box-shadow: none; }
     .btn.gold { background: linear-gradient(#ffe27a, #ffc93d); }
-    h1 { margin: 0; font-size: 1.35rem; color: #ffc93d; text-shadow: 0 2px 0 #0a0826; white-space: nowrap; }
-    .nowp { flex: 1; min-width: 0; font-weight: 800; font-size: .95rem; opacity: .92; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
-    .ctl { flex-wrap: wrap; justify-content: space-between; row-gap: 6px; }
-    .ctl .vol { flex: none; }
-    .ctl .vol .fgs-row { gap: 8px; }
-    .ctl .vol .fgs-mute { width: 44px; height: 34px; font-size: 1.1rem; border-radius: 12px; }
-    .ctl .vol .fgs-bars { height: 34px; gap: 4px; }
-    .ctl .vol .fgs-bar { width: 15px; max-height: 32px; border-width: 2px; }
-    .ctl .grp { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    h1 { margin: 0; font-size: 1.3rem; color: #ffc93d; text-shadow: 0 2px 0 #0a0826; min-width: 0; }
+
+    /* ---- プレーヤー ---- */
+    .player { background: linear-gradient(#352b85, #231c5c); border: 3px solid #0a0826; border-radius: 18px; box-shadow: 0 4px 0 #0a0826; padding: 10px 14px 12px; }
+    .p-head { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .p-no { flex: none; width: 54px; height: 54px; border-radius: 14px; background: linear-gradient(#ffe27a, #ffc93d); border: 3px solid #0a0826; color: #241c4e; font-weight: 900; font-size: 1.45rem; display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 0 #0a0826; }
+    .p-info { flex: 1; min-width: 0; }
+    .p-title { font-weight: 900; font-size: clamp(1.1rem, 4.2vw, 1.7rem); line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .p-sub { font-weight: 800; font-size: .8rem; opacity: .75; margin-top: 2px; }
+    .seek { display: flex; align-items: center; gap: 10px; margin: 8px 0 6px; }
+    .seek .t { flex: none; width: 3.2em; font-size: .85rem; font-weight: 800; font-variant-numeric: tabular-nums; opacity: .9; }
+    .seek .t:last-child { text-align: right; }
+    #seek { flex: 1; min-width: 0; height: 22px; margin: 0; -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer; --p: 0%; touch-action: none; }
+    #seek:disabled { opacity: .45; cursor: default; }
+    #seek::-webkit-slider-runnable-track { height: 10px; border-radius: 6px; border: 2px solid #0a0826; background: linear-gradient(90deg, #7ae8dc var(--p), rgba(255,255,255,.18) var(--p)); }
+    #seek::-moz-range-track { height: 6px; border-radius: 6px; border: 2px solid #0a0826; background: rgba(255,255,255,.18); }
+    #seek::-moz-range-progress { height: 6px; border-radius: 6px; background: #7ae8dc; }
+    #seek::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; margin-top: -7px; border-radius: 50%; background: #ffc93d; border: 3px solid #0a0826; box-shadow: 0 2px 0 #0a0826; }
+    #seek::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: #ffc93d; border: 3px solid #0a0826; }
+    .p-ctl { display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; }
+    .seg { display: flex; border: 3px solid #0a0826; border-radius: 12px; overflow: hidden; box-shadow: 0 3px 0 #0a0826; }
+    .seg button { font-family: inherit; font-weight: 900; font-size: .85rem; padding: 4px 10px; border: 0; cursor: pointer; background: rgba(255,255,255,.16); color: #fff; white-space: nowrap; }
+    .seg button + button { border-left: 3px solid #0a0826; }
+    .seg button.on { background: linear-gradient(#ffe27a, #ffc93d); color: #241c4e; }
+    .main { display: flex; align-items: center; gap: 10px; }
+    .rb { width: 42px; height: 42px; border-radius: 50%; border: 3px solid #0a0826; background: linear-gradient(#fff, #e2dbff); color: #241c4e; font-size: 1.05rem; font-weight: 900; cursor: pointer; padding: 0; box-shadow: 0 3px 0 #0a0826; line-height: 1; }
+    .rb.big { width: 56px; height: 56px; font-size: 1.4rem; background: linear-gradient(#7ae8dc, #35d0c0); }
+    .rb:active { transform: translateY(3px); box-shadow: none; }
+    .vol .fgs-row { gap: 8px; }
+    .vol .fgs-mute { width: 42px; height: 34px; font-size: 1.05rem; border-radius: 12px; }
+    .vol .fgs-bars { height: 34px; gap: 3px; }
+    .vol .fgs-bar { width: 13px; max-height: 32px; border-width: 2px; }
+
+    .tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .tools .btn { padding: 3px 10px; font-size: .82rem; }
     .msg { font-weight: 900; font-size: .85rem; color: #7ae8dc; }
-    /* 曲の一覧 */
+
+    /* ---- 曲の一覧 ---- */
     .grid { flex: 1; min-height: 0; display: grid; gap: 5px 8px; }
     .row {
         position: relative; display: flex; align-items: center; gap: 6px; min-width: 0; min-height: 0; overflow: hidden;
         padding: 0 6px 0 4px; border-radius: 12px; background: rgba(255,255,255,.08); border: 2px solid transparent;
     }
     .row.now { border-color: #ffc93d; background: rgba(255,201,61,.2); }
-    .row .bg { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: linear-gradient(90deg, rgba(255,120,170,.38), rgba(255,120,170,.10)); transition: width .4s; pointer-events: none; }
+    .row .bg { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: linear-gradient(90deg, rgba(255,120,170,.34), rgba(255,120,170,.08)); transition: width .4s; pointer-events: none; }
     .row > *:not(.bg) { position: relative; }
     .pl { flex: none; width: 30px; height: 30px; border-radius: 50%; border: 3px solid #0a0826; background: linear-gradient(#7ae8dc,#35d0c0); color: #0a0826; font-size: .8rem; font-weight: 900; line-height: 1; cursor: pointer; padding: 0; box-shadow: 0 2px 0 #0a0826; }
     .pl.on { background: linear-gradient(#ffe27a,#ffc93d); }
     .tt { flex: 1; min-width: 0; font-weight: 800; font-size: .88rem; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+    .tt .no { flex: none; min-width: 1.6em; font-size: .78rem; font-weight: 900; color: #ffc93d; font-variant-numeric: tabular-nums; }
     .tt span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .tt input { flex: none; width: 18px; height: 18px; accent-color: #ffc93d; cursor: pointer; margin: 0; }
-    .vt { flex: none; display: flex; align-items: center; gap: 3px; border: 2px solid #0a0826; border-radius: 999px; padding: 1px 8px 1px 6px; cursor: pointer; font-family: inherit; font-weight: 900; font-size: .8rem; line-height: 1.2; color: #241c4e; background: linear-gradient(#fff, #ffd9e8); box-shadow: 0 2px 0 #0a0826; min-width: 48px; justify-content: center; }
-    .vt:active { transform: translateY(2px); box-shadow: none; }
-    .vt.voted { background: linear-gradient(#ff9ec4, #ff5f9e); color: #fff; cursor: default; }
-    .vt.voted:active { transform: none; box-shadow: 0 2px 0 #0a0826; }
+    /* お気に入り(投票)ボタン: 暗いボタンに、ピンクのハート(ボタンより小さく) */
+    .vt { flex: none; display: flex; align-items: center; justify-content: center; gap: 5px; height: 26px; padding: 0 10px 0 8px; border-radius: 999px; cursor: pointer; font-family: inherit; font-weight: 900; font-size: .8rem; line-height: 1; color: #fff; background: rgba(10,8,38,.6); border: 2px solid rgba(255,255,255,.38); min-width: 52px; }
+    .vt svg { width: 13px; height: 13px; flex: none; color: #ff7aa8; display: block; }
+    .vt:active { transform: translateY(1px); }
+    .vt.voted { border-color: #ff5f9e; background: rgba(255,95,158,.22); cursor: default; }
+    .vt.voted svg { color: #ff5f9e; }
     .compact .row { display: grid; grid-template-columns: 30px 1fr; grid-template-rows: 1fr 1fr; column-gap: 5px; row-gap: 0; padding: 2px 5px 2px 3px; }
     .compact .row .bg { grid-area: 1 / 1 / 3 / 3; }
     .compact .pl { grid-row: 1 / 3; align-self: center; }
     .compact .tt { grid-column: 2; grid-row: 1; font-size: .78rem; align-self: end; }
-    .compact .vt { grid-column: 2; grid-row: 2; justify-self: end; align-self: start; font-size: .72rem; padding: 0 7px 0 5px; min-width: 44px; }
-    .row > .crown { position: absolute; right: 2px; top: -1px; font-size: .7rem; }
-    @media (max-width: 420px) { h1 { font-size: 1.1rem; } .tt { font-size: .8rem; } .btn { padding: 3px 9px; font-size: .8rem; } }
+    .compact .vt { grid-column: 2; grid-row: 2; justify-self: end; align-self: start; height: 20px; font-size: .72rem; padding: 0 8px 0 6px; min-width: 46px; }
+    .compact .vt svg { width: 11px; height: 11px; }
+    .row > .crown { position: absolute; left: 3px; top: -2px; z-index: 2; font-size: .7rem; }
+    @media (max-width: 520px) {
+        .app { padding: 6px 8px 10px; gap: 6px; }
+        h1 { font-size: 1.1rem; }
+        .btn { padding: 3px 9px; font-size: .8rem; }
+        .player { padding: 8px 10px 10px; }
+        .p-no { width: 44px; height: 44px; font-size: 1.15rem; border-radius: 12px; }
+        .main { order: -1; width: 100%; justify-content: center; }
+        .seg button { font-size: .78rem; padding: 3px 8px; }
+        .vol .fgs-row { gap: 6px; }
+        .vol .fgs-bars { gap: 2px; }
+        .vol .fgs-bar { width: 9px; }
+        .vol .fgs-mute { width: 36px; }
+        .p-ctl { justify-content: space-between; }
+    }
 </style>
 </head>
 <body>
-<div class="app">
-    <div class="bar">
+<div class="app" id="app">
+    <div class="top">
         <a class="btn" href="../index.html" id="back">◀ もどる</a>
         <h1 id="ttl">🎶 ジュークボックス</h1>
-        <div class="nowp" id="now"></div>
-        <button type="button" class="btn" id="next">⏭ つぎの曲</button>
     </div>
-    <div class="bar ctl">
-        <div class="vol" id="vol"></div>
-        <div class="grp">
-            <button type="button" class="btn" id="all">全部えらぶ</button>
-            <button type="button" class="btn" id="clr">全部はずす</button>
-            <button type="button" class="btn gold" id="apply">🌐 BGMを全ゲームに適用</button>
-            <span class="msg" id="msg"></span>
+    <div class="player">
+        <div class="p-head">
+            <div class="p-no" id="pno">♪</div>
+            <div class="p-info"><div class="p-title" id="ptitle"></div><div class="p-sub" id="psub"></div></div>
         </div>
+        <div class="seek"><span class="t" id="tcur">0:00</span><input type="range" id="seek" min="0" max="1000" value="0" aria-label="seek"><span class="t" id="tdur">0:00</span></div>
+        <div class="p-ctl">
+            <div class="seg"><button type="button" id="m-shuffle">🔀 ランダム</button><button type="button" id="m-order">🔢 順番</button></div>
+            <div class="main"><button type="button" class="rb" id="prev" aria-label="prev">⏮</button><button type="button" class="rb big" id="play" aria-label="play">▶</button><button type="button" class="rb" id="next" aria-label="next">⏭</button></div>
+            <div class="vol" id="vol"></div>
+        </div>
+    </div>
+    <div class="tools">
+        <button type="button" class="btn" id="all">全部えらぶ</button>
+        <button type="button" class="btn" id="clr">全部はずす</button>
+        <button type="button" class="btn gold" id="apply">🌐 BGMを全ゲームに適用</button>
+        <span class="msg" id="msg"></span>
     </div>
     <div class="grid" id="grid"></div>
 </div>
 <script src="../fgl-sfx.js?v=5"></script>
-<script src="../fgl-bgm.js?v=8"></script>
+<script src="../fgl-bgm.js?v=9"></script>
 <script>
 (function () {
     var lang = 'ja';
     try { lang = localStorage.getItem('fgl_top_lang') || 'ja'; } catch (e) {}
     var T = {
-        ja: { back: '◀ もどる', title: '🎶 ジュークボックス', next: '⏭ つぎの曲', all: '全部えらぶ', clr: '全部はずす', apply: '🌐 BGMを全ゲームに適用',
-              now: 'いま:', none: '（まだ流れていません）', off: '（曲が選ばれていません）', applied: '全ゲームに適用しました！', failed: '保存できませんでした',
-              voteFail: '投票できませんでした', voteTip: 'この曲に投票', votedTip: '投票ずみ' },
-        en: { back: '◀ Back', title: '🎶 Jukebox', next: '⏭ Next', all: 'Select all', clr: 'Clear all', apply: '🌐 Apply BGM to all games',
-              now: 'Now:', none: '(not playing yet)', off: '(no tracks selected)', applied: 'Applied to all games!', failed: 'Could not save',
-              voteFail: 'Could not vote', voteTip: 'Vote for this track', votedTip: 'Voted' }
+        ja: { back: '◀ もどる', title: '🎶 ジュークボックス', all: '全部えらぶ', clr: '全部はずす', apply: '🌐 BGMを全ゲームに適用', applyS: '🌐 全ゲームに適用',
+              shuffle: '🔀 ランダム', order: '🔢 順番', shuffleSub: 'ランダム再生', orderSub: '番号順に再生', sel: '曲えらび中',
+              none: 'ボタンをおして はじめよう', off: '曲が選ばれていません', playing: '再生中', paused: '一時停止',
+              applied: '全ゲームに適用しました！', failed: '保存できませんでした', voteFail: '投票できませんでした', voteTip: 'お気に入りに投票', votedTip: '投票ずみ' },
+        en: { back: '◀ Back', title: '🎶 Jukebox', all: 'Select all', clr: 'Clear all', apply: '🌐 Apply BGM to all games',
+              shuffle: '🔀 Shuffle', order: '🔢 In order', shuffleSub: 'Shuffle', orderSub: 'In order', sel: 'selected',
+              none: 'Press play to start', off: 'No tracks selected', playing: 'Playing', paused: 'Paused',
+              applied: 'Applied to all games!', failed: 'Could not save', voteFail: 'Could not vote', voteTip: 'Vote as favorite', votedTip: 'Voted' }
     }[lang === 'en' ? 'en' : 'ja'];
     if (lang === 'en') { document.documentElement.lang = 'en'; document.title = 'Jukebox | Fun & Growth Lab'; }
     var $ = function (id) { return document.getElementById(id); };
-    $('back').textContent = T.back; $('ttl').textContent = T.title; $('next').textContent = T.next;
-    $('all').textContent = T.all; $('clr').textContent = T.clr; $('apply').textContent = T.apply;
+    $('back').textContent = T.back; $('ttl').textContent = T.title;
+    $('all').textContent = T.all; $('clr').textContent = T.clr; $('apply').textContent = (window.innerWidth < 520 && T.applyS) ? T.applyS : T.apply;
+    $('m-shuffle').textContent = T.shuffle; $('m-order').textContent = T.order;
     var esc = function (t) { return String(t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+    var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+    var HEART = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.8C5.8 16.4 2.6 13 2.6 9.2 2.6 6.1 4.9 3.9 7.6 3.9 9.4 3.9 11 4.8 12 6.4 13 4.8 14.6 3.9 16.4 3.9 19.1 3.9 21.4 6.1 21.4 9.2 21.4 13 18.2 16.4 12 20.8z" ';
+    var heart = function (on) { return HEART + (on ? 'fill="currentColor"' : 'fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"') + '/></svg>'; };
 
     var BGM = FGLBgm.create({ key: 'jukebox' });
     var TRACKS = BGM.tracks;
+    var numOf = function (id) { for (var i = 0; i < TRACKS.length; i++) if (TRACKS[i].id === id) return i + 1; return 0; };
 
     // ---- 投票: 共通の rankings テーブルに game='jukebox_vote_v1' / class_name=曲ID の1行=1票 として入れる ----
     var SB = 'https://rpxassndgiunoqkxqcco.supabase.co/rest/v1', KEY = 'sb_publishable_Wnge6OPvSf5l2YEgaPg4rw_nj4CyYAH';
@@ -118,8 +177,8 @@
         return page(0).then(function (rows) {
             var c = {}; TRACKS.forEach(function (t) { c[t.id] = 0; });
             rows.forEach(function (r) { if (r.class_name in c) c[r.class_name]++; });
-            counts = c; render();
-        }).catch(function () { render(); });
+            counts = c; renderList();
+        }).catch(function () { renderList(); });
     }
     var msgTimer = 0;
     function say(m) { $('msg').textContent = m; clearTimeout(msgTimer); msgTimer = setTimeout(function () { $('msg').textContent = ''; }, 3000); }
@@ -127,7 +186,7 @@
         if (voted.indexOf(id) >= 0) return;
         voted.push(id); saveVoted();
         if (counts) counts[id] = (counts[id] || 0) + 1;
-        render();
+        renderList();
         fetch(SB + '/rankings', {
             method: 'POST', keepalive: true,
             headers: { apikey: KEY, Authorization: 'Bearer ' + KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
@@ -136,52 +195,87 @@
           .catch(function () {                                        // 失敗したら、投票を取り消して押しなおせるようにする
               voted = voted.filter(function (x) { return x !== id; }); saveVoted();
               if (counts) counts[id] = Math.max(0, counts[id] - 1);
-              say(T.voteFail); render();
+              say(T.voteFail); renderList();
           });
     }
 
-    // ---- 画面 ----
-    var grid = $('grid');
-    function render() {
+    // ---- プレーヤー ----
+    var dragging = false;
+    var fmt = function (s) { s = Math.max(0, Math.floor(s || 0)); return Math.floor(s / 60) + ':' + pad(s % 60); };
+    function renderPlayer() {
         var cur = BGM.current, playing = BGM.playing;
         var ct = TRACKS.filter(function (t) { return t.id === cur; })[0];
-        $('now').textContent = T.now + ' ' + (ct ? '♪ ' + ct.title : (BGM.selectedCount === 0 ? T.off : T.none));
+        $('pno').textContent = ct ? pad(numOf(ct.id)) : '♪';
+        $('ptitle').textContent = ct ? ct.title : (BGM.selectedCount === 0 ? T.off : T.none);
+        $('psub').textContent = (BGM.mode === 'order' ? T.orderSub : T.shuffleSub) + ' ・ ' + BGM.selectedCount + '/' + TRACKS.length + ' ' + T.sel + (ct ? ' ・ ' + (playing ? T.playing : T.paused) : '');
+        $('play').textContent = playing ? '⏸' : '▶';
+        $('m-shuffle').classList.toggle('on', BGM.mode !== 'order');
+        $('m-order').classList.toggle('on', BGM.mode === 'order');
+        $('seek').disabled = !ct;
+        tick();
+    }
+    function tick() {
+        var d = BGM.duration, c = dragging ? Number($('seek').value) / 1000 * d : BGM.currentTime;
+        if (!dragging) $('seek').value = d ? Math.round(c / d * 1000) : 0;
+        $('seek').style.setProperty('--p', (d ? c / d * 100 : 0) + '%');
+        $('tcur').textContent = fmt(c); $('tdur').textContent = fmt(d);
+    }
+    var sk = $('seek');
+    sk.addEventListener('input', function () { dragging = true; tick(); });
+    sk.addEventListener('change', function () { BGM.seek(Number(sk.value) / 1000 * BGM.duration); dragging = false; tick(); });
+    $('play').onclick = function () { BGM.toggle(); };
+    $('prev').onclick = function () { BGM.prev(); };
+    $('next').onclick = function () { BGM.next(); };
+    $('m-shuffle').onclick = function () { BGM.setMode('shuffle'); };
+    $('m-order').onclick = function () { BGM.setMode('order'); };
+    $('all').onclick = function () { BGM.selectAll(); };
+    $('clr').onclick = function () { BGM.deselectAll(); };
+    $('apply').onclick = function () { say(BGM.applyBgmToAll() ? T.applied : T.failed); };
+
+    // ---- 曲の一覧 ----
+    var grid = $('grid');
+    function renderList() {
+        var cur = BGM.current, playing = BGM.playing;
         var max = 0, top = null;
         if (counts) TRACKS.forEach(function (t) { if (counts[t.id] > max) { max = counts[t.id]; top = t.id; } });
-        grid.innerHTML = TRACKS.map(function (t) {
+        grid.innerHTML = TRACKS.map(function (t, i) {
             var on = t.id === cur, v = voted.indexOf(t.id) >= 0, n = counts ? counts[t.id] : null;
             return '<div class="row' + (on ? ' now' : '') + '">' +
                 '<div class="bg" style="width:' + (counts && max ? Math.round(n / max * 100) : 0) + '%"></div>' +
                 '<button type="button" class="pl' + (on && playing ? ' on' : '') + '" data-p="' + t.id + '">' + (on && playing ? '⏸' : '▶') + '</button>' +
-                '<label class="tt"><span>' + esc(t.title) + '</span><input type="checkbox" data-c="' + t.id + '"' + (BGM.isSelected(t.id) ? ' checked' : '') + '></label>' +
-                '<button type="button" class="vt' + (v ? ' voted' : '') + '" data-v="' + t.id + '" title="' + (v ? T.votedTip : T.voteTip) + '">' + (v ? '❤️' : '🤍') + ' <b>' + (n === null ? '–' : n) + '</b></button>' +
+                '<label class="tt"><b class="no">' + pad(i + 1) + '</b><span>' + esc(t.title) + '</span><input type="checkbox" data-c="' + t.id + '"' + (BGM.isSelected(t.id) ? ' checked' : '') + '></label>' +
+                '<button type="button" class="vt' + (v ? ' voted' : '') + '" data-v="' + t.id + '" title="' + (v ? T.votedTip : T.voteTip) + '">' + heart(v) + '<b>' + (n === null ? '–' : n) + '</b></button>' +
                 (top === t.id && max > 0 ? '<span class="crown">👑</span>' : '') + '</div>';
         }).join('');
         grid.querySelectorAll('[data-p]').forEach(function (b) { b.onclick = function () { BGM.togglePreview(b.getAttribute('data-p')); }; });
         grid.querySelectorAll('[data-c]').forEach(function (c) { c.onchange = function () { BGM.toggleTrack(c.getAttribute('data-c')); }; });
         grid.querySelectorAll('[data-v]').forEach(function (b) { b.onclick = function () { vote(b.getAttribute('data-v')); }; });
     }
-    // 画面に収まる列数を選ぶ(行が低くなりすぎず、幅も足りる最小の列数)
+    // 画面に収まる列数を選ぶ。入りきらないほど小さい画面では、行の高さの下限で止めて、下にスクロールできるようにする
     function layout() {
-        var W = grid.clientWidth, H = grid.clientHeight, n = TRACKS.length, cols = 5, compact = true;
+        var vh = window.innerHeight;
+        $('app').style.setProperty('--vh', vh + 'px');
+        grid.style.minHeight = '0';
+        var W = grid.clientWidth, H = grid.clientHeight, n = TRACKS.length, cols = 5, compact = true, found = false;
         for (var c = 2; c <= 5; c++) {
             var rows = Math.ceil(n / c), cp = W / c < 230;       // 1列が狭いときは、曲名の下にボタンを置く2段の行にする
-            if (H / rows >= (cp ? 44 : 38)) { cols = c; compact = cp; break; }
-            if (c === 5) compact = cp;
+            if (H / rows >= (cp ? 44 : 38)) { cols = c; compact = cp; found = true; break; }
         }
+        if (!found) { cols = W < 520 ? 2 : (W < 760 ? 3 : 4); compact = W / cols < 230; }
+        var nr = Math.ceil(n / cols), minRow = compact ? 44 : 38;
         grid.classList.toggle('compact', compact);
         grid.style.gridTemplateColumns = 'repeat(' + cols + ',minmax(0,1fr))';
-        grid.style.gridTemplateRows = 'repeat(' + Math.ceil(n / cols) + ',minmax(0,1fr))';
+        grid.style.gridTemplateRows = 'repeat(' + nr + ',minmax(0,1fr))';
         grid.style.gridAutoFlow = 'column';       // 上から下へ、左の列から順に並べる
+        grid.style.minHeight = (nr * minRow + (nr - 1) * 5) + 'px';
     }
-    $('next').onclick = function () { BGM.next(); };
-    $('all').onclick = function () { BGM.selectAll(); };
-    $('clr').onclick = function () { BGM.deselectAll(); };
-    $('apply').onclick = function () { say(BGM.applyBgmToAll() ? T.applied : T.failed); };
     FGLSfx.volumeUI($('vol'), BGM);
-    BGM.onChange(function () { render(); FGLSfx.volumeUI($('vol'), BGM); });
+    BGM.onChange(function () { renderPlayer(); renderList(); FGLSfx.volumeUI($('vol'), BGM); layout(); });
     window.addEventListener('resize', layout);
-    layout(); render(); loadCounts();
+    window.addEventListener('orientationchange', function () { setTimeout(layout, 200); });
+    renderPlayer(); renderList(); layout(); loadCounts();
+    setTimeout(layout, 300);                  // フォントや下のバーが落ちついてからもう一度
+    setInterval(tick, 250);
     setInterval(loadCounts, 30000);           // 他の人の投票も見えるように、ときどき読みなおす
 })();
 </script>
