@@ -1956,25 +1956,25 @@ function maxClearedStar(sid){
 }
 function runAccess(sid){
     const i = SHACKLES.findIndex(s => s.id === sid);
-    if (i <= 0) return { open: true, maxStar: BASE_STARS, prevId: null };
-    const prevId = SHACKLES[i - 1].id, m = Math.min(BASE_STARS, maxClearedStar(prevId));
+    if (i <= 0) return { open: true, maxStar: maxOpenStar(sid), prevId: null };
+    const prevId = SHACKLES[i - 1].id, m = maxClearedStar(prevId);
     // 先頭から順に、ひとつ前のRUNがすべてクリア済みでなければ解放しない（古いセーブデータなどで、順番を飛ばして解放されるのを防ぐ）
     for (let j = 1; j < i; j++) if (maxClearedStar(SHACKLES[j - 1].id) < 1) return { open: false, maxStar: 0, prevId };
     return { open: m >= 1, maxStar: m, prevId };
 }
-// ★4(名人)は、そのRUNの★3をクリアしていれば出てくる（ひとつ前のRUNの進み具合は関係ない）
+// 最初のRUNは、★4(名人)がそのRUNの★3クリアで、★5(伝説)が★4クリアで出てくる。ほかのRUNは、ひとつ前のRUNでクリアした一番高い難易度(名人・伝説も含む)まで選べる
 function secretStarOpen(sid, n){ return n > BASE_STARS && !!getProg(sid).stars[n - 1]; }   // ★n(n>3)は、そのRUNの★(n-1)をクリアすると出る
 function maxOpenStar(sid){ let m = BASE_STARS; while (m < STARS && secretStarOpen(sid, m + 1)) m++; return m; }
 function starOpen(sid, n){
     const acc = runAccess(sid);
     if (!acc.open) return false;
-    return n > BASE_STARS ? secretStarOpen(sid, n) : n <= acc.maxStar;
+    return n <= acc.maxStar;
 }
 function renderRunSelect(){
     document.getElementById('ds-master-badge').classList.toggle('hidden', !isAllGold());
     const prog = getProg(selSid);
     const acc = runAccess(selSid);
-    if (acc.open) selStar = Math.max(1, Math.min(selStar, maxOpenStar(selSid) > BASE_STARS ? maxOpenStar(selSid) : acc.maxStar));
+    if (acc.open) selStar = Math.max(1, Math.min(selStar, acc.maxStar));
     document.getElementById('rs-strip').innerHTML = SHACKLES.map(s => {
         const mc = maxClearedStar(s.id), lk = !runAccess(s.id).open;
         return `<div class="rs-card${s.id === selSid ? ' sel' : ''}${lk ? ' locked' : ''}" style="--c:${SHACKLE_COLOR[s.id]}" data-id="${s.id}" onclick="selectShackle('${s.id}')">
@@ -1993,7 +1993,7 @@ function renderRunSelect(){
     else if (acc.prevId && acc.maxStar < BASE_STARS) note = `<br><span class="ds-lock">${escapeHtml(uif('rs_cap', prevName, starName(acc.maxStar + 1)))}</span>`;
     document.getElementById('ds-preview-sub').innerHTML = escapeHtml(L(SHACKLE_TEXT[selSid].desc)) +
         (prog.best[selStar] ? `　<span class="ds-best">${escapeHtml(uif('best_label', prog.best[selStar]))}</span>` : '') + note;
-    document.getElementById('star-row').innerHTML = Array.from({ length: STARS }, (_, i) => i + 1).filter(n => n <= BASE_STARS || secretStarOpen(selSid, n)).map(n => {
+    document.getElementById('star-row').innerHTML = Array.from({ length: STARS }, (_, i) => i + 1).filter(n => n <= BASE_STARS || n <= acc.maxStar).map(n => {
         const locked = !starOpen(selSid, n);
         return `<button class="star-btn${n === selStar ? ' active' : ''}${locked ? ' locked' : ''}${prog.stars[n] ? ' cleared' : ''}${n === BASE_STARS + 1 ? ' secret' : ''}${n > BASE_STARS + 1 ? ' secret5' : ''}" data-star="${n}" onclick="selectStar(${n})">${n === selStar ? `<em class="pick">▶ ${escapeHtml(ui('rs_picked'))}</em>` : ''}${'★'.repeat(n)}<small>${locked ? '🔒 ' : (prog.stars[n] ? '✔ ' : '')}${escapeHtml(starName(n))}</small></button>`;
     }).join('');
