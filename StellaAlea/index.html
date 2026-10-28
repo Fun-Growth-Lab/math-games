@@ -1220,9 +1220,9 @@ const SKILL_COND = langTable({
     en: { alleven: 'All dice are even', allodd: 'All dice are odd', le10: 'Sum is 10 or less', ge11: 'Sum is 11 or more', even: 'Sum is even', odd: 'Sum is odd', prime: 'Sum is prime (2,3,5,7,11,13,17)', m3: 'Sum is a multiple of 3', m4: 'Sum is a multiple of 4', m5: 'Sum is a multiple of 5', m6: 'Sum is a multiple of 6', allle3: 'All dice are 3 or less', allge4: 'All dice are 4 or more', norr: 'You have not re-rolled this game', rr2: 'You re-rolled 2 or more times this game', poor: 'You have 10 coins or less', last: 'The 3rd (last) game of a stage', nohand: 'The hand is No Hand' } });
 // スキルのアイコンの文字(2行のときは \n)
 const SKILL_GLYPH = {
-    ja:      { alleven: '全偶', allodd: '全奇', even: '偶', odd: '奇', prime: '素', m3: '3倍', m4: '4倍', m5: '5倍', m6: '6倍', allle3: '全小', allge4: '全大', norr: '🔄✕', rr2: '🔄2+', poor: '🪙10↓', last: '最終', nohand: '無役' },
-    ja_easy: { alleven: 'ぜん\nぐう', allodd: 'ぜん\nき', even: 'ぐう', odd: 'き', prime: 'そ', m3: '3の\nばい', m4: '4の\nばい', m5: '5の\nばい', m6: '6の\nばい', allle3: 'ぜん\nしょう', allge4: 'ぜん\nだい', norr: '🔄✕', rr2: '🔄2+', poor: '🪙10↓', last: 'さいご', nohand: 'やく\nなし' },
-    en:      { alleven: 'ALL\nEVEN', allodd: 'ALL\nODD', even: 'EVEN', odd: 'ODD', prime: 'PRIME', m3: 'MULT\n3', m4: 'MULT\n4', m5: 'MULT\n5', m6: 'MULT\n6', allle3: 'ALL\n≤3', allge4: 'ALL\n≥4', norr: '🔄✕', rr2: '🔄2+', poor: '🪙≤10', last: 'LAST', nohand: 'NO\nHAND' }
+    ja:      { alleven: '全偶', allodd: '全奇', even: '偶', odd: '奇', prime: '素', m3: '3倍', m4: '4倍', m5: '5倍', m6: '6倍', allle3: '全小', allge4: '全大', norr: '🔄✕', rr2: '🔄2+', poor: '🪙\n10↓', last: '最終', nohand: '無役' },
+    ja_easy: { alleven: 'ぜん\nぐう', allodd: 'ぜん\nき', even: 'ぐう', odd: 'き', prime: 'そ', m3: '3の\nばい', m4: '4の\nばい', m5: '5の\nばい', m6: '6の\nばい', allle3: 'ぜん\nしょう', allge4: 'ぜん\nだい', norr: '🔄✕', rr2: '🔄2+', poor: '🪙\n10↓', last: 'さいご', nohand: 'やく\nなし' },
+    en:      { alleven: 'ALL\nEVEN', allodd: 'ALL\nODD', even: 'EVEN', odd: 'ODD', prime: 'PRIME', m3: 'MULT\n3', m4: 'MULT\n4', m5: 'MULT\n5', m6: 'MULT\n6', allle3: 'ALL\n≤3', allge4: 'ALL\n≥4', norr: '🔄✕', rr2: '🔄2+', poor: '🪙\n≤10', last: 'LAST', nohand: 'NO\nHAND' }
 };
 const TYPE_NAME = langTable({
     ja: { normal: 'ノーマル', onepair: 'ワンペア', trio: 'トリオ', twopair: 'ツーペア', fullhouse: 'フルハウス', threepair: 'スリーペア', doubletrio: 'ダブルトリオ', charm: 'お守り', ones: 'ピンだけ' },
@@ -1606,7 +1606,15 @@ function saveProg(sid, p){ const all = getProgAll(); all[sid] = p; try { localSt
 function runIndex(sid){ return RUNS.findIndex(r => r.id === sid); }
 function maxCleared(sid){ const st = getProg(sid).stars; let m = 0; for (let n = 1; n <= STARS; n++) if (st[n]) m = n; return m; }
 function runOpen(sid){ const i = runIndex(sid); return i <= 0 || maxCleared(RUNS[i - 1].id) >= 1; }     // 前のRUNを1回クリアすると遊べる
-function starOpen(sid, n){ return runOpen(sid) && (n === 1 || !!getProg(sid).stars[n - 1]); }
+// 「基本」は★1〜3を最初から選べる。ほかのRUNは、ひとつ前のRUNでクリアした一番高い難易度(★3まで)以下だけ選べる。
+// ★4・★5は、そのRUNの★3・★4をクリアすると出る
+const BASE_STARS = 3;
+function starOpen(sid, n){
+    if (!runOpen(sid)) return false;
+    if (n > BASE_STARS) return !!getProg(sid).stars[n - 1];
+    const i = runIndex(sid);
+    return i <= 0 || n <= Math.min(BASE_STARS, maxCleared(RUNS[i - 1].id));
+}
 let selSid = 'basic', selStar = 1;
 function goToRunSelect(){
     goTo('run-select-screen');
