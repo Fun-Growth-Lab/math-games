@@ -193,6 +193,20 @@
             repeating-radial-gradient(circle at 24% 18%, rgba(255,255,255,0.04) 0 46px, rgba(0,0,0,0) 46px 92px),
             linear-gradient(160deg, #2c2480 0%, #1c1658 55%, #0c1132 100%); }
         .rk-wrap { position:absolute; left:26px; right:26px; top:84px; bottom:20px; display:flex; flex-direction:column; gap:12px; z-index:2; }
+        /* RUNカードの帯(九九ポーカーのランキングと同じ形式) */
+        .rk-stage { position: relative; z-index: 2; width: 100%; height: 170px; flex-shrink: 0; display: flex; align-items: center; }
+        .rk-arrow { flex-shrink: 0; width: 46px; height: 74px; border-radius: 14px; border: 4px solid var(--ol); background: linear-gradient(#f2b84a,#d8901e); color: #4a2c00; font-size: 1.5rem; font-weight: 900; font-family: inherit; cursor: pointer; box-shadow: 0 5px 0 #05031a; z-index: 3; }
+        .rk-arrow:active { transform: translateY(4px); box-shadow: 0 1px 0 #05031a; }
+        .rk-arrow:disabled { opacity: 0.35; cursor: default; }
+        .rk-viewport { flex: 1; height: 100%; overflow: hidden; position: relative; }
+        #rk-strip { position: absolute; left: 0; top: 0; height: 100%; display: flex; align-items: center; gap: 14px; padding: 18px 18px 12px; transition: transform 0.35s cubic-bezier(.2,.9,.3,1.15); }
+        .rk-card { position: relative; width: 150px; height: 136px; flex-shrink: 0; display: flex; flex-direction: column; border: 4px solid var(--ol); border-radius: 16px; background: #fff3d6; overflow: hidden; cursor: pointer; box-shadow: 0 6px 0 #05031a, 0 12px 18px rgba(0,0,0,0.3); opacity: 0.8; filter: saturate(0.85); transition: transform 0.2s, opacity 0.2s, box-shadow 0.2s; }
+        .rk-card:hover { opacity: 1; }
+        .rk-card.sel { opacity: 1; filter: none; transform: translateY(-9px) scale(1.07); z-index: 2; box-shadow: 0 6px 0 #05031a, 0 0 0 4px #ffd84d, 0 0 26px 6px rgba(255,216,77,0.6), 0 16px 22px rgba(0,0,0,0.35); }
+        .rk-tab { text-wrap: balance; height: 42px; display: flex; align-items: center; justify-content: center; text-align: center; padding: 0 5px; font-weight: 900; line-height: 1.12; color: #fff; background: var(--c); border-bottom: 4px solid var(--ol); text-shadow: 0 2px 0 rgba(0,0,0,0.3); }
+        .rk-art { position: relative; flex: 1; overflow: hidden; }
+        .rk-art-in { position: absolute; left: 0; top: 0; width: 244px; height: 158px; transform: scale(0.6); transform-origin: 0 0; }
+        .rk-art-in .rs-art { border-bottom: none; height: 158px; }
         .rk-ctrl { display:flex; gap:14px; justify-content:center; flex-wrap:wrap; }
         .rk-seg { display:flex; gap:0; border:4px solid var(--ol); border-radius:14px; overflow:hidden; box-shadow:0 4px 0 var(--ol); }
         .rk-seg button { font-family:inherit; font-weight:900; font-size:1.05rem; padding:6px 16px; border:none; border-right:3px solid var(--ol); background: linear-gradient(#fff,#e2dbff); color:var(--ink); cursor:pointer; }
@@ -547,7 +561,8 @@
         <div class="starfield"></div>
         <div style="position:absolute;left:20px;right:20px;top:12px;"><div class="rs-top"><button class="rs-mini" onclick="closeRanking()" data-i18n="btn_back_title"></button><div class="rs-plaque" data-i18n="rank_title"></div></div></div>
         <div class="rk-wrap">
-            <div class="rk-ctrl"><select class="rk-sel" id="rk-run" onchange="switchRank('run', this.value)"></select><div class="rk-seg" id="rk-seg-kind"></div><div class="rk-seg" id="rk-seg-star"></div><div class="rk-seg" id="rk-seg-tab"></div></div>
+            <div class="rk-stage"><button class="rk-arrow" id="rk-prev" onclick="moveRankRun(-1)">◀</button><div class="rk-viewport" id="rk-viewport"><div id="rk-strip"></div></div><button class="rk-arrow" id="rk-next" onclick="moveRankRun(1)">▶</button></div>
+            <div class="rk-ctrl"><div class="rk-seg" id="rk-seg-kind"></div><div class="rk-seg" id="rk-seg-star"></div><div class="rk-seg" id="rk-seg-tab"></div></div>
             <div class="rk-panel"><div class="rk-head" id="rk-head"></div><ul class="rk-list" id="rank-list"></ul></div>
         </div>
     </div>
@@ -1432,12 +1447,29 @@ function openRanking(from, sid, star){
 }
 function closeRanking(){ if (rankFrom === 'run-select-screen') goToRunSelect(); else goTo('title-screen'); }
 function renderRankScreen(){
-    $('rk-run').innerHTML = RUNS.map(r => `<option value="${r.id}"${r.id === rankSid ? ' selected' : ''}>${escapeHtml(runName(r))}</option>`).join('');
+    $('rk-strip').innerHTML = RUNS.map(r => `<div class="rk-card${r.id === rankSid ? ' sel' : ''}" style="--c:${r.color}" onclick="switchRank('run','${r.id}')">
+            <div class="rk-tab" style="font-size:${rkNameSize(r)}">${escapeHtml(runName(r))}</div>
+            <div class="rk-art"><div class="rk-art-in">${runArt(r.id)}</div></div>
+        </div>`).join('');
+    const ri = runIndex(rankSid);
+    $('rk-prev').disabled = ri <= 0; $('rk-next').disabled = ri >= RUNS.length - 1;
+    centerRankStrip();
     const seg = (id, items, cur) => { $(id).innerHTML = items.map(([v, label, fn]) => `<button class="${v === cur ? 'on' : ''}" onclick="${fn}">${escapeHtml(label)}</button>`).join(''); };
     seg('rk-seg-kind', [['score', tx('rank_kind_score'), "switchRank('kind','score')"], ['hand', tx('rank_kind_hand'), "switchRank('kind','hand')"]], rankKind);
     seg('rk-seg-star', [[0, tx('rank_star_all'), "switchRank('star',0)"]].concat([1, 2, 3, 4, 5].map(n => [n, '★'.repeat(n), `switchRank('star',${n})`])), rankStar);
     seg('rk-seg-tab', [['world', tx('rank_tab_world'), "switchRank('tab','world')"], ['local', tx('rank_tab_local'), "switchRank('tab','local')"]], rankTab);
 }
+const RK_W = 150, RK_GAP = 14, RK_PAD = 18;
+const rkNameSize = r => { const n = runName(r).length; return n <= 5 ? '.95rem' : n <= 8 ? '.8rem' : n <= 11 ? '.68rem' : '.6rem'; };
+function centerRankStrip(){
+    const vp = $('rk-viewport'), idx = runIndex(rankSid);
+    const total = RUNS.length * RK_W + (RUNS.length - 1) * RK_GAP + RK_PAD * 2;
+    const vw = vp.clientWidth || 1000;
+    let x = vw / 2 - (RK_PAD + idx * (RK_W + RK_GAP) + RK_W / 2);
+    x = Math.max(Math.min(0, vw - total), Math.min(0, x));
+    $('rk-strip').style.transform = `translateX(${x}px)`;
+}
+function moveRankRun(d){ const i = runIndex(rankSid) + d; if (i < 0 || i >= RUNS.length) return; switchRank('run', RUNS[i].id); }
 function switchRank(what, v){
     if (what === 'run') rankSid = v; else if (what === 'kind') rankKind = v; else if (what === 'star') rankStar = v; else rankTab = v;
     renderRankScreen(); loadAndRenderRanking();
