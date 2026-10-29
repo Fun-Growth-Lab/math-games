@@ -1279,6 +1279,6 @@ function renderRankRows(rows) {
     list.innerHTML = rows.map((d, i) => {
         const cls = 'rk-row' + (i < 3 ? ' r' + (i + 1) : '') + ((d.name || '') === state.playerName ? ' me' : '');
         const res = d.clear ? `<span class="rk-res clear">${T('rank_result_clear')}</span>` : (d.stage ? `<span class="rk-res">${T('rank_result_stage', { n: d.stage })}</span>` : '<span></span>');
-        return `<li class="${cls}"><span class="rk-no">${i + 1}</span><span class="rk-name">${esc(FGLName.display(d.name || state.playerName, 'ななしさん'))}</span><span class="rk-star">${d.star ? '★' + d.star : ''}</span>${res}<span class="rk-score">${d.score}</span><span class="rk-sub">${esc(d.date || '')}</span></li>`;
+        return `<li class="${cls}"><span class="rk-no">${i + 1}</span><span class="rk-name">${esc(FGLName.display(d.name || state.playerName, 'ななしさん'))}</span><span class="rk-star">${d.star ? '★'.repeat(d.star) : ''}</span>${res}<span class="rk-score">${d.score}</span><span class="rk-sub">${esc(d.date || '')}</span></li>`;
     }).join('');
 }
