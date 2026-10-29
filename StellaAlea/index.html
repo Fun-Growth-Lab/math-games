@@ -185,6 +185,9 @@
         .rl-nm small { font-size:.85rem; color: #fff; background: rgba(0,0,0,.35); border-radius: 8px; padding: 0 7px; margin-left:6px; vertical-align:middle; }
         .rl-ml { grid-row:1; grid-column:2; font-weight:900; font-size:2rem; line-height:1.05; text-shadow: 0 3px 0 var(--ol); color:#fff; }
         .rl.hit { animation: hitflash 1s ease-out; outline: 3px solid #fff; }
+        .rl.used { filter: grayscale(.9) brightness(.7); }
+        .rl.used .rl-ml { color:#ff9a9a; }
+        .rl.used::after { content:'✕'; position:absolute; right:10px; bottom:2px; font-size:2.2rem; font-weight:900; color:#ff5a5a; text-shadow: 0 2px 0 var(--ol); line-height:1; }
         .rl.none { opacity:.8; }
 
         /* ---------- RUN SELECT ---------- */
@@ -770,6 +773,7 @@ const CLEAR_COIN = 15;                // ステージクリア時のコイン(�
 
 // ---- RUNごとの特別ルール(setRules で切りかえる)----
 //   roleMul: 役の倍率にかける数 / coinMul: クリアコインの倍 / offerN: スキルえらびの枚数 / noReroll: ふりなおし禁止
+//   autoSkill: スキルを選べない(ランダムに1つ、Lvが+1高く手に入る) / noRepeatRole: そのステージで一度出た役は、倍率が×0になる
 //   firstRerollFree: 1ゲームめのふりなおし1回目が無料 / fixedDie: 1番左のスロットに入る、変えられないサイコロ / starRange: サイコロの★の数の範囲
 let RULES = {}, CUR_SID = 'basic';
 function setRules(r, sid){ RULES = r || {}; CUR_SID = sid || 'basic'; }
@@ -819,7 +823,9 @@ const SKILLS = [
     { id: 'last',     kind: 'all', m: 2.2,  test: (v, s, c) => c.final },
     { id: 'nohand',   kind: 'all', m: 1.5,  test: (v, s, c) => c.role === 'none' }
 ];
-function skillCtx(role, ctx){ return Object.assign({ rerolls: 0, coins: 99, final: false }, ctx || {}, { role }); }
+function skillCtx(role, ctx){ return Object.assign({ rerolls: 0, coins: 99, final: false, used: [] }, ctx || {}, { role }); }
+// 「もう逢えない気がして」: そのステージですでに出た役なら ×0
+function roleRepeat(role, sc){ return !!(RULES.noRepeatRole && sc.used && sc.used.indexOf(role) >= 0); }
 const SKILL_BY_ID = {}; SKILLS.forEach(k => SKILL_BY_ID[k.id] = k);
 function lvRate(lv){ return 1 + SKILL_LV_RATE * (lv - 1); }
 
@@ -904,7 +910,7 @@ function calcScore(v, st, skillLv, roleLv, ctx){
     const sum = v[0] + v[1] + v[2];
     const role = judgeRole(v);
     const sc = skillCtx(role, ctx);
-    const rm = roleMult(role, roleLv[role] || 1);
+    const rm = roleRepeat(role, sc) ? 0 : roleMult(role, roleLv[role] || 1);
     const parts = [];
     let skillMul = 1;
     SKILLS.forEach(k => {
@@ -935,7 +941,7 @@ function expectedScore(dice, skillLv, roleLv, ctx){
         const v = [dice[0].faces[a], dice[1].faces[b], dice[2].faces[c]];
         const sum = v[0] + v[1] + v[2];
         const role = judgeRole(v), sc = skillCtx(role, ctx);
-        let m = rm[role] * (1 + STAR_MULT_STEP * (dice[0].stars[a] + dice[1].stars[b] + dice[2].stars[c]));
+        let m = (roleRepeat(role, sc) ? 0 : rm[role]) * (1 + STAR_MULT_STEP * (dice[0].stars[a] + dice[1].stars[b] + dice[2].stars[c]));
         for (let i = 0; i < act.length; i++){
             const k = act[i].k, rate = act[i].r;
             if (k.kind === 'face'){ const cnt = (v[0] === k.n) + (v[1] === k.n) + (v[2] === k.n); if (cnt) m *= Math.pow(1 + k.x * rate, cnt); }
@@ -971,17 +977,19 @@ const RUN_RULES = {
     onesdie: { fixedDie: { type: 'ones', faces: [1, 1, 1, 1, 1, 1] } },    // 俺たちはこれを使わせてもらう
     hope:    { roleMul: { none: 2, pair: 0.5, stairs: 0.5, zorome: 0.5, pinzoro: 0.5 } },   // 希望の灯は消さない！
     dream:   { starRange: [6, 12] },                                       // まるで夢を見てるみたい
-    power:   { firstRerollFree: true }                                     // あなたに、力を…。
+    power:   { firstRerollFree: true },                                    // あなたに、力を…。
+    rush:    { autoSkill: true },                                          // 何も考えずに走れ！
+    lost:    { noRepeatRole: true }                                        // もう逢えない気がして
 };
-const RUN_ORDER = ['basic', 'stairs', 'zorome', 'rich', 'dead', 'luck', 'pick2', 'omamori', 'onesdie', 'hope', 'dream', 'power'];
+const RUN_ORDER = ['basic', 'stairs', 'zorome', 'rich', 'dead', 'luck', 'pick2', 'omamori', 'onesdie', 'power', 'rush', 'dream', 'lost', 'hope'];
 // RUNごとのボーダー(basic以外は、各RUNのルールでボットを測って決める。sim2.js)
 // ボーダーは、基本RUNのボーダーに「ステージごとの倍数」をかけて決める。倍数は sim3.js(ボットを各RUNのルールで走らせた、
 // 各ステージの合計点の分布)を基本RUNと比べて出した。強いRUNほど高く、弱いRUNほど低い。
 const RUN_BORDER_SCALE = {
     basic:   1,
-    stairs:  1.05,
-    zorome:  0.95,
-    rich:    [1, 1, 1.1, 1.2, 1.3, 1.35, 1.4],
+    stairs:  1,
+    zorome:  1,
+    rich:    1,
     dead:    0.58,
     luck:    0.72,
     pick2:   0.88,
@@ -989,12 +997,19 @@ const RUN_BORDER_SCALE = {
     onesdie: 1.05,
     hope:    0.95,
     dream:   [1.4, 1.4, 1.5, 2.3, 3, 4, 5.5],
-    power:   1.5
+    rush:    1.3,
+    lost:    1
 };
+// ステージごとの倍数をそのまま使うRUN(EARLY_Wで弱めない)。「もう逢えない気がして」は序盤ほど役が重なって厳しいので、序盤を特に低くする
+const RUN_BORDER_RATIO = { lost: [0.4, 0.35, 0.4, 0.45, 0.4, 0.4, 0.52] };
+// ステージnのボーダーを(1+0.1n)倍にするRUN(序盤の差を縮めるEARLY_Wは使わない)
+const RUN_BORDER_LINEAR = { stairs: 0.1, zorome: 0.1, rich: 0.1, power: 0.1 };
 function niceBorder(v){ const u = v < 100 ? 2 : v < 1000 ? 10 : v < 10000 ? 50 : 100; return Math.max(u, Math.round(v / u) * u); }
 const TARGETS_BY_RUN = {};
 RUN_ORDER.forEach(id => {
     const sc = RUN_BORDER_SCALE[id];
+    if (RUN_BORDER_RATIO[id]){ TARGETS_BY_RUN[id] = TARGETS.map(row => row.map((v, i) => niceBorder(v * RUN_BORDER_RATIO[id][i]))); return; }
+    if (RUN_BORDER_LINEAR[id]){ TARGETS_BY_RUN[id] = TARGETS.map(row => row.map((v, i) => niceBorder(v * (1 + RUN_BORDER_LINEAR[id] * (i + 1))))); return; }
     TARGETS_BY_RUN[id] = sc === 1 ? TARGETS : TARGETS.map(row => row.map((v, i) => niceBorder(v * Math.pow(Array.isArray(sc) ? sc[i] : sc, EARLY_W[i]))));
 });
 function stageTarget(stage, star, sid){ const t = TARGETS_BY_RUN[sid || CUR_SID] || TARGETS; return t[(star || 1) - 1][stage - 1]; }
@@ -1006,7 +1021,13 @@ function rerollCostAt(done){ return RULES.noReroll ? Infinity : (RULES.firstRero
 function roleUpCost(buys){ return ROLE_COST_BASE + ROLE_COST_STEP * buys; }
 function roleUpPrice(buys, onSale){ const c = roleUpCost(buys); return onSale ? Math.ceil(c * ROLE_SALE_RATE) : c; }
 // スキルえらびの3枚。{id, up}: upは上がるレベル(ふつう1、10%で2)
-function offerSkills(rnd){ return shuffled(SKILLS.map(k => k.id), rnd).slice(0, RULES.offerN || 3).map(id => ({ id, up: rnd() < SKILL_LV2_RATE ? 2 : 1 })); }
+function offerSkills(rnd, skillLv){
+    if (RULES.autoSkill){      // 選べない: ランダムな1つが、ふつうより+1高いLvで手に入る
+        const pool = SKILLS.map(k => k.id).filter(id => !skillLv || (skillLv[id] || 0) < SKILL_MAX_LV);
+        const id = shuffled(pool, rnd)[0];
+        return [{ id, up: (rnd() < SKILL_LV2_RATE ? 2 : 1) + 1 }];
+    }
+    return shuffled(SKILLS.map(k => k.id), rnd).slice(0, RULES.offerN || 3).map(id => ({ id, up: rnd() < SKILL_LV2_RATE ? 2 : 1 })); }
 // スキルは、1ゲームおわるたびに3択で獲得(ゲーム全体の最後の1ゲームだけは、なし)
 function hasSkillPick(stage, gameNo){ return !(stage === STAGES && gameNo === GAMES_PER_STAGE); }
 // ふりなおし: 1つだけ振りなおしたとき、いちばん期待値が上がるサイコロの番号と、その期待値
@@ -1081,6 +1102,7 @@ const TX = {
     modal_dice:   { ja: '🎲 つかうサイコロ', ja_easy: '🎲 つかう サイコロ', en: '🎲 Dice to Use' },
     modal_skill:  { ja: '⚡ スキルセット', ja_easy: '⚡ スキルセット', en: '⚡ Set Skills' },
     pick_title:   { ja: 'スキルをえらぼう', ja_easy: 'スキルを えらぼう', en: 'Choose a Skill' },
+    pick_title_auto: { ja: 'スキルがきまった！', ja_easy: 'スキルが きまった！', en: 'Your Skill!' },
     howto_title:  { ja: 'あそびかた', ja_easy: 'あそびかた', en: 'How to Play' },
     btn_close:    { ja: 'とじる', ja_easy: 'とじる', en: 'Close' },
     retire_msg:   { ja: '今のたびをやめて、RUN選択にもどりますか？', ja_easy: 'いまの たびを やめて、RUNせんたくに もどる？', en: 'Quit this run and return to RUN select?' },
@@ -1209,6 +1231,12 @@ const TX = {
     run_power_name:  { ja: 'あなたに、力を…。', ja_easy: 'あなたに、ちからを…。', en: 'I Give You Strength…' },
     run_power_short: { ja: 'ふりなおしの\n1回目は無料！\n（ボーダー高め）', ja_easy: 'ふりなおしの\n1かいめは むりょう！\n（ボーダー たかめ）', en: 'The first re-roll\nis free!\n(higher borders)' },
     run_power_desc:  { ja: '1ゲームの最初のふりなおしに、コインがかかりません。ボーダーは高めです', ja_easy: '1ゲームの さいしょの ふりなおしは、コインが かかりません。ボーダーは たかめです', en: 'The first re-roll of each game costs no coins. Borders are higher.' },
+    run_rush_name: { ja: '何も考えずに走れ！', ja_easy: 'なにも かんがえずに はしれ！', en: 'Don\'t Think, Just Run!' },
+    run_rush_short: { ja: 'スキルは選べない！\nでもLvが高い！', ja_easy: 'スキルは えらべない！\nでも Lvが たかい！', en: 'No skill choice!\nBut higher levels!' },
+    run_rush_desc: { ja: 'スキルえらびがなく、ランダムなスキルが1つ手に入ります。そのかわり、Lvがふつうより1高くなります', ja_easy: 'スキルえらびが なく、ランダムな スキルが 1つ てに はいります。そのかわり、Lvが ふつうより 1 たかく なります', en: 'You cannot choose skills; you get one random skill each time, at 1 level higher than usual.' },
+    run_lost_name: { ja: 'もう逢えない気がして', ja_easy: 'もう あえない きがして', en: 'I Feel We Won\'t Meet Again' },
+    run_lost_short: { ja: '一度出た役は、\nそのステージでは×0！', ja_easy: 'いちど でた やくは、\nそのステージでは ×0！', en: 'A hand that came up\nis ×0 for the stage!' },
+    run_lost_desc: { ja: 'そのステージで一度出た役は、そのあと倍率が×0になります（役なしもふくみます）', ja_easy: 'そのステージで いちど でた やくは、そのあと ばいりつが ×0に なります（やくなしも ふくみます）', en: 'Once a hand comes up in a stage, it is worth ×0 for the rest of that stage (No Hand too).' },
     rs_locked:    { ja: 'ひとつ前のRUNをクリアすると あそべます', ja_easy: 'ひとつ まえの RUNを クリアすると あそべるよ', en: 'Clear the previous RUN to unlock' },
     rk_run:       { ja: 'RUN', ja_easy: 'RUN', en: 'RUN' },
     btn_end_ranking: { ja: '🏆 ランキング', ja_easy: '🏆 ランキング', en: '🏆 Ranking' }
@@ -1620,9 +1648,11 @@ const RUNS = [
     { id: 'pick2',   color: '#8e5cf0', art: { bg: '#7a52c8,#2e1a60 60%,#0c1132', dice: [[3, 0], [6, 0], [1, 0]], ic: '⚖️' } },
     { id: 'omamori', color: '#e8743c', art: { bg: '#d8683a,#5a2412 60%,#0c1132', dice: [[4, 0], [5, 0], [6, 0]], ic: '🧧', tp: 'charm' } },
     { id: 'onesdie', color: '#5f7cc8', art: { bg: '#4f6cb0,#1c2a5a 60%,#0c1132', dice: [[1, 0], [1, 0], [1, 0]], ic: '☝️', tp: 'ones' } },
-    { id: 'hope',    color: '#f08a2a', art: { bg: '#d8802a,#4a2a10 60%,#07071a', dice: [[2, 0], [1, 0], [4, 0]], ic: '🕯️' } },
+    { id: 'power',   color: '#d8483c', art: { bg: '#c8483c,#561a18 60%,#0c1132', dice: [[3, 0], [5, 0], [4, 0]], ic: '💪' } },
+    { id: 'rush',    color: '#22b8c0', art: { bg: '#25a8b4,#124a5a 60%,#0c1132', dice: [[6, 0], [2, 0], [5, 0]], ic: '💨' } },
     { id: 'dream',   color: '#b45ce0', art: { bg: '#9a4cc8,#32185a 60%,#0c1132', dice: [[6, 3], [6, 3], [6, 3]], ic: '🌙' } },
-    { id: 'power',   color: '#d8483c', art: { bg: '#c8483c,#561a18 60%,#0c1132', dice: [[3, 0], [5, 0], [4, 0]], ic: '💪' } }
+    { id: 'lost',    color: '#b0486e', art: { bg: '#9a3a64,#3a1838 60%,#0c1132', dice: [[1, 0], [4, 0], [6, 0]], ic: '🥀' } },
+    { id: 'hope',    color: '#f08a2a', art: { bg: '#d8802a,#4a2a10 60%,#07071a', dice: [[2, 0], [1, 0], [4, 0]], ic: '🕯️' } }
 ].map(r => Object.assign(r, { nameKey: 'run_' + r.id + '_name', shortKey: 'run_' + r.id + '_short', descKey: 'run_' + r.id + '_desc' }));
 const runName = r => tx(r.nameKey);
 const runNameSize = r => { const n = runName(r).length; return n <= 5 ? '1.9rem' : n <= 7 ? '1.5rem;letter-spacing:1px' : n <= 10 ? '1.25rem;letter-spacing:0' : n <= 14 ? '1.1rem;letter-spacing:0' : '.95rem;letter-spacing:0'; };
@@ -1710,7 +1740,7 @@ function startRun(sid, star){
     const fd = fixedDieFor();
     const dice = fd ? [fd, startDie(), startDie()] : [startDie(), startDie(), startDie()];
     run = { sid, star, gameRerolls: 0, stage: 1, gameNo: 1, total: 0, sumScore: 0, pending: 0, coins: START_COINS - GAME_COIN, dice, loadout: dice.map(d => d.id), skillLv: {}, equipped: [null, null, null, null], newSkill: false,
-        roleLv: { none: 1, pair: 1, stairs: 1, zorome: 1, pinzoro: 1 }, roleBuys: 0, bestGame: 0, bestRole: 'none',
+        roleLv: { none: 1, pair: 1, stairs: 1, zorome: 1, pinzoro: 1 }, roleBuys: 0, bestGame: 0, bestRole: 'none', usedRoles: [],
         phase: 'ready', gachaLast: null, cur: null, curRes: null };
     goTo('play-screen');
     beginGame();
@@ -1762,9 +1792,10 @@ function renderSkills(){
     $('skill-list').innerHTML = run.equipped.map(id => id ? skillPanelHtml(id, run.skillLv[id], { icon: 'big' }) : '<div class="sk empty">＋</div>').join('');
 }
 function rolePanelHtml(id){
-    return `<div class="rl ${id === 'none' ? 'none' : ''}" id="rt-${id}" style="--c:${ROLE_COLOR[id]}">
+    const used = RULES.noRepeatRole && run.usedRoles.indexOf(id) >= 0;     // もう逢えない気がして: このステージで出た役
+    return `<div class="rl ${id === 'none' ? 'none' : ''}${used ? ' used' : ''}" id="rt-${id}" style="--c:${ROLE_COLOR[id]}">
         <div class="rl-nm">${ROLE_NAME[id]}<small>Lv${run.roleLv[id]}</small></div>
-        <div class="rl-dice">${ROLE_SAMPLE[id].map(v => dieFaceHtml(v, 0, 'xs')).join('')}</div><div class="rl-ml">×${fm(roleMult(id, run.roleLv[id]))}</div></div>`;
+        <div class="rl-dice">${ROLE_SAMPLE[id].map(v => dieFaceHtml(v, 0, 'xs')).join('')}</div><div class="rl-ml">×${used ? 0 : fm(roleMult(id, run.roleLv[id]))}</div></div>`;
 }
 function renderRoleList(hit){
     $('role-list').innerHTML = ['pinzoro', 'zorome', 'stairs', 'pair', 'none'].map(id => rolePanelHtml(id)).join('');
@@ -1964,7 +1995,7 @@ function rerollDie(i){
 }
 function showResult(instant){
     const r = run.cur.r;
-    const res = calcScore(r.v, r.st, eqLv(), run.roleLv, { rerolls: run.gameRerolls, coins: run.coins, final: run.gameNo === GAMES_PER_STAGE });
+    const res = calcScore(r.v, r.st, eqLv(), run.roleLv, { rerolls: run.gameRerolls, coins: run.coins, final: run.gameNo === GAMES_PER_STAGE, used: run.usedRoles });
     run.curRes = res;
     // 長い名前は、チップの幅(約5.3文字ぶん)におさまるよう文字を小さくする
     const chip = (label, val, c) => { const w = [...String(label)].reduce((a, ch) => a + (ch.charCodeAt(0) < 256 ? .6 : 1), 0); return `<div class="chip" style="--c:${c}"><small${w > 5.3 ? ` style="font-size:${(5.3 / w * .95).toFixed(2)}rem"` : ''}>${label}</small><b>${val}</b></div>`; };
@@ -2008,6 +2039,7 @@ function afterResult(){
     clearRerollable();
     run.total += run.pending;
     run.sumScore += run.pending;
+    run.usedRoles.push(run.curRes.role);
     if (run.pending > run.bestGame){ run.bestGame = run.pending; run.bestRole = run.curRes.role; }
     run.pending = 0;
     updateBar();
@@ -2021,12 +2053,12 @@ function afterResult(){
 
 // ---- スキルえらび(毎ゲームのあと) ----
 function openPick(){
-    run.offer = offerSkills(rnd);
+    run.offer = offerSkills(rnd, run.skillLv);
     renderPick();
     $('pick-modal').classList.remove('hidden'); SFX.play('chest');
 }
 function renderPick(){
-    $('pick-title').innerHTML = `${tx('pick_title')}　<span class="coin-pill" style="font-size:1.3rem;vertical-align:middle"><i style="width:26px;height:26px;font-size:.9rem">$</i>${run.coins}</span>`;
+    $('pick-title').innerHTML = `${tx(RULES.autoSkill ? 'pick_title_auto' : 'pick_title')}　<span class="coin-pill" style="font-size:1.3rem;vertical-align:middle"><i style="width:26px;height:26px;font-size:.9rem">$</i>${run.coins}</span>`;
     $('pick-row').innerHTML = run.offer.map(o => {
         const id = o.id, lv = run.skillLv[id] || 0, maxed = lv >= SKILL_MAX_LV, nl = Math.min(SKILL_MAX_LV, lv + o.up);
         return `<div class="pk${o.up > 1 ? ' rare' : ''}" style="--c:${skillColor(id)}" onclick="pickSkill('${id}',${o.up})">${o.up > 1 ? '<div class="pk-rare">Lv+2！</div>' : ''}<div class="pk-top">${skillIcon(id, 'big')}<div class="pk-lv${lv ? '' : ' new'}">${lv ? (maxed ? `Lv${lv} MAX` : `Lv${lv} → ${nl}`) : `NEW！ Lv${nl}`}</div></div>
@@ -2034,6 +2066,7 @@ function renderPick(){
             <div class="pk-ml"><small>${tx('mult_label')}</small>×${fm(skillMultAt(id, nl))}</div></div></div>`;
     }).join('');
     const rb = $('btn-reload');
+    rb.parentElement.style.display = RULES.autoSkill ? 'none' : '';      // 何も考えずに走れ！: スキルは選べない(リロードもない)
     rb.disabled = run.coins < SKILL_RELOAD_COST;
     rb.innerHTML = `${tx('reload')} <span class="coin-pill" style="font-size:1.15rem;padding:0 10px 0 5px;box-shadow:none;border-width:3px"><i style="width:22px;height:22px;font-size:.8rem">$</i>${SKILL_RELOAD_COST}</span>`;
 }
@@ -2042,7 +2075,7 @@ function reloadSkills(){
     if (run.coins < SKILL_RELOAD_COST) return;
     run.coins -= SKILL_RELOAD_COST;
     $('hud-coin').textContent = run.coins;
-    run.offer = offerSkills(rnd);
+    run.offer = offerSkills(rnd, run.skillLv);
     renderPick();
 }
 function pickSkill(id, up){
@@ -2133,7 +2166,7 @@ function sellDie(id){
     renderShop();
 }
 function goNextStage(){
-    run.stage++; run.gameNo = 1; run.total = 0;
+    run.stage++; run.gameNo = 1; run.total = 0; run.usedRoles = [];
     goTo('play-screen');
     beginGame();
 }
