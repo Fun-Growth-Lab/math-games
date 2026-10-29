@@ -948,6 +948,45 @@ if (window.visualViewport) window.visualViewport.addEventListener('resize', resi
     root.addEventListener('touchend', ()=>{ dragging=false; box=null; });
 })();
 
+// ランキングの一覧(#rk-list)は、画面の向き・ゲームごとのタッチ処理に関係なく、ここでタッチスクロールを受けもつ。
+// (ゲーム側が画面全体のtouchmoveでスクロールを打ち消したり、回転表示用の簡易スクロールとネイティブスクロールがぶつかって
+//  ちらついたりするのを防ぐため。この一覧のタッチは、ほかの処理には渡さない。慣性つき)
+(function setupRankTouchScroll(){
+    const list = document.getElementById('rk-list');
+    if (!list) return;
+    let on = false, p0 = 0, top0 = 0, last = 0, lastT = 0, vel = 0, raf = 0;
+    // 回転表示(rotate(90deg))中は、画面の左が一覧の下。いっぽう通常は画面の下が一覧の下。指の動きを「一覧のたて位置」にそろえる
+    const pos = (t) => isMobileRotated ? -t.clientX : t.clientY;
+    const k = () => 1 / (currentScale || 1);
+    list.addEventListener('touchstart', (e) => {
+        e.stopPropagation();
+        if (e.touches.length !== 1) return;
+        cancelAnimationFrame(raf);
+        on = true; p0 = last = pos(e.touches[0]); top0 = list.scrollTop; lastT = performance.now(); vel = 0;
+    }, { passive: true });
+    list.addEventListener('touchmove', (e) => {
+        e.stopPropagation();
+        if (!on) return;
+        e.preventDefault();
+        const x = pos(e.touches[0]), now = performance.now();
+        list.scrollTop = top0 - (x - p0) * k();
+        const dt = Math.max(1, now - lastT);
+        vel = 0.8 * vel + 0.2 * ((x - last) * k() / dt);   // px/ms(指の向きと逆に一覧が動く)
+        last = x; lastT = now;
+    }, { passive: false });
+    const end = (e) => {
+        e.stopPropagation();
+        if (!on) return;
+        on = false;
+        if (performance.now() - lastT > 80) return;   // 止めてから指をはなしたときは、慣性なし
+        let v = -vel * 16;                              // 1フレームあたりのpx
+        const step = () => { if (Math.abs(v) < 0.3) return; list.scrollTop += v; v *= 0.95; raf = requestAnimationFrame(step); };
+        raf = requestAnimationFrame(step);
+    };
+    list.addEventListener('touchend', end, { passive: true });
+    list.addEventListener('touchcancel', end, { passive: true });
+})();
+
 function randomInt(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
 }
