@@ -32,11 +32,11 @@ const PRESET_EASY = {
     thresholds: CROWN_THRESHOLDS,
     dropRatesByFloor: [
         null,
-        { time: 10, score: 10, item: 10, numCard: 10, creature: 20 }, // F1 空:40%
-        { time: 10, score: 10, item: 10, numCard: 10, creature: 25 }, // F2 空:35%
-        { time: 10, score: 10, item: 10, numCard: 10, creature: 30 }, // F3 空:30%
-        { time: 10, score: 10, item: 10, numCard: 10, creature: 35 }, // F4 空:25%
-        { time: 10, score: 10, item: 10, numCard: 10, creature: 40 }, // F5 空:20%
+        { time: 10, score: 10, item: 10, numCard: 10, creature: 10 }, // F1 空:50%
+        { time: 10, score: 10, item: 10, numCard: 10, creature: 10 }, // F2 空:50%
+        { time: 10, score: 10, item: 10, numCard: 10, creature: 10 }, // F3 空:50%
+        { time: 10, score: 10, item: 10, numCard: 10, creature: 10 }, // F4 空:50%
+        { time: 10, score: 10, item: 10, numCard: 10, creature: 10 }, // F5 空:50%
     ],
     expInitial: 150,
     // やさしいはカード2,3,4 → 2^a×3^b の形のみ有効
@@ -57,11 +57,11 @@ const PRESET_NORMAL = {
     thresholds: CROWN_THRESHOLDS,
     dropRatesByFloor: [
         null,
-        { time: 10, score: 10, item: 10, numCard: 10, creature: 30 }, // F1 空:30%
-        { time: 10, score: 10, item: 10, numCard: 10, creature: 35 }, // F2 空:25%
-        { time: 10, score: 10, item: 10, numCard: 10, creature: 40 }, // F3 空:20%
-        { time: 10, score: 10, item: 10, numCard: 10, creature: 45 }, // F4 空:15%
-        { time: 10, score: 10, item: 10, numCard: 10, creature: 50 }, // F5 空:10%
+        { time: 10, score: 10, item: 10, numCard: 10, creature: 20 }, // F1 空:40%
+        { time: 10, score: 10, item: 10, numCard: 10, creature: 20 }, // F2 空:40%
+        { time: 10, score: 10, item: 10, numCard: 10, creature: 20 }, // F3 空:40%
+        { time: 10, score: 10, item: 10, numCard: 10, creature: 20 }, // F4 空:40%
+        { time: 10, score: 10, item: 10, numCard: 10, creature: 20 }, // F5 空:40%
     ],
     expInitial: 200,
     // ふつうはカード2,3,4,5 → 2^a×3^b×5^c の形のみ有効
@@ -82,11 +82,11 @@ const PRESET_HARD = {
     thresholds: CROWN_THRESHOLDS,
     dropRatesByFloor: [
         null,
-        { time: 10, score: 10, item: 10, numCard: 10, creature: 40 }, // F1 空:20%
-        { time: 10, score: 10, item: 10, numCard: 10, creature: 45 }, // F2 空:15%
-        { time: 10, score: 10, item: 10, numCard: 10, creature: 50 }, // F3 空:10%
-        { time: 10, score: 10, item: 10, numCard: 10, creature: 55 }, // F4 空:5%
-        { time: 10, score: 10, item: 10, numCard: 10, creature: 60 }, // F5 空:0%
+        { time: 10, score: 10, item: 10, numCard: 10, creature: 30 }, // F1 空:30%
+        { time: 10, score: 10, item: 10, numCard: 10, creature: 30 }, // F2 空:30%
+        { time: 10, score: 10, item: 10, numCard: 10, creature: 30 }, // F3 空:30%
+        { time: 10, score: 10, item: 10, numCard: 10, creature: 30 }, // F4 空:30%
+        { time: 10, score: 10, item: 10, numCard: 10, creature: 30 }, // F5 空:30%
     ],
     expInitial: 300,
     // むずかしいはカード2〜9 → 2^a×3^b×5^c×7^d の形のみ有効
@@ -99,7 +99,7 @@ const MAX_FLOOR = 5;
 
 
 // シークレット★4(名人)・★5(伝説): むずかしいをもとに、はじめの時間をへらし、ボスを強くし(ボスのHPは 2〜7の数だけで作れる数)、
-// 時間のドロップをへらして その分 魔物をふやす。経験値(レベルアップ)も ひつようが多い
-const _dropMod = (rows, dt) => rows.map(r => r && Object.assign({}, r, { time: r.time - dt, creature: r.creature + dt }));
-const PRESET_MASTER = Object.assign({}, PRESET_HARD, { label: '名人', initTime: 18, expInitial: 360, dropRatesByFloor: _dropMod(PRESET_HARD.dropRatesByFloor, 2), bossHpList: [360, 420, 504, 540, 576, 600, 672] });
-const PRESET_LEGEND = Object.assign({}, PRESET_HARD, { label: '伝説', initTime: 16, expInitial: 420, dropRatesByFloor: _dropMod(PRESET_HARD.dropRatesByFloor, 4), bossHpList: [450, 540, 630, 675, 720, 756, 840] });
+// 時間のドロップをへらす。魔物の出る割合は ★ごとに 10/20/30/40/50%(どのフロアも同じ)。経験値(レベルアップ)も ひつようが多い
+const _dropMod = (rows, dt, creature) => rows.map(r => r && Object.assign({}, r, { time: r.time - dt, creature: creature }));
+const PRESET_MASTER = Object.assign({}, PRESET_HARD, { label: '名人', initTime: 18, expInitial: 360, dropRatesByFloor: _dropMod(PRESET_HARD.dropRatesByFloor, 2, 40), bossHpList: [360, 420, 504, 540, 576, 600, 672] });
+const PRESET_LEGEND = Object.assign({}, PRESET_HARD, { label: '伝説', initTime: 16, expInitial: 420, dropRatesByFloor: _dropMod(PRESET_HARD.dropRatesByFloor, 4, 50), bossHpList: [450, 540, 630, 675, 720, 756, 840] });

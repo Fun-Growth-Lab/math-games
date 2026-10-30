@@ -206,8 +206,32 @@ function generateEnemyValue() {
     return parseInt(entries[entries.length - 1][0]);
 }
 
-// カード値を重み付きランダムで生成。手札に素数(2・3など)をわざと出しやすくする補助は ない(難易度の差は、敵の出る確率と敵の強さでつける)
+// カード値を重み付きランダムで生成（スマートドロー付き）
 function generateCardValue(excludeValue = -1) {
+    const handVals = state.cards.filter(c => c !== null).map(c => c.value);
+    const primeTargets = [2, 3];      // 手札に出しやすくする素数。どの★でも同じ(2と3。その★のカードに出ない数は自動でとばす)
+
+    // 対象素数のうち手札に1枚もないもの
+    const missing = primeTargets.filter(p =>
+        p !== excludeValue &&
+        CONFIG.weights[p] !== undefined &&
+        !handVals.includes(p)
+    );
+    // 対象素数のうち手札に1枚だけあるもの
+    const onlyOne = primeTargets.filter(p =>
+        p !== excludeValue &&
+        CONFIG.weights[p] !== undefined &&
+        handVals.filter(v => v === p).length === 1
+    );
+
+    if (missing.length > 0 && Math.random() < 0.5) {
+        // IF: 手札に存在しない素数がある → 50%でその中からランダムに引く
+        return missing[Math.floor(Math.random() * missing.length)];
+    } else if (missing.length === 0 && onlyOne.length > 0 && Math.random() < 0.5) {
+        // ELSE IF: 全素数が手札にあるが1枚しかないものがある → 50%で補充
+        return onlyOne[Math.floor(Math.random() * onlyOne.length)];
+    }
+
     // 通常の重み付き抽選
     let pool = [];
     for (const [valStr, weight] of Object.entries(CONFIG.weights)) {
