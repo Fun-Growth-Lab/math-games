@@ -23,7 +23,7 @@
         ['eminor', 'E Minor Loop'], ['neon', 'Neon Night Drive'], ['oddly', 'Oddly Addictive'], ['pixel', 'Pixel Party'],
         ['racing', 'Racing Loop'], ['seamless', 'Seamless Loop'], ['wheel', 'Spin the Dream Wheel'], ['pop', 'Super Pop'], ['map', 'The Map of Wonders'],
         ['aminor', 'A Minor Loop'], ['amen', 'Amen Loop'], ['baroque', 'Baroque Pop Loop'], ['bouncy', 'Bouncy Button Press'],
-        ['cocky', 'Cocky Breakbeat'], ['festival', 'Festival Loop'], ['ryukyu', 'Ryukyu Sun Loop']
+        ['cocky', 'Cocky Breakbeat'], ['festival', 'Festival Loop'], ['ryukyu', 'Ryukyu Sun Loop'], ['hoedown', 'Hoedown House'], ['pentatonic', 'Pentatonic Playground']
     ].map(function (a) { return { id: a[0], title: a[1], file: a[1] + '.mp3' }; });
     const K_ALL = 'fgl_bgm_all', K_NOW = 'fgl_bgm_now', RESUME_MS = 15 * 60 * 1000;
     const gainOf = function (v) { return Math.pow(v / 10, 1.7) * 0.85; };
