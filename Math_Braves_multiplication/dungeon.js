@@ -1,7 +1,7 @@
 // かけざんダンジョン(ブリキの地下迷宮)の本体。
 // 見た目はDOM(#bl)で描き、入力は透明なcanvasが受ける。座標はゲームエリア内のpx(720x720)で、チュートリアルの位置指定もこの座標を使う。
 // ルール(パネル/カード/アイテム/レベルアップ)は元のかけざんダンジョンと同じ。ステージ制RUN(フロア=ステージ)の画面は braves-run.js が受け持つ。
-const STAR_PRESETS = { 1: PRESET_EASY, 2: PRESET_NORMAL, 3: PRESET_HARD };
+const STAR_PRESETS = { 1: PRESET_EASY, 2: PRESET_NORMAL, 3: PRESET_HARD, 4: PRESET_MASTER, 5: PRESET_LEGEND };
 
 Object.assign(state, {
     floor: 1, keysFound: 0, keysNeeded: 1, items: [], itemSelectMode: null, itemSelectValue: null, lastCardValue: 0, doorRevealed: false,
@@ -651,7 +651,7 @@ function updateStageLabel() {
     const n = Math.min(state.floor, STAGE_COUNT);
     document.getElementById('disp-difficulty-label').textContent = `${n} / ${STAGE_COUNT}`;
     document.getElementById('sp-run').textContent = T('run_' + RUN_LIST[runSelIdx].id + '_name');
-    document.getElementById('sp-diff').textContent = '★'.repeat(state.star) + ' ' + T(['diff_easy', 'diff_normal', 'diff_hard'][state.star - 1]);
+    document.getElementById('sp-diff').textContent = '★'.repeat(state.star) + ' ' + diffName(state.star);
     let h = '';
     for (let k = 1; k <= STAGE_COUNT; k++) h += `<div class="rt ${k < n ? 'done' : (k === n ? 'now' : '')}${k === STAGE_COUNT ? ' last' : ''}" style="--rc:${STAGE_THEMES[k - 1].c}"><b class="no">${k}</b><span class="nm">${stageName(k)}</span></div>`;
     document.getElementById('sp-route').innerHTML = h;

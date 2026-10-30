@@ -4,7 +4,7 @@
 // 商と余りの 1〜9 のパネル(3×3)にHITさせ、ノルマの数だけ HITさせればラウンドクリア。ターゲット・ビンゴ・パーフェクトのボーナスつき。
 // 画面の中央には ロボが1体。のこりのHIT数が ロボのHP(HITするたびにへり、0で たおす)。
 // ステージ制RUN(ラウンド=ステージ。ラウンド数は★ごとに3/5/7)の画面は braves-run.js が受け持つ。
-const STAR_PRESETS = { 1: PRESET_EASY, 2: PRESET_NORMAL, 3: PRESET_HARD };
+const STAR_PRESETS = { 1: PRESET_EASY, 2: PRESET_NORMAL, 3: PRESET_HARD, 4: PRESET_MASTER, 5: PRESET_LEGEND };
 
 // 画面の寸法(ゲームエリア 720x720)
 const PANEL = 66, PGAP = 8, GROUP_W = 3 * PANEL + 2 * PGAP;       // パネル1枚と、3x3のかたまり
@@ -76,7 +76,7 @@ function updateStageLabel() {
     const n = Math.min(state.round, STAGE_COUNT);
     document.getElementById('disp-difficulty-label').textContent = `${n} / ${STAGE_COUNT}`;
     document.getElementById('sp-run').textContent = T('run_' + RUN_LIST[runSelIdx].id + '_name');
-    document.getElementById('sp-diff').textContent = '★'.repeat(state.star) + ' ' + T(['diff_easy', 'diff_normal', 'diff_hard'][state.star - 1]);
+    document.getElementById('sp-diff').textContent = '★'.repeat(state.star) + ' ' + diffName(state.star);
     let h = '';
     for (let k = 1; k <= STAGE_COUNT; k++) h += `<div class="rt ${k < n ? 'done' : (k === n ? 'now' : '')}${k === STAGE_COUNT ? ' last' : ''}" style="--rc:${STAGE_THEMES[k - 1].c}"><b class="no">${k}</b><span class="nm">${stageName(k)}</span></div>`;
     document.getElementById('sp-route').innerHTML = h;

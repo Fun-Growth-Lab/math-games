@@ -97,3 +97,9 @@ const GRID_ROWS = 5;
 const GRID_COLS = 5;
 const MAX_FLOOR = 5;
 
+
+// シークレット★4(名人)・★5(伝説): むずかしいをもとに、はじめの時間をへらし、ボスを強くし(ボスのHPは 2〜7の数だけで作れる数)、
+// 時間のドロップをへらして その分 魔物をふやす。経験値(レベルアップ)も ひつようが多い
+const _dropMod = (rows, dt) => rows.map(r => r && Object.assign({}, r, { time: r.time - dt, creature: r.creature + dt }));
+const PRESET_MASTER = Object.assign({}, PRESET_HARD, { label: '名人', initTime: 18, expInitial: 360, dropRatesByFloor: _dropMod(PRESET_HARD.dropRatesByFloor, 2), bossHpList: [360, 420, 504, 540, 576, 600, 672] });
+const PRESET_LEGEND = Object.assign({}, PRESET_HARD, { label: '伝説', initTime: 16, expInitial: 420, dropRatesByFloor: _dropMod(PRESET_HARD.dropRatesByFloor, 4), bossHpList: [450, 540, 630, 675, 720, 756, 840] });

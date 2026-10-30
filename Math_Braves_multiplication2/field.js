@@ -3,7 +3,7 @@
 // ルールは元のかけざん2と同じ: 手札のカードをまん中の「ばのカード」にかさねて かけざん → 101いじょうで てきにこうげき(ダメージ=ばのカードの数)。
 // こうげきするとアクションが1へる。てきのHP=(ラウンド+4)×(50×ラウンド+hpBase)、アクション=ラウンド+4。ラウンドをクリアするとアイテムが1つ。
 // ステージ制RUN(ラウンド=ステージ)の画面は braves-run.js が受け持つ。
-const STAR_PRESETS = { 1: PRESET_EASY, 2: PRESET_NORMAL, 3: PRESET_HARD };
+const STAR_PRESETS = { 1: PRESET_EASY, 2: PRESET_NORMAL, 3: PRESET_HARD, 4: PRESET_MASTER, 5: PRESET_LEGEND };
 
 // 画面の寸法(ゲームエリア 720x720)
 const FIELD_X = 360, FIELD_Y = 458, FIELD_W = 120, FIELD_H = 160;     // ばのカード(中心の座標)
@@ -90,7 +90,7 @@ function updateStageLabel() {
     const n = Math.min(state.round, STAGE_COUNT);
     document.getElementById('disp-difficulty-label').textContent = `${n} / ${STAGE_COUNT}`;
     document.getElementById('sp-run').textContent = T('run_' + RUN_LIST[runSelIdx].id + '_name');
-    document.getElementById('sp-diff').textContent = '★'.repeat(state.star) + ' ' + T(['diff_easy', 'diff_normal', 'diff_hard'][state.star - 1]);
+    document.getElementById('sp-diff').textContent = '★'.repeat(state.star) + ' ' + diffName(state.star);
     let h = '';
     for (let k = 1; k <= STAGE_COUNT; k++) h += `<div class="rt ${k < n ? 'done' : (k === n ? 'now' : '')}${k === STAGE_COUNT ? ' last' : ''}" style="--rc:${STAGE_THEMES[k - 1].c}"><b class="no">${k}</b><span class="nm">${stageName(k)}</span></div>`;
     document.getElementById('sp-route').innerHTML = h;

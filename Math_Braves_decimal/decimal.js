@@ -4,7 +4,7 @@
 //   5.0をこえると、こえた分だけHPがへる(ちょうど5.0なら+1000)。1.0〜4.0にぴったり止まるとボーナス。
 //   リボンの上のイベント(てき・たから・ダイヤ・おかし)に止まると、その効果。ダイヤでチェンジ。全7ステージ。
 // ステージ制RUN(★で HP 3.0/2.0/1.0)の画面は braves-run.js が受け持つ。
-const STAR_PRESETS = { 1: PRESET_EASY, 2: PRESET_NORMAL, 3: PRESET_HARD };
+const STAR_PRESETS = { 1: PRESET_EASY, 2: PRESET_NORMAL, 3: PRESET_HARD, 4: PRESET_MASTER, 5: PRESET_LEGEND };
 
 // 画面の寸法(ゲームエリア 720x720)
 const TX0 = 40, TW = 624;                  // リボンの 0.0 の位置と、0.0〜5.0 の長さ
@@ -48,7 +48,7 @@ function updateStageLabel() {
     const n = Math.min(state.stage, STAGE_COUNT);
     document.getElementById('disp-difficulty-label').textContent = `${n} / ${STAGE_COUNT}`;
     document.getElementById('sp-run').textContent = T('run_' + RUN_LIST[runSelIdx].id + '_name');
-    document.getElementById('sp-diff').textContent = '★'.repeat(state.star) + ' ' + T(['diff_easy', 'diff_normal', 'diff_hard'][state.star - 1]);
+    document.getElementById('sp-diff').textContent = '★'.repeat(state.star) + ' ' + diffName(state.star);
     let h = '';
     for (let k = 1; k <= STAGE_COUNT; k++) h += `<div class="rt ${k < n ? 'done' : (k === n ? 'now' : '')}${k === STAGE_COUNT ? ' last' : ''}" style="--rc:${STAGE_THEMES[k - 1].c}"><b class="no">${k}</b><span class="nm">${stageName(k)}</span></div>`;
     document.getElementById('sp-route').innerHTML = h;

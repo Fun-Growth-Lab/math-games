@@ -3,3 +3,6 @@
 const PRESET_EASY = { label: "やさしい", maxHp: 3.0, maxStage: 7 };
 const PRESET_NORMAL = { label: "ふつう", maxHp: 2.0, maxStage: 7 };
 const PRESET_HARD = { label: "むずかしい", maxHp: 1.0, maxStage: 7 };
+// シークレット★4(名人)・★5(伝説): HPがへる。名人は「いきすぎ」あわせて0.2まで / 伝説は 1回もいきすぎられない(0.1でもHP0)
+const PRESET_MASTER = { label: "名人", maxHp: 0.3, maxStage: 7 };
+const PRESET_LEGEND = { label: "伝説", maxHp: 0.1, maxStage: 7 };
