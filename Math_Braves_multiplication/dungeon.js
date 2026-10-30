@@ -206,34 +206,8 @@ function generateEnemyValue() {
     return parseInt(entries[entries.length - 1][0]);
 }
 
-// カード値を重み付きランダムで生成（スマートドロー付き）
+// カード値を重み付きランダムで生成。手札に素数(2・3など)をわざと出しやすくする補助は ない(難易度の差は、敵の出る確率と敵の強さでつける)
 function generateCardValue(excludeValue = -1) {
-    const handVals = state.cards.filter(c => c !== null).map(c => c.value);
-    const primeTargets = [2, 3];
-    if (state.difficulty === 'NORMAL' || state.difficulty === 'HARD') primeTargets.push(5);
-    if (state.difficulty === 'HARD') primeTargets.push(7);
-
-    // 対象素数のうち手札に1枚もないもの
-    const missing = primeTargets.filter(p =>
-        p !== excludeValue &&
-        CONFIG.weights[p] !== undefined &&
-        !handVals.includes(p)
-    );
-    // 対象素数のうち手札に1枚だけあるもの
-    const onlyOne = primeTargets.filter(p =>
-        p !== excludeValue &&
-        CONFIG.weights[p] !== undefined &&
-        handVals.filter(v => v === p).length === 1
-    );
-
-    if (missing.length > 0 && Math.random() < 0.5) {
-        // IF: 手札に存在しない素数がある → 50%でその中からランダムに引く
-        return missing[Math.floor(Math.random() * missing.length)];
-    } else if (missing.length === 0 && onlyOne.length > 0 && Math.random() < 0.5) {
-        // ELSE IF: 全素数が手札にあるが1枚しかないものがある → 50%で補充
-        return onlyOne[Math.floor(Math.random() * onlyOne.length)];
-    }
-
     // 通常の重み付き抽選
     let pool = [];
     for (const [valStr, weight] of Object.entries(CONFIG.weights)) {
@@ -594,10 +568,7 @@ function collectItem(cell) {
         addDungeonLog(T('dlog_time_recover', {n: timeGain}));
     }
     else if (cell.item === 'ITEM_SCORE') {
-        let base = 200;
-        if (state.difficulty === 'NORMAL') base = Math.floor(200 * 1.5);
-        if (state.difficulty === 'HARD') base = Math.floor(200 * 2.0);
-        scoreGain = base;
+        scoreGain = 200;
         symbol = "🎁"; color = '#ffca28';
         addDungeonLog(T('dlog_score_bonus', {n: scoreGain}));
     }
