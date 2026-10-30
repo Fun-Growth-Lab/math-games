@@ -1970,6 +1970,8 @@ function starOpen(sid, n){
     if (!acc.open) return false;
     return n <= acc.maxStar;
 }
+// まだ ひらいていないRUNは、名前も絵も せつめいも ふせる(つぎのRUNが どんなものか、クリアするまで 見えない)
+const MYST_ART = '<div class="rs-art" style="background:linear-gradient(#4a4f66,#2a2d40)"><div style="position:absolute;left:78px;top:14px;font-size:92px;font-weight:900;color:rgba(255,255,255,0.25)">？</div><div style="position:absolute;left:96px;top:84px;font-size:40px;line-height:1">🔒</div></div>';
 function renderRunSelect(){
     document.getElementById('ds-master-badge').classList.toggle('hidden', !isAllGold());
     const prog = getProg(selSid);
@@ -1978,10 +1980,10 @@ function renderRunSelect(){
     document.getElementById('rs-strip').innerHTML = SHACKLES.map(s => {
         const mc = maxClearedStar(s.id), lk = !runAccess(s.id).open;
         return `<div class="rs-card${s.id === selSid ? ' sel' : ''}${lk ? ' locked' : ''}" style="--c:${SHACKLE_COLOR[s.id]}" data-id="${s.id}" onclick="selectShackle('${s.id}')">
-            <div class="rs-tab">${escapeHtml(shackleName(s.id))}</div>
-            ${shackleArt(s.id)}
+            <div class="rs-tab">${lk ? '？？？' : escapeHtml(shackleName(s.id))}</div>
+            ${lk ? MYST_ART : shackleArt(s.id)}
             ${mc ? `<div class="rs-medal m${mc}"><svg viewBox="0 0 64 50" aria-hidden="true"><path d="M6 40 L9 13 L23 27 L32 7 L41 27 L55 13 L58 40 Z" fill="var(--c1)" stroke="var(--c3)" stroke-width="3" stroke-linejoin="round"/><rect x="6" y="39" width="52" height="9" rx="3" fill="var(--c2)" stroke="var(--c3)" stroke-width="3"/><circle cx="9" cy="12" r="4.5" fill="var(--c4)" stroke="var(--c3)" stroke-width="2"/><circle cx="32" cy="6" r="4.5" fill="var(--c4)" stroke="var(--c3)" stroke-width="2"/><circle cx="55" cy="12" r="4.5" fill="var(--c4)" stroke="var(--c3)" stroke-width="2"/><path d="M13 24 L15 18" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity="0.7"/></svg></div>` : ''}
-            <div class="rs-body"><div class="rs-short">${escapeHtml(L(SHACKLE_SHORT[s.id]))}</div>
+            <div class="rs-body"><div class="rs-short">${lk ? '？？？' : escapeHtml(L(SHACKLE_SHORT[s.id]))}</div>
                 ${lk ? '<div class="rs-medals">🔒</div>' : ''}</div>
             <button class="rs-go${lk ? ' off' : ' has-st'}" ${lk ? 'disabled' : ''} onclick="event.stopPropagation(); startRunFromSelect()">${lk ? escapeHtml(ui('btn_run_locked')) : `<span class="go-st">${'★'.repeat(selStar)}</span><span>${escapeHtml(ui('btn_run_go'))}</span>`}</button>
         </div>`;
@@ -1991,13 +1993,13 @@ function renderRunSelect(){
     let note = '';
     if (!acc.open) note = `<br><span class="ds-lock">${escapeHtml(uif('rs_locked', prevName))}</span>`;
     else if (acc.prevId && acc.maxStar < BASE_STARS) note = `<br><span class="ds-lock">${escapeHtml(uif('rs_cap', prevName, starName(acc.maxStar + 1)))}</span>`;
-    document.getElementById('ds-preview-sub').innerHTML = escapeHtml(L(SHACKLE_TEXT[selSid].desc)) +
+    document.getElementById('ds-preview-sub').innerHTML = (acc.open ? escapeHtml(L(SHACKLE_TEXT[selSid].desc)) : '？？？') +
         (prog.best[selStar] ? `　<span class="ds-best">${escapeHtml(uif('best_label', prog.best[selStar]))}</span>` : '') + note;
     document.getElementById('star-row').innerHTML = Array.from({ length: STARS }, (_, i) => i + 1).filter(n => n <= BASE_STARS || n <= acc.maxStar).map(n => {
         const locked = !starOpen(selSid, n);
         return `<button class="star-btn${n === selStar ? ' active' : ''}${locked ? ' locked' : ''}${prog.stars[n] ? ' cleared' : ''}${n === BASE_STARS + 1 ? ' secret' : ''}${n > BASE_STARS + 1 ? ' secret5' : ''}" data-star="${n}" onclick="selectStar(${n})">${n === selStar ? `<em class="pick">▶ ${escapeHtml(ui('rs_picked'))}</em>` : ''}${'★'.repeat(n)}<small>${locked ? '🔒 ' : (prog.stars[n] ? '✔ ' : '')}${escapeHtml(starName(n))}</small></button>`;
     }).join('');
-    document.getElementById('border-row').innerHTML = Array.from({ length: STAGES }, (_, i) =>
+    document.getElementById('border-row').innerHTML = !acc.open ? '' : Array.from({ length: STAGES }, (_, i) =>
         `<div class="border-chip"><small>${uif('stage_chip', i + 1)}</small>${borderFor(selSid, selStar, i + 1)}</div>`).join('');
     const idx = SHACKLES.findIndex(s => s.id === selSid);
     document.getElementById('rs-prev').disabled = idx <= 0;
@@ -2773,7 +2775,7 @@ let rankTab = 'world', rankSid = 'normal', rankStar = 0, rankKind = 'score';   /
 const RK_W = 150, RK_GAP = 14, RK_PAD = 18;
 function openRanking(from, sid, star){
     rankFrom = from || 'title-screen';
-    if (sid && SHACKLE_BY_ID[sid]){ rankSid = sid; rankStar = star || 0; }
+    if (sid && SHACKLE_BY_ID[sid] && runAccess(sid).open){ rankSid = sid; rankStar = star || 0; }
     goTo('ranking-screen');
     renderRankScreen();
     loadAndRenderRanking();
@@ -2782,14 +2784,14 @@ let rankFrom = 'title-screen';   // どこから開いたか（もどるボタ�
 function closeRanking(){ if (rankFrom === 'run-select-screen') goToRunSelect(); else goTo('title-screen'); }
 // 上のRUNカードの帯 + 3つの切りかえ(記録の種類 / ★ / ワールド・ローカル)
 function renderRankScreen(){
-    document.getElementById('rk-strip').innerHTML = SHACKLES.map(sh => `
-        <div class="rk-card${sh.id === rankSid ? ' sel' : ''}" style="--c:${SHACKLE_COLOR[sh.id]}" onclick="selectRankShackle('${sh.id}')">
-            <div class="rk-tab">${escapeHtml(shackleName(sh.id))}</div>
-            <div class="rk-art"><div class="rk-art-in">${shackleArt(sh.id)}</div></div>
-        </div>`).join('');
+    document.getElementById('rk-strip').innerHTML = SHACKLES.map(sh => { const lk = !runAccess(sh.id).open; return `
+        <div class="rk-card${sh.id === rankSid ? ' sel' : ''}${lk ? ' locked' : ''}" style="--c:${SHACKLE_COLOR[sh.id]}" onclick="selectRankShackle('${sh.id}')">
+            <div class="rk-tab">${lk ? '？？？' : escapeHtml(shackleName(sh.id))}</div>
+            <div class="rk-art"><div class="rk-art-in">${lk ? MYST_ART : shackleArt(sh.id)}</div></div>
+        </div>`; }).join('');
     const idx = SHACKLES.findIndex(sh => sh.id === rankSid);
     document.getElementById('rk-prev').disabled = idx <= 0;
-    document.getElementById('rk-next').disabled = idx >= SHACKLES.length - 1;
+    document.getElementById('rk-next').disabled = idx >= SHACKLES.length - 1 || !runAccess(SHACKLES[idx + 1].id).open;
     centerRankStrip();
     const seg = (id, items, cur) => { document.getElementById(id).innerHTML = items.map(([v, label, fn]) => `<button class="${v === cur ? 'on' : ''}" onclick="${fn}">${escapeHtml(label)}</button>`).join(''); };
     seg('rk-seg-kind', [['score', ui('rank_kind_score'), "switchRankKind('score')"], ['hand', ui('rank_kind_hand'), "switchRankKind('hand')"]], rankKind);
@@ -2805,10 +2807,10 @@ function centerRankStrip(){
     x = Math.max(Math.min(0, vw - total), Math.min(0, x));
     document.getElementById('rk-strip').style.transform = `translateX(${x}px)`;
 }
-function selectRankShackle(id){ rankSid = id; renderRankScreen(); loadAndRenderRanking(); }
+function selectRankShackle(id){ if (!runAccess(id).open) return; rankSid = id; renderRankScreen(); loadAndRenderRanking(); }
 function moveRankShackle(d){
     const idx = SHACKLES.findIndex(sh => sh.id === rankSid) + d;
-    if (idx < 0 || idx >= SHACKLES.length) return;
+    if (idx < 0 || idx >= SHACKLES.length || !runAccess(SHACKLES[idx].id).open) return;
     selectRankShackle(SHACKLES[idx].id);
 }
 function switchRankStar(n){ rankStar = n; renderRankScreen(); loadAndRenderRanking(); }

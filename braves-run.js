@@ -140,6 +140,8 @@ function runArt(id) {
         <div style="position:absolute;left:78px;top:14px;font-size:92px;font-weight:900;color:rgba(255,255,255,0.25)">？</div>
         <div style="position:absolute;left:92px;top:84px;width:44px;height:44px;color:#fff">${ICO.lock}</div></div>`;
 }
+// まだ ひらいていないRUN(「じゅんびちゅう」ではなく、クリアで ひらく本物のRUN)は、名前も絵も せつめいも 見せない
+function runHidden(r) { return !!(r && r.locked && r.id !== 'locked'); }
 function renderRunSelect() {
     if (!starUnlocked(selStar)) selStar = 1;
     const cur = RUN_LIST[runSelIdx];
@@ -147,10 +149,10 @@ function renderRunSelect() {
         // クリアした いちばん高い難易度を、RUNカードの王冠(銅・銀・金)で見せる
         const mc = r.locked ? 0 : (SINGLE_STAR ? (maxClearedStar(i) ? 3 : 0) : maxClearedStar(i));
         return `<div class="rs-card${i === runSelIdx ? ' sel' : ''}${r.locked ? ' locked' : ''}" style="--c:${r.color}" data-idx="${i}">
-            <div class="rs-tab">${T('run_' + r.id + '_name')}</div>
+            <div class="rs-tab">${runHidden(r) ? T('run_hidden_name') : T('run_' + r.id + '_name')}</div>
             ${mc ? `<div class="rs-medal m${mc}">${CROWN_SVG}</div>` : ''}
-            ${runArt(r.id)}
-            <div class="rs-body"><div class="rs-short">${T('run_' + r.id + '_short')}</div></div>
+            ${runArt(runHidden(r) ? 'locked' : r.id)}
+            <div class="rs-body"><div class="rs-short">${runHidden(r) ? T('run_hidden_short') : T('run_' + r.id + '_short')}</div></div>
             ${r.locked ? '' : (SINGLE_STAR ? `<button class="rs-go" data-go="1"><span>${T('btn_run_go')}</span></button>` : `<button class="rs-go has-st" data-go="1"><span class="go-st">${'★'.repeat(selStar)}</span><span>${T('btn_run_go')}</span></button>`)}
         </div>`;
     }).join('');

@@ -1468,19 +1468,19 @@ function closeEndToRanking(){
 let rankTab = 'world', rankSid = 'basic', rankStar = 0, rankKind = 'score', rankFrom = 'title-screen', rankSeq = 0;
 function openRanking(from, sid, star){
     rankFrom = from || 'title-screen';
-    if (sid){ rankSid = sid; rankStar = star || 0; }
+    if (sid && runOpen(sid)){ rankSid = sid; rankStar = star || 0; }
     goTo('ranking-screen');
     renderRankScreen();
     loadAndRenderRanking();
 }
 function closeRanking(){ if (rankFrom === 'run-select-screen') goToRunSelect(); else goTo('title-screen'); }
 function renderRankScreen(){
-    $('rk-strip').innerHTML = RUNS.map(r => `<div class="rk-card${r.id === rankSid ? ' sel' : ''}" style="--c:${r.color}" onclick="switchRank('run','${r.id}')">
-            <div class="rk-tab" style="font-size:${rkNameSize(r)}">${escapeHtml(runName(r))}</div>
-            <div class="rk-art"><div class="rk-art-in">${runArt(r.id)}</div></div>
-        </div>`).join('');
+    $('rk-strip').innerHTML = RUNS.map(r => { const lk = !runOpen(r.id); return `<div class="rk-card${r.id === rankSid ? ' sel' : ''}${lk ? ' locked' : ''}" style="--c:${r.color}" onclick="switchRank('run','${r.id}')">
+            <div class="rk-tab" style="font-size:${lk ? '.95rem' : rkNameSize(r)}">${lk ? '？？？' : escapeHtml(runName(r))}</div>
+            <div class="rk-art"><div class="rk-art-in">${lk ? MYST_ART : runArt(r.id)}</div></div>
+        </div>`; }).join('');
     const ri = runIndex(rankSid);
-    $('rk-prev').disabled = ri <= 0; $('rk-next').disabled = ri >= RUNS.length - 1;
+    $('rk-prev').disabled = ri <= 0; $('rk-next').disabled = ri >= RUNS.length - 1 || !runOpen(RUNS[ri + 1].id);
     centerRankStrip();
     const seg = (id, items, cur) => { $(id).innerHTML = items.map(([v, label, fn]) => `<button class="${v === cur ? 'on' : ''}" onclick="${fn}">${escapeHtml(label)}</button>`).join(''); };
     seg('rk-seg-kind', [['score', tx('rank_kind_score'), "switchRank('kind','score')"], ['hand', tx('rank_kind_hand'), "switchRank('kind','hand')"]], rankKind);
@@ -1499,7 +1499,7 @@ function centerRankStrip(){
 }
 function moveRankRun(d){ const i = runIndex(rankSid) + d; if (i < 0 || i >= RUNS.length) return; switchRank('run', RUNS[i].id); }
 function switchRank(what, v){
-    if (what === 'run') rankSid = v; else if (what === 'kind') rankKind = v; else if (what === 'star') rankStar = v; else rankTab = v;
+    if (what === 'run'){ if (!runOpen(v)) return; rankSid = v; } else if (what === 'kind') rankKind = v; else if (what === 'star') rankStar = v; else rankTab = v;
     renderRankScreen(); loadAndRenderRanking();
 }
 function localRows(){
@@ -1692,16 +1692,18 @@ function runArt(id){
         ${dice}${A.ic ? `<div class="rs-ic">${A.ic}</div>` : ''}
 </div>`;
 }
+// まだ ひらいていないRUNは、名前も絵も せつめいも ふせる(つぎのRUNが どんなものか、クリアするまで 見えない)
+const MYST_ART = '<div class="rs-art" style="background:linear-gradient(#4a4f66,#2a2d40)"><div style="position:absolute;left:78px;top:14px;font-size:92px;font-weight:900;color:rgba(255,255,255,0.25)">？</div><div style="position:absolute;left:96px;top:84px;font-size:40px;line-height:1">🔒</div></div>';
 function renderRunSelect(){
     const prog = getProg(selSid);
     if (!starOpen(selSid, selStar)) selStar = 1;
     $('rs-strip').innerHTML = RUNS.map(r => {
         const mc = maxCleared(r.id), lk = !runOpen(r.id);
         return `<div class="rs-card${r.id === selSid ? ' sel' : ''}${lk ? ' locked' : ''}" style="--c:${r.color}" onclick="selectRun('${r.id}')">
-            <div class="rs-tab" style="font-size:${runNameSize(r)}">${escapeHtml(runName(r))}</div>
-            ${runArt(r.id)}
+            <div class="rs-tab" style="font-size:${lk ? '.95rem' : runNameSize(r)}">${lk ? '？？？' : escapeHtml(runName(r))}</div>
+            ${lk ? MYST_ART : runArt(r.id)}
             ${mc >= STARS ? '<div class="rs-crown">👑</div>' : ''}
-            <div class="rs-body"><div class="rs-short">${tx(r.shortKey).split('\n').map(escapeHtml).join('<br>')}</div></div>
+            <div class="rs-body"><div class="rs-short">${lk ? '？？？' : tx(r.shortKey).split('\n').map(escapeHtml).join('<br>')}</div></div>
             <button class="rs-go${lk ? ' off' : ''}" ${lk ? 'disabled' : ''} onclick="event.stopPropagation(); startRunFromSelect()">${lk ? '🔒' : `<span class="go-st">${'★'.repeat(selStar)}</span><span>${tx('btn_go')}</span>`}</button>
         </div>`;
     }).join('');
@@ -1712,7 +1714,7 @@ function renderRunSelect(){
         const locked = !starOpen(selSid, n);
         return `<button class="star-btn${n === selStar ? ' active' : ''}${locked ? ' locked' : ''}${prog.stars[n] ? ' cleared' : ''}" onclick="selectStar(${n})">${n === selStar ? `<em class="sbpk">${tx('picked')}</em>` : ''}${'★'.repeat(n)}<small>${starLabel(n)}</small></button>`;
     }).join('');
-    $('border-row').innerHTML = Array.from({ length: STAGES }, (_, i) => `<div class="border-chip"><small>${tx('stage_chip', i + 1)}</small>${stageTarget(i + 1, selStar, selSid)}</div>`).join('');
+    $('border-row').innerHTML = !runOpen(selSid) ? '' : Array.from({ length: STAGES }, (_, i) => `<div class="border-chip"><small>${tx('stage_chip', i + 1)}</small>${stageTarget(i + 1, selStar, selSid)}</div>`).join('');
     const idx = runIndex(selSid);
     $('rs-prev').disabled = idx <= 0;
     $('rs-next').disabled = idx >= RUNS.length - 1;

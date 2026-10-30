@@ -446,6 +446,7 @@ const STRINGS = {
         "run_locked_name": "じゅんびちゅう",
         "run_locked_short": "あたらしい しばりが くるよ！",
         "run_locked_desc": "あたらしいしばりは じゅんびちゅう。おたのしみに！",
+        "run_hidden_name": "？？？", "run_hidden_short": "ひらくと わかるよ",
         "btn_run_go": "はじめる ▶",
         "best_label": "ベスト {n}点",
         "stage_chip": "ステージ{n}",
@@ -576,6 +577,7 @@ const STRINGS = {
         "run_locked_name": "じゅんびちゅう",
         "run_locked_short": "あたらしい しばりが くるよ！",
         "run_locked_desc": "あたらしい しばりは じゅんびちゅう。おたのしみに！",
+        "run_hidden_name": "？？？", "run_hidden_short": "ひらくと わかるよ",
         "btn_run_go": "はじめる ▶",
         "best_label": "ベスト {n}てん",
         "stage_chip": "ステージ{n}",
@@ -706,6 +708,7 @@ const STRINGS = {
         "run_locked_name": "Coming Soon",
         "run_locked_short": "New twists on the way!",
         "run_locked_desc": "New twists are being prepared. Stay tuned!",
+        "run_hidden_name": "？？？", "run_hidden_short": "Unlock to see!",
         "btn_run_go": "Start ▶",
         "best_label": "Best {n} pts",
         "stage_chip": "Stage {n}",
@@ -1220,8 +1223,8 @@ function showRankingScreen() {
 function renderRankScreen() {
     document.getElementById('rk-strip').innerHTML = RUN_LIST.map((r, i) => `
         <div class="rk-card${i === rkRunIdx ? ' sel' : ''}${r.locked ? ' locked' : ''}" style="--c:${r.color}" data-idx="${i}">
-            <div class="rk-tab">${T('run_' + r.id + '_name')}</div>
-            <div class="rk-art"><div class="rk-art-in">${runArt(r.id)}</div></div>
+            <div class="rk-tab">${runHidden(r) ? T('run_hidden_name') : T('run_' + r.id + '_name')}</div>
+            <div class="rk-art"><div class="rk-art-in">${runArt(runHidden(r) ? 'locked' : r.id)}</div></div>
         </div>`).join('');
     document.querySelectorAll('#rk-strip .rk-card').forEach(el => bindBtn(el, () => {
         const i = parseInt(el.dataset.idx, 10);
