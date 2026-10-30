@@ -209,7 +209,7 @@ function generateEnemyValue() {
 // カード値を重み付きランダムで生成（スマートドロー付き）
 function generateCardValue(excludeValue = -1) {
     const handVals = state.cards.filter(c => c !== null).map(c => c.value);
-    const primeTargets = [2, 3];      // 手札に出しやすくする素数。どの★でも同じ(2と3。その★のカードに出ない数は自動でとばす)
+    const primeTargets = [2, 3, 5, 7];      // 手札に出しやすくする素数。どの★でも同じ(2・3・5・7。その★のカードに出ない数は下で自動でとばす: ★1は2・3、★2は2・3・5)
 
     // 対象素数のうち手札に1枚もないもの
     const missing = primeTargets.filter(p =>
