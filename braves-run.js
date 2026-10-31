@@ -27,6 +27,16 @@ function stageName(n) { return T('stage_name_' + (GAME.stagePick ? GAME.stagePic
 
 // ---- タイトルの ゲーム名(大きく)。文字数に合わせて大きさを決める ----
 function buildTitleName() {
+    // ゲームごとの舞台(GAME.titleScene)では、題名を2語(title_word1=教科 / title_word2=カードバトル)に分けて舞台のロゴに入れる
+    // data-fit=最大の幅(px)。英語など長いときは字を小さくしておさめる
+    document.querySelectorAll('#title-screen [data-tw]').forEach(e => {
+        e.textContent = T('title_word' + e.dataset.tw);
+        e.style.fontSize = '';
+        const max = +e.dataset.fit;
+        if (!max) return;
+        let fs = parseFloat(getComputedStyle(e).fontSize);
+        while (e.scrollWidth > max && fs > 24) { fs -= 4; e.style.fontSize = fs + 'px'; }
+    });
     const el = document.getElementById('ts-l2');
     if (!el) return;
     const text = T('title_plaque');
@@ -56,6 +66,12 @@ function buildTitleHero() {
 
 // ---- タイトルの飾り ----
 function buildTitleDecor() {
+    // GAME.titleScene があれば、共通の舞台(夜空・街・グリッドの床・カードの扇)のかわりに ゲームごとの舞台を置く。ボタンは共通のまま
+    if (GAME.titleScene && !document.getElementById('ts-scene')) {
+        const ts = document.getElementById('title-screen');
+        ts.classList.add('has-scene');
+        ts.insertAdjacentHTML('afterbegin', `<div class="ts-scene" id="ts-scene">${GAME.titleScene()}<div class="ts-series"><i></i>MATH BRAVES</div></div>`);
+    }
     const letters = (text) => Array.from(text).map((ch, i) => `<span class="tl" data-t="${ch}" style="--i:${i}">${ch}</span>`).join('');
     document.getElementById('ts-l1').innerHTML = Array.from('MATH BRAVES').map((ch, i) => ch === ' ' ? '<span class="ts-sp"></span>' : `<span class="tl" data-t="${ch}" style="--i:${i}">${ch}</span>`).join('');
     buildTitleName();
