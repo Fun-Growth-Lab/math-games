@@ -261,6 +261,7 @@
 <script src="../fgl-cui.js?v=1"></script>
 <script src="../fgl-sfx.js?v=5"></script>
 <script src="../fgl-bgm.js?v=10"></script>
+<script src="../fgl-howto.js?v=4"></script>
 <script>
 // ============================================================
 //  I18N（かんたんなにほんご／日本語／English）
@@ -1855,16 +1856,38 @@ const Game = (function() {
     }
 
     // あそびかた（ヘルプ）の開閉。中身はHTML/CSS側（#howtoOverlay）で表示する
+    // あそびかた: 横長カードを 上から1列(共通部品 fgl-howto.js)。絵は howto/ の 本物の画面の切りぬき
+    function howtoRows() {
+        const I = (n, h, x) => FGLHowto.img('howto/' + n + '.webp', h, x), O = FGLHowto.op, R = FGLHowto.res, E = FGLHowto.emo;
+        return [
+            { c: '#3fa9e0', art: I('board', 94),
+              t: { ja: 'パネルを うごかす', simple: 'パネルを うごかす', en: 'Move a panel' },
+              b: { ja: '数字パネルを あいている マスへ <em>ドラッグ</em>。1回 うごかすたびに 新しい パネルが ふえる。', simple: 'すうじパネルを あいている マスへ <em>ドラッグ</em>。1かい うごかす たびに あたらしい パネルが ふえる。', en: '<em>Drag</em> a number panel to an empty square. Each move adds a new panel.' } },
+            { c: '#f07a2a', art: I('t3', 62) + O('+') + I('t7', 62) + O('=') + R('10') + '<span style="width:12px"></span>' + I('t2', 50) + I('t3', 50) + I('t5', 50),
+              t: { ja: 'となりで 10 を つくる', simple: 'となりで 10 を つくる', en: 'Make 10 side by side' },
+              b: { ja: 'タテか ヨコに となり合う 数字の 合計が ちょうど <em>10</em> なら 消える (3と7、2・3・5 など)。', simple: 'タテか ヨコに となりあう すうじの ごうけいが ちょうど <em>10</em> なら きえる (3と7、2・3・5 など)。', en: 'Neighbors in a row or column that add up to exactly <em>10</em> vanish (3+7, 2+3+5…).' } },
+            { c: '#e8a317', art: E('🔥') + R('COMBO!'),
+              t: { ja: 'コンボ', simple: 'コンボ', en: 'Combos' },
+              b: { ja: '1回で 2か所 以上 消えたり、つづけて 10 が できると <em>コンボ</em>！ スコアが 大きく アップ。', simple: '1かいで 2かしょ いじょう きえたり、つづけて 10 が できると <em>コンボ</em>！ スコアが おおきく アップ。', en: 'Clear 2+ spots at once, or chain more 10s, for a <em>combo</em> and a big score boost!' } },
+            { c: '#8a5cf0', art: E('👾') + E('👻') + E('🤖') + O('▶') + E('🪨'),
+              t: { ja: 'ボスを たおす', simple: 'ボスを たおす', en: 'Beat the bosses' },
+              b: { ja: '10を つくると <em>ボス</em> が 出る。となりで 10 を 消すたび HP −1。ボスは 毎ターン 岩を おいてくる。', simple: '10を つくると <em>ボス</em> が でる。となりで 10 を けす たび HP −1。ボスは まいターン いわを おいてくる。', en: 'Making 10s brings out a <em>boss</em>. Each 10 cleared next to it: HP −1. Bosses drop rocks every turn.' } },
+            { c: '#2fb872', art: E('🪨') + I('coin', 62) + E('💰'),
+              t: { ja: 'じゃまな モノ', simple: 'じゃまな モノ', en: 'Obstacles' },
+              b: { ja: '岩・コイン・バッグは となりで 10 を 消すと こわせる。コイン <em>+300</em>、バッグ <em>+1000</em>。', simple: 'いわ・コイン・バッグは となりで 10 を けすと こわせる。コイン <em>+300</em>、バッグ <em>+1000</em>。', en: 'Clear a 10 next to rocks, coins or bags to break them. Coin <em>+300</em>, bag <em>+1000</em>.' } },
+            { c: '#e0559f', art: I('star', 60) + E('🎆'),
+              t: { ja: 'アイテムと ゲームオーバー', simple: 'アイテムと ゲームオーバー', en: 'Items & game over' },
+              b: { ja: '流れ星は 1つの 数字を <em>ぜんぶ 消す</em>。花火は 十字に 1列 消す。マスが うまったら おわり！', simple: 'ながれぼしは 1つの すうじを <em>ぜんぶ けす</em>。はなびは じゅうじに 1れつ けす。マスが うまったら おわり！', en: 'A shooting star <em>clears every panel</em> of one number; fireworks clear a cross. A full board ends the game!' } },
+        ];
+    }
+    FGLHowto.preload(['board', 't2', 't3', 't5', 't7', 'coin', 'star'].map(n => 'howto/' + n + '.webp'));
     function openHowto() {
         SFX.play('click');
-        renderHowto();
-        const ov = document.getElementById('howtoOverlay');
-        if (ov) ov.classList.add('show');
-        const body = document.getElementById('howtoBody');
-        if (body) body.scrollTop = 0; // 表示後にスクロール位置を先頭へ
         isShowingHelp = true;
+        FGLHowto.open({ lang: currentLang, root: document.getElementById('game-container'), accent: '#f08a2a', artBg: 'radial-gradient(ellipse at 50% 40%, #fffbea, #ffe7b8)', opColor: '#e0702a', rows: howtoRows(), onClose: () => { if (isShowingHelp) SFX.play('back'); isShowingHelp = false; } });
     }
     function closeHowto() {
+        if (window.FGLHowto && FGLHowto.isOpen()) { FGLHowto.close(); return; }
         if (isShowingHelp) SFX.play('back');
         const ov = document.getElementById('howtoOverlay');
         if (ov) ov.classList.remove('show');
