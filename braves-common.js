@@ -79,6 +79,16 @@ const _HOWTO_HTML = `
         </div>
     </div>
 `;
+// あそびかた(カード式): 横長のカードを 上から順に 1列。中身は GAME.howto() が かえす行のならび(buildHowto で 開くたびに つくる)
+const _HW_HTML = `
+    <div id="howto-modal" class="hidden hw">
+        <div class="hw-box">
+            <div class="hw-head"><i class="ico" data-ico="book"></i><b data-i18n="howto_title">あそびかた</b></div>
+            <button id="btn-close-howto" aria-label="close">✕</button>
+            <div class="hw-list" id="hw-list"></div>
+        </div>
+    </div>
+`;
 const _TITLE_INNER_HTML = `
         <div class="ts-bg">
             <div class="ts-stars"></div><div class="ts-sun"></div>
@@ -142,7 +152,7 @@ const _PLAYER_MGR_INNER_HTML = `
             <button id="btn-close-player-manager" class="btn" data-i18n="btn_close">とじる</button>
         </div>
 `;
-document.getElementById('container').innerHTML = (GAME.gameLayerHTML || _GAME_LAYER_HTML) + (GAME.howtoHTML || _HOWTO_HTML) + `
+document.getElementById('container').innerHTML = (GAME.gameLayerHTML || _GAME_LAYER_HTML) + (GAME.howtoHTML || (GAME.howto ? _HW_HTML : _HOWTO_HTML)) + `
     <!-- ==================== TITLE ==================== -->
     <div id="title-screen" class="intro">${GAME.titleHTML || _TITLE_INNER_HTML}</div>
 
@@ -732,6 +742,25 @@ const STRINGS = {
         "rank_star_3": "★★★ Hard",
     },
 };
+// あそびかた(カード式)の 共通の行の文言。ゲームごとに GAME.strings で上書きできる
+Object.assign(STRINGS.ja, {
+    hw_ta: 'てきの こうげき', hw_ba: 'かさねる・すてる・ぶつける たびに、てきが こうげき。<em>HP が 0</em> になったら まけ。いらないカードは 下の すてばへ。',
+    hw_ts: 'コインと ショップ', hw_bs: 'ダメージと おなじ数の <em>コイン</em> が もらえる。ステージクリアで HP ぜんかいふく、<em>ショップ</em> で そうびを かおう。',
+    hw_tb: 'ボスを たおす', hw_bb: 'ボスは ときどき <em>ためて ひっさつわざ</em>！ たおすと ステージクリア。<em>7ステージ</em> を クリアしよう！',
+    hw_charge: 'ため', hw_special: 'ひっさつ',
+});
+Object.assign(STRINGS.simple, {
+    hw_ta: 'てきの こうげき', hw_ba: 'かさねる・すてる・ぶつける たびに、てきが こうげき。<em>HP が 0</em> に なったら まけ。いらない カードは したの すてばへ。',
+    hw_ts: 'コインと ショップ', hw_bs: 'ダメージと おなじ かずの <em>コイン</em> が もらえる。ステージクリアで HP ぜんかいふく、<em>ショップ</em> で そうびを かおう。',
+    hw_tb: 'ボスを たおす', hw_bb: 'ボスは ときどき <em>ためて ひっさつわざ</em>！ たおすと ステージクリア。<em>7ステージ</em> を クリアしよう！',
+    hw_charge: 'ため', hw_special: 'ひっさつ',
+});
+Object.assign(STRINGS.en, {
+    hw_ta: 'Enemy attacks', hw_ba: 'Each time you stack, discard or attack, the enemy strikes. <em>HP 0</em> means game over. Drop unwanted cards in the bin below.',
+    hw_ts: 'Coins & Shop', hw_bs: 'Earn <em>coins</em> equal to your damage. Clearing a stage fully heals you — then gear up in the <em>shop</em>.',
+    hw_tb: 'Beat the boss', hw_bb: 'Bosses <em>charge up a special attack</em>! Defeat one to clear the stage. Conquer all <em>7 stages</em>!',
+    hw_charge: 'Charge', hw_special: 'Special',
+});
 // ゲームごとの文言を重ねる(GAME.strings は各ゲームのhtmlで定義)
 ['ja', 'simple', 'en'].forEach(l => Object.assign(STRINGS[l], (GAME.strings || {})[l] || {}));
 
@@ -1287,4 +1316,23 @@ function renderRankRows(rows) {
         const res = d.clear ? `<span class="rk-res clear">${T('rank_result_clear')}</span>` : (d.stage ? `<span class="rk-res">${T('rank_result_stage', { n: d.stage })}</span>` : '<span></span>');
         return `<li class="${cls}"><span class="rk-no">${i + 1}</span><span class="rk-name">${esc(FGLName.display(d.name || state.playerName, 'ななしさん'))}</span><span class="rk-star">${d.star ? '★'.repeat(d.star) : ''}</span>${res}<span class="rk-score">${d.score}</span><span class="rk-sub">${esc(d.date || '')}</span></li>`;
     }).join('');
+}
+
+// ---- あそびかた(カード式) ----
+// 行 = { c: 色, art: () => 絵のHTML, t: 見出しのキー, b: 説明のキー }。絵は ゲームの フォルダの howto/*.webp (本物の画面の切りぬき)
+const hwImg = (name, h, extra) => `<img class="hw-im" src="howto/${name}.webp" style="max-height:${h}px${extra ? ';' + extra : ''}" alt="">`;
+const hwOp = t => `<span class="hw-op">${t}</span>`;
+const HW = {
+    attack: { c: '#e8503d', art: () => hwImg('robot', 78) + hwOp('▶') + hwImg('hp', 58), t: 'hw_ta', b: 'hw_ba' },
+    shop: { c: '#2fb872', art: () => `<span class="hw-coin"></span>` + hwOp('▶') + ['atk:2', 'guard:2', 'potion:1', 'dance:1'].map(k => { const [kd, n] = k.split(':'); return `<span class="hw-eq">${equipSvg(kd, +n)}</span>`; }).join(''), t: 'hw_ts', b: 'hw_bs' },
+    boss: { c: '#8a5cf0', art: () => hwImg('boss', 84) + `<span class="hw-tag">${T('hw_charge')}</span>` + hwOp('▶') + `<span class="hw-tag hot">${T('hw_special')}</span>`, t: 'hw_tb', b: 'hw_bb' },
+};
+function buildHowto() {
+    const list = document.getElementById('hw-list');
+    if (!list || !GAME.howto) return;
+    list.innerHTML = GAME.howto().map((r, i) => `<div class="hw-row" style="--hc:${r.c}">
+        <div class="hw-no">${i + 1}</div>
+        <div class="hw-art">${r.art()}</div>
+        <div class="hw-tx"><div class="hw-t">${emo(T(r.t))}</div><div class="hw-b">${emo(T(r.b))}</div></div>
+    </div>`).join('');
 }

@@ -373,8 +373,9 @@ bindBtn(ui.btnToTitle, () => {
 const howtoModal   = document.getElementById('howto-modal');
 const btnHowto     = document.getElementById('btn-howto');
 const btnCloseHowto = document.getElementById('btn-close-howto');
-if (btnHowto)      bindBtn(btnHowto, () => howtoModal.classList.remove('hidden'));
+if (btnHowto)      bindBtn(btnHowto, () => { if (typeof buildHowto === 'function') buildHowto(); howtoModal.classList.remove('hidden'); });
 if (btnCloseHowto) bindBtn(btnCloseHowto, () => howtoModal.classList.add('hidden'));
+if (typeof buildHowto === 'function') setTimeout(buildHowto, 1200);   // 絵を 先に 読みこんでおく(はじめて ひらいた時に 空にならないように)
 howtoModal.addEventListener('click', (e) => { if (e.target === howtoModal) howtoModal.classList.add('hidden'); });
 
 bindBtn(ui.btnIndex, () => {
