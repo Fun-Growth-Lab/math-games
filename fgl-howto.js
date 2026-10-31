@@ -4,7 +4,7 @@
 //       lang: 'ja' | 'simple' | 'en',          // 'ja_easy' / 'easy' / 'kana' なども simple あつかい
 //       root: 要素(省略時は body に 画面いっぱいで出す。1280x720 の舞台を拡大縮小しているゲームは その舞台を わたす),
 //       accent: '#色'(わく・題名の色), artBg: 'CSSのbackground'(絵のところ。省略時は こい紺), opColor: '#色'(▶ + = の色),
-//       rows: [{ c: '#行の色', art: '絵のHTML', t: {ja,simple,en} か 文字, b: {ja,simple,en} か 文字 }],   // b の中の <em>…</em> は強調
+//       rows: [{ c: '#行の色', bg: 'その行だけの絵の背景'(省略可), art: '絵のHTML', t: {ja,simple,en} か 文字, b: {ja,simple,en} か 文字 }],   // b の中の <em>…</em> は強調
 //       onClose: () => {}
 //   });
 //   FGLHowto.img('パス', 最大の高さpx, 'style追加') … 絵の <img>(横幅は 絵のところに おさまるよう ちぢむ)
@@ -33,6 +33,8 @@
 .fgh-row{flex:1;min-height:0;display:grid;grid-template-columns:58px 400px 1fr;align-items:stretch;background:#fff;border:4px solid var(--hc);border-radius:18px;overflow:hidden;box-shadow:0 4px 0 var(--hc)}
 .fgh-no{display:flex;align-items:center;justify-content:center;background:var(--hc);color:#fff;font-size:2rem;font-weight:900;text-shadow:0 2px 0 rgba(0,0,0,.25)}
 .fgh-art{display:flex;align-items:center;justify-content:center;gap:8px;padding:0 10px;min-width:0;overflow:hidden;background:var(--fart)}
+.fgh-art>*{flex:none}
+.fgh-art>.fgh-im{flex:0 1 auto}
 .fgh-im{display:block;width:auto;height:auto;max-width:100%;min-width:0;filter:drop-shadow(0 3px 4px rgba(0,0,0,.35))}
 .fgh-op{color:var(--fop);font-weight:900;font-size:1.6rem;text-shadow:0 2px 0 rgba(0,0,0,.35)}
 .fgh-res{background:#ffc93d;color:#5a3d00;font-weight:900;font-size:1.6rem;padding:2px 14px;border-radius:14px;border:3px solid #fff;box-shadow:0 3px 0 rgba(0,0,0,.3);white-space:nowrap}
@@ -61,7 +63,7 @@
         el.style.setProperty('--fa', o.accent || '#3fa9e0');
         el.style.setProperty('--fart', o.artBg || 'radial-gradient(ellipse at 50% 40%,#2c3f7a,#141d40)');
         el.style.setProperty('--fop', o.opColor || '#ffe08a');
-        const rows = (o.rows || []).map((r, i) => `<div class="fgh-row" style="--hc:${r.c}"><div class="fgh-no">${i + 1}</div><div class="fgh-art">${typeof r.art === 'function' ? r.art() : (r.art || '')}</div><div class="fgh-tx"><div class="fgh-t">${pick(r.t, l)}</div><div class="fgh-b">${pick(r.b, l)}</div></div></div>`).join('');
+        const rows = (o.rows || []).map((r, i) => `<div class="fgh-row" style="--hc:${r.c}${r.bg ? ';--fart:' + r.bg : ''}"><div class="fgh-no">${i + 1}</div><div class="fgh-art">${typeof r.art === 'function' ? r.art() : (r.art || '')}</div><div class="fgh-tx"><div class="fgh-t">${pick(r.t, l)}</div><div class="fgh-b">${pick(r.b, l)}</div></div></div>`).join('');
         el.innerHTML = `<div class="fgh-box" role="dialog" aria-modal="true"><div class="fgh-head">${BOOK}<b>${pick(o.title || TITLE, l)}</b></div><button type="button" class="fgh-x" aria-label="${pick(CLOSE, l)}">✕</button><div class="fgh-list">${rows}</div></div>`;
         el.addEventListener('click', e => { if (e.target === el || e.target.closest('.fgh-x')) close(); });
         const key = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
