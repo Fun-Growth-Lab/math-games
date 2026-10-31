@@ -9,6 +9,7 @@
 //   });
 //   FGLHowto.img('パス', 最大の高さpx, 'style追加') … 絵の <img>(横幅は 絵のところに おさまるよう ちぢむ)
 //   FGLHowto.op('▶') … 絵と絵の あいだの記号
+//   FGLHowto.sprite('パス', 大きさpx, 横コマ数, 縦コマ数) … スプライトシートの 左上1コマ
 //   FGLHowto.preload(['パス', ...]) … はじめて ひらいたときに 絵が 空にならないよう 先に読みこむ
 (function () {
     const TITLE = { ja: 'あそびかた', simple: 'あそびかた', en: 'How to Play' };
@@ -35,6 +36,7 @@
 .fgh-im{display:block;width:auto;height:auto;max-width:100%;min-width:0;filter:drop-shadow(0 3px 4px rgba(0,0,0,.35))}
 .fgh-op{color:var(--fop);font-weight:900;font-size:1.6rem;text-shadow:0 2px 0 rgba(0,0,0,.35)}
 .fgh-res{background:#ffc93d;color:#5a3d00;font-weight:900;font-size:1.6rem;padding:2px 14px;border-radius:14px;border:3px solid #fff;box-shadow:0 3px 0 rgba(0,0,0,.3);white-space:nowrap}
+.fgh-sp{display:inline-block;flex:none;background-repeat:no-repeat;background-position:0 0;filter:drop-shadow(0 3px 4px rgba(0,0,0,.35))}
 .fgh-emo{font-size:2.3rem;line-height:1;filter:drop-shadow(0 3px 3px rgba(0,0,0,.3))}
 .fgh-tx{display:flex;flex-direction:column;justify-content:center;padding:2px 20px;min-width:0}
 .fgh-t{font-size:1.45rem;font-weight:900;line-height:1.25;color:color-mix(in srgb,var(--hc) 82%,#000);word-break:keep-all}
@@ -72,6 +74,8 @@
     const op = t => `<span class="fgh-op">${t}</span>`;
     const res = t => `<span class="fgh-res">${t}</span>`;
     const emo = t => `<span class="fgh-emo">${t}</span>`;
+    // スプライトシート(cols×rows コマ)の 左上の1コマだけを 出す
+    const sprite = (src, size, cols, rows) => `<span class="fgh-sp" style="width:${size}px;height:${size}px;background-image:url('${src}');background-size:${(cols || 2) * 100}% ${(rows || 2) * 100}%"></span>`;
     function preload(list) { setTimeout(() => (list || []).forEach(s => { const i = new Image(); i.src = s; }), 800); }
-    window.FGLHowto = { open, close, isOpen: () => !!cur, img, op, res, emo, preload };
+    window.FGLHowto = { open, close, isOpen: () => !!cur, img, op, res, emo, sprite, preload };
 })();
