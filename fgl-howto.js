@@ -28,7 +28,7 @@
   background:linear-gradient(170deg,#fffdf8,color-mix(in srgb,var(--fa) 14%,#fff));border:5px solid var(--fa);box-shadow:0 8px 0 color-mix(in srgb,var(--fa) 70%,#000),0 24px 50px rgba(0,0,0,.4);text-align:left;line-height:normal;letter-spacing:normal}
 .fgh-head{flex:none;height:46px;display:flex;align-items:center;justify-content:center;gap:10px;font-size:1.85rem;font-weight:900;letter-spacing:4px;color:color-mix(in srgb,var(--fa) 75%,#000)}
 .fgh-head svg{width:34px;height:34px}
-.fgh-x{position:absolute;top:10px;right:14px;width:44px;height:44px;border-radius:50%;padding:0;margin:0;background:#fff;border:3px solid color-mix(in srgb,var(--fa) 45%,#fff);color:color-mix(in srgb,var(--fa) 70%,#000);font:900 1.35rem/1 sans-serif;cursor:pointer;box-shadow:0 3px 0 color-mix(in srgb,var(--fa) 40%,#fff)}
+.fgh-ov .fgh-x{position:absolute;top:10px;right:14px;width:44px!important;height:44px!important;min-width:0!important;border-radius:50%!important;padding:0!important;margin:0!important;background:#fff;border:3px solid color-mix(in srgb,var(--fa) 45%,#fff);color:color-mix(in srgb,var(--fa) 70%,#000);font:900 1.35rem/1 sans-serif;cursor:pointer;box-shadow:0 3px 0 color-mix(in srgb,var(--fa) 40%,#fff)}
 .fgh-list{flex:1;min-height:0;display:flex;flex-direction:column;gap:8px}
 .fgh-row{flex:1;min-height:0;display:grid;grid-template-columns:58px 400px 1fr;align-items:stretch;background:#fff;border:4px solid var(--hc);border-radius:18px;overflow:hidden;box-shadow:0 4px 0 var(--hc)}
 .fgh-no{display:flex;align-items:center;justify-content:center;background:var(--hc);color:#fff;font-size:2rem;font-weight:900;text-shadow:0 2px 0 rgba(0,0,0,.25)}
