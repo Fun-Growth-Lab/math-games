@@ -44,6 +44,7 @@
 .fgh-t{font-size:1.45rem;font-weight:900;line-height:1.25;color:color-mix(in srgb,var(--hc) 82%,#000);word-break:keep-all}
 .fgh-b{font-size:1.2rem;font-weight:700;line-height:1.4;color:#3a3550;word-break:keep-all;overflow-wrap:anywhere}
 .fgh-b em,.fgh-t em{font-style:normal;font-weight:900;color:color-mix(in srgb,var(--hc) 80%,#000);background:linear-gradient(transparent 62%,color-mix(in srgb,var(--hc) 24%,transparent) 62%)}
+.fgh-box.few{height:auto}.fgh-box.few .fgh-list{flex:none}.fgh-box.few .fgh-row{flex:none;height:116px}.fgh-box.few .fgh-emo{font-size:2.8rem}
 @media (max-width:900px),(max-height:520px){.fgh-row{grid-template-columns:40px 38% 1fr}.fgh-head{height:34px;font-size:1.3rem}.fgh-t{font-size:1.05rem}.fgh-b{font-size:.86rem;line-height:1.3}.fgh-no{font-size:1.4rem}.fgh-box{padding:6px 10px 10px}.fgh-list{gap:5px}.fgh-tx{padding:2px 10px}}`;
         document.head.appendChild(s);
     }
@@ -64,7 +65,7 @@
         el.style.setProperty('--fart', o.artBg || 'radial-gradient(ellipse at 50% 40%,#2c3f7a,#141d40)');
         el.style.setProperty('--fop', o.opColor || '#ffe08a');
         const rows = (o.rows || []).map((r, i) => `<div class="fgh-row" style="--hc:${r.c}${r.bg ? ';--fart:' + r.bg : ''}"><div class="fgh-no">${i + 1}</div><div class="fgh-art">${typeof r.art === 'function' ? r.art() : (r.art || '')}</div><div class="fgh-tx"><div class="fgh-t">${pick(r.t, l)}</div><div class="fgh-b">${pick(r.b, l)}</div></div></div>`).join('');
-        el.innerHTML = `<div class="fgh-box" role="dialog" aria-modal="true"><div class="fgh-head">${BOOK}<b>${pick(o.title || TITLE, l)}</b></div><button type="button" class="fgh-x" aria-label="${pick(CLOSE, l)}">✕</button><div class="fgh-list">${rows}</div></div>`;
+        el.innerHTML = `<div class="fgh-box${(o.rows || []).length <= 3 ? ' few' : ''}" role="dialog" aria-modal="true"><div class="fgh-head">${BOOK}<b>${pick(o.title || TITLE, l)}</b></div><button type="button" class="fgh-x" aria-label="${pick(CLOSE, l)}">✕</button><div class="fgh-list">${rows}</div></div>`;
         el.addEventListener('click', e => { if (e.target === el || e.target.closest('.fgh-x')) close(); });
         const key = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
         document.addEventListener('keydown', key, true);
