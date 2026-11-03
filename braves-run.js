@@ -1,4 +1,4 @@
-// Math Braves 共通部品(RUN): タイトルの飾り・RUN選択・ステージ演出・RUNの結果・タイトル/ランキング/設定/プレーヤーのボタン結線。
+// Math Braves 共通部品(RUN): タイトルの飾り・RUN選択・ステージ演出・RUNの結果・タイトル/ランキング/設定/プレイヤーのボタン結線。
 // braves-common.js と、ゲームの本体(braves-battle.js、または各ゲームのhtml内のスクリプト)の「あと」に読み込む。
 // ゲーム本体が用意するもの: backToTitle() / startRun(star) / startStage(n) / monHTML(shape) / startTutorial()
 // ゲームのhtmlで決められるもの: GAME.stageCount(ステージ数。既定7) / GAME.stageThemes(ステージの色 [{c}]) / GAME.titleScene(タイトルの街の形)

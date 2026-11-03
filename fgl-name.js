@@ -170,6 +170,7 @@
         const fb = fallback === undefined ? 'ななしさん' : fallback;
         let s = clean(String(name == null ? '' : name).replace(/[\u0000-\u001f\u007f-\u009f​-‏‪-‮⁠-⁯﻿]/g, ''));
         if (!s) return fb;
+        if (s === 'ゲスト' || s === '名無しさん') return fb;   // 古い記録の名前も そろえる
         if (isBlocked(s)) return fb;
         const cs = Array.from(s);
         return cs.length > 16 ? cs.slice(0, 16).join('') : s;

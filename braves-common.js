@@ -1,4 +1,4 @@
-// Math Braves 共通部品(UI): 画面のひな形・多言語・アイコン・プレーヤー管理・ランキング保存・画面サイズ調整など。
+// Math Braves 共通部品(UI): 画面のひな形・多言語・アイコン・プレイヤー管理・ランキング保存・画面サイズ調整など。
 // 使い方: 各ゲームのhtmlで先に `const GAME = {...}` などを定義してから、このファイルを読み込む。
 //   GAME.sbGame   : Supabaseに保存するゲームID
 //   GAME.keys     : localStorageのキー(lang / lastStar / ranking(diff) / clearCount(diff))
@@ -14,7 +14,7 @@ const _GAME_LAYER_HTML = `
             <div class="sp-mode"><span class="rn" id="sp-run"></span><span class="df" id="sp-diff"></span></div>
             <div class="sp-card sp-player">
                 <div class="av" id="sp-av">な</div>
-                <div class="who"><div class="sp-lb" data-i18n="label_player" data-noemo>プレーヤー</div><span id="disp-player-name">ななしさん</span></div>
+                <div class="who"><div class="sp-lb" data-i18n="label_player" data-noemo>プレイヤー</div><span id="disp-player-name">ななしさん</span></div>
             </div>
             <div class="sp-card">
                 <div class="sp-lb"><i class="ico" data-ico="flag"></i><span data-i18n="label_stage" data-noemo>ステージ</span><b class="rt-num" id="disp-difficulty-label"></b></div>
@@ -111,7 +111,7 @@ const _TITLE_INNER_HTML = `
                 <button id="btn-tutorial" class="tm-btn mini"><span class="ic"><i class="ico" data-ico="help"></i></span><span data-i18n="tm_tutorial">チュートリアル</span></button>
                 <button id="btn-view-ranking" class="tm-btn mini"><span class="ic"><i class="ico" data-ico="trophy"></i></span><span data-i18n="tm_ranking">ランキング</span></button>
                 <button id="btn-open-settings" class="tm-btn mini"><span class="ic"><i class="ico" data-ico="gear"></i></span><span data-i18n="tm_settings">設定</span></button>
-                <button id="player-select-btn" class="tm-btn mini sub" title="プレーヤーをへんこうする"><span class="ic"><i class="ico" data-ico="user"></i></span><span id="current-player-name-display">ななしさん</span></button>
+                <button id="player-select-btn" class="tm-btn mini sub" title="プレイヤーをへんこうする"><span class="ic"><i class="ico" data-ico="user"></i></span><span id="current-player-name-display">ななしさん</span></button>
                 <button id="btn-index" class="tm-btn mini"><span class="ic"><i class="ico" data-ico="home"></i></span><span data-i18n="tm_index">INDEXへ</span></button>
             </div>
             <button id="btn-login" class="btn btn-auth title-menu-btn" style="display:none;">Googleでログイン</button>
@@ -134,7 +134,7 @@ const _SETTINGS_INNER_HTML = `
 `;
 const _PLAYER_MGR_INNER_HTML = `
         <div class="overlay-content" style="width: 400px;">
-            <h2 style="color: #ff7043; margin-top: 0; border:none;" data-i18n="pm_title">プレーヤーをえらぶ</h2>
+            <h2 style="color: #ff7043; margin-top: 0; border:none;" data-i18n="pm_title">プレイヤーをえらぶ</h2>
             <p style="font-size: 0.9rem; color: #888; line-height: 1.5;" data-i18n-html="pm_hint">
                 <b>ひらがな</b>　でにゅうりょくしてね<br>
                 みんなが見るなまえです<br>
@@ -255,7 +255,7 @@ document.getElementById('container').innerHTML = (GAME.gameLayerHTML || _GAME_LA
                 body: JSON.stringify({
                     game: gameId || GAME.sbGame,
                     difficulty: difficulty||'normal',
-                    player_name: (typeof FGLName !== 'undefined' ? FGLName.display(name || 'ゲスト', 'ゲスト') : (name || 'ゲスト')),
+                    player_name: (typeof FGLName !== 'undefined' ? FGLName.display(name || 'ななしさん', 'ななしさん') : (name || 'ななしさん')),
                     point_score: Math.round(score)||0,
                     stage_score: stage||0,
                     turns: stage||0,
@@ -373,7 +373,7 @@ const STRINGS = {
         "rank_result_stage": "ステージ{n}",
         "rank_empty_sub": "RUNをあそんで、いちばんのりをめざそう！",
         "panel_battle_info": "⚔️ バトル情報",
-        "label_player": "👤 プレーヤー",
+        "label_player": "👤 プレイヤー",
         "label_level": "🎯 レベル",
         "label_enemy_range": "🔢 まとの すうじ",
         "label_enemies_left": "👾 のこりの てき",
@@ -398,7 +398,7 @@ const STRINGS = {
         "btn_start": "はじめる",
         "btn_tutorial": "🔰 チュートリアル",
         "player_change_suffix": "(へんこう)",
-        "player_change_title": "プレーヤーをへんこうする",
+        "player_change_title": "プレイヤーをへんこうする",
         "btn_ranking": "🏆 ランキング",
         "btn_settings": "⚙ 設定",
         "btn_index": "🏠 INDEXへ",
@@ -421,10 +421,10 @@ const STRINGS = {
         "rank_loading": "読み込み中…",
         "rank_login_required": "ログインが必要です",
         "rank_empty": "記録なし",
-        "pm_title": "プレーヤーをえらぶ",
+        "pm_title": "プレイヤーをえらぶ",
         "pm_hint": "<b>ひらがな</b>　でにゅうりょくしてね<br>みんなが見るなまえです<br>ていねいなことばをつかってね",
         "pm_placeholder": "なまえ (12もじまで)",
-        "pm_empty_list": "プレーヤーがいません。<br>うえから ついか してね。",
+        "pm_empty_list": "プレイヤーがいません。<br>うえから ついか してね。",
         "pm_delete_title": "さくじょ",
         "btn_add": "ついか",
         "delete_confirm": "{name} をさくじょしますか？",
@@ -506,7 +506,7 @@ const STRINGS = {
         "rank_result_stage": "ステージ{n}",
         "rank_empty_sub": "RUNを あそんで、いちばんを めざそう！",
         "panel_battle_info": "⚔️ バトルじょうほう",
-        "label_player": "👤 プレーヤー",
+        "label_player": "👤 プレイヤー",
         "label_level": "🎯 レベル",
         "label_enemy_range": "🔢 まとの すうじ",
         "label_enemies_left": "👾 のこりの てき",
@@ -531,7 +531,7 @@ const STRINGS = {
         "btn_start": "はじめる",
         "btn_tutorial": "🔰 チュートリアル",
         "player_change_suffix": "(へんこう)",
-        "player_change_title": "プレーヤーを へんこうする",
+        "player_change_title": "プレイヤーを へんこうする",
         "btn_ranking": "🏆 ランキング",
         "btn_settings": "⚙ せってい",
         "btn_index": "🏠 INDEXへ",
@@ -554,10 +554,10 @@ const STRINGS = {
         "rank_loading": "よみこみちゅう…",
         "rank_login_required": "ログインが ひつようです",
         "rank_empty": "きろくなし",
-        "pm_title": "プレーヤーを えらぶ",
+        "pm_title": "プレイヤーを えらぶ",
         "pm_hint": "<b>ひらがな</b>　で にゅうりょくしてね<br>みんなが みる なまえです<br>ていねいな ことばを つかってね",
         "pm_placeholder": "なまえ (12もじまで)",
-        "pm_empty_list": "プレーヤーが いません。<br>うえから ついか してね。",
+        "pm_empty_list": "プレイヤーが いません。<br>うえから ついか してね。",
         "pm_delete_title": "さくじょ",
         "btn_add": "ついか",
         "delete_confirm": "{name} を さくじょしますか？",
