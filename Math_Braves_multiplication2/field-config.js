@@ -9,5 +9,4 @@ const PRESET_LEGEND = { label: "伝説", hpBase: 440 };
 const MAX_ROUND = 6;
 const ATTACK_LINE = 100;                 // ばのカードがこの数を こえると こうげき(101いじょう)
 const HAND_VALUES = [2, 2, 3, 3, 4, 5, 6, 7, 8, 9];   // 手札に出る数(2と3が出やすい)
-const FIELD_VALUES = [2, 3, 4, 5, 6, 7, 8, 9];       // ばのカードに出る数
 const ITEM_KEYS = ['change', 'action_plus', 'x20', 'damage_500', 'all_plus_5'];
