@@ -129,7 +129,7 @@ function initGame() {
 
 function startRound(n) {
     state.round = n;
-    state.quota = CONFIG.baseQuota + (n - 1);
+    state.quota = Math.min(18, CONFIG.baseQuota + (n - 1));   // パネルは 商9+あまり9=18まい。それより多くはならない
     state.ap = CONFIG.ap;                         // ラウンドごとの加算なしで固定
     state.roundHits = 0; state.roundScore = 0; state.roundBingos = 0; state.roundPerfects = 0;
     state.stageStartScore = state.score;
