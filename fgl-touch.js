@@ -11,9 +11,14 @@
         var t = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
         return !!t && (t === el || el.contains(t) || t.contains(el));
     }
-    document.addEventListener('click', function (e) {
-        var t = e.target;
-        if (!t || !t.closest || t.closest('button, a, input, select, textarea, canvas, [onclick], [role=button]')) return;
+    // 指で触るゲームは touchstart を止めていて click が来ないことがあるので、ポインターで見る
+    var down = null;
+    document.addEventListener('pointerdown', function (e) { down = e.pointerType === 'mouse' ? null : { x: e.clientX, y: e.clientY }; }, true);
+    document.addEventListener('pointerup', function (e) {
+        if (!down || Math.abs(e.clientX - down.x) > 10 || Math.abs(e.clientY - down.y) > 10) return;
+        down = null;
+        var t = document.elementFromPoint(e.clientX, e.clientY);
+        if (!t || t.closest('button, a, input, select, textarea, canvas, [onclick], [role=button]')) return;
         var best = null, bestD = REACH;
         document.querySelectorAll(SEL).forEach(function (b) {
             var r = b.getBoundingClientRect();
@@ -21,6 +26,9 @@
             var d = Math.sqrt(dx * dx + dy * dy);
             if (d <= bestD && visible(b)) { best = b; bestD = d; }
         });
-        if (best) { e.stopPropagation(); e.preventDefault(); best.click(); }
+        if (best) {
+            best.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+            best.click();
+        }
     }, true);
 })();
