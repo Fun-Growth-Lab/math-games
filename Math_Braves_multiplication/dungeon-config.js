@@ -4,16 +4,16 @@
 const MONSTER_ROOM = { creatureAdd: 30, expMul: 2 };
 const CROWN_THRESHOLDS = { BRONZE: 5000, SILVER: 7500, GOLD: 10000 };
 const ITEMS = {
-    1:  { name: 'カギ探知',  emoji: '🔑', img: 'item_1.png',  needsTarget: false, desc: 'まだ見つかっていないカギの場所を1か所だけ明らかにします。' },
-    2:  { name: 'ドア探知',  emoji: '🚪', img: 'item_2.png',  needsTarget: false, desc: 'ドアがどこにあるかを地図に表示します。' },
-    3:  { name: '透視',      emoji: '🔍', img: 'item_3.png',  needsTarget: false, desc: 'まだ開いていないパネル5マスの数値をこっそりのぞき見ます。' },
-    4:  { name: '地形変換',    emoji: '🔄', img: 'item_4.png',  needsTarget: false, desc: 'パネルの約半分の数値をランダムにシャッフルします。' },
-    5:  { name: '大地形変換',  emoji: '💫', img: 'item_5.png',  needsTarget: false, desc: 'すべてのパネルの数値を一斉にシャッフルします。' },
-    6:  { name: '手札交換',    emoji: '✨', img: 'item_6.png',  needsTarget: false, desc: '手札5枚をすべて新しいカードに引き直します。APは消費しません。' },
-    7:  { name: '小爆弾',          emoji: '💣', img: 'item_7.png',  needsTarget: true,  desc: '1マスを爆発させてパネルを破壊します。周囲のマスの数値もオープンされます。（ドラッグで対象指定）' },
-    8:  { name: '十字爆弾',        emoji: '💥', img: 'item_8.png',  needsTarget: true,  desc: '十字型5マスを一気に爆発・破壊します。周囲の数値もオープンされます。（ドラッグで対象指定）' },
-    9:  { name: '２分の１の剣',    emoji: '⚔️', img: 'item_9.png',  needsTarget: true,  desc: '50%の確率で敵を一撃で倒します。ボスには効きません。（ドラッグで対象指定）' },
-    10: { name: '数字カード',       emoji: '🃏', img: 'item_10.png', needsTarget: false, desc: '手札カードにドロップすることで、そのカードの数値を掛け算できます。（ドラッグで手札に使用）' },
+    1:  { name: 'カギ探知',  emoji: '🔑', img: 'item_1.webp',  needsTarget: false, desc: 'まだ見つかっていないカギの場所を1か所だけ明らかにします。' },
+    2:  { name: 'ドア探知',  emoji: '🚪', img: 'item_2.webp',  needsTarget: false, desc: 'ドアがどこにあるかを地図に表示します。' },
+    3:  { name: '透視',      emoji: '🔍', img: 'item_3.webp',  needsTarget: false, desc: 'まだ開いていないパネル5マスの数値をこっそりのぞき見ます。' },
+    4:  { name: '地形変換',    emoji: '🔄', img: 'item_4.webp',  needsTarget: false, desc: 'パネルの約半分の数値をランダムにシャッフルします。' },
+    5:  { name: '大地形変換',  emoji: '💫', img: 'item_5.webp',  needsTarget: false, desc: 'すべてのパネルの数値を一斉にシャッフルします。' },
+    6:  { name: '手札交換',    emoji: '✨', img: 'item_6.webp',  needsTarget: false, desc: '手札5枚をすべて新しいカードに引き直します。APは消費しません。' },
+    7:  { name: '小爆弾',          emoji: '💣', img: 'item_7.webp',  needsTarget: true,  desc: '1マスを爆発させてパネルを破壊します。周囲のマスの数値もオープンされます。（ドラッグで対象指定）' },
+    8:  { name: '十字爆弾',        emoji: '💥', img: 'item_8.webp',  needsTarget: true,  desc: '十字型5マスを一気に爆発・破壊します。周囲の数値もオープンされます。（ドラッグで対象指定）' },
+    9:  { name: '２分の１の剣',    emoji: '⚔️', img: 'item_9.webp',  needsTarget: true,  desc: '50%の確率で敵を一撃で倒します。ボスには効きません。（ドラッグで対象指定）' },
+    10: { name: '数字カード',       emoji: '🃏', img: 'item_10.webp', needsTarget: false, desc: '手札カードにドロップすることで、そのカードの数値を掛け算できます。（ドラッグで手札に使用）' },
 };
 
 // カード重みは √値 の逆数基準（小さい数ほど引きやすい）

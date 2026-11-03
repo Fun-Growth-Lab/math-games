@@ -18,7 +18,7 @@ const STAGE_THEMES_ALL = [
     { c: '#6fd3e8', bgf: 'grayscale(0.5) brightness(1.15) hue-rotate(15deg) saturate(1.2)',   bossf: 'hue-rotate(-95deg) saturate(0.8) brightness(1.1)' },
     { c: '#ef5350', bgf: 'sepia(0.9) hue-rotate(-50deg) saturate(3) brightness(0.7) contrast(1.15)', bossf: 'hue-rotate(110deg) saturate(1.4) brightness(0.95)' },
     { c: '#7e8bff', bgf: 'brightness(1.2) saturate(0.85) hue-rotate(-8deg) contrast(0.95)',   bossf: 'hue-rotate(60deg) saturate(1.3) brightness(1.05)' },
-    { c: '#8e24aa', img: 'haikei_2.png', bgf: 'brightness(0.95) saturate(1.1)',               bossf: 'brightness(0.8) saturate(1.35) contrast(1.1)' },
+    { c: '#8e24aa', img: 'haikei_2.webp', bgf: 'brightness(0.95) saturate(1.1)',               bossf: 'brightness(0.8) saturate(1.35) contrast(1.1)' },
 ];
 // GAME.stagePick = [1, 4, 7] のように、元の7つの世界のうち どれを使うか(ステージ数を減らしたゲーム用)。名前と色が その世界のものになる
 const STAGE_THEMES = GAME.stageThemes || (GAME.stagePick ? GAME.stagePick.map(k => STAGE_THEMES_ALL[k - 1]) : STAGE_THEMES_ALL);
