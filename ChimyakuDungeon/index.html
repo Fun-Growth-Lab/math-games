@@ -1419,12 +1419,13 @@
         .score-total-row { display:flex; justify-content:space-between; align-items:center; margin-top:10px; padding-top:10px; border-top:2px solid var(--gold); font-size:1.25rem; font-weight:800; color:var(--gold); }
         .btn-build-room { width:100%; margin-bottom:8px; padding:9px 12px; font-size:0.95rem; }
     </style>
-<script src="../fgl-name.js?v=20261224"></script>
-<script src="../fgl-sfx.js?v=5"></script>
-<script src="../fgl-nudge.js?v=7"></script>
-<script src="../fgl-bgm.js?v=10"></script>
-<script src="../fgl-howto.js?v=6"></script>
-<script src="../tutorial-engine.js?v=20261226"></script>
+<script src="../fgl-name.js?v=20261103a"></script>
+<script src="../fgl-sfx.js?v=20261103a"></script>
+<script src="../fgl-touch.js?v=20261103a"></script>
+<script src="../fgl-nudge.js?v=20261103a"></script>
+<script src="../fgl-bgm.js?v=20261103a"></script>
+<script src="../fgl-howto.js?v=20261103a"></script>
+<script src="../tutorial-engine.js?v=20261103a"></script>
 </head>
 <body>
 <div id="container">
@@ -3667,11 +3668,16 @@ function updateGemFocus(newType){
     if (focusedType && cache[focusedType]) cache[focusedType].forEach(el => el.classList.add('focus'));
 }
 
-function cellFromEvent(e){
+// 画面上の点が、マップの左上から何割の位置か(スマホ縦持ちで回転しているときも同じ)
+function gridFraction(clientX, clientY){
     const rect = gridEl.getBoundingClientRect();
-    const x = e.clientX - rect.left, y = e.clientY - rect.top;
-    const c = Math.floor(x / rect.width * GRID_COLS);
-    const r = Math.floor(y / rect.height * GRID_ROWS);
+    if (isMobileRotated) return { x: (clientY - rect.top) / rect.height, y: (rect.right - clientX) / rect.width };
+    return { x: (clientX - rect.left) / rect.width, y: (clientY - rect.top) / rect.height };
+}
+function cellFromEvent(e){
+    const g = gridFraction(e.clientX, e.clientY);
+    const c = Math.floor(g.x * GRID_COLS);
+    const r = Math.floor(g.y * GRID_ROWS);
     if (r<0||r>=GRID_ROWS||c<0||c>=GRID_COLS) return null;
     return {r,c};
 }
@@ -4073,9 +4079,9 @@ function completeRoomRect(cell){
 let roomDrag = null;            // { pointerId, start:{r,c}, active:boolean }
 let roomDragClickBlockUntil = 0; // ドラッグを離した直後に届く click を無視する期限(ms)
 function clampedCellFromPoint(clientX, clientY){
-    const rect = gridEl.getBoundingClientRect();
-    let c = Math.floor((clientX - rect.left) / rect.width * GRID_COLS);
-    let r = Math.floor((clientY - rect.top) / rect.height * GRID_ROWS);
+    const g = gridFraction(clientX, clientY);
+    let c = Math.floor(g.x * GRID_COLS);
+    let r = Math.floor(g.y * GRID_ROWS);
     c = Math.max(0, Math.min(GRID_COLS-1, c));
     r = Math.max(ROOM_MIN_ROW, Math.min(GRID_ROWS-1, r));
     return { r, c };
@@ -6975,11 +6981,13 @@ function beginTouchDrag(sourceEl, data, point, pointerId){
     ghost.className += ' touch-drag-ghost';
     ghost.style.position = 'fixed';
     ghost.style.transition = 'none';
-    ghost.style.width = r.width+'px'; ghost.style.height = r.height+'px';
-    ghost.style.left = (point.clientX - r.width/2)+'px'; ghost.style.top = (point.clientY - r.height/2)+'px';
+    const gw = isMobileRotated ? r.height : r.width, gh = isMobileRotated ? r.width : r.height;
+    if (isMobileRotated) ghost.style.transform = 'rotate(90deg)';
+    ghost.style.width = gw+'px'; ghost.style.height = gh+'px';
+    ghost.style.left = (point.clientX - gw/2)+'px'; ghost.style.top = (point.clientY - gh/2)+'px';
     document.body.appendChild(ghost);
     sourceEl.style.opacity = '0.4';
-    touchDragState = { data, sourceEl, ghostEl: ghost, width: r.width, height: r.height, pointerId };
+    touchDragState = { data, sourceEl, ghostEl: ghost, width: gw, height: gh, pointerId };
 }
 function moveTouchDrag(point){
     if (!touchDragState || !point) return;
@@ -10857,12 +10865,14 @@ function startTutorial(){
 // ============================================================
 // 画面サイズが変わっても縦横比(1280×720)を保ったまま拡大縮小する
 // ============================================================
+let isMobileRotated = false;
 function scaleContainer(){
     const el = document.getElementById('container');
     const w = window.innerWidth, h = window.innerHeight;
     if (w <= 0 || h <= 0) return;
-    const s = Math.min(w / 1280, h / 720);
-    el.style.transform = `scale(${s})`;
+    isMobileRotated = w < h && w <= 900;
+    if (isMobileRotated) el.style.transform = `rotate(90deg) scale(${Math.min(h / 1280, w / 720)})`;
+    else el.style.transform = `scale(${Math.min(w / 1280, h / 720)})`;
 }
 window.addEventListener('resize', scaleContainer);
 window.addEventListener('load', scaleContainer);
