@@ -4,9 +4,8 @@
 // ゲームのhtmlで決められるもの: GAME.stageCount(ステージ数。既定7) / GAME.stageThemes(ステージの色 [{c}]) / GAME.titleScene(タイトルの街の形)
 
 // ステージ数と、ステージごとの世界の色(c)
-// ステージ数。★ごとに変わるゲーム(わりざん)は GAME.stageCountFor(star) を用意すると、RUNを始めるときに入れかわる
+// ステージ数。RUNごとに変わるゲーム(わりざん)は、ゲームの startRun で入れかえる
 let STAGE_COUNT = GAME.stageCount || 7;
-function stageCountFor(star) { return GAME.stageCountFor ? GAME.stageCountFor(star) : (GAME.stageCount || 7); }
 // 難易度(★)の数。GAME.starMax=5 なら ★4・★5 は「ひとつ前をクリアしたら あらわれる」シークレット
 const STAR_MAX = GAME.starMax || 3;
 const STAR_LOCK = false;      // true にすると、★は1つ前をクリアすると開く。今は ★を自由に選べる
@@ -107,8 +106,12 @@ function buildTitleDecor() {
 const LAST_STAR_KEY = GAME.keys.lastStar;
 let selStar = 1;
 try { selStar = Math.max(1, Math.min(STAR_MAX, parseInt(localStorage.getItem(LAST_STAR_KEY), 10) || 1)); } catch (e) {}
-// ri = RUNの番号(省くと いま選んでいるRUN)。GAME.starKey があれば RUNごとに記録を分ける
-function starKey(n, ri) { return GAME.starKey ? GAME.starKey(n, ri === undefined ? runSelIdx : ri) : 'STAR' + n; }
+// ri = RUNの番号(省くと いま選んでいるRUN)。記録は RUNごとに分ける(基本は むかしからの 'STAR1' のまま)。GAME.starKey で決めなおせる
+function starKey(n, ri) {
+    const i = ri === undefined ? runSelIdx : ri;
+    if (GAME.starKey) return GAME.starKey(n, i);
+    return RUN_LIST[i].id === 'normal' ? 'STAR' + n : RUN_LIST[i].id + '_STAR' + n;
+}
 function starCleared(n, ri) { return getClearCount(starKey(n, ri)) > 0; }
 function starUnlocked(n) { return !STAR_LOCK || n === 1 || starCleared(n - 1); }
 const SINGLE_STAR = STAR_MAX === 1;      // 難易度なし(★は1つだけ): ★の表示をぜんぶ消す
@@ -133,6 +136,13 @@ function goRunSelect() {
 
 // ---- RUN選択 ----
 let runSelIdx = 0;
+// GAME.runChain: RUNを どれかの★で クリアすると、つぎのRUNが ひらく(うしろのRUNの記録があれば、そこまでは ひらいている)
+function refreshRunLocks() {
+    if (!GAME.runChain) return;
+    let open = 0;
+    RUN_LIST.forEach((r, i) => { if (maxClearedStar(i)) open = Math.max(open, i + 1); });
+    RUN_LIST.forEach((r, i) => { r.locked = i > open; });
+}
 const RS_CARD_W = 244, RS_GAP = 20;
 function pcardBg(n) { return ['linear-gradient(#ff8a7a,#e8503d)', 'linear-gradient(#5cc7ff,#2a8fd8)', 'linear-gradient(#7be05c,#3fae2a)', 'linear-gradient(#ffd24a,#e8a317)', 'linear-gradient(#b48aff,#7a4fd6)'][n % 5]; }
 function pcard(n, left, top, rot, extra) {
@@ -142,14 +152,16 @@ function runArt(id) {
     if (GAME.runArtFor) { const h = GAME.runArtFor(id); if (h) return h; }
     const sp = (ch, l, t, s, d) => `<div class="spark" style="left:${l}px;top:${t}px;font-size:${s}px;animation-delay:${d || 0}s">${ch}</div>`;
     const white = 'background:linear-gradient(#fff,#dfe8ff);color:#2d3d78;border-color:#c9d3f0;';
-    const rn = GAME.runArtNums || [4, 6, 10];       // RUNカードに浮かべる数字(しょうすうは小数)
+    const run = RUN_LIST.find(r => r.id === id) || {};      // RUNごとの絵: artNums=数字 / artBg=背景 / artMons=[[形, left, top, 大きさ, 色], ...]
+    const rn = run.artNums || GAME.runArtNums || [4, 6, 10];       // RUNカードに浮かべる数字(しょうすうは小数)
     const rl = GAME.runArtLayout || [[6, 62, -12], [38, 76, 7], [160, 8, 10]];     // その位置 [left, top, 角度]
-    if (id === 'normal') {
-        return `<div class="rs-art" style="background:linear-gradient(hsl(calc(var(--h) + 5) 72.3% 32.6%),hsl(calc(var(--h) + 8) 77.8% 17.6%))">
+    if (id === 'normal' || run.artBg) {
+        const mons = run.artMons || [[GAME.runArt.shape, 58, 2, 0.92, GAME.runArt.color]];
+        return `<div class="rs-art" style="background:${run.artBg || 'linear-gradient(hsl(calc(var(--h) + 5) 72.3% 32.6%),hsl(calc(var(--h) + 8) 77.8% 17.6%))'}">
             <div class="rsa-floor"></div>
-            <div class="mon" style="position:absolute;left:58px;top:2px;width:150px;height:150px;--c:${GAME.runArt.color};transform:scale(0.92);transform-origin:50% 100%">${monHTML(GAME.runArt.shape)}</div>
-            ${pcard(rn[0], rl[0][0], rl[0][1], rl[0][2], white)}${pcard(rn[1], rl[1][0], rl[1][1], rl[1][2], white)}
-            ${pcard(rn[2], rl[2][0], rl[2][1], rl[2][2], 'background:linear-gradient(160deg,#fff4b0,#ffc93d 55%,#e8a317);color:#7a2a00;border-color:#b57a00;box-shadow:0 4px 0 rgba(0,0,0,0.3),0 0 18px rgba(255,216,77,0.9);')}
+            ${mons.map(([k, l, t, sc, c]) => `<div class="mon" style="position:absolute;left:${l}px;top:${t}px;width:150px;height:150px;--c:${c};transform:scale(${sc});transform-origin:50% 100%">${monHTML(k)}</div>`).join('')}
+            ${run.artMons ? '' : `${pcard(rn[0], rl[0][0], rl[0][1], rl[0][2], white)}${pcard(rn[1], rl[1][0], rl[1][1], rl[1][2], white)}
+            ${pcard(rn[2], rl[2][0], rl[2][1], rl[2][2], 'background:linear-gradient(160deg,#fff4b0,#ffc93d 55%,#e8a317);color:#7a2a00;border-color:#b57a00;box-shadow:0 4px 0 rgba(0,0,0,0.3),0 0 18px rgba(255,216,77,0.9);')}`}
             ${sp('✦', 126, 14, 20)}${sp('✦', 14, 20, 16, 0.6)}${sp('✦', 200, 100, 14, 1.1)}</div>`;
     }
     return `<div class="rs-art" style="background:linear-gradient(#4a4f66,#2a2d40)">
@@ -159,6 +171,7 @@ function runArt(id) {
 // まだ ひらいていないRUN(「じゅんびちゅう」ではなく、クリアで ひらく本物のRUN)は、名前も絵も せつめいも 見せない
 function runHidden(r) { return !!(r && r.locked && r.id !== 'locked'); }
 function renderRunSelect() {
+    refreshRunLocks();
     if (!starUnlocked(selStar)) selStar = 1;
     const cur = RUN_LIST[runSelIdx];
     document.getElementById('rs-strip').innerHTML = RUN_LIST.map((r, i) => {
@@ -181,7 +194,8 @@ function renderRunSelect() {
     });
     centerRunStrip();
     const best = bestScore(selStar);
-    document.getElementById('rs-desc').innerHTML = ((cur.locked && GAME.lockedHint) ? GAME.lockedHint(runSelIdx) : T('run_' + cur.id + '_desc')) +
+    const lastOpen = RUN_LIST.filter(r => !r.locked).pop();
+    document.getElementById('rs-desc').innerHTML = ((cur.locked && GAME.lockedHint) ? GAME.lockedHint(runSelIdx) : (runHidden(cur) && GAME.runChain) ? T('run_hidden_desc', { name: T('run_' + lastOpen.id + '_name') }) : T('run_' + cur.id + '_desc')) +
         (best && !cur.locked ? `　<span class="ds-best">${T('best_label', { n: best })}</span>` : '');
     document.getElementById('star-row').innerHTML = SINGLE_STAR ? '' : Array.from({ length: STAR_MAX }, (_, i) => i + 1).filter(n => starVisible(n)).map(n => {
         const locked = !starUnlocked(n);

@@ -656,6 +656,14 @@ function startRun(star) {
     state.star = star;
     state.difficulty = starKey(star);
     CONFIG = Object.assign({}, STAR_PRESETS[star]);
+    if (RUN_LIST[runSelIdx].monsterRoom) {
+        CONFIG.creatureExpMul = MONSTER_ROOM.expMul;
+        CONFIG.dropRatesByFloor = CONFIG.dropRatesByFloor.map(r => {
+            if (!r) return r;
+            const others = r.time + r.score + r.item + (r.numCard || 0);
+            return Object.assign({}, r, { creature: Math.min(100 - others, r.creature + MONSTER_ROOM.creatureAdd) });
+        });
+    }
     initGame();
     state.runMode = true;
     startStage(1);
@@ -1702,7 +1710,7 @@ function onUp(e) {
                         state.particles.push(new Particle(cx, cy+40, `Time+${rec}`, '#66bb6a', 'text'));
                         state.particles.push(new Particle(cx, cy-40, T('particle_defeat'), '#ef5350', 'text'));
                         addDungeonLog(T('dlog_enemy_defeat', {n: gain}));
-                        gainExp(gain); SFX.play(isBoss ? 'clearstage' : 'attack'); setTimeout(() => SFX.play('hit'), 90);
+                        gainExp(isBoss ? gain : gain * (CONFIG.creatureExpMul || 1)); SFX.play(isBoss ? 'clearstage' : 'attack'); setTimeout(() => SFX.play('hit'), 90);
 
                         if (isBoss) {
                             cell.item = 'DOOR';

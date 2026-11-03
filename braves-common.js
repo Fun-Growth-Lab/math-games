@@ -456,7 +456,9 @@ const STRINGS = {
         "run_locked_name": "じゅんびちゅう",
         "run_locked_short": "あたらしい しばりが くるよ！",
         "run_locked_desc": "あたらしいしばりは じゅんびちゅう。おたのしみに！",
-        "run_hidden_name": "？？？", "run_hidden_short": "ひらくと わかるよ",
+        "run_hidden_name": "？？？", "run_hidden_short": "ひらくと わかるよ", "run_hidden_desc": "「{name}」を クリアすると ひらくよ！",
+        "run_odd_name": "奇数の世界", "run_odd_short": "奇数が 出やすい！", "run_odd_desc": "奇数のカードが 出やすい世界だよ！",
+        "run_even_name": "偶数の世界", "run_even_short": "偶数が 出やすい！", "run_even_desc": "偶数のカードが 出やすい世界だよ！",
         "btn_run_go": "はじめる ▶",
         "best_label": "ベスト {n}点",
         "stage_chip": "ステージ{n}",
@@ -587,7 +589,9 @@ const STRINGS = {
         "run_locked_name": "じゅんびちゅう",
         "run_locked_short": "あたらしい しばりが くるよ！",
         "run_locked_desc": "あたらしい しばりは じゅんびちゅう。おたのしみに！",
-        "run_hidden_name": "？？？", "run_hidden_short": "ひらくと わかるよ",
+        "run_hidden_name": "？？？", "run_hidden_short": "ひらくと わかるよ", "run_hidden_desc": "「{name}」を クリアすると ひらくよ！",
+        "run_odd_name": "きすうの せかい", "run_odd_short": "きすうが でやすい！", "run_odd_desc": "きすうの カードが でやすい せかいだよ！",
+        "run_even_name": "ぐうすうの せかい", "run_even_short": "ぐうすうが でやすい！", "run_even_desc": "ぐうすうの カードが でやすい せかいだよ！",
         "btn_run_go": "はじめる ▶",
         "best_label": "ベスト {n}てん",
         "stage_chip": "ステージ{n}",
@@ -718,7 +722,9 @@ const STRINGS = {
         "run_locked_name": "Coming Soon",
         "run_locked_short": "New twists on the way!",
         "run_locked_desc": "New twists are being prepared. Stay tuned!",
-        "run_hidden_name": "？？？", "run_hidden_short": "Unlock to see!",
+        "run_hidden_name": "？？？", "run_hidden_short": "Unlock to see!", "run_hidden_desc": "Clear \"{name}\" to unlock!",
+        "run_odd_name": "Odd World", "run_odd_short": "More odd numbers!", "run_odd_desc": "Odd number cards come up more often!",
+        "run_even_name": "Even World", "run_even_short": "More even numbers!", "run_even_desc": "Even number cards come up more often!",
         "btn_run_go": "Start ▶",
         "best_label": "Best {n} pts",
         "stage_chip": "Stage {n}",
@@ -1022,6 +1028,18 @@ if (window.visualViewport) window.visualViewport.addEventListener('resize', resi
     list.addEventListener('touchcancel', end, { passive: true });
 })();
 
+// RUN_LIST の parity(1=奇数の世界 / 0=偶数の世界)があれば、その数を 2:1 で 出やすくして values から1つ えらぶ
+function pickRunValue(values) {
+    const parity = RUN_LIST[runSelIdx].parity;
+    let pool = values;
+    if (parity !== undefined) {
+        const want = Math.random() < 2 / 3 ? parity : 1 - parity;
+        const hit = values.filter(v => v % 2 === want);
+        if (hit.length) pool = hit;
+    }
+    return pool[Math.floor(Math.random() * pool.length)];
+}
+
 function randomInt(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
 }
@@ -1245,6 +1263,7 @@ let rkRunIdx = 0, rkStar = 0, rkSeq = 0, rkKind = 'score';   // rkStar: 0=すべ
 const RK_W = 150, RK_GAP = 14, RK_PAD = 18;
 function showRankingScreen() {
     ui.rankingScreen.classList.remove('hidden');
+    if (typeof refreshRunLocks === 'function') refreshRunLocks();
     rkRunIdx = (typeof runSelIdx === 'number' && RUN_LIST[runSelIdx] && !RUN_LIST[runSelIdx].locked) ? runSelIdx : 0;
     renderRankScreen();
     loadRankRows();

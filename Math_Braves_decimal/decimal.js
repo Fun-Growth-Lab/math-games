@@ -116,7 +116,12 @@ function makeCard(i) {
 }
 
 // ---- イベント(リボンの上にならぶ) ----
-function makeEvent(zone, pool) {
+// RUN「まものべや」は 1つの区間(1.0ぶん)を はんぶんに分けて、イベントを 2つずつ おく
+function eventsPerZone() { return RUN_LIST[runSelIdx].monsterRoom && !state.tutorial ? 2 : 1; }
+function addZoneEvents(list, zone, pool) {
+    for (let slot = 0; slot < eventsPerZone(); slot++) list.push(makeEvent(zone, pool, slot));
+}
+function makeEvent(zone, pool, slot) {
     const r = Math.random();
     const hasSnack = pool.length > 0;
     let type;
@@ -127,8 +132,9 @@ function makeEvent(zone, pool) {
     else if (type === 'enemy') { if (Math.random() < 0.1) { sub = 'dragon'; icon = '🐲'; } else { sub = 'normal_enemy'; icon = '👾'; } }
     else if (type === 'gem') { icon = '💎'; }
     else { const k = getRandomInt(0, pool.length - 1); icon = pool[k]; pool.splice(k, 1); }
-    const wInt = Math.round((type === 'enemy' ? 0.8 : type === 'snack' ? 0.2 : 0.4) * 10);
-    const sInt = zone * 10, maxStart = zone * 10 + 9 - wInt;
+    const two = eventsPerZone() === 2;
+    const wInt = two ? (type === 'enemy' ? 4 : type === 'snack' ? 2 : 3) : Math.round((type === 'enemy' ? 0.8 : type === 'snack' ? 0.2 : 0.4) * 10);
+    const sInt = zone * 10 + slot * 5, maxStart = sInt + (two ? 4 : 9) - wInt;
     const st = getRandomInt(sInt, maxStart);
     return { type: type, sub: sub, icon: icon, start: st / 10, end: (st + wInt) / 10, triggered: false, cleared: false };
 }
@@ -147,7 +153,7 @@ function initStage(n) {
     }
     const pool = [...state.availSnacks];
     state.events = [];
-    for (let z = 0; z < 5; z++) state.events.push(makeEvent(z, pool));
+    for (let z = 0; z < 5; z++) addZoneEvents(state.events, z, pool);
     clearDcLayer();
     document.getElementById('game-area').style.setProperty('--sc', STAGE_THEMES[Math.min(n, STAGE_COUNT) - 1].c);
     dcInit();
@@ -183,7 +189,7 @@ function useGemForField() {
     const from = cur === 0 ? 0 : Math.floor(cur) + 1;      // いま いるところより先のイベントを作りなおす
     const kept = state.events.filter(ev => Math.floor(ev.start) < from);
     const pool = state.availSnacks.filter(s => !kept.some(ev => ev.icon === s));
-    for (let z = from; z < 5; z++) kept.push(makeEvent(z, pool));
+    for (let z = from; z < 5; z++) addZoneEvents(kept, z, pool);
     state.events = kept;
     burst(vx(2.5), BAR_Y + BAR_H / 2, '#A5D6A7', 30);
     addLog(T('dc_log_change_field'));

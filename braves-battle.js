@@ -111,7 +111,7 @@ function itemEffect(it) { return it.kind === 'hp' ? HP_UP : it.kind === 'coin' ?
 class Card {
     constructor(slotIndex) {
         this.slotIndex = slotIndex;
-        this.value = randomInt(CONFIG.handMin, CONFIG.handMax);
+        this.value = drawHandValue();
         this.stackCount = 1;
         
         const baseSize = Math.min(state.width, state.height * 1.5);
@@ -345,13 +345,18 @@ function initGame() {
     startLoop();
 }
 
+function drawHandValue() {
+    const values = [];
+    for (let v = CONFIG.handMin; v <= CONFIG.handMax; v++) values.push(v);
+    return pickRunValue(values);
+}
 function refillCards() {
     for (let i = 0; i < 5; i++) {
         if (state.cards[i] === null) {
             state.cards[i] = new Card(i);
             if (state.forbiddenValue !== null && state.cards[i].value === state.forbiddenValue) {
                 while(state.cards[i].value === state.forbiddenValue) {
-                    state.cards[i].value = randomInt(CONFIG.handMin, CONFIG.handMax);
+                    state.cards[i].value = drawHandValue();
                 }
             }
         }

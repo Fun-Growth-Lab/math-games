@@ -1,5 +1,7 @@
 // かけざんダンジョンの設定(アイテム表・難易度ごとのパネル/カード/ボスの設定・フロア数)。braves-common.js より先に読み込む。
 
+// RUN「まものべや」: 魔物の出る割合が +30%(空マスから へらす)、魔物から もらえる経験値が ×2
+const MONSTER_ROOM = { creatureAdd: 30, expMul: 2 };
 const CROWN_THRESHOLDS = { BRONZE: 5000, SILVER: 7500, GOLD: 10000 };
 const ITEMS = {
     1:  { name: 'カギ探知',  emoji: '🔑', img: 'item_1.png',  needsTarget: false, desc: 'まだ見つかっていないカギの場所を1か所だけ明らかにします。' },

@@ -30,7 +30,7 @@ document.getElementById('container').insertAdjacentHTML('beforeend', `
 
 function itemName(key) { return T(`item_${key}_name`); }
 function itemDesc(key) { return T(`item_${key}_desc`); }
-function randHand() { return HAND_VALUES[Math.floor(Math.random() * HAND_VALUES.length)]; }
+function randHand() { return pickRunValue(HAND_VALUES); }
 
 // ---- ログ ----
 function addLog(html) {
@@ -77,7 +77,7 @@ function makeHandCard(i) {
     return { value: randHand(), x: x, y: HAND_Y, width: HAND_W, height: HAND_H, targetX: x, targetY: HAND_Y, isDragging: false, isSelected: false, _fresh: true };
 }
 function setFieldCard() {
-    state.field = { value: Math.floor(Math.random() * 8) + 2, x: FIELD_X, y: FIELD_Y, width: FIELD_W, height: FIELD_H, scale: 1.0, alpha: 1 };
+    state.field = { value: pickRunValue(FIELD_VALUES), x: FIELD_X, y: FIELD_Y, width: FIELD_W, height: FIELD_H, scale: 1.0, alpha: 1 };
 }
 
 // ---- ステージ制RUNとの受けわたし ----

@@ -85,7 +85,7 @@ function startRun(star) {
     if (!starUnlocked(star)) return;
     state.star = star;
     state.difficulty = starKey(star);
-    CONFIG = Object.assign({}, STAR_PRESETS[star]);
+    CONFIG = Object.assign({}, STAR_PRESETS[star], { maxRound: RUN_LIST[runSelIdx].rounds });     // ラウンド数は RUNで決まる
     STAGE_COUNT = CONFIG.maxRound;
     initGame();
     state.runMode = true;
