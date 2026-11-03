@@ -493,7 +493,7 @@
         o = o || {};
         const lang = function () { let l = 'ja'; try { if (o.getLang) l = o.getLang(); } catch (e) {} return (l === 'ja_easy' || l === 'simple' || l === 'easy') ? 'easy' : (l === 'en' ? 'en' : 'ja'); };
         const wrap = document.createElement('div');
-        wrap.style.cssText = 'text-align:center;margin:12px 0';
+        wrap.style.cssText = 'display:flex;flex-wrap:wrap;justify-content:center;gap:8px 10px;margin:12px 0';   // 枠がせまいときは縦にならぶ
         const b = document.createElement('button');
         b.type = 'button'; b.className = 'fgb-btn gold'; b.style.fontSize = '1.05rem';
         let b2 = null;
@@ -503,7 +503,7 @@
         wrap.appendChild(b);
         if (o.sfx) {
             b2 = document.createElement('button');
-            b2.type = 'button'; b2.className = 'fgb-btn gold'; b2.style.cssText = 'font-size:1.05rem;margin-left:10px';
+            b2.type = 'button'; b2.className = 'fgb-btn gold'; b2.style.fontSize = '1.05rem';
             b2.onclick = function (e) { e.stopPropagation(); openPanel(bgm, Object.assign({}, o, { mode: 'sfx' })); };
             wrap.appendChild(b2);
             paint();

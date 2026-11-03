@@ -317,10 +317,9 @@ window.addEventListener('load', () => {
     if (b) FGLNudge.attach(b, { unset: () => { const l = loadPlayers(); return !(getSelectedPlayerIndex() >= 0 && l[getSelectedPlayerIndex()]); }, lang: () => currentLang === 'ja' || currentLang === 'en' ? currentLang : 'simple', dir: 'down' });
 });
 window.addEventListener('load', () => {
-    const host = document.getElementById('sfx-vol');   // 設定画面を作り直しているゲーム(ぶんすう)は、自分で置き場所を決めている
-    if (host) FGLSfx.volumeUI(host, SFX); else FGLSfx.settingsRow(SFX, { before: '#btn-close-settings' });
-    // BGM(fgl-bgm.js): 設定画面の「🎵 BGMのせってい」ボタン→パネル
-    FGLBgm.settingsButton(BGM, host ? { after: '#sfx-vol', sfx: SFX, getLang: () => currentLang } : { before: '#btn-close-settings', sfx: SFX, getLang: () => currentLang });
+    const host = document.getElementById('snd-btns');   // 設定画面を作り直しているゲーム(ぶんすう)は、自分で置き場所を決めている
+    // BGM(fgl-bgm.js): 設定画面の「🎵 BGMのせってい」「🔊 効果音のせってい」ボタン→パネル
+    FGLBgm.settingsButton(BGM, host ? { parent: '#snd-btns', sfx: SFX, getLang: () => currentLang } : { before: '#btn-close-settings', sfx: SFX, getLang: () => currentLang });
 });
 
 // ブラウザ標準のalert()/confirm()の代わりに使うゲーム内ポップアップ

@@ -34,17 +34,17 @@
         rh:{'apikey':_k,'Authorization':'Bearer '+_k} };
 })();
 </script>
-<link rel="stylesheet" href="../fgl-hero.css?v=20261103g">
-<link rel="stylesheet" href="../fgl-title.css?v=20261103g">
-<script src="../fgl-title-boot.js?v=20261103g"></script>
+<link rel="stylesheet" href="../fgl-hero.css?v=20261104a">
+<link rel="stylesheet" href="../fgl-title.css?v=20261104a">
+<script src="../fgl-title-boot.js?v=20261104a"></script>
 <script>FGLBoot.title({ host:'#title-screen', hide:['.title-box','.deco-tile'], bg:"repeating-conic-gradient(from 0deg at 50% 46%, rgba(255,255,255,.38) 0deg 7deg, rgba(255,255,255,0) 7deg 18deg), radial-gradient(circle at 50% 46%, #fffaf0 0%, #ffe3ae 55%, #ffc978 100%)" });</script>
-<script src="../fgl-name.js?v=20261103g"></script>
-<script src="../fgl-sfx.js?v=20261103g"></script>
-<script src="../fgl-touch.js?v=20261103g"></script>
-<script src="../fgl-scroll.js?v=20261103g"></script>
-<script src="../fgl-bgm.js?v=20261103g"></script>
-<script src="../fgl-howto.js?v=20261103g"></script>
-<script src="../tutorial-engine.js?v=20261103g"></script>
+<script src="../fgl-name.js?v=20261104a"></script>
+<script src="../fgl-sfx.js?v=20261104a"></script>
+<script src="../fgl-touch.js?v=20261104a"></script>
+<script src="../fgl-scroll.js?v=20261104a"></script>
+<script src="../fgl-bgm.js?v=20261104a"></script>
+<script src="../fgl-howto.js?v=20261104a"></script>
+<script src="../tutorial-engine.js?v=20261104a"></script>
 <script src="words_more_e.js?v=1"></script>
 <script src="words_more_j1.js?v=1"></script>
 <script src="words_more_j2.js?v=1"></script>
@@ -733,8 +733,7 @@ body { overflow:hidden; background:var(--bg-page); font-family:"M PLUS Rounded 1
       <div class="set-row"><div class="lab2" data-i18n="set_lang"></div><div class="row" id="set-lang"></div></div>
       <div class="set-row"><div class="lab2" data-i18n="set_time"></div><div class="row" id="set-time"></div></div>
       <div class="set-row"><div class="lab2" data-i18n="set_case"></div><div class="row" id="set-case"></div></div>
-      <div class="set-row"><div class="lab2" id="set-sound-lab"></div><div class="row volrow" id="set-vol"></div></div>
-      <div class="set-row"><div class="lab2">🎵 BGM</div><div class="row" id="set-bgm"></div></div>
+      <div class="set-row" style="justify-content:center"><div class="row" id="set-bgm"></div></div>
     </div>
   </div>
 </div>
@@ -786,7 +785,6 @@ function recordRun(cleared, words, gems) {
 
 // --- 効果音(WebAudioで合成。音声ファイルは使わない)。音量は 0〜10 の11段階(0 = OFF)。保存キーは fgl_english_dash_volume ---
 const BGM = FGLBgm.create({ key: 'englishdash' });
-FGLBgm.settingsButton(BGM, { parent: '#set-bgm', getLang: () => settings.lang });   // BGM設定(🎵ボタン→パネル)。効果音は自前なのでパネルには出さない
 const SFX = (() => {
     let ac = null, count = 0, vol = 5, lastVol = 5;
     try { const v = localStorage.getItem('fgl_english_dash_volume'); if (v !== null) vol = Math.max(0, Math.min(10, parseInt(v, 10) || 0)); } catch (e) {}
@@ -830,6 +828,7 @@ const SFX = (() => {
         get count() { return count; },
         get volume() { return vol; },
         get lastVolume() { return lastVol; },
+        toggleMute() { this.setVolume(vol > 0 ? 0 : (lastVol || 5)); },
         setVolume(n) {   // 聞いて確かめられるよう、0より大きいときは短い音を鳴らす
             n = Math.max(0, Math.min(10, Math.round(n)));
             if (vol > 0) lastVol = vol;
@@ -840,6 +839,7 @@ const SFX = (() => {
         unlock() { if (vol > 0) audio(); }
     };
 })();
+FGLBgm.settingsButton(BGM, { parent: '#set-bgm', sfx: SFX, sfxApply: false, getLang: () => settings.lang });   // BGM・効果音の設定(ボタン→パネル)。効果音は自前なので「全ゲームに適用」はなし
 // ボタンをおしたときの音(キーボードの絵のキーは、打つ音が別にあるので除く)。ブラウザの決まりで、最初のタッチ/キーで音を使えるようにする
 document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('button, .gcard, .mcard'); if (b && !b.classList.contains('key')) SFX.play('click'); }, true);
 ['pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, () => SFX.unlock(), { capture: true }));
@@ -1814,16 +1814,7 @@ function renderWordList() {
 }
 
 // ================= せってい =================
-function renderSound() {
-    const v = SFX.volume;
-    $('set-sound-lab').textContent = t('set_sound') + '　' + v + ' / 10';
-    let h = '<button class="mute ' + (v > 0 ? 'on' : 'off') + '" data-v="mute">' + (v > 0 ? '🔊' : '🔇') + '</button>';
-    for (let i = 0; i < 10; i++) h += '<button class="bar ' + (i < v ? (i < 4 ? 'g' : i < 7 ? 'y' : 'o') : '') + '" data-v="' + (i + 1) + '"></button>';
-    const box = $('set-vol'); box.innerHTML = h;
-    box.querySelectorAll('button').forEach(b => { b.onclick = () => { if (b.dataset.v === 'mute') SFX.setVolume(SFX.volume > 0 ? 0 : (SFX.lastVolume || 5)); else SFX.setVolume(parseInt(b.dataset.v, 10)); renderSound(); }; });
-}
 function renderSettings() {
-    renderSound();
     chipRow($('set-lang'), [{ id: 'ja', label: t('lang_ja') }, { id: 'easy', label: t('lang_easy') }], settings.lang, v => { settings.lang = v; saveSettings(); refreshAll(); }, ['#ff7a45', '#c8470f']);
     chipRow($('set-time'), [{ id: '1', label: t('time_on') }, { id: '0', label: t('time_off') }], settings.showTime ? '1' : '0', v => { settings.showTime = v === '1'; saveSettings(); refreshAll(); }, ['#17b8a6', '#0f8f81']);
     chipRow($('set-case'), [{ id: 'upper', label: t('case_upper') }, { id: 'lower', label: t('case_lower') }], settings.caseMode, v => { settings.caseMode = v; saveSettings(); refreshAll(); }, ['#8a5cf0', '#5b32b0']);
@@ -1872,9 +1863,9 @@ function startTutorial() {
     applyStatic();
 })();
 </script>
-<script src="../fgl-hero.js?v=20261103g"></script>
-<script src="../fgl-nudge.js?v=20261103g"></script>
-<script src="../fgl-title.js?v=20261103g"></script>
+<script src="../fgl-hero.js?v=20261104a"></script>
+<script src="../fgl-nudge.js?v=20261104a"></script>
+<script src="../fgl-title.js?v=20261104a"></script>
 <script>
 // 共通タイトル: 主役の絵は「本物のゲーム画面の切りぬき」(title_parts/*.webp)
 FGLTitle.mount({
