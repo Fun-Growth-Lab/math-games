@@ -95,7 +95,61 @@
         speaker:     '<path d="M3 9h4l5-4.5v15L7 15H3z" fill="#5a6a85" ' + O + '/><path d="M15 8.5c1.5 1.8 1.5 5.2 0 7M18 6c2.8 3.2 2.8 8.8 0 12" fill="none" stroke="#3a8ee6" stroke-width="2" stroke-linecap="round"/>',
         mute:        '<path d="M3 9h4l5-4.5v15L7 15H3z" fill="#5a6a85" ' + O + '/><path d="M15.5 9.5l5 5M20.5 9.5l-5 5" stroke="#e8384f" stroke-width="2.2" stroke-linecap="round"/>',
         next:        '<path d="M3 5l8 7-8 7zM11 5l8 7-8 7z" fill="#5a6a85"/><rect x="19" y="5" width="2.4" height="14" fill="#5a6a85"/>',
-        pause:       '<rect x="5.5" y="4.5" width="4.5" height="15" rx="1" fill="#5a6a85"/><rect x="14" y="4.5" width="4.5" height="15" rx="1" fill="#5a6a85"/>'
+        pause:       '<rect x="5.5" y="4.5" width="4.5" height="15" rx="1" fill="#5a6a85"/><rect x="14" y="4.5" width="4.5" height="15" rx="1" fill="#5a6a85"/>',
+        // ---- アビスラビリンス ----
+        heart_yellow:'<path d="' + HEART + '" fill="#ffcc1f" ' + O + '/><ellipse cx="7.4" cy="8" rx="1.9" ry="1.3" fill="#fff" opacity=".55" transform="rotate(-35 7.4 8)"/>',
+        heart_pink:  '<path d="' + HEART + '" fill="#ff7eb6" ' + O + '/><ellipse cx="7.4" cy="8" rx="1.9" ry="1.3" fill="#fff" opacity=".55" transform="rotate(-35 7.4 8)"/>',
+        circle_purple:'<circle cx="12" cy="12" r="9.5" fill="#9a5ce0" ' + O + '/>',
+        monster:     '<path d="M7 4l2 3h6l2-3M3 11h2V8h14v3h2v6h-2v-2H5v2H3z" fill="#9a5ce0" ' + O + '/><path d="M5 15h14v2h-3v3h-2v-3h-4v3H8v-3H5z" fill="#9a5ce0" ' + O + '/><rect x="8" y="10" width="2.4" height="2.4" fill="#fff"/><rect x="13.6" y="10" width="2.4" height="2.4" fill="#fff"/>',
+        pill:        '<g transform="rotate(-40 12 12)"><rect x="3" y="8" width="18" height="8" rx="4" fill="#fff"/><path d="M12 8h5a4 4 0 010 8h-5z" fill="#e8384f"/><rect x="3" y="8" width="18" height="8" rx="4" fill="none" ' + O + '/></g>',
+        reload:      '<rect x="1.5" y="1.5" width="21" height="21" rx="4.5" fill="#3a8ee6" ' + O + '/><g fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 10a6 6 0 00-10.6-2.2M6.5 14a6 6 0 0010.6 2.2"/><path d="M6 4.5v3.6h3.6M18 19.5v-3.6h-3.6"/></g>',
+        repeat:      '<rect x="1.5" y="1.5" width="21" height="21" rx="4.5" fill="#3a8ee6" ' + O + '/><g fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 11V9.5A2.5 2.5 0 018.5 7H17M18 13v1.5a2.5 2.5 0 01-2.5 2.5H7"/><path d="M15 4.8L17.3 7 15 9.2M9 14.8L6.7 17 9 19.2"/></g>',
+        chart:       '<rect x="2.5" y="2.5" width="19" height="19" rx="2.5" fill="#fff" ' + O + '/><rect x="5.5" y="12" width="3" height="6.5" fill="#3a8ee6"/><rect x="10.5" y="7" width="3" height="11.5" fill="#e8384f"/><rect x="15.5" y="10" width="3" height="8.5" fill="#2fb85a"/>',
+        fire:        '<path d="M12 22c-4.4 0-7.5-3-7.5-7 0-3.5 2.3-5.6 3.8-8 .4 2 1.4 3.2 2.6 3.7C11 7 12.3 4 15 2c-.4 3 1.3 5 2.7 6.8 1.2 1.6 1.8 3.4 1.8 5.2 0 4.6-3.1 8-7.5 8z" fill="#ff6a1a" ' + O + '/><path d="M12 22c-2.3 0-3.8-1.6-3.8-3.8 0-2.3 1.8-3.6 2.8-5.2.3 1.4 1 2.1 1.8 2.4.4-1.6 1.2-2.6 2.2-3.4-.1 1.8.8 3 1.4 4 .4.7.6 1.4.6 2.2 0 2.3-2 3.8-5 3.8z" fill="#ffd43b"/>',
+        diamond_dot: '<path d="M12 1.8L22.2 12 12 22.2 1.8 12z" fill="#3fb8e8" ' + O + '/><path d="M12 5.5L18.5 12 12 18.5 5.5 12z" fill="#8fdcff"/><circle cx="12" cy="12" r="2.2" fill="#1d6fa8"/>',
+        diamond_blue:'<path d="M12 2L21 12 12 22 3 12z" fill="#3a7fe6" ' + O + '/><path d="M12 2L7.5 12H3zM12 2l4.5 10H21z" fill="#7fb2ff" opacity=".7"/>',
+        bag:         '<path d="M9 6V4.5a3 3 0 016 0V6" fill="none" stroke="#7a4a24" stroke-width="1.8"/><rect x="4" y="6" width="16" height="15.5" rx="4" fill="#d07a3a" ' + O + '/><rect x="7" y="13" width="10" height="6" rx="1.5" fill="#a85a24"/><path d="M4.5 11h15" stroke="#a85a24" stroke-width="1.4"/><circle cx="12" cy="11" r="1.2" fill="#ffc928"/>',
+        book:        '<path d="M12 6c-2.5-2-6-2.4-9.5-1.5v14c3.5-.9 7-.5 9.5 1.5 2.5-2 6-2.4 9.5-1.5v-14C18 3.6 14.5 4 12 6z" fill="#fff" ' + O + '/><path d="M12 6v14" stroke="#a8743e" stroke-width="1.2"/><path d="M4.5 8.5c2-.4 4-.2 5.5.6M4.5 11.5c2-.4 4-.2 5.5.6M14 9.1c1.5-.8 3.5-1 5.5-.6M14 12.1c1.5-.8 3.5-1 5.5-.6" stroke="#9aa6b8" stroke-width=".9" fill="none"/><path d="M2.5 18.5c3.5-.9 7-.5 9.5 1.5 2.5-2 6-2.4 9.5-1.5v1.5c-3.5-.6-7-.2-9.5 1.5-2.5-1.7-6-2.1-9.5-1.5z" fill="#3a8ee6"/>',
+        map:         '<path d="M2.5 5.5l6-2 7 2.5 6-2v15l-6 2-7-2.5-6 2z" fill="#f4e3b4" ' + O + '/><path d="M8.5 3.5v15M15.5 6v15" stroke="#c8a96a" stroke-width="1"/><path d="M5 14c2-1 3-3 6-2s4 0 5.5-2" stroke="#e8384f" stroke-width="1.4" stroke-dasharray="1.6 1.4" fill="none"/><path d="M17 7.5l2 2M19 7.5l-2 2" stroke="#e8384f" stroke-width="1.4" stroke-linecap="round"/><path d="M4 8c1 .5 2 .3 3-.5" stroke="#3cc65c" stroke-width="1.6" fill="none"/>',
+        scroll:      '<rect x="5" y="4" width="14" height="16" fill="#f4e3b4" ' + O + '/><rect x="3" y="2.5" width="18" height="3.5" rx="1.75" fill="#d9b878" ' + O + '/><rect x="3" y="18" width="18" height="3.5" rx="1.75" fill="#d9b878" ' + O + '/><path d="M8 9h8M8 12h8M8 15h5" stroke="#8a6a3a" stroke-width="1.2" stroke-linecap="round"/>',
+        bow:         '<path d="M5 3c8 2 14 8 16 16" fill="none" stroke="#8a5a2b" stroke-width="2.4" stroke-linecap="round"/><path d="M5 3l16 16" stroke="#cfd8e3" stroke-width=".9"/><path d="M3 21L17 7" stroke="#6b4a2b" stroke-width="1.6" stroke-linecap="round"/><path d="M19.5 4.5L15 6l3 3z" fill="#9aa6b8" ' + O + '/><path d="M3 21l-.5-3M3 21l3 .5" stroke="#e8384f" stroke-width="1.6" stroke-linecap="round"/>',
+        gift:        '<rect x="3" y="9" width="18" height="12.5" rx="1.5" fill="#e8384f" ' + O + '/><rect x="2" y="6.5" width="20" height="4" rx="1" fill="#ff5a6e" ' + O + '/><path d="M12 6.5v15" stroke="#ffc928" stroke-width="3"/><path d="M12 6.5C10 2.5 6 3 7 5.5c.6 1.5 3 1 5 1zM12 6.5c2-4 6-3.5 5-1-.6 1.5-3 1-5 1z" fill="#ffc928" ' + O + '/>',
+        snow:        '<g stroke="#5cc6f2" stroke-linecap="round" fill="none"><path d="M12 2v20M3.3 7l17.4 10M3.3 17L20.7 7" stroke-width="2"/><path d="M9.5 3.5L12 6l2.5-2.5M9.5 20.5L12 18l2.5 2.5M3 10.5l3.4-.9-.9-3.4M21 13.5l-3.4.9.9 3.4M3 13.5l3.4.9-.9 3.4M21 10.5l-3.4-.9.9-3.4" stroke-width="1.6"/></g>',
+        ice:         '<path d="M4 7l8-4.5L20 7v10l-8 4.5L4 17z" fill="#9fe0fa" ' + O + '/><path d="M4 7l8 4.5L20 7M12 11.5v10" fill="none" stroke="#5cb8e0" stroke-width="1"/><path d="M6.5 8.5l3 1.7" stroke="#fff" stroke-width="1.4" stroke-linecap="round"/>',
+        hammer:      '<path d="M13.5 10.5L4 20" stroke="#8a5a2b" stroke-width="3" stroke-linecap="round"/><path d="M10 7.5l5-5 6.5 6.5-2.3 2.3-2-1.3-2.7 2.7-1.3-2-2.2 2.2-1-1z" fill="#8f9aa8" ' + O + '/>',
+        tools:       '<path d="M15 9L4 20" stroke="#8a5a2b" stroke-width="2.8" stroke-linecap="round"/><path d="M12.5 5l3.5-3 6 6-3 3.5-2-1.5-1.5-1.5z" fill="#8f9aa8" ' + O + '/><path d="M9 9L20 20" stroke="#9aa6b8" stroke-width="2.8" stroke-linecap="round"/><path d="M3 6a3.5 3.5 0 004.8 3.3L9 10.5 10.5 9 9.3 7.8A3.5 3.5 0 006 3l1.8 1.8-.8 2.2-2.2.8z" fill="#9aa6b8" ' + O + '/>',
+        trap:        '<rect x="3" y="15" width="18" height="5" rx="1" fill="#a8743e" ' + O + '/><path d="M5 15V8M19 15V8" stroke="#8f9aa8" stroke-width="2"/><path d="M5 8h14" stroke="#8f9aa8" stroke-width="1.6"/><path d="M5 8.5l2 6M8 8.5l2 6M11 8.5l2 6M14 8.5l2 6" stroke="#cfd8e3" stroke-width="1"/><circle cx="17" cy="12.5" r="2" fill="#ffc928" ' + O + '/>',
+        medal:       '<path d="M7 2h4l2 6H9z" fill="#3cc65c"/><path d="M17 2h-4l-2 6h4z" fill="#3a8ee6"/><circle cx="12" cy="15" r="7" fill="#ffc928" ' + O + '/><path d="M12 10.5l1.4 2.9 3.1.4-2.3 2.1.6 3.1L12 17.5 9.2 19l.6-3.1-2.3-2.1 3.1-.4z" fill="#fff6c4"/>',
+        tengu:       '<circle cx="12" cy="11" r="9" fill="#d9302a" ' + O + '/><path d="M12 11l9 5-9 1z" fill="#c42a24" ' + O + '/><path d="M6 7.5l4 1.5M18 7.5l-4 1.5" stroke="#1a1a1a" stroke-width="2" stroke-linecap="round"/><circle cx="8.5" cy="10.5" r="1" fill="#fff"/><circle cx="15.5" cy="10.5" r="1" fill="#fff"/><path d="M7 15.5c1.5 2 4 2.5 5 2.5" stroke="#fff" stroke-width="1.5" fill="none"/>',
+        fairy:       '<ellipse cx="7" cy="10" rx="5" ry="6" fill="#bfe8ff" opacity=".9" ' + O + ' transform="rotate(-25 7 10)"/><ellipse cx="17" cy="10" rx="5" ry="6" fill="#bfe8ff" opacity=".9" ' + O + ' transform="rotate(25 17 10)"/><path d="M9.5 21l2.5-9 2.5 9z" fill="#ff7eb6" ' + O + '/><circle cx="12" cy="8.5" r="3.3" fill="#f6d2b0" ' + O + '/><path d="M8.8 8c0-3 6.4-3 6.4 0-1-1-2-1.3-3.2-1.3S9.8 7 8.8 8z" fill="#ffc928"/>',
+        elf:         '<path d="M4 9l4.5 2.5M20 9l-4.5 2.5" stroke="#f6d2b0" stroke-width="2.4" stroke-linecap="round"/><path d="M6 11v10M18 11v10" stroke="#ffd96b" stroke-width="2.4"/><circle cx="12" cy="12" r="6" fill="#f6d2b0" ' + O + '/><path d="M5.8 11c0-5 3-7.5 6.2-7.5s6.2 2.5 6.2 7.5c-1-2.3-3-3.4-6.2-3.6C9 7.6 7 8.7 5.8 11z" fill="#ffd96b" ' + O + '/><circle cx="9.8" cy="12.5" r=".9" fill="#2b5a2b"/><circle cx="14.2" cy="12.5" r=".9" fill="#2b5a2b"/><path d="M10.5 15.3c1 .7 2 .7 3 0" stroke="#b5654a" stroke-width="1" fill="none" stroke-linecap="round"/>',
+        muscle:      '<path d="M5 21c-1.5-4-1-9 2-13l2-4.5c1.2-1 2.8-.8 3.5.4l-.8 3.6c-.5 1.2-1.6 1.6-2.7 1.5L8 12c2.5-2.5 6.5-3 9.5-1 2.5 1.7 3 5.5 1 8.5-.9 1.3-2.4 1.5-3.5 1.5z" fill="#ffc48a" ' + O + '/><path d="M10 15c1.5-1.3 4-1.6 6-.3" stroke="#d89058" stroke-width="1.1" fill="none"/>',
+        box:         '<path d="M2.5 7.5L12 3l9.5 4.5v10L12 22l-9.5-4.5z" fill="#d9a65a" ' + O + '/><path d="M2.5 7.5L12 12l9.5-4.5M12 12v10" fill="none" stroke="#a8743e" stroke-width="1.1"/><path d="M7 5.2l9.5 4.5v3" fill="none" stroke="#f4e3c4" stroke-width="1.6"/>',
+        clipboard:   '<rect x="4" y="3.5" width="16" height="18.5" rx="2" fill="#c8915a" ' + O + '/><rect x="6" y="6" width="12" height="14" rx="1" fill="#fff"/><rect x="8.5" y="2" width="7" height="3.5" rx="1" fill="#9aa6b8" ' + O + '/><path d="M8 10h8M8 13h8M8 16h5" stroke="#9aa6b8" stroke-width="1.2" stroke-linecap="round"/>',
+        save:        '<path d="M3 3h15l3 3v15H3z" fill="#3a6fd4" ' + O + '/><rect x="7" y="3" width="9" height="6" fill="#dfe7f2"/><rect x="13" y="4" width="2" height="4" fill="#3a6fd4"/><rect x="6" y="13" width="12" height="8" rx="1" fill="#fff"/>',
+        arrow_right: '<rect x="1.5" y="1.5" width="21" height="21" rx="4.5" fill="#3a8ee6" ' + O + '/><path d="M5.5 12h11M12.5 7l5 5-5 5" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>',
+        arrow_shot:  '<path d="M3 21L19 5" stroke="#8a5a2b" stroke-width="1.8" stroke-linecap="round"/><path d="M21.5 2.5L15.5 4.5l4 4z" fill="#9aa6b8" ' + O + '/><path d="M3 21l-.6-3.6M3 21l3.6.6M5 19l-.6-3.6M5 19l3.6.6" stroke="#e8384f" stroke-width="1.5" stroke-linecap="round"/>',
+        ox:          '<path d="M4 6C1.5 6 1 3 2 2c.5 2 2 2.5 4 2.5M20 6c2.5 0 3-3 2-4-.5 2-2 2.5-4 2.5" fill="#f4e3c4" ' + O + '/><path d="M5 6.5C6 4 18 4 19 6.5c1 3-1 6-1 9 0 3.5-2.5 6-6 6s-6-2.5-6-6c0-3-2-6-1-9z" fill="#8a5a3a" ' + O + '/><ellipse cx="12" cy="17.5" rx="4.5" ry="3.3" fill="#d8a888"/><circle cx="10.3" cy="17.5" r=".9" fill="#5a3a2a"/><circle cx="13.7" cy="17.5" r=".9" fill="#5a3a2a"/><circle cx="8.6" cy="10.5" r="1.1" fill="#1a1a1a"/><circle cx="15.4" cy="10.5" r="1.1" fill="#1a1a1a"/>',
+        wolf:        '<path d="M4 2.5l4.5 4.5h7L20 2.5l.5 9.5L12 22 3.5 12z" fill="#8f9aa8" ' + O + '/><path d="M7 13l5 9 5-9c-1.5-1-3.3-1.4-5-1.4S8.5 12 7 13z" fill="#e8edf3"/><path d="M5.5 5l2 3M18.5 5l-2 3" stroke="#5a6475" stroke-width="1.6"/><path d="M7.5 10.5l2.5.8M16.5 10.5l-2.5.8" stroke="#ffc928" stroke-width="1.6" stroke-linecap="round"/><path d="M10.8 17.5h2.4l-1.2 1.6z" fill="#1a1a1a"/>',
+        eagle:       '<path d="M1.5 9c3-2 6.5-2 9 0 2.5-2 6-2 9 0l2 1.5-5 .5c-1 0-2 .7-2.5 1.5L12 21l-2-8.5C9.5 11.7 8.5 11 7.5 11l-5-.5z" fill="#7a4a24" ' + O + '/><circle cx="12" cy="9" r="3.2" fill="#fff" ' + O + '/><path d="M12 9.5l3.2.5-2 1.6z" fill="#ffc928" ' + O + '/><circle cx="12.5" cy="8.3" r=".6" fill="#1a1a1a"/>',
+        ghost:       '<path d="M4.5 21V11a7.5 7.5 0 0115 0v10l-2.5-2-2.5 2-2.5-2-2.5 2-2.5-2z" fill="#f2f4fb" stroke="#7a8699" stroke-width="1.1" stroke-linejoin="round"/><ellipse cx="9.3" cy="11" rx="1.4" ry="2" fill="#2b2430"/><ellipse cx="14.7" cy="11" rx="1.4" ry="2" fill="#2b2430"/><ellipse cx="12" cy="15.3" rx="1.6" ry="1.2" fill="#2b2430"/>',
+        moon_new:    '<circle cx="12" cy="12" r="9.5" fill="#3a3f55" stroke="#9aa6b8" stroke-width="1"/><circle cx="9" cy="9" r="1.8" fill="#2a2e40"/><circle cx="14.5" cy="14.5" r="2.4" fill="#2a2e40"/>',
+        search:      '<circle cx="10" cy="10" r="6.5" fill="#cfefff" stroke="#5a6475" stroke-width="2.4"/><path d="M15 15l6 6" stroke="#8a5a2b" stroke-width="3.2" stroke-linecap="round"/><path d="M7 8a3.5 3.5 0 013-2.2" stroke="#fff" stroke-width="1.4" fill="none" stroke-linecap="round"/>',
+        flask:       '<path d="M9 2.5h6M10 2.5v7L4.5 19a2 2 0 001.8 2.9h11.4a2 2 0 001.8-2.9L14 9.5v-7" fill="#e8f4ff" ' + O + '/><path d="M7.3 14h9.4l2.5 5a2 2 0 01-1.8 2.9H6.6A2 2 0 014.8 19z" fill="#3cc65c"/><circle cx="10" cy="17" r="1" fill="#b9f2c8"/><circle cx="13.5" cy="18.8" r=".7" fill="#b9f2c8"/>',
+        egg:         '<path d="M12 2.5c-4 0-7 6-7 11s3 8 7 8 7-3 7-8-3-11-7-11z" fill="#fdf6e3" stroke="#a8743e" stroke-width="1.1"/><circle cx="9.5" cy="12" r="1.4" fill="#e8b66a"/><circle cx="14" cy="16" r="1.8" fill="#e8b66a"/><circle cx="14.5" cy="9" r="1" fill="#e8b66a"/>',
+        gi:          '<path d="M7 3l5 4 5-4 5 4-3 4-1-1v12H6V10l-1 1-3-4z" fill="#f4f6fa" ' + O + '/><path d="M7 3l5 9 5-9" fill="none" stroke="#9aa6b8" stroke-width="1.2"/><rect x="6" y="13" width="12" height="2.4" fill="#2b2430"/><path d="M11 15.4l-1.5 4M13 15.4l1.5 4" stroke="#2b2430" stroke-width="1.6"/>',
+        mountain:    '<path d="M1.5 20.5L9 7l3.5 5.5L15.5 9l7 11.5z" fill="#8a7a6a" ' + O + '/><path d="M9 7l-2 3.8 1.6-.8 1 1.2 1.3-1.4z" fill="#b9a994"/>',
+        mountain_snow:'<path d="M1.5 20.5L10 5l4 6.5L16.5 8l6 12.5z" fill="#6b7a99" ' + O + '/><path d="M10 5l-3.2 5.8 1.8-.8 1.6 1.4 1.8-1.4 1.3.6z" fill="#fff"/><path d="M16.5 8l-1.7 3.4 1.2-.4 1 .8 1-.6z" fill="#fff"/>',
+        tree:        '<path d="M12 2l5.5 7h-2.5l4.5 6h-3l4 5.5H3.5l4-5.5h-3l4.5-6H6.5z" fill="#2f9a4a" ' + O + '/><rect x="10.6" y="20" width="2.8" height="3" fill="#8a5a2b"/>',
+        drop:        '<path d="M12 2.5C9 7.5 5.5 11 5.5 15a6.5 6.5 0 0013 0c0-4-3.5-7.5-6.5-12.5z" fill="#3fa8f0" ' + O + '/><path d="M8.8 15a3.2 3.2 0 002.4 3.2" stroke="#d6f0ff" stroke-width="1.6" fill="none" stroke-linecap="round"/>',
+        town:        '<path d="M1.5 12L7 6.5l5.5 5.5v9.5h-11z" fill="#f4e3c4" ' + O + '/><path d="M.8 12.5L7 6l6.2 6.5" fill="none" stroke="#c8332f" stroke-width="2" stroke-linecap="round"/><path d="M11.5 11l6-5.5L23 11v10.5H11.5z" fill="#e6d0a8" ' + O + '/><path d="M10.8 11.5L17.5 5l6 6.5" fill="none" stroke="#3a6fd4" stroke-width="2" stroke-linecap="round"/><rect x="5.5" y="16" width="3" height="5.5" fill="#a8743e"/><rect x="15.5" y="15" width="3" height="3" fill="#7fc8ff"/>',
+        castle:      '<path d="M2.5 9h4V6.5h2V9h2V6.5h3V9h2V6.5h2V9h4v12.5h-19z" fill="#b9c3d0" ' + O + '/><path d="M9.5 21.5V16a2.5 2.5 0 015 0v5.5z" fill="#6b4a2b"/><path d="M12 6.5V1.5l3.5 1.2L12 4" fill="#e8384f" stroke="#5a6475" stroke-width=".8"/><rect x="5" y="12" width="2" height="3" fill="#5a6475"/><rect x="17" y="12" width="2" height="3" fill="#5a6475"/>',
+        sprout:      '<path d="M12 21v-9" stroke="#2f9a4a" stroke-width="2.2" stroke-linecap="round"/><path d="M12 12C12 7 8.5 4.5 3.5 5c0 4.5 3.5 7.3 8.5 7z" fill="#3cc65c" ' + O + '/><path d="M12 14c0-4 3-6.5 8.5-6 0 4-3.5 6.3-8.5 6z" fill="#7ad65a" ' + O + '/><path d="M6 21.5h12" stroke="#8a5a2b" stroke-width="2" stroke-linecap="round"/>',
+        ninja:       '<path d="M19.5 8l3-2.5M19.5 9l3.3.3" stroke="#e8384f" stroke-width="1.6" stroke-linecap="round"/><circle cx="12" cy="12" r="9.5" fill="#2b2f45" ' + O + '/><rect x="4" y="9" width="16" height="5" rx="2.5" fill="#f6d2b0"/><path d="M6.5 11.5l3.5-.8M17.5 11.5l-3.5-.8" stroke="#1a1a1a" stroke-width="1.6" stroke-linecap="round"/>',
+        earth:       '<circle cx="12" cy="12" r="9.5" fill="#3a8ee6" ' + O + '/><path d="M5 7c2 0 3.5 1 3 3s-2 2.5-1.5 4.5S8 18 6.5 18.5C4 16.5 2.8 13 3.4 9.5zM13 4c2 .5 2 2.5 4 2.5s2.5 3 1 4.5-3 0-4 2 1.5 3.5 0 5.5c-2 .5-2.5-2-2-4.5S10 11 11 9s1-3.5 2-5z" fill="#3fae5a"/>',
+        galaxy:      '<circle cx="12" cy="12" r="10" fill="#1d1f4a" ' + O + '/><path d="M12 12c3-3 7-1 6 2.5S11 20 7 16 8 4 15 5" fill="none" stroke="#b98cff" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="12" r="1.8" fill="#fff6c4"/><circle cx="6" cy="7" r=".7" fill="#fff"/><circle cx="18" cy="17.5" r=".7" fill="#fff"/><circle cx="17" cy="6" r=".5" fill="#fff"/>',
+        devil:       '<path d="M4 3.5c0 3 1 4.5 3 5.5M20 3.5c0 3-1 4.5-3 5.5" fill="none" stroke="#7a3fc0" stroke-width="2.4" stroke-linecap="round"/><circle cx="12" cy="13.5" r="8.5" fill="#9a5ce0" ' + O + '/><path d="M7.5 11l3 1.2M16.5 11l-3 1.2" stroke="#2b1a3a" stroke-width="1.6" stroke-linecap="round"/><circle cx="9" cy="13.3" r="1" fill="#2b1a3a"/><circle cx="15" cy="13.3" r="1" fill="#2b1a3a"/><path d="M7.5 16.5c2.5 2.5 6.5 2.5 9 0" stroke="#2b1a3a" stroke-width="1.6" fill="none" stroke-linecap="round"/>',
+        cyclone:     '<path d="M12 12.5c1.2 0 1.7-1.6.5-2.3-2-1.2-4.4 1-3.8 3.4.8 3.2 5.4 3.8 7.6 1.4 3-3.2.7-8.6-3.8-9.2C7 5 3.5 9.5 4.5 14c1.3 5.5 8.8 8.2 13.5 5" fill="none" stroke="#3a8ee6" stroke-width="2.2" stroke-linecap="round"/>'
     };
 
     // ---- 絵文字 → アイコン名 ----
@@ -113,7 +167,17 @@
         '🦇': 'bat', '🧟': 'zombie', '🏺': 'vase', '🗿': 'moai', '🐉': 'dragon', '👁': 'eye',
         '🎯': 'target', '🕊': 'dove', '🔒': 'lock', '🔓': 'unlock',
         '🥇': 'medal1', '🥈': 'medal2', '🥉': 'medal3',
-        '🌐': 'globe', '🔊': 'speaker', '🔇': 'mute', '⏭': 'next', '⏸': 'pause'
+        '🌐': 'globe', '🔊': 'speaker', '🔇': 'mute', '⏭': 'next', '⏸': 'pause',
+        '💛': 'heart_yellow', '💗': 'heart_pink', '💖': 'heart_pink', '🟣': 'circle_purple',
+        '👾': 'monster', '💊': 'pill', '🔄': 'reload', '🔁': 'repeat', '📊': 'chart', '🔥': 'fire',
+        '💠': 'diamond_dot', '🔷': 'diamond_blue', '🎒': 'bag', '📖': 'book', '🗺': 'map', '📜': 'scroll',
+        '🏹': 'bow', '🎁': 'gift', '❄': 'snow', '🧊': 'ice', '🔨': 'hammer', '🛠': 'tools', '🪤': 'trap',
+        '🐲': 'dragon', '🏅': 'medal', '👺': 'tengu', '🧚': 'fairy', '🧝': 'elf', '💪': 'muscle',
+        '📦': 'box', '📋': 'clipboard', '💾': 'save', '➡': 'arrow_right', '➹': 'arrow_shot',
+        '🐂': 'ox', '🐺': 'wolf', '🦅': 'eagle', '👻': 'ghost', '🌑': 'moon_new', '🔍': 'search',
+        '🧪': 'flask', '🥚': 'egg', '🥋': 'gi', '⛰': 'mountain', '🏔': 'mountain_snow', '🌲': 'tree',
+        '💧': 'drop', '🏘': 'town', '🏰': 'castle', '🌱': 'sprout', '🥷': 'ninja', '🌎': 'earth', '🌍': 'earth', '🌏': 'earth',
+        '🌌': 'galaxy', '😈': 'devil', '🌀': 'cyclone'
     };
 
     // 絵文字らしい文字(対応表にないものも拾って「未対応」として記録する)
@@ -208,10 +272,13 @@
 
     // ---- 自動変換(後から入る文字も) ----
     var pending = [], scheduled = false;
+    var stats = { flushes: 0, nodes: 0, ms: 0 };   // 重さの確認用(FGLIcons.stats)
     function flush() {
         scheduled = false;
         var q = pending; pending = [];
+        var t0 = performance.now();
         for (var i = 0; i < q.length; i++) if (q[i].isConnected !== false) convert(q[i]);
+        stats.flushes++; stats.nodes += q.length; stats.ms += performance.now() - t0;
     }
     function start() {
         injectCss();
@@ -232,7 +299,8 @@
     window.FGLIcons = {
         ICONS: ICONS, MAP: MAP,
         svg: svg, html: html, nameOf: nameOf, convert: convert,
-        missing: function () { return Object.assign({}, missing); }
+        missing: function () { return Object.assign({}, missing); },
+        stats: stats
     };
 
     if (document.body) start();
