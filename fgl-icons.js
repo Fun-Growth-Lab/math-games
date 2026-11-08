@@ -36,6 +36,12 @@
             + '<text x="12" y="18.2" text-anchor="middle" font-size="8.5" font-weight="900" font-family="Arial,sans-serif" fill="' + c2 + '">' + n + '</text>';
     };
 
+    // 顔の絵(動物・人)の共通部品
+    var FACE = function (fill, extra) { return '<circle cx="12" cy="13" r="8.5" fill="' + fill + '" ' + O + '/>' + (extra || ''); };
+    var EYES = '<circle cx="9" cy="12.3" r="1.15" fill="#2b2430"/><circle cx="15" cy="12.3" r="1.15" fill="#2b2430"/>';
+    var SMILE = '<path d="M9.5 15.6c1.4 1.3 3.6 1.3 5 0" stroke="#2b2430" stroke-width="1.3" fill="none" stroke-linecap="round"/>';
+    var LETTER = function (bg, txt, size) { return '<rect x="2" y="2" width="20" height="20" rx="4.5" fill="' + bg + '" ' + O + '/><text x="12" y="' + (12 + size * 0.36) + '" text-anchor="middle" font-size="' + size + '" font-weight="900" font-family="Arial,sans-serif" fill="#fff">' + txt + '</text>'; };
+
     var ICONS = {
         heart:       '<path d="' + HEART + '" fill="#ec3b55" ' + O + '/><ellipse cx="7.4" cy="8" rx="1.9" ry="1.3" fill="#fff" opacity=".55" transform="rotate(-35 7.4 8)"/>',
         heart_green: '<path d="' + HEART + '" fill="#3cc65c" ' + O + '/><ellipse cx="7.4" cy="8" rx="1.9" ry="1.3" fill="#fff" opacity=".55" transform="rotate(-35 7.4 8)"/>',
@@ -171,8 +177,159 @@
         bell:        '<path d="M12 3a6 6 0 00-6 6v4.5L3.5 17.5h17L18 13.5V9a6 6 0 00-6-6z" fill="#ffc928" ' + O + '/><circle cx="12" cy="19.5" r="2" fill="#d68a12"/><circle cx="12" cy="2.5" r="1.2" fill="#d68a12"/><path d="M8.5 8a3.5 3.5 0 012-2.5" stroke="#fff6c4" stroke-width="1.4" fill="none" stroke-linecap="round"/>',
         confetti:    '<path d="M12 4v2" stroke="#7a8699" stroke-width="1.4"/><path d="M4 10a8 8 0 0116 0z" fill="#ffc928" ' + O + '/><path d="M12 10l-6 11M12 10l-2 12M12 10l2 12M12 10l6 11" stroke="#e8384f" stroke-width="1.3" stroke-dasharray="2 1.5"/><circle cx="4" cy="15" r="1" fill="#3a8ee6"/><circle cx="20" cy="15" r="1" fill="#3cc65c"/><path d="M7 2.5l1 1.5M17 2.5l-1 1.5" stroke="#ff7eb6" stroke-width="1.4" stroke-linecap="round"/>',
         lantern:     '<rect x="9" y="2" width="6" height="2.5" rx=".8" fill="#2b2430"/><ellipse cx="12" cy="12" rx="7.5" ry="7.8" fill="#e8402f" ' + O + '/><path d="M5 9.5h14M4.6 12h14.8M5 14.5h14" stroke="#b8261a" stroke-width=".9"/><rect x="9" y="19.5" width="6" height="2.5" rx=".8" fill="#2b2430"/><ellipse cx="12" cy="12" rx="3" ry="7.5" fill="#ffb422" opacity=".55"/>',
-        zzz:         '<text x="3" y="21" font-size="10" font-weight="900" font-family="Arial,sans-serif" fill="#5c8af0">Z</text><text x="10" y="14" font-size="8" font-weight="900" font-family="Arial,sans-serif" fill="#7aa2ff">Z</text><text x="16" y="8" font-size="6.5" font-weight="900" font-family="Arial,sans-serif" fill="#9fbcff">Z</text>'
-    };
+        zzz:         '<text x="3" y="21" font-size="10" font-weight="900" font-family="Arial,sans-serif" fill="#5c8af0">Z</text><text x="10" y="14" font-size="8" font-weight="900" font-family="Arial,sans-serif" fill="#7aa2ff">Z</text><text x="16" y="8" font-size="6.5" font-weight="900" font-family="Arial,sans-serif" fill="#9fbcff">Z</text>',
+        // ---- 道具・UI ----
+        pickaxe:     '<path d="M12.5 11.5L4 20" stroke="#8a5a2b" stroke-width="2.8" stroke-linecap="round"/><path d="M3.5 7.5C8 2.5 15 2 20.5 3.5 22 9 21.5 16 16.5 20.5c1-4.5.5-9-2.5-12S7.5 6.5 3.5 7.5z" fill="#9aa6b8" ' + O + '/>',
+        hammer_pick: '<path d="M7 7l13 13M17 7L4 20" stroke="#8a5a2b" stroke-width="2.4" stroke-linecap="round"/><path d="M2.5 6.5c3-3.5 7-4 10-3-2.5.5-5 2.5-6 6z" fill="#9aa6b8" ' + O + '/><rect x="14" y="2.5" width="8" height="5" rx="1" fill="#8f9aa8" ' + O + ' transform="rotate(45 18 5)"/>',
+        moneybag:    '<path d="M9 3h6l-1.5 3.5h-3z" fill="#c8915a" ' + O + '/><path d="M10 6.5h4c4 2 7 6 7 10 0 3-2 5-5 5H8c-3 0-5-2-5-5 0-4 3-8 7-10z" fill="#d9a65a" ' + O + '/><text x="12" y="18.5" text-anchor="middle" font-size="9" font-weight="900" font-family="Arial,sans-serif" fill="#7a4a10">$</text>',
+        money_wings: '<path d="M2 9c2-3 5-3 6.5-1L7 12c-2 0-4-1-5-3zM22 9c-2-3-5-3-6.5-1L17 12c2 0 4-1 5-3z" fill="#fff" stroke="#7a8699" stroke-width="1"/><rect x="6.5" y="7" width="11" height="12" rx="1.5" fill="#6fcf7a" ' + O + ' transform="rotate(-8 12 13)"/><circle cx="12" cy="13" r="2.4" fill="#3f9a4a"/>',
+        alarm:       '<circle cx="12" cy="13" r="8" fill="#e8384f" ' + O + '/><circle cx="12" cy="13" r="6" fill="#fff"/><path d="M12 9v4.3l2.8 1.8" stroke="#2b2430" stroke-width="1.6" fill="none" stroke-linecap="round"/><path d="M3 6.5l3.5-3M21 6.5l-3.5-3" stroke="#e8384f" stroke-width="2.4" stroke-linecap="round"/><path d="M7 21l1.5-1.8M17 21l-1.5-1.8" stroke="#5a6475" stroke-width="1.8" stroke-linecap="round"/>',
+        stopwatch:   '<rect x="10" y="1.5" width="4" height="2.5" rx=".8" fill="#5a6475"/><circle cx="12" cy="13.5" r="8.5" fill="#dfe7f2" ' + O + '/><circle cx="12" cy="13.5" r="6.5" fill="#fff"/><path d="M12 13.5V8.5" stroke="#e8384f" stroke-width="1.8" stroke-linecap="round"/><path d="M18.5 6l1.5-1.5" stroke="#5a6475" stroke-width="2" stroke-linecap="round"/>',
+        hourglass:   '<rect x="4.5" y="2" width="15" height="2.5" rx="1" fill="#a8743e" ' + O + '/><rect x="4.5" y="19.5" width="15" height="2.5" rx="1" fill="#a8743e" ' + O + '/><path d="M6.5 4.5h11c0 4-5.5 5.5-5.5 7.5s5.5 3.5 5.5 7.5h-11c0-4 5.5-5.5 5.5-7.5S6.5 8.5 6.5 4.5z" fill="#e8f4ff" ' + O + '/><path d="M8.5 19.5c0-2 3.5-3 3.5-4.5s3.5 2.5 3.5 4.5zM9 7h6c-1 1.5-3 2-3 3s-2-1.5-3-3z" fill="#ffc928"/>',
+        oldkey:      '<circle cx="7" cy="12" r="4.5" fill="none" stroke="#c8963a" stroke-width="2.6"/><path d="M11.5 12h10M18 12v4M21 12v3" stroke="#c8963a" stroke-width="2.6" stroke-linecap="round"/>',
+        key:         '<circle cx="7.5" cy="12" r="5" fill="#ffc928" ' + O + '/><circle cx="6.5" cy="12" r="1.8" fill="#fff6c4"/><path d="M12 12h9.5M18.5 12v3.5M21 12v2.5" stroke="#e8a317" stroke-width="2.8" stroke-linecap="round"/>',
+        rock:        '<path d="M3 18l2.5-7 4.5-4.5 5.5 1 4 4.5 2 6-3 2.5H6z" fill="#8f8a84" ' + O + '/><path d="M10 6.5l1 5-6.5-1M15.5 7.5l-4.5 4 9 1" fill="none" stroke="#6f6a64" stroke-width="1"/>',
+        wind:        '<g fill="none" stroke="#7fc8f0" stroke-width="2.2" stroke-linecap="round"><path d="M2.5 9h12a3 3 0 10-3-3"/><path d="M2.5 13.5h16a3 3 0 11-3 3"/><path d="M4 18h6"/></g>',
+        square_white:'<rect x="3" y="3" width="18" height="18" rx="2.5" fill="#fff" stroke="#7a8699" stroke-width="1.3"/>',
+        warning:     '<path d="M12 2.5L22.5 20.5h-21z" fill="#ffc928" ' + O + ' stroke-linejoin="round"/><path d="M12 9v5.5" stroke="#2b2430" stroke-width="2.4" stroke-linecap="round"/><circle cx="12" cy="17.6" r="1.4" fill="#2b2430"/>',
+        compass:     '<circle cx="12" cy="12" r="9.5" fill="#f4e3c4" ' + O + '/><circle cx="12" cy="12" r="7.5" fill="#fff" stroke="#c8a96a" stroke-width="1"/><path d="M12 4.8l2.3 7.2h-4.6z" fill="#e8384f"/><path d="M12 19.2l2.3-7.2h-4.6z" fill="#5a6475"/><circle cx="12" cy="12" r="1.2" fill="#2b2430"/>',
+        fireworks:   '<circle cx="12" cy="12" r="10.5" fill="#1d1f4a"/><g stroke-linecap="round" stroke-width="1.6"><path d="M12 12V4M12 12v8M12 12H4M12 12h8" stroke="#ffd43b"/><path d="M12 12l5.5-5.5M12 12l-5.5 5.5M12 12l-5.5-5.5M12 12l5.5 5.5" stroke="#ff7eb6"/></g><circle cx="12" cy="12" r="1.6" fill="#fff"/>',
+        shooting_star:'<path d="M2 21l9-8" stroke="#ffe680" stroke-width="2.4" stroke-linecap="round" opacity=".8"/><path d="M5 22l5-4.5M1.5 17.5L7 13" stroke="#ffe680" stroke-width="1.4" stroke-linecap="round" opacity=".6"/><path d="M15 2.5l2 4.3 4.7.6-3.4 3.2.9 4.7-4.2-2.3-4.2 2.3.9-4.7-3.4-3.2 4.7-.6z" fill="#ffc928" ' + O + '/>',
+        forbidden:   '<circle cx="12" cy="12" r="9" fill="#fff" stroke="#e8384f" stroke-width="3"/><path d="M5.8 5.8l12.4 12.4" stroke="#e8384f" stroke-width="3"/>',
+        checkered:   '<path d="M5 2.5v19" stroke="#5a6475" stroke-width="2" stroke-linecap="round"/><rect x="6" y="3.5" width="14" height="10" fill="#fff" ' + O + '/><path d="M6 3.5h3.5v3.3H6zM13 3.5h3.5v3.3H13zM9.5 6.8H13v3.4H9.5zM16.5 6.8H20v3.4h-3.5zM6 10.2h3.5v3.3H6zM13 10.2h3.5v3.3H13z" fill="#2b2430"/>',
+        flag_red:    '<path d="M5 2.5v19" stroke="#7a8699" stroke-width="2" stroke-linecap="round"/><path d="M6 3.5l13 4.5-13 4.5z" fill="#e8384f" ' + O + '/>',
+        wrench:      '<path d="M14.5 3a5 5 0 00-4.7 6.7L3 16.5a2 2 0 002.8 2.8l6.8-6.8A5 5 0 0019.5 8l-3 1.5-2.5-2.5 1.5-3A5 5 0 0014.5 3z" fill="#9aa6b8" ' + O + '/>',
+        eyes:        '<ellipse cx="7.5" cy="12" rx="4.8" ry="7" fill="#fff" ' + O + '/><ellipse cx="16.5" cy="12" rx="4.8" ry="7" fill="#fff" ' + O + '/><circle cx="8.5" cy="13" r="2.4" fill="#2b2430"/><circle cx="17.5" cy="13" r="2.4" fill="#2b2430"/>',
+        palette:     '<path d="M12 2.5c-5.5 0-9.5 4-9.5 9s4 9.5 9 9.5c1.5 0 2.2-1 2-2.2-.3-1.5.5-2.8 2-2.8H18c2.2 0 3.5-1.6 3.5-3.8 0-5.3-4.2-9.7-9.5-9.7z" fill="#f4dcb0" ' + O + '/><circle cx="7" cy="11" r="1.8" fill="#e8384f"/><circle cx="9.5" cy="6.5" r="1.8" fill="#ffc928"/><circle cx="14.5" cy="6.5" r="1.8" fill="#3cc65c"/><circle cx="18" cy="10" r="1.8" fill="#3a8ee6"/>',
+        paintbrush:  '<path d="M20.5 3.5L11 13" stroke="#8a5a2b" stroke-width="2.6" stroke-linecap="round"/><path d="M10.5 12l2 2" stroke="#9aa6b8" stroke-width="3"/><path d="M9.5 13.5c-3 0-4.5 2-4.5 4S3.5 21 2.5 21c4 1 9 .5 9-4.5z" fill="#e8384f" ' + O + '/>',
+        sweat:       '<path d="M8 3c-2 3.5-4 6-4 8.5a4 4 0 008 0C12 9 10 6.5 8 3z" fill="#5cc6f2" ' + O + '/><path d="M17 10c-1.5 2.5-3 4.3-3 6a3 3 0 006 0c0-1.7-1.5-3.5-3-6z" fill="#5cc6f2" ' + O + '/>',
+        robot:       '<path d="M12 2v3" stroke="#7a8699" stroke-width="1.6"/><circle cx="12" cy="2.2" r="1.3" fill="#e8384f"/><rect x="4" y="5" width="16" height="13" rx="3" fill="#b9c3d0" ' + O + '/><rect x="6.5" y="8" width="11" height="5.5" rx="2" fill="#2b3550"/><circle cx="9.5" cy="10.7" r="1.3" fill="#5cf2e0"/><circle cx="14.5" cy="10.7" r="1.3" fill="#5cf2e0"/><path d="M9 15.8h6" stroke="#5a6475" stroke-width="1.4" stroke-linecap="round"/><rect x="2" y="9" width="2" height="5" rx="1" fill="#7a8699"/><rect x="20" y="9" width="2" height="5" rx="1" fill="#7a8699"/><rect x="7" y="18" width="10" height="4" rx="1" fill="#9aa6b8" ' + O + '/>',
+        gamepad:     '<path d="M6.5 7h11c3 0 5 3 5 7 0 3-1.5 4.5-3 4.5-1.8 0-2.5-2.5-4.5-2.5h-6c-2 0-2.7 2.5-4.5 2.5-1.5 0-3-1.5-3-4.5 0-4 2-7 5-7z" fill="#5a6a85" ' + O + '/><path d="M7.5 10v4M5.5 12h4" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/><circle cx="16" cy="11" r="1.1" fill="#e8384f"/><circle cx="18" cy="13" r="1.1" fill="#3cc65c"/>',
+        phone:       '<rect x="6" y="1.5" width="12" height="21" rx="2.5" fill="#3a3f55" ' + O + '/><rect x="7.5" y="4" width="9" height="14.5" rx=".8" fill="#7fc8ff"/><circle cx="12" cy="20.3" r=".9" fill="#9aa6b8"/>',
+        calendar:    '<rect x="3" y="4" width="18" height="17.5" rx="2" fill="#fff" ' + O + '/><path d="M3 6a2 2 0 012-2h14a2 2 0 012 2v3H3z" fill="#e8384f"/><path d="M8 2.5v3M16 2.5v3" stroke="#5a6475" stroke-width="1.8" stroke-linecap="round"/><text x="12" y="18.5" text-anchor="middle" font-size="8.5" font-weight="900" font-family="Arial,sans-serif" fill="#2b2430">7</text>',
+        numbers:     LETTER('#3a8ee6', '1234', 6.2),
+        ten:         LETTER('#3a8ee6', '10', 11),
+        hundred:     '<text x="12" y="15" text-anchor="middle" font-size="11" font-weight="900" font-style="italic" font-family="Arial,sans-serif" fill="#e8384f">100</text><path d="M3.5 18.5h17M4.5 21h15" stroke="#e8384f" stroke-width="1.6" stroke-linecap="round"/>',
+        plus:        '<rect x="2" y="2" width="20" height="20" rx="4.5" fill="#2fb85a" ' + O + '/><path d="M12 6.5v11M6.5 12h11" stroke="#fff" stroke-width="3" stroke-linecap="round"/>',
+        abc:         LETTER('#3a8ee6', 'abc', 9),
+        letter_a:    LETTER('#e8384f', 'A', 14),
+        up_word:     LETTER('#3a8ee6', 'UP', 10),
+        infinity:    '<path d="M12 12c-2-3-3.5-4.5-6-4.5a4.5 4.5 0 000 9c2.5 0 4-1.5 6-4.5s3.5-4.5 6-4.5a4.5 4.5 0 010 9c-2.5 0-4-1.5-6-4.5z" fill="none" stroke="#9a5ce0" stroke-width="2.6"/>',
+        recycle:     '<g fill="none" stroke="#2fb85a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5.5l3-3 3 3M12 2.5v0M7.5 9.5L12 2.5l4.5 7"/><path d="M18 14.5l2.5 4.5h-8.5M14.5 21.5l-2.5-2.5 2.5-2.5"/><path d="M6 14.5l-2.5 4.5H9M3.5 9.5l3.5 0-.5 3.5"/></g>',
+        mirror:      '<ellipse cx="12" cy="10" rx="7" ry="8" fill="#c8915a" ' + O + '/><ellipse cx="12" cy="10" rx="5.3" ry="6.3" fill="#cfefff"/><path d="M9 7.5l3-2M9.5 11l5-4" stroke="#fff" stroke-width="1.3" stroke-linecap="round"/><path d="M12 18v4" stroke="#c8915a" stroke-width="2.6" stroke-linecap="round"/>',
+        fast_forward:'<path d="M3 5l9 7-9 7zM12 5l9 7-9 7z" fill="#3a8ee6" ' + O + '/>',
+        prev:        '<path d="M21 5l-8 7 8 7zM13 5l-8 7 8 7z" fill="#5a6a85"/><rect x="2.6" y="5" width="2.4" height="14" fill="#5a6a85"/>',
+        bomb:        '<circle cx="10.5" cy="14" r="7.5" fill="#2b2f45" ' + O + '/><rect x="13.5" y="5" width="4" height="4" rx="1" fill="#5a6475" transform="rotate(45 15.5 7)"/><path d="M17 5c1-2 3-2.5 4-1.5" stroke="#a8743e" stroke-width="1.4" fill="none"/><path d="M21.5 2l.5 1.5 1.5.5-1.5.5-.5 1.5-.5-1.5L19.5 4l1.5-.5z" fill="#ffc928"/><circle cx="7.5" cy="11.5" r="1.6" fill="#fff" opacity=".5"/>',
+        ring:        '<circle cx="12" cy="15" r="6.5" fill="none" stroke="#ffc928" stroke-width="2.6"/><path d="M9 3.5h6l2 3-5 5-5-5z" fill="#7fe0ff" ' + O + '/>',
+        thread:      '<rect x="6" y="2.5" width="12" height="3" rx="1" fill="#a8743e" ' + O + '/><rect x="6" y="18.5" width="12" height="3" rx="1" fill="#a8743e" ' + O + '/><rect x="7.5" y="5.5" width="9" height="13" fill="#e8384f"/><path d="M7.5 8l9 2M7.5 11l9 2M7.5 14l9 2" stroke="#b8261a" stroke-width="1"/>',
+        wood:        '<rect x="2" y="8" width="16" height="9" rx="1" fill="#b07a42" ' + O + '/><ellipse cx="18" cy="12.5" rx="4" ry="4.5" fill="#e8c38a" ' + O + '/><ellipse cx="18" cy="12.5" rx="2" ry="2.3" fill="none" stroke="#b07a42" stroke-width="1"/><path d="M4 11h9M6 14h8" stroke="#8a5a2b" stroke-width="1"/>',
+        nut_bolt:    '<path d="M8 3l4 2.3v4.6L8 12.2 4 9.9V5.3z" fill="#9aa6b8" ' + O + '/><circle cx="8" cy="7.6" r="1.6" fill="#5a6475"/><path d="M15 8l5 5-1.5 1.5-5-5zM18.5 14.5l-6 6" stroke="#9aa6b8" stroke-width="3" stroke-linecap="round"/>',
+        inbox:       '<path d="M3 13l3-8h12l3 8v7H3z" fill="#dfe7f2" ' + O + '/><path d="M3 13h5l1.5 2.5h5L16 13h5" fill="none" stroke="#7a8699" stroke-width="1.2"/><path d="M12 3v7M9 7.5l3 3 3-3" stroke="#3a8ee6" stroke-width="2" fill="none" stroke-linecap="round"/>',
+        outbox:      '<path d="M3 13l3-6h3M21 13l-3-6h-3M3 13h5l1.5 2.5h5L16 13h5v7H3z" fill="#dfe7f2" ' + O + '/><path d="M12 11V3M9 6l3-3 3 3" stroke="#3a8ee6" stroke-width="2" fill="none" stroke-linecap="round"/>',
+        folder:      '<path d="M2.5 6a1.5 1.5 0 011.5-1.5h5l2 2h9A1.5 1.5 0 0121.5 8v11a1.5 1.5 0 01-1.5 1.5H4A1.5 1.5 0 012.5 19z" fill="#ffc94a" ' + O + '/><path d="M2.5 10h19" stroke="#e8a317" stroke-width="1.2"/>',
+        email:       '<rect x="2" y="5" width="20" height="14" rx="2" fill="#fff" ' + O + '/><path d="M2.5 6l9.5 7.5L21.5 6" fill="none" stroke="#3a8ee6" stroke-width="1.8"/>',
+        school:      '<path d="M2.5 10L12 4l9.5 6v11h-19z" fill="#f4e3c4" ' + O + '/><rect x="9.5" y="15" width="5" height="6" fill="#a8743e"/><circle cx="12" cy="10" r="2.3" fill="#fff" stroke="#5a6475" stroke-width="1"/><path d="M12 8.8v1.4l1 .6" stroke="#5a6475" stroke-width=".8" fill="none"/><rect x="4.5" y="13" width="3" height="3" fill="#7fc8ff"/><rect x="16.5" y="13" width="3" height="3" fill="#7fc8ff"/>',
+        broom:       '<path d="M19 3l-8 9" stroke="#8a5a2b" stroke-width="2.4" stroke-linecap="round"/><path d="M10 10.5l3.5 3L9 21c-2 .5-5 0-6.5-1.5L4 16z" fill="#f2c94c" ' + O + '/><path d="M6 17.5l2 2.5M8 15.5l2.5 2.5" stroke="#c89a2a" stroke-width="1"/>',
+        hospital:    '<rect x="3" y="5" width="18" height="16.5" fill="#fff" ' + O + '/><rect x="9" y="7" width="6" height="6" fill="#e8384f"/><path d="M12 8v4M10 10h4" stroke="#fff" stroke-width="1.6"/><rect x="10" y="16" width="4" height="5.5" fill="#7fc8ff"/><rect x="5" y="15" width="3" height="3" fill="#7fc8ff"/><rect x="16" y="15" width="3" height="3" fill="#7fc8ff"/>',
+        classical:   '<path d="M2.5 8L12 2.5 21.5 8z" fill="#dfe7f2" ' + O + '/><rect x="3" y="8" width="18" height="2" fill="#c3ccd8"/><path d="M5.5 10v8.5M9.5 10v8.5M14.5 10v8.5M18.5 10v8.5" stroke="#dfe7f2" stroke-width="2.2"/><rect x="2.5" y="18.5" width="19" height="3" fill="#c3ccd8" ' + O + '/>',
+        derelict:    '<path d="M3 11l9-7 9 7v10.5H3z" fill="#a89a84" ' + O + '/><path d="M8 21.5v-6h4v6" fill="#6b5a44"/><path d="M14 13l3 3M17 13l-3 3" stroke="#5a4a34" stroke-width="1.2"/><path d="M10 6.5l1.5 3-2 1.5" stroke="#5a4a34" stroke-width="1" fill="none"/>',
+        volcano:     '<path d="M1.5 21.5L8.5 9h7l7 12.5z" fill="#8a5a3a" ' + O + '/><path d="M8.5 9l2 4 1.5-2 1.5 2.5 2-4.5z" fill="#ff6a1a"/><path d="M12 7c-1-2 0-4 2-4.5M10 7.5C8 6 8 3.5 9 2.5M14 7.5c2-1 3.5-1 4.5 0" stroke="#9aa6b8" stroke-width="1.6" fill="none" stroke-linecap="round"/>',
+        bed:         '<rect x="2" y="12" width="20" height="5" rx="1" fill="#3a8ee6" ' + O + '/><rect x="2" y="8" width="3" height="13" rx="1" fill="#a8743e"/><rect x="5.5" y="9.5" width="5.5" height="3" rx="1.5" fill="#fff" ' + O + '/><path d="M21 17v4" stroke="#a8743e" stroke-width="2.4"/>',
+        picture:     '<rect x="2.5" y="4" width="19" height="16" rx="1.5" fill="#c8915a" ' + O + '/><rect x="4.5" y="6" width="15" height="12" fill="#bfe8ff"/><path d="M4.5 18l5-6 3.5 4 2-2.5 4.5 4.5z" fill="#3fae5a"/><circle cx="16" cy="9" r="1.6" fill="#ffc928"/>',
+        ticket:      '<path d="M2.5 7h19v3a2 2 0 000 4v3h-19v-3a2 2 0 000-4z" fill="#ffc928" ' + O + '/><path d="M8 7v10" stroke="#d68a12" stroke-width="1.2" stroke-dasharray="1.5 1.2"/><path d="M14.5 9.5l.7 1.5 1.6.2-1.2 1.1.3 1.6-1.4-.8-1.4.8.3-1.6-1.2-1.1 1.6-.2z" fill="#e8384f"/>',
+        military:    '<path d="M8 2h8v7l-4 2-4-2z" fill="#3a6fd4" ' + O + '/><path d="M10.5 2v8M13.5 2v8" stroke="#e8384f" stroke-width="1.2"/><path d="M12 11l2.2 4.4 4.8.7-3.5 3.4.8 4.8-4.3-2.3-4.3 2.3.8-4.8L5 16.1l4.8-.7z" fill="#ffc928" ' + O + '/>',
+        link:        '<g fill="none" stroke="#7a8699" stroke-width="2.6" stroke-linecap="round"><path d="M10 14a4 4 0 005.6 0l3.2-3.2a4 4 0 00-5.6-5.6l-1 1"/><path d="M14 10a4 4 0 00-5.6 0l-3.2 3.2a4 4 0 005.6 5.6l1-1"/></g>',
+        blood:       '<path d="M12 2.5C9 7.5 5.5 11 5.5 15a6.5 6.5 0 0013 0c0-4-3.5-7.5-6.5-12.5z" fill="#d61f3a" ' + O + '/><path d="M8.8 15a3.2 3.2 0 002.4 3.2" stroke="#ff9aa8" stroke-width="1.6" fill="none" stroke-linecap="round"/>',
+        bandage:     '<rect x="2" y="8.5" width="20" height="7" rx="3.5" fill="#f4c99a" ' + O + ' transform="rotate(-35 12 12)"/><rect x="8.5" y="9" width="7" height="6" fill="#fde7d0" transform="rotate(-35 12 12)"/><circle cx="11" cy="11.5" r=".6" fill="#d89a64"/><circle cx="13" cy="12.5" r=".6" fill="#d89a64"/>',
+        syringe:     '<path d="M15.5 3.5l5 5M18 6l-3 3" stroke="#7a8699" stroke-width="1.8" stroke-linecap="round"/><path d="M16 7.5L7 16.5 5 19l-1.5 1.5M16 7.5l-3-3L4 13.5l3 3z" fill="#dfe7f2" stroke="#7a8699" stroke-width="1.1" stroke-linejoin="round"/><path d="M7 13l4-4 2 2-4 4z" fill="#e8384f"/>',
+        ladder:      '<path d="M7 2v20M17 2v20" stroke="#a8743e" stroke-width="2.4" stroke-linecap="round"/><path d="M7 6h10M7 10.5h10M7 15h10M7 19.5h10" stroke="#c8915a" stroke-width="2"/>',
+        scales:      '<path d="M12 3v17M6 21h12M4 7h16" stroke="#c8963a" stroke-width="1.8" stroke-linecap="round"/><path d="M4 7l-2.5 6h5zM20 7l-2.5 6h5z" fill="none" stroke="#c8963a" stroke-width="1.2"/><path d="M1.5 13a2.5 2 0 005 0zM17.5 13a2.5 2 0 005 0z" fill="#ffc928" ' + O + '/><circle cx="12" cy="3" r="1.5" fill="#ffc928"/>',
+        red_envelope:'<rect x="4" y="2.5" width="16" height="19" rx="2" fill="#e0233f" ' + O + '/><path d="M4 8c4 3 12 3 16 0" fill="none" stroke="#b8162c" stroke-width="1.2"/><circle cx="12" cy="10" r="2.6" fill="#ffc928" ' + O + '/>',
+        meat:        '<path d="M14 3c4 0 7 3 7 7 0 5-5 8-9 7l-3 3c.5 1.2-.5 2.8-2 2.3-1.2-.4-1.2-1.6-1-2-.6.2-1.8.1-2.1-1.1-.4-1.5 1.2-2.5 2.3-2L9 14c-1-4 1-11 5-11z" fill="#c8562a" ' + O + '/><path d="M14 6c2 0 4 2 4 4" stroke="#f0a070" stroke-width="1.5" fill="none" stroke-linecap="round"/><path d="M4.5 19.5l3-3" stroke="#f4eee0" stroke-width="2.4" stroke-linecap="round"/>',
+        door:        '<rect x="5" y="2.5" width="14" height="19" rx="1.5" fill="#a8743e" ' + O + '/><rect x="7.5" y="5" width="9" height="6" rx="1" fill="#8a5a2b"/><rect x="7.5" y="12.5" width="9" height="6.5" rx="1" fill="#8a5a2b"/><circle cx="16" cy="12" r="1.1" fill="#ffc928"/>',
+        point_up:    '<path d="M10 3a1.5 1.5 0 013 0v8l4.5.8c1.5.3 2.5 1.5 2.3 3l-.6 4.2A3.5 3.5 0 0115.7 22H11c-1.2 0-2.3-.6-3-1.6L5 16a1.5 1.5 0 012.3-1.9L10 16z" fill="#ffc48a" ' + O + '/>',
+        hand:        '<path d="M7 11V5a1.5 1.5 0 013 0v5V3.5a1.5 1.5 0 013 0V10V4.5a1.5 1.5 0 013 0V12V7.5a1.5 1.5 0 013 0V15c0 4-3 7-7 7-3 0-5-1.5-6.5-4L3.5 14a1.5 1.5 0 012.5-1.5z" fill="#ffc48a" ' + O + '/>',
+        ear:         '<path d="M7 9a5.5 5.5 0 0111 0c0 3-2 4-3 5.5S13.5 18 13 19.5c-.6 1.8-2.5 2.5-4 1.8" fill="#ffc48a" ' + O + '/><path d="M10 9.5a2.5 2.5 0 015 0c0 1.5-1.5 2-2 3" fill="none" stroke="#d89058" stroke-width="1.3" stroke-linecap="round"/>',
+        foot:        '<path d="M8 21c-3 0-4.5-2.5-4-5.5L6 8c.8-3 5-3 6 0l1.5 4.5c1.5 2 6 2.5 6.5 5.5.3 2-1 3-3 3z" fill="#ffc48a" ' + O + '/><circle cx="20" cy="15" r="1.1" fill="#ffc48a" ' + O + '/>',
+        brain:       '<path d="M12 4c-1.5-1.5-5-1.5-6 1-2.5.5-3.5 3-2.5 5-1.5 1.5-1 4.5 1 5.5 0 2.5 2.5 4 4.5 3.5 1 1.5 2 1.5 3 1 1 .5 2 .5 3-1 2 .5 4.5-1 4.5-3.5 2-1 2.5-4 1-5.5 1-2 0-4.5-2.5-5-1-2.5-4.5-2.5-6-1z" fill="#ffaac4" ' + O + '/><path d="M12 4v15.5M8 8c1 1 1 3 0 4M16 8c-1 1-1 3 0 4M7 15c1.5 0 2.5 1 2.5 2M17 15c-1.5 0-2.5 1-2.5 2" fill="none" stroke="#e07a9a" stroke-width="1.1"/>',
+        dividers:    '<rect x="3" y="5" width="18" height="15" rx="1.5" fill="#c8915a" ' + O + '/><rect x="5" y="3" width="6" height="4" rx="1" fill="#e8384f"/><rect x="11" y="3.5" width="6" height="3.5" rx="1" fill="#3a8ee6"/><rect x="5" y="7" width="14" height="11" rx="1" fill="#fff"/>',
+        memo:        '<rect x="4" y="2.5" width="14" height="19" rx="1.5" fill="#fff" ' + O + '/><path d="M7 7h8M7 10.5h8M7 14h5" stroke="#9aa6b8" stroke-width="1.2" stroke-linecap="round"/><path d="M21.5 9L13 17.5l-2.5.8.8-2.5L19.8 7.3z" fill="#ffc928" ' + O + '/>',
+        pencil:      '<path d="M4 20l1-4.5L16.5 4l3.5 3.5L8.5 19z" fill="#ffc928" ' + O + '/><path d="M4 20l1-4.5 3.5 3.5z" fill="#f4dcb0"/><path d="M4 20l.4-1.8 1.4 1.4z" fill="#2b2430"/><path d="M15 5.5l3.5 3.5" stroke="#e8384f" stroke-width="2.4"/>',
+        keyboard:    '<rect x="1.5" y="6" width="21" height="12" rx="2" fill="#dfe7f2" ' + O + '/><path d="M4.5 9h1.5M8 9h1.5M11.5 9H13M15 9h1.5M18 9h1.5M4.5 12h1.5M8 12h1.5M11.5 12H13M15 12h1.5M18 12h1.5M7 15h10" stroke="#5a6475" stroke-width="1.6" stroke-linecap="round"/>',
+        glasses:     '<circle cx="6.5" cy="13" r="4" fill="#bfe8ff" stroke="#3a6fd4" stroke-width="2"/><circle cx="17.5" cy="13" r="4" fill="#bfe8ff" stroke="#3a6fd4" stroke-width="2"/><path d="M10.5 12.5c1-1 2-1 3 0M2.5 12l-1-3M21.5 12l1-3" stroke="#3a6fd4" stroke-width="1.8" fill="none"/>',
+        mic:         '<rect x="9" y="2" width="6" height="11" rx="3" fill="#b9c3d0" ' + O + '/><path d="M6 10a6 6 0 0012 0M12 16v5M8.5 21.5h7" stroke="#9aa6b8" stroke-width="1.8" fill="none" stroke-linecap="round"/>',
+        violin:      '<path d="M19 2l-6 6" stroke="#2b2430" stroke-width="1.6"/><path d="M12 7c2 0 3 1.5 2.5 3-.4 1 .5 2 1.5 2 2 0 3 2 2 4.5-1 2.5-4 3.5-6 2.5-1-.5-2-.5-2.5.5-1 2-4 2-5.5 0-1.5-2 0-5 2-5 1 0 1.5-1 1-2-.5-2.5 1.5-5.5 5-5.5z" fill="#c8562a" ' + O + '/><path d="M15 9l-6 6" stroke="#2b2430" stroke-width="1.2"/>',
+        // ---- 色・形 ----
+        circle_orange:'<circle cx="12" cy="12" r="9.5" fill="#ff8a1f" ' + O + '/>',
+        diamond_sblue:'<path d="M12 6l6 6-6 6-6-6z" fill="#3a8ee6" ' + O + '/>',
+        diamond_sorange:'<path d="M12 6l6 6-6 6-6-6z" fill="#ff8a1f" ' + O + '/>',
+        heart_white: '<path d="' + HEART + '" fill="#fff" stroke="#9aa6b8" stroke-width="1.1"/>',
+        moon:        '<path d="M15 2.5A9.5 9.5 0 1021.5 15 7.5 7.5 0 0115 2.5z" fill="#ffd43b" ' + O + '/>',
+        sun_face:    '<g stroke="#ffb020" stroke-width="2" stroke-linecap="round"><path d="M12 1v2.5M12 20.5V23M1 12h2.5M20.5 12H23M4.2 4.2L6 6M18 18l1.8 1.8M4.2 19.8L6 18M18 6l1.8-1.8"/></g><circle cx="12" cy="12" r="6.8" fill="#ffd43b" ' + O + '/><circle cx="9.8" cy="11" r=".9" fill="#7a4a10"/><circle cx="14.2" cy="11" r=".9" fill="#7a4a10"/><path d="M9.8 14c1.2 1 3.2 1 4.4 0" stroke="#7a4a10" stroke-width="1.1" fill="none" stroke-linecap="round"/>',
+        sunrise:     '<rect x="1.5" y="3" width="21" height="18" rx="3" fill="#ffb27a"/><circle cx="12" cy="15" r="5" fill="#ffd43b"/><rect x="1.5" y="15" width="21" height="6" rx="0" fill="#3a8ee6"/><path d="M5 17.5h4M14 18.5h5" stroke="#bfe8ff" stroke-width="1.2" stroke-linecap="round"/>',
+        rainbow:     '<g fill="none" stroke-width="2"><path d="M2 19a10 10 0 0120 0" stroke="#e8384f"/><path d="M4.2 19a7.8 7.8 0 0115.6 0" stroke="#ffc928"/><path d="M6.4 19a5.6 5.6 0 0111.2 0" stroke="#3cc65c"/><path d="M8.6 19a3.4 3.4 0 016.8 0" stroke="#3a8ee6"/></g>',
+        cherry_blossom:'<g fill="#ffb3cf" ' + O + '><circle cx="12" cy="6" r="4"/><circle cx="18" cy="10.5" r="4"/><circle cx="15.7" cy="17.5" r="4"/><circle cx="8.3" cy="17.5" r="4"/><circle cx="6" cy="10.5" r="4"/></g><circle cx="12" cy="12.2" r="2.6" fill="#ffd43b"/>',
+        leaf:        '<path d="M4 20C4 10 10 4 21 3c-1 11-7 17-17 17z" fill="#3cc65c" ' + O + '/><path d="M4 20L15 9" stroke="#2a8a44" stroke-width="1.3"/>',
+        herb:        '<path d="M12 22V9" stroke="#2a8a44" stroke-width="1.6"/><path d="M12 9c-1-4 1-6 0-7.5C10 3 9 6 12 9zM12 13c-3-1-6 0-7-2 3-1 5 0 7 2zM12 13c3-1 6 0 7-2-3-1-5 0-7 2zM12 18c-3-1-6 0-7-2 3-1 5 0 7 2zM12 18c3-1 6 0 7-2-3-1-5 0-7 2z" fill="#3cc65c" ' + O + '/>',
+        clover:      '<g fill="#2fb85a" ' + O + '><circle cx="8.5" cy="8.5" r="4"/><circle cx="15.5" cy="8.5" r="4"/><circle cx="8.5" cy="15.5" r="4"/><circle cx="15.5" cy="15.5" r="4"/></g><path d="M12 12l5 10" stroke="#2a8a44" stroke-width="1.8" stroke-linecap="round"/>',
+        cactus:      '<path d="M9.5 21V5a2.5 2.5 0 015 0v16z" fill="#3fae5a" ' + O + '/><path d="M9.5 13H7a2 2 0 01-2-2V8M14.5 11H17a2 2 0 002-2V6" fill="none" stroke="#3fae5a" stroke-width="3" stroke-linecap="round"/><rect x="6" y="20" width="12" height="3" rx="1" fill="#c8562a"/>',
+        wilted:      '<path d="M12 22c0-6 0-9 3-12" stroke="#5a7a3a" stroke-width="1.8" fill="none"/><path d="M15 10c-1-3 1-5 3-5 1 2 2 4 0 6 1 2-1 4-3 3-1 0-1-2 0-4z" fill="#8a2a3a" ' + O + '/><path d="M10 17c-2-1-4-1-5 1 2 1 4 1 5-1z" fill="#6a8a4a"/>',
+        camping:     '<path d="M1.5 21.5L12 4l10.5 17.5z" fill="#3fae5a" ' + O + '/><path d="M12 9l-4 12.5h8z" fill="#2a7a3c"/><circle cx="19" cy="4" r="2" fill="#ffd43b"/>',
+        snowman:     '<circle cx="12" cy="16.5" r="5.5" fill="#fff" stroke="#7a8699" stroke-width="1.1"/><circle cx="12" cy="8.5" r="4" fill="#fff" stroke="#7a8699" stroke-width="1.1"/><rect x="8.5" y="2" width="7" height="3" rx=".6" fill="#2b2430"/><circle cx="10.5" cy="8" r=".8" fill="#2b2430"/><circle cx="13.5" cy="8" r=".8" fill="#2b2430"/><path d="M12 9.2l2 .8-2 .5z" fill="#ff8a1f"/><circle cx="12" cy="15" r=".9" fill="#2b2430"/><circle cx="12" cy="18" r=".9" fill="#2b2430"/>',
+        pumpkin:     '<path d="M12 5.5c0-2 1-3 2.5-3.5" stroke="#3f8a3a" stroke-width="2" fill="none" stroke-linecap="round"/><ellipse cx="12" cy="13.5" rx="9.5" ry="8" fill="#ff8a1f" ' + O + '/><path d="M12 5.5v16M7 7c-2 4-2 9 0 13M17 7c2 4 2 9 0 13" stroke="#d96a0a" stroke-width="1" fill="none"/><path d="M7.5 11.5l2 1.5h-2.5zM16.5 11.5l-2 1.5h2.5zM8 16.5l2 1.2 2-1.2 2 1.2 2-1.2" fill="#5a2a0a" stroke="#5a2a0a" stroke-width="1"/>',
+        mahjong:     '<rect x="5" y="2" width="14" height="20" rx="2" fill="#fbf7ee" ' + O + '/><rect x="5" y="17.5" width="14" height="4.5" rx="2" fill="#3fae5a"/><text x="12" y="14" text-anchor="middle" font-size="10" font-weight="900" fill="#d61f3a">中</text>',
+        // ---- 乗りもの ----
+        rocket:      '<path d="M12 2c4 3 5 8 3.5 13h-7C7 10 8 5 12 2z" fill="#eef2f8" ' + O + '/><circle cx="12" cy="9" r="2" fill="#3a8ee6" ' + O + '/><path d="M8.5 13l-3 4 3.5-1M15.5 13l3 4-3.5-1" fill="#e8384f" ' + O + '/><path d="M10 15.5c0 3 1 5 2 6.5 1-1.5 2-3.5 2-6.5z" fill="#ff8a1f"/>',
+        airplane:    '<path d="M21.5 4.5c-.8-.8-2.5-.5-3.5.5L14.5 8.5 5 6l-2 2 7.5 4L7 15.5H4L2.5 17l4 1.5 1.5 4 1.5-1.5v-3L13 14.5l4 7.5 2-2-2.5-9.5L20 7c1-1 1.3-2.7.5-3.5z" fill="#dfe7f2" ' + O + '/>',
+        bus:         '<rect x="3" y="3" width="18" height="16" rx="3" fill="#ffc928" ' + O + '/><rect x="5" y="5.5" width="14" height="6" rx="1" fill="#bfe8ff"/><circle cx="7" cy="15" r="1.2" fill="#fff"/><circle cx="17" cy="15" r="1.2" fill="#fff"/><rect x="5" y="19" width="3.5" height="2.5" rx="1" fill="#2b2430"/><rect x="15.5" y="19" width="3.5" height="2.5" rx="1" fill="#2b2430"/>',
+        train:       '<rect x="4" y="2.5" width="16" height="16" rx="3.5" fill="#3cc65c" ' + O + '/><rect x="6" y="5" width="12" height="6" rx="1" fill="#bfe8ff"/><circle cx="8" cy="14.5" r="1.2" fill="#fff"/><circle cx="16" cy="14.5" r="1.2" fill="#fff"/><path d="M7 18.5l-2 3.5M17 18.5l2 3.5" stroke="#5a6475" stroke-width="1.8" stroke-linecap="round"/>',
+        firetruck:   '<rect x="1.5" y="9" width="14" height="8" fill="#e8384f" ' + O + '/><path d="M15.5 11h3.5l3 3v3h-6.5z" fill="#e8384f" ' + O + '/><rect x="16.5" y="12" width="2.5" height="2" fill="#bfe8ff"/><path d="M2.5 7.5l11-2.5M3.5 8.5l1-3M7 7.7l1-3M10.5 6.9l1-3" stroke="#9aa6b8" stroke-width="1.2"/><circle cx="5.5" cy="18" r="2.2" fill="#2b2430"/><circle cx="17.5" cy="18" r="2.2" fill="#2b2430"/>',
+        bicycle:     '<circle cx="6" cy="16" r="4" fill="none" stroke="#8a96aa" stroke-width="2"/><circle cx="18" cy="16" r="4" fill="none" stroke="#8a96aa" stroke-width="2"/><path d="M6 16l4-7h6l2 7M10 9l3 7h-7M16 9l-1-3h-2M9 9H7" fill="none" stroke="#e8384f" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>',
+        motorcycle:  '<circle cx="5.5" cy="16.5" r="3.5" fill="none" stroke="#8a96aa" stroke-width="2.2"/><circle cx="18.5" cy="16.5" r="3.5" fill="none" stroke="#8a96aa" stroke-width="2.2"/><path d="M5.5 16.5l4-5h6l3 5M15.5 11.5l-1-4h2.5" fill="none" stroke="#9aa6b8" stroke-width="1.8" stroke-linecap="round"/><path d="M8 11.5h8.5l-1.5 3H10z" fill="#e8384f" ' + O + '/>',
+        helicopter:  '<path d="M3 4h18M12 4v3" stroke="#5a6475" stroke-width="1.8" stroke-linecap="round"/><path d="M5 12c0-3 3-5 7-5s6 2 6 5-3 5-7 5H8c-2 0-3-2-3-5z" fill="#ffc928" ' + O + '/><path d="M12 8c2 0 4 1.5 4 4h-4z" fill="#bfe8ff"/><path d="M5 12H1.5M1.5 10v4" stroke="#5a6475" stroke-width="1.6"/><path d="M8 17v3M15 17v3M5 20.5h13" stroke="#5a6475" stroke-width="1.5" stroke-linecap="round"/>',
+        roller_skate:'<path d="M5 3h5v8l7 2c2 .5 3 2 3 3.5V17H4V4a1 1 0 011-1z" fill="#ff7eb6" ' + O + '/><path d="M7 7h3M7 10h3" stroke="#fff" stroke-width="1.2"/><circle cx="7" cy="20" r="2" fill="#7a8699"/><circle cx="17" cy="20" r="2" fill="#7a8699"/>',
+        tower:       '<path d="M12 1.5v3M10.5 4.5h3L18 22h-3l-3-9-3 9H6z" fill="#e8402f" ' + O + '/><path d="M8.5 13h7M7.3 17h9.4" stroke="#fff" stroke-width="1.4"/>',
+        // ---- 食べもの ----
+        apple:       '<path d="M12 6.5c-2-1.5-6-1.5-7.5 2-1.5 4 0 9 3 11.5 1.5 1.2 3 1 4.5.3 1.5.7 3 .9 4.5-.3 3-2.5 4.5-7.5 3-11.5-1.5-3.5-5.5-3.5-7.5-2z" fill="#e8243c" ' + O + '/><path d="M12 6.5c0-2 .5-3.5 2-4.5" stroke="#6b4a2b" stroke-width="1.6" fill="none" stroke-linecap="round"/><path d="M13 4.5c1.5-1.5 4-1.5 5 0-1.5 1.5-3.5 1.5-5 0z" fill="#3cc65c"/><ellipse cx="8" cy="10" rx="1.2" ry="2" fill="#fff" opacity=".5"/>',
+        carrot:      '<path d="M17.5 6.5L3 21l1-5 9.5-9.5c1.5-1.5 3-1.5 4 0z" fill="#ff8a1f" ' + O + '/><path d="M8 13l2 1M6 16l2 1M11 10l2 1" stroke="#d96a0a" stroke-width="1"/><path d="M16 7c0-3 1-5 3-5 0 2-1 4-3 5zM17 8c3 0 5-1 5-3-2 0-4 1-5 3z" fill="#3cc65c"/>',
+        banana:      '<path d="M4 6c1 8 6 13 15 13.5 1.5 0 2-1.5.8-2.3C12 15 8 11 7 5c-.3-1.5-3.2-1.5-3 1z" fill="#ffd43b" ' + O + '/><path d="M4.5 4.5L5 2.5" stroke="#6b4a2b" stroke-width="1.6" stroke-linecap="round"/>',
+        tomato:      '<circle cx="12" cy="13.5" r="8.5" fill="#e8302f" ' + O + '/><path d="M12 5l1.5 2.5L16.5 6 15 8.5l2.5 1L14 10l-2 2-2-2-3.5-.5L9 8.5 7.5 6l3 1.5z" fill="#3cc65c"/><ellipse cx="8.5" cy="13" rx="1.2" ry="2" fill="#fff" opacity=".45"/>',
+        pizza:       '<path d="M12 21.5L2.5 5c6-3.5 13-3.5 19 0z" fill="#ffc94a" ' + O + '/><path d="M2.5 5c6-3.5 13-3.5 19 0l-1 1.8c-5.5-3-11.5-3-17 0z" fill="#d9944a"/><circle cx="9.5" cy="9" r="1.6" fill="#e0402f"/><circle cx="14.5" cy="10" r="1.6" fill="#e0402f"/><circle cx="12" cy="14.5" r="1.4" fill="#e0402f"/>',
+        cake:        '<path d="M3 13l18-5v12H3z" fill="#fff3e0" ' + O + '/><path d="M3 13l18-5v3L3 16z" fill="#ffb3cf"/><path d="M14 9V4" stroke="#3a8ee6" stroke-width="1.4"/><path d="M14 2c-.8 1-.8 1.8 0 2 .8-.2.8-1 0-2z" fill="#ff8a1f"/><circle cx="17.5" cy="7.5" r="1.5" fill="#e0233f"/>',
+        birthday_cake:'<rect x="3" y="12" width="18" height="9" rx="1.5" fill="#fff3e0" ' + O + '/><path d="M3 15c3 1.5 6 1.5 9 0s6-1.5 9 0v-3H3z" fill="#ffb3cf"/><path d="M8 12V8M12 12V8M16 12V8" stroke="#3a8ee6" stroke-width="1.4"/><path d="M8 5.5c-.8 1-.8 1.8 0 2 .8-.2.8-1 0-2zM12 5.5c-.8 1-.8 1.8 0 2 .8-.2.8-1 0-2zM16 5.5c-.8 1-.8 1.8 0 2 .8-.2.8-1 0-2z" fill="#ff8a1f"/>',
+        onigiri:     '<path d="M12 3c3 0 9.5 10 9.5 14 0 2.5-2 4-5 4H7.5c-3 0-5-1.5-5-4C2.5 13 9 3 12 3z" fill="#fff" stroke="#9aa6b8" stroke-width="1.1"/><rect x="7.5" y="14" width="9" height="7" fill="#2b3a2b"/>',
+        milk:        '<path d="M7 7l2-4h6l2 4v14H7z" fill="#fff" stroke="#7a8699" stroke-width="1.1" stroke-linejoin="round"/><rect x="7" y="11" width="10" height="6" fill="#3a8ee6"/><path d="M9 3h6" stroke="#3a8ee6" stroke-width="1.4"/>',
+        bread:       '<path d="M4 10c-2-4 2-7 8-7s10 3 8 7v10H4z" fill="#e8b66a" ' + O + '/><path d="M6 10c0-2 2.5-4 6-4s6 2 6 4v8H6z" fill="#fde7c0"/>',
+        donut:       '<circle cx="12" cy="12" r="9.5" fill="#d9944a" ' + O + '/><path d="M3.5 11c1-5 5-8 8.5-8s7.5 3 8.5 8c-1 2-2.5 1-3.5 2.5s-2 .5-3 1.5-2 0-3 .5-2-1-3-.5-2 .5-2.5-1S3 12 3.5 11z" fill="#ff7eb6"/><circle cx="12" cy="12" r="3" fill="#fff" ' + O + '/><path d="M7 7l1 .5M15 6l.8.8M17.5 10l1 .2M9 9.5l.5 1" stroke="#fff" stroke-width="1.2" stroke-linecap="round"/>',
+        chocolate:   '<rect x="5" y="2.5" width="14" height="19" rx="1.5" fill="#6b3a1a" ' + O + '/><path d="M5 9h14M5 15.5h14M12 2.5v19" stroke="#4a2410" stroke-width="1.2"/><path d="M5 13l14-4v12.5H5z" fill="#e8384f"/>',
+        lollipop:    '<path d="M12 13v9" stroke="#fff" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="8.5" r="6.5" fill="#ff7eb6" ' + O + '/><path d="M12 8.5c0-1 1.5-1 1.5 0 0 2-3 2-3 0 0-3 4.5-3 4.5 0 0 4-6 4-6 0" fill="none" stroke="#fff" stroke-width="1.3"/>',
+        ramen:       '<path d="M2.5 11h19c0 5.5-4 9.5-9.5 9.5S2.5 16.5 2.5 11z" fill="#e8384f" ' + O + '/><path d="M4 11c1-2 2-2 3 0s2 2 3 0 2-2 3 0 2 2 3 0 2-2 3 0" stroke="#ffd96b" stroke-width="1.4" fill="none"/><path d="M14 9L21 2M16 9.5L22 4" stroke="#a8743e" stroke-width="1.4" stroke-linecap="round"/><path d="M7 14.5c1.5 1 3 1 4.5 0" stroke="#fff" stroke-width="1.2" fill="none"/>',
+        tropical:    '<path d="M4 6h14l-6 8z" fill="#ffb27a" ' + O + '/><path d="M12 14v6M8 21h8" stroke="#9aa6b8" stroke-width="1.6" stroke-linecap="round"/><path d="M15 9l4-7" stroke="#3cc65c" stroke-width="1.4"/><circle cx="6.5" cy="5.5" r="2.5" fill="#ffd43b" ' + O + '/>',
+        // ---- 生きもの・人 ----
+        dog:         '<path d="M4 5c-2 2-2 7 0 9l2.5-4zM20 5c2 2 2 7 0 9l-2.5-4z" fill="#8a5a2b" ' + O + '/>' + FACE('#e8b66a', EYES + '<ellipse cx="12" cy="15.3" rx="1.6" ry="1.1" fill="#2b2430"/><path d="M12 16.4v1.2M10 17.6c1 .8 3 .8 4 0" stroke="#2b2430" stroke-width="1" fill="none" stroke-linecap="round"/>'),
+        cat:         '<path d="M4.5 9L5 2.5l5 4M19.5 9L19 2.5l-5 4" fill="#ffb84a" ' + O + '/>' + FACE('#ffb84a', EYES + '<path d="M11.2 15l.8.8.8-.8z" fill="#e0607a"/><path d="M3 14h4M3 16.5l4-1M21 14h-4M21 16.5l-4-1" stroke="#7a4a10" stroke-width=".9"/>'),
+        rabbit:      '<ellipse cx="8.5" cy="5.5" rx="2.2" ry="5" fill="#fff" stroke="#9aa6b8" stroke-width="1"/><ellipse cx="15.5" cy="5.5" rx="2.2" ry="5" fill="#fff" stroke="#9aa6b8" stroke-width="1"/><circle cx="12" cy="14" r="7.5" fill="#fff" stroke="#9aa6b8" stroke-width="1"/>' + EYES.replace(/12.3/g, '13.5') + '<path d="M11.2 16l.8.8.8-.8z" fill="#e0607a"/>',
+        panda:       '<circle cx="5.5" cy="6" r="3" fill="#2b2430"/><circle cx="18.5" cy="6" r="3" fill="#2b2430"/>' + FACE('#fff', '<ellipse cx="8.8" cy="12.3" rx="2" ry="2.6" fill="#2b2430"/><ellipse cx="15.2" cy="12.3" rx="2" ry="2.6" fill="#2b2430"/><circle cx="9" cy="12" r=".7" fill="#fff"/><circle cx="15" cy="12" r=".7" fill="#fff"/><ellipse cx="12" cy="16" rx="1.3" ry=".9" fill="#2b2430"/>'),
+        polar_bear:  '<circle cx="5.5" cy="6" r="2.8" fill="#fff" stroke="#9aa6b8" stroke-width="1"/><circle cx="18.5" cy="6" r="2.8" fill="#fff" stroke="#9aa6b8" stroke-width="1"/><circle cx="12" cy="13" r="8.5" fill="#fff" stroke="#9aa6b8" stroke-width="1"/>' + EYES + '<ellipse cx="12" cy="16" rx="1.4" ry="1" fill="#2b2430"/>',
+        tiger:       '<path d="M5 5l3 3M19 5l-3 3" stroke="#ffa31f" stroke-width="4" stroke-linecap="round"/>' + FACE('#ffa31f', EYES + '<path d="M12 4.5v3M9.5 5l.8 2.5M14.5 5l-.8 2.5M3.5 12h2.5M18 12h2.5M4 15h2.5M17.5 15H20" stroke="#2b2430" stroke-width="1.2" stroke-linecap="round"/><ellipse cx="12" cy="16.5" rx="3" ry="2.2" fill="#fff3e0"/><path d="M11.2 15.5l.8.7.8-.7z" fill="#2b2430"/>'),
+        lion:        '<circle cx="12" cy="12.5" r="11" fill="#c8761a"/>' + FACE('#ffc94a', EYES + '<ellipse cx="12" cy="16" rx="2.8" ry="2" fill="#fff3e0"/><path d="M11.2 15l.8.7.8-.7z" fill="#2b2430"/>'),
+        cow:         '<path d="M3 8l3 1.5M21 8l-3 1.5" stroke="#9aa6b8" stroke-width="2.5" stroke-linecap="round"/>' + FACE('#fff', EYES + '<path d="M6 7c2 0 3 2 2 3.5-1 1-3 .5-3.5-1zM16.5 6c1.5.5 2 2 1 3" fill="#2b2430"/><ellipse cx="12" cy="17" rx="4.5" ry="3" fill="#ffb3cf"/><circle cx="10.5" cy="17" r=".7" fill="#2b2430"/><circle cx="13.5" cy="17" r=".7" fill="#2b2430"/>'),
+        frog:        '<circle cx="7.5" cy="7" r="3.5" fill="#5ccf5a" ' + O + '/><circle cx="16.5" cy="7" r="3.5" fill="#5ccf5a" ' + O + '/><ellipse cx="12" cy="14" rx="9.5" ry="7" fill="#5ccf5a" ' + O + '/><circle cx="7.5" cy="7" r="1.5" fill="#2b2430"/><circle cx="16.5" cy="7" r="1.5" fill="#2b2430"/><path d="M6 15c3 3 9 3 12 0" stroke="#2b5a2b" stroke-width="1.4" fill="none" stroke-linecap="round"/>',
+        chick:       '<path d="M3 15c0-5 4-9 9-9s9 4 9 9c0 4-3 6.5-9 6.5S3 19 3 15z" fill="#fff" stroke="#9aa6b8" stroke-width="1"/><path d="M3 15l3-2 3 2 3-2 3 2 3-2 3 2" fill="none" stroke="#9aa6b8" stroke-width="1"/><circle cx="12" cy="8" r="5" fill="#ffd43b" ' + O + '/><circle cx="10.5" cy="7.5" r=".8" fill="#2b2430"/><circle cx="13.5" cy="7.5" r=".8" fill="#2b2430"/><path d="M11 9.3h2l-1 1.2z" fill="#ff8a1f"/>',
+        mouse:       '<circle cx="5.5" cy="7" r="4" fill="#b9c3d0" ' + O + '/><circle cx="18.5" cy="7" r="4" fill="#b9c3d0" ' + O + '/><circle cx="5.5" cy="7" r="2.2" fill="#ffb3cf"/><circle cx="18.5" cy="7" r="2.2" fill="#ffb3cf"/>' + FACE('#b9c3d0', EYES + '<circle cx="12" cy="16" r="1.1" fill="#e0607a"/>'),
+        elephant:    '<circle cx="5" cy="11" r="4.5" fill="#9aa6c8" ' + O + '/><circle cx="19" cy="11" r="4.5" fill="#9aa6c8" ' + O + '/><circle cx="12" cy="10" r="6.5" fill="#aab4d4" ' + O + '/><path d="M12 13c0 3 0 5 1.5 7.5 1 1.5 3 1 3-.5" fill="none" stroke="#aab4d4" stroke-width="3.2" stroke-linecap="round"/><circle cx="9.5" cy="9.5" r="1" fill="#2b2430"/><circle cx="14.5" cy="9.5" r="1" fill="#2b2430"/>',
+        bird:        '<path d="M2.5 12c3 0 4-3 7-4 4-1.5 8 0 10 3l2.5.5-2.2 1.3c-1 4-4.5 6.5-9 6.5-3 0-6-2-8.3-7.3z" fill="#3a8ee6" ' + O + '/><path d="M8 12c2 2 5 2.5 7 1.5" stroke="#1d6fa8" stroke-width="1.2" fill="none"/><circle cx="17" cy="10" r=".9" fill="#fff"/>',
+        phoenix:     '<path d="M12 4c-2 3-8 4-9.5 9 3-1 5-1 6.5 1-2 2-3 4-2.5 7 2-2 4-3 5.5-3s3.5 1 5.5 3c.5-3-.5-5-2.5-7 1.5-2 3.5-2 6.5-1-1.5-5-7.5-6-9.5-9z" fill="#ff6a1a" ' + O + '/><path d="M12 7c-1 2-3 3-4 5h8c-1-2-3-3-4-5z" fill="#ffd43b"/><circle cx="12" cy="5" r="2" fill="#ff8a1f" ' + O + '/>',
+        ant:         '<circle cx="5" cy="13" r="2.8" fill="#b0482a"/><ellipse cx="10.5" cy="13" rx="2.6" ry="2.2" fill="#b0482a"/><ellipse cx="17.5" cy="13" rx="4.5" ry="3.5" fill="#b0482a"/><path d="M8 15l-2 4M10.5 15v4.5M13 15l2 4M8 11l-2-3.5M13 11l2-4M4 10.5L2 7M6 10.5l1-3.5" stroke="#b0482a" stroke-width="1.1" stroke-linecap="round"/>',
+        trex:        '<path d="M3 21l2-6c-1-3 0-6 2-8 2-3 6-4.5 10-4 3 .3 4.5 2 4.5 4s-1.5 3-3.5 3h-3l-1 2 2 1-1 1.5-2-.5L12 18l1 3H10l-1-3-2 3z" fill="#3fae5a" ' + O + '/><circle cx="15" cy="6" r="1" fill="#2b2430"/><path d="M14 10l1.5 1M16 10l1 1" stroke="#fff" stroke-width=".9"/>',
+        smile:       FACE('#ffd43b', '<path d="M8 11.5c.5-1 1.5-1 2 0M14 11.5c.5-1 1.5-1 2 0" stroke="#5a3a10" stroke-width="1.4" fill="none" stroke-linecap="round"/><path d="M7.5 14.5c1.5 3.5 7.5 3.5 9 0z" fill="#5a3a10"/>'),
+        cool:        FACE('#ffd43b', '<path d="M4.5 10.5h15l-.5 1.5c-.5 2-1.5 2.5-3 2.5s-2.5-.5-3-2.2h-2c-.5 1.7-1.5 2.2-3 2.2s-2.5-.5-3-2.5z" fill="#2b2430"/><path d="M9 17c2 1.2 4.5 1 6-.5" stroke="#5a3a10" stroke-width="1.4" fill="none" stroke-linecap="round"/>'),
+        imp:         '<path d="M4 3.5c0 3 1 4.5 3 5.5M20 3.5c0 3-1 4.5-3 5.5" fill="none" stroke="#6a2fb0" stroke-width="2.4" stroke-linecap="round"/><circle cx="12" cy="13.5" r="8.5" fill="#8a4ad0" ' + O + '/><path d="M7.5 10.5l3 1.5M16.5 10.5l-3 1.5" stroke="#2b1a3a" stroke-width="1.6" stroke-linecap="round"/><path d="M8 17.5c2.5-2 5.5-2 8 0" stroke="#2b1a3a" stroke-width="1.6" fill="none" stroke-linecap="round"/>',
+        teddy:       '<circle cx="6" cy="5.5" r="2.8" fill="#b07a42" ' + O + '/><circle cx="18" cy="5.5" r="2.8" fill="#b07a42" ' + O + '/>' + FACE('#c8915a', EYES + '<ellipse cx="12" cy="15.8" rx="3" ry="2.3" fill="#f0d0a8"/><ellipse cx="12" cy="15" rx="1.2" ry=".8" fill="#2b2430"/>'),
+        man:         '<circle cx="12" cy="13" r="8" fill="#f6d2b0" ' + O + '/><path d="M4 12c0-6 4-8.5 8-8.5s8 2.5 8 8.5c-1-3-3-4-8-4s-7 1-8 4z" fill="#3a2a1a"/>' + EYES.replace(/12.3/g, '13') + SMILE.replace('15.6', '16.3'),
+        woman:       '<path d="M3.5 14c0-7 3.5-11 8.5-11s8.5 4 8.5 11v7h-17z" fill="#8a4a1a"/><circle cx="12" cy="13" r="7" fill="#f6d2b0" ' + O + '/><path d="M5 11c1-4 4-6 7-6s6 2 7 6c-3-1-6-3-7-5-1 2-4 4-7 5z" fill="#8a4a1a"/>' + EYES.replace(/12.3/g, '13') + SMILE.replace('15.6', '16.3'),
+        boy:         '<circle cx="12" cy="13" r="8" fill="#f6d2b0" ' + O + '/><path d="M4 12c0-5 3-8 8-8 2 0 4 1 5 2.5 1.5-.5 3 0 3 2-1 1-2 1-3 .5-3 0-8 0-13 3z" fill="#5a3a1a"/>' + EYES.replace(/12.3/g, '13') + SMILE.replace('15.6', '16.3'),
+        grandma:     '<circle cx="12" cy="4.5" r="3" fill="#dfe2e8" ' + O + '/><circle cx="12" cy="13.5" r="7.8" fill="#f6d2b0" ' + O + '/><path d="M4.2 12.5c0-4 3.5-6.5 7.8-6.5s7.8 2.5 7.8 6.5c-2-2.5-5-3.5-7.8-3.5s-5.8 1-7.8 3.5z" fill="#dfe2e8"/><circle cx="9" cy="13.3" r="2" fill="none" stroke="#5a6475" stroke-width="1"/><circle cx="15" cy="13.3" r="2" fill="none" stroke="#5a6475" stroke-width="1"/>' + SMILE.replace('15.6', '17')    };
 
     // ---- 絵文字 → アイコン名 ----
     // キーは異体字セレクタ(U+FE0F)なしで書く(変換時に取りのぞいてから引く)
@@ -203,16 +360,37 @@
         '🪙': 'coin', '🛒': 'cart', '⛩': 'torii', '🎲': 'dice', '🧩': 'puzzle', '🏳': 'flag_white',
         '⛲': 'fountain', '🤔': 'thinking', '🕯': 'candle', '💡': 'bulb', '🚶': 'walk', '🧴': 'bottle',
         '🙏': 'pray', '⛈': 'storm', '😩': 'tired', '🫧': 'bubbles', '🍒': 'cherry', '🔔': 'bell',
-        '🎊': 'confetti', '🏮': 'lantern', '💤': 'zzz'
+        '🎊': 'confetti', '🏮': 'lantern', '💤': 'zzz',
+        '⛏': 'pickaxe', '⚒': 'hammer_pick', '💰': 'moneybag', '💸': 'money_wings', '⏰': 'alarm', '⏱': 'stopwatch', '⏳': 'hourglass', '⌛': 'hourglass',
+        '🗝': 'oldkey', '🔑': 'key', '🪨': 'rock', '💨': 'wind', '⬜': 'square_white', '⚠': 'warning', '🧭': 'compass',
+        '🎆': 'fireworks', '🎇': 'fireworks', '🌠': 'shooting_star', '🚫': 'forbidden', '🏁': 'checkered', '🚩': 'flag_red', '🔧': 'wrench',
+        '👀': 'eyes', '🎨': 'palette', '🖌': 'paintbrush', '💦': 'sweat', '🤖': 'robot', '🎮': 'gamepad', '📱': 'phone',
+        '📅': 'calendar', '📆': 'calendar', '🔢': 'numbers', '🔟': 'ten', '💯': 'hundred', '➕': 'plus', '🔤': 'abc', '🅰': 'letter_a', '🆙': 'up_word',
+        '♾': 'infinity', '♻': 'recycle', '🪞': 'mirror', '⏩': 'fast_forward', '⏮': 'prev', '💣': 'bomb', '💍': 'ring',
+        '🧵': 'thread', '🪵': 'wood', '🔩': 'nut_bolt', '📥': 'inbox', '📤': 'outbox', '📂': 'folder', '📁': 'folder', '📧': 'email', '✉': 'email',
+        '🏫': 'school', '🧹': 'broom', '🏥': 'hospital', '🏛': 'classical', '🏚': 'derelict', '🌋': 'volcano', '🛏': 'bed', '🖼': 'picture',
+        '🎟': 'ticket', '🎫': 'ticket', '🎖': 'military', '🔗': 'link', '🩸': 'blood', '🩹': 'bandage', '💉': 'syringe', '🪜': 'ladder', '⚖': 'scales',
+        '🧧': 'red_envelope', '🍖': 'meat', '🚪': 'door', '👆': 'point_up', '☝': 'point_up', '✋': 'hand', '🖐': 'hand', '👂': 'ear', '🦶': 'foot',
+        '🧠': 'brain', '🗂': 'dividers', '📝': 'memo', '✏': 'pencil', '⌨': 'keyboard', '👓': 'glasses', '🎤': 'mic', '🎻': 'violin',
+        '🟠': 'circle_orange', '🔹': 'diamond_sblue', '🔸': 'diamond_sorange', '🤍': 'heart_white', '🌙': 'moon', '🌛': 'moon', '🌞': 'sun_face', '🌅': 'sunrise',
+        '🌈': 'rainbow', '🌸': 'cherry_blossom', '🍃': 'leaf', '🌿': 'herb', '🍀': 'clover', '🌵': 'cactus', '🥀': 'wilted', '🏕': 'camping',
+        '⛄': 'snowman', '🎃': 'pumpkin', '🀄': 'mahjong',
+        '🚀': 'rocket', '✈': 'airplane', '🚌': 'bus', '🚃': 'train', '🚒': 'firetruck', '🚲': 'bicycle', '🏍': 'motorcycle', '🚁': 'helicopter', '🛼': 'roller_skate', '🗼': 'tower',
+        '🍎': 'apple', '🥕': 'carrot', '🍌': 'banana', '🍅': 'tomato', '🍕': 'pizza', '🍰': 'cake', '🎂': 'birthday_cake', '🍙': 'onigiri', '🥛': 'milk', '🍞': 'bread',
+        '🍩': 'donut', '🍫': 'chocolate', '🍭': 'lollipop', '🍜': 'ramen', '🍹': 'tropical',
+        '🐶': 'dog', '🐱': 'cat', '🐰': 'rabbit', '🐼': 'panda', '🐻‍❄': 'polar_bear', '🐯': 'tiger', '🦁': 'lion', '🐮': 'cow', '🐸': 'frog', '🐣': 'chick',
+        '🐭': 'mouse', '🐘': 'elephant', '🐦‍🔥': 'phoenix', '🐦': 'bird', '🐜': 'ant', '🦖': 'trex', '😄': 'smile', '😊': 'smile', '😎': 'cool', '👿': 'imp', '🧸': 'teddy',
+        '👨': 'man', '👩': 'woman', '👦': 'boy', '👵': 'grandma'
     };
 
     // 絵文字らしい文字(対応表にないものも拾って「未対応」として記録する)
     // ZWJ でつながった絵文字・肌色・異体字セレクタもひとかたまりで拾う
-    var EMO = '(?:[\\u{1F000}-\\u{1FAFF}]|[\\u2600-\\u26FF]|[\\u2700-\\u27BF]|[\\u23E9-\\u23FA]|\\u2B50|\\u2B55|\\u2B1B|\\u2B1C)';
+    var EMO = '(?:[\\u{1F000}-\\u{1FAFF}]|\\u2328|\\u231A|\\u231B|[\\u2600-\\u26FF]|[\\u2700-\\u27BF]|[\\u23E9-\\u23FA]|\\u2B50|\\u2B55|\\u2B1B|\\u2B1C)';
     var RE = new RegExp(EMO + '(?:\\uFE0F|[\\u{1F3FB}-\\u{1F3FF}])?(?:\\u200D' + EMO + '\\uFE0F?)*', 'gu');
     // 日本語フォントにある記号は変換しない
-    var KEEP = /^[♠-♧★☆☐-☒←-⇿■-◿♪♫✓✕✖✦✧✂☀-☃♀♂←]$/u;
+    var KEEP = /^[♠-♧★☆☐-☒←-⇿■-◿♪♫♬✓✕✖✦✧✂☀-☃♀♂←]$/u;
 
+    var LEAD = new RegExp('^\\s*(' + EMO + '(?:\\uFE0F|[\\u{1F3FB}-\\u{1F3FF}])?(?:\\u200D' + EMO + '\\uFE0F?)*)', 'u');   // 文字の頭の絵文字
     var missing = {};
 
     function nameOf(emo) {
@@ -252,12 +430,35 @@
 
     function hasEmoji(s) { RE.lastIndex = 0; return RE.test(s); }
 
+    // 変換で1つの文字から分かれた部品(文字・アイコン)の組。
+    // 「先頭の文字ノードだけ書き換える」作りのゲーム(多言語切替など)で、
+    // 古いアイコンが残って2重にならないように、書き直されたら同じ組の古い部品を片づける。
+    var groupOf = typeof WeakMap === 'function' ? new WeakMap() : null;
+
     function convertText(tn) {
         var s = tn.nodeValue;
         if (!s || !hasEmoji(s)) return;
         var p = tn.parentNode;
         if (!p || SKIP[p.nodeName] || p.isContentEditable) return;
         if (p.closest && p.closest('svg,.fgi')) return;
+        if (groupOf && groupOf.has(tn)) {
+            var old = groupOf.get(tn);
+            for (var gi = 0; gi < old.length; gi++) {
+                if (old[gi] !== tn && old[gi].parentNode === p) p.removeChild(old[gi]);
+            }
+            groupOf.delete(tn);
+        }
+        // 複製された部品でも同じことが起きるので、文字の頭にある絵文字と同じアイコンが
+        // すぐ前に並んでいたら(=前回の変換の残り)片づける
+        var prev = tn.previousSibling;
+        if (prev && prev.nodeType === 1 && prev.classList && prev.classList.contains('fgi')) {
+            var lead = [], lm, rest = s;
+            while ((lm = LEAD.exec(rest))) { lead.push(nameOf(lm[1])); rest = rest.slice(lm[0].length); }
+            var li = lead.length - 1;
+            while (prev && li >= 0 && prev.nodeType === 1 && prev.classList && prev.classList.contains('fgi') && prev.getAttribute('data-fgi') === lead[li]) {
+                var pp = prev.previousSibling; p.removeChild(prev); prev = pp; li--;
+            }
+        }
         if (STRIP[p.nodeName]) {
             var t = s.replace(RE, function (m) { return KEEP.test(m) ? m : ''; }).replace(/^\s+/, '');
             if (t !== s) tn.nodeValue = t;
@@ -283,6 +484,10 @@
         }
         if (!frag) return;
         if (last < s.length) frag.appendChild(document.createTextNode(s.slice(last)));
+        if (groupOf) {
+            var group = Array.prototype.slice.call(frag.childNodes);
+            for (var k = 0; k < group.length; k++) if (group[k].nodeType === 3) groupOf.set(group[k], group);
+        }
         p.replaceChild(frag, tn);
     }
 
@@ -322,9 +527,114 @@
         mo.observe(document.body, { childList: true, subtree: true, characterData: true });
     }
 
+    // ---- canvas の fillText / strokeText / measureText ----
+    // canvas に描く文字の絵文字も、自前アイコンの画像で描く(ゲーム側の変更は不要)。
+    // 画像は最初に全部読みこんでおく。読みこみ前に描かれた分は、次の描き直しから絵になる。
+    var imgCache = {};
+    function iconImage(n) {
+        var im = imgCache[n];
+        if (!im) {
+            im = new Image();
+            im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(
+                '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="128" height="128">' + ICONS[n] + '</svg>');
+            imgCache[n] = im;
+        }
+        return im;
+    }
+    function fontPx(ctx) {
+        var m = /(\d+(?:\.\d+)?)px/.exec(ctx.font || '');
+        return m ? parseFloat(m[1]) : 10;
+    }
+    // 文字列を「文字」と「アイコン」の並びに分ける(絵文字がなければ null)
+    function splitIcons(text) {
+        text = String(text);
+        if (!hasEmoji(text)) return null;
+        var parts = [], last = 0, m, found = false;
+        RE.lastIndex = 0;
+        while ((m = RE.exec(text))) {
+            var e = m[0];
+            if (KEEP.test(e.replace(/️/g, ''))) continue;
+            var n = nameOf(e);
+            if (!n) { missing[e] = (missing[e] || 0) + 1; continue; }
+            if (m.index > last) parts.push({ t: text.slice(last, m.index) });
+            parts.push({ icon: n, e: e });
+            last = m.index + e.length; found = true;
+        }
+        if (!found) return null;
+        if (last < text.length) parts.push({ t: text.slice(last) });
+        return parts;
+    }
+    function patchCanvas() {
+        var P = window.CanvasRenderingContext2D && CanvasRenderingContext2D.prototype;
+        if (!P || P.__fgiPatched) return;
+        P.__fgiPatched = true;
+        var oFill = P.fillText, oStroke = P.strokeText, oMeasure = P.measureText;
+        var ICON_W = 1.15;   // アイコンの幅(文字の大きさに対する倍率)
+        function layout(ctx, parts) {
+            var px = fontPx(ctx), w = 0;
+            for (var i = 0; i < parts.length; i++) {
+                var p = parts[i];
+                p.w = p.icon ? px * ICON_W : oMeasure.call(ctx, p.t).width;
+                w += p.w;
+            }
+            return { px: px, w: w };
+        }
+        function draw(ctx, parts, x, y, stroke, orig) {
+            var L = layout(ctx, parts), px = L.px;
+            var align = ctx.textAlign, base = ctx.textBaseline;
+            var x0 = x;
+            if (align === 'center') x0 = x - L.w / 2;
+            else if (align === 'right' || (align === 'end' && ctx.direction !== 'rtl')) x0 = x - L.w;
+            var s = px * ICON_W, top;
+            if (base === 'middle') top = y - s / 2;
+            else if (base === 'top' || base === 'hanging') top = y - (s - px) / 2;
+            else if (base === 'bottom' || base === 'ideographic') top = y - s;
+            else top = y - px * 0.88 - (s - px) / 2;   // alphabetic
+            ctx.textAlign = 'left';
+            try {
+                for (var i = 0; i < parts.length; i++) {
+                    var p = parts[i];
+                    if (p.icon) {
+                        if (!stroke) {
+                            var im = iconImage(p.icon);
+                            if (im.complete && im.naturalWidth) ctx.drawImage(im, x0, top, s, s);
+                            else orig.call(ctx, p.e, x0, y);   // 読みこみ前はもとの絵文字で
+                        }
+                    } else if (p.t) {
+                        orig.call(ctx, p.t, x0, y);
+                    }
+                    x0 += p.w;
+                }
+            } finally { ctx.textAlign = align; }
+        }
+        P.fillText = function (text, x, y, maxW) {
+            var parts = splitIcons(text);
+            if (!parts) return maxW === undefined ? oFill.call(this, text, x, y) : oFill.call(this, text, x, y, maxW);
+            draw(this, parts, x, y, false, oFill);
+        };
+        P.strokeText = function (text, x, y, maxW) {
+            var parts = splitIcons(text);
+            if (!parts) return maxW === undefined ? oStroke.call(this, text, x, y) : oStroke.call(this, text, x, y, maxW);
+            draw(this, parts, x, y, true, oStroke);
+        };
+        P.measureText = function (text) {
+            var parts = splitIcons(text);
+            var r = oMeasure.call(this, text);
+            if (!parts) return r;
+            var w = layout(this, parts).w, o = {};
+            for (var k in r) o[k] = r[k];
+            o.width = w;
+            return o;
+        };
+        // 画像を先に読みこんでおく
+        for (var n in ICONS) iconImage(n);
+    }
+    try { patchCanvas(); } catch (e) { /* canvas がない環境 */ }
+
     window.FGLIcons = {
         ICONS: ICONS, MAP: MAP,
         svg: svg, html: html, nameOf: nameOf, convert: convert,
+        image: iconImage,
         missing: function () { return Object.assign({}, missing); },
         stats: stats
     };
