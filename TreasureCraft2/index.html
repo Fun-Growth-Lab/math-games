@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<script>if(screen.orientation&&screen.orientation.lock){screen.orientation.lock('landscape').catch(function(){});}</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>トレジャークラフト2（開発中） - Fun &amp; Growth Lab</title>
+<meta name="description" content="木を切り、地下を掘り、道具を組み立てて、異世界の魔王をたおそう。1歩ごとに時間が進むターン制サバイバルクラフト。">
+<link rel="canonical" href="https://fun-growth-lab.github.io/math-games/TreasureCraft2/index.html">
+<link rel="icon" href="../images/icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../fgl-title.css?v=20261103e">
+<style>
+:root { --wood:#c89a5c; --wood-dk:#7c5228; --wood-lt:#f0dcb4; --ink:#3a2612; --leaf:#5aa83f; --leaf-dk:#35772a; --red:#e0483c; --sky:#4a9fd8; --gold:#ffd84a; }
+* { box-sizing:border-box; margin:0; padding:0; }
+html,body { height:100%; overflow:hidden; background:#23331c; font-family:"M PLUS Rounded 1c",sans-serif; user-select:none; -webkit-user-select:none; touch-action:none; color:var(--ink); }
+#stage { position:absolute; left:0; top:0; width:1280px; height:720px; transform-origin:0 0; overflow:hidden; background:#2f7fbf; }
+#world { position:absolute; inset:0; width:1280px; height:720px; }
+.hidden { display:none !important; }
+button { font-family:inherit; color:inherit; cursor:pointer; }
+
+/* 木の札のボタン */
+.wbtn { white-space:nowrap; font-weight:800; font-size:20px; padding:8px 18px; border:3px solid var(--wood-dk); border-radius:12px; background:linear-gradient(#f4e2bc,#dcbc84); box-shadow:0 4px 0 var(--wood-dk); }
+.wbtn:active { transform:translateY(3px); box-shadow:0 1px 0 var(--wood-dk); }
+.wbtn.big { font-size:28px; padding:14px 30px; min-width:240px; }
+.menu-main { justify-content:center; gap:18px; margin:14px 0 8px; }
+.wbtn.blue { background:linear-gradient(#a8d4f6,#5a9fd8); border-color:#2a5a8a; box-shadow:0 4px 0 #2a5a8a; color:#0c2a4a; }
+.wbtn.go { background:linear-gradient(#a6e07c,#6cbc4a); border-color:var(--leaf-dk); box-shadow:0 4px 0 var(--leaf-dk); color:#14330a; }
+.wbtn.no { opacity:.5; }
+
+/* HUD */
+#hud { position:absolute; inset:0; pointer-events:none; }
+#hud > * { pointer-events:auto; }
+.plate { background:rgba(255,246,224,.93); border:3px solid var(--wood-dk); border-radius:12px; box-shadow:0 3px 0 rgba(60,36,12,.6); }
+#bars { position:absolute; left:12px; top:12px; width:300px; padding:8px 12px; display:grid; gap:6px; pointer-events:none; }
+.bar-row { display:flex; align-items:center; gap:8px; font-weight:800; font-size:17px; }
+.bar { flex:1; height:16px; background:#5c4630; border-radius:8px; overflow:hidden; }
+.bar i { display:block; height:100%; border-radius:8px; }
+#air-fill { background:linear-gradient(#a8e8ff,#3f9fe0); }
+#hp-fill { background:linear-gradient(#ff7a6a,#e0483c); } #food-fill { background:linear-gradient(#ffc26a,#e8922c); }
+.bar-num { width:66px; text-align:right; font-size:15px; }
+#clock { position:absolute; right:12px; top:12px; padding:6px 12px; font-weight:800; font-size:18px; text-align:right; pointer-events:none; line-height:1.3; }
+#clock small { display:block; font-size:14px; font-weight:700; color:#6a4c2c; }
+#goal { position:absolute; left:328px; right:300px; top:12px; padding:7px 12px; font-weight:800; font-size:16px; text-align:center; pointer-events:none; line-height:1.3; }
+#log { position:absolute; left:290px; right:290px; bottom:106px; pointer-events:none !important; text-align:center; display:flex; flex-direction:column; align-items:center; gap:3px; }
+#log div { background:rgba(30,20,10,.72); color:#fff; border-radius:8px; padding:2px 12px; font-size:16px; font-weight:700; }
+#log .good { color:#b8f09a; } #log .bad { color:#ffb0a4; } #log .warn { color:#ffe48a; }
+#hot { position:absolute; left:50%; transform:translateX(-50%); bottom:10px; display:flex; gap:5px; padding:6px; }
+.slot { position:relative; width:76px; height:76px; border:3px solid var(--wood-dk); border-radius:10px; background:#f5e6c4; display:flex; align-items:center; justify-content:center; padding:0; }
+.slot img { width:66px; height:66px; image-rendering:pixelated; pointer-events:none; }
+.slot .emo { font-size:40px; line-height:1; pointer-events:none; }
+.slot .n { position:absolute; right:3px; bottom:1px; font-weight:900; font-size:18px; color:#fff; text-shadow:0 0 3px #000,0 0 3px #000; pointer-events:none; }
+.slot .key { position:absolute; left:4px; top:0; font-size:13px; font-weight:800; color:#8a6a44; pointer-events:none; }
+.slot .dur { position:absolute; left:6px; right:6px; bottom:4px; height:6px; background:#5c4630; border-radius:3px; overflow:hidden; pointer-events:none; }
+.slot .dur i { display:block; height:100%; background:#6ad05a; }
+.slot .eq { position:absolute; right:3px; top:1px; width:20px; height:20px; border-radius:50%; background:#ff9a1c; color:#fff; font-size:13px; font-weight:900; line-height:20px; text-align:center; pointer-events:none; }
+.slot.sel { border-color:#ff9a1c; box-shadow:0 0 0 3px #ffd84a; background:#fff3cf; }
+#hot .slot { width:66px; height:66px; } #hot .slot img { width:58px; height:58px; } #hot .slot .emo { font-size:34px; }
+#dpad { pointer-events:none; position:absolute; left:14px; bottom:14px; width:234px; height:234px; display:grid; grid-template:repeat(3,1fr)/repeat(3,1fr); gap:3px; touch-action:none; }
+.pad { pointer-events:auto; background:rgba(255,246,224,.72); border:3px solid var(--wood-dk); border-radius:14px; font-size:34px; font-weight:900; display:flex; align-items:center; justify-content:center; padding:0; touch-action:none; }
+.pad.on { background:#ffd84a; }
+#btn-turn { font-size:16px; line-height:1.15; flex-direction:column; gap:3px; }
+#btn-turn.on { background:#7fd0ff; }
+#actions { position:absolute; right:14px; bottom:14px; width:262px; height:234px; }
+.act { position:absolute; border:4px solid var(--wood-dk); border-radius:50%; font-weight:900; display:flex; flex-direction:column; align-items:center; justify-content:center; line-height:1.1; padding:0; touch-action:none; box-shadow:0 4px 0 var(--wood-dk); }
+.act:active { transform:translateY(3px); box-shadow:0 1px 0 var(--wood-dk); }
+.kbd { position:absolute; right:-4px; top:-4px; min-width:24px; height:24px; padding:0 4px; border-radius:7px; background:#3a2612; color:#fff; font-size:15px; font-weight:800; font-style:normal; line-height:24px; text-align:center; }
+.kbd2 { display:block; font-size:12px; font-weight:800; font-style:normal; background:#3a2612; color:#fff; border-radius:5px; padding:0 4px; line-height:16px; }
+@media (hover:none) and (pointer:coarse) { body:not(.haskeys) .kbd, body:not(.haskeys) .kbd2 { display:none; } }
+#tip { position:absolute; z-index:60; transform:translate(-50%,-100%); background:#3a2612; color:#fff; font-size:18px; font-weight:800; padding:4px 12px; border-radius:8px; white-space:nowrap; pointer-events:none; }
+body.bigui #dpad { transform:scale(var(--k)); transform-origin:left bottom; }
+body.bigui #actions { transform:scale(var(--k)); transform-origin:right bottom; }
+body.bigui #hot { left:var(--hl); transform:scale(var(--kh)); transform-origin:left bottom; }
+body.bigui #log { bottom:var(--logb); }
+body.bigui .wbtn { font-size:24px; padding:12px 24px; }
+body.bigui .tab { font-size:24px; padding:12px 20px; }
+body.bigui .pickb { padding:9px 12px; font-size:19px; }
+body.bigui .rec .wbtn { font-size:21px; padding:12px 14px; }
+body.bigui #btn-menu { width:96px; height:60px; font-size:20px; }
+#ach-toast { position:absolute; left:50%; top:70px; z-index:35; transform:translate(-50%,-260px); opacity:0; transition:transform .3s, opacity .3s; background:#3a2612; color:#fff; border:3px solid #ffd84a; border-radius:12px; padding:8px 20px; text-align:center; pointer-events:none; }
+#ach-toast.on { transform:translate(-50%,0); opacity:1; }
+.own { color:#2a7ab8; font-weight:800; }
+.lookrow { display:grid; grid-template-columns:repeat(8, 1fr); gap:8px; margin:8px 0; }
+.look { background:#fff8e6; border:3px solid var(--wood); border-radius:10px; padding:6px 2px 4px; display:flex; flex-direction:column; align-items:center; gap:2px; font-size:15px; font-weight:800; color:#5c3c1c; min-width:0; }
+.look img { height:96px; image-rendering:pixelated; }
+.look span { font-size:13px; line-height:1.15; text-align:center; word-break:keep-all; max-width:100%; }
+.look.on { border-color:#ff9a1c; box-shadow:0 0 0 3px var(--gold); background:#fff3cf; }
+#panel-title { display:flex; align-items:center; gap:6px; font-size:24px; font-weight:900; color:#5c3c1c; margin-right:6px; white-space:nowrap; }
+#panel-title img { width:52px; height:52px; }
+#panel-title.hidden { display:none; }
+.pickb small.own { display:inline; font-size:15px; color:#2a7ab8; }
+#ach-toast b { display:block; font-size:21px; font-weight:900; color:#ffd84a; }
+#ach-toast span { font-size:16px; font-weight:700; }
+.agrid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; margin-bottom:8px; }
+.ac { display:flex; align-items:center; gap:10px; background:#e8d9b8; border:2px solid var(--wood); border-radius:10px; padding:5px 10px; color:#6a5230; }
+.ac i { font-style:normal; font-size:24px; width:30px; text-align:center; flex-shrink:0; }
+.ac b { display:block; font-size:17px; font-weight:900; }
+.ac span { font-size:14px; font-weight:700; line-height:1.25; display:block; }
+.ac.got { background:#fff3cf; border-color:#ff9a1c; color:var(--ink); }
+body.ach-only .tab:not(#tab-ach), body.ach-only #chips { display:none; }
+.kf { outline:4px solid #ff9a1c !important; outline-offset:1px; z-index:3; position:relative; }
+.keys { display:grid; grid-template-columns:auto 1fr; gap:4px 16px; text-align:left; font-size:18px; }
+.keys b { background:#3a2612; color:#fff; border-radius:6px; padding:0 8px; font-size:16px; text-align:center; white-space:nowrap; }
+.act b { font-size:30px; } .act span { font-size:15px; }
+#btn-use { right:0; bottom:10px; width:118px; height:118px; background:#ffd84a; } #btn-use b { font-size:38px; }
+#btn-dig { right:124px; bottom:0; width:92px; height:92px; background:#e8c49a; }
+#btn-use2 { right:118px; bottom:96px; width:78px; height:78px; background:#ffe88a; } #btn-use2 span { font-size:17px; }
+#btn-wait { right:2px; bottom:140px; width:78px; height:78px; background:#dfeaf2; }
+#btn-craft { right:84px; bottom:176px; width:88px; height:88px; background:#b6e08c; }
+#btn-map { right:180px; bottom:180px; width:70px; height:70px; background:#cfe6f6; } #btn-map b { font-size:24px; } #btn-map span { font-size:13px; }
+#btn-grid { position:absolute; right:12px; top:132px; width:66px; height:40px; font-size:13px; font-weight:800; touch-action:none; }
+#btn-grid.on { background:#ffd84a; }
+body.bigui #btn-grid { width:96px; height:52px; font-size:17px; top:150px; }
+#btn-menu { position:absolute; right:12px; top:78px; width:66px; height:44px; font-size:15px; font-weight:800; }
+
+/* 画面ぜんたいの演出 */
+#fade { position:absolute; inset:0; background:#000; opacity:0; pointer-events:none; transition:opacity .25s; display:flex; align-items:center; justify-content:center; color:#fff; font-size:44px; font-weight:900; z-index:30; }
+#banner { position:absolute; left:0; right:0; top:230px; text-align:center; pointer-events:none; z-index:25; transition:opacity .35s; opacity:0; }
+#banner b { display:block; font-size:60px; font-weight:900; color:#fff; -webkit-text-stroke:8px #2a1408; paint-order:stroke fill; }
+#banner span { font-size:24px; font-weight:800; color:#ffe48a; -webkit-text-stroke:5px #2a1408; paint-order:stroke fill; }
+
+/* パネル */
+.modal { position:absolute; inset:0; background:rgba(20,12,4,.55); z-index:40; display:flex; align-items:center; justify-content:center; }
+.sheet { background:var(--wood-lt); border:5px solid var(--wood-dk); border-radius:18px; box-shadow:0 8px 0 var(--wood-dk); position:relative; display:flex; flex-direction:column; }
+#panel .sheet { width:1210px; height:670px; padding:12px 16px; }
+.tabs { display:flex; gap:8px; align-items:center; margin-bottom:10px; }
+.tab { white-space:nowrap; flex-shrink:0; font-size:21px; font-weight:800; padding:7px 20px; border:3px solid var(--wood-dk); border-radius:12px; background:#dcbc84; }
+.tab.on { background:#fff3cf; box-shadow:0 0 0 3px var(--gold); }
+.close { margin-left:auto; }
+#panel-remove:not(.hidden) + .close, #panel-sort:not(.hidden) ~ .close { margin-left:0; }
+#panel-sort:not(.hidden) + #panel-remove { margin-left:8px !important; }
+.chips { display:flex; gap:6px; margin-left:14px; font-size:15px; font-weight:800; }
+.chip { padding:4px 10px; border-radius:999px; background:#c9b48c; color:#6a5230; } .chip.on { background:#6cbc4a; color:#fff; }
+.pbody { flex:1; min-height:0; display:flex; gap:14px; }
+.grid { display:grid; grid-template-columns:repeat(8,76px); gap:6px; align-content:start; }
+/* 持ち物は64枠: 8段がおさまるように 小さめの枠にする */
+#pbody > .grid, #chest-inv { grid-template-columns:repeat(8,56px) !important; gap:4px; position:relative; padding-top:14px; }
+#pbody > .grid .slot:nth-child(-n+8), #chest-inv .slot:nth-child(-n+8) { margin-bottom:8px; }
+#pbody > .grid .slot, #chest-inv .slot, #chest-box .slot { width:56px; height:56px; border-radius:8px; } #pbody > .grid .slot img, #chest-inv .slot img, #chest-box .slot img { width:48px; height:48px; }
+#pbody > .grid .slot .n, #chest-inv .slot .n, #chest-box .slot .n { font-size:16px; }
+#chest-box { gap:4px; }
+/* いちばん上の段は手持ち(1〜8キー): オレンジの枠でかこむ */
+#pbody > .grid::before, #chest-inv::before { content:''; position:absolute; left:-5px; right:-5px; top:9px; height:66px; border:3px solid #ff9a1c; border-radius:12px; background:rgba(255,216,74,.28); pointer-events:none; }
+#pbody > .grid::after, #chest-inv::after { content:'手持ち'; position:absolute; left:50%; transform:translateX(-50%); top:1px; padding:0 6px; font-size:12px; font-weight:900; color:#fff; background:#ff9a1c; border-radius:6px; line-height:16px; pointer-events:none; }
+/* 箱の画面は見出しのぶん せまいので もう少し小さく */
+#chest-inv { grid-template-columns:repeat(8,50px) !important; }
+#chest-inv .slot, #chest-box .slot { width:50px; height:50px; } #chest-inv .slot img, #chest-box .slot img { width:42px; height:42px; }
+#chest-inv::before { height:60px; }
+.detail { flex:1; background:#fff8e6; border:3px solid var(--wood); border-radius:12px; padding:12px 14px; font-size:18px; font-weight:700; line-height:1.5; min-width:0; }
+.detail h3 { font-size:24px; font-weight:900; margin-bottom:4px; }
+.list { flex:1; overflow-y:auto; touch-action:pan-y; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; align-content:start; padding-right:6px; }
+.bgrid { display:grid; grid-template-columns:repeat(8,minmax(0,1fr)); gap:6px; margin-bottom:8px; }
+.bk { background:#fff8e6; border:2px solid var(--wood); border-radius:10px; padding:3px; text-align:center; font-size:13px; font-weight:800; line-height:1.2; }
+.bk img { width:52px; height:52px; display:block; margin:auto; image-rendering:pixelated; }
+.bk .q { height:52px; line-height:52px; font-size:30px; font-weight:900; color:#a89878; }
+.bk.un { background:#e8d9b8; color:#8a7450; }
+.sec { grid-column:1/-1; display:flex; align-items:center; gap:8px; font-size:20px; font-weight:900; color:#5c3c1c; padding-top:4px; }
+.sec img { width:44px; height:44px; }
+.sec small { font-size:14px; font-weight:800; color:#c8301c; margin-left:6px; }
+.sec.off { color:#8a7450; } .sec.off img { filter:grayscale(.7); opacity:.7; }
+.rec { display:flex; align-items:center; gap:8px; background:#fff8e6; border:3px solid var(--wood); border-radius:12px; padding:5px 8px; min-height:74px; }
+.rec.off { background:#e8dcc2; border-color:#b89a72; }
+.rec.off .nm { color:#8a7458; } .rec.off .nd { color:#9a8466 !important; } .rec.off .nd .ok { color:#5c8a50; } .rec.off .ic { opacity:.5; filter:grayscale(.5); }
+.pickb.short { background:#efe4cc; border-color:#b89a72; color:#8a7458; } .pickb.short small { color:#9a8466; }
+.pickb small .lack { color:#c8301c; font-weight:900; } .pickb small .ok { color:#2c7a1c; }
+.tic { width:32px; height:32px; image-rendering:pixelated; vertical-align:middle; }
+.rec .ic img { image-rendering:pixelated; }
+.rec .ic { width:56px; height:56px; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:36px; } .rec .ic img { width:56px; height:56px; }
+.rec .tx { flex:1; min-width:0; } .rec .nm { font-size:18px; font-weight:900; } .rec .nd { font-size:14px; font-weight:700; line-height:1.3; }
+.nd .lack { color:#c8301c; } .nd .ok { color:#2c7a1c; }
+.rec .wbtn { font-size:17px; padding:6px 12px; flex-shrink:0; }
+.col { display:flex; flex-direction:column; gap:6px; min-width:0; }
+.col h4 { font-size:17px; font-weight:900; color:#6a4c2c; }
+.pickb { width:100%; text-align:left; background:#fff8e6; border:3px solid var(--wood); border-radius:10px; padding:4px 10px; font-size:17px; font-weight:800; line-height:1.25; }
+.pickb small { display:block; font-size:13px; font-weight:700; color:#6a4c2c; }
+.pickb { position:relative; }
+.pickb .st { position:absolute; right:4px; top:50%; transform:translateY(-50%); width:36px; height:36px; }
+.pickb.on { border-color:#ff9a1c; box-shadow:0 0 0 3px var(--gold); background:#fff3cf; }
+.pickb.lock { opacity:.5; }
+.scr { overflow-y:auto; touch-action:pan-y; display:flex; flex-direction:column; gap:5px; padding:3px 6px 3px 3px; flex:1; min-height:0; }
+.stat { display:flex; justify-content:space-between; font-size:19px; font-weight:800; border-bottom:2px dotted #c8a878; padding:3px 0; }
+.up { color:#2c7a1c; } .down { color:#c8301c; }
+
+.box { padding:20px 28px; width:640px; max-height:680px; text-align:center; gap:12px; font-size:20px; font-weight:700; line-height:1.5; }
+.box h2 { font-size:32px; font-weight:900; }
+.box .row { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+.box input { font:inherit; font-weight:800; padding:8px 12px; border:3px solid var(--wood-dk); border-radius:10px; width:300px; text-align:center; touch-action:auto; user-select:text; -webkit-user-select:text; }
+#map-sheet { flex-direction:row; padding:14px; gap:14px; }
+#map-cv { width:660px; height:660px; background:#100c08; image-rendering:pixelated; border-radius:8px; display:block; }
+#map-side { width:340px; display:flex; flex-direction:column; gap:10px; font-size:18px; font-weight:700; line-height:1.5; }
+.rk { flex:1; overflow-y:auto; touch-action:pan-y; text-align:left; width:100%; max-height:420px; }
+.rk div { display:flex; gap:12px; padding:5px 10px; border-bottom:2px dotted #c8a878; font-size:19px; }
+.rk b { width:44px; } .rk span { flex:1; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; } .rk em { font-style:normal; font-weight:900; }
+
+#title-screen { position:absolute; inset:0; z-index:20; }
+#title-real { position:absolute; left:-4000px; top:0; opacity:0; }
+</style>
+</head>
+<body>
+<div id="stage">
+    <canvas id="world" width="1280" height="720"></canvas>
+
+    <div id="hud" class="hidden">
+        <div id="bars" class="plate">
+            <div class="bar-row"><span>❤️</span><div class="bar"><i id="hp-fill"></i></div><span class="bar-num" id="hp-num"></span></div>
+            <div class="bar-row"><span>🍖</span><div class="bar"><i id="food-fill"></i></div><span class="bar-num" id="food-num"></span></div>
+            <div class="bar-row hidden" id="air-row"><span>🫧</span><div class="bar"><i id="air-fill"></i></div><span class="bar-num" id="air-num"></span></div>
+        </div>
+        <div id="goal" class="plate"></div>
+        <div id="clock" class="plate"></div>
+        <button id="btn-grid" class="wbtn" style="padding:0">グリッド<i class="kbd2" style="position:absolute;right:2px;top:-8px">G</i></button>
+        <button id="btn-menu" class="wbtn" style="padding:0">メニュー<i class="kbd2" style="position:absolute;right:2px;top:-8px">Esc</i></button>
+        <div id="log"></div>
+        <div id="hot" class="plate"></div>
+        <div id="dpad">
+            <span></span><button class="pad" data-d="0,-1" aria-label="上">▲</button><span></span>
+            <button class="pad" data-d="-1,0" aria-label="左">◀</button><button class="pad" id="btn-turn"><span>向き<br>だけ</span><i class="kbd2">Shift</i></button><button class="pad" data-d="1,0" aria-label="右">▶</button>
+            <span></span><button class="pad" data-d="0,1" aria-label="下">▼</button><span></span>
+        </div>
+        <div id="actions">
+            <button class="act" id="btn-map"><i class="kbd">M</i><b>🗺️</b><span>地図</span></button>
+            <button class="act" id="btn-craft"><i class="kbd">E</i><b>🎒</b><span>持ち物</span></button>
+            <button class="act" id="btn-wait"><i class="kbd">Q</i><b>⏳</b><span>まつ</span></button>
+            <button class="act" id="btn-dig"><i class="kbd">X</i><b>⛏️</b><span>ほる</span></button>
+            <button class="act hidden" id="btn-use2"><i class="kbd">C</i><span></span></button>
+            <button class="act" id="btn-use"><i class="kbd">Z</i><b>✋</b><span>つかう</span></button>
+        </div>
+    </div>
+
+    <div id="banner"><b></b><span></span></div>
+    <div id="fade"></div>
+    <div id="ach-toast"></div>
+    <div id="tip" class="hidden"></div>
+
+    <div id="panel" class="modal hidden"><div class="sheet">
+        <div class="tabs">
+            <span id="panel-title" class="hidden"></span>
+            <button class="tab" id="tab-inv" data-tab="inv">持ち物</button>
+            <button class="tab" id="tab-make" data-tab="make">つくる</button>
+            <button class="tab" id="tab-tool" data-tab="tool">組み立て</button>
+            <button class="tab" id="tab-book" data-tab="book">図鑑</button>
+            <button class="tab" id="tab-ach" data-tab="ach">実績</button>
+            <div class="chips" id="chips"></div>
+            <button class="wbtn hidden" id="panel-sort" style="margin-left:auto" title="2段目から下を ならべかえる(手持ちはそのまま)">ならべる</button>
+            <button class="wbtn hidden" id="panel-remove" style="margin-left:auto">片づける</button>
+            <button class="wbtn close" id="panel-close">とじる</button>
+        </div>
+        <div class="pbody" id="pbody"></div>
+    </div></div>
+    <div id="chest-modal" class="modal hidden"><div class="sheet" style="width:1210px;height:600px;padding:12px 16px">
+        <div class="tabs"><span style="font-size:24px;font-weight:900">箱(タップで出し入れ)</span><button class="wbtn" id="chest-remove" style="margin-left:auto">箱を片づける</button><button class="wbtn" id="chest-close">とじる</button></div>
+        <div class="pbody" style="justify-content:center;gap:30px">
+            <div class="col"><h4>持ち物</h4><div class="grid" id="chest-inv" style="grid-template-columns:repeat(8,64px)"></div></div>
+            <div class="col"><h4>箱の中</h4><div class="grid" id="chest-box" style="grid-template-columns:repeat(4,64px)"></div></div>
+        </div>
+    </div></div>
+    <div id="map-modal" class="modal hidden"><div class="sheet" id="map-sheet">
+        <canvas id="map-cv" width="250" height="250"></canvas>
+        <div id="map-side">
+            <div class="tabs" id="map-tabs" style="flex-wrap:wrap"></div>
+            <div id="map-info"></div>
+            <button class="wbtn" id="map-close" style="margin-top:auto">とじる</button>
+        </div>
+    </div></div>
+    <div id="dialog" class="modal hidden"><div class="sheet box" id="dialog-box"></div></div>
+
+    <div id="title-screen">
+        <div id="title-real">
+            <button id="btn-start"></button><button id="btn-new">はじめから</button><button id="btn-tutorial">チュートリアル</button><button id="btn-howto">あそびかた</button>
+            <button id="btn-rank">ランキング</button><button id="btn-ach">実績</button><button id="btn-sound">設定</button><button id="btn-name">ニックネーム</button><button id="btn-home">ホーム</button>
+        </div>
+    </div>
+</div>
+
+<script src="../fgl-sfx.js?v=20261103e"></script>
+<script src="../fgl-bgm.js?v=20261103e"></script>
+<script src="../fgl-name.js?v=20261103e"></script>
+<script src="../fgl-nudge.js?v=20261103e"></script>
+<script src="../fgl-howto.js?v=20261103e"></script>
+<script src="../fgl-touch.js?v=20261103e"></script>
+<script src="../tutorial-engine.js?v=20261103e"></script>
+<script src="../fgl-title.js?v=20261103e"></script>
+<script src="data.js?v=1"></script>
+<script src="world.js?v=1"></script>
+<script src="places.js?v=1"></script>
+<script src="achievements.js?v=1"></script>
+<script src="game.js?v=1"></script>
+<script src="circuit.js?v=1"></script>
+<script src="pixels.js?v=1"></script>
+<script src="render.js?v=1"></script>
+<script src="ui.js?v=1"></script>
+</body>
+</html>
