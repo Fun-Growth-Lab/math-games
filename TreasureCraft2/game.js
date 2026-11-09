@@ -1505,7 +1505,7 @@ function useLadder(x, y, t, id) {
         else if (!TILE[t].ground) { H.log('掘って広げた床に かけよう', ''); return; }
         else setT(S.f, x, y, T.LADDER_U);
     } else { H.log('ここでは はしごは使えない', ''); return; }
-    removeItem(id, 1); H.sfx('place'); H.log('はしごをかけた。乗ると移動できる', 'good');
+    removeItem(id, 1); H.sfx('place'); const up = getT(S.f, x, y) === T.LADDER_U; H.log(up ? '上の階へ のぼる はしごをかけた(下へ行くときは「ほる」で 床に穴をあけてから かけよう)' : '下の階へ おりる はしごをかけた', 'good');
     endTurn(1);
 }
 // はしごをはずす: はしごが1こもどり、穴はうまる(上と下の階の はしごも 消える)
