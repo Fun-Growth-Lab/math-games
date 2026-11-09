@@ -160,8 +160,8 @@ function buildSprites() {
     o[T.GLASS] = [block(TX.glass, .85)];
     // 回路
     // 赤いパネル(床)・赤いかべ。信号が来ていると明るい
-    o[T.WIRE] = [boxSprite([[.06, .06, 0, .94, .94, .04, '#7a2018'], [.24, .24, .04, .76, .76, .06, '#a8301c'], [.42, .42, .06, .58, .58, .07, '#5a160e']]), boxSprite([[.06, .06, 0, .94, .94, .04, '#c8301c'], [.24, .24, .04, .76, .76, .06, '#ff5a2c'], [.42, .42, .06, .58, .58, .07, '#ffd08a']])];
-    o[T.WIRE_W] = [boxSprite([[.04, .04, 0, .96, .96, .8, '#8a2418'], [.2, .2, .8, .8, .8, .82, '#6a1a10'], [.44, .96, .2, .56, .97, .6, '#5a160e']]), boxSprite([[.04, .04, 0, .96, .96, .8, '#c8301c'], [.2, .2, .8, .8, .8, .82, '#ff6a3c'], [.44, .96, .2, .56, .97, .6, '#ffd08a']])];
+    o[T.WIRE] = [boxSprite(wireBoxes('V', 0, false, false))]; o[T.WIRE_W] = [boxSprite([[0, 0, 0, 1, 1, .85, { top: TX.brick, side: TX.brick }]].concat(wireBoxes('V', .85, false, false)))];
+    'NESW'.split('').forEach((c, i) => { o[T['REP_' + c]] = [repSprite(i, false)]; }); o[T.NOT_V] = [notSprite('V', false, false)]; o[T.NOT_H] = [notSprite('H', false, false)];
     const sw = on => boxSprite([[.3, .3, 0, .7, .7, .16, '#8e8e8a'], [.44, .44, .16, .56, .56, .5, '#6e4622'], [.4, .4, .5, .6, .6, .6, on ? '#ff3a1c' : '#5a1a14']]);
     o[T.SWITCH_OFF] = [sw(false)]; o[T.SWITCH_ON] = [sw(true)];
     o[T.PLATE] = [boxSprite([[.14, .14, 0, .86, .86, .07, '#a2a29c']]), boxSprite([[.14, .14, 0, .86, .86, .025, '#8e8e8a']])];
@@ -226,33 +226,52 @@ function buildSprites() {
     o[T.SPAWNER] = [boxSprite([[.08, .08, 0, .92, .92, .9, '#2a1c34'], [.2, .92, .2, .36, .94, .7, '#ff6a2c'], [.5, .92, .3, .66, .94, .76, '#c05aff'], [.3, .3, .9, .7, .7, 1, '#ff6a2c']])];
     OS = o;
 }
-// 導線: となりの導線・回路の部品へ線をのばす。信号が来ていると明るい
+// 導線: 向き(たて・よこ・十字・交差)の線。信号が来ていると明るい
 const wireCache = {};
-const wireLink = (x, y) => { const t = getT(S.f, x, y), d = TILE[t]; return t === T.WIRE || t === T.WIRE_W || d.dev || t === T.SWITCH_OFF || t === T.SWITCH_ON || t === T.PLATE; };
-const wireMask = (x, y) => { let m = 0; DIR4.forEach((o, i) => { if (wireLink(x + o[0], y + o[1])) m |= 1 << i; }); return m; };
-// 線の箱(z0 の高さに うすく)。つながりがなければ 点
-function lineBoxes(m, z0, c) {
-    const z = z0 + .04, w = .13, a = .5 - w / 2, b = .5 + w / 2, l = [[a - .03, a - .03, z0, b + .03, b + .03, z, c]];
-    if (m & 1) l.push([a, 0, z0, b, a, z, c]); if (m & 2) l.push([b, a, z0, 1, b, z, c]);
-    if (m & 4) l.push([a, b, z0, b, 1, z, c]); if (m & 8) l.push([0, a, z0, a, b, z, c]);
-    return l;
+const LIT = '#ff3a1c', DIM = '#9a2818';
+// mode の線の箱。z0 の高さに うすく。lit0/lit1 = 通り道ごとの信号
+function wireBoxes(mode, z0, lit0, lit1) {
+    const z = z0 + .04, w = .13, a = .5 - w / 2, b = .5 + w / 2, c0 = lit0 ? LIT : DIM, c1 = lit1 ? LIT : DIM;
+    if (mode === 'V') return [[a, 0, z0, b, 1, z, c0]];
+    if (mode === 'H') return [[0, a, z0, 1, b, z, c0]];
+    if (mode === 'P') return [[a, 0, z0, b, 1, z, c0], [0, a, z0, 1, b, z, c0], [a - .04, a - .04, z0, b + .04, b + .04, z + .01, c0]];
+    // 交差: たての線は まん中で切れて、よこの線が 上を橋のように通る
+    return [[a, 0, z0, b, .34, z, c0], [a, .66, z0, b, 1, z, c0], [0, a, z0, 1, b, z + .03, c1], [.36, a - .03, z0, .64, b + .03, z + .02, '#5a5a62']];
 }
 function wireSprite(x, y) {
-    const m = wireMask(x, y), on = !VIEW.title && wireLit(x, y), key = m + (on ? 'on' : '');
-    if (wireCache[key]) return wireCache[key];
-    return (wireCache[key] = boxSprite(lineBoxes(m, 0, on ? '#ff3a1c' : '#9a2818')));
+    const m = wireMode(S.f, x, y), l0 = !VIEW.title && wireLevel(x, y, 0) > 0, l1 = !VIEW.title && wireLevel(x, y, 1) > 0, key = m + l0 + l1;
+    return wireCache[key] || (wireCache[key] = boxSprite(wireBoxes(m, 0, l0, l1)));
 }
-// 赤いラインを引いた かべ: もとの かべの絵の上に 線
+// 導線つきの かべ: もとの かべの絵の上に 線
 const WALL_TEX = { WALL_W: 'plank', WALL_S: 'brick', WALL_CU: 'mcu', WALL_FE: 'mfe', WALL_AU: 'mau', WALL_NW: 'nplank' };
 function wallWireSprite(x, y) {
-    const e = S.ex[exKey(S.f, x, y)], base = e && e.base;
-    const m = wireMask(x, y), on = !VIEW.title && wireLit(x, y), key = 'w' + (base || '') + m + (on ? 'on' : '');
+    const e = S.ex[exKey(S.f, x, y)], base = e && e.base, m = wireMode(S.f, x, y);
+    const l0 = !VIEW.title && wireLevel(x, y, 0) > 0, l1 = !VIEW.title && wireLevel(x, y, 1) > 0, key = 'w' + (base || '') + m + l0 + l1;
     if (wireCache[key]) return wireCache[key];
-    const tex = TX[WALL_TEX[base] || 'brick'], c = on ? '#ff3a1c' : '#9a2818';
-    return (wireCache[key] = boxSprite([[0, 0, 0, 1, 1, .85, { top: tex, side: tex }]].concat(lineBoxes(m, .85, c))));
+    const tex = TX[WALL_TEX[base] || 'brick'];
+    return (wireCache[key] = boxSprite([[0, 0, 0, 1, 1, .85, { top: tex, side: tex }]].concat(wireBoxes(m, .85, l0, l1))));
+}
+// 北向きの箱を d の向きに回す
+const rotBoxD = (q, d) => { const f = [(x, y) => [x, y], (x, y) => [1 - y, x], (x, y) => [1 - x, 1 - y], (x, y) => [y, 1 - x]][d], p = f(q[0], q[1]), r = f(q[3], q[4]); return [Math.min(p[0], r[0]), Math.min(p[1], r[1]), q[2], Math.max(p[0], r[0]), Math.max(p[1], r[1]), q[5], q[6]]; };
+// リピーター: 石の板に 出る向きの矢印
+function repSprite(d, on) {
+    const key = 'r' + d + on; if (wireCache[key]) return wireCache[key];
+    const c = on ? LIT : '#7a2018';
+    const l = [[.08, .08, 0, .92, .92, .1, '#a8a8a0'], [.44, .42, .1, .56, .84, .13, c], [.28, .3, .1, .72, .42, .13, c], [.4, .16, .1, .6, .3, .13, c]];
+    return (wireCache[key] = boxSprite(l.map((q, i) => i ? rotBoxD(q, d) : q)));
+}
+// NOT素子: 黒い板の まん中に 丸、両はしに 線(ONのはしは 明るい)
+function notSprite(ax, onA, onB) {
+    const key = 'n' + ax + onA + onB; if (wireCache[key]) return wireCache[key];
+    const ca = onA ? LIT : '#7a2018', cb = onB ? LIT : '#7a2018';
+    let l = [[.08, .08, 0, .92, .92, .1, '#5a5a66'], [.45, .04, .1, .55, .36, .13, ca], [.45, .64, .1, .55, .96, .13, cb], [.36, .36, .1, .64, .64, .2, '#2a2a34'], [.45, .45, .2, .55, .55, .22, '#f4f4f8']];
+    if (ax === 'H') l = l.map((q, i) => i ? rotBoxD(q, 1) : q);
+    return (wireCache[key] = boxSprite(l));
 }
 const objSprite = (t, x, y) => { const a = OS[t]; if (!a) return null;
     if (t === T.WIRE) return wireSprite(x, y);
+    if (TILE[t].rep) return repSprite(TILE[t].rep - 1, !VIEW.title && repLit(x, y));
+    if (TILE[t].notg) { const ax = TILE[t].notg, e = notEnds(ax); return notSprite(ax, !VIEW.title && notLit(x, y, e[0]), !VIEW.title && notLit(x, y, e[1])); }
     if (t === T.WIRE_W) return wallWireSprite(x, y);
     if (t === T.PLATE) return a[!VIEW.title && plateDown(x, y) ? 1 : 0];
     if (t === T.BULB || TILE[t].belt) return a[!VIEW.title && powered(x, y) ? 1 : 0];

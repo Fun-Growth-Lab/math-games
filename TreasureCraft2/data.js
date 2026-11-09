@@ -96,7 +96,7 @@ defT('SAPLING', { n: '若木', solid: 1, hp: 1, back: 'berry' });
 // ガラスと回路
 defT('GLASS', { n: 'ガラスのかべ', solid: 1, hp: 2, back: 'glass_w' });   // 視線と明かりは通す・敵と矢は通さない
 defT('ORE_RS', { n: '赤い石', solid: 1, wall: 1, hp: 12, tool: 'pick', tier: 2, drop: [['rdust', 2, 4]] });
-defT('WIRE', { n: '赤いライン', hp: 1, back: 'rdust' });   // 床に引いた線。上を歩ける
+defT('WIRE', { n: '導線', hp: 1, back: 'rdust' });   // 床に置いた導線。上を歩ける
 defT('SWITCH_OFF', { n: 'スイッチ', solid: 1, hp: 2, back: 'switch' });
 defT('SWITCH_ON', { n: 'スイッチ', solid: 1, hp: 2, back: 'switch' });
 defT('PLATE', { n: '感圧板', hp: 2, tool: 'pick', back: 'plate' });
@@ -130,7 +130,11 @@ defT('FLOOR_NW', { n: '魔樹の床', hp: 5, tool: 'axe', back: 'floor_nw', floo
 defT('CLAMP', { n: '水晶のランプ', solid: 1, low: 1, hp: 2, back: 'clamp', light: 8 });   // 信号がいらない明るい明かり
 defT('CROWN', { n: '宝石の王冠', solid: 1, low: 1, hp: 3, back: 'crown', light: 3 });   // 飾り
 defT('STAIRS_U', { n: '階段(上へ)', light: 2 });   // 洞窟の入口・天然の穴の下
-defT('WIRE_W', { n: '赤いラインのかべ', solid: 1, hp: 8, back: 'rdust', opaque: 1 });   // 置いたかべに粉をぬった物。信号は赤いパネルと同じに伝える
+defT('WIRE_W', { n: '導線つきのかべ', solid: 1, hp: 8, back: 'rdust', opaque: 1 });   // 置いたかべに粉をぬった物。信号は赤いパネルと同じに伝える
+// 回路の素子(床に置く。上を歩ける)。リピーター=後ろから前へ 強さを16にもどして1ターンおくらせる / NOT素子=たて・よこの 両はしで 信号を反対にする
+'NESW'.split('').forEach((c, i) => defT('REP_' + c, { n: 'リピーター', hp: 2, back: 'rep', rep: i + 1 }));
+defT('NOT_V', { n: 'NOT素子', hp: 2, back: 'notg', notg: 'V' });
+defT('NOT_H', { n: 'NOT素子', hp: 2, back: 'notg', notg: 'H' });
 // 視線をさえぎる物。木や柵はさえぎらない
 ['ROCK', 'BURIED', 'WALL_W', 'WALL_S', 'DOOR', 'RWALL', 'TOWERW', 'SANDB1', 'SANDB2', 'SANDB3', 'HUTW', 'HULL', 'GIANT', 'GIANTB', 'METEOR', 'SPAWNER'].forEach(k => { TILE[T[k]].opaque = 1; });
 TILE.forEach(d => { if (d.wall) d.opaque = 1; });
@@ -232,6 +236,8 @@ const RECIPES = [
     { out: 'torch', n: 3, need: { wood: 1, coal: 1 }, st: 'bench' },
     { out: 'arrow', n: 8, need: { wood: 1, stone: 1, feather: 1 }, st: 'bench' },
     { out: 'carpet', n: 2, need: { wool: 1 }, st: 'bench' },
+    { out: 'rep', need: { stone: 2, rdust: 2 }, st: 'bench' },
+    { out: 'notg', need: { stone: 2, rdust: 1, torch: 1 }, st: 'bench' },
     { out: 'clamp', need: { crystal: 2, rdust: 1 }, st: 'bench' },
     { out: 'crown', need: { gem: 5, ingot_au: 2 }, st: 'bench', t: 3 },
     { out: 'wall_nw', n: 2, need: { nwood: 2 }, st: 'bench' },
@@ -286,7 +292,7 @@ for (const m of ['cu', 'fe', 'au']) {
         { out: 'fence_' + m, n: 3, need: { [ing]: 1 }, st: 'bench' }, { out: 'floor_' + m, n: 4, need: { [ing]: 1 }, st: 'bench' });
 }
 Object.assign(ITEM, {
-    sand: { n: '砂' }, glass: { n: 'ガラス' }, rdust: { n: '赤い石の粉', use: 'rdust', desc: '赤いラインを引く' },
+    sand: { n: '砂' }, glass: { n: 'ガラス' }, rdust: { n: '赤い石の粉', use: 'rdust', desc: '導線を置く' },
     glass_w: { n: 'ガラスのかべ', tile: 'GLASS', place: 'GLASS', desc: '外が見える かべ' },
     bottle: { n: 'ガラスびん', desc: '回復薬の材料' },
     switch: { n: 'スイッチ', tile: 'SWITCH_OFF', place: 'SWITCH_OFF', desc: 'ぶつかって ON/OFF' },
@@ -300,6 +306,7 @@ Object.assign(ITEM, {
     carpet: { n: 'カーペット', tile: 'CARPET', place: 'CARPET', desc: '上にいると 回復が少し速い' },
     wall_nw: { n: '魔樹のかべ', tile: 'WALL_NW', place: 'WALL_NW', desc: '木のかべより丈夫' }, floor_nw: { n: '魔樹の床', tile: 'FLOOR_NW', place: 'FLOOR_NW' },
     egg: { n: 'たまご', c: '#f4ecd8', food: 6 }, fegg: { n: '目玉焼き', c: '#ffd84a', food: 22, heal: 5 },
+    rep: { n: 'リピーター', tile: 'REP_S', place: 'REP_N', dir: 'REP', desc: '信号を強くして おくらせる' }, notg: { n: 'NOT素子', tile: 'NOT_V', place: 'NOT_V', axis: 'NOT', desc: '信号を反対にする' },
     gem: { n: '宝石', tile: 'GEM', place: 'GEM', desc: '置くと 光る' }, gmush: { n: '光るきのこ', tile: 'GLOWM', place: 'GLOWM', desc: '置くと 明るい' },
     bow_t: { n: '弓', pseudo: 1 }   // レシピの材料にする「持っている弓(どれでも)」
 });
@@ -411,9 +418,9 @@ const LOOKS = [
     { id: 'g1', g: 'f', n: 'さくら', body: '#f07aa8', leg: '#5a3c6c', arm: SKIN, hair: '#6a3e20', style: 'long', skirt: '#c8487c' },
     { id: 'g2', g: 'f', n: 'ポニー', body: '#f2c42c', leg: '#2c3f7c', hair: '#3a2a1c', style: 'pony', skirt: '#3f6fd0' },
     { id: 'g3', g: 'f', n: 'ツイン', body: '#6ac8e8', leg: '#f4f1e8', arm: SKIN, hair: '#e8a03c', style: 'twin', skirt: '#2a8ac8' },
-    { id: 'g4', g: 'f', n: '探検家', body: '#4a8a3c', leg: '#a8865a', arm: '#e8dcc0', hair: '#e8c040', style: 'long', hat: 'explorer' },
-    { id: 'g5', g: 'f', n: '赤マント', body: '#c8342c', leg: '#2a2a2a', hair: '#1c1c24', style: 'bob', cape: '#7a1c1c' },
-    { id: 'g6', g: 'f', n: '鉱夫', body: '#e8822c', leg: '#3a4a8a', arm: '#7a7a84', hair: '#8a4a24', style: 'pony', hat: 'helmet' },
+    { id: 'g4', g: 'f', n: 'ひまわり', body: '#f2a83c', leg: '#5a8a3c', arm: SKIN, hair: '#3a2a1c', style: 'long', skirt: '#5a8a3c', hat: 'ribbon', hatc: '#ffe04a' },
+    { id: 'g5', g: 'f', n: 'うみ', body: '#2a7ab8', leg: '#f4f1e8', arm: SKIN, hair: '#1c1c24', style: 'bob', skirt: '#f4f1e8', scarf: '#d8352c' },
+    { id: 'g6', g: 'f', n: 'こおり', body: '#c8e8f4', leg: '#4a6a9a', hair: '#f4f8ff', style: 'pony', cape: '#7ab8e8' },
     { id: 'g7', g: 'f', n: 'リボン', body: '#f4f1e8', leg: '#3a2c24', arm: SKIN, hair: '#4a2a1c', style: 'long', skirt: '#d8352c', hat: 'ribbon', hatc: '#ff5a8a' },
     { id: 'g8', g: 'f', n: '魔法使い', body: '#5a3a9a', leg: '#2a1c44', hair: '#b8a0ff', style: 'long', skirt: '#3a2a6c', scarf: '#ffd84a' }
 ];

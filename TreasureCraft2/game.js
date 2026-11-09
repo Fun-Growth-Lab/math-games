@@ -1119,7 +1119,8 @@ function breakTile(x, y, t, tool) {
     // 押しっぱなしなら 止めずに そのまま進んで 次を掘る
     H.sfx('garbagebreak');
     if (d.back) give(d.back, 1);
-    if (t === T.WIRE_W) { const e = S.ex[exKey(S.f, x, y)]; if (e && e.base) give(TILE[T[e.base]].back, 1); delete S.ex[exKey(S.f, x, y)]; }
+    if (t === T.WIRE_W) { const e = S.ex[exKey(S.f, x, y)]; if (e && e.base) give(TILE[T[e.base]].back, 1); }
+    if (t === T.WIRE || t === T.WIRE_W) delete S.ex[exKey(S.f, x, y)];
     if (t === T.CHEST) {
         const k = exKey(S.f, x, y), c = S.ex[k];
         if (c && c.items) for (const it of c.items) { if (it.tool) putTool(it.tool); else give(it.id, it.n); }
@@ -1319,19 +1320,23 @@ const canFeed = (m, id) => (m.t === 'wolf' && (id === 'meat' || id === 'steak'))
 function useActions() {
     const s = S.inv[S.sel];
     const x = S.x + S.face[0], y = S.y + S.face[1], t = getT(S.f, x, y), fm = mobAt(x, y);
-    const dk = TILE[t].key.match(/^(F?CONV|DISP)_([NESW])$/), rot = dk && !fm ? { l: '回す', run: () => { setT(S.f, x, y, T[dk[1] + '_' + 'NESW'[('NESW'.indexOf(dk[2]) + 1) % 4]]); H.sfx('select'); endTurn(1); } } : null;
+    const dk = TILE[t].key.match(/^(F?CONV|DISP|REP)_([NESW])$/), nk = TILE[t].notg;
+    const rot = dk && !fm ? { l: '回す', run: () => { setT(S.f, x, y, T[dk[1] + '_' + 'NESW'[('NESW'.indexOf(dk[2]) + 1) % 4]]); H.sfx('select'); endTurn(1); } }
+        : nk && !fm ? { l: '回す', run: () => { setT(S.f, x, y, nk === 'V' ? T.NOT_H : T.NOT_V); H.sfx('select'); endTurn(1); } }
+        : isWire(t) && !fm ? { l: '回す', run: () => { const w = cycleWire(x, y); H.log('導線: ' + ({ V: 'たて', H: 'よこ', P: '十字(つながる)', X: '交差(つながらない)' })[w], ''); H.sfx('select'); endTurn(1); } } : null;
     const peel = (t === T.WIRE || t === T.WIRE_W) && !fm ? { l: 'はがす', run: () => {
         if (!S.inv.some(q => !q || (q.id === 'rdust' && q.n < STACK))) { H.sfx('error'); H.log('持ち物がいっぱいで はがせない', 'warn'); return; }   // あふれて落とさない
         const e = S.ex[exKey(S.f, x, y)];
         setT(S.f, x, y, t === T.WIRE_W && e && e.base ? T[e.base] : groundOf(S.f, x, y));
-        if (t === T.WIRE_W) delete S.ex[exKey(S.f, x, y)];
-        give('rdust', 1); H.sfx('item'); H.log('赤いラインを はがした', 'good'); endTurn(1);
+        delete S.ex[exKey(S.f, x, y)];
+        give('rdust', 1); H.sfx('item'); H.log('導線を はがした', 'good'); endTurn(1);
     } } : null;
-    // 「はがす」は 何も持っていないか 赤い石の粉のとき、「回す」は 何も持っていないか 動く床・発射台のときだけ(ほかの物の使い方を じゃましない)
+    // 「回す」「はがす」「はずす」は 何も持っていないか その物に関係する物を持っているときだけ(ほかの物の使い方を じゃましない)
     const unl = t === T.LADDER_D && !fm ? { l: 'はずす', run: () => takeLadder(x, y, t) } : null;
-    const pre = !s ? (rot || peel || unl) : (peel && s.id === 'rdust') ? peel : (rot && ['conv', 'fconv', 'disp'].includes(s.id)) ? rot : (unl && s.id === 'ladder') ? unl : null;
-    if (!s) return pre ? [pre] : [];
-    if (s.tool && pre) return [pre];
+    const rel = !s || (s.id === 'rdust' && peel) || (['conv', 'fconv', 'disp', 'rep', 'notg'].includes(s.id) && rot && !peel) || (s.id === 'ladder' && unl);
+    const pre = !rel ? [] : [rot, peel, unl].filter(Boolean);
+    if (!s) return pre;
+    if (s.tool && pre.length) return pre;
     if (s.tool) {
         if (s.tool.k === 'hoe') return [{ l: 'たがやす', run: () => {
             if (S.f === 0 && (t === T.GRASS || t === T.GRASS2 || t === T.FLOWER || t === T.DIRT) && !fm) { setT(S.f, x, y, T.FARM); wear(s.tool, 1); H.sfx('tick'); H.log('畑をたがやした。種を「つかう」で植えよう', 'good'); endTurn(1); return; }
@@ -1340,7 +1345,7 @@ function useActions() {
         if (s.tool.k === 'bow') return [{ l: 'うつ', run: () => fireBow(s.tool) }];
         return [{ l: 'つかう', run: () => step(S.face[0], S.face[1]) }];
     }
-    const it = ITEM[s.id], list = pre ? [pre] : [];
+    const it = ITEM[s.id], list = pre.slice();
     if (it.use === 'rod') {
         if (fishing) return [{ l: 'ひく', run: reelIn }];
         return [{ l: 'つる', run: () => { if (TILE[t].swim) castLine(x, y); else H.log('水のほうを向いて 投げよう', ''); } }];
@@ -1364,11 +1369,13 @@ function useActions() {
     } });
     if (it.use === 'rdust') list.push({ l: '置く', run: () => {
         // 置いたかべ(木・石・金属・魔樹)なら 赤いかべにする。こわすと 粉とかべの両方がもどる
+        // 導線は 主人公が向いている方向に のびる(たて/よこ)。まわりの導線と つながる
+        const axis = S.face[0] ? 'H' : 'V';
         if (/^wall_/.test(TILE[t].back || '') && !fm) {
-            setT(S.f, x, y, T.WIRE_W); S.ex[exKey(S.f, x, y)] = { base: TILE[t].key };
-            removeItem(s.id, 1); H.sfx('place'); H.log(TILE[t].n + 'に 赤いラインを引いた', 'good'); endTurn(1); return;
+            setT(S.f, x, y, T.WIRE_W); S.ex[exKey(S.f, x, y)] = { base: TILE[t].key }; layWire(x, y, axis);
+            removeItem(s.id, 1); H.sfx('place'); H.log(TILE[t].n + 'の上に 導線を置いた', 'good'); endTurn(1); return;
         }
-        placeItem(s.id, { place: 'WIRE' }, x, y, t);
+        placeItem(s.id, { place: 'WIRE' }, x, y, t, () => layWire(x, y, axis));
     } });
     if (it.place) list.push({ l: '置く', run: () => placeItem(s.id, it, x, y, t) });
     if (it.use === 'ladder') list.push({ l: 'かける', run: () => useLadder(x, y, t, s.id) });
@@ -1472,14 +1479,16 @@ function sowWalking() {
         if (getT(S.f, p[0], p[1]) === T.FARM && !mobAt(p[0], p[1])) sowAt(p[0], p[1], s.id);
     }
 }
-function placeItem(id, it, x, y, t) {
-    const place = it.dir ? it.dir + '_' + 'NESW'[dirIndex(S.face)] : it.place;
+function placeItem(id, it, x, y, t, after) {
+    // dir: 向いている方向に置く物 / axis: 向いている方向の たて・よこ で置く物
+    const place = it.dir ? it.dir + '_' + 'NESW'[dirIndex(S.face)] : it.axis ? it.axis + '_' + (S.face[0] ? 'H' : 'V') : it.place;
     const bridge = TILE[T[place]].floorlike && (t === T.WATER || t === T.PIT);
     if ((!TILE[t].ground && !TILE[t].floorlike && !bridge) || mobAt(x, y) || (x === S.x && y === S.y)) { H.sfx('error'); H.log('そこには 置けない', ''); H.stopHold(); return; }
     setT(S.f, x, y, T[place]); delete S.dmg['b' + exKey(S.f, x, y)];
     removeItem(id, 1);
     S.got['placed_' + id] = 1;
     if (id === 'crown') ach('crown');
+    if (after) after();
     H.sfx('place'); H.chips(x, y, '#c8a878');
     endTurn(1);
 }
