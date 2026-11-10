@@ -8,9 +8,14 @@ const H = {
     achieve() { }, seen() { }, victory() { }, dead() { }, openCraft() { }, openChest() { }, openBed() { }, openTrade() { }, stopHold() { }, gain() { }
 };
 let S = null;
+// 回路モード: 自由に回路をつくるモード。おなか・HPがへらない、敵が出ない、回路の部品などが ∞。セーブは別
+const CIRCUIT_SAVE_KEY = 'tc2_save_circuit';
+const circuitMode = () => !!(S && S.mode === 'circuit');
+const INF_ITEMS = ['rdust', 'switch', 'plate', 'bulb', 'rep', 'notg', 'conv', 'fconv', 'disp', 'arrow', 'wall_s', 'wall_w', 'wall_fe', 'glass_w', 'floor', 'floor_fe'];
+const infItem = id => circuitMode() && INF_ITEMS.includes(id);
 // 実績を達成する。セーブとは別に残るので、新しい世界でも消えない
 function ach(id) {
-    if (achData.done[id] || H.noAch) return;
+    if (achData.done[id] || H.noAch || circuitMode()) return;
     achData.done[id] = new Date().toISOString().slice(0, 10);
     try { localStorage.setItem(ACH_KEY, JSON.stringify(achData)); } catch (e) { }
     H.achieve(ACH.find(a => a.id === id));
@@ -29,6 +34,17 @@ const DIRS = [[0, -1], [1, 0], [0, 1], [-1, 0]];
 function newSeed() { return 1 + Math.floor(Math.random() * 2000000000); }
 const seedToCode = s => s.toString(36).toUpperCase();
 const codeToSeed = c => { const n = parseInt(String(c).trim().toLowerCase(), 36); return n > 0 && isFinite(n) ? n : 0; };
+// 回路モードを はじめから
+function newCircuitGame() {
+    newGame(0);
+    S.mode = 'circuit';
+    const tool = (k, b) => ({ tool: { k, a: 'star', b: b || 'wood', d: 520 } });
+    const order = ['rdust', 'switch', 'plate', 'bulb', 'rep', 'notg', 'conv', null, 'fconv', 'disp', 'arrow', 'wall_s', 'wall_w', 'wall_fe', 'glass_w', 'floor', 'floor_fe'];
+    order.forEach((id, i) => { S.inv[i] = id ? { id, n: STACK } : null; });
+    S.inv[7] = tool('pick'); S.inv[17] = tool('axe');
+    S.inv[7].tool.eq = 1; S.inv[17].tool.eq = 1;
+    mobs = mobs.filter(m => MOBS[m.t].animal);
+}
 function newGame(seed) {
     seed = seed || newSeed();
     setWorldSeed(seed, null);
@@ -51,14 +67,14 @@ function saveGame() {
         keptSync();
         S.pets = mobs.filter(m => MOBS[m.t].pet).map(m => m.hp);
         const o = Object.assign({}, S, { seen: S.seen.map(b64), diffs });
-        localStorage.setItem(SAVE_KEY, JSON.stringify(o));
+        localStorage.setItem(circuitMode() ? CIRCUIT_SAVE_KEY : SAVE_KEY, JSON.stringify(o));
         return true;
     } catch (e) { H.log('セーブできませんでした(ほぞん容量がいっぱいです)', 'bad'); return false; }
 }
-function hasSave() { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } }
-function loadGame() {
+function hasSave(key) { try { return !!localStorage.getItem(key || SAVE_KEY); } catch (e) { return false; } }
+function loadGame(key) {
     try {
-        const o = JSON.parse(localStorage.getItem(SAVE_KEY));
+        const o = JSON.parse(localStorage.getItem(key || SAVE_KEY));
         setWorldSeed(o.seed, o.diffs);
         delete o.diffs;
         o.seen = o.seen.map(unb64);
@@ -112,11 +128,13 @@ function addItem(id, n) {
 function give(id, n) {
     S.got[id] = (S.got[id] || 0) + n;
     S.book.i[id] = 1;
+    if (infItem(id) && S.inv.some(s => s && s.id === id)) { H.gain(id, n); return; }   // ∞の物は もう持っている
     const left = addItem(id, n);
     if (left > 0) { dropPile(S.x, S.y, [{ id, n: left }]); H.log('持ち物がいっぱい! 近くに落とした', 'bad'); }
     H.gain(id, n);
 }
 function removeItem(id, n) {
+    if (infItem(id)) return;   // 回路モードの ∞の物
     if (id === 'bow_t') {
         // 装備していない弓から先に使う
         const order = [...S.inv.keys()].filter(i => S.inv[i] && S.inv[i].tool && S.inv[i].tool.k === 'bow').sort((a, b) => (S.inv[a].tool.eq ? 1 : 0) - (S.inv[b].tool.eq ? 1 : 0));
@@ -202,7 +220,7 @@ const bestWeapon = () => equipped('sword') || equipped('axe') || equipped('pick'
 const curArmor = () => equipped('armor');
 const maxHp = () => { const a = curArmor(); return 100 + (a ? toolStats(a).hp : 0); };
 function wear(tool, n) {
-    if (!tool) return;
+    if (!tool || circuitMode()) return;   // 回路モードでは 道具はへらない
     const st = toolStats(tool);
     if (st.tough && rnd() < .35) return;
     tool.d -= n || 1;
@@ -332,7 +350,7 @@ function trySpawn() {
     if (!TILE[t].ground || mobAt(x, y) || t === T.CFLOOR) return;
     if (litNear(x, y)) return;
     const k = chooseSpawn(x, y);
-    if (!k) return;
+    if (!k || (circuitMode() && !MOBS[k].animal)) return;
     if (!MOBS[k].animal && hostile >= cap) return;
     spawnMob(k, x, y);
 }
@@ -505,6 +523,7 @@ function mobsAct() {
 
 // ---------- 戦闘 ----------
 function hurt(atk, src, d) {
+    if (circuitMode()) return;
     const a = curArmor(), def = a ? toolStats(a).def : 0;
     const dmg = Math.max(Math.ceil(atk * .2), Math.round((atk - def) * (.9 + rnd() * .2)));
     S.hp -= dmg;
@@ -643,7 +662,7 @@ function freeSpot() {
 
 // ---------- ボス ----------
 function ensureBoss() {
-    if (S.bossDead || mobs.some(m => m.big)) return;
+    if (S.bossDead || circuitMode() || mobs.some(m => m.big)) return;
     const p = bossPos(), m = spawnMob('boss', p.x, p.y);
     m.big = 1; m.hp = S.bossHp; m.cd = 2; m.plan = null; m.walk = 0;
 }
@@ -779,7 +798,7 @@ function endTurn(n) {
         const before = isNight();
         S.T++;
         S.hungerAcc++;
-        if (S.hungerAcc >= 5) { S.hungerAcc = 0; S.hunger = Math.max(0, S.hunger - 1); if (S.hunger === 20) H.log('おなかが減ってきた…', 'warn'); }
+        if (S.hungerAcc >= 5 && !circuitMode()) { S.hungerAcc = 0; S.hunger = Math.max(0, S.hunger - 1); if (S.hunger === 20) H.log('おなかが減ってきた…', 'warn'); }
         // HPの自然回復はゆっくり。しっかり治すには寝床で眠る
         if (S.hunger >= 30 && S.hp < maxHp() && !S.sleeping && S.T % (getT(S.f, S.x, S.y) === T.CARPET ? (S.hunger >= 70 ? 3 : 6) : (S.hunger >= 70 ? 4 : 8)) === 0) S.hp = Math.min(maxHp(), S.hp + 1);
         S.regenAcc++;
@@ -809,7 +828,8 @@ function endTurn(n) {
     H.refresh();
 }
 function updateBreath() {
-    if (S.air === undefined) S.air = AIR_MAX;
+    if (S.air === undefined || circuitMode()) S.air = AIR_MAX;
+    if (circuitMode()) return;
     if (!TILE[getT(S.f, S.x, S.y)].swim) { if (S.air <= 3) ach('breath'); S.air = Math.min(AIR_MAX, S.air + 4); return; }
     if (S.air === AIR_MAX) H.log('泳いでいる! 息が続くうちに 岸へ上がろう', 'warn');
     S.air = Math.max(0, S.air - 1);
@@ -841,7 +861,7 @@ function worldTick() {
         });
     }
     // まものの巣: 近くにいると わき続ける。巣をこわすと止まる
-    if (isCave(S.f) && S.T % 4 === 0) {
+    if (isCave(S.f) && S.T % 4 === 0 && !circuitMode()) {
         const s = cavePlaceAt(S.f, S.x, S.y);
         if (s && s.type === 'nest' && getT(S.f, s.x, s.y) === T.SPAWNER && mobs.filter(m => !MOBS[m.t].animal && near2(m.x, m.y, s, 4)).length < 4) {
             const o = pick(DIRS), x = s.x + o[0] * 2, y = s.y + o[1] * 2;
@@ -862,7 +882,7 @@ function worldTick() {
     }
     // 特別な場所の主
     const pl = S.T % 2 === 0 ? placeHere(S.f, S.x, S.y) : null;
-    if (pl && GUARDS[pl.type] && !S.guards[pl.key] && !mobs.some(m => m.gkey === pl.key)) {
+    if (pl && !circuitMode() && GUARDS[pl.type] && !S.guards[pl.key] && !mobs.some(m => m.gkey === pl.key)) {
         let spot = null;
         for (let r = 0; r < 7 && !spot; r++) for (let dy = -r; dy <= r && !spot; dy++) for (let dx = -r; dx <= r; dx++) {
             const x = pl.x + dx, y = pl.y + dy;
@@ -1248,7 +1268,7 @@ function sleep(x, y) {
         if (S.hp <= 0) break;
         if (night) { trySpawn(); trySpawn(); }
         // 暗い部屋には まものがわく
-        if (info.room && !info.lit && info.cells.length >= 4 && rnd() < .015 && !mobs.some(m => !MOBS[m.t].animal && inCells(info.cells, m))) {
+        if (!circuitMode() && info.room && !info.lit && info.cells.length >= 4 && rnd() < .015 && !mobs.some(m => !MOBS[m.t].animal && inCells(info.cells, m))) {
             const c = pick(info.cells);
             if (Math.abs(c[0] - S.x) + Math.abs(c[1] - S.y) >= 2 && !mobAt(c[0], c[1]) && TILE[getT(S.f, c[0], c[1])].ground) spawnMob(pick(['zombie', 'skeleton']), c[0], c[1]);
         }
@@ -1463,7 +1483,7 @@ function eat(id, it) {
     if (it.ret) addItem(it.ret, 1);
     H.sfx(it.heal ? 'heal' : 'item');
     H.log(it.n + 'を 口にした', 'good');
-    if (it.raw && rnd() < .3) { S.hp -= 5; H.log('生肉で おなかをこわした…', 'bad'); ach('bad_meat'); if (S.hp <= 0) { die('食あたり'); return; } }
+    if (it.raw && !circuitMode() && rnd() < .3) { S.hp -= 5; H.log('生肉で おなかをこわした…', 'bad'); ach('bad_meat'); if (S.hp <= 0) { die('食あたり'); return; } }
     endTurn(1);
 }
 function sowAt(x, y, id) {

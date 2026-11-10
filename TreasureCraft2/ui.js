@@ -110,7 +110,7 @@ function slotHtml(s, opt) {
             inner = '<img src="' + toolIconUrl(s.tool) + '" alt=""><span class="dur"><i style="width:' + Math.max(3, 100 * s.tool.d / st.dur) + '%;background:' + matColor(s.tool) + '"></i></span>' + (s.tool.eq ? '<span class="eq">E</span>' : '');
         } else {
             const u = iconUrl(s.id);
-            inner = (u ? '<img src="' + u + '" alt="">' : '<span class="emo">' + (ITEM[s.id].e || '❔') + '</span>') + (s.n > 1 ? '<span class="n">' + s.n + '</span>' : '');
+            inner = (u ? '<img src="' + u + '" alt="">' : '<span class="emo">' + (ITEM[s.id].e || '❔') + '</span>') + (infItem(s.id) ? '<span class="n">∞</span>' : s.n > 1 ? '<span class="n">' + s.n + '</span>' : '');
         }
     }
     return '<button class="slot' + (opt.sel ? ' sel' : '') + '" data-i="' + opt.i + '"' + (s ? ' data-tip="' + slotTip(s) + '"' : '') + '>' + (opt.key ? '<span class="key">' + opt.key + '</span>' : '') + inner + '</button>';
@@ -157,7 +157,7 @@ function refreshHud() {
     const dir = bossDirection();
     $('clock').innerHTML = (isNight() ? '🌙' : '☀️') + ' ' + dayNo() + '日目 ' + hourStr() + '<small>' + FLOOR_NAME[S.f] + (S.f === 0 ? '・' + BIOME_NAME[biomeAt(S.x, S.y)] : '') + (dir ? '・魔王城 ' + dir.name + ' ' + dir.dist + 'マス' : '') + '</small>';
     const gi = goalIndex();
-    $('goal').textContent = gi >= 0 ? '目標: ' + GOALS[gi].t : '魔王をたおした! 自由に遊ぼう';
+    $('goal').textContent = circuitMode() ? '回路モード: 自由に回路をつくろう' : gi >= 0 ? '目標: ' + GOALS[gi].t : '魔王をたおした! 自由に遊ぼう';
     // できることに合わせて ボタンの文字を変える。2つあるときだけ もう1つのボタンを出す
     const acts = useActions(), lab = $('btn-use').querySelector('span'), b2 = $('btn-use2');
     lab.textContent = acts[0] ? acts[0].l : 'つかう';
@@ -831,6 +831,13 @@ function askWorldCode() {
 }
 $('btn-start').onclick = () => { SFX.unlock && SFX.unlock(); if (hasSave() && loadGame()) { startPlay(); H.log(dayNo() + '日目から つづき', 'good'); } else askNewWorld(); };
 $('btn-new').onclick = askNewWorld;
+// 回路モード: セーブがあれば つづきから、なければ 新しい世界で
+$('btn-circuit').onclick = () => {
+    SFX.unlock && SFX.unlock();
+    if (hasSave(CIRCUIT_SAVE_KEY) && loadGame(CIRCUIT_SAVE_KEY)) { S.mode = 'circuit'; startPlay(); H.log('回路モード: つづきから', 'good'); return; }
+    newCircuitGame(); saveGame(); startPlay();
+    H.log('回路モード: 回路の部品は ∞。おなかも HPも へらず、敵も出ない', 'good');
+};
 $('btn-ach').onclick = () => { document.body.classList.add('ach-only'); openPanel('ach'); };
 $('btn-rank').onclick = () => showRanking();
 $('btn-howto').onclick = () => openHowto();
@@ -964,7 +971,7 @@ FGLTitle.mount({
     lang: () => 'ja',
     buttons: {
         start: '#btn-start', row: [
-            { sel: '#btn-new', ico: 'play' }, { sel: '#btn-tutorial', ico: 'help' }, { sel: '#btn-howto', ico: 'star' }, { sel: '#btn-rank', ico: 'trophy' }, { sel: '#btn-ach', ico: 'star' }, { sel: '#btn-sound', ico: 'gear' },
+            { sel: '#btn-new', ico: 'play' }, { sel: '#btn-tutorial', ico: 'help' }, { sel: '#btn-circuit', ico: 'gear' }, { sel: '#btn-howto', ico: 'star' }, { sel: '#btn-rank', ico: 'trophy' }, { sel: '#btn-ach', ico: 'star' }, { sel: '#btn-sound', ico: 'gear' },
             { sel: '#btn-name', ico: 'user', nudge: { unset: () => !getName(), dir: 'down' } }, { sel: '#btn-home', ico: 'home' }]
     }
 });
