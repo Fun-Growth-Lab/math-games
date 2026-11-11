@@ -112,7 +112,7 @@ const _TITLE_INNER_HTML = `
                 <button id="btn-view-ranking" class="tm-btn mini"><span class="ic"><i class="ico" data-ico="trophy"></i></span><span data-i18n="tm_ranking">ランキング</span></button>
                 <button id="btn-open-settings" class="tm-btn mini"><span class="ic"><i class="ico" data-ico="gear"></i></span><span data-i18n="tm_settings">設定</span></button>
                 <button id="player-select-btn" class="tm-btn mini sub" title="プレイヤーをへんこうする"><span class="ic"><i class="ico" data-ico="user"></i></span><span id="current-player-name-display">ななしさん</span></button>
-                <button id="btn-index" class="tm-btn mini"><span class="ic"><i class="ico" data-ico="home"></i></span><span data-i18n="tm_index">INDEXへ</span></button>
+                <button id="btn-index" class="tm-btn mini"><span class="ic"><i class="ico" data-ico="home"></i></span><span data-i18n="tm_index">ホームへ</span></button>
             </div>
             <button id="btn-login" class="btn btn-auth title-menu-btn" style="display:none;">Googleでログイン</button>
             <button id="btn-logout" class="btn btn-danger title-menu-btn hidden" style="display:none;">ログアウト</button>
@@ -400,7 +400,7 @@ const STRINGS = {
         "player_change_title": "プレイヤーをへんこうする",
         "btn_ranking": "🏆 ランキング",
         "btn_settings": "⚙ 設定",
-        "btn_index": "🏠 INDEXへ",
+        "btn_index": "🏠 ホームへ",
         "diff_easy": "やさしい",
         "diff_normal": "ふつう",
         "diff_hard": "むずかしい",
@@ -446,7 +446,7 @@ const STRINGS = {
         "tm_tutorial": "チュートリアル",
         "tm_ranking": "ランキング",
         "tm_settings": "設定",
-        "tm_index": "INDEXへ",
+        "tm_index": "ホームへ",
         "label_stage": "🗺️ ステージ",
         "btn_back_title": "◀ タイトルへ",
         "runselect_title": "RUNをえらぼう",
@@ -533,7 +533,7 @@ const STRINGS = {
         "player_change_title": "プレイヤーを へんこうする",
         "btn_ranking": "🏆 ランキング",
         "btn_settings": "⚙ せってい",
-        "btn_index": "🏠 INDEXへ",
+        "btn_index": "🏠 ホームへ",
         "diff_easy": "やさしい",
         "diff_normal": "ふつう",
         "diff_hard": "むずかしい",
@@ -579,7 +579,7 @@ const STRINGS = {
         "tm_tutorial": "チュートリアル",
         "tm_ranking": "ランキング",
         "tm_settings": "せってい",
-        "tm_index": "INDEXへ",
+        "tm_index": "ホームへ",
         "label_stage": "🗺️ ステージ",
         "btn_back_title": "◀ タイトルへ",
         "runselect_title": "RUNを えらぼう",
@@ -666,7 +666,7 @@ const STRINGS = {
         "player_change_title": "Change player",
         "btn_ranking": "🏆 Ranking",
         "btn_settings": "⚙ Settings",
-        "btn_index": "🏠 To INDEX",
+        "btn_index": "🏠 Home",
         "diff_easy": "Easy",
         "diff_normal": "Normal",
         "diff_hard": "Hard",
@@ -712,7 +712,7 @@ const STRINGS = {
         "tm_tutorial": "Tutorial",
         "tm_ranking": "Ranking",
         "tm_settings": "Settings",
-        "tm_index": "To INDEX",
+        "tm_index": "Home",
         "label_stage": "🗺️ Stage",
         "btn_back_title": "◀ Title",
         "runselect_title": "Choose a RUN",
