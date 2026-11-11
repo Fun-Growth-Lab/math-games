@@ -670,7 +670,7 @@ const SOUND_BTN = {};
 function soundBtn(sel) { if (SOUND_BTN[sel]) SOUND_BTN[sel](); else SOUND_BTN[sel] = FGLBgm.settingsButton(BGM, { parent: sel, sfx: SFX, getLang: () => 'ja' }); }
 function openMenu() {
     saveGame();
-    dialog('<h2>メニュー</h2>' + dayNo() + '日目 / ' + S.T + ' ターン<br>世界コード <b>' + seedToCode(S.seed) + '</b><div class="row menu-main"><button class="wbtn go big" id="m-back">つづける</button><button class="wbtn blue big" id="m-title">セーブしてタイトルへ</button></div><div class="row"><button class="wbtn" id="m-howto">あそびかた</button><button class="wbtn" id="m-keys">キー操作</button><button class="wbtn" id="m-look">主人公</button></div><div id="m-sound"></div>', b => {
+    dialog('<h2>メニュー</h2>' + (curSlot && !circuitMode() ? '<b>' + escapeHtml((slotList().find(q => q.id === curSlot) || {}).name || '') + '</b><br>' : circuitMode() ? '<b>回路モード</b><br>' : '') + dayNo() + '日目 / ' + S.T + ' ターン<br>世界コード <b>' + seedToCode(S.seed) + '</b><div class="row menu-main"><button class="wbtn go big" id="m-back">つづける</button><button class="wbtn blue big" id="m-title">セーブしてタイトルへ</button></div><div class="row"><button class="wbtn" id="m-howto">あそびかた</button><button class="wbtn" id="m-keys">キー操作</button><button class="wbtn" id="m-look">主人公</button></div><div id="m-sound"></div>', b => {
         b.querySelector('#m-back').onclick = closeDialog;
         b.querySelector('#m-howto').onclick = () => { closeDialog(); openHowto(); };
         b.querySelector('#m-keys').onclick = openKeys;
@@ -786,16 +786,53 @@ function startPlay() {
     SFX.play('start');
 }
 function startNew(seed) {
-    closeDialog(); deleteSave(); newGame(seed); saveGame(); startPlay();
+    closeDialog(); newGame(seed); curSlot = newSlot(); saveGame(); startPlay();
     H.log('まずは 木にぶつかって 切ってみよう', 'good');
 }
-// ふつうは すぐ始まる。セーブを消すときだけ確認する
-function askNewWorld() {
-    if (!hasSave()) { startNew(0); return; }
-    dialog('<h2>はじめから</h2><span style="color:#c8301c">今のセーブは消えます。</span><div class="row"><button class="wbtn go" id="n-go">はじめる</button><button class="wbtn" id="n-back">もどる</button></div>', b => {
+// はじめから: 新しい枠をつくる。いっぱいなら 一覧で消してもらう
+function askNewWorld(seed) {
+    if (slotList().length < SLOT_MAX) { startNew(seed || 0); return; }
+    dialog('<h2>はじめから</h2>セーブが いっぱいです(' + SLOT_MAX + 'こ)。<br>いらない世界を 消してから はじめよう。<div class="row"><button class="wbtn go" id="n-list">セーブの一覧</button><button class="wbtn" id="n-back">もどる</button></div>', b => {
         b.querySelector('#n-back').onclick = closeDialog;
-        b.querySelector('#n-go').onclick = () => startNew(0);
+        b.querySelector('#n-list').onclick = openSlots;
     });
+}
+const fmtTime = t => { const d = new Date(t); return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0'); };
+// つづきから: セーブの一覧(新しく遊んだ順)。つづける・なまえ・けす
+function openSlots() {
+    const list = slotList().sort((a, b) => b.updated - a.updated);
+    if (!list.length) { closeDialog(); refreshTitleButtons(); return; }
+    const row = q => '<div class="slotrow"><div class="sn"><b>' + escapeHtml(q.name) + '</b><small>' + q.day + '日目 ・ ' + fmtTime(q.updated) + ' に遊んだ</small></div>' +
+        '<button class="wbtn go" data-play="' + q.id + '">つづける</button><button class="wbtn" data-ren="' + q.id + '">なまえ</button><button class="wbtn danger" data-del="' + q.id + '">けす</button></div>';
+    dialog('<h2>つづきから</h2><div class="slotlist">' + list.map(row).join('') + '</div><div class="row">' + (list.length < SLOT_MAX ? '<button class="wbtn" id="s-new">はじめから</button>' : '') + '<button class="wbtn" id="s-back">もどる</button></div>', b => {
+        b.querySelector('#s-back').onclick = closeDialog;
+        if (b.querySelector('#s-new')) b.querySelector('#s-new').onclick = () => startNew(0);
+        b.querySelectorAll('[data-play]').forEach(el => el.onclick = () => {
+            const id = +el.dataset.play;
+            if (!loadGame(slotKey(id))) { SFX.play('error'); return; }
+            curSlot = id; closeDialog(); startPlay(); H.log(dayNo() + '日目から つづき', 'good');
+        });
+        b.querySelectorAll('[data-ren]').forEach(el => el.onclick = () => {
+            const q = list.find(q => q.id === +el.dataset.ren);
+            dialog('<h2>世界のなまえ</h2><div class="row"><input id="r-name" maxlength="20" value="' + escapeHtml(q.name) + '"></div><div class="row"><button class="wbtn go" id="r-ok">きめる</button><button class="wbtn" id="r-back">もどる</button></div>', c => {
+                c.querySelector('#r-back').onclick = openSlots;
+                c.querySelector('#r-ok').onclick = () => { const v = c.querySelector('#r-name').value.trim(); if (v) renameSlot(q.id, v); SFX.play('select'); openSlots(); };
+            });
+        });
+        b.querySelectorAll('[data-del]').forEach(el => el.onclick = () => {
+            const q = list.find(q => q.id === +el.dataset.del);
+            dialog('<h2>世界を消す</h2>「' + escapeHtml(q.name) + '」を消します。<br><span style="color:#c8301c">消すと もとに もどせません。</span><div class="row"><button class="wbtn danger" id="d-ok">消す</button><button class="wbtn go" id="d-back">やめる</button></div>', c => {
+                c.querySelector('#d-back').onclick = openSlots;
+                c.querySelector('#d-ok').onclick = () => { deleteSlot(q.id); SFX.play('select'); refreshTitleButtons(); openSlots(); };
+            });
+        });
+    });
+}
+// タイトルのボタン: セーブがあれば 大きいボタンは「つづきから」
+function refreshTitleButtons() {
+    const any = slotList().length > 0;
+    $('btn-start').textContent = any ? 'つづきから' : 'はじめから';
+    $('btn-new').style.display = any ? '' : 'none';
 }
 // 世界コードは 設定の中のオプション
 // 主人公をえらぶ(この端末で全部の世界に使う)
@@ -820,17 +857,17 @@ function openLooks(back) {
     });
 }
 function askWorldCode() {
-    dialog('<h2>世界コードではじめる</h2>同じコードなら 同じ世界で遊べます。' + (hasSave() ? '<br><span style="color:#c8301c">今のセーブは消えます。</span>' : '') + '<div class="row"><input id="n-code" maxlength="10" placeholder="世界コード"></div><div id="n-msg" style="color:#c8301c;font-size:16px"></div><div class="row"><button class="wbtn go" id="n-go">はじめる</button><button class="wbtn" id="n-back">もどる</button></div>', b => {
+    dialog('<h2>世界コードではじめる</h2>同じコードなら 同じ世界で遊べます。' + '<div class="row"><input id="n-code" maxlength="10" placeholder="世界コード"></div><div id="n-msg" style="color:#c8301c;font-size:16px"></div><div class="row"><button class="wbtn go" id="n-go">はじめる</button><button class="wbtn" id="n-back">もどる</button></div>', b => {
         b.querySelector('#n-back').onclick = closeDialog;
         b.querySelector('#n-go').onclick = () => {
             const seed = codeToSeed(b.querySelector('#n-code').value);
             if (!seed) { b.querySelector('#n-msg').textContent = 'そのコードは使えません'; return; }
-            startNew(seed);
+            askNewWorld(seed);
         };
     });
 }
-$('btn-start').onclick = () => { SFX.unlock && SFX.unlock(); if (hasSave() && loadGame()) { startPlay(); H.log(dayNo() + '日目から つづき', 'good'); } else askNewWorld(); };
-$('btn-new').onclick = askNewWorld;
+$('btn-start').onclick = () => { SFX.unlock && SFX.unlock(); if (slotList().length) openSlots(); else askNewWorld(); };
+$('btn-new').onclick = () => askNewWorld();
 // 回路モード: セーブがあれば つづきから、なければ 新しい世界で
 $('btn-circuit').onclick = () => {
     SFX.unlock && SFX.unlock();
@@ -843,17 +880,11 @@ $('btn-rank').onclick = () => showRanking();
 $('btn-howto').onclick = () => openHowto();
 $('btn-home').onclick = () => { location.href = '../index.html'; };
 $('btn-sound').onclick = () => { dialog('<h2>設定</h2><div id="t-sound"></div><div class="row"><button class="wbtn" id="t-look">主人公をえらぶ</button><button class="wbtn" id="t-code">世界コードではじめる</button><button class="wbtn" id="t-close">とじる</button></div>', b => { soundBtn('#t-sound'); b.querySelector('#t-code').onclick = askWorldCode; b.querySelector('#t-look').onclick = () => openLooks(); b.querySelector('#t-close').onclick = closeDialog; }); };
-$('btn-name').onclick = () => {
-    dialog('<h2>ニックネーム</h2><div class="row"><input id="p-name" maxlength="12" value="' + escapeHtml(getName()) + '"></div><div id="p-msg" style="color:#c8301c;font-size:16px"></div><div class="row"><button class="wbtn go" id="p-ok">決定</button><button class="wbtn" id="p-back">もどる</button></div>', b => {
-        b.querySelector('#p-back').onclick = closeDialog;
-        b.querySelector('#p-ok').onclick = () => { const v = FGLName.validate(b.querySelector('#p-name').value); if (!v.ok) { b.querySelector('#p-msg').textContent = v.reason === 'empty' ? 'ニックネームを入れてね' : FGLName.message(v.reason, 'simple'); return; } setName(v.name); closeDialog(); };
-    });
-};
-
 // ---------- チュートリアル ----------
 $('btn-tutorial').onclick = () => {
     FGLTutorial.begin({ root: '#stage', getLang: () => 'ja' });
     H.noAch = true;
+    curSlot = null;
     newGame(777777);
     const tx = S.x, ty = S.y;
     for (let y = -3; y <= 3; y++) for (let x = -3; x <= 3; x++) setT(0, tx + x, ty + y, T.GRASS);
@@ -961,8 +992,7 @@ initRender($('world'));
     const sp = [['cow', 4, 2], ['chicken', -4, 3], ['sheep', 7, -2], ['pig', -7, -2]];
     sp.forEach(q => { const x = S.x + q[1], y = S.y + q[2]; if (TILE[getT(0, x, y)].ground) spawnMob(q[0], x, y); });
     snapView();
-    $('btn-start').textContent = hasSave() ? 'つづきから' : 'はじめから';
-    if (!hasSave()) $('btn-new').style.display = 'none';   // セーブがないときは大きなボタンだけ
+    refreshTitleButtons();   // セーブがないときは大きなボタンだけ
 })();
 FGLTitle.mount({
     host: '#title-screen', hue: 100, art: 'compact', skin: 'board', fill: true, tag: 'FUN & GROWTH LAB',
@@ -972,7 +1002,7 @@ FGLTitle.mount({
     buttons: {
         start: '#btn-start', row: [
             { sel: '#btn-new', ico: 'play' }, { sel: '#btn-tutorial', ico: 'help' }, { sel: '#btn-circuit', ico: 'gear' }, { sel: '#btn-howto', ico: 'star' }, { sel: '#btn-rank', ico: 'trophy' }, { sel: '#btn-ach', ico: 'star' }, { sel: '#btn-sound', ico: 'gear' },
-            { sel: '#btn-name', ico: 'user', nudge: { unset: () => !getName(), dir: 'down' } }, { sel: '#btn-home', ico: 'home' }]
+            { sel: '#btn-home', ico: 'home' }]
     }
 });
 requestAnimationFrame(loop);

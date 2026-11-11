@@ -61,20 +61,51 @@ function newGame(seed) {
 }
 const b64 = u => { let s = ''; for (let i = 0; i < u.length; i++) s += String.fromCharCode(u[i]); return btoa(s); };
 const unb64 = s => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; };
+// ---------- セーブの枠(10こまで) ----------
+// tc2_slots = [{ id, name, created, updated, day }] / 中身は tc2_save_<id>
+const SLOT_MAX = 10, SLOTS_KEY = 'tc2_slots';
+let curSlot = null;   // 今 遊んでいる枠(チュートリアル中は null = セーブしない)
+const slotKey = id => 'tc2_save_' + id;
+function slotList() { try { return JSON.parse(localStorage.getItem(SLOTS_KEY)) || []; } catch (e) { return []; } }
+function slotWrite(list) { try { localStorage.setItem(SLOTS_KEY, JSON.stringify(list)); } catch (e) { } }
+const slotDefaultName = t => { const d = new Date(t); return (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0') + ' にはじめた世界'; };
+function newSlot(name) {
+    const list = slotList(), id = list.reduce((m, q) => Math.max(m, q.id), 0) + 1, now = Date.now();
+    list.push({ id, name: name || slotDefaultName(now), created: now, updated: now, day: 1 });
+    slotWrite(list);
+    return id;
+}
+function deleteSlot(id) { try { localStorage.removeItem(slotKey(id)); } catch (e) { } slotWrite(slotList().filter(q => q.id !== id)); }
+function renameSlot(id, name) { const list = slotList(), q = list.find(q => q.id === id); if (q) { q.name = name; slotWrite(list); } }
+// 前のセーブ(1つだけだったころ)を 1つ目の枠に うつす
+(function migrateSlots() {
+    try {
+        const old = localStorage.getItem(SAVE_KEY);
+        if (!old || slotList().length) return;
+        const now = Date.now(), id = 1;
+        let day = 1; try { day = Math.floor(JSON.parse(old).T / DAY_LEN) + 1; } catch (e) { }
+        localStorage.setItem(slotKey(id), old);
+        slotWrite([{ id, name: 'さいしょの世界', created: now, updated: now, day }]);
+        localStorage.removeItem(SAVE_KEY);
+    } catch (e) { }
+})();
 function saveGame() {
     if (!S) return false;
+    const key = circuitMode() ? CIRCUIT_SAVE_KEY : curSlot ? slotKey(curSlot) : null;
+    if (!key) return false;
     try {
         keptSync();
         S.pets = mobs.filter(m => MOBS[m.t].pet).map(m => m.hp);
         const o = Object.assign({}, S, { seen: S.seen.map(b64), diffs });
-        localStorage.setItem(circuitMode() ? CIRCUIT_SAVE_KEY : SAVE_KEY, JSON.stringify(o));
+        localStorage.setItem(key, JSON.stringify(o));
+        if (!circuitMode()) { const list = slotList(), q = list.find(q => q.id === curSlot); if (q) { q.updated = Date.now(); q.day = dayNo(); slotWrite(list); } }
         return true;
     } catch (e) { H.log('セーブできませんでした(ほぞん容量がいっぱいです)', 'bad'); return false; }
 }
-function hasSave(key) { try { return !!localStorage.getItem(key || SAVE_KEY); } catch (e) { return false; } }
+function hasSave(key) { try { return key ? !!localStorage.getItem(key) : slotList().length > 0; } catch (e) { return false; } }
 function loadGame(key) {
     try {
-        const o = JSON.parse(localStorage.getItem(key || SAVE_KEY));
+        const o = JSON.parse(localStorage.getItem(key));
         setWorldSeed(o.seed, o.diffs);
         delete o.diffs;
         o.seen = o.seen.map(unb64);
@@ -88,7 +119,6 @@ function loadGame(key) {
         return true;
     } catch (e) { return false; }
 }
-function deleteSave() { try { localStorage.removeItem(SAVE_KEY); } catch (e) { } }
 
 // ---------- 時間 ----------
 const dayNo = () => Math.floor(S.T / DAY_LEN) + 1;
