@@ -1773,6 +1773,7 @@ function nearStations() {
 // station: 開いている設備('bench' など)。持ち物画面から作るときは null(作業台だけ作れる)
 function craftRecipe(rec, station) {
     if (station !== undefined && (rec.st || null) !== station) return 'ここでは つくれない';
+    if (S.hunger === 0 && ITEM[rec.out].food === undefined) return 'おなかがペコペコで つくれない';   // 食べ物だけは 作れる
     const near = nearStations();
     if (rec.st && !near[rec.st]) return STATION_NAME[rec.st] + 'のそばで つくれる';
     if (!hasAll(rec.need)) return '材料がたりない';
@@ -1794,6 +1795,7 @@ function partNeed(kind, a, b) {
 function craftTool(kind, a, b, station, gem) {
     const near = nearStations(), st = kind === 'armor' ? BODIES[a].st : HEADS[a].st;
     if (station !== undefined && st !== station) return STATION_NAME[st] + 'で つくれる';
+    if (S.hunger === 0) return 'おなかがペコペコで つくれない';
     if (!near[st]) return STATION_NAME[st] + 'のそばで つくれる';
     const need = Object.assign({}, partNeed(kind, a, b));
     if (gem) need.gem = (need.gem || 0) + 1;

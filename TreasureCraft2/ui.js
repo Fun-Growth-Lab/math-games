@@ -414,7 +414,7 @@ function drawPanel() {
     const st = panelStation(), vis = visibleTabs();
     if (!vis.includes(tab)) tab = vis[0];
     document.querySelectorAll('.tab[data-tab]').forEach(b => { b.classList.toggle('on', b.dataset.tab === tab); b.classList.toggle('hidden', !vis.includes(b.dataset.tab)); });
-    $('panel-title').innerHTML = st ? '<img src="' + iconUrl(st) + '" alt="">' + STATION_NAME[st] : '';
+    $('panel-title').innerHTML = st ? '<img src="' + iconUrl(st) + '" alt=""><span>' + STATION_NAME[st] + '</span>' : '';
     $('panel-title').classList.toggle('hidden', !st);
     const near = nearStations();
     $('chips').innerHTML = '';
@@ -474,12 +474,36 @@ const MAKE_ORDER = {
     bench: ['torch', 'furnace', 'bed', 'wall_w', 'door', 'floor', 'fence', 'chest', 'ladder', 'rail', 'wall_s', 'arrow', 'carpet', 'clamp', 'rod', 'bread', 'arrow_fe', 'glass_w', 'bottle', 'wall_nw', 'floor_nw', 'switch', 'plate', 'bulb', 'conv', 'fconv', 'disp', 'rep', 'notg', 'wall_cu', 'door_cu', 'fence_cu', 'floor_cu', 'wall_fe', 'door_fe', 'fence_fe', 'floor_fe', 'wall_au', 'door_au', 'fence_au', 'floor_au', 'floor_s', 'fence_s', 'door_s', 'fence_nw', 'door_nw', 'wall_sr', 'door_sr', 'fence_sr', 'floor_sr', 'wall_dm', 'door_dm', 'fence_dm', 'floor_dm', 'feather_home', 'crown', 'gate', 'coinpile', 'fossil', 'mclock', 'sball', 'phoenix', 'dpot'],
     furnace: ['charcoal', 'glass', 'steak', 'ingot_cu', 'roast', 'ingot_fe', 'gfish', 'fegg', 'stew', 'pie', 'potion', 'ingot_au', 'ingot_n', 'feast'],
 };
+// つくる物の分類(作業台・かまど)。[名前, 絵にする物, 入る物]。どれにも入らない物は 1つめの分類に入る
+const MAKE_CATS = {
+    bench: [['くらし', 'bed', ['torch', 'furnace', 'bed', 'chest', 'ladder', 'rail', 'carpet', 'bread', 'gate']],
+        ['建材', 'wall_s', null],
+        ['道具', 'rod', ['arrow', 'arrow_fe', 'rod', 'bottle', 'feather_home']],
+        ['回路', 'bulb', ['switch', 'plate', 'bulb', 'conv', 'fconv', 'disp', 'rep', 'notg']],
+        ['かざり', 'crown', ['clamp', 'crown', 'coinpile', 'fossil', 'mclock', 'sball', 'phoenix', 'dpot']]],
+    furnace: [['素材', 'ingot_fe', ['charcoal', 'glass', 'ingot_cu', 'ingot_fe', 'ingot_au', 'ingot_n']], ['料理', 'steak', null]]
+};
+const makeCat = {};   // 設備ごとに 選んでいる分類(-1 = ぜんぶ)
+function catOf(st, out) {
+    const cs = MAKE_CATS[st];
+    let i = cs.findIndex(c => c[2] && c[2].includes(out));
+    if (i < 0) i = cs.findIndex(c => !c[2]);
+    return i < 0 ? 0 : i;
+}
+function drawCats(st) {
+    const cs = MAKE_CATS[st], cur = makeCat[st] === undefined ? -1 : makeCat[st];
+    const el = $('chips');
+    el.innerHTML = '<button class="cat' + (cur === -1 ? ' on' : '') + '" data-cat="-1"><b class="all">全</b><span>ぜんぶ</span></button>' +
+        cs.map((c, i) => '<button class="cat' + (cur === i ? ' on' : '') + '" data-cat="' + i + '">' + iconHtml(c[1]) + '<span>' + c[0] + '</span></button>').join('');
+    el.querySelectorAll('.cat').forEach(b => b.onclick = () => { makeCat[st] = +b.dataset.cat; SFX.play('select'); drawPanel(); });
+    return cur;
+}
 function drawMake() {
-    const st = panelStation();
+    const st = panelStation(), cat = MAKE_CATS[st] ? drawCats(st) : -1;
     // 設備では その設備のレシピ全部(材料をまだ見つけていない物は ？？？)。持ち物画面では 作業台だけ
     // 並びは MAKE_ORDER(序盤に作る物・よく使う物が上)
     const ord = MAKE_ORDER[st || ''], pos = r => { const i = ord.indexOf(r.out); return i < 0 ? 999 : i; };
-    const list = RECIPES.filter(r => (r.st || null) === st).sort((p, q) => pos(p) - pos(q));
+    const list = RECIPES.filter(r => (r.st || null) === st && (cat < 0 || catOf(st, r.out) === cat)).sort((p, q) => pos(p) - pos(q));
     const card = r => {
         const known = !st || Object.keys(r.need).some(k => S.got[k] || count(k) > 0);
         if (!known) return '<div class="rec off"><div class="ic" style="font-size:30px;color:#a89878">？</div><div class="tx"><div class="nm">？？？</div><div class="nd">まだ材料を見つけていない</div></div></div>';
@@ -487,8 +511,8 @@ function drawMake() {
         return '<div class="rec' + (ok ? '' : ' off') + '" id="rec-' + r.out + '"><div class="ic">' + iconHtml(r.out) + '</div><div class="tx"><div class="nm">' + desc.n + (r.n ? ' ×' + r.n : '') + ' <small class="own">持っている ' + count(r.out) + '</small>' + (desc.food ? ' <small>満腹+' + desc.food + '</small>' : '') + (desc.heal ? ' <small>HP+' + desc.heal + '</small>' : '') + '</div>' + (desc.desc ? '<div class="nd" style="color:#6a4c2c">' + desc.desc + '</div>' : '') + '<div class="nd">' + needHtml(r.need) + (r.t > 1 ? ' <span style="color:#6a4c2c">(' + r.t + 'ターン)</span>' : '') + '</div></div><button class="wbtn' + (ok ? ' go' : ' no') + ' mk" data-out="' + r.out + '" data-rec="' + RECIPES.indexOf(r) + '">つくる</button></div>';
     };
     // 作り直す前の スクロール位置(同じ場所のレシピ一覧なら そのまま残す)
-    const old = $('pbody').querySelector('.list.mklist'), keep = old && old.dataset.st === String(st) ? old.scrollTop : 0;
-    let h = '<div class="list mklist" data-st="' + st + '">' + list.map(card).join('');
+    const old = $('pbody').querySelector('.list.mklist'), keep = old && old.dataset.st === st + ':' + cat ? old.scrollTop : 0;
+    let h = '<div class="list mklist" data-st="' + st + ':' + cat + '">' + list.map(card).join('');
     if (!st) h += '<div class="sec off" style="font-size:16px">作業台・かまどに ぶつかると、そこでつくれる物が出ます</div>';
     $('pbody').innerHTML = h + '</div>';
     if (keep) $('pbody').querySelector('.mklist').scrollTop = keep;
