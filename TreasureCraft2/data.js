@@ -145,6 +145,21 @@ const DECOS = [
 DECOS.forEach(([id, n, tier, desc, light]) => defT('DC_' + id.toUpperCase(), Object.assign({ n, solid: 1, hp: 2, back: id, deco: 1 }, light ? { light } : {})));
 defT('NOT_S', { n: 'インバーター', hp: 2, back: 'notg', inv: 3 });
 defT('NOT_W', { n: 'インバーター', hp: 2, back: 'notg', inv: 4 });
+// 石と魔樹の 床・柵・扉
+defT('FLOOR_ST', { n: '石畳', hp: 6, tool: 'pick', tier: 1, back: 'floor_s', floorlike: 1, blast: 1 });
+defT('FENCE_ST', { n: '石の柵', solid: 1, low: 1, hp: 8, tool: 'pick', tier: 1, back: 'fence_s', blast: 1 });
+defT('DOOR_ST', { n: '石の扉', door: 1, hp: 10, tool: 'pick', tier: 1, back: 'door_s', blast: 1, opaque: 1 });
+defT('FENCE_NW', { n: '魔樹の柵', solid: 1, low: 1, hp: 6, tool: 'axe', back: 'fence_nw' });
+defT('DOOR_NW', { n: '魔樹の扉', door: 1, hp: 9, tool: 'axe', back: 'door_nw', opaque: 1 });
+// 金より上の金属: 星晶=強く光る / 魔鋼=いちばん丈夫
+const METALS2 = { sr: { n: '星晶', hp: 4, blast: 99, light: 7 }, dm: { n: '魔鋼', hp: 6, blast: 99 } };
+for (const m in METALS2) {
+    const M = METALS2[m], U = m.toUpperCase(), lt = M.light ? { light: M.light } : {};
+    defT('WALL_' + U, Object.assign({ n: M.n + 'のかべ', solid: 1, hp: Math.round(10 * M.hp), tool: 'pick', tier: 1, back: 'wall_' + m, blast: M.blast, opaque: 1, metal: m }, lt));
+    defT('DOOR_' + U, Object.assign({ n: M.n + 'の扉', door: 1, hp: Math.round(5 * M.hp), tool: 'pick', tier: 1, back: 'door_' + m, blast: M.blast, opaque: 1, metal: m }, lt));
+    defT('FENCE_' + U, Object.assign({ n: M.n + 'の柵', solid: 1, low: 1, hp: Math.round(4 * M.hp), tool: 'pick', tier: 1, back: 'fence_' + m, blast: M.blast, metal: m }, lt));
+    defT('FLOOR_' + U, Object.assign({ n: M.n + 'の床', hp: Math.round(3 * M.hp), tool: 'pick', tier: 1, back: 'floor_' + m, floorlike: 1, blast: M.blast, metal: m }, lt));
+}
 // 視線をさえぎる物。木や柵はさえぎらない
 ['ROCK', 'BURIED', 'WALL_W', 'WALL_S', 'DOOR', 'RWALL', 'TOWERW', 'SANDB1', 'SANDB2', 'SANDB3', 'HUTW', 'HULL', 'GIANT', 'GIANTB', 'METEOR', 'SPAWNER'].forEach(k => { TILE[T[k]].opaque = 1; });
 TILE.forEach(d => { if (d.wall) d.opaque = 1; });
@@ -303,8 +318,22 @@ for (const m in METALS) {
     ITEM['fence_' + m] = { n: M.n + 'の柵', tile: 'FENCE_' + U, place: 'FENCE_' + U, desc: '向こうが見える' };
     ITEM['floor_' + m] = { n: M.n + 'の床', tile: 'FLOOR_' + U, place: 'FLOOR_' + U, desc: d };
 }
-for (const m of ['cu', 'fe', 'au']) {
-    const ing = { cu: 'ingot_cu', fe: 'ingot_fe', au: 'ingot_au' }[m];
+Object.assign(METAL_DESC, { sr: '強く光る', dm: 'いちばん丈夫' });
+for (const m in METALS2) {
+    const M = METALS2[m], U = m.toUpperCase(), d = METAL_DESC[m];
+    ITEM['wall_' + m] = { n: M.n + 'のかべ', tile: 'WALL_' + U, place: 'WALL_' + U, desc: d };
+    ITEM['door_' + m] = { n: M.n + 'の扉', tile: 'DOOR_' + U, place: 'DOOR_' + U, desc: d };
+    ITEM['fence_' + m] = { n: M.n + 'の柵', tile: 'FENCE_' + U, place: 'FENCE_' + U, desc: '向こうが見える' };
+    ITEM['floor_' + m] = { n: M.n + 'の床', tile: 'FLOOR_' + U, place: 'FLOOR_' + U, desc: d };
+}
+Object.assign(ITEM, {
+    floor_s: { n: '石畳', tile: 'FLOOR_ST', place: 'FLOOR_ST', desc: '爆発に1回たえる' }, fence_s: { n: '石の柵', tile: 'FENCE_ST', place: 'FENCE_ST', desc: '向こうが見える' }, door_s: { n: '石の扉', tile: 'DOOR_ST', place: 'DOOR_ST', desc: '爆発に1回たえる' },
+    fence_nw: { n: '魔樹の柵', tile: 'FENCE_NW', place: 'FENCE_NW', desc: '向こうが見える' }, door_nw: { n: '魔樹の扉', tile: 'DOOR_NW', place: 'DOOR_NW', desc: '木の扉より丈夫' }
+});
+RECIPES.push({ out: 'floor_s', n: 4, need: { stone: 1 }, st: 'bench' }, { out: 'fence_s', n: 3, need: { stone: 2 }, st: 'bench' }, { out: 'door_s', need: { stone: 3 }, st: 'bench' },
+    { out: 'fence_nw', n: 3, need: { nwood: 1 }, st: 'bench' }, { out: 'door_nw', need: { nwood: 2 }, st: 'bench' });
+for (const m of ['cu', 'fe', 'au', 'sr', 'dm']) {
+    const ing = { cu: 'ingot_cu', fe: 'ingot_fe', au: 'ingot_au', sr: 'star', dm: 'ingot_n' }[m];
     RECIPES.push({ out: 'wall_' + m, n: 2, need: { [ing]: 1 }, st: 'bench' }, { out: 'door_' + m, need: { [ing]: 2 }, st: 'bench' },
         { out: 'fence_' + m, n: 3, need: { [ing]: 1 }, st: 'bench' }, { out: 'floor_' + m, n: 4, need: { [ing]: 1 }, st: 'bench' });
 }

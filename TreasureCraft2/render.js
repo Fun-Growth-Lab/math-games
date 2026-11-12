@@ -65,7 +65,9 @@ function buildTextures() {
     // 金属の板: リベットつき
     const plate = (cols, dark, hi) => speck(cols, x => { x.fillStyle = dark; x.fillRect(0, 7, 16, 1); x.fillRect(0, 15, 16, 1); x.fillRect(7, 0, 1, 7); x.fillRect(15, 8, 1, 7); x.fillStyle = hi; for (const p of [[2, 2], [12, 2], [2, 11], [12, 11]]) x.fillRect(p[0], p[1], 2, 2); });
     TX.mcu = plate(['#e47a3c', '#d87034', '#ee8646'], '#8a3a18', '#ffc08a'); TX.mfe = plate(['#b4bac2', '#aab0b8', '#bec4cc'], '#6e747c', '#eef2f6'); TX.mau = plate(['#f2c840', '#e8be38', '#fad44c'], '#a8801c', '#fff4b0');
-    for (const m of ['cu', 'fe', 'au']) TX['fl' + m] = [TX['m' + m]];
+    TX.msr = plate(['#5ac8f0', '#4ebee8', '#6ad2f6'], '#2a90c0', '#e0faff'); TX.mdm = plate(['#7a2a8c', '#702484', '#843094'], '#3c1048', '#e070f0');
+    for (const m of ['cu', 'fe', 'au', 'sr', 'dm']) TX['fl' + m] = [TX['m' + m]];
+    TX.cobble = [speck(['#a4a49c', '#9a9a92', '#aeaea6'], bricks('#6e6e66'))];   // 石畳
     TX.benchtop = speck(['#e0bc84', '#d8b47c', '#e8c48c'], x => { x.fillStyle = '#a87c48'; x.fillRect(0, 0, 16, 1); x.fillRect(0, 15, 16, 1); x.fillRect(0, 0, 1, 16); x.fillRect(15, 0, 1, 16); });
     TX.nplank = speck(['#6c2448', '#642042', '#74284e'], planks('#3c1028'));
     TX.sandb = speck(['#dcc488', '#d4bc80', '#e4cc90'], bricks('#a8904c')); TX.hull = speck(['#6e5230', '#624828', '#7a5c38'], planks('#3c2c18'));
@@ -132,7 +134,7 @@ let GS = null, OS = null, LADDER_PARTS = null;
 function buildSprites() {
     buildTextures();
     const g = {};
-    for (const k of ['scorch', 'rail', 'grass', 'grass2', 'flower', 'dirt', 'sand', 'snow', 'cave', 'ash', 'rfloor', 'cfloor', 'wfloor', 'carpet', 'nfloor', 'flcu', 'flfe', 'flau', 'farm', 'water', 'magma']) g[k] = TX[k].map(flatSpr);
+    for (const k of ['scorch', 'rail', 'grass', 'grass2', 'flower', 'dirt', 'sand', 'snow', 'cave', 'ash', 'rfloor', 'cfloor', 'wfloor', 'carpet', 'nfloor', 'flcu', 'flfe', 'flau', 'flsr', 'fldm', 'cobble', 'farm', 'water', 'magma']) g[k] = TX[k].map(flatSpr);
     GS = g;
     const block = (top, h, side, i) => { i = i || 0; return boxSprite([[i, i, 0, 1 - i, 1 - i, h, { top, side: side || top }]]); };
     const o = {};
@@ -224,13 +226,17 @@ function buildSprites() {
         return [boxSprite(shut), boxSprite(open), boxSprite(turn(shut)), boxSprite(turn(open))];
     };
     o[T.DOOR] = mkDoor('#7c5228', '#b8854c', '#ffd84a');
-    const MC = { cu: ['#8a3a18', '#ec7a3a', '#5ad0b0'], fe: ['#5c626a', '#b4bac2', '#3c4048'], au: ['#a8801c', '#f2c840', '#fff4b0'] };
+    const MC = { cu: ['#8a3a18', '#ec7a3a', '#5ad0b0'], fe: ['#5c626a', '#b4bac2', '#3c4048'], au: ['#a8801c', '#f2c840', '#fff4b0'], sr: ['#2a90c0', '#5ac8f0', '#ffffff'], dm: ['#3c1048', '#7a2a8c', '#ff6a2c'] };
     for (const m in MC) {
         const U = m.toUpperCase(), c = MC[m];
         o[T['WALL_' + U]] = [block(TX['m' + m], .85)];
         o[T['DOOR_' + U]] = mkDoor(c[0], c[1], c[2]);
         o[T['FENCE_' + U]] = [boxSprite([[.42, .42, 0, .58, .58, .7, c[0]], [.02, .46, .36, .98, .54, .46, c[1]], [.46, .02, .36, .54, .98, .46, c[1]], [.02, .46, .56, .98, .54, .62, c[1]], [.46, .02, .56, .54, .98, .62, c[1]]])];
     }
+    // 石と魔樹の 扉・柵
+    o[T.DOOR_ST] = mkDoor('#5e5e58', '#9a9a92', '#3c3c38'); o[T.DOOR_NW] = mkDoor('#3c1028', '#6c2448', '#ffd84a');
+    const fence2 = (a, b) => [boxSprite([[.42, .42, 0, .58, .58, .7, a], [.02, .46, .36, .98, .54, .46, b], [.46, .02, .36, .54, .98, .46, b], [.02, .46, .56, .98, .54, .62, b], [.46, .02, .56, .54, .98, .62, b]])];
+    o[T.FENCE_ST] = fence2('#6e6e66', '#a4a49c'); o[T.FENCE_NW] = fence2('#3c1028', '#74284e');
     o[T.TORCH] = [boxSprite([[.44, .44, 0, .56, .56, .55, '#8a5a2c'], [.38, .38, .55, .62, .62, .78, '#ffb03c'], [.44, .44, .78, .56, .56, .92, '#ffe88a']])];
     // 作業台: 足のある台。赤い作業マットと道具でかべと見分ける
     o[T.BENCH] = [boxSprite([[.1, .1, 0, .22, .22, .42, '#6e4622'], [.78, .1, 0, .9, .22, .42, '#6e4622'], [.1, .78, 0, .22, .9, .42, '#6e4622'], [.78, .78, 0, .9, .9, .42, '#6e4622'],
@@ -280,7 +286,7 @@ function wireSprite(x, y) {
     return wireCache[key] || (wireCache[key] = boxSprite(wireBoxes(m, 0, l0, l1)));
 }
 // 導線つきの かべ: もとの かべの絵の上に 線
-const WALL_TEX = { WALL_W: 'plank', WALL_S: 'brick', WALL_CU: 'mcu', WALL_FE: 'mfe', WALL_AU: 'mau', WALL_NW: 'nplank' };
+const WALL_TEX = { WALL_W: 'plank', WALL_S: 'brick', WALL_CU: 'mcu', WALL_FE: 'mfe', WALL_AU: 'mau', WALL_NW: 'nplank', WALL_SR: 'msr', WALL_DM: 'mdm' };
 function wallWireSprite(x, y) {
     const e = S.ex[exKey(S.f, x, y)], base = e && e.base, m = wireMode(S.f, x, y);
     const l0 = !VIEW.title && wireLevel(x, y, 0) > 0, l1 = !VIEW.title && wireLevel(x, y, 1) > 0;
@@ -426,7 +432,7 @@ function groundSprite(t, f, x, y) {
         case T.GRASS: return pk(GS.grass); case T.GRASS2: return pk(GS.grass2); case T.FLOWER: return pk(GS.flower); case T.DIRT: return pk(GS.dirt); case T.SAND: return pk(GS.sand); case T.SNOW: return pk(GS.snow);
         case T.CAVE: return pk(GS.cave); case T.ASH: return pk(GS.ash); case T.RFLOOR: return GS.rfloor[0]; case T.CFLOOR: return GS.cfloor[0];
         case T.CROP_C: case T.CROP_W: return GS.farm[0];   // 畑の下も畑の土(すき間に草が見えないように)
-        case T.WFLOOR: return GS.wfloor[0]; case T.CARPET: return GS.carpet[0]; case T.FLOOR_NW: return GS.nfloor[0]; case T.FLOOR_CU: return GS.flcu[0]; case T.FLOOR_FE: return GS.flfe[0]; case T.FLOOR_AU: return GS.flau[0]; case T.FARM: return GS.farm[0]; case T.WATER: return pk(GS.water); case T.MAGMA: return pk(GS.magma);
+        case T.WFLOOR: return GS.wfloor[0]; case T.CARPET: return GS.carpet[0]; case T.FLOOR_NW: return GS.nfloor[0]; case T.FLOOR_CU: return GS.flcu[0]; case T.FLOOR_FE: return GS.flfe[0]; case T.FLOOR_AU: return GS.flau[0]; case T.FLOOR_SR: return GS.flsr[0]; case T.FLOOR_DM: return GS.fldm[0]; case T.FLOOR_ST: return GS.cobble[0]; case T.FARM: return GS.farm[0]; case T.WATER: return pk(GS.water); case T.MAGMA: return pk(GS.magma);
     }
     return null;
 }

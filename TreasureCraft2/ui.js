@@ -6,6 +6,7 @@ const BGM = FGLBgm.create({ key: 'treasurecraft2' });
 const MOVE_MS = 125, SWIM_MS = 240, FIRST_REPEAT_MS = 190;
 const moveWait = () => TILE[getT(S.f, S.x, S.y)].swim ? SWIM_MS : MOVE_MS;
 let ctrlHeld = false;   // Ctrl を押しているあいだは 向きを変えずに歩く
+let strafe = false;     // 向き固定ボタン: 押すと 向きを変えずに歩く(もう一度押すと もどる)
 let mode = 'title', held = null, holdLock = false, nextAct = 0, turnOnly = false, autoPath = [], logs = [], stageScale = 1, stageRot = false;
 
 // ---------- 舞台の大きさ ----------
@@ -216,7 +217,7 @@ let useHeld = false;   // 「つかう」(Z・ボタン)を押している間
 function doDir(d) {
     const w = rvInv(d[0], d[1]);
     if (turnOnly) { S.face = w; turnOnly = false; $('btn-turn').classList.remove('on'); VIEW.needDraw = true; refreshHud(); return; }
-    step(w[0], w[1], ctrlHeld);
+    step(w[0], w[1], ctrlHeld || strafe);
     if (useHeld && S.hp > 0) { sowWalking(); lastHot = ''; refreshHud(); }
 }
 addEventListener('keydown', e => { if (e.key === 'z' || e.key === 'Z' || e.key === ' ' || e.key === 'Enter') useHeld = true; });
@@ -346,7 +347,10 @@ dpad.addEventListener('pointerdown', e => { const b = padAt(e); if (b) { padPoin
 dpad.addEventListener('pointermove', e => { if (e.pointerId === padPointer) { const b = padAt(e); if (b) setPad(b); } });
 const padUp = e => { if (e.pointerId === padPointer) { padPointer = null; setPad(null); } };
 dpad.addEventListener('pointerup', padUp); dpad.addEventListener('pointercancel', padUp);
-$('btn-turn').addEventListener('click', () => { turnOnly = !turnOnly; $('btn-turn').classList.toggle('on', turnOnly); });
+// 「向きだけ」と「向き固定」は どちらか1つだけ点く
+function setStrafe(on) { strafe = on; $('btn-strafe').classList.toggle('on', on); if (on) { turnOnly = false; $('btn-turn').classList.remove('on'); } }
+$('btn-turn').addEventListener('click', () => { turnOnly = !turnOnly; $('btn-turn').classList.toggle('on', turnOnly); if (turnOnly) setStrafe(false); });
+$('btn-strafe').addEventListener('click', () => setStrafe(!strafe));
 // 押しっぱなしで続けられるボタン
 function repeatBtn(id, fn) {
     const b = $(id); let t = null;
@@ -464,7 +468,7 @@ const toolImg = t => '<img class="tic" src="' + toolIconUrl(t) + '" alt="">';
 function iconHtml(id) { const u = iconUrl(id); return u ? '<img src="' + u + '" alt="">' : (ITEM[id].e || '❔'); }
 const MAKE_ORDER = {
     '': ['bench'],
-    bench: ['torch', 'furnace', 'bed', 'wall_w', 'door', 'floor', 'fence', 'chest', 'ladder', 'wall_s', 'arrow', 'carpet', 'clamp', 'rod', 'bread', 'arrow_fe', 'glass_w', 'bottle', 'wall_nw', 'floor_nw', 'switch', 'plate', 'bulb', 'conv', 'fconv', 'disp', 'rep', 'notg', 'wall_cu', 'door_cu', 'fence_cu', 'floor_cu', 'wall_fe', 'door_fe', 'fence_fe', 'floor_fe', 'wall_au', 'door_au', 'fence_au', 'floor_au', 'feather_home', 'crown', 'gate', 'coinpile', 'fossil', 'mclock', 'sball', 'phoenix', 'dpot'],
+    bench: ['torch', 'furnace', 'bed', 'wall_w', 'door', 'floor', 'fence', 'chest', 'ladder', 'wall_s', 'arrow', 'carpet', 'clamp', 'rod', 'bread', 'arrow_fe', 'glass_w', 'bottle', 'wall_nw', 'floor_nw', 'switch', 'plate', 'bulb', 'conv', 'fconv', 'disp', 'rep', 'notg', 'wall_cu', 'door_cu', 'fence_cu', 'floor_cu', 'wall_fe', 'door_fe', 'fence_fe', 'floor_fe', 'wall_au', 'door_au', 'fence_au', 'floor_au', 'floor_s', 'fence_s', 'door_s', 'fence_nw', 'door_nw', 'wall_sr', 'door_sr', 'fence_sr', 'floor_sr', 'wall_dm', 'door_dm', 'fence_dm', 'floor_dm', 'feather_home', 'crown', 'gate', 'coinpile', 'fossil', 'mclock', 'sball', 'phoenix', 'dpot'],
     furnace: ['charcoal', 'glass', 'steak', 'ingot_cu', 'roast', 'ingot_fe', 'gfish', 'fegg', 'stew', 'pie', 'potion', 'ingot_au', 'ingot_n', 'feast'],
 };
 function drawMake() {
