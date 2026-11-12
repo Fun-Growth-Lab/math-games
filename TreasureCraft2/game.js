@@ -852,6 +852,7 @@ function endTurn(n) {
         updateBreath();
         if (S.hp <= 0) break;
         if (S.T % 20 === 0) { healDmg(); dropsExpire(); }
+        flowWater();
         if (dayT() === 0) {
             H.log(dayNo() + '日目の朝がきた', 'good'); saveGame();
             ach('first_morning');
@@ -1169,6 +1170,16 @@ function hitTile(x, y, t) {
 }
 function pruneDmg() { const k = Object.keys(S.dmg); if (k.length > 60) { delete S.dmg[k[0]]; delete S.dmgT[k[0]]; } }
 // 最後に傷をつけてから 1日たった マスは もとの丈夫さにもどる
+// 穴に 水が流れこむ: flood にある水のマスの となりの穴を 次のターンに水にする(1ターンに1マスずつ)
+function floodFrom(f, x, y, ready) { (S.flood || (S.flood = [])).push([f, x, y, ready === undefined ? S.T + 1 : ready]); }   // 次のターンから 広がる
+function flowWater() {
+    if (!S.flood || !S.flood.length) return;
+    const now = S.flood.filter(q => S.T > q[3]); S.flood = S.flood.filter(q => S.T <= q[3]);
+    for (const [f, x, y] of now) {
+        if (getT(f, x, y) !== T.WATER) continue;
+        for (const o of DIR4) { const nx = x + o[0], ny = y + o[1]; if (getT(f, nx, ny) === T.PIT) { setT(f, nx, ny, T.WATER); floodFrom(f, nx, ny, S.T); } }
+    }
+}
 function healDmg() {
     for (const k in S.dmg) {
         if (S.dmgT[k] === undefined) S.dmgT[k] = S.T;
@@ -1412,6 +1423,7 @@ function digFacing() {
             delete S.dmg[key];
             const wet = DIR4.some(o => getT(S.f, x + o[0], y + o[1]) === T.WATER);
             setT(S.f, x, y, wet ? T.WATER : T.PIT);
+            if (wet) floodFrom(S.f, x, y);
             give(soil, 1); H.stopHold();
         }
         pruneDmg(); endTurn(1);
