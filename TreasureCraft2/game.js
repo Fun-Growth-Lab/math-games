@@ -1451,12 +1451,14 @@ function applyTurn(x, y, c) {
 }
 // 持っている物と 向いている相手から、今できることを並べる。先頭が「つかう」(Z)、2番目があれば「もう1つ」(C)
 const canFeed = (m, id) => (m.t === 'wolf' && (id === 'meat' || id === 'steak')) || (FEED[m.t] && FEED[m.t].includes(id));
-// できる行動だけを返す。できる物がなければ useHint に 押したときに理由を出す行動を入れる
+// ボタンの役わり: [Z, C]。Z = 前の部品の「向き」か 持っている物の使い方 / C = 前の部品を「はずす」か 持っている物の 2つめの使い方
+// Z に何もなければ useHint に 押したときに理由を出す行動を入れる(ボタンは うすく出る)
 let useHint = null;
 function useActions() {
-    const all = buildActions(), ok = all.filter(a => !a.no);
-    useHint = ok.length ? null : all[0] || null;
-    return ok;
+    const { rot, take, items } = buildActions(), ok = items.filter(a => !a.no);
+    const z = rot || ok[0] || null, c = take || (rot ? null : ok[1]) || null;
+    useHint = z ? null : items[0] || null;
+    return [z, c];
 }
 function buildActions() {
     const s = S.inv[S.sel];
@@ -1464,28 +1466,21 @@ function buildActions() {
     const dk = TILE[t].key.match(/^(F?CONV|DISP|REP|NOT)_([NESW])$/), nk = false;
     const rot = (dk || nk || isWire(t)) && !fm ? { l: '向き', run: () => H.openTurn(x, y) } : null;
     const take = takeable(t) && !fm ? { l: 'はずす', run: () => takeTile(x, y, t) } : null;
-    // 「向き」「はずす」は 何も持っていない・道具を持っている・その物(導線なら赤い石の粉)を持っているとき。ほかの物の使い方を じゃましない
-    const own = s && (isWire(t) ? 'rdust' : t === T.LADDER_D ? 'ladder' : TILE[t].back);
-    // 食べ物以外は 部品のあるマスでは使えないので「はずす」を先に
-    const food = s && !s.tool && (ITEM[s.id].food !== undefined || ITEM[s.id].heal !== undefined);
-    const rel = !s || !!s.tool || (own && s.id === own) || (take && !food);
-    const pre = !rel ? [] : [rot, take].filter(Boolean);
-    if (s && !s.tool && take && pre.length) return pre;   // 部品のあるマスには 置けないので 持ち物の行動は出さない
-    if (!s) return pre;
-    if (s.tool && pre.length) return pre;
+    const out = items => ({ rot, take, items });
+    if (!s) return out([]);
     if (s.tool) {
         const tillOk = S.f === 0 && (t === T.GRASS || t === T.GRASS2 || t === T.FLOWER || t === T.DIRT) && !fm;
-        if (s.tool.k === 'hoe') return [{ l: 'たがやす', no: !tillOk, run: () => {
+        if (s.tool.k === 'hoe') return out([{ l: 'たがやす', no: !tillOk, run: () => {
             if (S.f === 0 && (t === T.GRASS || t === T.GRASS2 || t === T.FLOWER || t === T.DIRT) && !fm) { setT(S.f, x, y, T.FARM); wear(s.tool, 1); H.sfx('tick'); endTurn(1); return; }
             H.log('ここは たがやせないようだ', '');
-        } }];
-        if (s.tool.k === 'bow') return [{ l: 'うつ', run: () => fireBow(s.tool) }];
-        return [];   // ほかの道具は 体当たりや「こわす」で 使われる
+        } }]);
+        if (s.tool.k === 'bow') return out([{ l: 'うつ', run: () => fireBow(s.tool) }]);
+        return out([]);   // ほかの道具は 体当たりや「こわす」で 使われる
     }
-    const it = ITEM[s.id], list = pre.slice();
+    const it = ITEM[s.id], list = [];
     if (it.use === 'rod') {
-        if (fishing) return [{ l: 'ひく', run: reelIn }];
-        return [{ l: 'つる', no: !TILE[t].swim, run: () => { if (TILE[t].swim) castLine(x, y); else H.log('ここでは つれないようだ', ''); } }];
+        if (fishing) return out([{ l: 'ひく', run: reelIn }]);
+        return out([{ l: 'つる', no: !TILE[t].swim, run: () => { if (TILE[t].swim) castLine(x, y); else H.log('ここでは つれないようだ', ''); } }]);
     }
     if (fm && canFeed(fm, s.id)) list.push({ l: 'あげる', run: () => tryFeed(fm, s) });
     const edible = it.food !== undefined || it.heal !== undefined;
@@ -1523,19 +1518,20 @@ function buildActions() {
         const sp = S.spawn;
         changeFloor(sp.f, sp.x, sp.y); freeSpot(); endTurn(5);
     } });
-    if (take && !rel && list.filter(a => !a.no).length < 2) list.push(take);
     if (it.use === 'shard') list.push({ l: 'ひらく', run: () => { removeItem(s.id, 1); revealAround(110); H.sfx('unlock'); H.log('地図のかけらで 周りが地図に のった', 'good'); endTurn(1); } });
-    return list;
+    return out(list);
 }
 function useSelected(which) {
     if (!S || S.hp <= 0) return;
     const s = S.inv[S.sel];
-    if (!s) { const a0 = useActions(), act0 = a0[which || 0]; if (act0) act0.run(); else H.log('何も持っていない。下の枠で えらぼう', ''); return; }   // 何も持っていなくても「はずす」「向き」はできる
-    const a = useActions();
-    // できることがない: 理由を出す(置けない・水がない など)
-    if (!a.length) { if (useHint && !which) useHint.run(); else if (s.tool) H.log(toolName(s.tool) + 'は ぶつかったり「' + digInfo().l + '」で 使われる', ''); else H.log(ITEM[s.id].n + 'は 材料だ', ''); return; }
-    const act = a[which || 0];
-    if (act) act.run();
+    const act = useActions()[which || 0];
+    if (act) { act.run(); return; }
+    if (which) return;   // C は 出ていないときは 何もしない
+    // Z でできることがない: 理由を出す(置けない・水がない など)
+    if (useHint) useHint.run();
+    else if (!s) H.log('何も持っていない', '');
+    else if (s.tool) H.log(toolName(s.tool) + 'は ぶつかったり「' + digInfo().l + '」で 使われる', '');
+    else H.log(ITEM[s.id].n + 'は 材料だ', '');
 }
 // 弓: 向いている方向へ矢を飛ばす。かべで止まる
 function fireBow(bow) {
