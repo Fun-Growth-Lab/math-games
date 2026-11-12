@@ -122,7 +122,7 @@ function boxSprite(list, opt) {
 }
 const flatSpr = tex => boxSprite([[-.015, -.015, 0, 1.015, 1.015, 0, { top: tex }]]);   // つなぎ目が見えないよう少しだけ大きく
 
-let GS = null, OS = null;
+let GS = null, OS = null, LADDER_PARTS = null;
 function buildSprites() {
     buildTextures();
     const g = {};
@@ -139,7 +139,7 @@ function buildSprites() {
     o[T.HERB] = [boxSprite([[.3, .3, 0, .7, .7, .14, '#3a9a6a'], [.4, .4, .14, .6, .6, .36, '#5ac88a'], [.46, .46, .36, .54, .54, .44, '#f0f0a0']])];
     o[T.ROCK] = [boxSprite([[.04, .04, 0, .96, .96, .5, { top: TX.rock }], [.2, .2, .5, .8, .8, .72, { top: TX.rock }]]), boxSprite([[.08, .08, 0, .92, .92, .62, { top: TX.rock }]])];
     o[T.PIT] = [boxSprite([[0, 0, 0, 1, 1, 0, '#14100c'], [.08, .08, 0, .92, .92, 0, '#000000']])];
-    const ladder = [[.28, .44, 0, .36, .52, .9, '#a8743c'], [.64, .44, 0, .72, .52, .9, '#a8743c'], [.28, .46, .2, .72, .5, .26, '#c89a5c'], [.28, .46, .46, .72, .5, .52, '#c89a5c'], [.28, .46, .72, .72, .5, .78, '#c89a5c']];
+    const ladder = LADDER_PARTS = [[.28, .44, 0, .36, .52, .9, '#a8743c'], [.64, .44, 0, .72, .52, .9, '#a8743c'], [.28, .46, .2, .72, .5, .26, '#c89a5c'], [.28, .46, .46, .72, .5, .52, '#c89a5c'], [.28, .46, .72, .72, .5, .78, '#c89a5c']];
     o[T.LADDER_D] = [boxSprite([[0, 0, 0, 1, 1, 0, '#14100c']].concat(ladder))];
     o[T.LADDER_U] = [boxSprite([[0, 0, 0, 1, 1, 0, { top: TX.cave[0] }]].concat(ladder))];
     // 上り階段: 奥へ向かって 段が高くなる
@@ -320,6 +320,8 @@ function turnThumb(x, y, c) {
     return cv;
 }
 const objSprite = (t, x, y) => { const a = OS[t]; if (!a) return null;
+    if (t === T.PIT) return pitSprite(pitGround(S.f, x, y));
+    if (t === T.LADDER_D) return pitSprite(pitGround(S.f, x, y), LADDER_PARTS);
     if (t === T.WIRE) return wireSprite(x, y);
     if (TILE[t].rep) return repSprite(TILE[t].rep - 1, !VIEW.title && repLit(x, y));
     if (TILE[t].notg) { const ax = TILE[t].notg, e = notEnds(ax); return notSprite(ax, !VIEW.title && notLit(x, y, e[0]), !VIEW.title && notLit(x, y, e[1])); }
@@ -336,6 +338,27 @@ const objSprite = (t, x, y) => { const a = OS[t]; if (!a) return null;
     if (t === T.SAPLING) { const c = S.ex[exKey(S.f, x, y)]; return a[c && S.T - c.p > TREE_TIME / 2 ? 1 : 0]; }
     return a.length > 1 ? a[(x * 7 + y * 13) & 1] : a[0]; };
 
+// 穴のまわりの地面: となり4マスで いちばん多い地面(なければ もとの地面)
+const PIT_NORM = t => t === T.GRASS2 || t === T.FLOWER ? T.GRASS : t;
+function pitGround(f, x, y) {
+    const cnt = new Map();
+    for (const o of DIR4) { const t = PIT_NORM(getT(f, x + o[0], y + o[1])); if (TILE[t].ground) cnt.set(t, (cnt.get(t) || 0) + 1); }
+    let g = f === 0 ? groundOf(0, x, y) : isCave(f) ? T.CAVE : T.ASH; if (g === T.WATER) g = T.GRASS; g = PIT_NORM(g);
+    let best = cnt.has(g) ? g : null, bv = best ? cnt.get(g) : 0;
+    for (const [t, n] of cnt) if (n > bv) { best = t; bv = n; }
+    return best || g;
+}
+// 穴の絵: 奥と左の かべが 見えて、底は暗い。かべの色は 地面に合わせる(まわりは 透明で 下の地面が見える)
+const PIT_WALL = { sand: ['#d8c080', '#b89a5c', '#8a7040'], cave: ['#8a847a', '#6a645c', '#4a4640'], dirt: ['#a87848', '#86603a', '#5e4228'] };
+const pitCache = {};
+function pitSprite(g, ladder) {
+    const m = g === T.SAND ? 'sand' : g === T.CAVE || g === T.ASH ? 'cave' : 'dirt', key = m + (ladder ? 'L' : '');
+    if (pitCache[key]) return pitCache[key];
+    const [c0, c1, c2] = PIT_WALL[m];
+    // 底(まん中ほど暗い) → 左のかべ → 奥のかべ(上ほど明るい) の順に重ねる
+    const l = [[.1, .1, 0, .9, .9, 0, '#2e2216'], [.34, .56, 0, .86, .88, 0, '#1a120c'], [.1, .1, 0, .2, .9, 0, c1], [.2, .24, 0, .3, .9, 0, c2], [.1, .1, 0, .9, .24, 0, c0], [.2, .24, 0, .9, .38, 0, c1], [.3, .38, 0, .9, .5, 0, c2]];
+    return (pitCache[key] = boxSprite(ladder ? l.concat(ladder) : l, { base: l.length }));
+}
 function groundSprite(t, f, x, y) {
     const v = ((x * 3 + y * 5) % 3 + 3) % 3, pk = a => a[v % a.length];
     switch (t) {
@@ -573,7 +596,7 @@ function drawGround(f) {
             if (caveHidden(f, x, y)) continue;
             if (d.light) L.lights.push([x + .5, y + .5, d.light]);
             if (d.wall) continue;
-            const spr = groundSprite(t, f, x, y) || underSprite(f, x, y);
+            const spr = groundSprite(t, f, x, y) || (t === T.PIT || t === T.LADDER_D ? groundSprite(pitGround(f, x, y), f, x, y) : null) || underSprite(f, x, y);
             if (spr) c.drawImage(spr.cv, Math.round(sx - spr.ox), Math.round(sy - spr.oy));
         }
     }
