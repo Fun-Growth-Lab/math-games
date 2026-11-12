@@ -360,7 +360,7 @@ const isHole = t => t === T.PIT || t === T.LADDER_D;
 const mixHex = (a, b, t) => { const p = parseInt(a.slice(1), 16), q = parseInt(b.slice(1), 16), f = (s1, s2) => Math.round(s1 + (s2 - s1) * t); return 'rgb(' + f(p >> 16, q >> 16) + ',' + f((p >> 8) & 255, (q >> 8) & 255) + ',' + f(p & 255, q & 255) + ')'; };
 const PIT_N = 10;   // 1マスを 10x10 に分ける(ふちの はば = 1升)
 // (x,y)のまわり 5x5 マスの 穴の並び(絵の使い回しのキー)
-function holeSig(f, x, y) { let s = ''; for (let dy = -3; dy <= 1; dy++) for (let dx = -2; dx <= 2; dx++) s += isHole(getT(f, x + dx, y + dy)) ? 1 : 0; return s; }
+function holeSig(f, x, y) { let s = ''; for (let dy = -3; dy <= 1; dy++) for (let dx = -2; dx <= 2; dx++) { const t = getT(f, x + dx, y + dy); s += isHole(t) ? 1 : t === T.WATER ? 2 : 0; } return s; }
 function pitSpriteAt(f, x, y, ladder) {
     const g = pitGround(f, x, y), m = g === T.SAND ? 'sand' : g === T.CAVE || g === T.ASH ? 'cave' : 'dirt';
     const key = m + (ladder ? 'L' : '') + holeSig(f, x, y);
@@ -368,6 +368,8 @@ function pitSpriteAt(f, x, y, ladder) {
     const N = PIT_N, hole = (dx, dy) => isHole(getT(f, x + dx, y + dy));
     // 升は マスが穴なら 穴(穴のまわりに 地面のふちは作らない)
     const cell = (gx, gy) => hole(Math.floor(gx / N), Math.floor(gy / N));
+    // となりが水なら そのかべは 水が流れ落ちる かべにする
+    const wet = (gx, gy) => getT(f, x + Math.floor(gx / N), y + Math.floor(gy / N)) === T.WATER;
     const cv = mkCanvas(O_W, O_H), c = cv.getContext('2d'), ox = O_X, oy = O_Y;
     const P = (px, py, z) => { const p = pj(px, py, z); return [ox + p[0], oy + p[1]]; };
     const poly = (pts, fill) => { c.beginPath(); pts.forEach((p, k) => k ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.closePath(); c.fillStyle = fill; c.fill(); };
@@ -380,25 +382,37 @@ function pitSpriteAt(f, x, y, ladder) {
         c.moveTo(q[0][0], q[0][1]); q.slice(1).forEach(p => c.lineTo(p[0], p[1])); c.closePath();
     }
     c.clip();
-    c.fillStyle = '#0c0806'; c.fillRect(0, 0, O_W, O_H);
+    // となりに水があれば 底に水がたまりはじめている(青っぽく暗い)
+    const wetSide = [0, 1, 2, 3].filter(k => getT(f, x + DIR4[k][0], y + DIR4[k][1]) === T.WATER);
+    c.fillStyle = wetSide.length ? '#0e2234' : '#0c0806'; c.fillRect(0, 0, O_W, O_H);
     // かべを集める(まわりのマスの分も)。横のかべ(南向き)と たてのかべ(東向き)を それぞれ つなげる
     const H2 = [], V2 = [];
     for (let gy = -2 * N; gy < N; gy++) for (let gx = -N; gx < 2 * N; gx++) {
         if (!cell(gx, gy)) continue;
-        if (!cell(gx, gy - 1)) { const last = H2[H2.length - 1]; if (last && last.y === gy && last.x1 === gx) last.x1 = gx + 1; else H2.push({ y: gy, x0: gx, x1: gx + 1 }); }
-        if (!cell(gx - 1, gy)) V2.push({ x: gx, y0: gy, y1: gy + 1 });
+        if (!cell(gx, gy - 1)) { const w = wet(gx, gy - 1), last = H2[H2.length - 1]; if (last && last.y === gy && last.x1 === gx && last.w === w) last.x1 = gx + 1; else H2.push({ y: gy, x0: gx, x1: gx + 1, w }); }
+        if (!cell(gx - 1, gy)) V2.push({ x: gx, y0: gy, y1: gy + 1, w: wet(gx - 1, gy) });
     }
     V2.sort((p, q) => p.x - q.x || p.y0 - q.y0);
-    const V = []; for (const v of V2) { const l = V[V.length - 1]; if (l && l.x === v.x && l.y1 === v.y0) l.y1 = v.y1; else V.push(Object.assign({}, v)); }
+    const V = []; for (const v of V2) { const l = V[V.length - 1]; if (l && l.x === v.x && l.y1 === v.y0 && l.w === v.w) l.y1 = v.y1; else V.push(Object.assign({}, v)); }
     const [c0, c1] = PIT_WALL[m], DARK = '#0c0806', BANDS = 14, DEEP = .56;
-    const wall = (p1, p2, col) => { for (let k = 0; k < BANDS; k++) { const za = DEEP * k / BANDS, zb = DEEP * (k + 1) / BANDS + .01; poly([P(p1[0], p1[1], -za), P(p2[0], p2[1], -za), P(p2[0], p2[1], -zb), P(p1[0], p1[1], -zb)], mixHex(col, DARK, Math.pow(k / (BANDS - 1), .8))); } };
+    const WATER_C = ['#6ab8ec', '#559fd4'], WDARK = '#14304a';
+    const wall = (p1, p2, col, w) => { for (let k = 0; k < BANDS; k++) { const za = DEEP * k / BANDS, zb = DEEP * (k + 1) / BANDS + .01; poly([P(p1[0], p1[1], -za), P(p2[0], p2[1], -za), P(p2[0], p2[1], -zb), P(p1[0], p1[1], -zb)], mixHex(col, w ? WDARK : DARK, Math.pow(k / (BANDS - 1), .8))); }
+        // 水の かべには 落ちる水の すじ
+        if (w) { c.strokeStyle = 'rgba(255,255,255,.45)'; c.lineWidth = 1; const n = Math.max(2, Math.round(Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) * 6)); for (let j = 1; j < n; j++) { const t = j / n, px = p1[0] + (p2[0] - p1[0]) * t, py = p1[1] + (p2[1] - p1[1]) * t, a = P(px, py, -.02), b = P(px, py, -(.15 + (j % 3) * .08)); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); } } };
     // 奥から順に(上のかべ → 下のかべ)
-    const ws = H2.map(h => ({ y: h.y, p1: [h.x0 / N, h.y / N], p2: [h.x1 / N, h.y / N], col: c0 })).concat(V.map(v => ({ y: v.y0, p1: [v.x / N, v.y0 / N], p2: [v.x / N, v.y1 / N], col: c1 })));
+    const ws = H2.map(h => ({ y: h.y, p1: [h.x0 / N, h.y / N], p2: [h.x1 / N, h.y / N], col: h.w ? WATER_C[0] : c0, w: h.w })).concat(V.map(v => ({ y: v.y0, p1: [v.x / N, v.y0 / N], p2: [v.x / N, v.y1 / N], col: v.w ? WATER_C[1] : c1, w: v.w })));
     ws.sort((p, q) => p.y - q.y);
-    ws.forEach(w => wall(w.p1, w.p2, w.col));
+    ws.forEach(w => wall(w.p1, w.p2, w.col, w.w));
     // 地層の すじ と 奥の角の たて線
     c.strokeStyle = 'rgba(0,0,0,.16)'; c.lineWidth = 1;
-    for (const w of ws) for (const z of [.12, .26, .42]) { const p = P(w.p1[0], w.p1[1], -z), q = P(w.p2[0], w.p2[1], -z); c.beginPath(); c.moveTo(p[0], p[1]); c.lineTo(q[0], q[1]); c.stroke(); }
+    for (const w of ws) if (!w.w) for (const z of [.12, .26, .42]) { const p = P(w.p1[0], w.p1[1], -z), q = P(w.p2[0], w.p2[1], -z); c.beginPath(); c.moveTo(p[0], p[1]); c.lineTo(q[0], q[1]); c.stroke(); }
+    // 東・南の水は かべが見えないので、ふちから流れこむ 水の帯を描く
+    for (const k of wetSide) if (k === 1 || k === 2) {
+        const q = k === 1 ? [[.84, 0], [1.02, 0], [1.02, 1], [.84, 1]] : [[0, .84], [1, .84], [1, 1.02], [0, 1.02]];
+        poly(q.map(p => P(p[0], p[1], 0)), 'rgba(106,184,236,.85)');
+        c.strokeStyle = 'rgba(255,255,255,.5)'; c.lineWidth = 1;
+        for (let j = 1; j < 6; j++) { const t = j / 6, a = k === 1 ? P(.86, t, 0) : P(t, .86, 0), b = k === 1 ? P(.97, t, 0) : P(t, .97, 0); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); }
+    }
     c.strokeStyle = 'rgba(0,0,0,.45)';
     for (const h of H2) if (V.some(v => v.x === h.x0 && v.y0 === h.y)) { const p = P(h.x0 / N, h.y / N, 0), q = P(h.x0 / N, h.y / N, -DEEP); c.beginPath(); c.moveTo(p[0], p[1]); c.lineTo(q[0], q[1]); c.stroke(); }
     c.restore();

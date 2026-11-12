@@ -241,7 +241,7 @@ function loadDispenser(x, y) {
     const n = Math.min(count('arrow'), 64 - (c.arrows || 0));
     H.stopHold();
     if (n > 0) { removeItem('arrow', n); c.arrows = (c.arrows || 0) + n; H.sfx('item'); H.log('矢を ' + n + '本 入れた(中に ' + c.arrows + '本)', 'good'); endTurn(1); return; }
-    H.log('矢の発射台(中に ' + (c.arrows || 0) + '本)。矢を持ってぶつかると 入れられる', '');
+    H.log('矢の発射台(中に ' + (c.arrows || 0) + '本)', '');
 }
 function toggleSwitch(x, y, t) {
     setT(S.f, x, y, t === T.SWITCH_ON ? T.SWITCH_OFF : T.SWITCH_ON);
