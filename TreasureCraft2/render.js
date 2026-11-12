@@ -342,22 +342,47 @@ const objSprite = (t, x, y) => { const a = OS[t]; if (!a) return null;
 const PIT_NORM = t => t === T.GRASS2 || t === T.FLOWER ? T.GRASS : t;
 function pitGround(f, x, y) {
     const cnt = new Map();
-    for (const o of DIR4) { const t = PIT_NORM(getT(f, x + o[0], y + o[1])); if (TILE[t].ground) cnt.set(t, (cnt.get(t) || 0) + 1); }
+    for (const o of DIR4) {
+        const nx = x + o[0], ny = y + o[1], out = nx < 0 || ny < 0 || nx >= WORLD || ny >= WORLD;
+        const t = out ? (f === 0 ? T.DIRT : isCave(f) ? T.CAVE : T.ASH) : PIT_NORM(getT(f, nx, ny));   // マップの外は ふつうの土
+        if (TILE[t].ground) cnt.set(t, (cnt.get(t) || 0) + 1);
+    }
     let g = f === 0 ? groundOf(0, x, y) : isCave(f) ? T.CAVE : T.ASH; if (g === T.WATER) g = T.GRASS; g = PIT_NORM(g);
     let best = cnt.has(g) ? g : null, bv = best ? cnt.get(g) : 0;
     for (const [t, n] of cnt) if (n > bv) { best = t; bv = n; }
     return best || g;
 }
-// 穴の絵: 奥と左の かべが 見えて、底は暗い。かべの色は 地面に合わせる(まわりは 透明で 下の地面が見える)
-const PIT_WALL = { sand: ['#d8c080', '#b89a5c', '#8a7040'], cave: ['#8a847a', '#6a645c', '#4a4640'], dirt: ['#a87848', '#86603a', '#5e4228'] };
+// 穴の絵: 本当に下へ掘れた たて穴として描く。見えるのは 奥(北)のかべと 左(西)のかべの内がわで、
+// 奥の角から まっすぐ下へ のびる線で 2つのかべが分かれる。深いほど暗く、ふちの外は透明(下の地面が見える)
+const PIT_WALL = { sand: ['#d8c080', '#b89a5c'], cave: ['#8a847a', '#6a645c'], dirt: ['#a87848', '#86603a'] };
 const pitCache = {};
 function pitSprite(g, ladder) {
     const m = g === T.SAND ? 'sand' : g === T.CAVE || g === T.ASH ? 'cave' : 'dirt', key = m + (ladder ? 'L' : '');
     if (pitCache[key]) return pitCache[key];
-    const [c0, c1, c2] = PIT_WALL[m];
-    // 底(まん中ほど暗い) → 左のかべ → 奥のかべ(上ほど明るい) の順に重ねる
-    const l = [[.1, .1, 0, .9, .9, 0, '#2e2216'], [.34, .56, 0, .86, .88, 0, '#1a120c'], [.1, .1, 0, .2, .9, 0, c1], [.2, .24, 0, .3, .9, 0, c2], [.1, .1, 0, .9, .24, 0, c0], [.2, .24, 0, .9, .38, 0, c1], [.3, .38, 0, .9, .5, 0, c2]];
-    return (pitCache[key] = boxSprite(ladder ? l.concat(ladder) : l, { base: l.length }));
+    const cv = mkCanvas(O_W, O_H), c = cv.getContext('2d'), ox = O_X, oy = O_Y;
+    const P = (x, y, z) => { const p = pj(x, y, z); return [ox + p[0], oy + p[1]]; };
+    const poly = (pts, fill) => { c.beginPath(); pts.forEach((p, k) => k ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.closePath(); c.fillStyle = fill; c.fill(); };
+    const i = .1, a = i, b = 1 - i, D = 1.6, DARK = '#0c0806';
+    const A = (z) => P(a, a, z), B = (z) => P(b, a, z), Dp = (z) => P(a, b, z), C = (z) => P(b, b, z);
+    // 穴の口で 切りぬく
+    c.save(); c.beginPath(); [A(0), B(0), C(0), Dp(0)].forEach((p, k) => k ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.closePath(); c.clip();
+    poly([A(0), B(0), C(0), Dp(0)], DARK);
+    // 手前のふちに近づくほど 深い所なので 暗く(口の高さの 8割で まっくら)
+    const y0 = Math.min(A(0)[1], B(0)[1]), y1 = Math.max(C(0)[1], Dp(0)[1]);
+    const grad = col => { const g2 = c.createLinearGradient(0, y0, 0, y1); g2.addColorStop(0, col); g2.addColorStop(.45, shade(col, .55)); g2.addColorStop(.8, DARK); return g2; };
+    const [c0, c1] = PIT_WALL[m];
+    poly([A(0), B(0), B(-D), A(-D)], grad(c0));   // 奥のかべ(明るい)
+    poly([A(0), Dp(0), Dp(-D), A(-D)], grad(c1));  // 左のかべ(少し暗い)
+    // 地層の すじ(かべにそって 横に)
+    c.strokeStyle = 'rgba(0,0,0,.18)'; c.lineWidth = 1;
+    for (const z of [.12, .26, .42]) { c.beginPath(); const p1 = Dp(-z), p2 = A(-z), p3 = B(-z); c.moveTo(p1[0], p1[1]); c.lineTo(p2[0], p2[1]); c.lineTo(p3[0], p3[1]); c.stroke(); }
+    // 奥の角: まっすぐ下へ
+    c.strokeStyle = 'rgba(0,0,0,.45)'; c.beginPath(); c.moveTo(A(0)[0], A(0)[1]); c.lineTo(A(-D)[0], A(-D)[1]); c.stroke();
+    c.restore();
+    // 口のふち(土の切り口)
+    c.strokeStyle = 'rgba(40,24,12,.55)'; c.lineWidth = 1.5; c.beginPath(); [A(0), B(0), C(0), Dp(0)].forEach((p, k) => k ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.closePath(); c.stroke();
+    if (ladder) ladder.slice().sort((p, q) => ((p[0] + p[3]) * SN + (p[1] + p[4]) * CS + (p[2] + p[5]) * .35) - ((q[0] + q[3]) * SN + (q[1] + q[4]) * CS + (q[2] + q[5]) * .35)).forEach(q => drawBox(c, ox, oy, q, 1));
+    return (pitCache[key] = { cv, ox, oy });
 }
 function groundSprite(t, f, x, y) {
     const v = ((x * 3 + y * 5) % 3 + 3) % 3, pk = a => a[v % a.length];
