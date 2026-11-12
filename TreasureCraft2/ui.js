@@ -337,7 +337,7 @@ const dpad = $('dpad');
 let padPointer = null;
 function padAt(e) { const el = document.elementFromPoint(e.clientX, e.clientY); return el && el.closest && el.closest('.pad[data-d]'); }
 function setPad(btn) {
-    dpad.querySelectorAll('.pad.on').forEach(b => b.classList.remove('on'));
+    dpad.querySelectorAll('.pad[data-d].on').forEach(b => b.classList.remove('on'));   // 矢印だけ消す(向きだけ・向き固定の点灯は のこす)
     if (!btn) { held = null; return; }
     btn.classList.add('on');
     const d = btn.dataset.d.split(',').map(Number);
