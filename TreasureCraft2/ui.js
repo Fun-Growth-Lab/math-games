@@ -173,7 +173,8 @@ function refreshHud() {
     // 「ほる」ボタン: 前のマスに合わせて こうげき・ほる・こわす。使う道具の絵(なければ手)。できないときは うすく
     { const di = digInfo(), bt = $('btn-dig'), ic = bt.querySelector('b'), tl = di.tool, k = tl ? tl.k + tl.a + tl.b + (tl.gem ? 'g' : '') : 'hand'; if (ic.dataset.k !== k) { ic.dataset.k = k; ic.innerHTML = tl ? toolImg(tl) : '✋'; } bt.querySelector('span').textContent = di.l; bt.classList.toggle('dim', !di.ok); }
     const acts = useActions(), lab = $('btn-use').querySelector('span'), b2 = $('btn-use2');
-    lab.textContent = acts[0] ? acts[0].l : 'つかう';
+    lab.textContent = acts[0] ? acts[0].l : useHint ? useHint.l : 'つかう';
+    $('btn-use').classList.toggle('dim', !acts[0]);
     b2.classList.toggle('hidden', !acts[1]);
     if (acts[1]) b2.querySelector('span').textContent = acts[1].l;
     const key = JSON.stringify([S.inv.slice(0, HOT_SIZE), S.sel]);

@@ -1140,6 +1140,7 @@ function interact(x, y, t) {
     }
     if (t === T.MAGMA) { H.stopHold(); H.log('マグマだ! 木の床でも わたれない', 'warn'); return; }
     if (t === T.PIT) { H.stopHold(); H.log('穴だ。はしごを選んで「かける」で かけよう', ''); return; }
+    if (d.station || t === T.BED || t === T.CHEST) { H.stopHold(); H.log(d.n + 'は ぶつかると開く。しまうときは 中の「片づける」', ''); return; }
     if (d.hp) { hitTile(x, y, t); return; }
     H.stopHold();
     H.log(d.n + 'は こわせない', '');
@@ -1382,6 +1383,8 @@ function digInfo() {
     if (fm) return { l: 'こうげき', tool: equipped('sword'), ok: !(MOBS[fm.t].npc || MOBS[fm.t].pet) };
     const soil = S.f === 0 ? SOIL[t] : d.ground && S.f !== 2 && floorBelow(S.f) >= 0 && t !== T.RFLOOR && t !== T.SCORCH;
     if (soil) return { l: 'ほる', tool: equipped('shovel'), ok: !shaftBlock(floorBelow(S.f), x, y) };
+    if (t === T.FARM) return { l: 'ほる', tool: equipped('shovel'), ok: true };   // 畑は 土にもどる
+    if (d.station || t === T.BED || t === T.CHEST) return { l: 'こわす', tool: null, ok: false };   // 中の「片づける」で しまう
     if (d.ground || t === T.PIT || takeable(t) || t === T.LADDER_U || t === T.STAIRS_U || t === T.CAVEIN || t === T.GATE || !d.hp) return { l: 'ほる', tool: null, ok: false };
     if (!d.tool) return { l: 'こわす', tool: null, ok: true };
     const eq = equipped(d.tool), tier = d.tier || 0;
@@ -1419,6 +1422,7 @@ function digFacing() {
     if (t === T.PIT) { H.stopHold(); H.log('穴があいている。はしごを選んで「かける」で かけよう。木の床を置くと ふさげる', ''); return; }
     if (takeable(t)) { H.stopHold(); H.log((isWire(t) ? '導線' : d.n) + 'は「はずす」で 外せる', ''); return; }
     if (t === T.LADDER_D || t === T.LADDER_U || t === T.STAIRS_U || t === T.CAVEIN || t === T.GATE) { H.stopHold(); H.log(d.n + 'は こわせない', ''); return; }
+    if (d.station || t === T.BED || t === T.CHEST) { H.stopHold(); H.log(d.n + 'は ぶつかると開く。しまうときは 中の「片づける」', ''); return; }
     if (d.hp) { hitTile(x, y, t); return; }
     H.stopHold();
     H.log(d.n + 'は こわせない', '');
@@ -1438,7 +1442,14 @@ function applyTurn(x, y, c) {
 }
 // 持っている物と 向いている相手から、今できることを並べる。先頭が「つかう」(Z)、2番目があれば「もう1つ」(C)
 const canFeed = (m, id) => (m.t === 'wolf' && (id === 'meat' || id === 'steak')) || (FEED[m.t] && FEED[m.t].includes(id));
+// できる行動だけを返す。できる物がなければ useHint に 押したときに理由を出す行動を入れる
+let useHint = null;
 function useActions() {
+    const all = buildActions(), ok = all.filter(a => !a.no);
+    useHint = ok.length ? null : all[0] || null;
+    return ok;
+}
+function buildActions() {
     const s = S.inv[S.sel];
     const x = S.x + S.face[0], y = S.y + S.face[1], t = getT(S.f, x, y), fm = mobAt(x, y);
     const dk = TILE[t].key.match(/^(F?CONV|DISP|REP)_([NESW])$/), nk = TILE[t].notg;
@@ -1454,21 +1465,22 @@ function useActions() {
     if (!s) return pre;
     if (s.tool && pre.length) return pre;
     if (s.tool) {
-        if (s.tool.k === 'hoe') return [{ l: 'たがやす', run: () => {
+        const tillOk = S.f === 0 && (t === T.GRASS || t === T.GRASS2 || t === T.FLOWER || t === T.DIRT) && !fm;
+        if (s.tool.k === 'hoe') return [{ l: 'たがやす', no: !tillOk, run: () => {
             if (S.f === 0 && (t === T.GRASS || t === T.GRASS2 || t === T.FLOWER || t === T.DIRT) && !fm) { setT(S.f, x, y, T.FARM); wear(s.tool, 1); H.sfx('tick'); H.log('畑をたがやした。種を「つかう」で植えよう', 'good'); endTurn(1); return; }
             H.log('草地か土を たがやそう', '');
         } }];
         if (s.tool.k === 'bow') return [{ l: 'うつ', run: () => fireBow(s.tool) }];
-        return [{ l: 'つかう', run: () => step(S.face[0], S.face[1]) }];
+        return [];   // ほかの道具は 体当たりや「こわす」で 使われる
     }
     const it = ITEM[s.id], list = pre.slice();
     if (it.use === 'rod') {
         if (fishing) return [{ l: 'ひく', run: reelIn }];
-        return [{ l: 'つる', run: () => { if (TILE[t].swim) castLine(x, y); else H.log('水のほうを向いて 投げよう', ''); } }];
+        return [{ l: 'つる', no: !TILE[t].swim, run: () => { if (TILE[t].swim) castLine(x, y); else H.log('水のほうを向いて 投げよう', ''); } }];
     }
     if (fm && canFeed(fm, s.id)) list.push({ l: 'あげる', run: () => tryFeed(fm, s) });
     const edible = it.food !== undefined || it.heal !== undefined;
-    const eatA = { l: it.food !== undefined ? '食べる' : '飲む', run: () => eat(s.id, it) };
+    const eatA = { l: it.food !== undefined ? '食べる' : '飲む', no: it.food !== undefined && S.hunger >= 100 && !it.heal, run: () => eat(s.id, it) };
     const treeOk = it.plant && S.f === 0 && !fm && (t === T.GRASS || t === T.GRASS2 || t === T.FLOWER || t === T.DIRT || t === T.SNOW);
     const plantA = { l: '植える', run: () => {
         setT(S.f, x, y, T.SAPLING);
@@ -1477,13 +1489,13 @@ function useActions() {
         removeItem(s.id, 1); H.sfx('place'); H.log(it.n + 'を植えた。2日で' + (it.plant === 1 ? '木' : TILE[T[it.plant]].n) + 'になる', 'good'); endTurn(1);
     } };
     // おなかいっぱいなら 植えるほうを先に
-    if (edible && treeOk && S.hunger >= 100 && !it.heal) list.push(plantA, eatA);
+    if (edible && treeOk && eatA.no) list.push(plantA, eatA);
     else { if (edible) list.push(eatA); if (treeOk) list.push(plantA); }
-    if (it.seed) list.push({ l: '植える', run: () => {
+    if (it.seed) list.push({ l: '植える', no: t !== T.FARM || !!fm, run: () => {
         if (t !== T.FARM) { H.log('種は 畑に植えよう(クワでたがやす)', ''); return; }
         sowAt(x, y, s.id);
     } });
-    if (it.use === 'rdust') list.push({ l: '置く', run: () => {
+    if (it.use === 'rdust') list.push({ l: '置く', no: !((/^wall_/.test(TILE[t].back || '') && !fm) || placeOk({ place: 'WIRE' }, x, y, t)), run: () => {
         // 置いたかべ(木・石・金属・魔樹)なら 赤いかべにする。こわすと 粉とかべの両方がもどる
         // 導線は 主人公が向いている方向に のびる(たて/よこ)。まわりの導線と つながる
         const axis = S.face[0] ? 'H' : 'V';
@@ -1493,16 +1505,16 @@ function useActions() {
         }
         placeItem(s.id, { place: 'WIRE' }, x, y, t, () => layWire(x, y, axis));
     } });
-    if (it.place) list.push({ l: '置く', run: () => placeItem(s.id, it, x, y, t) });
-    if (it.use === 'fill') list.push({ l: 'うめる', run: () => fillAt(x, y, t, s.id) });
-    if (it.use === 'ladder') list.push({ l: 'かける', run: () => useLadder(x, y, t, s.id) });
-    if (it.use === 'gate') list.push({ l: '建てる', run: () => placeGate(x, y, t, s.id) });
+    if (it.place) list.push({ l: '置く', no: !placeOk(it, x, y, t), run: () => placeItem(s.id, it, x, y, t) });
+    if (it.use === 'fill') list.push({ l: 'うめる', no: !((t === T.WATER || t === T.PIT) && !fm), run: () => fillAt(x, y, t, s.id) });
+    if (it.use === 'ladder') list.push({ l: 'かける', no: !!fm || !(S.f === 0 ? t === T.PIT : isCave(S.f) && (t === T.PIT || TILE[t].ground)), run: () => useLadder(x, y, t, s.id) });
+    if (it.use === 'gate') list.push({ l: '建てる', no: S.f !== 0 || !TILE[t].ground || !!fm, run: () => placeGate(x, y, t, s.id) });
     if (it.use === 'home') list.push({ l: 'もどる', run: () => {
         removeItem(s.id, 1); H.sfx('unlock'); H.log('羽にみちびかれて もどった', 'good');
         const sp = S.spawn;
         changeFloor(sp.f, sp.x, sp.y); freeSpot(); endTurn(5);
     } });
-    if (take && !rel && list.length < 2) list.push(take);
+    if (take && !rel && list.filter(a => !a.no).length < 2) list.push(take);
     if (it.use === 'shard') list.push({ l: 'ひらく', run: () => { removeItem(s.id, 1); revealAround(110); H.sfx('unlock'); H.log('地図のかけらで 周りが地図に のった', 'good'); endTurn(1); } });
     return list;
 }
@@ -1511,7 +1523,8 @@ function useSelected(which) {
     const s = S.inv[S.sel];
     if (!s) { const a0 = useActions(), act0 = a0[which || 0]; if (act0) act0.run(); else H.log('何も持っていない。下の枠で えらぼう', ''); return; }   // 何も持っていなくても「はずす」「向き」はできる
     const a = useActions();
-    if (!a.length) { H.log(ITEM[s.id].n + 'は 材料だ', ''); return; }
+    // できることがない: 理由を出す(置けない・水がない など)
+    if (!a.length) { if (useHint && !which) useHint.run(); else if (s.tool) H.log(toolName(s.tool) + 'は ぶつかったり「' + digInfo().l + '」で 使われる', ''); else H.log(ITEM[s.id].n + 'は 材料だ', ''); return; }
     const act = a[which || 0];
     if (act) act.run();
 }
@@ -1597,11 +1610,15 @@ function sowWalking() {
         if (getT(S.f, p[0], p[1]) === T.FARM && !mobAt(p[0], p[1])) sowAt(p[0], p[1], s.id);
     }
 }
+// dir: 向いている方向に置く物 / axis: 向いている方向の たて・よこ で置く物
+const placeTile = it => it.dir ? it.dir + '_' + 'NESW'[dirIndex(S.face)] : it.axis ? it.axis + '_' + (S.face[0] ? 'H' : 'V') : it.place;
+function placeOk(it, x, y, t) {
+    const bridge = TILE[T[placeTile(it)]].floorlike && (t === T.WATER || t === T.PIT);
+    return (TILE[t].ground || TILE[t].floorlike || bridge) && !mobAt(x, y) && !(x === S.x && y === S.y);
+}
 function placeItem(id, it, x, y, t, after) {
-    // dir: 向いている方向に置く物 / axis: 向いている方向の たて・よこ で置く物
-    const place = it.dir ? it.dir + '_' + 'NESW'[dirIndex(S.face)] : it.axis ? it.axis + '_' + (S.face[0] ? 'H' : 'V') : it.place;
-    const bridge = TILE[T[place]].floorlike && (t === T.WATER || t === T.PIT);
-    if ((!TILE[t].ground && !TILE[t].floorlike && !bridge) || mobAt(x, y) || (x === S.x && y === S.y)) { H.sfx('error'); H.log('そこには 置けない', ''); H.stopHold(); return; }
+    const place = placeTile(it);
+    if (!placeOk(it, x, y, t)) { H.sfx('error'); H.log('そこには 置けない', ''); H.stopHold(); return; }
     setT(S.f, x, y, T[place]); delete S.dmg['b' + exKey(S.f, x, y)];
     removeItem(id, 1);
     S.got['placed_' + id] = 1;
