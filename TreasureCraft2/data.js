@@ -324,7 +324,7 @@ Object.assign(ITEM, {
     carpet: { n: 'カーペット', tile: 'CARPET', place: 'CARPET', desc: '上にいると 回復が少し速い' },
     wall_nw: { n: '魔樹のかべ', tile: 'WALL_NW', place: 'WALL_NW', desc: '木のかべより丈夫' }, floor_nw: { n: '魔樹の床', tile: 'FLOOR_NW', place: 'FLOOR_NW' },
     egg: { n: 'たまご', c: '#f4ecd8', food: 6 }, fegg: { n: '目玉焼き', c: '#ffd84a', food: 22, heal: 5 },
-    rep: { n: 'リピーター', tile: 'REP_S', place: 'REP_N', dir: 'REP', desc: '信号を強くして 一方通行' }, notg: { n: 'インバーター', tile: 'NOT_N', place: 'NOT_N', dir: 'NOT', desc: '信号を反対にする' },
+    rep: { n: 'リピーター', tile: 'REP_E', place: 'REP_N', dir: 'REP', desc: '信号を強くする(一方通行)' }, notg: { n: 'インバーター', tile: 'NOT_E', place: 'NOT_N', dir: 'NOT', desc: '信号を強く 反対にする(一方通行)' },
     gem: { n: '宝石', tile: 'GEM', place: 'GEM', desc: '置くと 光る' }, gmush: { n: '光るきのこ', tile: 'GLOWM', place: 'GLOWM', desc: '置くと 明るい' },
     bow_t: { n: '弓', pseudo: 1 }   // レシピの材料にする「持っている弓(どれでも)」
 });

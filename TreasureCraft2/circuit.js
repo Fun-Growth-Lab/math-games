@@ -13,9 +13,9 @@ const ckey = (x, y) => y * 1000 + x;
 const plateDown = (x, y) => (S.x === x && S.y === y) || !!mobAt(x, y);
 
 // ---------- 導線の向き ----------
-// V=たて(北南) H=よこ(東西) P=十字(4方向つながる) X=交差(たてと よこが べつべつ)
-const WIRE_CH = { V: [[0, 2]], H: [[1, 3]], P: [[0, 1, 2, 3]], X: [[0, 2], [1, 3]], NE: [[0, 1]], ES: [[1, 2]], SW: [[2, 3]], WN: [[3, 0]] };
-const WIRE_ORDER = ['V', 'H', 'P', 'X', 'WN', 'NE', 'SW', 'ES'];   // えらぶ画面の ならび
+// V=たて(北南) H=よこ(東西) P=十字(4方向つながる) X=交差(たてと よこが べつべつ) NE など=L字 T0〜T3=T字(数字の向きの腕がない)
+const WIRE_CH = { V: [[0, 2]], H: [[1, 3]], P: [[0, 1, 2, 3]], X: [[0, 2], [1, 3]], NE: [[0, 1]], ES: [[1, 2]], SW: [[2, 3]], WN: [[3, 0]], T0: [[1, 2, 3]], T1: [[0, 2, 3]], T2: [[0, 1, 3]], T3: [[0, 1, 2]] };
+const WIRE_ORDER = ['V', 'H', 'P', 'X', 'WN', 'NE', 'SW', 'ES', 'T0', 'T1', 'T2', 'T3'];   // えらぶ画面の ならび
 // 腕 p と q だけを持つ形(たて・よこ・L字)
 const wireOf = (p, q) => ['V', 'H', 'NE', 'ES', 'SW', 'WN'].find(m => WIRE_CH[m][0].includes(p) && WIRE_CH[m][0].includes(q));
 const isWire = t => t === T.WIRE || t === T.WIRE_W;
@@ -33,14 +33,14 @@ function armLinked(x, y, a) {
     if (isWire(t)) return chanAt(nx, ny, opp(a)) >= 0;
     return !!(d.rep || d.inv || d.dev || t === T.SWITCH_OFF || t === T.SWITCH_ON || t === T.PLATE);
 }
-// 導線(x,y)に a 方向の腕を足す: ほかに つながっている腕が 1本なら L字(まっすぐなら たて・よこ)、0本なら a へ まっすぐ、2本以上なら 十字
+// 導線(x,y)に a 方向の腕を足す: つながっている腕と a で 形を決める(2本=たて・よこ・L字、3本=T字、4本=十字)。0本なら a へ まっすぐ
 function addArm(x, y, a) {
     const e = S.ex[exKey(S.f, x, y)];
     if (!e || !e.w || e.w === 'P' || e.w === 'X') return;
     const arms = WIRE_CH[e.w][0];
     if (arms.includes(a)) return;
     const linked = arms.filter(r => armLinked(x, y, r));
-    e.w = linked.length === 1 ? wireOf(linked[0], a) : linked.length === 0 ? wireOf(a, opp(a)) : 'P';
+    e.w = linked.length === 0 ? wireOf(a, opp(a)) : linked.length === 1 ? wireOf(linked[0], a) : linked.length === 2 ? 'T' + [0, 1, 2, 3].find(k => k !== a && !linked.includes(k)) : 'P';
 }
 // 導線を置いたとき: まわりの導線とつなぐ(平行な導線は つながない)
 function connectWire(x, y) {

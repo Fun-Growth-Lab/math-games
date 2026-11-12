@@ -751,7 +751,12 @@ function iconUrl(id) {
     if (it.tile) { const k = T[it.tile]; spr = (OS[k] && OS[k][0]) || (groundSprite(k, 0, 0, 0)); }
     else if (it.c) spr = boxSprite([[.14, .14, 0, .86, .86, .62, it.c]]);
     if (!spr) return (iconCache[id] = null);
-    const s = mkCanvas(96, 96), c = s.getContext('2d');
-    c.drawImage(spr.cv, 48 - spr.ox - 12, 74 - spr.oy - 20);
+    // 絵の はしを けずって 枠のまん中に置く(小さい物は 少しだけ大きく)
+    const src = spr.cv, W = src.width, Hh = src.height, px = src.getContext('2d').getImageData(0, 0, W, Hh).data;
+    let x0 = W, y0 = Hh, x1 = -1, y1 = -1;
+    for (let yy = 0; yy < Hh; yy++) for (let xx = 0; xx < W; xx++) if (px[(yy * W + xx) * 4 + 3] > 10) { if (xx < x0) x0 = xx; if (xx > x1) x1 = xx; if (yy < y0) y0 = yy; if (yy > y1) y1 = yy; }
+    if (x1 < 0) return (iconCache[id] = null);
+    const s = mkCanvas(96, 96), c = s.getContext('2d'), bw = x1 - x0 + 1, bh = y1 - y0 + 1, sc = Math.min(1.3, 84 / bw, 84 / bh);
+    c.drawImage(src, x0, y0, bw, bh, (96 - bw * sc) / 2, (96 - bh * sc) / 2, bw * sc, bh * sc);
     return (iconCache[id] = s.toDataURL());
 }
