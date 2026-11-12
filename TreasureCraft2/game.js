@@ -1139,7 +1139,7 @@ function interact(x, y, t) {
         return;
     }
     if (t === T.MAGMA) { H.stopHold(); H.log('マグマだ! 木の床でも わたれない', 'warn'); return; }
-    if (t === T.PIT) { H.stopHold(); H.log('穴だ。はしごを選んで「かける」で かけよう', ''); return; }
+    if (t === T.PIT) { H.stopHold(); H.refresh(); return; }   // 穴の方を 向くだけ
     if (d.station || t === T.BED || t === T.CHEST) { H.stopHold(); H.log(d.n + 'は ぶつかると開く。しまうときは 中の「片づける」', ''); return; }
     if (d.hp) { hitTile(x, y, t); return; }
     H.stopHold();
@@ -1413,13 +1413,12 @@ function digFacing() {
             const wet = DIR4.some(o => getT(S.f, x + o[0], y + o[1]) === T.WATER);
             setT(S.f, x, y, wet ? T.WATER : T.PIT);
             give(soil, 1); H.stopHold();
-            H.log(wet ? '水が 流れこんできた' : '穴があいた! はしごを「かける」と 地下へ行ける', wet ? '' : 'good');
         }
         pruneDmg(); endTurn(1);
         return;
     }
     if (d.ground) { H.stopHold(); H.log(S.f === 6 ? 'ここより下は ない' : 'ここは これ以上 掘れない', ''); return; }   // 掘れる地面は 上で すんでいる
-    if (t === T.PIT) { H.stopHold(); H.log('穴があいている。はしごを選んで「かける」で かけよう。木の床を置くと ふさげる', ''); return; }
+    if (t === T.PIT) { H.stopHold(); return; }
     if (takeable(t)) { H.stopHold(); H.log((isWire(t) ? '導線' : d.n) + 'は「はずす」で 外せる', ''); return; }
     if (t === T.LADDER_D || t === T.LADDER_U || t === T.STAIRS_U || t === T.CAVEIN || t === T.GATE) { H.stopHold(); H.log(d.n + 'は こわせない', ''); return; }
     if (d.station || t === T.BED || t === T.CHEST) { H.stopHold(); H.log(d.n + 'は ぶつかると開く。しまうときは 中の「片づける」', ''); return; }
@@ -1640,7 +1639,7 @@ function useLadder(x, y, t, id) {
         else if (!TILE[t].ground) { H.log('掘って広げた床に かけよう', ''); return; }
         else setT(S.f, x, y, T.LADDER_U);
     } else { H.log('ここでは はしごは使えない', ''); return; }
-    removeItem(id, 1); H.sfx('place'); const up = getT(S.f, x, y) === T.LADDER_U; H.log(up ? '上の階へ のぼる はしごをかけた(下へ行くときは「ほる」で 床に穴をあけてから かけよう)' : '下の階へ おりる はしごをかけた', 'good');
+    removeItem(id, 1); H.sfx('place');
     endTurn(1);
 }
 // はしごをはずす: はしごが1こもどり、穴はうまる(上と下の階の はしごも 消える)

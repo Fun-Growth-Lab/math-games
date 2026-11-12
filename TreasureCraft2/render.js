@@ -320,8 +320,8 @@ function turnThumb(x, y, c) {
     return cv;
 }
 const objSprite = (t, x, y) => { const a = OS[t]; if (!a) return null;
-    if (t === T.PIT) return pitSprite(pitGround(S.f, x, y));
-    if (t === T.LADDER_D) return pitSprite(pitGround(S.f, x, y), LADDER_PARTS);
+    if (t === T.PIT) return pitSprite(pitGround(S.f, x, y), null, holeMask(S.f, x, y));
+    if (t === T.LADDER_D) return pitSprite(pitGround(S.f, x, y), LADDER_PARTS, holeMask(S.f, x, y));
     if (t === T.WIRE) return wireSprite(x, y);
     if (TILE[t].rep) return repSprite(TILE[t].rep - 1, !VIEW.title && repLit(x, y));
     if (TILE[t].notg) { const ax = TILE[t].notg, e = notEnds(ax); return notSprite(ax, !VIEW.title && notLit(x, y, e[0]), !VIEW.title && notLit(x, y, e[1])); }
@@ -356,31 +356,40 @@ function pitGround(f, x, y) {
 // 奥の角から まっすぐ下へ のびる線で 2つのかべが分かれる。深いほど暗く、ふちの外は透明(下の地面が見える)
 const PIT_WALL = { sand: ['#d8c080', '#b89a5c'], cave: ['#8a847a', '#6a645c'], dirt: ['#a87848', '#86603a'] };
 const pitCache = {};
-function pitSprite(g, ladder) {
-    const m = g === T.SAND ? 'sand' : g === T.CAVE || g === T.ASH ? 'cave' : 'dirt', key = m + (ladder ? 'L' : '');
+// open: となりも穴の向き(北1 東2 南4 西8)。その向きは ふちを作らず となりの穴と つながる
+const isHole = t => t === T.PIT || t === T.LADDER_D;
+const holeMask = (f, x, y) => DIR4.reduce((m, o, k) => m | (isHole(getT(f, x + o[0], y + o[1])) ? 1 << k : 0), 0);
+const mixHex = (a, b, t) => { const p = parseInt(a.slice(1), 16), q = parseInt(b.slice(1), 16), f = (s1, s2) => Math.round(s1 + (s2 - s1) * t); return 'rgb(' + f(p >> 16, q >> 16) + ',' + f((p >> 8) & 255, (q >> 8) & 255) + ',' + f(p & 255, q & 255) + ')'; };
+function pitSprite(g, ladder, open) {
+    open = open || 0;
+    const m = g === T.SAND ? 'sand' : g === T.CAVE || g === T.ASH ? 'cave' : 'dirt', key = m + (ladder ? 'L' : '') + open;
     if (pitCache[key]) return pitCache[key];
     const cv = mkCanvas(O_W, O_H), c = cv.getContext('2d'), ox = O_X, oy = O_Y;
     const P = (x, y, z) => { const p = pj(x, y, z); return [ox + p[0], oy + p[1]]; };
-    const poly = (pts, fill) => { c.beginPath(); pts.forEach((p, k) => k ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.closePath(); c.fillStyle = fill; c.fill(); };
-    const i = .1, a = i, b = 1 - i, D = 1.6, DARK = '#0c0806';
-    const A = (z) => P(a, a, z), B = (z) => P(b, a, z), Dp = (z) => P(a, b, z), C = (z) => P(b, b, z);
+    const path = pts => { c.beginPath(); pts.forEach((p, k) => k ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.closePath(); };
+    const poly = (pts, fill) => { path(pts); c.fillStyle = fill; c.fill(); };
+    const i = .1, D = 1.6, DARK = '#0c0806';
+    // つながる辺は 少しはみ出して描き、となりとの すき間(地面が線のように見える)をなくす
+    const e = .03, x0 = open & 8 ? -e : i, x1 = open & 2 ? 1 + e : 1 - i, y0 = open & 1 ? -e : i, y1 = open & 4 ? 1 + e : 1 - i;
+    const mouth = [P(x0, y0, 0), P(x1, y0, 0), P(x1, y1, 0), P(x0, y1, 0)];
     // 穴の口で 切りぬく
-    c.save(); c.beginPath(); [A(0), B(0), C(0), Dp(0)].forEach((p, k) => k ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.closePath(); c.clip();
-    poly([A(0), B(0), C(0), Dp(0)], DARK);
-    // 手前のふちに近づくほど 深い所なので 暗く(口の高さの 8割で まっくら)
-    const y0 = Math.min(A(0)[1], B(0)[1]), y1 = Math.max(C(0)[1], Dp(0)[1]);
-    const grad = col => { const g2 = c.createLinearGradient(0, y0, 0, y1); g2.addColorStop(0, col); g2.addColorStop(.45, shade(col, .55)); g2.addColorStop(.8, DARK); return g2; };
-    const [c0, c1] = PIT_WALL[m];
-    poly([A(0), B(0), B(-D), A(-D)], grad(c0));   // 奥のかべ(明るい)
-    poly([A(0), Dp(0), Dp(-D), A(-D)], grad(c1));  // 左のかべ(少し暗い)
-    // 地層の すじ(かべにそって 横に)
-    c.strokeStyle = 'rgba(0,0,0,.18)'; c.lineWidth = 1;
-    for (const z of [.12, .26, .42]) { c.beginPath(); const p1 = Dp(-z), p2 = A(-z), p3 = B(-z); c.moveTo(p1[0], p1[1]); c.lineTo(p2[0], p2[1]); c.lineTo(p3[0], p3[1]); c.stroke(); }
+    c.save(); path(mouth); c.clip();
+    poly(mouth, DARK);
+    // かべは 深さで 色を決める(上は明るく 深いほど暗い)。となりの穴と 色がつながる
+    const [c0, c1] = PIT_WALL[m], BANDS = 14, DEEP = .56;
+    const wall = (e1, e2, col) => { for (let k = 0; k < BANDS; k++) { const za = DEEP * k / BANDS, zb = DEEP * (k + 1) / BANDS + .01, t = k / (BANDS - 1); poly([P(e1[0], e1[1], -za), P(e2[0], e2[1], -za), P(e2[0], e2[1], -zb), P(e1[0], e1[1], -zb)], mixHex(col, DARK, Math.pow(t, .8))); } };
+    const north = !(open & 1), west = !(open & 8);
+    if (north) wall([x0, y0], [x1, y0], c0);   // 奥のかべ(明るい)
+    if (west) wall([x0, y0], [x0, y1], c1);    // 左のかべ(少し暗い)
+    // 地層の すじ
+    c.strokeStyle = 'rgba(0,0,0,.16)'; c.lineWidth = 1;
+    for (const z of [.12, .26, .42]) { c.beginPath(); if (west) { const p = P(x0, y1, -z), q = P(x0, y0, -z); c.moveTo(p[0], p[1]); c.lineTo(q[0], q[1]); } else { const q = P(x0, y0, -z); c.moveTo(q[0], q[1]); } if (north) { const r = P(x1, y0, -z); c.lineTo(r[0], r[1]); } c.stroke(); }
     // 奥の角: まっすぐ下へ
-    c.strokeStyle = 'rgba(0,0,0,.45)'; c.beginPath(); c.moveTo(A(0)[0], A(0)[1]); c.lineTo(A(-D)[0], A(-D)[1]); c.stroke();
+    if (north && west) { const p = P(x0, y0, 0), q = P(x0, y0, -DEEP); c.strokeStyle = 'rgba(0,0,0,.45)'; c.beginPath(); c.moveTo(p[0], p[1]); c.lineTo(q[0], q[1]); c.stroke(); }
     c.restore();
-    // 口のふち(土の切り口)
-    c.strokeStyle = 'rgba(40,24,12,.55)'; c.lineWidth = 1.5; c.beginPath(); [A(0), B(0), C(0), Dp(0)].forEach((p, k) => k ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.closePath(); c.stroke();
+    // 口のふち(土の切り口)。となりと つながる辺には 描かない
+    c.strokeStyle = 'rgba(40,24,12,.55)'; c.lineWidth = 1.5;
+    [[0, 1, 1], [1, 2, 2], [2, 3, 4], [3, 0, 8]].forEach(([p, q, bit]) => { if (open & bit) return; c.beginPath(); c.moveTo(mouth[p][0], mouth[p][1]); c.lineTo(mouth[q][0], mouth[q][1]); c.stroke(); });
     if (ladder) ladder.slice().sort((p, q) => ((p[0] + p[3]) * SN + (p[1] + p[4]) * CS + (p[2] + p[5]) * .35) - ((q[0] + q[3]) * SN + (q[1] + q[4]) * CS + (q[2] + q[5]) * .35)).forEach(q => drawBox(c, ox, oy, q, 1));
     return (pitCache[key] = { cv, ox, oy });
 }
