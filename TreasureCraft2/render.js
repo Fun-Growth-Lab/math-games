@@ -377,7 +377,8 @@ function pitSpriteAt(f, x, y, ladder) {
     const e = .03 * N;
     c.save(); c.beginPath();
     for (let b = 0; b < N; b++) for (let a = 0; a < N; a++) if (cell(a, b)) {
-        const l = a === 0 && hole(-1, 0) ? -e : 0, r = a === N - 1 && hole(1, 0) ? e : 0, t = b === 0 && hole(0, -1) ? -e : 0, bt = b === N - 1 && hole(0, 1) ? e : 0;
+        const open = (dx, dy) => hole(dx, dy) || getT(f, x + dx, y + dy) === T.WATER;   // 穴か水の側は はみ出して 地面が見えないように
+        const l = a === 0 && open(-1, 0) ? -e : 0, r = a === N - 1 && open(1, 0) ? e : 0, t = b === 0 && open(0, -1) ? -e : 0, bt = b === N - 1 && open(0, 1) ? e : 0;
         const q = [P((a + l) / N, (b + t) / N, 0), P((a + 1 + r) / N, (b + t) / N, 0), P((a + 1 + r) / N, (b + 1 + bt) / N, 0), P((a + l) / N, (b + 1 + bt) / N, 0)];
         c.moveTo(q[0][0], q[0][1]); q.slice(1).forEach(p => c.lineTo(p[0], p[1])); c.closePath();
     }
@@ -397,10 +398,10 @@ function pitSpriteAt(f, x, y, ladder) {
     const [c0, c1] = PIT_WALL[m], DARK = '#0c0806', BANDS = 14, DEEP = .56;
     const WATER_C = ['#6ab8ec', '#559fd4'], WDARK = '#14304a';
     const wall = (p1, p2, col, w) => { for (let k = 0; k < BANDS; k++) { const za = DEEP * k / BANDS, zb = DEEP * (k + 1) / BANDS + .01; poly([P(p1[0], p1[1], -za), P(p2[0], p2[1], -za), P(p2[0], p2[1], -zb), P(p1[0], p1[1], -zb)], mixHex(col, w ? WDARK : DARK, Math.pow(k / (BANDS - 1), .8))); }
-        // 水の かべには 落ちる水の すじ
-        if (w) { c.strokeStyle = 'rgba(255,255,255,.45)'; c.lineWidth = 1; const n = Math.max(2, Math.round(Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) * 6)); for (let j = 1; j < n; j++) { const t = j / n, px = p1[0] + (p2[0] - p1[0]) * t, py = p1[1] + (p2[1] - p1[1]) * t, a = P(px, py, -.02), b = P(px, py, -(.15 + (j % 3) * .08)); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); } } };
+    };
     // 奥から順に(上のかべ → 下のかべ)
-    const ws = H2.map(h => ({ y: h.y, p1: [h.x0 / N, h.y / N], p2: [h.x1 / N, h.y / N], col: h.w ? WATER_C[0] : c0, w: h.w })).concat(V.map(v => ({ y: v.y0, p1: [v.x / N, v.y0 / N], p2: [v.x / N, v.y1 / N], col: v.w ? WATER_C[1] : c1, w: v.w })));
+    const sh = w => w ? e / N : 0;   // 水のかべは 口のはみ出しの分 奥から
+    const ws = H2.map(h => ({ y: h.y, p1: [h.x0 / N, h.y / N - sh(h.w)], p2: [h.x1 / N, h.y / N - sh(h.w)], col: h.w ? WATER_C[0] : c0, w: h.w })).concat(V.map(v => ({ y: v.y0, p1: [v.x / N - sh(v.w), v.y0 / N], p2: [v.x / N - sh(v.w), v.y1 / N], col: v.w ? WATER_C[1] : c1, w: v.w })));
     ws.sort((p, q) => p.y - q.y);
     ws.forEach(w => wall(w.p1, w.p2, w.col, w.w));
     // 地層の すじ と 奥の角の たて線
@@ -410,8 +411,6 @@ function pitSpriteAt(f, x, y, ladder) {
     for (const k of wetSide) if (k === 1 || k === 2) {
         const q = k === 1 ? [[.84, 0], [1.02, 0], [1.02, 1], [.84, 1]] : [[0, .84], [1, .84], [1, 1.02], [0, 1.02]];
         poly(q.map(p => P(p[0], p[1], 0)), 'rgba(106,184,236,.85)');
-        c.strokeStyle = 'rgba(255,255,255,.5)'; c.lineWidth = 1;
-        for (let j = 1; j < 6; j++) { const t = j / 6, a = k === 1 ? P(.86, t, 0) : P(t, .86, 0), b = k === 1 ? P(.97, t, 0) : P(t, .97, 0); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); }
     }
     c.strokeStyle = 'rgba(0,0,0,.45)';
     for (const h of H2) if (V.some(v => v.x === h.x0 && v.y0 === h.y)) { const p = P(h.x0 / N, h.y / N, 0), q = P(h.x0 / N, h.y / N, -DEEP); c.beginPath(); c.moveTo(p[0], p[1]); c.lineTo(q[0], q[1]); c.stroke(); }
