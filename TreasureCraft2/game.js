@@ -35,14 +35,15 @@ function newSeed() { return 1 + Math.floor(Math.random() * 2000000000); }
 const seedToCode = s => s.toString(36).toUpperCase();
 const codeToSeed = c => { const n = parseInt(String(c).trim().toLowerCase(), 36); return n > 0 && isFinite(n) ? n : 0; };
 // 回路モードを はじめから
-function newCircuitGame() {
-    newGame(0);
+function newCircuitGame(seed) {
+    newGame(seed || 0);
     S.mode = 'circuit';
     const tool = (k, b) => ({ tool: { k, a: 'star', b: b || 'wood', d: 520 } });
     const order = ['rdust', 'switch', 'plate', 'bulb', 'rep', 'notg', 'conv', null, 'fconv', 'disp', 'arrow', 'wall_s', 'wall_w', 'wall_fe', 'glass_w', 'floor', 'floor_fe'];
     order.forEach((id, i) => { S.inv[i] = id ? { id, n: STACK } : null; });
     S.inv[7] = tool('pick'); S.inv[17] = tool('axe');
-    S.inv[7].tool.eq = 1; S.inv[17].tool.eq = 1;
+    S.inv[18] = tool('shovel');
+    S.inv[7].tool.eq = 1; S.inv[17].tool.eq = 1; S.inv[18].tool.eq = 1;
     mobs = mobs.filter(m => MOBS[m.t].animal);
 }
 function newGame(seed) {
@@ -68,10 +69,11 @@ let curSlot = null;   // 今 遊んでいる枠(チュートリアル中は null
 const slotKey = id => 'tc2_save_' + id;
 function slotList() { try { return JSON.parse(localStorage.getItem(SLOTS_KEY)) || []; } catch (e) { return []; } }
 function slotWrite(list) { try { localStorage.setItem(SLOTS_KEY, JSON.stringify(list)); } catch (e) { } }
-const slotDefaultName = t => { const d = new Date(t); return (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0') + ' にはじめた世界'; };
-function newSlot(name) {
+const slotDefaultName = (t, mode) => { const d = new Date(t); return (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0') + ' にはじめた' + (mode === 'circuit' ? '回路の世界' : '世界'); };
+// mode: 'circuit' = 回路モード / なし = サバイバルモード
+function newSlot(name, mode) {
     const list = slotList(), id = list.reduce((m, q) => Math.max(m, q.id), 0) + 1, now = Date.now();
-    list.push({ id, name: name || slotDefaultName(now), created: now, updated: now, day: 1 });
+    list.push(Object.assign({ id, name: name || slotDefaultName(now, mode), created: now, updated: now, day: 1 }, mode ? { mode } : {}));
     slotWrite(list);
     return id;
 }
@@ -89,16 +91,26 @@ function renameSlot(id, name) { const list = slotList(), q = list.find(q => q.id
         localStorage.removeItem(SAVE_KEY);
     } catch (e) { }
 })();
+// 前の 回路モードのセーブ(1つだけ)を 枠に うつす
+(function migrateCircuit() {
+    try {
+        const old = localStorage.getItem(CIRCUIT_SAVE_KEY);
+        if (!old || slotList().length >= SLOT_MAX) return;
+        const id = newSlot('回路の世界', 'circuit');
+        localStorage.setItem(slotKey(id), old);
+        localStorage.removeItem(CIRCUIT_SAVE_KEY);
+    } catch (e) { }
+})();
 function saveGame() {
     if (!S) return false;
-    const key = circuitMode() ? CIRCUIT_SAVE_KEY : curSlot ? slotKey(curSlot) : null;
+    const key = curSlot ? slotKey(curSlot) : null;
     if (!key) return false;
     try {
         keptSync();
         S.pets = mobs.filter(m => MOBS[m.t].pet).map(m => m.hp);
         const o = Object.assign({}, S, { seen: S.seen.map(b64), diffs });
         localStorage.setItem(key, JSON.stringify(o));
-        if (!circuitMode()) { const list = slotList(), q = list.find(q => q.id === curSlot); if (q) { q.updated = Date.now(); q.day = dayNo(); slotWrite(list); } }
+        { const list = slotList(), q = list.find(q => q.id === curSlot); if (q) { q.updated = Date.now(); q.day = dayNo(); slotWrite(list); } }
         return true;
     } catch (e) { H.log('セーブできませんでした(ほぞん容量がいっぱいです)', 'bad'); return false; }
 }
@@ -158,6 +170,7 @@ function addItem(id, n) {
 function give(id, n) {
     S.got[id] = (S.got[id] || 0) + n;
     S.book.i[id] = 1;
+    if (ITEM[id].deco !== undefined && DECOS.every(q => S.book.i[q[0]])) ach('treasure_all');
     if (infItem(id) && S.inv.some(s => s && s.id === id)) { H.gain(id, n); return; }   // ∞の物は もう持っている
     const left = addItem(id, n);
     if (left > 0) { dropPile(S.x, S.y, [{ id, n: left }]); H.log('持ち物がいっぱい! 近くに落とした', 'bad'); }
@@ -343,7 +356,7 @@ function spawnMob(t, x, y) {
 }
 const mobAtk = (m, d) => Math.round(d.atk * (1 + .2 * ((m.lv || 1) - 1)));
 function litNear(x, y) {
-    for (let dy = -5; dy <= 5; dy++) for (let dx = -5; dx <= 5; dx++) { const d = TILE[getT(S.f, x + dx, y + dy)]; if ((d.key === 'TORCH' || d.key === 'GLOWM' || d.key === 'GMUSH' || d.metal) && d.light && Math.max(Math.abs(dx), Math.abs(dy)) <= d.light - 1) return true; if (d.key === 'BULB' && powered(x + dx, y + dy)) return true; }
+    for (let dy = -5; dy <= 5; dy++) for (let dx = -5; dx <= 5; dx++) { const d = TILE[getT(S.f, x + dx, y + dy)]; if ((d.key === 'TORCH' || d.key === 'GLOWM' || d.key === 'GMUSH' || d.metal || d.deco) && d.light && Math.max(Math.abs(dx), Math.abs(dy)) <= d.light - 1) return true; if (d.key === 'BULB' && powered(x + dx, y + dy)) return true; }
     return false;
 }
 function chooseSpawn(x, y) {
@@ -1185,7 +1198,7 @@ function breakTile(x, y, t, tool) {
 }
 // 「はずす」で外す物(回路の部品と小物)。つるはしなどで こわすことはできない
 const TAKE_BACK = ['switch', 'plate', 'bulb', 'rep', 'notg', 'conv', 'fconv', 'disp', 'torch', 'clamp', 'crown', 'gmush', 'carpet'];
-const takeable = t => isWire(t) || t === T.LADDER_D || TAKE_BACK.includes(TILE[t].back);
+const takeable = t => isWire(t) || t === T.LADDER_D || !!TILE[t].deco || TAKE_BACK.includes(TILE[t].back);
 function takeTile(x, y, t) {
     if (t === T.LADDER_D) { takeLadder(x, y, t); return; }
     const id = isWire(t) ? 'rdust' : TILE[t].back;
@@ -1246,6 +1259,14 @@ function pickupPile(x, y, auto) {
     if (S.graves.some(q => q.f === S.f && q.x === x && q.y === y)) ach('retrieve');
     S.graves = S.graves.filter(q => !(q.f === S.f && q.x === x && q.y === y));
 }
+// おたから: 出る所(0=地上 1=地下 2=異界)の中から 1つ
+const decoTier = () => S.f === 0 ? 0 : S.f === 2 ? 2 : 1;
+function giveDeco(tier) {
+    const id = pick(DECOS.filter(q => q[2] === tier))[0];
+    give(id, 1); H.banner('おたからだ!', ITEM[id].n);
+    return id;
+}
+const DECO_RATE = .25;   // 宝箱に おたからが入っている割合
 function openBuriedLoot() {
     const table = LOOT[1];
     let total = 0; table.forEach(r => total += r[3]);
@@ -1253,6 +1274,7 @@ function openBuriedLoot() {
     for (const q of table) { v -= q[3]; if (v <= 0) { r = q; break; } }
     give(r[0], rint(r[1], r[2]));
     H.sfx('chest'); H.banner('お宝だ!', '');
+    if (rnd() < DECO_RATE) giveDeco(decoTier());
     ach('buried');
 }
 function openLoot(x, y) {
@@ -1266,6 +1288,7 @@ function openLoot(x, y) {
     }
     setT(S.f, x, y, T.RFLOOR);
     H.sfx('chest'); H.log('宝箱を開けた!', 'good');
+    if (rnd() < DECO_RATE) giveDeco(decoTier());   // おたからは 場所(地上・地下・異界)で決まる
     endTurn(1);
 }
 function harvest(x, y, t) {
@@ -1341,6 +1364,16 @@ function sleep(x, y) {
     saveGame();
     H.refresh();
 }
+// 地上の やわらかい地面(素手かスコップで掘れる)と とれる物
+const SOIL = { [T.GRASS]: 'dirt', [T.GRASS2]: 'dirt', [T.FLOWER]: 'dirt', [T.DIRT]: 'dirt', [T.SNOW]: 'dirt', [T.SAND]: 'sand' };
+const SOIL_HP = 3;   // 素手は3回、スコップは1回
+// 土・砂で 水や穴を うめる
+function fillAt(x, y, t, id) {
+    if (mobAt(x, y)) { H.log('だれかがいる', ''); return; }
+    if (t !== T.WATER && t !== T.PIT) { H.log('水か 穴に向かって 使おう', ''); return; }
+    setT(S.f, x, y, id === 'sand' ? T.SAND : T.DIRT);
+    removeItem(id, 1); H.sfx('place'); H.log(t === T.WATER ? '水を うめた' : '穴を うめた', 'good'); endTurn(1);
+}
 const inCells = (cells, m) => cells.some(c => c[0] === m.x && c[1] === m.y);
 function digFacing() {
     if (!S || S.hp <= 0) return;
@@ -1351,29 +1384,25 @@ function digFacing() {
         if (fm.ref) { S.kept = S.kept.filter(e => e !== fm.ref); fm.ref = null; }
         playerAttack(fm); endTurn(1); return;
     }
-    if (t === T.SAND && S.f === 0) {
-        setT(S.f, x, y, T.DIRT); H.chips(x, y, '#ecd9a0'); H.sfx('tick');
-        give('sand', 1); endTurn(1);
-        return;
-    }
-    if (d.ground) {
-        if (S.f === 2 || floorBelow(S.f) < 0 || t === T.RFLOOR || t === T.SCORCH) { H.stopHold(); H.log(S.f === 6 ? 'ここより下は ない' : 'ここは これ以上 掘れない', ''); return; }
-        const tool = equipped('pick');
-        if (!tool) { H.stopHold(); H.sfx('error'); H.log('地面を掘るには つるはしが必要', 'warn'); return; }
-        { const bl = shaftBlock(floorBelow(S.f), x, y); if (bl) { H.stopHold(); H.sfx('error'); H.log('下に ' + bl + 'がある。ここには 穴をほれない', 'warn'); return; } }
-        const key = exKey(S.f, x, y);
-        S.dmg[key] = (S.dmg[key] || 0) + toolStats(tool).mine; S.dmgT[key] = S.T;
-        H.chips(x, y, '#7a5a3a'); H.sfx('tick');
-        wear(tool, 1);
-        if (S.dmg[key] >= 6) {
+    // 地上の やわらかい地面と 地下の床は 素手かスコップで掘る(地上は 土・砂、地下は 土がとれる)
+    const soil = S.f === 0 ? SOIL[t] : d.ground && S.f !== 2 && floorBelow(S.f) >= 0 && t !== T.RFLOOR && t !== T.SCORCH ? 'dirt' : null;
+    if (soil) {
+        { const bl = shaftBlock(floorBelow(S.f), x, y); if (bl) { H.stopHold(); H.sfx('error'); H.log('下に ' + bl + 'がある。ここは 掘れない', 'warn'); return; } }
+        const sh = equipped('shovel'), key = exKey(S.f, x, y);
+        S.dmg[key] = (S.dmg[key] || 0) + (sh ? SOIL_HP : 1); S.dmgT[key] = S.T;
+        H.chips(x, y, soil === 'sand' ? '#ecd9a0' : '#8a6038'); H.sfx('tick');
+        if (sh) wear(sh, 1);
+        if (S.dmg[key] >= SOIL_HP) {
             delete S.dmg[key];
-            setT(S.f, x, y, T.PIT);
-            H.stopHold();
-            H.log('穴があいた! はしごを選んで「かける」で かけよう', 'good');
+            const wet = DIR4.some(o => getT(S.f, x + o[0], y + o[1]) === T.WATER);
+            setT(S.f, x, y, wet ? T.WATER : T.PIT);
+            give(soil, 1); H.stopHold();
+            H.log(wet ? '水が 流れこんできた' : '穴があいた! はしごを「かける」と 地下へ行ける', wet ? '' : 'good');
         }
-        endTurn(1);
+        pruneDmg(); endTurn(1);
         return;
     }
+    if (d.ground) { H.stopHold(); H.log(S.f === 6 ? 'ここより下は ない' : 'ここは これ以上 掘れない', ''); return; }   // 掘れる地面は 上で すんでいる
     if (t === T.PIT) { H.stopHold(); H.log('穴があいている。はしごを選んで「かける」で かけよう。木の床を置くと ふさげる', ''); return; }
     if (takeable(t)) { H.stopHold(); H.log((isWire(t) ? '導線' : d.n) + 'は「はずす」で 外せる', ''); return; }
     if (t === T.LADDER_D || t === T.LADDER_U || t === T.STAIRS_U || t === T.CAVEIN || t === T.GATE) { H.stopHold(); H.log(d.n + 'は こわせない', ''); return; }
@@ -1452,6 +1481,7 @@ function useActions() {
         placeItem(s.id, { place: 'WIRE' }, x, y, t, () => layWire(x, y, axis));
     } });
     if (it.place) list.push({ l: '置く', run: () => placeItem(s.id, it, x, y, t) });
+    if (it.use === 'fill') list.push({ l: 'うめる', run: () => fillAt(x, y, t, s.id) });
     if (it.use === 'ladder') list.push({ l: 'かける', run: () => useLadder(x, y, t, s.id) });
     if (it.use === 'gate') list.push({ l: '建てる', run: () => placeGate(x, y, t, s.id) });
     if (it.use === 'home') list.push({ l: 'もどる', run: () => {
@@ -1524,7 +1554,7 @@ function reelIn() {
     if (!f.bit) { H.log('まだ何もかかっていない', ''); return; }
     const r = rnd();
     H.sfx('item');
-    if (r < .06) { const tb = LOOT[isCave(S.f) ? 1 : 0], q = pick(tb); give(q[0], rint(q[1], q[2])); H.banner('お宝を釣った!', ITEM[q[0]].n); H.sfx('chest'); ach('fish_treasure'); }
+    if (r < .06) { const tb = LOOT[isCave(S.f) ? 1 : 0], q = pick(tb); if (rnd() < DECO_RATE) giveDeco(decoTier()); else { give(q[0], rint(q[1], q[2])); H.banner('お宝を釣った!', ITEM[q[0]].n); } H.sfx('chest'); ach('fish_treasure'); }
     else if (r < .08) { give(isCave(S.f) ? 'cfish' : 'kfish', 1); H.banner(isCave(S.f) ? '光る魚だ!' : '金の魚だ!', ''); H.sfx('levelup'); ach('gold_fish'); }
     else if (r < .22) give('bone', 1);
     else give(isCave(S.f) ? (rnd() < .1 ? 'cfish' : 'fish') : 'fish', 1);

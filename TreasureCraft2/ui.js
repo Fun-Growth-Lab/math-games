@@ -234,13 +234,13 @@ addEventListener('keydown', e => {
         pressDir(k);
         return;
     }
-    if (e.repeat && !['x', 'X', 'z', 'Z', ' '].includes(e.key)) return;
+    if (e.repeat && !['x', 'X', 'z', 'Z', ' ', 'q', 'Q'].includes(e.key)) return;
     if (!canAct()) return;
     if (e.key === ' ' || e.key === 'z' || e.key === 'Z' || e.key === 'Enter') { e.preventDefault(); useSelected(); }
     else if (e.key === 'c' || e.key === 'C') useSelected(1);
     else if (e.key === 'f' || e.key === 'F') fireBow(equipped('bow'));
     else if (e.key === 'x' || e.key === 'X') digFacing();
-    else if (e.key === 'q' || e.key === 'Q') waitTurn();
+    else if (e.key === 'q' || e.key === 'Q') { const now = performance.now(); if (e.repeat && now - (waitTurn.last || 0) < MOVE_MS) return; waitTurn.last = now; waitTurn(); }   // 押しっぱなしで 待ちつづける
     else if (e.key === 'e' || e.key === 'E' || e.key === 'i') openPanel('inv');
     else if (e.key === 'm' || e.key === 'M') openMap();
     else if (e.key >= '1' && e.key <= '8') selectSlot(+e.key - 1);
@@ -446,7 +446,7 @@ const toolImg = t => '<img class="tic" src="' + toolIconUrl(t) + '" alt="">';
 function iconHtml(id) { const u = iconUrl(id); return u ? '<img src="' + u + '" alt="">' : (ITEM[id].e || '❔'); }
 const MAKE_ORDER = {
     '': ['bench'],
-    bench: ['torch', 'furnace', 'bed', 'wall_w', 'door', 'floor', 'fence', 'chest', 'ladder', 'wall_s', 'arrow', 'carpet', 'clamp', 'rod', 'bread', 'arrow_fe', 'glass_w', 'bottle', 'wall_nw', 'floor_nw', 'switch', 'plate', 'bulb', 'conv', 'fconv', 'disp', 'rep', 'notg', 'wall_cu', 'door_cu', 'fence_cu', 'floor_cu', 'wall_fe', 'door_fe', 'fence_fe', 'floor_fe', 'wall_au', 'door_au', 'fence_au', 'floor_au', 'feather_home', 'crown', 'gate'],
+    bench: ['torch', 'furnace', 'bed', 'wall_w', 'door', 'floor', 'fence', 'chest', 'ladder', 'wall_s', 'arrow', 'carpet', 'clamp', 'rod', 'bread', 'arrow_fe', 'glass_w', 'bottle', 'wall_nw', 'floor_nw', 'switch', 'plate', 'bulb', 'conv', 'fconv', 'disp', 'rep', 'notg', 'wall_cu', 'door_cu', 'fence_cu', 'floor_cu', 'wall_fe', 'door_fe', 'fence_fe', 'floor_fe', 'wall_au', 'door_au', 'fence_au', 'floor_au', 'feather_home', 'crown', 'gate', 'coinpile', 'fossil', 'mclock', 'sball', 'phoenix', 'dpot'],
     furnace: ['charcoal', 'glass', 'steak', 'ingot_cu', 'roast', 'ingot_fe', 'gfish', 'fegg', 'stew', 'pie', 'potion', 'ingot_au', 'ingot_n', 'feast'],
 };
 function drawMake() {
@@ -512,11 +512,12 @@ function drawAch() {
 }
 function drawBook() {
     const cell = (known, img, name) => '<div class="bk' + (known ? '' : ' un') + '">' + (known ? img : '<div class="q">？</div>') + '<span>' + (known ? name : '？？？') + '</span></div>';
-    const places = Object.keys(PLACE_NAMES), mobKeys = Object.keys(MOBS).filter(k => k !== 'villager' || true), items = Object.keys(ITEM).filter(k => k !== 'anvil' && !ITEM[k].pseudo && !ITEM[k].old);
+    const places = Object.keys(PLACE_NAMES), mobKeys = Object.keys(MOBS).filter(k => k !== 'villager' || true), items = Object.keys(ITEM).filter(k => k !== 'anvil' && !ITEM[k].pseudo && !ITEM[k].old && ITEM[k].deco === undefined), decos = DECOS.map(q => q[0]);
     const num = (o, l) => l.filter(k => o[k]).length + '/' + l.length;
     const placeImg = t => '<div class="q" style="color:#2a8a70">★</div>';
     const h = '<div class="list" style="display:block"><div class="sec">場所 <small style="color:#5c3c1c">' + num(S.book.p, places) + '</small></div><div class="bgrid">' + places.map(k => cell(S.book.p[k], placeImg(k), PLACE_NAMES[k])).join('') + '</div>' +
         '<div class="sec">生き物 <small style="color:#5c3c1c">' + num(S.book.m, mobKeys) + '</small></div><div class="bgrid">' + mobKeys.map(k => cell(S.book.m[k], '<img src="' + (S.book.m[k] ? mobIcon(k) : '') + '" alt="">', MOBS[k].n)).join('') + '</div>' +
+        '<div class="sec">おたから <small style="color:#5c3c1c">' + num(S.book.i, decos) + '</small></div><div class="bgrid">' + decos.map(k => cell(S.book.i[k], S.book.i[k] ? iconHtml(k) : '', ITEM[k].n)).join('') + '</div>' +
         '<div class="sec">アイテム <small style="color:#5c3c1c">' + num(S.book.i, items) + '</small></div><div class="bgrid">' + items.map(k => cell(S.book.i[k], S.book.i[k] ? iconHtml(k) : '', ITEM[k].n)).join('') + '</div></div>';
     $('pbody').innerHTML = h;
 }
@@ -796,13 +797,24 @@ function startPlay() {
     refreshHud();
     SFX.play('start');
 }
-function startNew(seed) {
-    closeDialog(); newGame(seed); curSlot = newSlot(); saveGame(); startPlay();
-    H.log('まずは 木にぶつかって 切ってみよう', 'good');
+function startNew(seed, mode) {
+    closeDialog();
+    if (mode === 'circuit') newCircuitGame(seed); else newGame(seed);
+    curSlot = newSlot(null, mode); saveGame(); startPlay();
+    if (mode === 'circuit') H.log('回路モード: 回路の部品は ∞。おなかも HPも へらず、敵も出ない', 'good');
+    else H.log('まずは 木にぶつかって 切ってみよう', 'good');
+}
+// モードを えらぶ
+function askMode(seed) {
+    dialog('<h2>はじめから</h2><div class="modepick"><button class="wbtn big go" id="m-surv">サバイバルモード<small>魔王をたおす ぼうけん</small></button><button class="wbtn big blue" id="m-circ">回路モード<small>自由に 回路をつくる</small></button></div><div class="row"><button class="wbtn" id="m-back">もどる</button></div>', b => {
+        b.querySelector('#m-surv').onclick = () => startNew(seed || 0);
+        b.querySelector('#m-circ').onclick = () => startNew(seed || 0, 'circuit');
+        b.querySelector('#m-back').onclick = closeDialog;
+    });
 }
 // はじめから: 新しい枠をつくる。いっぱいなら 一覧で消してもらう
 function askNewWorld(seed) {
-    if (slotList().length < SLOT_MAX) { startNew(seed || 0); return; }
+    if (slotList().length < SLOT_MAX) { askMode(seed); return; }
     dialog('<h2>はじめから</h2>セーブが いっぱいです(' + SLOT_MAX + 'こ)。<br>いらない世界を 消してから はじめよう。<div class="row"><button class="wbtn go" id="n-list">セーブの一覧</button><button class="wbtn" id="n-back">もどる</button></div>', b => {
         b.querySelector('#n-back').onclick = closeDialog;
         b.querySelector('#n-list').onclick = openSlots;
@@ -813,11 +825,11 @@ const fmtTime = t => { const d = new Date(t); return (d.getMonth() + 1) + '/' + 
 function openSlots() {
     const list = slotList().sort((a, b) => b.updated - a.updated);
     if (!list.length) { closeDialog(); refreshTitleButtons(); return; }
-    const row = q => '<div class="slotrow"><div class="sn"><b>' + escapeHtml(q.name) + '</b><small>' + q.day + '日目 ・ ' + fmtTime(q.updated) + ' に遊んだ</small></div>' +
+    const row = q => '<div class="slotrow"><div class="sn"><b>' + (q.mode === 'circuit' ? '<span class="modetag">回路</span>' : '') + escapeHtml(q.name) + '</b><small>' + q.day + '日目 ・ ' + fmtTime(q.updated) + ' に遊んだ</small></div>' +
         '<button class="wbtn go" data-play="' + q.id + '">つづける</button><button class="wbtn" data-ren="' + q.id + '">なまえ</button><button class="wbtn danger" data-del="' + q.id + '">けす</button></div>';
     dialog('<h2>つづきから</h2><div class="slotlist">' + list.map(row).join('') + '</div><div class="row">' + (list.length < SLOT_MAX ? '<button class="wbtn" id="s-new">はじめから</button>' : '') + '<button class="wbtn" id="s-back">もどる</button></div>', b => {
         b.querySelector('#s-back').onclick = closeDialog;
-        if (b.querySelector('#s-new')) b.querySelector('#s-new').onclick = () => startNew(0);
+        if (b.querySelector('#s-new')) b.querySelector('#s-new').onclick = () => askMode(0);
         b.querySelectorAll('[data-play]').forEach(el => el.onclick = () => {
             const id = +el.dataset.play;
             if (!loadGame(slotKey(id))) { SFX.play('error'); return; }
@@ -879,13 +891,6 @@ function askWorldCode() {
 }
 $('btn-start').onclick = () => { SFX.unlock && SFX.unlock(); if (slotList().length) openSlots(); else askNewWorld(); };
 $('btn-new').onclick = () => askNewWorld();
-// 回路モード: セーブがあれば つづきから、なければ 新しい世界で
-$('btn-circuit').onclick = () => {
-    SFX.unlock && SFX.unlock();
-    if (hasSave(CIRCUIT_SAVE_KEY) && loadGame(CIRCUIT_SAVE_KEY)) { S.mode = 'circuit'; startPlay(); H.log('回路モード: つづきから', 'good'); return; }
-    newCircuitGame(); saveGame(); startPlay();
-    H.log('回路モード: 回路の部品は ∞。おなかも HPも へらず、敵も出ない', 'good');
-};
 $('btn-ach').onclick = () => { document.body.classList.add('ach-only'); openPanel('ach'); };
 $('btn-rank').onclick = () => showRanking();
 $('btn-howto').onclick = () => openHowto();
@@ -1012,7 +1017,7 @@ FGLTitle.mount({
     lang: () => 'ja',
     buttons: {
         start: '#btn-start', row: [
-            { sel: '#btn-new', ico: 'play' }, { sel: '#btn-tutorial', ico: 'help' }, { sel: '#btn-circuit', ico: 'gear' }, { sel: '#btn-howto', ico: 'star' }, { sel: '#btn-rank', ico: 'trophy' }, { sel: '#btn-ach', ico: 'star' }, { sel: '#btn-sound', ico: 'gear' },
+            { sel: '#btn-new', ico: 'play' }, { sel: '#btn-tutorial', ico: 'help' }, { sel: '#btn-howto', ico: 'star' }, { sel: '#btn-rank', ico: 'trophy' }, { sel: '#btn-ach', ico: 'star' }, { sel: '#btn-sound', ico: 'gear' },
             { sel: '#btn-home', ico: 'home' }]
     }
 });

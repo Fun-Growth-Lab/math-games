@@ -49,6 +49,7 @@ const PIX_ART = {
     seed_w: [['.....tt.....', '....bttb....', '...bbBBbb...', '..bBByYBBb..', '.bBBByYyBBb.', '.bBByYyBBBb.', '.bBBByYBBBb.', '.bBBBsBBBBb.', '..bbbbbbbb..', '.y..y...y.y.'], { t: '#7c5228', b: '#a88860', B: '#f4ecd4', y: '#e0b83c', Y: '#ffe88a', s: '#a89040' }],
     crystal: [['.....C......', '....CcC.C...', '.C..Ccc.Cc..', '.Cc.Ccd.Cd..', '.CccCcdCcd..', '..CccccCd...', '...Cccdd....', '....ddd.....'], { C: '#f0e4ff', c: '#b8a0ff', d: '#7a5ad0' }],
     arrow: [['.........HH', '........Hhh', '.......shH.', '......s.h..', '.....s.....', '....s......', '...s.......', 'f.s........', 'ff.........', '.ff........'], { h: '#8e8e8a', H: '#b8b8b2', s: '#a8743c', f: '#d8352c' }],
+    dirt: [['...........', '....dd.....', '...dDdd....', '..dddDdd...', '.ddDddkdd..', 'ddddddDddd.', 'dDddkdddkd.'], { d: '#8a6038', D: '#a87848', k: '#5e3e22' }],
     sand: [['...........', '....ss.....', '...sSss....', '..sssSss...', '.ssSsssss..', 'ssssssSsss.', 'sSssssssss.'], { s: '#e2cd8e', S: '#c8b070' }],
     glass: [['GGGGGGGGGG', 'GwwggggggG', 'GwgggggggG', 'GgggggggwG', 'GggggggwgG', 'GgggggwggG', 'GggggggggG', 'GGGGGGGGGG'], { G: '#7fb8d0', g: '#cfeefc', w: '#ffffff' }],
     rdust: [['...........', '.....r.....', '...rRr..r..', '..rRrrRr...', '.rrRrrrrRr.', 'rRrrRrrRrr.'], { r: '#d8301c', R: '#ff6a4c' }],
@@ -68,6 +69,7 @@ const PIX_TOOL = {
     sword: ['............Hh', '...........Hhd', '..........Hhd.', '.........Hhd..', '........Hhd...', '.......Hhd....', '......Hhd.....', '.d...Hhd......', '.dd.Hhd.......', '..ddhd........', '...dds........', '..s.dd........', '.sS...........', 'sS............'],
     pick: ['.....hhhhh....', '...hhhHHHhhh..', '..hh....sdhhh.', '.h.....sS..hhh', '......sS....hh', '.....sS.....hh', '....sS.......h', '...sS.........', '..sS..........', '.sS...........', 'sS............'],
     axe: ['......hhhh....', '.....hHHHHh...', '.....hHHHHHh..', '.....ddhHsShh.', '.......dsShhh.', '......sSd.hh..', '.....sS.......', '....sS........', '...sS.........', '..sS..........', '.sS...........'],
+    shovel: ['..........hh..', '.........hHHh.', '........hHHHhd', '.......hHHHhd.', '........hHhd..', '.......sSdd...', '......sS......', '.....sS.......', '....sS........', '...sS.........', '.ssS..........', 'sSs...........'],
     hoe: ['.....hhhhhsS..', '....hHHHHsS...', '....hhh.sS....', '.......sS.....', '......sS......', '.....sS.......', '....sS........', '...sS.........', '..sS..........', '.sS...........'],
     bow: ['...hh..S', '..hH...S', '.hH....S', '.hH....S', 'hh.....S', '.hH....S', '.hH....S', '..hH...S', '...hh..S'],
     armor: ['.hhh....hhh.', 'hHHhh..hhHHh', 'hHHHhhhhHHHh', 'hHHHHHHHHHHh', '.ddHHHHHHdd.', '...hHHHHh...', '...hHHHHh...', '...hHHHHh...', '...dddddd...']

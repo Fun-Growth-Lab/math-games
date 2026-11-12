@@ -4,6 +4,7 @@
 const ACH_CATS = [['life', 'くらし'], ['find', '発見'], ['battle', '戦い'], ['craft', 'ものづくり'], ['boss', '魔王'], ['oops', 'しっぱい']];
 const ACH = [
     // くらし
+    { id: 'treasure_all', c: 'find', n: 'おたから はかせ', d: 'おたからを 全部(' + 21 + 'こ) 集める' },
     { id: 'first_morning', c: 'life', n: 'はじめての朝', d: '最初の夜を越える' },
     { id: 'home', c: 'life', n: 'わが家', d: 'かべで囲った明るい部屋で 朝まで眠る' },
     { id: 'night_owl', c: 'life', n: '夜ふかし', d: '一度も眠らずに 夜を越える' },

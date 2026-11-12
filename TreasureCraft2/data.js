@@ -135,6 +135,14 @@ defT('WIRE_W', { n: '導線つきのかべ', solid: 1, hp: 8, back: 'rdust', opa
 'NESW'.split('').forEach((c, i) => defT('REP_' + c, { n: 'リピーター', hp: 2, back: 'rep', rep: i + 1 }));
 defT('NOT_V', { n: 'NOT素子', hp: 2, back: 'notg', notg: 'V' });
 defT('NOT_H', { n: 'NOT素子', hp: 2, back: 'notg', notg: 'H' });
+// おたから: [id, 名前, 出る所(0=地上 1=地下 2=異界 c=組み合わせ), 説明, 明るさ]。置いて飾るだけ
+const DECOS = [
+    ['coin', '古いコイン', 0, 'むかしのお金'], ['shell', '貝がら', 0, '海のかおり'], ['wbird', '木ぼりの小鳥', 0, 'ていねいな手作り'], ['sglass', '砂時計', 0, '時をはかる'], ['opot', '古いつぼ', 0, '遺跡のつぼ'],
+    ['ammon', 'アンモナイト', 1, 'うずまきの化石'], ['dtooth', '恐竜の歯', 1, '大きな歯の化石'], ['cball', '水晶玉', 1, 'すきとおった玉'], ['gear', '古代の歯車', 1, 'なぞの歯車'], ['fbottle', 'ほたる石のびん', 1, 'ほんのり光る', 4],
+    ['dscale', '竜のうろこ', 2, 'かたくて美しい'], ['pfeath', '火の鳥の羽', 2, 'ほんのり あたたかい'], ['sdust', '星くずのびん', 2, '夜空のかけら'], ['dlant', '魔界のランタン', 2, '紫に光る', 6], ['omask', '黒曜の仮面', 2, 'あやしい仮面'],
+    ['coinpile', 'コインの山', 'c', 'お金もち気分'], ['fossil', '化石の標本', 'c', '博物館みたい'], ['mclock', 'からくり時計', 'c', '歯車で動く'], ['sball', '星空の水晶玉', 'c', '星が光る', 6], ['phoenix', '不死鳥の像', 'c', '炎が光る', 5], ['dpot', '竜の宝つぼ', 'c', '竜のかざり']
+];
+DECOS.forEach(([id, n, tier, desc, light]) => defT('DC_' + id.toUpperCase(), Object.assign({ n, solid: 1, hp: 2, back: id, deco: 1 }, light ? { light } : {})));
 // 視線をさえぎる物。木や柵はさえぎらない
 ['ROCK', 'BURIED', 'WALL_W', 'WALL_S', 'DOOR', 'RWALL', 'TOWERW', 'SANDB1', 'SANDB2', 'SANDB3', 'HUTW', 'HULL', 'GIANT', 'GIANTB', 'METEOR', 'SPAWNER'].forEach(k => { TILE[T[k]].opaque = 1; });
 TILE.forEach(d => { if (d.wall) d.opaque = 1; });
@@ -205,7 +213,7 @@ const STRINGS = {
     hide: { n: '皮のつる', item: 'hide', cost: 1, range: 5, note: '射程5' },
     silk: { n: '糸のつる', item: 'silk', cost: 1, range: 7, atk: 2, note: '射程7・攻撃+2' }
 };
-const TOOL_KINDS = { sword: { n: '剣', e: '🗡️', head: '刃' }, pick: { n: 'つるはし', e: '⛏️', head: '頭' }, axe: { n: '斧', e: '🪓', head: '頭' }, hoe: { n: 'クワ', e: '🔱', head: '頭' }, armor: { n: 'よろい', e: '🛡️', head: '胴' }, bow: { n: '弓', e: '🏹', head: '本体' } };
+const TOOL_KINDS = { sword: { n: '剣', e: '🗡️', head: '刃' }, pick: { n: 'つるはし', e: '⛏️', head: '頭' }, axe: { n: '斧', e: '🪓', head: '頭' }, hoe: { n: 'クワ', e: '🔱', head: '頭' }, shovel: { n: 'スコップ', e: '🪏', head: '頭' }, armor: { n: 'よろい', e: '🛡️', head: '胴' }, bow: { n: '弓', e: '🏹', head: '本体' } };
 
 function toolStats(t) {
     if (t.k === 'armor') {
@@ -239,6 +247,13 @@ const RECIPES = [
     { out: 'rep', need: { stone: 2, rdust: 2 }, st: 'bench' },
     { out: 'notg', need: { stone: 2, rdust: 1, torch: 1 }, st: 'bench' },
     { out: 'clamp', need: { crystal: 2, rdust: 1 }, st: 'bench' },
+    // おたからの組み合わせ
+    { out: 'coinpile', need: { coin: 3 }, st: 'bench' },
+    { out: 'fossil', need: { ammon: 1, dtooth: 1 }, st: 'bench' },
+    { out: 'mclock', need: { sglass: 1, gear: 1 }, st: 'bench' },
+    { out: 'sball', need: { cball: 1, sdust: 1 }, st: 'bench' },
+    { out: 'phoenix', need: { wbird: 1, pfeath: 1 }, st: 'bench' },
+    { out: 'dpot', need: { opot: 1, dscale: 1 }, st: 'bench' },
     { out: 'crown', need: { gem: 5, ingot_au: 2 }, st: 'bench', t: 3 },
     { out: 'wall_nw', n: 2, need: { nwood: 2 }, st: 'bench' },
     { out: 'floor_nw', n: 2, need: { nwood: 1 }, st: 'bench' },
@@ -292,7 +307,8 @@ for (const m of ['cu', 'fe', 'au']) {
         { out: 'fence_' + m, n: 3, need: { [ing]: 1 }, st: 'bench' }, { out: 'floor_' + m, n: 4, need: { [ing]: 1 }, st: 'bench' });
 }
 Object.assign(ITEM, {
-    sand: { n: '砂' }, glass: { n: 'ガラス' }, rdust: { n: '赤い石の粉', use: 'rdust', desc: '導線を置く' },
+    ...Object.fromEntries(DECOS.map(([id, n, tier, desc]) => [id, { n, tile: 'DC_' + id.toUpperCase(), place: 'DC_' + id.toUpperCase(), desc, deco: tier }])),
+    sand: { n: '砂', use: 'fill', desc: '水や穴を うめる' }, dirt: { n: '土', use: 'fill', desc: '水や穴を うめる' }, glass: { n: 'ガラス' }, rdust: { n: '赤い石の粉', use: 'rdust', desc: '導線を置く' },
     glass_w: { n: 'ガラスのかべ', tile: 'GLASS', place: 'GLASS', desc: '外が見える かべ' },
     bottle: { n: 'ガラスびん', desc: '回復薬の材料' },
     switch: { n: 'スイッチ', tile: 'SWITCH_OFF', place: 'SWITCH_OFF', desc: 'ぶつかって ON/OFF' },
