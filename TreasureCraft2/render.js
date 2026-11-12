@@ -498,6 +498,7 @@ function rotateView(step) {
     for (const k in mobCache) delete mobCache[k];
     groundLayer.key = '';
     VIEW.needDraw = true;
+    H.refresh();   // コンパスも回す
 }
 function snapView() { P.rx = S.x; P.ry = S.y; playerVia = null; VIEW.cx = S.x + .5; VIEW.cy = S.y + .5; VIEW.needDraw = true; }
 

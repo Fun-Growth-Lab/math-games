@@ -852,7 +852,7 @@ function endTurn(n) {
         }
         updateBreath();
         if (S.hp <= 0) break;
-        if (S.T % 20 === 0) { healDmg(); dropsExpire(); }
+        if (S.T % 20 === 0) { healDmg(); dropsExpire(); regrowGround(); }
         flowWater();
         if (dayT() === 0) {
             H.log(dayNo() + '日目の朝がきた', 'good'); saveGame();
@@ -1182,6 +1182,20 @@ function flowWater() {
         for (const o of DIR4) { const nx = x + o[0], ny = y + o[1]; if (getT(f, nx, ny) === T.PIT) { setT(f, nx, ny, T.WATER); floodFrom(f, nx, ny, S.T); } }
     }
 }
+// 埋めた土: 1日たったら となりに いちばん多い 草の地面に変わる(草が まわりにないときは 土のまま)
+const REGROW = [T.GRASS, T.GRASS2, T.FLOWER, T.SNOW];
+function regrowGround() {
+    if (!S.regrow || !S.regrow.length) return;
+    S.regrow = S.regrow.filter(([f, x, y, t]) => {
+        if (S.T - t < DAY_LEN) return true;
+        if (getT(f, x, y) !== T.DIRT) return false;
+        const cnt = new Map();
+        for (const o of DIR4) { const n = getT(f, x + o[0], y + o[1]); if (REGROW.includes(n)) cnt.set(n, (cnt.get(n) || 0) + 1); }
+        let best = null, bv = 0; for (const [n, v] of cnt) if (v > bv) { best = n; bv = v; }
+        if (best !== null) setT(f, x, y, best);
+        return false;
+    });
+}
 function healDmg() {
     for (const k in S.dmg) {
         if (S.dmgT[k] === undefined) S.dmgT[k] = S.T;
@@ -1384,6 +1398,7 @@ function fillAt(x, y, t, id) {
     if (mobAt(x, y)) { H.log('だれかがいる', ''); return; }
     if (t !== T.WATER && t !== T.PIT) { H.log('ここでは 使えないようだ', ''); return; }
     setT(S.f, x, y, id === 'sand' ? T.SAND : T.DIRT);
+    if (id !== 'sand' && S.f === 0) (S.regrow || (S.regrow = [])).push([S.f, x, y, S.T]);   // 1日たつと まわりの地面に なじむ
     removeItem(id, 1); H.sfx('place'); endTurn(1);
 }
 const inCells = (cells, m) => cells.some(c => c[0] === m.x && c[1] === m.y);

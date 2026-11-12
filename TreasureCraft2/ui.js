@@ -158,8 +158,15 @@ $('stage').addEventListener('pointerdown', e => {
 ['pointerup', 'pointercancel'].forEach(n => $('stage').addEventListener(n, () => { clearTimeout(tipTimer); if (tipLong) { hideTip(); setTimeout(() => { tipLong = false; }, 60); } }));
 $('stage').addEventListener('click', e => { if (tipLong) { e.stopPropagation(); e.preventDefault(); tipLong = false; } }, true);   // 長押しのあとは 押したことにしない
 let lastHot = '';
+// コンパス: 世界の北が 画面のどちらか(画面を回すと 回る)
+function updateCompass() {
+    const v = rv(0, -1), p = pj(v[0], v[1], 0), ang = Math.atan2(p[0], -p[1]);
+    $('cmp-needle').setAttribute('transform', 'rotate(' + (ang * 180 / Math.PI).toFixed(1) + ' 30 30)');
+    const t = $('cmp-n'); t.setAttribute('x', (30 + Math.sin(ang) * 16).toFixed(1)); t.setAttribute('y', (30 - Math.cos(ang) * 16).toFixed(1));
+}
 function refreshHud() {
     if (!S || mode !== 'play') return;
+    updateCompass();
     TOOL_KIND_KEYS.forEach(equipped);   // 装備の印をそろえる
     const mx = maxHp();
     $('hp-fill').style.width = Math.max(0, 100 * S.hp / mx) + '%'; $('hp-num').textContent = Math.max(0, S.hp) + '/' + mx;
@@ -662,7 +669,13 @@ function drawMap() {
     c.drawImage(mapLayer(mapFloor), 0, 0);
     const pin = (x, y, col, r) => { c.fillStyle = '#000'; c.fillRect((x >> 2) - r - 1, (y >> 2) - r - 1, r * 2 + 3, r * 2 + 3); c.fillStyle = col; c.fillRect((x >> 2) - r, (y >> 2) - r, r * 2 + 1, r * 2 + 1); };
     const notes = [];
-    if (S.f === mapFloor) { pin(S.x, S.y, '#ffffff', 2); notes.push('⬜ 自分 (' + S.x + ', ' + S.y + ')'); }
+    if (S.f === mapFloor) {
+        // 自分: 向いている方へ とがった 三角
+        const cx = (S.x >> 2) + .5, cy = (S.y >> 2) + .5, fx = S.face[0], fy = S.face[1], px = -fy, py = fx;
+        const tri = r => { c.beginPath(); c.moveTo(cx + fx * r * 1.6, cy + fy * r * 1.6); c.lineTo(cx - fx * r + px * r * 1.2, cy - fy * r + py * r * 1.2); c.lineTo(cx - fx * r - px * r * 1.2, cy - fy * r - py * r * 1.2); c.closePath(); };
+        tri(4.2); c.fillStyle = '#000'; c.fill(); tri(3); c.fillStyle = '#fff'; c.fill();
+        notes.push('▶ 自分');
+    }
     if (S.bed && S.bed.f === mapFloor) { pin(S.bed.x, S.bed.y, '#ff5a5a', 1); notes.push('🟥 寝床'); }
     if (S.gate && (mapFloor === 0 || mapFloor === 2)) { pin(S.gate.x, S.gate.y, '#c05aff', 1); notes.push('🟪 門'); }
     S.graves.filter(g => g.f === mapFloor).forEach(g => pin(g.x, g.y, '#ffd84a', 1));
@@ -673,7 +686,12 @@ function drawMap() {
     if (mapFloor === 2 && !S.bossDead && S.got.reach_2) { const p = bossPos(); pin(p.x, p.y, '#ff2a2a', 2); notes.push('🔺 魔王城'); }
     $('map-tabs').innerHTML = FLOOR_ORDER.map(i => (i === 0 || S.got['reach_' + i]) ? '<button class="tab' + (i === mapFloor ? ' on' : '') + '" data-f="' + i + '">' + FLOOR_NAME[i] + '</button>' : '').join('');
     $('map-tabs').querySelectorAll('[data-f]').forEach(b => b.onclick = () => { mapFloor = +b.dataset.f; drawMap(); });
-    $('map-info').innerHTML = notes.join('<br>') + '<br><br>世界の広さ 1000×1000<br>歩いた所だけ 地図にのる';
+    // コンパス(地図は いつも 北が上)
+    c.save(); c.translate(232, 18); c.fillStyle = 'rgba(255,248,230,.9)'; c.strokeStyle = '#7c5228'; c.lineWidth = 1.5; c.beginPath(); c.arc(0, 0, 13, 0, 7); c.fill(); c.stroke();
+    c.fillStyle = '#d8301c'; c.beginPath(); c.moveTo(0, -10); c.lineTo(3.5, 0); c.lineTo(-3.5, 0); c.closePath(); c.fill();
+    c.fillStyle = '#9a9a9a'; c.beginPath(); c.moveTo(0, 10); c.lineTo(3.5, 0); c.lineTo(-3.5, 0); c.closePath(); c.fill(); c.restore();
+    c.font = '900 9px sans-serif'; c.textAlign = 'center'; c.fillStyle = '#5c3c1c'; c.fillText('北', 232, 40);
+    $('map-info').innerHTML = notes.join('<br>');
 }
 // 地図用: まだ読みこんでいないチャンクは作らず、生成式だけで見る(チャンクの入れ物をあふれさせない)
 function getTFast(f, x, y) {
