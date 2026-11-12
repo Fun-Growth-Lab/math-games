@@ -170,6 +170,8 @@ function refreshHud() {
     const gi = goalIndex();
     $('goal').textContent = circuitMode() ? '回路モード: 自由に回路をつくろう' : gi >= 0 ? '目標: ' + GOALS[gi].t : '魔王をたおした! 自由に遊ぼう';
     // できることに合わせて ボタンの文字を変える。2つあるときだけ もう1つのボタンを出す
+    // 「ほる」ボタン: 前のマスに合わせて こうげき・ほる・こわす。使う道具の絵(なければ手)。できないときは うすく
+    { const di = digInfo(), bt = $('btn-dig'), ic = bt.querySelector('b'), tl = di.tool, k = tl ? tl.k + tl.a + tl.b + (tl.gem ? 'g' : '') : 'hand'; if (ic.dataset.k !== k) { ic.dataset.k = k; ic.innerHTML = tl ? toolImg(tl) : '✋'; } bt.querySelector('span').textContent = di.l; bt.classList.toggle('dim', !di.ok); }
     const acts = useActions(), lab = $('btn-use').querySelector('span'), b2 = $('btn-use2');
     lab.textContent = acts[0] ? acts[0].l : 'つかう';
     b2.classList.toggle('hidden', !acts[1]);

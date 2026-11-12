@@ -1375,6 +1375,19 @@ function fillAt(x, y, t, id) {
     removeItem(id, 1); H.sfx('place'); H.log(t === T.WATER ? '水を うめた' : '穴を うめた', 'good'); endTurn(1);
 }
 const inCells = (cells, m) => cells.some(c => c[0] === m.x && c[1] === m.y);
+// 「ほる」ボタンの中身: 前のマスに合わせて 言葉・絵・できるか を返す(tool = 絵にする道具、なければ手)
+function digInfo() {
+    const x = S.x + S.face[0], y = S.y + S.face[1], t = getT(S.f, x, y), d = TILE[t], fm = mobAt(x, y);
+    const sample = k => ({ k, a: 'stone', b: 'wood' });
+    if (fm) return { l: 'こうげき', tool: equipped('sword'), ok: !(MOBS[fm.t].npc || MOBS[fm.t].pet) };
+    const soil = S.f === 0 ? SOIL[t] : d.ground && S.f !== 2 && floorBelow(S.f) >= 0 && t !== T.RFLOOR && t !== T.SCORCH;
+    if (soil) return { l: 'ほる', tool: equipped('shovel'), ok: !shaftBlock(floorBelow(S.f), x, y) };
+    if (d.ground || t === T.PIT || takeable(t) || t === T.LADDER_U || t === T.STAIRS_U || t === T.CAVEIN || t === T.GATE || !d.hp) return { l: 'ほる', tool: null, ok: false };
+    if (!d.tool) return { l: 'こわす', tool: null, ok: true };
+    const eq = equipped(d.tool), tier = d.tier || 0;
+    if (d.tool === 'pick' && tier > 0 && (!eq || toolStats(eq).tier < tier)) return { l: 'こわす', tool: eq || sample('pick'), ok: false };
+    return { l: 'こわす', tool: eq, ok: true };
+}
 function digFacing() {
     if (!S || S.hp <= 0) return;
     const x = S.x + S.face[0], y = S.y + S.face[1], t = getT(S.f, x, y), d = TILE[t];
