@@ -57,7 +57,7 @@ defT('CHEST_W', { n: '古い宝箱', solid: 1 });
 defT('WALL_W', { n: '木のかべ', solid: 1, hp: 7, tool: 'axe', back: 'wall_w' });
 defT('WALL_S', { n: '石のかべ', solid: 1, hp: 14, tool: 'pick', tier: 1, back: 'wall_s', blast: 1 });
 defT('DOOR', { n: '扉', door: 1, hp: 5, tool: 'axe', back: 'door' });
-defT('TORCH', { n: '松明', solid: 1, hp: 1, back: 'torch', light: 6 });
+defT('TORCH', { n: '松明', hp: 1, back: 'torch', light: 6 });   // 上を歩ける。「はずす」で しまう
 defT('BENCH', { n: '作業台', solid: 1, hp: 5, tool: 'axe', back: 'bench', station: 'bench' });
 defT('FURNACE', { n: 'かまど', solid: 1, hp: 7, tool: 'pick', back: 'furnace', station: 'furnace', light: 2 });
 defT('ANVIL', { n: '金床', solid: 1, hp: 9, tool: 'pick', back: 'anvil', station: 'bench' }); // 金床は廃止(作業台に統一)。古いセーブに置いてある物は作業台として使える
@@ -480,6 +480,7 @@ const PLAYER_BOX = LOOKS[0].box;
 // 動物を飼う: 好きな食べ物と、なでるともらえる物
 const FEED = { chicken: ['wheat', 'berry', 'seed_w'], pig: ['carrot', 'berry'], sheep: ['wheat'], cow: ['wheat'] };
 const PRODUCT = { chicken: 'feather', sheep: 'wool', cow: 'hide' };
+const CRY = { chicken: 'コケコッコー', pig: 'ブーブー', sheep: 'メェー', cow: 'モー' };   // なついた動物の 鳴き声
 // 村人の手伝い(物の交換はしない)。1人につき1日1回
 const HELPERS = [
     { n: '農夫', job: 'seeds', say: '畑の種を わけてあげよう。たまに めずらしい種も あるよ', btn: '種をもらう' },

@@ -1082,11 +1082,17 @@ function springTrap(x, y, t) {
 function bumpMob(m) {
     const d = MOBS[m.t];
     if (d.npc) { H.stopHold(); H.openTrade(m); return true; }
-    if (d.pet) { const x = m.x, y = m.y; m.x = S.x; m.y = S.y; S.x = x; S.y = y; endTurn(1); return true; }
+    if (d.pet) {
+        const x = m.x, y = m.y; m.x = S.x; m.y = S.y; S.x = x; S.y = y;
+        const t = getT(S.f, x, y);   // 入れかわった先が はしご・階段・門なら 歩いて乗ったときと同じ
+        if (t === T.LADDER_D || t === T.CAVEIN) goDown(x, y);
+        else if (t === T.LADDER_U || t === T.STAIRS_U) goUp(x, y);
+        else if (t === T.GATE) useGate(x, y);
+        endTurn(1); return true;
+    }
     if (m.ref) {
         const prod = PRODUCT[m.t];
-        if (!prod) { H.stopHold(); H.log('なついている', ''); return true; }
-        if (S.T < (m.ref.pcd || 0)) { H.stopHold(); H.log(d.n + 'は まだ何もくれない', ''); return true; }
+        if (!prod || S.T < (m.ref.pcd || 0)) { H.stopHold(); H.float(m.x, m.y, CRY[m.t] || '♪', '#ffffff'); return true; }
         m.ref.pcd = S.T + 200;
         give(prod, 1); H.sfx('item'); H.float(m.x, m.y, '♥', '#ff7aa0');
         endTurn(1);

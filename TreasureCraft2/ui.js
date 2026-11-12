@@ -668,6 +668,23 @@ function mapRebuild() {
     slice();
 }
 function openMap() { mapFloor = S.f; held = null; autoPath = []; $('map-modal').classList.remove('hidden'); SFX.play('select'); drawMap(); }
+// 見つけた場所の印: 形(四角・丸・三角・ひし形)と色の組み合わせで 場所ごとに ちがう印にする
+const MARK_COL = ['#3fe0c0', '#ff9a3c', '#ff7aa0', '#7fb8ff', '#c08aff'], MARK_SHAPE = ['sq', 'ci', 'tr', 'di'];
+const PLACE_KINDS = Object.keys(PLACE_NAMES).filter(k => k !== 'mine');
+const placeMarkOf = k => { const i = Math.max(0, PLACE_KINDS.indexOf(k)); return { col: MARK_COL[i % 5], shape: MARK_SHAPE[Math.floor(i / 5) % 4] }; };
+function markPath(c, x, y, shape, r) {
+    c.beginPath();
+    if (shape === 'ci') c.arc(x, y, r, 0, 7);
+    else if (shape === 'tr') { c.moveTo(x, y - r * 1.15); c.lineTo(x + r * 1.1, y + r * .8); c.lineTo(x - r * 1.1, y + r * .8); c.closePath(); }
+    else if (shape === 'di') { c.moveTo(x, y - r * 1.2); c.lineTo(x + r * 1.2, y); c.lineTo(x, y + r * 1.2); c.lineTo(x - r * 1.2, y); c.closePath(); }
+    else c.rect(x - r, y - r, r * 2, r * 2);
+}
+function placeMark(c, x, y, k, r) { const m = placeMarkOf(k); markPath(c, x, y, m.shape, r + 1.2); c.fillStyle = '#000'; c.fill(); markPath(c, x, y, m.shape, r); c.fillStyle = m.col; c.fill(); }
+function placeMarkSvg(k) {
+    const m = placeMarkOf(k), s = m.shape, a = 'fill="' + m.col + '" stroke="#000" stroke-width="1.5"';
+    const body = s === 'ci' ? '<circle cx="8" cy="8" r="6" ' + a + '/>' : s === 'tr' ? '<polygon points="8,1.5 15,14 1,14" ' + a + '/>' : s === 'di' ? '<polygon points="8,1 15,8 8,15 1,8" ' + a + '/>' : '<rect x="2" y="2" width="12" height="12" ' + a + '/>';
+    return '<svg width="16" height="16" viewBox="0 0 16 16" style="vertical-align:-2px">' + body + '</svg>';
+}
 function drawMap() {
     const c = $('map-cv').getContext('2d');
     c.drawImage(mapLayer(mapFloor), 0, 0);
@@ -684,8 +701,9 @@ function drawMap() {
     if (S.gate && (mapFloor === 0 || mapFloor === 2)) { pin(S.gate.x, S.gate.y, '#c05aff', 1); notes.push('🟪 門'); }
     S.graves.filter(g => g.f === mapFloor).forEach(g => pin(g.x, g.y, '#ffd84a', 1));
     const fnd = Object.values(S.found).filter(p => p.f === mapFloor && p.type !== 'mine');
-    fnd.forEach(p => pin(p.x, p.y, '#3fe0c0', 1));
-    if (fnd.length) notes.push('🟩 見つけた場所 ' + fnd.length + 'か所');
+    fnd.forEach(p => placeMark(c, (p.x >> 2) + .5, (p.y >> 2) + .5, p.type, 3.2));
+    const kinds = {}; fnd.forEach(p => kinds[p.type] = (kinds[p.type] || 0) + 1);
+    for (const k in kinds) notes.push(placeMarkSvg(k) + ' ' + PLACE_NAMES[k] + (kinds[k] > 1 ? ' ×' + kinds[k] : ''));
     if (S.graves.some(g => g.f === mapFloor)) notes.push('🟨 落とした荷物');
     if (mapFloor === 2 && !S.bossDead && S.got.reach_2) { const p = bossPos(); pin(p.x, p.y, '#ff2a2a', 2); notes.push('🔺 魔王城'); }
     $('map-tabs').innerHTML = FLOOR_ORDER.map(i => (i === 0 || S.got['reach_' + i]) ? '<button class="tab' + (i === mapFloor ? ' on' : '') + '" data-f="' + i + '">' + FLOOR_NAME[i] + '</button>' : '').join('');
