@@ -3,7 +3,7 @@
 const PLACE_NAMES = {
     giant: '巨木', tower: '崩れた塔', pyramid: '砂漠のピラミッド', meteor: '隕石のクレーター', ship: '難破船', village: '村',
     crystal: '水晶の洞窟', lake: '地底湖', nest: 'まものの巣', mine: '廃坑', cave: '洞窟の入口', ruin: '小さな遺跡',
-    mushroom: '光るきのこの森', merchant: '地底の案内人の小屋', vault: '封印の宝物庫', fossil: '化石', geode: '晶洞', bigvein: '大鉱脈'
+    mushroom: '光るきのこの森', merchant: '地底の案内人の小屋', vault: '封印の宝物庫', fossil: '化石', geode: '晶洞', bigvein: '大鉱脈', mhouse: 'モンスターハウス'
 };
 const near2 = (x, y, p, r) => Math.abs(x - p.x) <= r && Math.abs(y - p.y) <= r;
 
@@ -242,6 +242,39 @@ function bigVeinAt(f, x, y) {
     if (!c) return null;
     const list = VEIN_ORE[caveDepth(f)];
     return T[list[Math.floor(c.r * list.length)]];
+}
+// モンスターハウス(どの地下の階にも): 岩の中に 入口のない部屋。掘り当てると まものが うじゃうじゃ。宝箱つき
+const MH_GRID = 72;
+function mhouseCell(f, gx, gy) {
+    const key = 'mh' + f + ':' + gx + ',' + gy;
+    if (regionCache.has(key)) return regionCache.get(key);
+    let c = cellPick(f, gx * MH_GRID, gy * MH_GRID, MH_GRID, 680, .3);
+    if (c) {
+        const x = c.cx, y = c.cy, pts = [[0, 0], [-6, -6], [6, -6], [-6, 6], [6, 6]];
+        let ok = distC(x, y) > 45 && Math.min(x, y, WORLD - 1 - x, WORLD - 1 - y) > 12;
+        // ほかの見どころ・坑道・洞窟の入口の下とは かさねない
+        if (ok && pts.some(o => cavePlaceAt(f, x + o[0], y + o[1]) || ruinAt(f, x + o[0], y + o[1]) !== null)) ok = false;
+        for (let d = -6; ok && d <= 6; d++) if (onMine(f, x + d, y + d)) ok = false;
+        if (ok && f === 1) { const cv = caveNear(x, y); if (cv && Math.hypot(x - cv.x, y - cv.y) < 14) ok = false; }
+        c = ok ? { key: f + ':mh' + gx + ',' + gy, x, y, f } : null;
+    }
+    regionCache.set(key, c);
+    return c;
+}
+// (x,y) が 部屋(かべ ch=4〜5 まで)に入っていれば その部屋
+function mhouseAt(f, x, y, r) {
+    if (!isCave(f)) return null;
+    const c = mhouseCell(f, Math.floor(x / MH_GRID), Math.floor(y / MH_GRID));
+    return c && near2(x, y, c, r === undefined ? 5 : r) ? c : null;
+}
+const MH_CHEST = [[-2, -2], [2, -2], [0, 2]];
+function mhouseTile(f, x, y) {
+    const c = mhouseAt(f, x, y);
+    if (!c) return null;
+    const dx = x - c.x, dy = y - c.y, ch = Math.max(Math.abs(dx), Math.abs(dy));
+    if (ch >= 4) return caveDepth(f) >= 4 ? T.WHARD : T.WSTONE;   // まわりは ふつうの岩
+    if (MH_CHEST.some(q => q[0] === dx && q[1] === dy)) return T.CHEST_W;
+    return hash(x, y, 681) < .06 ? T.BONES : T.CAVE;
 }
 // 埋もれた宝箱(どの地下の階にも): 岩の中に ぽつんと
 const buriedChestAt = (f, x, y) => hash(x, y, 95 + caveDepth(f)) < .0015;

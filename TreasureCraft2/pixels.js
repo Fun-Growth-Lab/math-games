@@ -46,6 +46,9 @@ const PIX_ART = {
     potion: [['....cccc....', '....wwww....', '.....ww.....', '....wttw....', '...wrrrrw...', '..wrRrrrrw..', '..wrRrrrrw..', '..wrrrrrrw..', '...wwwwww...'], { c: '#8a5a2c', w: '#d8ecf4', t: '#eef8fc', r: '#e0486c', R: '#ff9ab0' }],
     // 種は種ぶくろ。ふくろの絵で にんじんと麦を見分ける
     seed_c: [['.....tt.....', '....bttb....', '...bbBBbb...', '..bBBBBgBb..', '.bBBBBggBBb.', '.bBBBOOBBBb.', '.bBBOOOBBBb.', '.bBOOBBBBBb.', '..bbbbbbbb..', '.o..o...o.o.'], { t: '#7c5228', b: '#a88860', B: '#e8d4a8', g: '#3f9a45', O: '#f08a24', o: '#a8642c' }],
+    egg: [['....ee....', '...eWee...', '..eWWeee..', '..eWeeee..', '.eWeeeeed.', '.eeeeeeed.', '.eeeeeeed.', '.eeeeeedd.', '.eeeeeedd.', '..eeeedd..', '...dddd...'], { e: '#f6eedc', W: '#ffffff', d: '#d8c6a0' }],
+    fegg: [['..wwww......', '.wWWWWww.ww.', 'wWWWWWWwwWWw', 'wWWyyyWWWWWw', 'wWyYyyyWWWw.', 'wWyyyyyWWWw.', '.wWyyyWWWWWw', '.wWWWWWWWWw.', '..wwwWWww...', '.....ww.....'], { w: '#d8d0c0', W: '#fbf8f0', y: '#f0a820', Y: '#ffe070' }],
+    nseed: [['....dd....', '...dPPd...', '..dPLPPd..', '..dPPPPd..', '.dPPPPPpd.', '.dPPPPppd.', '..dPPppd..', '...dddd...'], { d: '#3c1048', P: '#a04ac0', p: '#7a2a8c', L: '#e0a0ff' }],
     seed_w: [['.....tt.....', '....bttb....', '...bbBBbb...', '..bBByYBBb..', '.bBBByYyBBb.', '.bBByYyBBBb.', '.bBBByYBBBb.', '.bBBBsBBBBb.', '..bbbbbbbb..', '.y..y...y.y.'], { t: '#7c5228', b: '#a88860', B: '#f4ecd4', y: '#e0b83c', Y: '#ffe88a', s: '#a89040' }],
     crystal: [['.....C......', '....CcC.C...', '.C..Ccc.Cc..', '.Cc.Ccd.Cd..', '.CccCcdCcd..', '..CccccCd...', '...Cccdd....', '....ddd.....'], { C: '#f0e4ff', c: '#b8a0ff', d: '#7a5ad0' }],
     arrow: [['.........HH', '........Hhh', '.......shH.', '......s.h..', '.....s.....', '....s......', '...s.......', 'f.s........', 'ff.........', '.ff........'], { h: '#8e8e8a', H: '#b8b8b2', s: '#a8743c', f: '#d8352c' }],

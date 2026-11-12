@@ -78,7 +78,7 @@ function ruinAt(f, x, y) {
     if (f !== 2 && tr < .14) return T.TRAP_ARROW;
     return T.RFLOOR;
 }
-const chestTier = (f, x, y) => f === 2 ? 2 : (f === 0 && surfPlaceAt(x, y) && surfPlaceAt(x, y).type !== 'village') ? 1 : (isCave(f) && buriedChestAt(f, x, y)) ? (caveDepth(f) >= 3 ? 2 : 1) : (f === 1 && b1PlaceAt(x, y)) ? 1 : f >= 3 ? (caveDepth(f) >= 4 || cavePlaceAt(f, x, y) ? 2 : 1) : (f === 1 ? (hash(x, y, 41) < .4 ? 1 : 0) : 0);
+const chestTier = (f, x, y) => (isCave(f) && mhouseAt(f, x, y, 3)) ? (caveDepth(f) >= 2 ? 2 : 1) : f === 2 ? 2 : (f === 0 && surfPlaceAt(x, y) && surfPlaceAt(x, y).type !== 'village') ? 1 : (isCave(f) && buriedChestAt(f, x, y)) ? (caveDepth(f) >= 3 ? 2 : 1) : (f === 1 && b1PlaceAt(x, y)) ? 1 : f >= 3 ? (caveDepth(f) >= 4 || cavePlaceAt(f, x, y) ? 2 : 1) : (f === 1 ? (hash(x, y, 41) < .4 ? 1 : 0) : 0);
 
 // ---------- マスの生成 ----------
 // バイオームの中に、小さな地形(池・林・岩場・畑など)を細かく散らす。数十歩ごとに景色が変わるくらいの大きさ
@@ -156,6 +156,7 @@ function genCave(f, x, y) {
     // 洞くつ: すじ状のノイズ+大きな空洞
     const c1 = Math.abs(vnoise(X, Y, 26, 22) - .5), c2 = Math.abs(vnoise(X, Y, 38, 23) - .5), hole = fbm(X, Y, 22, 24);
     const cave = (c1 < .035 && c2 < .16) || hole > .69;
+    { const mh = mhouseTile(f, x, y); if (mh !== null) return mh; }
     { const special = caveSpecial(f, x, y); if (special !== null) return special; }
     const ruin = ruinAt(f, x, y);
     if (ruin !== null) return ruin;

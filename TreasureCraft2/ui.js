@@ -110,8 +110,10 @@ function showBanner(a, b) {
     clearTimeout(showBanner.t); showBanner.t = setTimeout(() => el.style.opacity = 0, 2400);
 }
 function fadeFx(text) {
-    const el = $('fade'); el.textContent = text || ''; el.style.opacity = 1;
-    setTimeout(() => { snapView(); el.style.opacity = 0; }, 420);
+    // 先の階が 一瞬見えないように、暗くするのは すぐ(明けるときだけ ゆっくり)
+    const el = $('fade'); el.textContent = text || '';
+    el.style.transition = 'none'; el.style.opacity = 1; void el.offsetWidth; el.style.transition = '';
+    clearTimeout(fadeFx.t); fadeFx.t = setTimeout(() => { snapView(); el.style.opacity = 0; }, 420);
 }
 
 // ---------- HUD ----------
@@ -172,6 +174,7 @@ function refreshHud() {
     const mx = maxHp();
     $('hp-fill').style.width = Math.max(0, 100 * S.hp / mx) + '%'; $('hp-num').textContent = Math.max(0, S.hp) + '/' + mx;
     $('food-fill').style.width = S.hunger + '%'; $('food-num').textContent = S.hunger + '/100';
+    { const low = S.hp > 0 && S.hp <= mx * .3 ? 'hp' : S.hunger <= 30 ? 'food' : ''; const el = $('lowfx'); if (el.className !== low) el.className = low; }
     const air = S.air === undefined ? AIR_MAX : S.air;
     $('air-row').classList.toggle('hidden', air >= AIR_MAX);
     $('air-fill').style.width = (100 * air / AIR_MAX) + '%'; $('air-num').textContent = air + '/' + AIR_MAX;
@@ -468,7 +471,7 @@ const toolImg = t => '<img class="tic" src="' + toolIconUrl(t) + '" alt="">';
 function iconHtml(id) { const u = iconUrl(id); return u ? '<img src="' + u + '" alt="">' : (ITEM[id].e || '❔'); }
 const MAKE_ORDER = {
     '': ['bench'],
-    bench: ['torch', 'furnace', 'bed', 'wall_w', 'door', 'floor', 'fence', 'chest', 'ladder', 'wall_s', 'arrow', 'carpet', 'clamp', 'rod', 'bread', 'arrow_fe', 'glass_w', 'bottle', 'wall_nw', 'floor_nw', 'switch', 'plate', 'bulb', 'conv', 'fconv', 'disp', 'rep', 'notg', 'wall_cu', 'door_cu', 'fence_cu', 'floor_cu', 'wall_fe', 'door_fe', 'fence_fe', 'floor_fe', 'wall_au', 'door_au', 'fence_au', 'floor_au', 'floor_s', 'fence_s', 'door_s', 'fence_nw', 'door_nw', 'wall_sr', 'door_sr', 'fence_sr', 'floor_sr', 'wall_dm', 'door_dm', 'fence_dm', 'floor_dm', 'feather_home', 'crown', 'gate', 'coinpile', 'fossil', 'mclock', 'sball', 'phoenix', 'dpot'],
+    bench: ['torch', 'furnace', 'bed', 'wall_w', 'door', 'floor', 'fence', 'chest', 'ladder', 'rail', 'wall_s', 'arrow', 'carpet', 'clamp', 'rod', 'bread', 'arrow_fe', 'glass_w', 'bottle', 'wall_nw', 'floor_nw', 'switch', 'plate', 'bulb', 'conv', 'fconv', 'disp', 'rep', 'notg', 'wall_cu', 'door_cu', 'fence_cu', 'floor_cu', 'wall_fe', 'door_fe', 'fence_fe', 'floor_fe', 'wall_au', 'door_au', 'fence_au', 'floor_au', 'floor_s', 'fence_s', 'door_s', 'fence_nw', 'door_nw', 'wall_sr', 'door_sr', 'fence_sr', 'floor_sr', 'wall_dm', 'door_dm', 'fence_dm', 'floor_dm', 'feather_home', 'crown', 'gate', 'coinpile', 'fossil', 'mclock', 'sball', 'phoenix', 'dpot'],
     furnace: ['charcoal', 'glass', 'steak', 'ingot_cu', 'roast', 'ingot_fe', 'gfish', 'fegg', 'stew', 'pie', 'potion', 'ingot_au', 'ingot_n', 'feast'],
 };
 function drawMake() {

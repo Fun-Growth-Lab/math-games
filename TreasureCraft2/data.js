@@ -34,7 +34,7 @@ defT('PIT', { n: '穴', solid: 1 });
 defT('LADDER_D', { n: 'はしご(下へ)' , light: 2 });
 defT('LADDER_U', { n: 'はしご(上へ)', light: 2 });
 // 地下
-defT('WDIRT', { n: '土のかべ', solid: 1, wall: 1, hp: 3, tool: 'pick', tier: 0 });
+defT('WDIRT', { n: '土のかべ', solid: 1, wall: 1, hp: 3, tool: 'pick', tier: 0, drop: [['dirt', 1, 1]] });
 defT('WSTONE', { n: '石のかべ', solid: 1, wall: 1, hp: 8, tool: 'pick', tier: 1, drop: [['stone', 1, 2]] });
 defT('WHARD', { n: '深部のかたい岩', solid: 1, wall: 1, hp: 16, tool: 'pick', tier: 3, drop: [['stone', 2, 2]] });
 defT('ORE_COAL', { n: '石炭', solid: 1, wall: 1, hp: 7, tool: 'pick', tier: 1, drop: [['coal', 1, 2]] });
@@ -90,7 +90,7 @@ defT('HUTW', { n: '家のかべ', solid: 1 });
 defT('FENCE', { n: '柵', solid: 1, low: 1, hp: 3, tool: 'axe', back: 'fence' });   // 向こうが見える・矢が通る
 defT('CRYSTAL', { n: '水晶', solid: 1, wall: 1, hp: 8, tool: 'pick', tier: 2, light: 3, drop: [['crystal', 1, 2]] });
 defT('SPAWNER', { n: 'まものの巣', solid: 1, hp: 22, tool: 'pick', tier: 2, light: 2, drop: [['ancient', 1, 1], ['bone', 2, 4]] });
-defT('RAIL', { n: '坑道の線路', ground: 1 });
+defT('RAIL', { n: '線路', ground: 1, back: 'rail' });
 
 defT('SAPLING', { n: '若木', solid: 1, hp: 1, back: 'berry' });
 // ガラスと回路
@@ -186,7 +186,7 @@ const ITEM = {
     bench: { n: '作業台', tile: 'BENCH', place: 'BENCH' }, furnace: { n: 'かまど', tile: 'FURNACE', place: 'FURNACE' }, anvil: { n: '金床', tile: 'ANVIL', place: 'ANVIL' },
     bed: { n: '寝床', tile: 'BED', place: 'BED' }, chest: { n: '箱', tile: 'CHEST', place: 'CHEST' }, torch: { n: '松明', tile: 'TORCH', place: 'TORCH' },
     wall_w: { n: '木のかべ', tile: 'WALL_W', place: 'WALL_W', desc: '敵の視線をさえぎる' }, wall_s: { n: '石のかべ', tile: 'WALL_S', place: 'WALL_S', desc: '爆発に1回たえる' }, door: { n: '扉', tile: 'DOOR', place: 'DOOR' },
-    floor: { n: '木の床', tile: 'WFLOOR', place: 'WFLOOR' }, arrow_fe: { n: '鉄の矢', c: '#d9dde2', desc: '弓の攻撃+5' }, ladder: { n: 'はしご', tile: 'LADDER_D', use: 'ladder' }, gate: { n: '門', tile: 'GATE', use: 'gate' }
+    floor: { n: '木の床', tile: 'WFLOOR', place: 'WFLOOR' }, arrow_fe: { n: '鉄の矢', c: '#d9dde2', desc: '弓の攻撃+5' }, rail: { n: '線路', tile: 'RAIL', place: 'RAIL', desc: '床にしく' }, ladder: { n: 'はしご', tile: 'LADDER_D', use: 'ladder' }, gate: { n: '門', tile: 'GATE', use: 'gate' }
 };
 
 // ---------- 部品クラフトの素材 ----------
@@ -291,6 +291,7 @@ const RECIPES = [
     { out: 'floor', n: 2, need: { wood: 1 }, st: 'bench' },
     { out: 'door', need: { wood: 3 }, st: 'bench' },
     { out: 'ladder', n: 2, need: { wood: 3 }, st: 'bench' },
+    { out: 'rail', n: 8, need: { ingot_fe: 1, wood: 1 }, st: 'bench' },
     { out: 'bed', need: { wood: 4, leaf: 5 }, st: 'bench' },
     { out: 'chest', need: { wood: 6 }, st: 'bench' },
     { out: 'furnace', need: { stone: 8 }, st: 'bench' },

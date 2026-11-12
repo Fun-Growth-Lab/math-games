@@ -439,6 +439,7 @@ function actMob(m) {
             return;
         }
     }
+    if (m.foe && mobFoe(m, d)) return;
     if (dist === 1) {
         m.ax = Math.sign(dx) * .35; m.ay = Math.sign(dy) * .35;
         m.face = dx > 0 ? 1 : dx < 0 ? 3 : dy > 0 ? 2 : 0;
@@ -451,6 +452,15 @@ function actMob(m) {
     }
     if (d.shoot && (dx === 0 || dy === 0) && dist <= d.shoot && lineClear(m.x, m.y, S.x, S.y)) {
         m.face = dx > 0 ? 1 : dx < 0 ? 3 : dy > 0 ? 2 : 0;
+        let hit = null;
+        for (let i = 1; i < dist && !hit; i++) { const o = mobAt(m.x + Math.sign(dx) * i, m.y + Math.sign(dy) * i); if (o && o !== m) hit = o; }
+        if (hit) {
+            H.shot(m.x, m.y, hit.x, hit.y, m.t === 'eye' ? '#d05aff' : '#f0e8d0', m.t === 'skeleton');
+            H.sfx('attack');
+            damageMob(hit, Math.max(1, mobAtk(m, d) - (MOBS[hit.t].def || 0)), true);
+            H.stopHold();
+            return;
+        }
         H.shot(m.x, m.y, S.x, S.y, m.t === 'eye' ? '#d05aff' : '#f0e8d0', m.t === 'skeleton');
         H.sfx('attack');
         hurt(mobAtk(m, d), d.n + (m.t === 'skeleton' ? 'の矢' : ''), d);
@@ -529,12 +539,39 @@ function explode(m) {
     const dist = Math.abs(S.x - m.x) + Math.abs(S.y - m.y);
     if (dist <= 3) { ach('boom'); hurt(dist <= 1 ? 40 : dist === 2 ? 28 : 14, '爆発', null); }
 }
+// オオカミにかまれた敵: そのオオカミをねらう。いなくなったら 主人公にもどる。動いたら true
+function mobFoe(m, d) {
+    const f = m.foe;
+    if (!mobs.includes(f) || Math.abs(f.x - m.x) + Math.abs(f.y - m.y) > 12) { m.foe = null; return false; }
+    const fx = f.x - m.x, fy = f.y - m.y, fd = Math.abs(fx) + Math.abs(fy);
+    m.face = Math.abs(fx) >= Math.abs(fy) ? (fx > 0 ? 1 : 3) : (fy > 0 ? 2 : 0);
+    if (fd === 1) { m.ax = Math.sign(fx) * .35; m.ay = Math.sign(fy) * .35; petHurt(f, mobAtk(m, d)); return true; }
+    if (d.shoot && (fx === 0 || fy === 0) && fd <= d.shoot && lineClear(m.x, m.y, f.x, f.y)) {
+        H.shot(m.x, m.y, f.x, f.y, m.t === 'eye' ? '#d05aff' : '#f0e8d0', m.t === 'skeleton'); H.sfx('attack');
+        petHurt(f, mobAtk(m, d)); return true;
+    }
+    const sx = Math.sign(fx), sy = Math.sign(fy);
+    const steps = Math.abs(fx) >= Math.abs(fy) ? [[sx, 0], [0, sy || 1], [0, -(sy || 1)]] : [[0, sy], [sx || 1, 0], [-(sx || 1), 0]];
+    for (const o of steps) if ((o[0] || o[1]) && moveMob(m, o[0], o[1])) return true;
+    return true;
+}
+// なかまのオオカミが ダメージを受ける。0になると たおれる
+function petHurt(p, dmg) {
+    p.hp -= dmg; p.flash = 1;
+    H.float(p.x, p.y, String(dmg), '#ff6a5a');
+    if (p.hp > 0) return;
+    const i = mobs.indexOf(p);
+    if (i >= 0) mobs.splice(i, 1);
+    for (const q of mobs) if (q.foe === p) q.foe = null;
+    H.chips(p.x, p.y, '#d8d8e0'); H.sfx('hurt');
+    H.log('オオカミが たおれた', 'bad');
+}
 // なかまのオオカミ: 近くの敵をおそい、主人公についてくる
 function petAct(m) {
     const foe = mobs.find(q => !MOBS[q.t].animal && !q.big && Math.abs(q.x - m.x) + Math.abs(q.y - m.y) <= 6);
     if (foe) {
         const dx = foe.x - m.x, dy = foe.y - m.y;
-        if (Math.abs(dx) + Math.abs(dy) === 1) { m.ax = Math.sign(dx) * .35; m.ay = Math.sign(dy) * .35; lastAttack = 'pet'; damageMob(foe, 9, true); lastAttack = null; return; }
+        if (Math.abs(dx) + Math.abs(dy) === 1) { m.ax = Math.sign(dx) * .35; m.ay = Math.sign(dy) * .35; lastAttack = 'pet'; if (!MOBS[foe.t].bomb) foe.foe = m; damageMob(foe, 9, true); lastAttack = null; return; }
         // 主人公などにふさがれていたら 回りこむ
         const steps = Math.abs(dx) > Math.abs(dy) ? [[Math.sign(dx), 0], [0, Math.sign(dy) || 1], [0, -(Math.sign(dy) || 1)]] : [[0, Math.sign(dy)], [Math.sign(dx) || 1, 0], [-(Math.sign(dx) || 1), 0]];
         for (const o of steps) if (moveMob(m, o[0], o[1])) return;
@@ -585,6 +622,7 @@ function damageMob(m, dmg, silent) {
         const arm = curArmor();
         if ((attackTool && attackTool.a === 'demon') || (arm && arm.a === 'demon')) S.bossDemon = 1;
     }
+    if (lastAttack && lastAttack !== 'pet') m.foe = null;
     m.hp -= dmg; m.flash = 1;
     H.float(m.x, m.y, String(dmg), '#ffe14a', m.big ? 3 : 1);
     if (d.animal) m.scared = 6;
@@ -913,6 +951,11 @@ function worldTick() {
             if (TILE[getT(S.f, x, y)].ground && !mobAt(x, y) && !(x === S.x && y === S.y)) { spawnMob(s.spawn, x, y); H.chips(x, y, '#c05aff'); }
         }
     }
+    // モンスターハウス: かべに穴があいたら 中に まものが うじゃうじゃ
+    if (isCave(S.f) && !circuitMode()) {
+        const c = mhouseAt(S.f, S.x, S.y, 7);
+        if (c && !S.found[c.key] && mhouseOpen(c)) wakeMhouse(c);
+    }
     // 地底の商人
     if (isCave(S.f) && S.T % 3 === 0) {
         const s = cavePlaceAt(S.f, S.x, S.y);
@@ -951,6 +994,27 @@ function worldTick() {
     // 図鑑: 見かけた魔物
     for (const m of mobs) if (Math.abs(m.x - S.x) + Math.abs(m.y - S.y) <= 9 && !S.book.m[m.t]) { S.book.m[m.t] = 1; }
 }
+// 部屋のかべ(内がわの1枚)に 通れる所ができたか
+function mhouseOpen(c) {
+    for (let d = -3; d <= 3; d++) for (const q of [[d, -4], [d, 4], [-4, d], [4, d]]) if (!TILE[getT(S.f, c.x + q[0], c.y + q[1])].solid) return true;
+    return false;
+}
+const MH_MOBS = [null, ['zombie', 'zombie', 'skeleton', 'spider', 'bat', 'slime'], ['zombie', 'skeleton', 'spider', 'bat', 'mole'], ['zombie', 'skeleton', 'spider', 'mole', 'mole', 'orec'], ['skeleton', 'spider', 'mole', 'orec', 'orec'], ['skeleton', 'mole', 'orec', 'orec']];
+function wakeMhouse(c) {
+    S.found[c.key] = { f: S.f, x: c.x, y: c.y, type: 'mhouse' };
+    S.book.p.mhouse = 1;
+    const dep = caveDepth(S.f), n = Math.min(16, 6 + dep * 2), cells = [];
+    for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) {
+        const x = c.x + dx, y = c.y + dy;
+        if (mobWalk(getT(S.f, x, y)) && TILE[getT(S.f, x, y)].ground && !mobAt(x, y) && Math.abs(x - S.x) + Math.abs(y - S.y) >= 2) cells.push([x, y]);
+    }
+    for (let i = 0; i < n && cells.length; i++) {
+        const [x, y] = cells.splice(Math.floor(rnd() * cells.length), 1)[0];
+        spawnMob(pick(MH_MOBS[dep]), x, y);
+    }
+    H.banner('モンスターハウスだ!', '');
+    H.sfx('warn');
+}
 function keptSync() { if (S && S.kept) for (const m of mobs) if (m.ref) { m.ref.x = m.x; m.ref.y = m.y; } }
 function checkArea() {
     if (S.f === 0 && distC(S.x, S.y) >= 400) ach('far');
@@ -978,7 +1042,7 @@ function changeFloor(f, x, y) {
     if (f === 2) ach('otherworld');
     if (f === 2) ensureBoss();
     H.floorFx(FLOOR_NAME[f]);
-    if (first && f >= 3) H.banner(FLOOR_NAME[f], ['', '', '鉄が よくとれる', '金と 赤い石が ねむっている', '星晶が ねむる かたい岩の階', 'いちばん深い階。星晶が多い'][caveDepth(f)] + '・まものは Lv' + (caveDepth(f) + 1));
+    if (first && f >= 3) H.banner(FLOOR_NAME[f], '');
     H.stopHold();
     markSeen();
     refreshPower();
@@ -1101,9 +1165,19 @@ function bumpMob(m) {
     return false;
 }
 // 動物にエサをやる・オオカミを手なずける。やったら true
+const PET_MAX = 3;   // 連れていける オオカミの数
 function tryFeed(m, s) {
     const d = MOBS[m.t];
+    if (m.t === 'pet' && (s.id === 'meat' || s.id === 'steak')) {
+        if (m.hp >= m.mhp) return false;
+        removeItem(s.id, 1);
+        const v = Math.min(m.mhp - m.hp, s.id === 'steak' ? 40 : 20);
+        m.hp += v; H.float(m.x, m.y, '+' + v, '#5aff8a', 1); H.sfx('item');
+        endTurn(1);
+        return true;
+    }
     if (m.t === 'wolf' && (s.id === 'meat' || s.id === 'steak')) {
+        if (mobs.filter(q => MOBS[q.t].pet).length >= PET_MAX) { H.stopHold(); H.log('もう なかまは いっぱいだ', ''); return true; }
         removeItem(s.id, 1);
         if (rnd() < .5) { const i = mobs.indexOf(m); mobs.splice(i, 1); const p = spawnMob('pet', m.x, m.y); H.float(p.x, p.y, '♥', '#ff7aa0', 1); H.sfx('unlock'); H.banner('なかまになった!', 'オオカミがついてくる'); ach('friend'); S.book.m.pet = 1; }
         else { H.float(m.x, m.y, '…', '#fff'); H.log('肉を食べたが まだなつかない', ''); }
@@ -1231,7 +1305,7 @@ function breakTile(x, y, t, tool) {
     if (isCave(S.f)) foundInRock(x, y, t);
 }
 // 「はずす」で外す物(回路の部品と小物)。つるはしなどで こわすことはできない
-const TAKE_BACK = ['switch', 'plate', 'bulb', 'rep', 'notg', 'conv', 'fconv', 'disp', 'torch', 'clamp', 'crown', 'gmush', 'carpet'];
+const TAKE_BACK = ['rail', 'switch', 'plate', 'bulb', 'rep', 'notg', 'conv', 'fconv', 'disp', 'torch', 'clamp', 'crown', 'gmush', 'carpet'];
 const takeable = t => isWire(t) || t === T.LADDER_D || !!TILE[t].deco || TAKE_BACK.includes(TILE[t].back);
 function takeTile(x, y, t) {
     if (t === T.LADDER_D) { takeLadder(x, y, t); return; }
@@ -1472,7 +1546,7 @@ function applyTurn(x, y, c) {
     H.sfx('select'); endTurn(1);
 }
 // 持っている物と 向いている相手から、今できることを並べる。先頭が「つかう」(Z)、2番目があれば「もう1つ」(C)
-const canFeed = (m, id) => (m.t === 'wolf' && (id === 'meat' || id === 'steak')) || (FEED[m.t] && FEED[m.t].includes(id));
+const canFeed = (m, id) => ((m.t === 'wolf' || (m.t === 'pet' && m.hp < m.mhp)) && (id === 'meat' || id === 'steak')) || (FEED[m.t] && FEED[m.t].includes(id));
 // ボタンの役わり: [Z, C]。Z = 前の部品の「向き」か 持っている物の使い方 / C = 前の部品を「はずす」か 持っている物の 2つめの使い方
 // Z に何もなければ useHint に 押したときに理由を出す行動を入れる(ボタンは うすく出る)
 let useHint = null;
