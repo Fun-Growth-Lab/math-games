@@ -5,6 +5,7 @@ const SFX = FGLSfx.create({ key: 'treasurecraft2' });
 const BGM = FGLBgm.create({ key: 'treasurecraft2' });
 const MOVE_MS = 125, SWIM_MS = 240, FIRST_REPEAT_MS = 190;
 const moveWait = () => TILE[getT(S.f, S.x, S.y)].swim ? SWIM_MS : MOVE_MS;
+let ctrlHeld = false;   // Ctrl を押しているあいだは 向きを変えずに歩く
 let mode = 'title', held = null, holdLock = false, nextAct = 0, turnOnly = false, autoPath = [], logs = [], stageScale = 1, stageRot = false;
 
 // ---------- 舞台の大きさ ----------
@@ -44,7 +45,7 @@ Object.assign(H, {
         if (!ch) return;
         const wire = isWire(getT(S.f, x, y)), cls = wire ? 'wire' : ch.list.length === 4 ? 'cross' : 'two';
         dialog('<h2>' + (wire ? '形をえらぶ' : '向きをえらぶ') + '</h2><div class="turngrid ' + cls + '">' + ch.list.map((c, i) => '<button class="turnbtn' + (i === ch.cur ? ' go' : '') + '" id="tn' + i + '"></button>').join('') + '</div><div class="row"><button class="wbtn" id="tn-back">もどる</button></div>', b => {
-            ch.list.forEach((c, i) => { const el = b.querySelector('#tn' + i); el.appendChild(turnThumb(x, y, c)); el.onclick = () => { closeDialog(); if (i !== ch.cur) applyTurn(x, y, c); }; });
+            ch.list.forEach((c, i) => { const el = b.querySelector('#tn' + i); el.appendChild(turnThumb(x, y, c)); if (cls === 'cross') { const v = rv(DIR4[i][0], DIR4[i][1]); el.style.gridArea = 'nesw'[dirIndex(v)]; } el.onclick = () => { closeDialog(); if (i !== ch.cur) applyTurn(x, y, c); }; });
             b.querySelector('#tn-back').onclick = closeDialog;
             setKf(b.querySelector('#tn' + ch.cur));
         });
@@ -204,9 +205,11 @@ function selectSlot(i) {
 const overlayOpen = () => ['panel', 'chest-modal', 'map-modal', 'dialog'].some(id => !$(id).classList.contains('hidden'));
 const canAct = () => mode === 'play' && !overlayOpen() && S.hp > 0;
 let useHeld = false;   // 「つかう」(Z・ボタン)を押している間
+// d は 画面の向き(矢印)。画面を回していても 見たとおりの方向へ進む
 function doDir(d) {
-    if (turnOnly) { S.face = d; turnOnly = false; $('btn-turn').classList.remove('on'); VIEW.needDraw = true; refreshHud(); return; }
-    step(d[0], d[1]);
+    const w = rvInv(d[0], d[1]);
+    if (turnOnly) { S.face = w; turnOnly = false; $('btn-turn').classList.remove('on'); VIEW.needDraw = true; refreshHud(); return; }
+    step(w[0], w[1], ctrlHeld);
     if (useHeld && S.hp > 0) { sowWalking(); lastHot = ''; refreshHud(); }
 }
 addEventListener('keydown', e => { if (e.key === 'z' || e.key === 'Z' || e.key === ' ' || e.key === 'Enter') useHeld = true; });
@@ -220,7 +223,9 @@ function pressDir(d) {
 function releaseDir(d) { if (!d || (held && held[0] === d[0] && held[1] === d[1])) { held = null; holdLock = false; } }
 addEventListener('keydown', () => { document.body.classList.add('haskeys'); fitTouch(); }, { once: true });   // キーボードがあるとわかったらキー表示を出す
 const KEYS = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0], w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0], W: [0, -1], S: [0, 1], A: [-1, 0], D: [1, 0] };
+addEventListener('keyup', e => { ctrlHeld = e.ctrlKey; });
 addEventListener('keydown', e => {
+    ctrlHeld = e.ctrlKey;
     if (e.target && e.target.tagName === 'INPUT') {
         if (e.key === 'Enter') { const g = $('dialog-box').querySelector('.go'); if (g) g.click(); }
         if (e.key === 'Escape') e.target.blur();
@@ -234,7 +239,7 @@ addEventListener('keydown', e => {
     if (k) {
         e.preventDefault();
         if (e.repeat) return;
-        if (e.shiftKey && canAct()) { S.face = k; VIEW.needDraw = true; refreshHud(); return; }
+        if (e.shiftKey && canAct()) { S.face = rvInv(k[0], k[1]); VIEW.needDraw = true; refreshHud(); return; }
         pressDir(k);
         return;
     }
@@ -247,6 +252,7 @@ addEventListener('keydown', e => {
     else if (e.key === 'q' || e.key === 'Q') { const now = performance.now(); if (e.repeat && now - (waitTurn.last || 0) < MOVE_MS) return; waitTurn.last = now; waitTurn(); }   // 押しっぱなしで 待ちつづける
     else if (e.key === 'e' || e.key === 'E' || e.key === 'i') openPanel('inv');
     else if (e.key === 'm' || e.key === 'M') openMap();
+    else if (e.key === 'r' || e.key === 'R') rotateView(1);
     else if (e.key >= '1' && e.key <= '8') selectSlot(+e.key - 1);
 });
 // パネル・ダイアログ・タイトルを 矢印とEnterで操作する
@@ -316,7 +322,7 @@ function navKey(e) {
     return mode === 'title' ? false : true;
 }
 addEventListener('keyup', e => { const k = KEYS[e.key]; if (k) releaseDir(k); });
-addEventListener('blur', () => { held = null; });
+addEventListener('blur', () => { held = null; ctrlHeld = false; });
 function waitTurn() { autoPath = []; endTurn(1); }
 // 十字ボタン(指をすべらせても切りかわる)
 const dpad = $('dpad');
@@ -351,6 +357,7 @@ $('btn-map').addEventListener('click', () => { if (canAct()) openMap(); });
 // グリッド線: ボタンかGキーを押している間だけ出す
 function setGrid(on) { VIEW.grid = on; $('btn-grid').classList.toggle('on', on); VIEW.needDraw = true; }
 $('btn-grid').addEventListener('pointerdown', e => { e.preventDefault(); setGrid(true); });
+$('btn-rot').addEventListener('click', () => rotateView(1));
 ['pointerup', 'pointerleave', 'pointercancel'].forEach(n => $('btn-grid').addEventListener(n, () => setGrid(false)));
 addEventListener('keydown', e => { if ((e.key === 'g' || e.key === 'G') && !e.repeat && mode === 'play' && !(e.target && e.target.tagName === 'INPUT')) setGrid(true); });
 addEventListener('keyup', e => { if (e.key === 'g' || e.key === 'G') setGrid(false); });
@@ -707,7 +714,7 @@ function openTrade(m) {   // 村人に話しかけたとき(手伝い)
     draw();
 }
 function openKeys() {
-    const rows = [['矢印 / WASD', '移動(長押しで歩き続ける)'], ['Shift + 矢印', '向きだけ変える'], ['Z / スペース / Enter', 'つかう・置く・食べる'], ['C', 'もう1つの使い方(ボタンが出ているとき)'], ['F', '弓をうつ(装備している弓)'], ['X', 'ほる'], ['Q', '1ターンまつ'], ['1〜8', '下の枠をえらぶ(道具なら装備)'], ['E', '持ち物・つくる'], ['M', '地図'], ['Esc', 'メニュー・とじる'], ['G(押している間)', 'グリッド線を出す'], ['H', 'この一覧'],
+    const rows = [['矢印 / WASD', '移動(長押しで歩き続ける)'], ['Shift + 矢印', '向きだけ変える'], ['Ctrl + 矢印', '向きを変えずに歩く'], ['R', '画面を回す'], ['Z / スペース / Enter', 'つかう・置く・食べる'], ['C', 'もう1つの使い方(ボタンが出ているとき)'], ['F', '弓をうつ(装備している弓)'], ['X', 'ほる'], ['Q', '1ターンまつ'], ['1〜8', '下の枠をえらぶ(道具なら装備)'], ['E', '持ち物・つくる'], ['M', '地図'], ['Esc', 'メニュー・とじる'], ['G(押している間)', 'グリッド線を出す'], ['H', 'この一覧'],
         ['画面を開いているとき', '矢印でえらぶ / Enter で決定 / Tab でタブ切りかえ / Esc でとじる']];
     dialog('<h2>キー操作</h2><div class="keys">' + rows.map(r => '<b>' + r[0] + '</b><span>' + r[1] + '</span>').join('') + '</div><div class="row"><button class="wbtn go" id="k-back">とじる</button></div>', b => { b.querySelector('#k-back').onclick = closeDialog; });
 }

@@ -6,6 +6,11 @@ const TW = 52, ANG = 15 * Math.PI / 180, CS = Math.cos(ANG), SN = Math.sin(ANG),
 const VW = 1280, VH = 720, CX = VW / 2, CY = VH / 2 + 30;
 const pj = (x, y, z) => [(x * CS - y * SN) * TW, (x * SN + y * CS) * TW * KY - (z || 0) * TW * KZ];
 
+// 画面の回転: VIEW.rot(0〜3)。rv = 世界の向き → 画面の向き / rvInv = その逆
+const rv = (dx, dy) => { switch (VIEW.rot & 3) { case 1: return [-dy, dx]; case 2: return [-dx, -dy]; case 3: return [dy, -dx]; default: return [dx, dy]; } };
+const rvInv = (vx, vy) => { switch (VIEW.rot & 3) { case 1: return [vy, -vx]; case 2: return [-vx, -vy]; case 3: return [-vy, vx]; default: return [vx, vy]; } };
+// 箱を まん中(cs)のまわりに 画面の向きへ回す
+const rotQ = (q, cs) => { const a = rv(q[0] - cs, q[1] - cs), b = rv(q[3] - cs, q[4] - cs); return [Math.min(a[0], b[0]) + cs, Math.min(a[1], b[1]) + cs, q[2], Math.max(a[0], b[0]) + cs, Math.max(a[1], b[1]) + cs, q[5], q[6]]; };
 function shade(hex, f) {
     const n = parseInt(hex.slice(1), 16);
     const c = v => Math.max(0, Math.min(255, Math.round(v * f)));
@@ -111,6 +116,7 @@ function drawBox(c, ox, oy, b, sc) {
 }
 function boxSprite(list, opt) {
     opt = opt || {};
+    if (VIEW.rot) { const cs = (opt.size || 1) / 2; list = list.map(q => rotQ(q, cs)); }   // 画面を回しているときは 箱も回す
     const sc = opt.sc || 1, w = opt.w || O_W, h = opt.h || O_H, ox = opt.ox || O_X, oy = opt.oy || O_Y;
     const cv = mkCanvas(w, h), c = cv.getContext('2d');
     // opt.base: はじめの base こは 土台。先に描き、上にのる部品が かくれないようにする
@@ -363,13 +369,13 @@ const PIT_N = 10;   // 1マスを 10x10 に分ける(ふちの はば = 1升)
 function holeSig(f, x, y) { let s = ''; for (let dy = -3; dy <= 1; dy++) for (let dx = -2; dx <= 2; dx++) { const t = getT(f, x + dx, y + dy); s += isHole(t) ? 1 : t === T.WATER ? 2 : 0; } return s; }
 function pitSpriteAt(f, x, y, ladder) {
     const g = pitGround(f, x, y), m = g === T.SAND ? 'sand' : g === T.CAVE || g === T.ASH ? 'cave' : 'dirt';
-    const key = m + (ladder ? 'L' : '') + holeSig(f, x, y);
+    const key = m + (ladder ? 'L' : '') + VIEW.rot + holeSig(f, x, y);
     if (pitCache[key]) return pitCache[key];
-    const N = PIT_N, hole = (dx, dy) => isHole(getT(f, x + dx, y + dy));
+    const N = PIT_N, wt = (dx, dy) => { const w = rvInv(dx, dy); return getT(f, x + w[0], y + w[1]); }, hole = (dx, dy) => isHole(wt(dx, dy));   // dx,dy は 画面の向き
     // 升は マスが穴なら 穴(穴のまわりに 地面のふちは作らない)
     const cell = (gx, gy) => hole(Math.floor(gx / N), Math.floor(gy / N));
     // となりが水なら そのかべは 水が流れ落ちる かべにする
-    const wet = (gx, gy) => getT(f, x + Math.floor(gx / N), y + Math.floor(gy / N)) === T.WATER;
+    const wet = (gx, gy) => wt(Math.floor(gx / N), Math.floor(gy / N)) === T.WATER;
     const cv = mkCanvas(O_W, O_H), c = cv.getContext('2d'), ox = O_X, oy = O_Y;
     const P = (px, py, z) => { const p = pj(px, py, z); return [ox + p[0], oy + p[1]]; };
     const poly = (pts, fill) => { c.beginPath(); pts.forEach((p, k) => k ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.closePath(); c.fillStyle = fill; c.fill(); };
@@ -378,7 +384,7 @@ function pitSpriteAt(f, x, y, ladder) {
     c.save(); c.beginPath();
     for (let b = 0; b < N; b++) for (let a = 0; a < N; a++) if (cell(a, b)) {
         // 穴の側と、奥・左の水の側(水のかべが見える側)は はみ出して 地面が見えないように
-        const open = (dx, dy) => hole(dx, dy) || ((dx < 0 || dy < 0) && getT(f, x + dx, y + dy) === T.WATER);
+        const open = (dx, dy) => hole(dx, dy) || ((dx < 0 || dy < 0) && wt(dx, dy) === T.WATER);
         const l = a === 0 && open(-1, 0) ? -e : 0, r = a === N - 1 && open(1, 0) ? e : 0, t = b === 0 && open(0, -1) ? -e : 0, bt = b === N - 1 && open(0, 1) ? e : 0;
         const q = [P((a + l) / N, (b + t) / N, 0), P((a + 1 + r) / N, (b + t) / N, 0), P((a + 1 + r) / N, (b + 1 + bt) / N, 0), P((a + l) / N, (b + 1 + bt) / N, 0)];
         c.moveTo(q[0][0], q[0][1]); q.slice(1).forEach(p => c.lineTo(p[0], p[1])); c.closePath();
@@ -409,7 +415,7 @@ function pitSpriteAt(f, x, y, ladder) {
     c.strokeStyle = 'rgba(0,0,0,.45)';
     for (const h of H2) if (V.some(v => v.x === h.x0 && v.y0 === h.y)) { const p = P(h.x0 / N, h.y / N, 0), q = P(h.x0 / N, h.y / N, -DEEP); c.beginPath(); c.moveTo(p[0], p[1]); c.lineTo(q[0], q[1]); c.stroke(); }
     c.restore();
-    if (ladder) ladder.slice().sort((p, q) => ((p[0] + p[3]) * SN + (p[1] + p[4]) * CS + (p[2] + p[5]) * .35) - ((q[0] + q[3]) * SN + (q[1] + q[4]) * CS + (q[2] + q[5]) * .35)).forEach(q => drawBox(c, ox, oy, q, 1));
+    if (ladder) ladder.map(q => VIEW.rot ? rotQ(q, .5) : q).sort((p, q) => ((p[0] + p[3]) * SN + (p[1] + p[4]) * CS + (p[2] + p[5]) * .35) - ((q[0] + q[3]) * SN + (q[1] + q[4]) * CS + (q[2] + q[5]) * .35)).forEach(q => drawBox(c, ox, oy, q, 1));
     if (Object.keys(pitCache).length > 400) for (const k in pitCache) delete pitCache[k];
     return (pitCache[key] = { cv, ox, oy });
 }
@@ -481,7 +487,18 @@ const BOSS_OPT = { size: 3, w: 400, h: 460, ox: 150, oy: 340 };
 // ---------- 演出 ----------
 const FX = { parts: [], floats: [], slashes: [], shots: [], gains: [], nextGain: 0 };
 const P = { rx: 0, ry: 0, ax: 0, ay: 0, flash: 0 };
-const VIEW = { cx: 0, cy: 0, shake: 0, title: false, drift: 0, needDraw: true, last: 0 };
+const VIEW = { cx: 0, cy: 0, shake: 0, title: false, drift: 0, needDraw: true, last: 0, rot: 0 };
+// 画面を 90度 回す。絵は 向きごとに作りなおす(持ち物のアイコンは 回さない)
+function rotateView(step) {
+    for (const id in ITEM) iconUrl(id);   // アイコンは 回す前の向きで 作っておく
+    VIEW.rot = (VIEW.rot + (step || 1) + 4) & 3;
+    buildSprites();
+    for (const k in wireCache) delete wireCache[k];
+    for (const k in pitCache) delete pitCache[k];
+    for (const k in mobCache) delete mobCache[k];
+    groundLayer.key = '';
+    VIEW.needDraw = true;
+}
 function snapView() { P.rx = S.x; P.ry = S.y; playerVia = null; VIEW.cx = S.x + .5; VIEW.cy = S.y + .5; VIEW.needDraw = true; }
 
 let canvas, ctx, dark, dctx;
@@ -490,10 +507,12 @@ function initRender(cv) {
     dark = mkCanvas(VW / 2, VH / 2); dctx = dark.getContext('2d');
     buildSprites();
 }
-function toScreen(x, y, z) { const p = pj(x - VIEW.cx, y - VIEW.cy, z); return [CX + p[0] + (VIEW.sx || 0), CY + p[1] + (VIEW.sy || 0)]; }
+function toScreen(x, y, z) { const v = rv(x - VIEW.cx, y - VIEW.cy), p = pj(v[0], v[1], z); return [CX + p[0] + (VIEW.sx || 0), CY + p[1] + (VIEW.sy || 0)]; }
+// マス(大きさ size)の絵を置く位置: マスのまん中を回してから 角にもどす
+function anchor(x, y, z, size) { const h = (size || 1) / 2, v = rv(x + h - VIEW.cx, y + h - VIEW.cy), p = pj(v[0] - h, v[1] - h, z); return [CX + p[0] + (VIEW.sx || 0), CY + p[1] + (VIEW.sy || 0)]; }
 function tapToTile(sx, sy) {
-    const a = (sx - CX) / TW, b = (sy - CY) / (TW * KY);
-    return [Math.floor(a * CS + b * SN + VIEW.cx), Math.floor(-a * SN + b * CS + VIEW.cy)];
+    const a = (sx - CX) / TW, b = (sy - CY) / (TW * KY), w = rvInv(a * CS + b * SN, -a * SN + b * CS);
+    return [Math.floor(w[0] + VIEW.cx), Math.floor(w[1] + VIEW.cy)];
 }
 function tilePoly(x, y, inset) {
     const i = inset || 0, a = toScreen(x + i, y + i), b = toScreen(x + 1 - i, y + i), c = toScreen(x + 1 - i, y + 1 - i), d = toScreen(x + i, y + 1 - i);
@@ -571,12 +590,17 @@ function render(now) {
     // 物と魔物(奥から順に)
     const byTile = new Map();
     for (const m of mobs) { const k = m.y * 1000 + m.x; (byTile.get(k) || byTile.set(k, []).get(k)).push(m); }
-    const drawActor = (spr, rx, ry, ax, ay, bob) => { const s = toScreen(rx + ax, ry + ay, bob || 0); ctx.drawImage(spr.cv, Math.round(s[0] - spr.ox), Math.round(s[1] - spr.oy)); };
-    for (let y = B.y0; y <= B.y1; y++) for (let x = B.x0; x <= B.x1; x++) {
+    const drawActor = (spr, rx, ry, ax, ay, bob, size) => { const s = anchor(rx + ax, ry + ay, bob || 0, size); ctx.drawImage(spr.cv, Math.round(s[0] - spr.ox), Math.round(s[1] - spr.oy)); };
+    // 奥から順に描く(画面を回しているときは 画面の向きで ならべかえる)
+    const order = [];
+    for (let y = B.y0; y <= B.y1; y++) for (let x = B.x0; x <= B.x1; x++) order.push(x, y);
+    if (VIEW.rot) { const idx = []; for (let i = 0; i < order.length; i += 2) { const v = rv(order[i], order[i + 1]); idx.push([v[1], v[0], order[i], order[i + 1]]); } idx.sort((p, q) => p[0] - q[0] || p[1] - q[1]); order.length = 0; for (const q of idx) order.push(q[2], q[3]); }
+    for (let oi = 0; oi < order.length; oi += 2) {
+        const x = order[oi], y = order[oi + 1];
         const hid = caveHidden(f, x, y);
         const t = getT(f, x, y), spr = hid ? HIDDEN_SPR : OS[t] ? objSprite(t, x, y) : null, here = hid ? null : byTile.get(y * 1000 + x);
         if (!spr && !here && !(x === S.x && y === S.y)) continue;
-        const s = toScreen(x, y);
+        const s = anchor(x, y);
         if (!visible(s[0], s[1]) && t !== T.GIANT) continue;
         if (spr) {
             let cv = spr, frame = spr;
@@ -597,7 +621,7 @@ function render(now) {
             const d = MOBS[m.t];
             if (m.big) {
                 const a = actorSprite('boss', d.box, m.face, m.flash > .3, BOSS_OPT);
-                drawActor(a, m.rx - 1, m.ry - 1, m.ax, m.ay);
+                drawActor(a, m.rx - 1, m.ry - 1, m.ax, m.ay, 0, 3);
                 drawHpBar(m, 3, 4.8);
             } else {
                 const w = stepInfo(m, m.x, m.y), a = poseSprite(m.t, d.box, m.face, m.flash > .3, w.ph);
@@ -636,7 +660,7 @@ function render(now) {
 const groundLayer = { cv: null, key: '', ix: 0, iy: 0, lights: [] };
 const GL_W = VW + 200, GL_H = VH + 200;
 function drawGround(f) {
-    const L = groundLayer, ix = Math.floor(VIEW.cx), iy = Math.floor(VIEW.cy), key = f + ',' + ix + ',' + iy + ',' + worldVer + ',' + wSeed + (isCave(f) && !VIEW.title ? ',' + caveView().key : '');
+    const L = groundLayer, ix = Math.floor(VIEW.cx), iy = Math.floor(VIEW.cy), key = f + ',' + ix + ',' + iy + ',' + VIEW.rot + ',' + worldVer + ',' + wSeed + (isCave(f) && !VIEW.title ? ',' + caveView().key : '');
     if (!L.cv) L.cv = mkCanvas(GL_W, GL_H);
     if (L.key !== key) {
         L.key = key; L.ix = ix; L.iy = iy; L.lights = [];
@@ -644,7 +668,7 @@ function drawGround(f) {
         c.fillStyle = BG[f]; c.fillRect(0, 0, GL_W, GL_H);
         const R = 26, ox = GL_W / 2, oy = GL_H / 2 + 30;
         for (let y = iy - R; y <= iy + R; y++) for (let x = ix - R; x <= ix + R; x++) {
-            const p = pj(x - ix, y - iy), sx = ox + p[0], sy = oy + p[1];
+            const v = rv(x + .5 - ix, y + .5 - iy), p = pj(v[0] - .5, v[1] - .5), sx = ox + p[0], sy = oy + p[1];
             if (sx < -110 || sx > GL_W + 110 || sy < -60 || sy > GL_H + 120) continue;
             const t = getT(f, x, y), d = TILE[t];
             if (caveHidden(f, x, y)) continue;
@@ -661,8 +685,9 @@ function drawGround(f) {
 const TALL = { [T.TOWERW]: 2.4, [T.SANDB3]: 1.8, [T.SANDB2]: 1.2, [T.MAST]: 2.8, [T.METEOR]: 1.3, [T.GIANT]: 5.6, [T.TREE]: 1.8, [T.PINE]: 1.6, [T.NTREE]: 1.3, [T.CACTUS]: 1, [T.GATE]: 1.46 };
 function hidesPlayer(t, x, y) {
     const h = TALL[t];
-    if (!h || y <= S.y) return false;
-    const p = pj(x - S.x, y - S.y);
+    const v = rv(x - S.x, y - S.y);
+    if (!h || v[1] <= 0) return false;
+    const p = pj(v[0], v[1]);
     return Math.abs(p[0]) < (t === T.GIANT ? 190 : 30) && p[1] < h * TW * KZ;
 }
 function drawHpBar(m, size, z) {

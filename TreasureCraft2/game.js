@@ -1037,10 +1037,11 @@ function youngCrop(x, y, t) {
     const c = S.ex[exKey(S.f, x, y)];
     return !!c && S.T - c.p < CROP_TIME;
 }
-function step(dx, dy) {
+// keep: 向きを変えずに歩く(Ctrl)
+function step(dx, dy, keep) {
     if (!S || S.hp <= 0) return;
     fishing = null;
-    S.face = [dx, dy];
+    if (!keep) S.face = [dx, dy];
     const nx = S.x + dx, ny = S.y + dy, m = mobAt(nx, ny);
     if (nx < 0 || ny < 0 || nx >= WORLD || ny >= WORLD) { H.stopHold(); H.log('ここが世界のはしだ', ''); ach('edge'); return; }
     if (m) { if (!bumpMob(m)) { playerAttack(m); endTurn(1); } return; }
