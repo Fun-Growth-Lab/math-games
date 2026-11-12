@@ -277,10 +277,16 @@ function wireSprite(x, y) {
 const WALL_TEX = { WALL_W: 'plank', WALL_S: 'brick', WALL_CU: 'mcu', WALL_FE: 'mfe', WALL_AU: 'mau', WALL_NW: 'nplank' };
 function wallWireSprite(x, y) {
     const e = S.ex[exKey(S.f, x, y)], base = e && e.base, m = wireMode(S.f, x, y);
-    const l0 = !VIEW.title && wireLevel(x, y, 0) > 0, l1 = !VIEW.title && wireLevel(x, y, 1) > 0, key = 'w' + (base || '') + m + l0 + l1;
+    const l0 = !VIEW.title && wireLevel(x, y, 0) > 0, l1 = !VIEW.title && wireLevel(x, y, 1) > 0;
+    // 腕の先が 地面の導線・回路の部品なら、かべの横を つたって 下までおりる線を描く(上どうしは つながっているので いらない)
+    const drops = [];
+    WIRE_CH[m].forEach((arms, ci) => arms.forEach(a => { const nx = x + DIR4[a][0], ny = y + DIR4[a][1]; if (getT(S.f, nx, ny) !== T.WIRE_W && armLinked(x, y, a)) drops.push([a, ci]); }));
+    const key = 'w' + (base || '') + m + l0 + l1 + drops.map(q => q[0]).join('');
     if (wireCache[key]) return wireCache[key];
-    const tex = TX[WALL_TEX[base] || 'brick'];
-    return (wireCache[key] = boxSprite([[0, 0, 0, 1, 1, .85, { top: tex, side: tex }]].concat(wireBoxes(m, .85, l0, l1)), { base: 1 }));
+    const tex = TX[WALL_TEX[base] || 'brick'], w = .13, a0 = .5 - w / 2, b0 = .5 + w / 2;
+    const face = [[a0, -.02, 0, b0, 0, .89], [1, a0, 0, 1.02, b0, .89], [a0, 1, 0, b0, 1.02, .89], [-.02, a0, 0, 0, b0, .89]];
+    const side = drops.map(([a, ci]) => face[a].concat([(ci ? l1 : l0) ? LIT : DIM]));
+    return (wireCache[key] = boxSprite([[0, 0, 0, 1, 1, .85, { top: tex, side: tex }]].concat(wireBoxes(m, .85, l0, l1), side), { base: 1 }));
 }
 // 北向きの箱を d の向きに回す
 const rotBoxD = (q, d) => { const f = [(x, y) => [x, y], (x, y) => [1 - y, x], (x, y) => [1 - x, 1 - y], (x, y) => [y, 1 - x]][d], p = f(q[0], q[1]), r = f(q[3], q[4]); return [Math.min(p[0], r[0]), Math.min(p[1], r[1]), q[2], Math.max(p[0], r[0]), Math.max(p[1], r[1]), q[5], q[6]]; };
