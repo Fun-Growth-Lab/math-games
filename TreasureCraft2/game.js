@@ -43,6 +43,7 @@ function newCircuitGame(seed) {
     order.forEach((id, i) => { S.inv[i] = id ? { id, n: STACK } : null; });
     S.inv[7] = tool('pick'); S.inv[17] = tool('axe');
     S.inv[18] = tool('shovel');
+    S.inv[19] = { id: 'bed', n: 1 };
     S.inv[7].tool.eq = 1; S.inv[17].tool.eq = 1; S.inv[18].tool.eq = 1;
     mobs = mobs.filter(m => MOBS[m.t].animal);
 }
@@ -1438,9 +1439,8 @@ function digFacing() {
 }
 // 向き・形を えらびなおせる物: えらべる形の一覧と 今の番号
 function turnChoices(x, y) {
-    const t = getT(S.f, x, y), dk = TILE[t].key.match(/^(F?CONV|DISP|REP)_([NESW])$/);
+    const t = getT(S.f, x, y), dk = TILE[t].key.match(/^(F?CONV|DISP|REP|NOT)_([NESW])$/);
     if (dk) return { list: 'NESW'.split('').map(c => ({ t: T[dk[1] + '_' + c] })), cur: 'NESW'.indexOf(dk[2]) };
-    if (TILE[t].notg) return { list: [{ t: T.NOT_V }, { t: T.NOT_H }], cur: TILE[t].notg === 'V' ? 0 : 1 };
     if (isWire(t)) return { list: WIRE_ORDER.map(w => ({ t, w })), cur: WIRE_ORDER.indexOf(wireMode(S.f, x, y)) };
     return null;
 }
@@ -1461,7 +1461,7 @@ function useActions() {
 function buildActions() {
     const s = S.inv[S.sel];
     const x = S.x + S.face[0], y = S.y + S.face[1], t = getT(S.f, x, y), fm = mobAt(x, y);
-    const dk = TILE[t].key.match(/^(F?CONV|DISP|REP)_([NESW])$/), nk = TILE[t].notg;
+    const dk = TILE[t].key.match(/^(F?CONV|DISP|REP|NOT)_([NESW])$/), nk = false;
     const rot = (dk || nk || isWire(t)) && !fm ? { l: '向き', run: () => H.openTurn(x, y) } : null;
     const take = takeable(t) && !fm ? { l: 'はずす', run: () => takeTile(x, y, t) } : null;
     // 「向き」「はずす」は 何も持っていない・道具を持っている・その物(導線なら赤い石の粉)を持っているとき。ほかの物の使い方を じゃましない
@@ -1632,6 +1632,7 @@ function placeItem(id, it, x, y, t, after) {
     S.got['placed_' + id] = 1;
     if (id === 'crown') ach('crown');
     if (after) after();
+    if (!isWire(getT(S.f, x, y)) && armLinked(x - 1, y, 1)) linkDevice(x, y);   // 回路の部品なら となりの導線と つなぐ
     H.sfx('place'); H.chips(x, y, '#c8a878');
     endTurn(1);
 }

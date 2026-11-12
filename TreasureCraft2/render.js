@@ -164,7 +164,7 @@ function buildSprites() {
     // 回路
     // 赤いパネル(床)・赤いかべ。信号が来ていると明るい
     o[T.WIRE] = [boxSprite(wireBoxes('V', 0, false, false))]; o[T.WIRE_W] = [boxSprite([[0, 0, 0, 1, 1, .85, { top: TX.brick, side: TX.brick }]].concat(wireBoxes('V', .85, false, false)))];
-    'NESW'.split('').forEach((c, i) => { o[T['REP_' + c]] = [repSprite(i, false)]; }); o[T.NOT_V] = [notSprite('V', false, false)]; o[T.NOT_H] = [notSprite('H', false, false)];
+    'NESW'.split('').forEach((c, i) => { o[T['REP_' + c]] = [repSprite(i, false)]; }); 'NESW'.split('').forEach((c, i) => { o[T['NOT_' + c]] = [invSprite(i, false)]; });
     const sw = on => boxSprite([[.3, .3, 0, .7, .7, .16, '#8e8e8a'], [.44, .44, .16, .56, .56, .5, '#6e4622'], [.4, .4, .5, .6, .6, .6, on ? '#ff3a1c' : '#5a1a14']]);
     o[T.SWITCH_OFF] = [sw(false)]; o[T.SWITCH_ON] = [sw(true)];
     o[T.PLATE] = [boxSprite([[.14, .14, 0, .86, .86, .07, '#a2a29c']]), boxSprite([[.14, .14, 0, .86, .86, .025, '#8e8e8a']])];
@@ -291,26 +291,26 @@ function wallWireSprite(x, y) {
 // 北向きの箱を d の向きに回す
 const rotBoxD = (q, d) => { const f = [(x, y) => [x, y], (x, y) => [1 - y, x], (x, y) => [1 - x, 1 - y], (x, y) => [y, 1 - x]][d], p = f(q[0], q[1]), r = f(q[3], q[4]); return [Math.min(p[0], r[0]), Math.min(p[1], r[1]), q[2], Math.max(p[0], r[0]), Math.max(p[1], r[1]), q[5], q[6]]; };
 // リピーター: 石の板に 出る向きの矢印
+// 北向きの矢印(先っぽ y0、三角の底 yb、軸の下 y1)を 細い板で作る
+const arrowBoxes = (y0, yb, y1, col) => { const l = [[.43, yb, .1, .57, y1, .13, col]], n = 6; for (let i = 0; i < n; i++) { const w = .04 + (i + 1) * (.24 / n), ya = y0 + (yb - y0) * i / n, yz = y0 + (yb - y0) * (i + 1) / n; l.push([.5 - w, ya, .1, .5 + w, yz + .005, .13, col]); } return l; };
 function repSprite(d, on) {
     const key = 'r' + d + on; if (wireCache[key]) return wireCache[key];
-    const c = on ? LIT : '#7a2018';
-    const l = [[.08, .08, 0, .92, .92, .1, '#a8a8a0'], [.44, .42, .1, .56, .84, .13, c], [.28, .3, .1, .72, .42, .13, c], [.4, .16, .1, .6, .3, .13, c]];
+    const l = [[.08, .08, 0, .92, .92, .1, '#a8a8a0']].concat(arrowBoxes(.12, .48, .88, on ? LIT : '#7a2018'));
     return (wireCache[key] = boxSprite(l.map((q, i) => i ? rotBoxD(q, d) : q), { base: 1 }));
 }
-// NOT素子: 黒い板の まん中に 丸、両はしに 線(ONのはしは 明るい)
-function notSprite(ax, onA, onB) {
-    const key = 'n' + ax + onA + onB; if (wireCache[key]) return wireCache[key];
-    const ca = onA ? LIT : '#7a2018', cb = onB ? LIT : '#7a2018';
-    let l = [[.08, .08, 0, .92, .92, .1, '#5a5a66'], [.45, .04, .1, .55, .36, .13, ca], [.45, .64, .1, .55, .96, .13, cb], [.36, .36, .1, .64, .64, .2, '#2a2a34'], [.45, .45, .2, .55, .55, .22, '#f4f4f8']];
-    if (ax === 'H') l = l.map((q, i) => i ? rotBoxD(q, 1) : q);
-    return (wireCache[key] = boxSprite(l, { base: 1 }));
+// インバーター: 黒い板に 矢印、先に 白い丸(反対にする しるし)。前へ出しているとき 明るい
+function invSprite(d, on) {
+    const key = 'i' + d + on; if (wireCache[key]) return wireCache[key];
+    const c = on ? LIT : '#7a2018';
+    const l = [[.08, .08, 0, .92, .92, .1, '#4a4a56']].concat(arrowBoxes(.3, .58, .9, c), [[.4, .11, .1, .6, .27, .16, '#f4f4f8'], [.45, .16, .16, .55, .22, .17, '#4a4a56']]);
+    return (wireCache[key] = boxSprite(l.map((q, i) => i ? rotBoxD(q, d) : q), { base: 1 }));
 }
 function turnThumb(x, y, c) {
     let spr;
     if (c.w) {
         const e = S.ex[exKey(S.f, x, y)], base = getT(S.f, x, y) === T.WIRE_W && e && e.base, tex = base && TX[WALL_TEX[base] || 'brick'];
         spr = base ? boxSprite([[0, 0, 0, 1, 1, .85, { top: tex, side: tex }]].concat(wireBoxes(c.w, .85, false, false)), { base: 1 }) : boxSprite(wireBoxes(c.w, 0, false, false));
-    } else spr = TILE[c.t].rep ? repSprite(TILE[c.t].rep - 1, false) : TILE[c.t].notg ? notSprite(TILE[c.t].notg, false, false) : OS[c.t][0];
+    } else spr = TILE[c.t].rep ? repSprite(TILE[c.t].rep - 1, false) : TILE[c.t].inv ? invSprite(TILE[c.t].inv - 1, false) : OS[c.t][0];
     const src = spr.cv, W = src.width, Hh = src.height, px = src.getContext('2d').getImageData(0, 0, W, Hh).data;
     let x0 = W, y0 = Hh, x1 = 0, y1 = 0;
     for (let yy = 0; yy < Hh; yy++) for (let xx = 0; xx < W; xx++) if (px[(yy * W + xx) * 4 + 3] > 10) { if (xx < x0) x0 = xx; if (xx > x1) x1 = xx; if (yy < y0) y0 = yy; if (yy > y1) y1 = yy; }
@@ -324,7 +324,7 @@ const objSprite = (t, x, y) => { const a = OS[t]; if (!a) return null;
     if (t === T.LADDER_D) return pitSpriteAt(S.f, x, y, LADDER_PARTS);
     if (t === T.WIRE) return wireSprite(x, y);
     if (TILE[t].rep) return repSprite(TILE[t].rep - 1, !VIEW.title && repLit(x, y));
-    if (TILE[t].notg) { const ax = TILE[t].notg, e = notEnds(ax); return notSprite(ax, !VIEW.title && notLit(x, y, e[0]), !VIEW.title && notLit(x, y, e[1])); }
+    if (TILE[t].inv) return invSprite(TILE[t].inv - 1, !VIEW.title && invLit(x, y));
     if (t === T.WIRE_W) return wallWireSprite(x, y);
     if (t === T.PLATE) return a[!VIEW.title && plateDown(x, y) ? 1 : 0];
     if (t === T.BULB || TILE[t].belt) return a[!VIEW.title && powered(x, y) ? 1 : 0];

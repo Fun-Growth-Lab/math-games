@@ -1,6 +1,6 @@
 // トレジャークラフト2: 赤い石の回路。画面に依存しない(H.* で知らせる)
 // 信号のもと(スイッチ・感圧板) → 導線(向きつき) → 電球・動く床・矢の発射台
-// 信号の強さは 16 から 1マスごとに 1 へり、1ターンに 1マス進む(リピーター・NOT素子も 1マスぶん)。リピーターは強さを 16 にもどして一方通行、NOT素子は反対にする
+// 信号の強さは 16 から 1マスごとに 1 へり、1ターンに 1マス進む(リピーター・インバーターも 1マスぶん)。リピーターは強さを 16 にもどして一方通行、NOT素子は反対にする
 'use strict';
 
 const SIG_MAX = 16;       // 信号がとどく長さ
@@ -31,7 +31,7 @@ function chanAt(x, y, dir) {
 function armLinked(x, y, a) {
     const nx = x + DIR4[a][0], ny = y + DIR4[a][1], t = getT(S.f, nx, ny), d = TILE[t];
     if (isWire(t)) return chanAt(nx, ny, opp(a)) >= 0;
-    return !!(d.rep || d.notg || d.dev || t === T.SWITCH_OFF || t === T.SWITCH_ON || t === T.PLATE);
+    return !!(d.rep || d.inv || d.dev || t === T.SWITCH_OFF || t === T.SWITCH_ON || t === T.PLATE);
 }
 // 導線(x,y)に a 方向の腕を足す: ほかに つながっている腕が 1本なら L字(まっすぐなら たて・よこ)、0本なら a へ まっすぐ、2本以上なら 十字
 function addArm(x, y, a) {
@@ -52,6 +52,17 @@ function connectWire(x, y) {
         if (mine && !theirs) addArm(nx, ny, opp(a));
         else if (!mine && theirs) addArm(x, y, a);
     }
+    for (let a = 0; a < 4; a++) {
+        const nx = x + DIR4[a][0], ny = y + DIR4[a][1];
+        if (!isWire(getT(S.f, nx, ny)) && armLinked(x, y, a) && !WIRE_CH[me.w].some(c => c.includes(a))) addArm(x, y, a);
+    }
+}
+// 回路の部品を置いたとき: となりの導線が こちらを向いていなければ 曲げて つなぐ
+function linkDevice(x, y) {
+    for (let a = 0; a < 4; a++) {
+        const nx = x + DIR4[a][0], ny = y + DIR4[a][1];
+        if (isWire(getT(S.f, nx, ny)) && chanAt(nx, ny, opp(a)) < 0) addArm(nx, ny, opp(a));
+    }
 }
 function layWire(x, y, axis) {
     const k = exKey(S.f, x, y);
@@ -59,19 +70,17 @@ function layWire(x, y, axis) {
     connectWire(x, y);
 }
 // ---------- 信号 ----------
-// power: on=信号が来ている装置 / ch=導線の通り道ごとの強さ(キー = マス*2+番号) / rep=リピーターの出力 / not=NOT素子のはしごとの出力
+// power: on=信号が来ている装置 / ch=導線の通り道ごとの強さ(キー = マス*2+番号) / rep=リピーターの出力 / not=インバーターの出力
 let power = { on: new Set(), ch: new Map(), rep: new Map(), not: new Map(), f: -1, x: 0, y: 0 };
 const repDir = t => TILE[t].rep ? TILE[t].rep - 1 : -1;               // リピーターの 出る向き
-const notAxis = t => TILE[t].notg || null;                             // 'V' か 'H'
-const notEnds = ax => ax === 'V' ? [0, 2] : [1, 3];
+const invDir = t => TILE[t].inv ? TILE[t].inv - 1 : -1;               // インバーターの 出る向き
 const srcOn = (x, y) => { const t = getT(S.f, x, y); return t === T.SWITCH_ON || (t === T.PLATE && plateDown(x, y)); };
 // (nx,ny)にある素子が (nx,ny)から見て dir 方向へ 信号を出しているか(導線以外)
 function emits(P, nx, ny, dir) {
     if (srcOn(nx, ny)) return true;
     const t = getT(S.f, nx, ny), k = ckey(nx, ny);
     if (repDir(t) === dir) return !!P.rep.get(k);
-    const ax = notAxis(t);
-    if (ax && notEnds(ax).includes(dir)) { const s = P.not.get(k); return s ? !!s[dir] : false; }
+    if (invDir(t) === dir) return !!P.not.get(k);
     return false;
 }
 // 範囲の中の 導線・リピーター・NOT・装置を集める
@@ -81,7 +90,7 @@ function scanCircuit() {
         const t = getT(S.f, x, y), d = TILE[t];
         if (isWire(t)) wires.push([x, y, WIRE_CH[wireMode(S.f, x, y)]]);
         else if (d.rep) reps.push([x, y, d.rep - 1]);
-        else if (d.notg) nots.push([x, y, d.notg]);
+        else if (d.inv) nots.push([x, y, d.inv - 1]);
         else if (d.dev) devs.push([x, y]);
     }
     return { wires, reps, nots, devs };
@@ -108,7 +117,7 @@ function stepPower(prev) {
             for (const a of arms) {
                 const nx = x + DIR4[a][0], ny = y + DIR4[a][1], nc = chanAt(nx, ny, opp(a));
                 if (nc >= 0) { const k = ckey(nx, ny) * 2 + nc; for (const q of [P.ch.get(k), P.ch2.get(k)]) if (q && q[0] > 1 && q[2] !== opp(a)) cand.push([q[0] - 1, q[1], a]); }
-                else if (emits(P, nx, ny, opp(a))) cand.push([SIG_MAX, TILE[getT(S.f, nx, ny)].notg ? 'n' + ckey(nx, ny) : 's' + ckey(nx, ny), a]);
+                else if (emits(P, nx, ny, opp(a))) cand.push([SIG_MAX, 's' + ckey(nx, ny), a]);
             }
             if (!cand.length) return;
             cand.sort((p, q) => q[0] - p[0]);
@@ -118,12 +127,8 @@ function stepPower(prev) {
         // リピーター: 後ろに信号が来ていれば 前へ 強さ16で出す(前から来た信号は 通さない)
         const nrep = new Map(), nnot = new Map();
         for (const [x, y, d] of sc.reps) nrep.set(ckey(x, y), feeds(x - DIR4[d][0], y - DIR4[d][1], d, null));
-        // NOT素子: 片方のはしに信号が来たら 反対のはしは OFF。どちらにも来ていなければ 両はしに ON
-        for (const [x, y, ax] of sc.nots) {
-            const [e1, e2] = notEnds(ax), me = 'n' + ckey(x, y);
-            const in1 = feeds(x + DIR4[e1][0], y + DIR4[e1][1], opp(e1), me), in2 = feeds(x + DIR4[e2][0], y + DIR4[e2][1], opp(e2), me);
-            nnot.set(ckey(x, y), { [e1]: !in2, [e2]: !in1 });
-        }
+        // インバーター: 後ろに信号が来ていなければ 前へ 強さ16で出す。来ていれば 前は OFF(前から来た信号は 通さない)
+        for (const [x, y, d] of sc.nots) nnot.set(ckey(x, y), !feeds(x - DIR4[d][0], y - DIR4[d][1], d, null));
         P.ch = nch; P.ch2 = nch2; P.rep = nrep; P.not = nnot;
     }
     // 装置: となりから 信号が向かってきていれば ON
@@ -144,7 +149,7 @@ const powered = (x, y) => power.f === S.f && power.on.has(ckey(x, y));
 const wireLevel = (x, y, ci) => { if (power.f !== S.f) return 0; const q = power.ch.get(ckey(x, y) * 2 + (ci || 0)); return q ? q[0] : 0; };
 const wireLit = (x, y) => wireLevel(x, y, 0) > 0 || wireLevel(x, y, 1) > 0;
 const repLit = (x, y) => power.f === S.f && !!power.rep.get(ckey(x, y));
-const notLit = (x, y, e) => { if (power.f !== S.f) return false; const s = power.not.get(ckey(x, y)); return !!(s && s[e]); };
+const invLit = (x, y) => power.f === S.f && !!power.not.get(ckey(x, y));
 
 // 毎ターン: 信号を進め、発射台(信号が来た瞬間)と動く床を動かす
 function circuitTick() {

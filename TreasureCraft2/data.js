@@ -131,10 +131,10 @@ defT('CLAMP', { n: '水晶のランプ', solid: 1, low: 1, hp: 2, back: 'clamp',
 defT('CROWN', { n: '宝石の王冠', solid: 1, low: 1, hp: 3, back: 'crown', light: 3 });   // 飾り
 defT('STAIRS_U', { n: '階段(上へ)', light: 2 });   // 洞窟の入口・天然の穴の下
 defT('WIRE_W', { n: '導線つきのかべ', solid: 1, hp: 8, back: 'rdust', opaque: 1 });   // 置いたかべに粉をぬった物。信号は赤いパネルと同じに伝える
-// 回路の素子(床に置く。上を歩ける)。リピーター=後ろから前へ 強さを16にもどす(一方通行) / NOT素子=たて・よこの 両はしで 信号を反対にする
+// 回路の素子(床に置く。上を歩ける)。リピーター=後ろから前へ 強さを16にもどす(一方通行) / インバーター=後ろに信号が来ていなければ 前へ出す(来ていれば 前はOFF)する
 'NESW'.split('').forEach((c, i) => defT('REP_' + c, { n: 'リピーター', hp: 2, back: 'rep', rep: i + 1 }));
-defT('NOT_V', { n: 'NOT素子', hp: 2, back: 'notg', notg: 'V' });
-defT('NOT_H', { n: 'NOT素子', hp: 2, back: 'notg', notg: 'H' });
+defT('NOT_N', { n: 'インバーター', hp: 2, back: 'notg', inv: 1 });
+defT('NOT_E', { n: 'インバーター', hp: 2, back: 'notg', inv: 2 });
 // おたから: [id, 名前, 出る所(0=地上 1=地下 2=異界 c=組み合わせ), 説明, 明るさ]。置いて飾るだけ
 const DECOS = [
     ['coin', '古いコイン', 0, 'むかしのお金'], ['shell', '貝がら', 0, '海のかおり'], ['wbird', '木ぼりの小鳥', 0, 'ていねいな手作り'], ['sglass', '砂時計', 0, '時をはかる'], ['opot', '古いつぼ', 0, '遺跡のつぼ'],
@@ -143,6 +143,8 @@ const DECOS = [
     ['coinpile', 'コインの山', 'c', 'お金もち気分'], ['fossil', '化石の標本', 'c', '博物館みたい'], ['mclock', 'からくり時計', 'c', '歯車で動く'], ['sball', '星空の水晶玉', 'c', '星が光る', 6], ['phoenix', '不死鳥の像', 'c', '炎が光る', 5], ['dpot', '竜の宝つぼ', 'c', '竜のかざり']
 ];
 DECOS.forEach(([id, n, tier, desc, light]) => defT('DC_' + id.toUpperCase(), Object.assign({ n, solid: 1, hp: 2, back: id, deco: 1 }, light ? { light } : {})));
+defT('NOT_S', { n: 'インバーター', hp: 2, back: 'notg', inv: 3 });
+defT('NOT_W', { n: 'インバーター', hp: 2, back: 'notg', inv: 4 });
 // 視線をさえぎる物。木や柵はさえぎらない
 ['ROCK', 'BURIED', 'WALL_W', 'WALL_S', 'DOOR', 'RWALL', 'TOWERW', 'SANDB1', 'SANDB2', 'SANDB3', 'HUTW', 'HULL', 'GIANT', 'GIANTB', 'METEOR', 'SPAWNER'].forEach(k => { TILE[T[k]].opaque = 1; });
 TILE.forEach(d => { if (d.wall) d.opaque = 1; });
@@ -322,7 +324,7 @@ Object.assign(ITEM, {
     carpet: { n: 'カーペット', tile: 'CARPET', place: 'CARPET', desc: '上にいると 回復が少し速い' },
     wall_nw: { n: '魔樹のかべ', tile: 'WALL_NW', place: 'WALL_NW', desc: '木のかべより丈夫' }, floor_nw: { n: '魔樹の床', tile: 'FLOOR_NW', place: 'FLOOR_NW' },
     egg: { n: 'たまご', c: '#f4ecd8', food: 6 }, fegg: { n: '目玉焼き', c: '#ffd84a', food: 22, heal: 5 },
-    rep: { n: 'リピーター', tile: 'REP_S', place: 'REP_N', dir: 'REP', desc: '信号を強くして 一方通行' }, notg: { n: 'NOT素子', tile: 'NOT_V', place: 'NOT_V', axis: 'NOT', desc: '信号を反対にする' },
+    rep: { n: 'リピーター', tile: 'REP_S', place: 'REP_N', dir: 'REP', desc: '信号を強くして 一方通行' }, notg: { n: 'インバーター', tile: 'NOT_N', place: 'NOT_N', dir: 'NOT', desc: '信号を反対にする' },
     gem: { n: '宝石', tile: 'GEM', place: 'GEM', desc: '置くと 光る' }, gmush: { n: '光るきのこ', tile: 'GLOWM', place: 'GLOWM', desc: '置くと 明るい' },
     bow_t: { n: '弓', pseudo: 1 }   // レシピの材料にする「持っている弓(どれでも)」
 });
