@@ -5,7 +5,7 @@ const AIR_MAX = 40;   // 息が続くターン数。泳ぎは歩きの半分の�
 const DAY_LEN = 480, DAY_LIGHT = 320, CROP_TIME = 240, INV_SIZE = 64, HOT_SIZE = 8, STACK = 99, SAVE_KEY = 'tc2_save';
 const H = {
     log() { }, float() { }, chips() { }, shake() { }, sfx() { }, slash() { }, shot() { }, refresh() { }, banner() { }, floorFx() { },
-    achieve() { }, seen() { }, victory() { }, dead() { }, openCraft() { }, openChest() { }, openBed() { }, openTrade() { }, stopHold() { }, gain() { }
+    achieve() { }, seen() { }, victory() { }, dead() { }, openCraft() { }, openChest() { }, openBed() { }, openTrade() { }, openTurn() { }, stopHold() { }, gain() { }
 };
 let S = null;
 // 回路モード: 自由に回路をつくるモード。おなか・HPがへらない、敵が出ない、回路の部品などが ∞。セーブは別
@@ -1183,6 +1183,21 @@ function breakTile(x, y, t, tool) {
     if (d.buried) { H.stopHold(); openBuriedLoot(); }
     if (isCave(S.f)) foundInRock(x, y, t);
 }
+// 「はずす」で外す物(回路の部品と小物)。つるはしなどで こわすことはできない
+const TAKE_BACK = ['switch', 'plate', 'bulb', 'rep', 'notg', 'conv', 'fconv', 'disp', 'torch', 'clamp', 'crown', 'gmush', 'carpet'];
+const takeable = t => isWire(t) || t === T.LADDER_D || TAKE_BACK.includes(TILE[t].back);
+function takeTile(x, y, t) {
+    if (t === T.LADDER_D) { takeLadder(x, y, t); return; }
+    const id = isWire(t) ? 'rdust' : TILE[t].back;
+    if (!S.inv.some(q => !q || (q.id === id && q.n < STACK)) && !infItem(id)) { H.sfx('error'); H.log('持ち物がいっぱいで はずせない', 'warn'); return; }   // あふれて落とさない
+    const k = exKey(S.f, x, y), e = S.ex[k];
+    delete S.dmg[k];
+    if (TILE[t].disp && e && e.arrows) give('arrow', e.arrows);
+    setT(S.f, x, y, t === T.WIRE_W && e && e.base ? T[e.base] : groundOf(S.f, x, y));
+    if (t !== T.CHEST) delete S.ex[k];
+    give(id, 1); H.sfx('item'); H.log((isWire(t) ? '導線' : TILE[t].n) + 'を はずした', 'good');
+    endTurn(1);
+}
 // 置いた物を片づけて持ち物にもどす
 function removePlaced(x, y) {
     const t = getT(S.f, x, y);
@@ -1360,10 +1375,24 @@ function digFacing() {
         return;
     }
     if (t === T.PIT) { H.stopHold(); H.log('穴があいている。はしごを選んで「かける」で かけよう。木の床を置くと ふさげる', ''); return; }
+    if (takeable(t)) { H.stopHold(); H.log((isWire(t) ? '導線' : d.n) + 'は「はずす」で 外せる', ''); return; }
     if (t === T.LADDER_D || t === T.LADDER_U || t === T.STAIRS_U || t === T.CAVEIN || t === T.GATE) { H.stopHold(); H.log(d.n + 'は こわせない', ''); return; }
     if (d.hp) { hitTile(x, y, t); return; }
     H.stopHold();
     H.log(d.n + 'は こわせない', '');
+}
+// 向き・形を えらびなおせる物: えらべる形の一覧と 今の番号
+function turnChoices(x, y) {
+    const t = getT(S.f, x, y), dk = TILE[t].key.match(/^(F?CONV|DISP|REP)_([NESW])$/);
+    if (dk) return { list: 'NESW'.split('').map(c => ({ t: T[dk[1] + '_' + c] })), cur: 'NESW'.indexOf(dk[2]) };
+    if (TILE[t].notg) return { list: [{ t: T.NOT_V }, { t: T.NOT_H }], cur: TILE[t].notg === 'V' ? 0 : 1 };
+    if (isWire(t)) return { list: WIRE_ORDER.map(w => ({ t, w })), cur: WIRE_ORDER.indexOf(wireMode(S.f, x, y)) };
+    return null;
+}
+function applyTurn(x, y, c) {
+    if (c.w) { const k = exKey(S.f, x, y); S.ex[k] = Object.assign(S.ex[k] || {}, { w: c.w }); }
+    else setT(S.f, x, y, c.t);
+    H.sfx('select'); endTurn(1);
 }
 // 持っている物と 向いている相手から、今できることを並べる。先頭が「つかう」(Z)、2番目があれば「もう1つ」(C)
 const canFeed = (m, id) => (m.t === 'wolf' && (id === 'meat' || id === 'steak')) || (FEED[m.t] && FEED[m.t].includes(id));
@@ -1371,20 +1400,15 @@ function useActions() {
     const s = S.inv[S.sel];
     const x = S.x + S.face[0], y = S.y + S.face[1], t = getT(S.f, x, y), fm = mobAt(x, y);
     const dk = TILE[t].key.match(/^(F?CONV|DISP|REP)_([NESW])$/), nk = TILE[t].notg;
-    const rot = dk && !fm ? { l: '回す', run: () => { setT(S.f, x, y, T[dk[1] + '_' + 'NESW'[('NESW'.indexOf(dk[2]) + 1) % 4]]); H.sfx('select'); endTurn(1); } }
-        : nk && !fm ? { l: '回す', run: () => { setT(S.f, x, y, nk === 'V' ? T.NOT_H : T.NOT_V); H.sfx('select'); endTurn(1); } }
-        : isWire(t) && !fm ? { l: '回す', run: () => { const w = cycleWire(x, y); H.log('導線: ' + ({ V: 'たて', H: 'よこ', P: '十字(つながる)', X: '交差(つながらない)' })[w], ''); H.sfx('select'); endTurn(1); } } : null;
-    const peel = (t === T.WIRE || t === T.WIRE_W) && !fm ? { l: 'はがす', run: () => {
-        if (!S.inv.some(q => !q || (q.id === 'rdust' && q.n < STACK))) { H.sfx('error'); H.log('持ち物がいっぱいで はがせない', 'warn'); return; }   // あふれて落とさない
-        const e = S.ex[exKey(S.f, x, y)];
-        setT(S.f, x, y, t === T.WIRE_W && e && e.base ? T[e.base] : groundOf(S.f, x, y));
-        delete S.ex[exKey(S.f, x, y)];
-        give('rdust', 1); H.sfx('item'); H.log('導線を はがした', 'good'); endTurn(1);
-    } } : null;
-    // 「回す」「はがす」「はずす」は 何も持っていないか その物に関係する物を持っているときだけ(ほかの物の使い方を じゃましない)
-    const unl = t === T.LADDER_D && !fm ? { l: 'はずす', run: () => takeLadder(x, y, t) } : null;
-    const rel = !s || (s.id === 'rdust' && peel) || (['conv', 'fconv', 'disp', 'rep', 'notg'].includes(s.id) && rot && !peel) || (s.id === 'ladder' && unl);
-    const pre = !rel ? [] : [rot, peel, unl].filter(Boolean);
+    const rot = (dk || nk || isWire(t)) && !fm ? { l: '向き', run: () => H.openTurn(x, y) } : null;
+    const take = takeable(t) && !fm ? { l: 'はずす', run: () => takeTile(x, y, t) } : null;
+    // 「向き」「はずす」は 何も持っていない・道具を持っている・その物(導線なら赤い石の粉)を持っているとき。ほかの物の使い方を じゃましない
+    const own = s && (isWire(t) ? 'rdust' : t === T.LADDER_D ? 'ladder' : TILE[t].back);
+    // 食べ物以外は 部品のあるマスでは使えないので「はずす」を先に
+    const food = s && !s.tool && (ITEM[s.id].food !== undefined || ITEM[s.id].heal !== undefined);
+    const rel = !s || !!s.tool || (own && s.id === own) || (take && !food);
+    const pre = !rel ? [] : [rot, take].filter(Boolean);
+    if (s && !s.tool && take && pre.length) return pre;   // 部品のあるマスには 置けないので 持ち物の行動は出さない
     if (!s) return pre;
     if (s.tool && pre.length) return pre;
     if (s.tool) {
@@ -1435,13 +1459,14 @@ function useActions() {
         const sp = S.spawn;
         changeFloor(sp.f, sp.x, sp.y); freeSpot(); endTurn(5);
     } });
+    if (take && !rel && list.length < 2) list.push(take);
     if (it.use === 'shard') list.push({ l: 'ひらく', run: () => { removeItem(s.id, 1); revealAround(110); H.sfx('unlock'); H.log('地図のかけらで 周りが地図に のった', 'good'); endTurn(1); } });
     return list;
 }
 function useSelected(which) {
     if (!S || S.hp <= 0) return;
     const s = S.inv[S.sel];
-    if (!s) { const a0 = useActions(), act0 = a0[which || 0]; if (act0) act0.run(); else H.log('何も持っていない。下の枠で えらぼう', ''); return; }   // 何も持っていなくても「はがす」「回す」はできる
+    if (!s) { const a0 = useActions(), act0 = a0[which || 0]; if (act0) act0.run(); else H.log('何も持っていない。下の枠で えらぼう', ''); return; }   // 何も持っていなくても「はずす」「向き」はできる
     const a = useActions();
     if (!a.length) { H.log(ITEM[s.id].n + 'は 材料だ', ''); return; }
     const act = a[which || 0];

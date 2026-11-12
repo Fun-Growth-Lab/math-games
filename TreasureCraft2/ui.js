@@ -38,6 +38,17 @@ function clientToStage(cx, cy) {
 
 // ---------- ゲームから画面への指示 ----------
 Object.assign(H, {
+    // 向き・形を えらぶ: 絵のボタン(タッチ / 矢印と Z)。同じ物を えらべば ターンは進まない
+    openTurn(x, y) {
+        const ch = turnChoices(x, y);
+        if (!ch) return;
+        const wire = isWire(getT(S.f, x, y)), cls = wire ? 'wire' : ch.list.length === 4 ? 'cross' : 'two';
+        dialog('<h2>' + (wire ? '形をえらぶ' : '向きをえらぶ') + '</h2><div class="turngrid ' + cls + '">' + ch.list.map((c, i) => '<button class="turnbtn' + (i === ch.cur ? ' go' : '') + '" id="tn' + i + '"></button>').join('') + '</div><div class="row"><button class="wbtn" id="tn-back">もどる</button></div>', b => {
+            ch.list.forEach((c, i) => { const el = b.querySelector('#tn' + i); el.appendChild(turnThumb(x, y, c)); el.onclick = () => { closeDialog(); if (i !== ch.cur) applyTurn(x, y, c); }; });
+            b.querySelector('#tn-back').onclick = closeDialog;
+            setKf(b.querySelector('#tn' + ch.cur));
+        });
+    },
     log(text, cls) { logs.push({ text, cls, at: performance.now() }); if (logs.length > 3) logs.shift(); drawLog(); },
     gain(id, n) {
         // まだ出ていない同じ物は まとめる(連続で掘っても文字がたまり続けないように)

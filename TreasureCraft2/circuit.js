@@ -1,10 +1,10 @@
 // トレジャークラフト2: 赤い石の回路。画面に依存しない(H.* で知らせる)
 // 信号のもと(スイッチ・感圧板) → 導線(向きつき) → 電球・動く床・矢の発射台
-// 信号の強さは 16 から 1マスごとに 1 へり、1ターンに 4マス進む。リピーターで強さを 16 にもどし、NOT素子で反対にする
+// 信号の強さは 16 から 1マスごとに 1 へり、1ターンに 1マス進む(リピーター・NOT素子も 1マスぶん)。リピーターは強さを 16 にもどして一方通行、NOT素子は反対にする
 'use strict';
 
 const SIG_MAX = 16;       // 信号がとどく長さ
-const SIG_SPEED = 4;      // 1ターンに進むマス
+const SIG_SPEED = 1;      // 1ターンに進むマス
 const CIRCUIT_R = 30;     // 主人公のまわり この範囲の回路だけ動かす
 const DIR4 = [[0, -1], [1, 0], [0, 1], [-1, 0]];   // 北・東・南・西(置くときの向きの番号)
 const dirIndex = d => DIR4.findIndex(o => o[0] === d[0] && o[1] === d[1]);
@@ -14,7 +14,10 @@ const plateDown = (x, y) => (S.x === x && S.y === y) || !!mobAt(x, y);
 
 // ---------- 導線の向き ----------
 // V=たて(北南) H=よこ(東西) P=十字(4方向つながる) X=交差(たてと よこが べつべつ)
-const WIRE_CH = { V: [[0, 2]], H: [[1, 3]], P: [[0, 1, 2, 3]], X: [[0, 2], [1, 3]] };
+const WIRE_CH = { V: [[0, 2]], H: [[1, 3]], P: [[0, 1, 2, 3]], X: [[0, 2], [1, 3]], NE: [[0, 1]], ES: [[1, 2]], SW: [[2, 3]], WN: [[3, 0]] };
+const WIRE_ORDER = ['V', 'H', 'P', 'X', 'WN', 'NE', 'SW', 'ES'];   // えらぶ画面の ならび
+// 腕 p と q だけを持つ形(たて・よこ・L字)
+const wireOf = (p, q) => ['V', 'H', 'NE', 'ES', 'SW', 'WN'].find(m => WIRE_CH[m][0].includes(p) && WIRE_CH[m][0].includes(q));
 const isWire = t => t === T.WIRE || t === T.WIRE_W;
 function wireMode(f, x, y) { const e = S.ex[exKey(f, x, y)]; return (e && e.w) || 'P'; }
 // (x,y)の導線で dir 方向に腕がある 通り道の番号(なければ -1)
@@ -24,17 +27,30 @@ function chanAt(x, y, dir) {
     for (let i = 0; i < ch.length; i++) if (ch[i].includes(dir)) return i;
     return -1;
 }
-// 導線を置いたとき: まわりの導線とつなぐ(向きがちがえば十字に。平行な導線は つながない)
+// (x,y)の a 方向の腕の先に 何かが つながっているか
+function armLinked(x, y, a) {
+    const nx = x + DIR4[a][0], ny = y + DIR4[a][1], t = getT(S.f, nx, ny), d = TILE[t];
+    if (isWire(t)) return chanAt(nx, ny, opp(a)) >= 0;
+    return !!(d.rep || d.notg || d.dev || t === T.SWITCH_OFF || t === T.SWITCH_ON || t === T.PLATE);
+}
+// 導線(x,y)に a 方向の腕を足す: ほかに つながっている腕が 1本なら L字(まっすぐなら たて・よこ)、0本なら a へ まっすぐ、2本以上なら 十字
+function addArm(x, y, a) {
+    const e = S.ex[exKey(S.f, x, y)];
+    if (!e || !e.w || e.w === 'P' || e.w === 'X') return;
+    const arms = WIRE_CH[e.w][0];
+    if (arms.includes(a)) return;
+    const linked = arms.filter(r => armLinked(x, y, r));
+    e.w = linked.length === 1 ? wireOf(linked[0], a) : linked.length === 0 ? wireOf(a, opp(a)) : 'P';
+}
+// 導線を置いたとき: まわりの導線とつなぐ(平行な導線は つながない)
 function connectWire(x, y) {
-    const k = exKey(S.f, x, y), me = S.ex[k], arms = WIRE_CH[me.w][0];
+    const me = S.ex[exKey(S.f, x, y)];
     for (let a = 0; a < 4; a++) {
         const nx = x + DIR4[a][0], ny = y + DIR4[a][1];
-        if (!isWire(getT(S.f, nx, ny))) continue;
-        const nm = wireMode(S.f, nx, ny);
-        if (arms.includes(a)) {
-            // 自分の腕が向いている先の導線が 向きちがいなら 十字にする
-            if ((nm === 'V' || nm === 'H') && !WIRE_CH[nm][0].includes(opp(a))) S.ex[exKey(S.f, nx, ny)].w = 'P';
-        } else if (chanAt(nx, ny, opp(a)) >= 0 && nm !== 'X') me.w = 'P';   // 横から腕がのびてきていれば 自分を十字に
+        if (!isWire(getT(S.f, nx, ny)) || wireMode(S.f, nx, ny) === 'X') continue;
+        const mine = WIRE_CH[me.w].some(c => c.includes(a)), theirs = chanAt(nx, ny, opp(a)) >= 0;
+        if (mine && !theirs) addArm(nx, ny, opp(a));
+        else if (!mine && theirs) addArm(x, y, a);
     }
 }
 function layWire(x, y, axis) {
@@ -42,12 +58,6 @@ function layWire(x, y, axis) {
     S.ex[k] = Object.assign(S.ex[k] || {}, { w: axis });
     connectWire(x, y);
 }
-function cycleWire(x, y) {
-    const k = exKey(S.f, x, y), order = ['V', 'H', 'P', 'X'], cur = wireMode(S.f, x, y);
-    S.ex[k] = Object.assign(S.ex[k] || {}, { w: order[(order.indexOf(cur) + 1) % 4] });
-    return S.ex[k].w;
-}
-
 // ---------- 信号 ----------
 // power: on=信号が来ている装置 / ch=導線の通り道ごとの強さ(キー = マス*2+番号) / rep=リピーターの出力 / not=NOT素子のはしごとの出力
 let power = { on: new Set(), ch: new Map(), rep: new Map(), not: new Map(), f: -1, x: 0, y: 0 };
@@ -82,7 +92,13 @@ function stepPower(prev) {
     // ch = いちばん強い信号 / ch2 = 出どころが ちがう 2番目に強い信号(NOT素子が 自分の出した信号を 入力とまちがえないため)
     const P = { on: new Set(), ch: same ? prev.ch : new Map(), ch2: same && prev.ch2 ? prev.ch2 : new Map(), rep: same ? prev.rep : new Map(), not: same ? prev.not : new Map(), f: S.f, x: S.x, y: S.y };
     const sc = scanCircuit();
-    // 導線: となりの導線の強さ-1 と 素子からの 16 の 大きいほう。SIG_SPEED回くり返す(1回で1マス進む)
+    // (nx,ny)から dir 方向へ 信号が入ってくるか(導線か素子)。skip = この NOT素子が自分で出した信号は数えない
+    const feeds = (nx, ny, dir, skip) => {
+        const c = chanAt(nx, ny, dir);
+        if (c >= 0) { const k = ckey(nx, ny) * 2 + c, q1 = P.ch.get(k), q2 = P.ch2.get(k); return !!(q1 && q1[1] !== skip) || !!(q2 && q2[1] !== skip); }
+        return emits(P, nx, ny, dir);
+    };
+    // 導線: となりの導線の強さ-1 と 素子からの 16 の 大きいほう。リピーター・NOT素子も 同じ1ステップで 1マスぶん進む
     for (let step = 0; step < SIG_SPEED; step++) {
         const nch = new Map(), nch2 = new Map();
         for (const [x, y, chs] of sc.wires) chs.forEach((arms, ci) => {
@@ -99,22 +115,16 @@ function stepPower(prev) {
             const key = ckey(x, y) * 2 + ci, b1 = cand[0], b2 = cand.find(q => q[1] !== b1[1]);
             nch.set(key, b1); if (b2) nch2.set(key, b2);
         });
-        P.ch = nch; P.ch2 = nch2;
-    }
-    // (nx,ny)から dir 方向へ 信号が入ってくるか(導線か素子)。skip = この NOT素子が自分で出した信号は数えない
-    const feeds = (nx, ny, dir, skip) => {
-        const c = chanAt(nx, ny, dir);
-        if (c >= 0) { const k = ckey(nx, ny) * 2 + c, q1 = P.ch.get(k), q2 = P.ch2.get(k); return !!(q1 && q1[1] !== skip) || !!(q2 && q2[1] !== skip); }
-        return emits(P, nx, ny, dir);
-    };
-    // リピーター・NOT素子の 次のターンの状態(1ターンおくれて変わる)
-    const rep = new Map(), not = new Map();
-    for (const [x, y, d] of sc.reps) rep.set(ckey(x, y), feeds(x - DIR4[d][0], y - DIR4[d][1], d, null));
-    for (const [x, y, ax] of sc.nots) {
-        const [e1, e2] = notEnds(ax), me = 'n' + ckey(x, y);
-        const in1 = feeds(x + DIR4[e1][0], y + DIR4[e1][1], opp(e1), me), in2 = feeds(x + DIR4[e2][0], y + DIR4[e2][1], opp(e2), me);
-        // 片方のはしに信号が来たら 反対のはしは OFF。どちらにも来ていなければ 両はしに ON
-        not.set(ckey(x, y), { [e1]: !in2, [e2]: !in1 });
+        // リピーター: 後ろに信号が来ていれば 前へ 強さ16で出す(前から来た信号は 通さない)
+        const nrep = new Map(), nnot = new Map();
+        for (const [x, y, d] of sc.reps) nrep.set(ckey(x, y), feeds(x - DIR4[d][0], y - DIR4[d][1], d, null));
+        // NOT素子: 片方のはしに信号が来たら 反対のはしは OFF。どちらにも来ていなければ 両はしに ON
+        for (const [x, y, ax] of sc.nots) {
+            const [e1, e2] = notEnds(ax), me = 'n' + ckey(x, y);
+            const in1 = feeds(x + DIR4[e1][0], y + DIR4[e1][1], opp(e1), me), in2 = feeds(x + DIR4[e2][0], y + DIR4[e2][1], opp(e2), me);
+            nnot.set(ckey(x, y), { [e1]: !in2, [e2]: !in1 });
+        }
+        P.ch = nch; P.ch2 = nch2; P.rep = nrep; P.not = nnot;
     }
     // 装置: となりから 信号が向かってきていれば ON
     for (const [x, y] of sc.devs) {
@@ -127,7 +137,6 @@ function stepPower(prev) {
         for (const o of DIR4) { const nk = ckey(x + o[0], y + o[1]); if (!P.on.has(nk) && TILE[getT(S.f, x + o[0], y + o[1])].belt) { P.on.add(nk); q.push(nk); } }
     }
     for (let y = S.y - CIRCUIT_R; y <= S.y + CIRCUIT_R; y++) for (let x = S.x - CIRCUIT_R; x <= S.x + CIRCUIT_R; x++) if (getT(S.f, x, y) === T.PLATE && plateDown(x, y)) P.on.add(ckey(x, y));
-    P.rep = rep; P.not = not;
     return P;
 }
 const powered = (x, y) => power.f === S.f && power.on.has(ckey(x, y));
@@ -166,6 +175,7 @@ function canRide(x, y, isPlayer) {
     if (!isPlayer && x === S.x && y === S.y) return false;
     return true;
 }
+let playerVia = null;   // 主人公が 動く床で運ばれる前に いたマス(絵は ここを通ってから 動く)
 function moveOnBelts() {
     const riders = [];
     if (beltAt(S.x, S.y)) riders.push(null);
@@ -180,7 +190,7 @@ function moveOnBelts() {
             if (!canRide(nx, ny, !m)) break;
             x = nx; y = ny;
         }
-        if (m) { m.x = x; m.y = y; } else if (x !== S.x || y !== S.y) { S.x = x; S.y = y; H.stopHold(); const e = S.ex[exKey(S.f, x, y)]; if (getT(S.f, x, y) === T.GRAVE || (e && e.items)) pickupPile(x, y, true); }
+        if (m) { if (x !== m.x || y !== m.y) m.via = [m.x, m.y]; m.x = x; m.y = y; } else if (x !== S.x || y !== S.y) { playerVia = [S.x, S.y]; S.x = x; S.y = y; H.stopHold(); const e = S.ex[exKey(S.f, x, y)]; if (getT(S.f, x, y) === T.GRAVE || (e && e.items)) pickupPile(x, y, true); }
     }
     moveItemsOnBelts();
 }

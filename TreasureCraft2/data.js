@@ -131,7 +131,7 @@ defT('CLAMP', { n: '水晶のランプ', solid: 1, low: 1, hp: 2, back: 'clamp',
 defT('CROWN', { n: '宝石の王冠', solid: 1, low: 1, hp: 3, back: 'crown', light: 3 });   // 飾り
 defT('STAIRS_U', { n: '階段(上へ)', light: 2 });   // 洞窟の入口・天然の穴の下
 defT('WIRE_W', { n: '導線つきのかべ', solid: 1, hp: 8, back: 'rdust', opaque: 1 });   // 置いたかべに粉をぬった物。信号は赤いパネルと同じに伝える
-// 回路の素子(床に置く。上を歩ける)。リピーター=後ろから前へ 強さを16にもどして1ターンおくらせる / NOT素子=たて・よこの 両はしで 信号を反対にする
+// 回路の素子(床に置く。上を歩ける)。リピーター=後ろから前へ 強さを16にもどす(一方通行) / NOT素子=たて・よこの 両はしで 信号を反対にする
 'NESW'.split('').forEach((c, i) => defT('REP_' + c, { n: 'リピーター', hp: 2, back: 'rep', rep: i + 1 }));
 defT('NOT_V', { n: 'NOT素子', hp: 2, back: 'notg', notg: 'V' });
 defT('NOT_H', { n: 'NOT素子', hp: 2, back: 'notg', notg: 'H' });
@@ -306,7 +306,7 @@ Object.assign(ITEM, {
     carpet: { n: 'カーペット', tile: 'CARPET', place: 'CARPET', desc: '上にいると 回復が少し速い' },
     wall_nw: { n: '魔樹のかべ', tile: 'WALL_NW', place: 'WALL_NW', desc: '木のかべより丈夫' }, floor_nw: { n: '魔樹の床', tile: 'FLOOR_NW', place: 'FLOOR_NW' },
     egg: { n: 'たまご', c: '#f4ecd8', food: 6 }, fegg: { n: '目玉焼き', c: '#ffd84a', food: 22, heal: 5 },
-    rep: { n: 'リピーター', tile: 'REP_S', place: 'REP_N', dir: 'REP', desc: '信号を強くして おくらせる' }, notg: { n: 'NOT素子', tile: 'NOT_V', place: 'NOT_V', axis: 'NOT', desc: '信号を反対にする' },
+    rep: { n: 'リピーター', tile: 'REP_S', place: 'REP_N', dir: 'REP', desc: '信号を強くして 一方通行' }, notg: { n: 'NOT素子', tile: 'NOT_V', place: 'NOT_V', axis: 'NOT', desc: '信号を反対にする' },
     gem: { n: '宝石', tile: 'GEM', place: 'GEM', desc: '置くと 光る' }, gmush: { n: '光るきのこ', tile: 'GLOWM', place: 'GLOWM', desc: '置くと 明るい' },
     bow_t: { n: '弓', pseudo: 1 }   // レシピの材料にする「持っている弓(どれでも)」
 });

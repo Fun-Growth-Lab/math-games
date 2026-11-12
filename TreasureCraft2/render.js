@@ -113,7 +113,10 @@ function boxSprite(list, opt) {
     opt = opt || {};
     const sc = opt.sc || 1, w = opt.w || O_W, h = opt.h || O_H, ox = opt.ox || O_X, oy = opt.oy || O_Y;
     const cv = mkCanvas(w, h), c = cv.getContext('2d');
-    const sorted = list.slice().sort((a, b) => ((a[0] + a[3]) * SN + (a[1] + a[4]) * CS + (a[2] + a[5]) * .35) - ((b[0] + b[3]) * SN + (b[1] + b[4]) * CS + (b[2] + b[5]) * .35));
+    // opt.base: はじめの base こは 土台。先に描き、上にのる部品が かくれないようにする
+    const nb = opt.base || 0;
+    for (let i = 0; i < nb; i++) drawBox(c, ox, oy, list[i], sc);
+    const sorted = list.slice(nb).sort((a, b) => ((a[0] + a[3]) * SN + (a[1] + a[4]) * CS + (a[2] + a[5]) * .35) - ((b[0] + b[3]) * SN + (b[1] + b[4]) * CS + (b[2] + b[5]) * .35));
     for (const b of sorted) drawBox(c, ox, oy, b, sc);
     return { cv, ox, oy };
 }
@@ -170,11 +173,12 @@ function buildSprites() {
     o[T.CLAMP] = [boxSprite([[.3, .3, 0, .7, .7, .12, '#5c5c66'], [.36, .36, .12, .64, .64, .2, '#7a7a86'], [.4, .4, .2, .6, .6, .62, '#d8c8ff'], [.44, .44, .62, .56, .56, .76, '#ffffff'], [.3, .46, .26, .4, .54, .5, '#b8a0ff'], [.6, .46, .26, .7, .54, .46, '#b8a0ff']])];
     o[T.CROWN] = [boxSprite([[.26, .26, 0, .74, .74, .12, '#8a3a2c'], [.3, .3, .12, .7, .7, .3, '#f2c840'], [.3, .3, .3, .38, .38, .44, '#f2c840'], [.62, .3, .3, .7, .38, .44, '#f2c840'], [.3, .62, .3, .38, .7, .44, '#f2c840'], [.62, .62, .3, .7, .7, .44, '#f2c840'], [.46, .7, .16, .54, .71, .24, '#ff4a8a'], [.29, .46, .16, .3, .54, .24, '#4ac8f0']])];
     // 動く床: 北向きの絵を作って回す。光っている矢じるしが動いている印
-    const chev = (dy, col) => [[.44, .2 + dy, .08, .56, .32 + dy, .11, col], [.32, .32 + dy, .08, .44, .44 + dy, .11, col], [.56, .32 + dy, .08, .68, .44 + dy, .11, col], [.2, .44 + dy, .08, .32, .56 + dy, .11, col], [.68, .44 + dy, .08, .8, .56 + dy, .11, col]];
-    const belt = (base, n, on) => { const col = on ? '#ffd84a' : '#9a9a8a'; let l = [[0, 0, 0, 1, 1, .08, base], [0, 0, .08, .08, 1, .12, '#2a2a30'], [.92, 0, .08, 1, 1, .12, '#2a2a30']].concat(chev(n === 2 ? -.06 : .12, col)); if (n === 2) l = l.concat(chev(.3, col)); return l; };
+    // 北向きの ▲ を 細い板を重ねて作る(y0 が先っぽ)
+    const tri = (y0, h, col) => [0, 1, 2, 3].map(i => { const w = .05 + i * .06; return [.5 - w, y0 + i * h / 4, .08, .5 + w, y0 + (i + 1) * h / 4, .11, col]; });
+    const belt = (base, n, on) => { const col = on ? '#ffd84a' : '#d8d8c8'; const ys = n === 2 ? [.06, .29, .52, .75] : [.1, .4, .7], h = n === 2 ? .18 : .22; return [[0, 0, 0, 1, 1, .08, base], [0, 0, .08, .08, 1, .12, '#2a2a30'], [.92, 0, .08, 1, 1, .12, '#2a2a30']].concat(...ys.map(y => tri(y, h, col))); };
     ['N', 'E', 'S', 'W'].forEach((c, i) => {
-        o[T['CONV_' + c]] = [boxSprite(belt('#4a4a54', 1, false).map(b => rotBox(b, i))), boxSprite(belt('#4a4a54', 1, true).map(b => rotBox(b, i)))];
-        o[T['FCONV_' + c]] = [boxSprite(belt('#7a3a2c', 2, false).map(b => rotBox(b, i))), boxSprite(belt('#7a3a2c', 2, true).map(b => rotBox(b, i)))];
+        o[T['CONV_' + c]] = [boxSprite(belt('#4a4a54', 1, false).map(b => rotBox(b, i)), { base: 1 }), boxSprite(belt('#4a4a54', 1, true).map(b => rotBox(b, i)), { base: 1 })];
+        o[T['FCONV_' + c]] = [boxSprite(belt('#7a3a2c', 2, false).map(b => rotBox(b, i)), { base: 1 }), boxSprite(belt('#7a3a2c', 2, true).map(b => rotBox(b, i)), { base: 1 })];
         const disp = [[.06, .06, 0, .94, .94, .8, { top: TX.brick }], [.34, -.01, .26, .66, .02, .58, '#1a1a1a'], [.4, .4, .8, .6, .6, .84, '#d8301c']];
         o[T['DISP_' + c]] = [boxSprite(disp.map(b => rotBox(b, i)))];
     });
@@ -235,6 +239,8 @@ function wireBoxes(mode, z0, lit0, lit1) {
     if (mode === 'V') return [[a, 0, z0, b, 1, z, c0]];
     if (mode === 'H') return [[0, a, z0, 1, b, z, c0]];
     if (mode === 'P') return [[a, 0, z0, b, 1, z, c0], [0, a, z0, 1, b, z, c0], [a - .04, a - .04, z0, b + .04, b + .04, z + .01, c0]];
+    // L字: まん中から 2本の腕
+    if (mode !== 'X') { const arm = [[a, 0, b, b], [a, a, 1, b], [a, a, b, 1], [0, a, b, b]]; return WIRE_CH[mode][0].map(r => [arm[r][0], arm[r][1], z0, arm[r][2], arm[r][3], z, c0]); }
     // 交差: たての線は まん中で切れて、よこの線が 上を橋のように通る
     return [[a, 0, z0, b, .34, z, c0], [a, .66, z0, b, 1, z, c0], [0, a, z0, 1, b, z + .03, c1], [.36, a - .03, z0, .64, b + .03, z + .02, '#5a5a62']];
 }
@@ -249,7 +255,7 @@ function wallWireSprite(x, y) {
     const l0 = !VIEW.title && wireLevel(x, y, 0) > 0, l1 = !VIEW.title && wireLevel(x, y, 1) > 0, key = 'w' + (base || '') + m + l0 + l1;
     if (wireCache[key]) return wireCache[key];
     const tex = TX[WALL_TEX[base] || 'brick'];
-    return (wireCache[key] = boxSprite([[0, 0, 0, 1, 1, .85, { top: tex, side: tex }]].concat(wireBoxes(m, .85, l0, l1))));
+    return (wireCache[key] = boxSprite([[0, 0, 0, 1, 1, .85, { top: tex, side: tex }]].concat(wireBoxes(m, .85, l0, l1)), { base: 1 }));
 }
 // 北向きの箱を d の向きに回す
 const rotBoxD = (q, d) => { const f = [(x, y) => [x, y], (x, y) => [1 - y, x], (x, y) => [1 - x, 1 - y], (x, y) => [y, 1 - x]][d], p = f(q[0], q[1]), r = f(q[3], q[4]); return [Math.min(p[0], r[0]), Math.min(p[1], r[1]), q[2], Math.max(p[0], r[0]), Math.max(p[1], r[1]), q[5], q[6]]; };
@@ -258,7 +264,7 @@ function repSprite(d, on) {
     const key = 'r' + d + on; if (wireCache[key]) return wireCache[key];
     const c = on ? LIT : '#7a2018';
     const l = [[.08, .08, 0, .92, .92, .1, '#a8a8a0'], [.44, .42, .1, .56, .84, .13, c], [.28, .3, .1, .72, .42, .13, c], [.4, .16, .1, .6, .3, .13, c]];
-    return (wireCache[key] = boxSprite(l.map((q, i) => i ? rotBoxD(q, d) : q)));
+    return (wireCache[key] = boxSprite(l.map((q, i) => i ? rotBoxD(q, d) : q), { base: 1 }));
 }
 // NOT素子: 黒い板の まん中に 丸、両はしに 線(ONのはしは 明るい)
 function notSprite(ax, onA, onB) {
@@ -266,7 +272,21 @@ function notSprite(ax, onA, onB) {
     const ca = onA ? LIT : '#7a2018', cb = onB ? LIT : '#7a2018';
     let l = [[.08, .08, 0, .92, .92, .1, '#5a5a66'], [.45, .04, .1, .55, .36, .13, ca], [.45, .64, .1, .55, .96, .13, cb], [.36, .36, .1, .64, .64, .2, '#2a2a34'], [.45, .45, .2, .55, .55, .22, '#f4f4f8']];
     if (ax === 'H') l = l.map((q, i) => i ? rotBoxD(q, 1) : q);
-    return (wireCache[key] = boxSprite(l));
+    return (wireCache[key] = boxSprite(l, { base: 1 }));
+}
+function turnThumb(x, y, c) {
+    let spr;
+    if (c.w) {
+        const e = S.ex[exKey(S.f, x, y)], base = getT(S.f, x, y) === T.WIRE_W && e && e.base, tex = base && TX[WALL_TEX[base] || 'brick'];
+        spr = base ? boxSprite([[0, 0, 0, 1, 1, .85, { top: tex, side: tex }]].concat(wireBoxes(c.w, .85, false, false)), { base: 1 }) : boxSprite(wireBoxes(c.w, 0, false, false));
+    } else spr = TILE[c.t].rep ? repSprite(TILE[c.t].rep - 1, false) : TILE[c.t].notg ? notSprite(TILE[c.t].notg, false, false) : OS[c.t][0];
+    const src = spr.cv, W = src.width, Hh = src.height, px = src.getContext('2d').getImageData(0, 0, W, Hh).data;
+    let x0 = W, y0 = Hh, x1 = 0, y1 = 0;
+    for (let yy = 0; yy < Hh; yy++) for (let xx = 0; xx < W; xx++) if (px[(yy * W + xx) * 4 + 3] > 10) { if (xx < x0) x0 = xx; if (xx > x1) x1 = xx; if (yy < y0) y0 = yy; if (yy > y1) y1 = yy; }
+    const cv = document.createElement('canvas'); cv.width = 96; cv.height = 80;
+    const bw = x1 - x0 + 1, bh = y1 - y0 + 1, sc = Math.min(88 / bw, 72 / bh);
+    cv.getContext('2d').drawImage(src, x0, y0, bw, bh, (96 - bw * sc) / 2, (80 - bh * sc) / 2, bw * sc, bh * sc);
+    return cv;
 }
 const objSprite = (t, x, y) => { const a = OS[t]; if (!a) return null;
     if (t === T.WIRE) return wireSprite(x, y);
@@ -354,7 +374,7 @@ const BOSS_OPT = { size: 3, w: 400, h: 460, ox: 150, oy: 340 };
 const FX = { parts: [], floats: [], slashes: [], shots: [], gains: [], nextGain: 0 };
 const P = { rx: 0, ry: 0, ax: 0, ay: 0, flash: 0 };
 const VIEW = { cx: 0, cy: 0, shake: 0, title: false, drift: 0, needDraw: true, last: 0 };
-function snapView() { P.rx = S.x; P.ry = S.y; VIEW.cx = S.x + .5; VIEW.cy = S.y + .5; VIEW.needDraw = true; }
+function snapView() { P.rx = S.x; P.ry = S.y; playerVia = null; VIEW.cx = S.x + .5; VIEW.cy = S.y + .5; VIEW.needDraw = true; }
 
 let canvas, ctx, dark, dctx;
 function initRender(cv) {
@@ -389,14 +409,16 @@ function render(now) {
     const gap = (now - (VIEW.last || now)) / 1000, dt = gap > .1 ? 1 / 60 : Math.min(.05, gap); VIEW.last = now;
     // 動きをなめらかに。1マスを長押しの間隔(125ms)とほぼ同じ時間で歩くので、操作は遅くならない
     const swimming = !!TILE[getT(S.f, S.x, S.y)].swim;
-    glide(P, S.x, S.y, swimming ? dt * .55 : dt);
-    if (Math.abs(S.x - P.rx) > 3 || Math.abs(S.y - P.ry) > 3) { P.rx = S.x; P.ry = S.y; }
+    // 動く床で運ばれたときは 乗ったマスまで歩いてから 運ばれる
+    if (playerVia) { glide(P, playerVia[0], playerVia[1], swimming ? dt * .55 : dt); if (P.rx === playerVia[0] && P.ry === playerVia[1]) playerVia = null; }
+    else glide(P, S.x, S.y, swimming ? dt * .55 : dt);
+    if (Math.abs(S.x - P.rx) > 3 || Math.abs(S.y - P.ry) > 3) { P.rx = S.x; P.ry = S.y; playerVia = null; }
     P.ax *= .8; P.ay *= .8; P.flash = Math.max(0, P.flash - dt * 4);
     if (VIEW.title) VIEW.drift += dt * .35;
     VIEW.cx = P.rx + .5 + (VIEW.title ? Math.sin(VIEW.drift * .3) * 4 : 0); VIEW.cy = P.ry + .5 + (VIEW.title ? Math.cos(VIEW.drift * .22) * 2.5 : 0);
     VIEW.shake = Math.max(0, VIEW.shake - dt * 24);
     VIEW.sx = VIEW.shake ? (Math.random() - .5) * VIEW.shake * 1.6 : 0; VIEW.sy = VIEW.shake ? (Math.random() - .5) * VIEW.shake * 1.6 : 0;
-    for (const m of mobs) { glide(m, m.x, m.y, dt); m.ax *= .8; m.ay *= .8; m.flash = Math.max(0, m.flash - dt * 4); }
+    for (const m of mobs) { if (m.via) { glide(m, m.via[0], m.via[1], dt); if (m.rx === m.via[0] && m.ry === m.via[1]) delete m.via; } else glide(m, m.x, m.y, dt); m.ax *= .8; m.ay *= .8; m.flash = Math.max(0, m.flash - dt * 4); }
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = BG[S.f]; ctx.fillRect(0, 0, VW, VH);
