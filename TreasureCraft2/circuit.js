@@ -175,6 +175,7 @@ function canRide(x, y, isPlayer) {
     if (!isPlayer && x === S.x && y === S.y) return false;
     return true;
 }
+// 動く床で運ばれても 押しっぱなしの移動は 止めない(H.stopHold を呼ばない)
 let playerVia = null;   // 主人公が 動く床で運ばれる前に いたマス(絵は ここを通ってから 動く)
 function moveOnBelts() {
     const riders = [];
@@ -190,7 +191,7 @@ function moveOnBelts() {
             if (!canRide(nx, ny, !m)) break;
             x = nx; y = ny;
         }
-        if (m) { if (x !== m.x || y !== m.y) m.via = [m.x, m.y]; m.x = x; m.y = y; } else if (x !== S.x || y !== S.y) { playerVia = [S.x, S.y]; S.x = x; S.y = y; H.stopHold(); const e = S.ex[exKey(S.f, x, y)]; if (getT(S.f, x, y) === T.GRAVE || (e && e.items)) pickupPile(x, y, true); }
+        if (m) { if (x !== m.x || y !== m.y) m.via = [m.x, m.y]; m.x = x; m.y = y; } else if (x !== S.x || y !== S.y) { playerVia = [S.x, S.y]; S.x = x; S.y = y; H.clearPath(); const e = S.ex[exKey(S.f, x, y)]; if (getT(S.f, x, y) === T.GRAVE || (e && e.items)) pickupPile(x, y, true); }
     }
     moveItemsOnBelts();
 }

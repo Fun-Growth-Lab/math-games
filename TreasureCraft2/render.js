@@ -366,16 +366,8 @@ function pitSpriteAt(f, x, y, ladder) {
     const key = m + (ladder ? 'L' : '') + holeSig(f, x, y);
     if (pitCache[key]) return pitCache[key];
     const N = PIT_N, hole = (dx, dy) => isHole(getT(f, x + dx, y + dy));
-    // 升(マス dx,dy の中の a,b)が 穴か。ふちの1升は となりが穴のときだけ 穴。角は 2方向と ななめが 穴のとき
-    const cell = (gx, gy) => {
-        const dx = Math.floor(gx / N), dy = Math.floor(gy / N), a = gx - dx * N, b = gy - dy * N;
-        if (!hole(dx, dy)) return false;
-        const sx = a === 0 ? -1 : a === N - 1 ? 1 : 0, sy = b === 0 ? -1 : b === N - 1 ? 1 : 0;
-        if (sx && !hole(dx + sx, dy)) return false;
-        if (sy && !hole(dx, dy + sy)) return false;
-        if (sx && sy && !hole(dx + sx, dy + sy)) return false;
-        return true;
-    };
+    // 升は マスが穴なら 穴(穴のまわりに 地面のふちは作らない)
+    const cell = (gx, gy) => hole(Math.floor(gx / N), Math.floor(gy / N));
     const cv = mkCanvas(O_W, O_H), c = cv.getContext('2d'), ox = O_X, oy = O_Y;
     const P = (px, py, z) => { const p = pj(px, py, z); return [ox + p[0], oy + p[1]]; };
     const poly = (pts, fill) => { c.beginPath(); pts.forEach((p, k) => k ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.closePath(); c.fillStyle = fill; c.fill(); };
@@ -383,7 +375,7 @@ function pitSpriteAt(f, x, y, ladder) {
     const e = .03 * N;
     c.save(); c.beginPath();
     for (let b = 0; b < N; b++) for (let a = 0; a < N; a++) if (cell(a, b)) {
-        const l = a === 0 ? -e : 0, r = a === N - 1 ? e : 0, t = b === 0 ? -e : 0, bt = b === N - 1 ? e : 0;
+        const l = a === 0 && hole(-1, 0) ? -e : 0, r = a === N - 1 && hole(1, 0) ? e : 0, t = b === 0 && hole(0, -1) ? -e : 0, bt = b === N - 1 && hole(0, 1) ? e : 0;
         const q = [P((a + l) / N, (b + t) / N, 0), P((a + 1 + r) / N, (b + t) / N, 0), P((a + 1 + r) / N, (b + 1 + bt) / N, 0), P((a + l) / N, (b + 1 + bt) / N, 0)];
         c.moveTo(q[0][0], q[0][1]); q.slice(1).forEach(p => c.lineTo(p[0], p[1])); c.closePath();
     }
@@ -410,17 +402,6 @@ function pitSpriteAt(f, x, y, ladder) {
     c.strokeStyle = 'rgba(0,0,0,.45)';
     for (const h of H2) if (V.some(v => v.x === h.x0 && v.y0 === h.y)) { const p = P(h.x0 / N, h.y / N, 0), q = P(h.x0 / N, h.y / N, -DEEP); c.beginPath(); c.moveTo(p[0], p[1]); c.lineTo(q[0], q[1]); c.stroke(); }
     c.restore();
-    // 口のふち(地面の切り口): 自分のマスの中の 穴と地面の さかいめ
-    c.strokeStyle = 'rgba(40,24,12,.55)'; c.lineWidth = 1.5; c.beginPath();
-    for (let b = 0; b < N; b++) for (let a = 0; a < N; a++) {
-        if (!cell(a, b)) continue;
-        const edge = (x1, y1, x2, y2) => { const p = P(x1 / N, y1 / N, 0), q = P(x2 / N, y2 / N, 0); c.moveTo(p[0], p[1]); c.lineTo(q[0], q[1]); };
-        if (!cell(a, b - 1)) edge(a, b, a + 1, b);
-        if (!cell(a + 1, b)) edge(a + 1, b, a + 1, b + 1);
-        if (!cell(a, b + 1)) edge(a, b + 1, a + 1, b + 1);
-        if (!cell(a - 1, b)) edge(a, b, a, b + 1);
-    }
-    c.stroke();
     if (ladder) ladder.slice().sort((p, q) => ((p[0] + p[3]) * SN + (p[1] + p[4]) * CS + (p[2] + p[5]) * .35) - ((q[0] + q[3]) * SN + (q[1] + q[4]) * CS + (q[2] + q[5]) * .35)).forEach(q => drawBox(c, ox, oy, q, 1));
     if (Object.keys(pitCache).length > 400) for (const k in pitCache) delete pitCache[k];
     return (pitCache[key] = { cv, ox, oy });

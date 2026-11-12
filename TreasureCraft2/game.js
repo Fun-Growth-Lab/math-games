@@ -5,7 +5,7 @@ const AIR_MAX = 40;   // 息が続くターン数。泳ぎは歩きの半分の�
 const DAY_LEN = 480, DAY_LIGHT = 320, CROP_TIME = 240, INV_SIZE = 64, HOT_SIZE = 8, STACK = 99, SAVE_KEY = 'tc2_save';
 const H = {
     log() { }, float() { }, chips() { }, shake() { }, sfx() { }, slash() { }, shot() { }, refresh() { }, banner() { }, floorFx() { },
-    achieve() { }, seen() { }, victory() { }, dead() { }, openCraft() { }, openChest() { }, openBed() { }, openTrade() { }, openTurn() { }, stopHold() { }, gain() { }
+    achieve() { }, seen() { }, victory() { }, dead() { }, openCraft() { }, openChest() { }, openBed() { }, openTrade() { }, openTurn() { }, stopHold() { }, clearPath() { }, gain() { }
 };
 let S = null;
 // 回路モード: 自由に回路をつくるモード。おなか・HPがへらない、敵が出ない、回路の部品などが ∞。セーブは別

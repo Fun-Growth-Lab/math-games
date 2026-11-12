@@ -81,7 +81,8 @@ Object.assign(H, {
     openChest(k) { openChest(k); },
     openBed(x, y) { openBedDialog(x, y); },
     openTrade(m) { openTrade(m); },
-    stopHold() { holdLock = true; autoPath = []; fishing = null; }
+    stopHold() { holdLock = true; autoPath = []; fishing = null; },
+    clearPath() { autoPath = []; }
 });
 // 実績の知らせ: 順番に出す。操作は止めない
 const achQueue = [];
