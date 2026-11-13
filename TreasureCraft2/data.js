@@ -175,7 +175,7 @@ const ITEM = {
     ore_cu: { n: '銅鉱石', c: '#c9743c' }, ore_fe: { n: '鉄鉱石', c: '#d8b89a' }, ore_au: { n: '金鉱石', c: '#e8c84a' }, ore_n: { n: '魔鉱石', c: '#b0349a' },
     ingot_cu: { n: '銅のかたまり', c: '#e08a4a' }, ingot_fe: { n: '鉄のかたまり', c: '#d9dde2' }, ingot_au: { n: '金のかたまり', c: '#ffd84a' }, ingot_n: { n: '魔鋼', c: '#8a2a9c' },
     crystal: { n: '水晶', c: '#b8a0ff', tile: 'CRYSTAL', place: 'CRYSTAL', desc: '置くと 光る' }, fence: { n: '柵', tile: 'FENCE', place: 'FENCE', desc: '向こうが見える' },
-    star: { n: '星晶', c: '#7fe8ff' }, core: { n: '大地の核', c: '#d8552c' }, nwood: { n: '魔樹の木材', c: '#7a2c4a' }, ancient: { n: '古代のかけら', c: '#5ac8a8' },
+    star: { n: '星晶', c: '#7fe8ff' }, core: { n: '大地の核', c: '#d8552c' }, frost: { n: 'とけない氷', c: '#a8e4ff' }, sunsand: { n: '太陽の砂', c: '#ffd84a' }, nwood: { n: '魔樹の木材', c: '#7a2c4a' }, ancient: { n: '古代のかけら', c: '#5ac8a8' },
     berry: { n: '木の実', e: '🫐', food: 9, plant: 1 }, carrot: { n: 'にんじん', e: '🥕', food: 14 }, wheat: { n: '麦', e: '🌾' }, cactus: { n: 'サボテンの実', e: '🌵', food: 6 },
     mush: { n: 'きのこ', e: '🍄', food: 8 }, herb: { n: '薬草', e: '🌿', heal: 20 }, jelly: { n: 'ゼリー', c: '#7cd86a', food: 5 },
     meat: { n: '生肉', e: '🥩', food: 8, raw: 1 }, steak: { n: '焼き肉', e: '🍖', food: 32, heal: 5 }, roast: { n: '焼きにんじん', e: '🍠', food: 26 },
@@ -312,7 +312,7 @@ const RECIPES = [
     { out: 'pie', need: { berry: 3, wheat: 2 }, st: 'furnace', t: 3 },
     { out: 'feast', need: { steak: 2, stew: 1, pie: 1 }, st: 'furnace', t: 4 },
     { out: 'potion', need: { herb: 2, mush: 1, bottle: 1 }, st: 'furnace', t: 2 },
-    { out: 'gate', need: { star: 6, core: 3, stone: 30 }, st: 'bench', t: 10 }
+    { out: 'gate', need: { star: 6, core: 3, frost: 3, sunsand: 3, stone: 30 }, st: 'bench', t: 10 }
 ];
 for (const m in METALS) {
     const M = METALS[m], U = m.toUpperCase(), d = METAL_DESC[m];
@@ -408,8 +408,8 @@ const MOBS = {
     zombie: { n: 'ゾンビ', hp: 26, atk: 8, spd: .7, agg: 9, drop: [['bone', 1, 1, .5], ['hide', 1, 1, .3]], box: humanoid('#7a5a6c', '#9ab48c', '#4a3c3a', '#c8302c', '#9ab48c').concat([[.24, .3, .48, .76, .7, .56, '#5c4450']]) },
     skeleton: { n: 'ガイコツ', hp: 20, atk: 6, spd: .6, agg: 9, shoot: 5, drop: [['bone', 1, 2]], box: humanoid('#d8d8cc', '#eeeee2', '#c8c8bc', '#222') },
     wolf: { n: 'オオカミ', hp: 22, atk: 9, spd: 1, agg: 12, drop: [['hide', 1, 1], ['meat', 1, 1, .5]], box: quad('#8a8a92', '#a0a0a8', '#6e6e76', .9, '#ffd84a') },
-    scorpion: { n: 'サソリ', hp: 24, atk: 8, spd: .8, agg: 8, poison: 6, drop: [['silk', 1, 1, .5]], box: [[.16, .2, 0, .84, .84, .24, '#b8862c'], [.42, .06, .24, .58, .3, .7, '#a07020'], [.42, .06, .7, .58, .5, .84, '#d8352c'], [.1, .8, .04, .34, 1.02, .2, '#a07020'], [.66, .8, .04, .9, 1.02, .2, '#a07020']] },
-    yeti: { n: '雪オニ', hp: 42, atk: 12, spd: .65, agg: 9, drop: [['hide', 1, 2], ['meat', 1, 2]], box: humanoid('#e6f0f8', '#f6fbff', '#c8d8e6', '#2a4a6a') },
+    scorpion: { n: 'サソリ', hp: 32, atk: 10, spd: .8, agg: 8, poison: 6, drop: [['sunsand', 1, 1, .35], ['silk', 1, 1, .5]], box: [[.16, .2, 0, .84, .84, .24, '#b8862c'], [.42, .06, .24, .58, .3, .7, '#a07020'], [.42, .06, .7, .58, .5, .84, '#d8352c'], [.1, .8, .04, .34, 1.02, .2, '#a07020'], [.66, .8, .04, .9, 1.02, .2, '#a07020']] },
+    yeti: { n: '雪オニ', hp: 42, atk: 12, spd: .65, agg: 9, drop: [['frost', 1, 1, .6], ['hide', 1, 2], ['meat', 1, 2]], box: humanoid('#e6f0f8', '#f6fbff', '#c8d8e6', '#2a4a6a') },
     golem: { n: '岩ゴーレム', hp: 95, atk: 15, def: 3, spd: .5, agg: 8, drop: [['core', 1, 1], ['stone', 3, 5]], box: humanoid('#8c8c86', '#a4a49c', '#6c6c66', '#ff6a2c', '#6c6c66') },
     // 地下の敵
     bat: { n: 'コウモリ', hp: 10, atk: 5, spd: 1.2, agg: 7, erratic: 1, drop: [['hide', 1, 1, .25]], box: [[.38, .38, .5, .62, .62, .8, '#4a3a5c'], [.04, .44, .62, .38, .56, .68, '#3a2c4a'], [.62, .44, .62, .96, .56, .68, '#3a2c4a'], [.42, .62, .68, .48, .64, .74, '#ff5a5a'], [.52, .62, .68, .58, .64, .74, '#ff5a5a']] },
@@ -524,7 +524,9 @@ const GOALS = [
     { t: '石のつるはし以上で 鉄鉱石を掘ろう', ok: g => g.ore_fe >= 1 },
     { t: '鉄のつるはしをつくろう(星晶を掘るのに必要)', ok: g => g.pick_tier >= 4 },
     { t: '地下B4より深い階で 星晶を6こ集めよう', ok: g => g.star >= 6 },
-    { t: '夜の山などにいる岩ゴーレムをたおして 大地の核を3こ集めよう', ok: g => g.core >= 3 },
+    { t: '夜の山などにいる岩ゴーレムをたおして 大地の核を3こ集めよう', ok: g => g.core >= 3 || g.placed_gate },
+    { t: '夜の雪原にいる雪オニをたおして とけない氷を3こ集めよう', ok: g => g.frost >= 3 || g.placed_gate },
+    { t: '砂漠のサソリをたおして 太陽の砂を3こ集めよう', ok: g => g.sunsand >= 3 || g.placed_gate },
     { t: '作業台で 門をつくって 地上に建てよう', ok: g => g.placed_gate },
     { t: '門をくぐって 異世界へ行こう', ok: g => g.reach_2 },
     { t: '魔鉱石で 魔鋼をつくって 武器とよろいを強くしよう', ok: g => g.ingot_n >= 3 },

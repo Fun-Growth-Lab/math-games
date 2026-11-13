@@ -53,6 +53,8 @@ const PIX_ART = {
     milk: [['....cc....', '...wccw...', '...wWWw...', '..wWWWWw..', '..wWWWWw..', '..wbbbbw..', '..wbWWbw..', '..wWWWWw..', '..wWWWWw..', '...wwww...'], { c: '#a87c4c', w: '#a8a8b8', W: '#ffffff', b: '#5a9ad8' }],
     horn: [['.........hh.', '........hHh.', '.......hHh..', '......hHh...', '.....hHHh...', '....hHHh....', '...hHHh.....', '..hHHHh.....', '.hHHHh......', '.hhhh.......'], { h: '#6a5a4a', H: '#e0d4b8' }],
     rfoot: [['....rr....', '...r..r...', '....rr....', '...pppp...', '..pPPPPp..', '.pPwPwPPp.', '.pPwPwPPp.', '.pPwwwPPp.', '..pPwwPp..', '...pppp...'], { r: '#d8352c', p: '#a83a5a', P: '#f08aa8', w: '#ffffff' }],
+    frost: [['.....ww.....', '....wWBw....', '...wWBBBw...', '..wWBBBBBw..', '.wWBBbBBBBw.', '.wBBBbbBBBw.', '..wBBBbBBw..', '...wBBBBw...', '....wBBw....', '.....ww.....'], { w: '#4a90c0', W: '#ffffff', B: '#a8e4ff', b: '#dff6ff' }],
+    sunsand: [['.....yy.....', '....yYYy....', '...yYOYYy...', '..yYYYYOYy..', '.yYOYYYYYYy.', 'yYYYYOYYYYYy', 'oooooooooooo'], { y: '#e8a020', Y: '#ffd84a', O: '#fff4b0', o: '#a86a1c' }],
     seed_w: [['.....tt.....', '....bttb....', '...bbBBbb...', '..bBByYBBb..', '.bBBByYyBBb.', '.bBByYyBBBb.', '.bBBByYBBBb.', '.bBBBsBBBBb.', '..bbbbbbbb..', '.y..y...y.y.'], { t: '#7c5228', b: '#a88860', B: '#f4ecd4', y: '#e0b83c', Y: '#ffe88a', s: '#a89040' }],
     crystal: [['.....C......', '....CcC.C...', '.C..Ccc.Cc..', '.Cc.Ccd.Cd..', '.CccCcdCcd..', '..CccccCd...', '...Cccdd....', '....ddd.....'], { C: '#f0e4ff', c: '#b8a0ff', d: '#7a5ad0' }],
     arrow: [['.........HH', '........Hhh', '.......shH.', '......s.h..', '.....s.....', '....s......', '...s.......', 'f.s........', 'ff.........', '.ff........'], { h: '#8e8e8a', H: '#b8b8b2', s: '#a8743c', f: '#d8352c' }],

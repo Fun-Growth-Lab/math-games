@@ -858,7 +858,7 @@ function openHowto() {
             { c: '#5aa83f', art: ic('wood') + op('▶') + ic('bench') + op('▶') + pic(toolIconUrl({ k: 'pick', a: 'iron', b: 'wood' }), 86), t: '集めて つくる', b: '1歩ごとに時間が進む。ぶつかると 切る・掘る・たたかう。集めた素材で道具を組み立てよう' },
             { c: '#7c5228', art: pic(toolIconUrl({ k: 'pick', a: 'iron', b: 'wood' }), 86) + op('▶') + ic('ladder') + op('▶') + ic('star'), t: '地下を掘る', b: '「ほる」で穴をあけ、はしごをかけると地下へ。世界のはしに近い深部に 星晶がある' },
             { c: '#3f4f8c', art: mob('zombie') + mob('wolf') + mob('golem'), t: '夜は気をつけて', b: '夜はまものが増える。寝床で朝まで眠れる。おなかが減るので 料理も大事' },
-            { c: '#8a2a9c', art: ic('gate') + op('▶') + mob('knight') + op('▶') + '<span style="font-size:60px">👑</span>', t: '魔王をたおす', b: '星晶と大地の核で門をつくり、異世界へ。光ったマスから にげて 魔王をたおそう' }
+            { c: '#8a2a9c', art: ic('gate') + op('▶') + mob('knight') + op('▶') + '<span style="font-size:60px">👑</span>', t: '魔王をたおす', b: '山・雪原・砂漠の魔物の宝と 星晶で門をつくり、異世界へ。光ったマスから にげて 魔王をたおそう' }
         ]
     });
 }
