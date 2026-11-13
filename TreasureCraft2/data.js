@@ -387,6 +387,13 @@ const MOBS = {
     sheep: { n: 'ヒツジ', hp: 9, spd: .45, animal: 1, drop: [['wool', 2, 2], ['meat', 1, 1]], box: quad('#f6f3ea', '#3c3c3c', '#3c3c3c', .9, '#fff') },
     cow: { n: 'ウシ', hp: 14, spd: .45, animal: 1, drop: [['meat', 2, 3], ['hide', 1, 2]], box: quad('#6a4a30', '#7a5636', '#4a3220', 1.1) },
     // 珍しい生き物(すぐ逃げる)
+    // ウサギ(雪原)・ネコ(砂漠のオアシス)・ヤギ(山)・カモ(水べ)・キツネ(森。すぐにげる)・カメ(砂浜)
+    rabbit: { n: 'ウサギ', hp: 5, spd: .9, animal: 1, drop: [['meat', 1, 1], ['hide', 1, 1, .4]], box: withPose(quad('#f4f4f0', '#fafaf6', '#dcdcd6', .6, '#d84a6a').slice(0, 8).concat([[.36, .76, .55, .44, .84, .86, '#fafaf6'], [.56, .76, .55, .64, .84, .86, '#fafaf6'], [.38, .8, .6, .42, .82, .82, '#f0a8b8'], [.58, .8, .6, .62, .82, .82, '#f0a8b8'], [.42, .08, .26, .58, .2, .42, '#ffffff']]), 'q') },
+    cat: { n: 'ネコ', hp: 8, spd: .7, animal: 1, drop: [], box: withPose(quad('#e8a050', '#eeae60', '#c8803c', .7, '#3a8a3a').slice(0, 8).concat([[.32, .82, .64, .4, .9, .76, '#c8803c'], [.6, .82, .64, .68, .9, .76, '#c8803c'], [.3, .36, .5, .7, .44, .54, '#c8803c'], [.3, .56, .5, .7, .62, .54, '#c8803c'], [.46, .06, .36, .54, .14, .7, '#c8803c']]), 'q') },
+    goat: { n: 'ヤギ', hp: 10, spd: .5, animal: 1, drop: [['meat', 1, 2], ['hide', 1, 1]], box: withPose(quad('#e8e0d0', '#f0e8d8', '#8a7a6a', .95).slice(0, 8).concat([[.32, .76, .87, .4, .84, 1.06, '#6a5a4a'], [.6, .76, .87, .68, .84, 1.06, '#6a5a4a'], [.44, .98, .44, .56, 1.03, .58, '#d0c8b8']]), 'q') },
+    duck: { n: 'カモ', hp: 5, spd: .5, animal: 1, drop: [['meat', 1, 1], ['feather', 1, 2]], box: [[.4, .44, 0, .46, .5, .16, '#f0a020'], [.56, .44, 0, .62, .5, .16, '#f0a020'], [.26, .22, .16, .74, .76, .44, '#c8b898'], [.3, .16, .3, .7, .3, .46, '#8a7a5a'], [.38, .62, .4, .62, .84, .68, '#2a7a4a'], [.38, .62, .36, .62, .84, .4, '#ffffff'], [.42, .84, .46, .58, .98, .54, '#f0a020']] },
+    fox: { n: 'キツネ', hp: 8, spd: 1.1, animal: 1, wary: 1, drop: [['hide', 1, 1], ['meat', 1, 1, .5]], box: withPose(quad('#e0702c', '#e8803c', '#3a2a20', .75, '#222').slice(0, 8).concat([[.32, .84, .69, .4, .92, .84, '#e0702c'], [.6, .84, .69, .68, .92, .84, '#e0702c'], [.4, .98, .3, .6, 1.02, .5, '#fff4e8'], [.42, -.04, .3, .58, .2, .5, '#e0702c'], [.43, -.12, .32, .57, -.04, .48, '#ffffff']]), 'q') },
+    turtle: { n: 'カメ', hp: 20, def: 3, spd: .2, animal: 1, drop: [['meat', 1, 1]], box: withPose([[.24, .24, 0, .36, .36, .12, '#8ab86a'], [.64, .24, 0, .76, .36, .12, '#8ab86a'], [.24, .64, 0, .36, .76, .12, '#8ab86a'], [.64, .64, 0, .76, .76, .12, '#8ab86a'], [.2, .18, .1, .8, .82, .36, '#4a7a3a'], [.28, .26, .36, .72, .74, .48, '#5c8c44'], [.38, .36, .48, .62, .64, .54, '#6e9c52'], [.4, .8, .08, .6, 1.02, .3, '#8ab86a'], [.42, 1.02, .2, .48, 1.03, .26, '#222'], [.52, 1.02, .2, .58, 1.03, .26, '#222']], 'q') },
     deer: { n: '金色のシカ', hp: 12, spd: 1.1, animal: 1, shy: 1, drop: [['ingot_au', 1, 2], ['meat', 1, 2]], box: quad('#e8c040', '#f4d860', '#b89020', 1.1) },
     goblin: { n: '宝ゴブリン', hp: 16, spd: 1.2, animal: 1, shy: 1, drop: [['ancient', 1, 1], ['ingot_fe', 1, 2], ['potion', 1, 1, .5], ['star', 1, 1, .25]], box: humanoid('#7a5a2c', '#6cb84a', '#4a3a1c', '#111', '#6cb84a').concat([[.2, .1, .4, .8, .4, .9, '#d8b84a']]) },
     pet: { n: 'なかまのオオカミ', hp: 60, spd: 1, animal: 1, pet: 1, box: quad('#d8d8e0', '#e8e8f0', '#a8a8b4', .9, '#222').concat([[.28, .7, .66, .72, 1.02, .74, '#d8352c']]) },
@@ -479,9 +486,9 @@ const curLook = () => LOOKS.find(o => o.id === lookId());
 const PLAYER_BOX = LOOKS[0].box;
 
 // 動物を飼う: 好きな食べ物と、なでるともらえる物
-const FEED = { chicken: ['wheat', 'berry', 'seed_w'], pig: ['carrot', 'berry'], sheep: ['wheat'], cow: ['wheat'] };
-const PRODUCT = { chicken: 'feather', sheep: 'wool', cow: 'hide' };
-const CRY = { chicken: 'コケコッコー', pig: 'ブーブー', sheep: 'メェー', cow: 'モー' };   // なついた動物の 鳴き声
+const FEED = { chicken: ['wheat', 'berry', 'seed_w'], pig: ['carrot', 'berry'], sheep: ['wheat'], cow: ['wheat'], rabbit: ['carrot'], cat: ['fish'], goat: ['wheat'], duck: ['wheat', 'seed_w'], fox: ['berry', 'meat'], turtle: ['berry'] };
+const PRODUCT = { chicken: 'feather', sheep: 'wool', cow: 'hide', duck: 'feather', turtle: 'shell' };
+const CRY = { chicken: 'コケコッコー', pig: 'ブーブー', sheep: 'メェー', cow: 'モー', rabbit: 'ピョン', cat: 'ニャー', goat: 'ベェー', duck: 'グワッ', fox: 'コン', turtle: '…' };   // なついた動物の 鳴き声
 // 村人の手伝い(物の交換はしない)。1人につき1日1回
 const HELPERS = [
     { n: '農夫', job: 'seeds', say: '畑の種を わけてあげよう。たまに めずらしい種も あるよ', btn: '種をもらう' },

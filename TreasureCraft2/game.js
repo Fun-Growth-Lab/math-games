@@ -360,13 +360,29 @@ function litNear(x, y) {
     for (let dy = -5; dy <= 5; dy++) for (let dx = -5; dx <= 5; dx++) { const d = TILE[getT(S.f, x + dx, y + dy)]; if ((d.key === 'TORCH' || d.key === 'GLOWM' || d.key === 'GMUSH' || d.metal || d.deco) && d.light && Math.max(Math.abs(dx), Math.abs(dy)) <= d.light - 1) return true; if (d.key === 'BULB' && powered(x + dx, y + dy)) return true; }
     return false;
 }
+// 昼の動物: 水べ(2マス以内に水)なら カモ・カメ(砂漠ならネコ)、それ以外は 土地ごと。砂漠は水べにしか出ない
+const LAND_ANIMALS = {
+    [BIOME.PLAIN]: ['cow', 'sheep', 'chicken', 'chicken'],
+    [BIOME.FOREST]: ['pig', 'pig', 'chicken', 'fox'],
+    [BIOME.SNOW]: ['rabbit', 'rabbit', 'sheep'],
+    [BIOME.MOUNT]: ['goat', 'goat', 'sheep', 'cow'],
+    [BIOME.DESERT]: null
+};
+function animalFor(x, y, b) {
+    let wet = false;
+    for (let dy = -2; dy <= 2 && !wet; dy++) for (let dx = -2; dx <= 2; dx++) if (getT(0, x + dx, y + dy) === T.WATER) { wet = true; break; }
+    if (wet && b === BIOME.DESERT) return 'cat';
+    if (wet && rnd() < .6) return getT(0, x, y) === T.SAND && b !== BIOME.SNOW && rnd() < .5 ? 'turtle' : 'duck';
+    const list = LAND_ANIMALS[b];
+    return list ? pick(list) : null;
+}
 function chooseSpawn(x, y) {
     if (S.f === 0) {
         const b = biomeAt(x, y), night = isNight(), animals = mobs.filter(m => MOBS[m.t].animal && !MOBS[m.t].npc && !MOBS[m.t].pet).length;
         if (!night && rnd() < .012) { H.log('何か光るものが 遠くを走っていった!', 'good'); return 'deer'; }
         if (!night && rnd() < .008) { H.log('ジャラジャラと音がする…', 'good'); return 'goblin'; }
         if (night && rnd() < (S.sleeping ? .03 : .12)) return 'bomber';   // 眠っている夜は少なめ
-        if (!night && animals < 7 && b !== BIOME.DESERT && rnd() < .8) return pick(b === BIOME.SNOW || b === BIOME.MOUNT ? ['sheep', 'sheep', 'cow'] : ['chicken', 'chicken', 'pig', 'sheep', 'cow']);
+        if (!night && animals < 7 && rnd() < .8) { const a = animalFor(x, y, b); if (a) return a; }
         if (!night) return b === BIOME.DESERT ? (rnd() < .5 ? 'scorpion' : null) : (rnd() < .4 ? pick(['slime', 'slime', 'zombie']) : null);
         if (b === BIOME.MOUNT && rnd() < .3) return 'golem';
         if (dayNo() >= 3 && rnd() < .025) return 'golem';
@@ -417,7 +433,8 @@ function actMob(m) {
     const d = MOBS[m.t], dx = S.x - m.x, dy = S.y - m.y, dist = Math.abs(dx) + Math.abs(dy);
     if (d.pet) { petAct(m); return; }
     if (d.animal) {
-        if (d.shy && dist <= 7) m.scared = 3;   // 珍しい生き物は すぐ逃げる
+        if (d.shy && dist <= 7) m.scared = 3;
+        if (d.wary && dist <= 3 && !m.ref) m.scared = 3;   // 野生のキツネは 近づくと にげる   // 珍しい生き物は すぐ逃げる
         if (m.scared > 0) {
             m.scared--;
             const opts = [[-Math.sign(dx), 0], [0, -Math.sign(dy)]].filter(o => o[0] || o[1]).sort(() => rnd() - .5);
