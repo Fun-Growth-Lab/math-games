@@ -211,7 +211,7 @@ function helperKey(m) { return m.vkey || 'v'; }
 function helpedToday(m) { return S.helped && S.helped[helperKey(m)] === dayNo(); }
 function useHelper(m) {
     const hp = HELPERS[m.role || 0];
-    if (helpedToday(m)) { H.log(hp.n + '「今日は もう手伝ったよ。また明日 おいで」', ''); return false; }
+    if (helpedToday(m)) { H.log(hp.n + '「また明日ね!」', ''); return false; }
     let ok = false;
     if (hp.job === 'seeds') {
         give('seed_w', 3); give('seed_c', 3); ok = true;
@@ -281,7 +281,7 @@ function dropPile(x, y, items, kind) {
         if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
         const nx = x + dx, ny = y + dy, t = getT(S.f, nx, ny);
         if (t === T.GRAVE && S.ex[exKey(S.f, nx, ny)]) { if (r <= 2) crowd++; if (r < nd) { nd = r; near = [nx, ny]; } }
-        else if (!spot && TILE[t].ground && !(nx === S.x && ny === S.y) && !mobAt(nx, ny)) spot = [nx, ny];
+        else if (!spot && TILE[t].ground && t !== T.RAIL && !(nx === S.x && ny === S.y) && !mobAt(nx, ny)) spot = [nx, ny];
     }
     if (near && (crowd >= 6 || !spot)) {
         const e = S.ex[exKey(S.f, near[0], near[1])];
@@ -290,8 +290,9 @@ function dropPile(x, y, items, kind) {
         return near;
     }
     if (!spot) return null;
+    const base = getT(S.f, spot[0], spot[1]);
     setT(S.f, spot[0], spot[1], T.GRAVE);
-    S.ex[exKey(S.f, spot[0], spot[1])] = { items, t: S.T, f: S.f, x: spot[0], y: spot[1], drop: kind === 'death' ? 0 : 1, death: kind === 'death' ? 1 : 0 };
+    S.ex[exKey(S.f, spot[0], spot[1])] = { base, items, t: S.T, f: S.f, x: spot[0], y: spot[1], drop: kind === 'death' ? 0 : 1, death: kind === 'death' ? 1 : 0 };
     return spot;
 }
 
@@ -418,7 +419,8 @@ const mobWalk = t => { const d = TILE[t]; return !d.solid && !d.door && !d.swim 
 function moveMob(m, dx, dy) {
     const nx = m.x + dx, ny = m.y + dy;
     if (nx === S.x && ny === S.y) return false;
-    if (!mobWalk(getT(S.f, nx, ny)) || mobAt(nx, ny)) return false;
+    const nt = getT(S.f, nx, ny);
+    if (!(mobWalk(nt) || (MOBS[m.t].swims && nt === T.WATER)) || mobAt(nx, ny)) return false;
     m.x = nx; m.y = ny;
     m.face = dx > 0 ? 1 : dx < 0 ? 3 : dy > 0 ? 2 : 0;
     return true;
@@ -682,7 +684,7 @@ function killMob(m) {
     H.chips(m.x, m.y, '#ffffff'); H.log(d.n + 'をたおした!', 'good');
     if (d.boss) { bossDown(); return; }
     if (m.gkey) { S.guards[m.gkey] = 1; H.banner(d.n + 'をたおした!', '良い物を落とした'); H.sfx('levelup'); }
-    const items = rollDrops(d.drop, false);
+    const items = rollDrops(d.drop, !d.animal && count('rfoot') > 0);
     if (items.length) dropLoot(m.x, m.y, items);
 }
 function rollDrops(drop, luck) {
@@ -698,6 +700,7 @@ function rollDrops(drop, luck) {
 function giveDrops(drop, luck) { for (const q of rollDrops(drop, luck)) give(q.id, q.n); }
 // 魔物の落とし物: たおした所に 荷物として落ちる(上に乗ると拾う)。2日たつと消える
 function dropLoot(x, y, items, quiet) {
+    items = items.map(q => Object.assign({ fresh: 1 }, q));   // 拾ったときに 集めた数に入れる印
     const spot = dropPile(x, y, items, 'mob');
     if (!spot) { if (!quiet) for (const q of items) give(q.id, q.n); return; }   // 置ける所がないときは そのまま持ち物へ
     if (!quiet) H.log(items.map(q => ITEM[q.id].n + (q.n > 1 ? q.n : '')).join('・') + 'を落とした', '');
@@ -713,17 +716,19 @@ function putPileAt(x, y, items) {
     const t = getT(S.f, x, y), k = exKey(S.f, x, y);
     if (TILE[t].belt) { addToBelt(x, y, items); return true; }
     if (t === T.GRAVE && S.ex[k] && S.ex[k].items) { S.ex[k].items = S.ex[k].items.concat(items); S.ex[k].t = S.T; return true; }
-    if (!TILE[t].ground || mobAt(x, y)) return false;
-    setT(S.f, x, y, T.GRAVE); S.ex[k] = { items, t: S.T, f: S.f, x, y, drop: 1 };
+    if (!TILE[t].ground || t === T.RAIL || mobAt(x, y)) return false;
+    setT(S.f, x, y, T.GRAVE); S.ex[k] = { base: t, items, t: S.T, f: S.f, x, y, drop: 1 };
     return true;
 }
+// 荷物をどけたあとの床: 置いたときの床(古いセーブは その場所の地面)
+const pileBase = e => e.base !== undefined && e.base !== T.GRAVE ? e.base : groundOf(e.f, e.x, e.y);
 function dropsExpire() {
     for (const k in S.ex) {
         const e = S.ex[k];
         if (!e || !e.items || e.t === undefined || e.f === undefined) continue;
         if (S.T - e.t < DAY_LEN * (e.death ? 5 : 2)) continue;
         S.graves = S.graves.filter(q => !(q.f === e.f && q.x === e.x && q.y === e.y));
-        if (getT(e.f, e.x, e.y) === T.GRAVE) setT(e.f, e.x, e.y, groundOf(e.f, e.x, e.y));
+        if (getT(e.f, e.x, e.y) === T.GRAVE) setT(e.f, e.x, e.y, pileBase(e));
         if (TILE[getT(e.f, e.x, e.y)].belt) { delete e.items; continue; }
         delete S.ex[k];
     }
@@ -735,7 +740,7 @@ function die(src) {
     const items = S.inv.filter(Boolean);
     if (items.length) {
         const spot = dropPile(S.x, S.y, items, 'death') || [S.x, S.y];
-        if (!S.ex[exKey(S.f, spot[0], spot[1])]) { setT(S.f, S.x, S.y, T.GRAVE); S.ex[exKey(S.f, S.x, S.y)] = { items, t: S.T, f: S.f, x: S.x, y: S.y, death: 1 }; }
+        if (!S.ex[exKey(S.f, spot[0], spot[1])]) { const base = getT(S.f, S.x, S.y); setT(S.f, S.x, S.y, T.GRAVE); S.ex[exKey(S.f, S.x, S.y)] = { base, items, t: S.T, f: S.f, x: S.x, y: S.y, death: 1 }; }
         S.graves.push({ f: S.f, x: spot[0], y: spot[1] });
         if (S.graves.length > 5) S.graves.shift();
     }
@@ -1042,7 +1047,7 @@ function checkArea() {
         if (['giant', 'tower', 'pyramid', 'meteor', 'ship', 'village'].every(k => S.book.p[k])) ach('all_land');
         if (['crystal', 'lake', 'nest', 'mine'].every(k => S.book.p[k])) ach('all_under');
         H.sfx('unlock');
-        H.banner('発見! ' + PLACE_NAMES[pl.type], pl.type === 'village' ? '村人にぶつかると 手伝ってもらえる(1日1回)' : pl.type === 'merchant' ? '案内人にぶつかると 役に立つ物をもらえる(1日1回)' : pl.type === 'vault' ? '入口はない。かべを掘りぬこう(鉄のつるはし以上)' : pl.type === 'mushroom' ? '光るきのこは 明かりになる' : pl.type === 'cave' ? '入ると地下へ行ける' : pl.type === 'nest' ? '巣をこわさないと まものがわき続ける' : '');
+        H.banner('発見! ' + PLACE_NAMES[pl.type], pl.type === 'village' ? '村人にぶつかると 手伝ってくれる' : pl.type === 'merchant' ? '案内人にぶつかると 役に立つ物をくれる' : pl.type === 'vault' ? '入口はない。かべを掘りぬこう(鉄のつるはし以上)' : pl.type === 'mushroom' ? '光るきのこは 明かりになる' : pl.type === 'cave' ? '入ると地下へ行ける' : pl.type === 'nest' ? '巣をこわさないと まものがわき続ける' : '');
     }
 
 }
@@ -1373,12 +1378,16 @@ function pickupPile(x, y, auto) {
     let got = 0;
     for (const it of c.items) {
         if (it.tool) { const e = S.inv.findIndex(s => !s); if (e >= 0) { S.inv[e] = { tool: it.tool }; got++; } else left.push(it); }
-        else { const l = addItem(it.id, it.n); if (l < it.n) got++; if (l) left.push({ id: it.id, n: l }); }
+        else {
+            const l = addItem(it.id, it.n);
+            if (l < it.n) { got++; if (it.fresh) { S.got[it.id] = (S.got[it.id] || 0) + it.n - l; S.book.i[it.id] = 1; } }
+            if (l) left.push(it.fresh ? { id: it.id, n: l, fresh: 1 } : { id: it.id, n: l });
+        }
     }
     if (!got) { if (!auto) { H.stopHold(); H.log('持ち物がいっぱいで 拾えない', 'warn'); } return; }
     H.sfx('item');
     if (left.length) { c.items = left; H.log('荷物を拾った。持ちきれない分は 残っている', 'warn'); return; }
-    if (TILE[getT(S.f, x, y)].belt) delete c.items; else { delete S.ex[k]; setT(S.f, x, y, groundOf(S.f, x, y)); }
+    if (TILE[getT(S.f, x, y)].belt) delete c.items; else { delete S.ex[k]; setT(S.f, x, y, pileBase(c)); }
     if (S.graves.some(q => q.f === S.f && q.x === x && q.y === y)) ach('retrieve');
     S.graves = S.graves.filter(q => !(q.f === S.f && q.x === x && q.y === y));
 }

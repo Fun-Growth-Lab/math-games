@@ -46,9 +46,13 @@ const PIX_ART = {
     potion: [['....cccc....', '....wwww....', '.....ww.....', '....wttw....', '...wrrrrw...', '..wrRrrrrw..', '..wrRrrrrw..', '..wrrrrrrw..', '...wwwwww...'], { c: '#8a5a2c', w: '#d8ecf4', t: '#eef8fc', r: '#e0486c', R: '#ff9ab0' }],
     // 種は種ぶくろ。ふくろの絵で にんじんと麦を見分ける
     seed_c: [['.....tt.....', '....bttb....', '...bbBBbb...', '..bBBBBgBb..', '.bBBBBggBBb.', '.bBBBOOBBBb.', '.bBBOOOBBBb.', '.bBOOBBBBBb.', '..bbbbbbbb..', '.o..o...o.o.'], { t: '#7c5228', b: '#a88860', B: '#e8d4a8', g: '#3f9a45', O: '#f08a24', o: '#a8642c' }],
+    fur: [['b........b..', 'bbb....bbb..', '.bBBBBBBb...', '.bBBwBBBb...', '..bBBBwBb...', '..bBBBBBb...', '.bBbBBBBBb..', 'bb.bBBBb.bb.', '....www.....'], { b: '#9a4a1c', B: '#e8843c', w: '#fff4e8' }],
     egg: [['....ee....', '...eWee...', '..eWWeee..', '..eWeeee..', '.eWeeeeed.', '.eeeeeeed.', '.eeeeeeed.', '.eeeeeedd.', '.eeeeeedd.', '..eeeedd..', '...dddd...'], { e: '#f6eedc', W: '#ffffff', d: '#d8c6a0' }],
     fegg: [['..wwww......', '.wWWWWww.ww.', 'wWWWWWWwwWWw', 'wWWyyyWWWWWw', 'wWyYyyyWWWw.', 'wWyyyyyWWWw.', '.wWyyyWWWWWw', '.wWWWWWWWWw.', '..wwwWWww...', '.....ww.....'], { w: '#d8d0c0', W: '#fbf8f0', y: '#f0a820', Y: '#ffe070' }],
     nseed: [['....dd....', '...dPPd...', '..dPLPPd..', '..dPPPPd..', '.dPPPPPpd.', '.dPPPPppd.', '..dPPppd..', '...dddd...'], { d: '#3c1048', P: '#a04ac0', p: '#7a2a8c', L: '#e0a0ff' }],
+    milk: [['....cc....', '...wccw...', '...wWWw...', '..wWWWWw..', '..wWWWWw..', '..wbbbbw..', '..wbWWbw..', '..wWWWWw..', '..wWWWWw..', '...wwww...'], { c: '#a87c4c', w: '#a8a8b8', W: '#ffffff', b: '#5a9ad8' }],
+    horn: [['.........hh.', '........hHh.', '.......hHh..', '......hHh...', '.....hHHh...', '....hHHh....', '...hHHh.....', '..hHHHh.....', '.hHHHh......', '.hhhh.......'], { h: '#6a5a4a', H: '#e0d4b8' }],
+    rfoot: [['....rr....', '...r..r...', '....rr....', '...pppp...', '..pPPPPp..', '.pPwPwPPp.', '.pPwPwPPp.', '.pPwwwPPp.', '..pPwwPp..', '...pppp...'], { r: '#d8352c', p: '#a83a5a', P: '#f08aa8', w: '#ffffff' }],
     seed_w: [['.....tt.....', '....bttb....', '...bbBBbb...', '..bBByYBBb..', '.bBBByYyBBb.', '.bBByYyBBBb.', '.bBBByYBBBb.', '.bBBBsBBBBb.', '..bbbbbbbb..', '.y..y...y.y.'], { t: '#7c5228', b: '#a88860', B: '#f4ecd4', y: '#e0b83c', Y: '#ffe88a', s: '#a89040' }],
     crystal: [['.....C......', '....CcC.C...', '.C..Ccc.Cc..', '.Cc.Ccd.Cd..', '.CccCcdCcd..', '..CccccCd...', '...Cccdd....', '....ddd.....'], { C: '#f0e4ff', c: '#b8a0ff', d: '#7a5ad0' }],
     arrow: [['.........HH', '........Hhh', '.......shH.', '......s.h..', '.....s.....', '....s......', '...s.......', 'f.s........', 'ff.........', '.ff........'], { h: '#8e8e8a', H: '#b8b8b2', s: '#a8743c', f: '#d8352c' }],

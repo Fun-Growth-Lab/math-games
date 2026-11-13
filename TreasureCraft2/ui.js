@@ -773,7 +773,7 @@ function openTrade(m) {   // 村人に話しかけたとき(手伝い)
     const hp = HELPERS[m.role || 0];
     const draw = () => {
         const done = helpedToday(m);
-        dialog('<h2>' + hp.n + '</h2><p style="font-size:20px;font-weight:700;margin:10px 0 16px">「' + (done ? '今日は もう手伝ったよ。また明日 おいで' : hp.say) + '」</p><div class="row"><button class="wbtn' + (done ? ' no' : ' go') + '" id="h-do">' + hp.btn + '</button><button class="wbtn" id="t-back">もどる</button></div>', b => {
+        dialog('<h2>' + hp.n + '</h2><p style="font-size:20px;font-weight:700;margin:10px 0 16px">「' + (done ? 'また明日ね!' : hp.say) + '」</p><div class="row"><button class="wbtn' + (done ? ' no' : ' go') + '" id="h-do">' + hp.btn + '</button><button class="wbtn" id="t-back">もどる</button></div>', b => {
             b.querySelector('#t-back').onclick = closeDialog;
             b.querySelector('#h-do').onclick = () => { if (useHelper(m)) { lastHot = ''; refreshHud(); closeDialog(); } else SFX.play('error'); };
         });
