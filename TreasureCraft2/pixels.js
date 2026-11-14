@@ -81,6 +81,9 @@ const PIX_TOOL = {
     shovel: ['..........hh..', '.........hHHh.', '........hHHHhd', '.......hHHHhd.', '........hHhd..', '.......sSdd...', '......sS......', '.....sS.......', '....sS........', '...sS.........', '.ssS..........', 'sSs...........'],
     hoe: ['.....hhhhhsS..', '....hHHHHsS...', '....hhh.sS....', '.......sS.....', '......sS......', '.....sS.......', '....sS........', '...sS.........', '..sS..........', '.sS...........'],
     bow: ['...hh..S', '..hH...S', '.hH....S', '.hH....S', 'hh.....S', '.hH....S', '.hH....S', '..hH...S', '...hh..S'],
+    helm: ['...hhhhhh...', '..hHHHHHHh..', '.hHHHHHHHHh.', '.hHHHHHHHHh.', 'hHHHddddHHHh', 'hHHd....dHHh', 'hHd......dHh', '.d........d.'],
+    glove: ['....h.h.h...', '...hHhHhHh..', '...hHhHhHh..', '.h.hHHHHHh..', 'hHhhHHHHHh..', '.hHHHHHHHh..', '..hHHHHHh...', '...ddddd....', '...dHHHd....', '...ddddd....'],
+    boot: ['..hhhh......', '..hHHh......', '..hHHh......', '..hHHh......', '..hHHhhhh...', '.hHHHHHHHh..', '.hHHHHHHHHh.', '.dddddddddd.'],
     armor: ['.hhh....hhh.', 'hHHhh..hhHHh', 'hHHHhhhhHHHh', 'hHHHHHHHHHHh', '.ddHHHHHHdd.', '...hHHHHh...', '...hHHHHh...', '...hHHHHh...', '...dddddd...']
 };
 const MAT_PAL = {
@@ -107,7 +110,7 @@ function pixelIcon(rows, pal) {
 }
 const toolIconCache = {};
 function toolIconUrl(t) {
-    const id = t.k + '_' + t.a + '_' + (t.k === 'armor' ? '' : t.b);
+    const id = t.k + '_' + t.a + '_' + (isArmor(t.k) ? '' : t.b);
     if (toolIconCache[id]) return toolIconCache[id];
     const m = MAT_PAL[t.a] || MAT_PAL.iron, h = HANDLE_PAL[t.b] || HANDLE_PAL.wood;
     return (toolIconCache[id] = pixelIcon(PIX_TOOL[t.k], { h: m[0], H: m[1], d: m[2], s: h[0], S: h[1] }));

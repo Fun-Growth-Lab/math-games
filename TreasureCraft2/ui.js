@@ -81,7 +81,7 @@ Object.assign(H, {
     floorFx(text) { fadeFx(text); },
     dead(src) { holdLock = true; autoPath = []; setTimeout(showDead, 50, src); },
     victory() { setTimeout(showVictory, 1200); },
-    openCraft(st, x, y) { panelTarget = { x, y, st }; openPanel(st === 'furnace' ? 'make' : 'tool', true); },
+    openCraft(st, x, y) { panelTarget = { x, y, st }; openPanel(st === 'furnace' ? 'make' : st === 'anvil' ? 'forge' : st === 'ench' ? 'ench' : 'tool', true); },
     openChest(k) { openChest(k); },
     openBed(x, y) { openBedDialog(x, y); },
     openTrade(m) { openTrade(m); },
@@ -136,7 +136,7 @@ function slotHtml(s, opt) {
 const TOOL_KIND_KEYS = Object.keys(TOOL_KINDS);
 function matColor(t) { return ({ wood: '#a8743c', stone: '#8e8e8a', bone: '#d8d0b8', copper: '#e08a4a', gold: '#ffd84a', iron: '#b8c0c8', ancient: '#5ac8a8', star: '#7fe8ff', demon: '#a030b0', hide: '#9c6a3c' })[t.a] || '#6ad05a'; }
 function slotTip(s) {
-    if (s.tool) { const q = toolStats(s.tool); return tr(toolName(s.tool)) + ' ' + (s.tool.k === 'armor' ? trf('守り{0}', q.def) : s.tool.k === 'bow' ? trf('攻撃{0}', q.atk) + ' ' + trf('射程{0}', q.range) : trf('攻撃{0}', q.atk) + ' ' + trf('掘る力{0}', q.mine)) + ' ' + trf('耐久{0}/{1}', s.tool.d, q.dur); }
+    if (s.tool) { const q = toolStats(s.tool); return tr(toolName(s.tool)) + ' ' + (isArmor(s.tool.k) ? trf('守り{0}', q.def) : s.tool.k === 'bow' ? trf('攻撃{0}', q.atk) + ' ' + trf('射程{0}', q.range) : trf('攻撃{0}', q.atk) + ' ' + trf('掘る力{0}', q.mine)) + ' ' + trf('耐久{0}/{1}', s.tool.d, q.dur); }
     const it = ITEM[s.id];
     return tr(it.n) + (it.food ? ' ' + trf('満腹+{0}', it.food) : '') + (it.heal ? ' HP+' + it.heal : '') + (it.desc ? ' ' + tr(it.desc) : '');
 }
@@ -177,9 +177,9 @@ function refreshHud() {
     $('hp-fill').style.width = Math.max(0, 100 * S.hp / mx) + '%'; $('hp-num').textContent = Math.max(0, S.hp) + '/' + mx;
     $('food-fill').style.width = S.hunger + '%'; $('food-num').textContent = S.hunger + '/100';
     { const low = S.hp > 0 && S.hp <= mx * .3 ? 'hp' : S.hunger <= 30 ? 'food' : ''; const el = $('lowfx'); if (el.className !== low) el.className = low; }
-    const air = S.air === undefined ? AIR_MAX : S.air;
-    $('air-row').classList.toggle('hidden', air >= AIR_MAX);
-    $('air-fill').style.width = (100 * air / AIR_MAX) + '%'; $('air-num').textContent = air + '/' + AIR_MAX;
+    const am = airMax(), air = S.air === undefined ? am : S.air;
+    $('air-row').classList.toggle('hidden', air >= am);
+    $('air-fill').style.width = (100 * air / am) + '%'; $('air-num').textContent = air + '/' + am;
     const dir = bossDirection();
     $('clock').innerHTML = (isNight() ? '🌙' : '☀️') + ' ' + dayNo() + '日目 ' + hourStr() + '<small><span>' + FLOOR_NAME[S.f] + '</span>' + (S.f === 0 ? '・<span>' + BIOME_NAME[biomeAt(S.x, S.y)] + '</span>' : '') + (dir ? '・<span>' + trf('魔王城 {0} {1}マス', dir.name, dir.dist) + '</span>' : '') + '</small>';
     const gi = goalIndex();
@@ -410,6 +410,8 @@ const panelStation = () => (panelTarget && panelTarget.st) || null;
 const ASSEMBLE_AT = { bench: true };
 function visibleTabs() {
     const st = panelStation();
+    if (st === 'anvil') return ['inv', 'forge'];
+    if (st === 'ench') return ['inv', 'ench'];
     if (st) return ['inv', 'make'].concat(ASSEMBLE_AT[st] ? ['tool'] : []);
     return document.body.classList.contains('ach-only') ? ['ach'] : ['inv', 'make', 'book', 'ach'];
 }
@@ -425,7 +427,7 @@ function drawPanel() {
     rm.classList.toggle('hidden', !target || !target.back);
     $('panel-sort').classList.toggle('hidden', tab !== 'inv');
     if (target) { rm.textContent = '片づける'; rm.title = target.n + 'を片づける'; }
-    if (tab === 'inv') drawInv(); else if (tab === 'make') drawMake(); else if (tab === 'book') drawBook(); else if (tab === 'ach') drawAch(); else drawTool();
+    if (tab === 'inv') drawInv(); else if (tab === 'make') drawMake(); else if (tab === 'book') drawBook(); else if (tab === 'ach') drawAch(); else if (tab === 'forge') drawForge(); else if (tab === 'ench') drawEnch(); else drawTool();
 }
 function drawInv() {
     let h = '<div class="grid">';
@@ -454,7 +456,7 @@ function invDetail() {
     }
     if (s.tool) {
         const st = toolStats(s.tool), t = s.tool;
-        const lines = t.k === 'armor' ? '守り ' + st.def + (st.hp ? '<br>HP +' + st.hp : '') + (st.thorn ? '<br>なぐられると ' + st.thorn + ' やり返す' : '') + '<br>裏地: ' + LININGS[t.b].n : t.k === 'bow' ? '攻撃 ' + st.atk + '<br>射程 ' + st.range + '<br>' + STRINGS[t.b].n : '攻撃 ' + st.atk + '<br>掘る力 ' + st.mine + '<br>' + HANDLES[t.b].n;
+        const lines = isArmor(t.k) ? '守り ' + st.def + (st.hp ? '<br>HP +' + st.hp : '') + (st.thorn ? '<br>なぐられると ' + st.thorn + ' やり返す' : '') + (t.k === 'armor' ? '<br>裏地: ' + LININGS[t.b].n : '') : t.k === 'bow' ? '攻撃 ' + st.atk + '<br>射程 ' + st.range + '<br>' + STRINGS[t.b].n : '攻撃 ' + st.atk + '<br>掘る力 ' + st.mine + '<br>' + HANDLES[t.b].n;
         return '<h3>' + toolImg(t) + ' ' + toolName(t) + '</h3>' + lines + '<br>耐久 ' + t.d + '/' + st.dur + '<br><br><div style="display:flex;gap:8px">' + (t.eq ? '<span style="font-weight:900;color:#c8701c;padding:8px 0">装備中</span>' : '<button class="wbtn go" id="inv-equip">装備する</button>') + '<button class="wbtn" id="inv-drop">すてる</button></div>';
     }
     const it = ITEM[s.id];
@@ -470,16 +472,16 @@ function invDetail() {
 function needHtml(need) {
     return Object.keys(need).map(k => { const c = count(k), ok = c >= need[k]; return '<span class="' + (ok ? 'ok' : 'lack') + '">' + ITEM[k].n + ' ' + c + '/' + need[k] + '</span>'; }).join(' ');
 }
-const toolImg = t => '<img class="tic" src="' + toolIconUrl(t) + '" alt="">';
+const toolImg = t => '<img class="tic" src="' + toolIconUrl({ k: t.k, a: t.a, b: t.b }) + '" alt="">';
 function iconHtml(id) { const u = iconUrl(id); return u ? '<img src="' + u + '" alt="">' : (ITEM[id].e || '❔'); }
 const MAKE_ORDER = {
     '': ['bench'],
-    bench: ['torch', 'furnace', 'bed', 'wall_w', 'door', 'floor', 'fence', 'chest', 'ladder', 'rail', 'wall_s', 'arrow', 'carpet', 'clamp', 'rod', 'bread', 'arrow_fe', 'glass_w', 'bottle', 'wall_nw', 'floor_nw', 'switch', 'plate', 'bulb', 'conv', 'fconv', 'disp', 'rep', 'notg', 'wall_cu', 'door_cu', 'fence_cu', 'floor_cu', 'wall_fe', 'door_fe', 'fence_fe', 'floor_fe', 'wall_au', 'door_au', 'fence_au', 'floor_au', 'floor_s', 'fence_s', 'door_s', 'fence_nw', 'door_nw', 'wall_sr', 'door_sr', 'fence_sr', 'floor_sr', 'wall_dm', 'door_dm', 'fence_dm', 'floor_dm', 'feather_home', 'crown', 'gate', 'coinpile', 'fossil', 'mclock', 'sball', 'phoenix', 'dpot'],
+    bench: ['torch', 'furnace', 'anvil', 'ench', 'bed', 'wall_w', 'door', 'floor', 'fence', 'chest', 'ladder', 'rail', 'wall_s', 'arrow', 'carpet', 'clamp', 'rod', 'bread', 'arrow_fe', 'glass_w', 'bottle', 'wall_nw', 'floor_nw', 'switch', 'plate', 'bulb', 'conv', 'fconv', 'disp', 'rep', 'notg', 'wall_cu', 'door_cu', 'fence_cu', 'floor_cu', 'wall_fe', 'door_fe', 'fence_fe', 'floor_fe', 'wall_au', 'door_au', 'fence_au', 'floor_au', 'floor_s', 'fence_s', 'door_s', 'fence_nw', 'door_nw', 'wall_sr', 'door_sr', 'fence_sr', 'floor_sr', 'wall_dm', 'door_dm', 'fence_dm', 'floor_dm', 'feather_home', 'crown', 'gate', 'coinpile', 'fossil', 'mclock', 'sball', 'phoenix', 'dpot'],
     furnace: ['charcoal', 'glass', 'steak', 'ingot_cu', 'roast', 'ingot_fe', 'gfish', 'fegg', 'stew', 'pie', 'potion', 'ingot_au', 'ingot_n', 'feast'],
 };
 // つくる物の分類(作業台・かまど)。[名前, 絵にする物, 入る物]。どれにも入らない物は 1つめの分類に入る
 const MAKE_CATS = {
-    bench: [['くらし', 'bed', ['torch', 'furnace', 'bed', 'chest', 'ladder', 'rail', 'carpet', 'bread', 'gate']],
+    bench: [['くらし', 'bed', ['torch', 'furnace', 'anvil', 'ench', 'bed', 'chest', 'ladder', 'rail', 'carpet', 'bread', 'gate']],
         ['建材', 'wall_s', null],
         ['道具', 'rod', ['arrow', 'arrow_fe', 'rod', 'bottle', 'feather_home']],
         ['回路', 'bulb', ['switch', 'plate', 'bulb', 'conv', 'fconv', 'disp', 'rep', 'notg']],
@@ -564,7 +566,7 @@ function drawAch() {
 }
 function drawBook() {
     const cell = (known, img, name) => '<div class="bk' + (known ? '' : ' un') + '">' + (known ? img : '<div class="q">？</div>') + '<span>' + (known ? name : '？？？') + '</span></div>';
-    const places = Object.keys(PLACE_NAMES), mobKeys = Object.keys(MOBS).filter(k => k !== 'villager' || true), items = Object.keys(ITEM).filter(k => k !== 'anvil' && !ITEM[k].pseudo && !ITEM[k].old && ITEM[k].deco === undefined), decos = DECOS.map(q => q[0]);
+    const places = Object.keys(PLACE_NAMES), mobKeys = Object.keys(MOBS).filter(k => k !== 'villager' || true), items = Object.keys(ITEM).filter(k => !ITEM[k].pseudo && !ITEM[k].old && ITEM[k].deco === undefined), decos = DECOS.map(q => q[0]);
     const num = (o, l) => l.filter(k => o[k]).length + '/' + l.length;
     const placeImg = t => '<div class="q" style="color:#2a8a70">★</div>';
     const h = '<div class="list" style="display:block"><div class="sec">場所 <small style="color:#5c3c1c">' + num(S.book.p, places) + '</small></div><div class="bgrid">' + places.map(k => cell(S.book.p[k], placeImg(k), PLACE_NAMES[k])).join('') + '</div>' +
@@ -575,16 +577,17 @@ function drawBook() {
 }
 // 持っている道具の数(同じ種類 / 同じ素材の組み合わせ)
 function ownKind(k) { let c = 0; eachTool(q => { if (q.k === k) c++; }); return c; }
-function ownSame(t) { let c = 0; eachTool(q => { if (q.k === t.k && q.a === t.a && (t.k === 'armor' || q.b === t.b)) c++; }); return c; }
+function ownSame(t) { let c = 0; eachTool(q => { if (q.k === t.k && q.a === t.a && (isArmor(t.k) || q.b === t.b)) c++; }); return c; }
 let toolGem = false;
 function drawTool() {
     const station = panelStation();
     // 種類ごとに この設備で使える素材があるか
-    const headsAt = k => { const src = k === 'armor' ? BODIES : HEADS; const o = {}; Object.keys(src).forEach(q => { if (src[q].st === station) o[q] = src[q]; }); return o; };
+    const headsAt = k => { const src = isArmor(k) ? BODIES : HEADS; const o = {}; Object.keys(src).forEach(q => { if (src[q].st === station) o[q] = src[q]; }); return o; };
     if (!Object.keys(headsAt(toolKind)).length) toolKind = Object.keys(TOOL_KINDS).find(k => Object.keys(headsAt(k)).length);
-    const armor = toolKind === 'armor', bow = toolKind === 'bow', HA = headsAt(toolKind), HB = armor ? LININGS : bow ? STRINGS : HANDLES;
+    const armor = isArmor(toolKind), bow = toolKind === 'bow', HA = headsAt(toolKind), HB = toolKind === 'armor' ? LININGS : armor ? { none: LININGS.none } : bow ? STRINGS : HANDLES;
     if (!HA[toolA]) toolA = Object.keys(HA)[0];
     if (!HB[toolB]) toolB = armor ? 'none' : bow ? 'hide' : 'wood';
+    if (!armor && toolB === 'none') toolB = bow ? 'hide' : 'wood';
     const kinds = Object.keys(TOOL_KINDS).filter(k => Object.keys(headsAt(k)).length).map(k => '<button class="pickb' + (k === toolKind ? ' on' : '') + '" data-kind="' + k + '" style="font-size:20px">' + toolImg({ k, a: 'iron', b: k === 'bow' ? 'hide' : 'wood' }) + ' ' + TOOL_KINDS[k].n + (ownKind(k) ? ' <small class="own">×' + ownKind(k) + '</small>' : '') + '</button>').join('');
     // その素材で作ったときの数値
     const headStat = key => {
@@ -597,8 +600,8 @@ function drawTool() {
         const c = m.item ? count(m.item) : 0;
         const info = '<span class="notr">' + (sel === 'a' ? headStat(key) + (m.note ? '・' + tr(m.note) : '') : (m.note ? tr(m.note) : '&nbsp;')) + '</span>';
         // 素材が足りないときは 数を赤にして ボタンを薄くする(知っているが今は作れない)
-        const short = m.item && c < m.cost;
-        return '<button class="pickb' + (on ? ' on' : '') + (short ? ' short' : '') + '" data-' + sel + '="' + key + '">' + m.n + (m.item ? ' <small style="display:inline">' + ITEM[m.item].n + ' <span class="' + (short ? 'lack' : 'ok') + '">' + c + '/' + m.cost + '</span></small>' : '') + '<small>' + info + '</small></button>';
+        const cost = sel === 'a' && armor ? pieceCost(toolKind, key) : m.cost, short = m.item && c < cost;
+        return '<button class="pickb' + (on ? ' on' : '') + (short ? ' short' : '') + '" data-' + sel + '="' + key + '">' + m.n + (m.item ? ' <small style="display:inline">' + ITEM[m.item].n + ' <span class="' + (short ? 'lack' : 'ok') + '">' + c + '/' + cost + '</span></small>' : '') + '<small>' + info + '</small></button>';
     };
     const gemKnown = S.got.gem || count('gem') > 0;
     if (!gemKnown) toolGem = false;
@@ -612,7 +615,7 @@ function drawTool() {
     const chips = '';
     const h = '<div class="col" style="width:170px"><h4>つくる物</h4>' + kinds + chips + '</div>' +
         '<div class="col" style="width:330px"><h4>' + TOOL_KINDS[toolKind].head + 'の素材</h4><div class="scr">' + Object.keys(HA).map(k => line(HA[k], k, k === toolA, 'a')).join('') + '</div></div>' +
-        '<div class="col" style="width:290px"><h4>' + (armor ? '裏地' : bow ? (LANG === 'en' ? 'String' : 'つる') : '柄') + '</h4><div class="scr">' + Object.keys(HB).map(k => line(HB[k], k, k === toolB, 'b')).join('') + '</div></div>' +
+        (toolKind !== 'armor' && armor ? '<div class="col" style="width:290px"></div>' : '<div class="col" style="width:290px"><h4>' + (armor ? '裏地' : bow ? (LANG === 'en' ? 'String' : 'つる') : '柄') + '</h4><div class="scr">' + Object.keys(HB).map(k => line(HB[k], k, k === toolB, 'b')).join('') + '</div></div>') +
         '<div class="detail col"><h3>' + toolImg(t) + ' ' + toolName(t) + '</h3><div class="own" style="font-size:16px">持っている ' + ownSame(t) + ' / ' + TOOL_KINDS[toolKind].n + 'は全部で ' + ownKind(toolKind) + '</div>' + stats +
         gemBtn + '<div class="nd" style="font-size:16px;line-height:1.5;margin-top:6px">' + needHtml(need) + '</div>' +
         '<button class="wbtn' + (ok ? ' go' : ' no') + '" id="tool-make" style="margin-top:auto;font-size:24px">組み立てる</button></div>';
@@ -624,6 +627,73 @@ function drawTool() {
     if ($('tool-gem')) $('tool-gem').onclick = () => { toolGem = !toolGem; SFX.play('select'); drawTool(); };
     $('tool-make').onclick = () => {
         const msg = craftTool(toolKind, toolA, toolB, station, toolGem);
+        if (msg) { SFX.play('error'); H.log(msg, 'warn'); }
+        lastHot = ''; if (S.hp > 0) drawPanel();
+    };
+}
+
+// 金床・エンチャント台: 左に 持っている武器と防具。えらんだ物を 強化 / エンチャント
+let forgePick = null, forgeMsg = '', enchPick = null, enchId = null, enchLv = 1;
+function gearList(cur, onlyEnch) {
+    const list = []; eachTool((t, i) => { if (!onlyEnch || Object.keys(ENCHANTS).some(id => enchFits(t, id))) list.push(t); });
+    return list;
+}
+function gearButtons(list, cur) {
+    return list.map((t, i) => '<button class="pickb' + (t === cur ? ' on' : '') + '" data-g="' + i + '" style="font-size:17px">' + toolImg(t) + ' ' + toolName(t) + (t.en ? ' <small style="display:inline;color:#8a2a9c">' + ENCHANTS[t.en.id].n + ' Lv' + t.en.lv + '</small>' : '') + (t.eq ? ' <small style="display:inline" class="own">E</small>' : '') + '</button>').join('');
+}
+const statLine = (t, st) => isArmor(t.k) ? trf('守り{0}', st.def) + ' ' + trf('耐久{0}', st.dur) : t.k === 'sword' || t.k === 'bow' ? trf('攻撃{0}', st.atk) + ' ' + trf('耐久{0}', st.dur) : trf('攻撃{0}', st.atk) + ' ' + trf('耐久{0}', st.dur);
+function drawForge() {
+    const list = gearList();
+    if (!list.includes(forgePick)) forgePick = list[0] || null;
+    let right = '<div class="nd" style="font-size:18px">' + '武器や防具を持っていない' + '</div>';
+    if (forgePick) {
+        const t = forgePick, p = t.p || 0, now = toolStats(t), nx = toolStats(Object.assign({}, t, { p: Math.min(FORGE_MAX, p + 1) })), need = forgeCost(t), ok = p < FORGE_MAX && hasAll(need);
+        right = '<h3>' + toolImg(t) + ' ' + toolName(t) + '</h3>' +
+            (p >= FORGE_MAX ? '<div class="stat"><span>+10</span><span>MAX</span></div>' :
+                '<div class="stat"><span>+' + p + '</span><span class="notr">' + statLine(t, now) + '</span></div>' +
+                '<div class="stat"><span>+' + (p + 1) + '</span><span class="notr">' + statLine(t, nx) + '</span></div>' +
+                '<div class="stat"><span>' + '成功する確率' + '</span><span>' + Math.round(FORGE_RATE[p] * 100) + '%</span></div>' +
+                (p > 0 ? '<div class="nd" style="font-size:15px;color:#a8301c">' + trf('失敗すると +{0} に下がる', p - 1) + '</div>' : '') +
+                '<div class="nd" style="font-size:16px;margin-top:6px">' + needHtml(need) + '</div>') +
+            '<div id="forge-msg" style="font-size:20px;font-weight:900;min-height:30px;margin-top:6px">' + forgeMsg + '</div>' +
+            '<button class="wbtn' + (ok ? ' go' : ' no') + '" id="forge-go" style="margin-top:auto;font-size:24px">' + '強化する' + '</button>';
+    }
+    $('pbody').innerHTML = '<div class="col" style="width:420px"><h4>' + '強化する物' + '</h4><div class="scr">' + gearButtons(list, forgePick) + '</div></div><div class="detail col">' + right + '</div>';
+    $('pbody').querySelectorAll('[data-g]').forEach(b => b.onclick = () => { forgePick = list[+b.dataset.g]; forgeMsg = ''; SFX.play('select'); drawForge(); });
+    const go = $('forge-go');
+    if (go) go.onclick = () => {
+        const r = forgeTool(forgePick);
+        if (r.msg) { SFX.play('error'); H.log(r.msg, 'warn'); forgeMsg = ''; }
+        else forgeMsg = r.ok ? '<span style="color:#2c8a1c">' + trf('成功! +{0} になった', r.p) + '</span>' : '<span style="color:#c8301c">' + trf('失敗… +{0} になった', r.p) + '</span>';
+        lastHot = ''; if (S.hp > 0) drawPanel();
+    };
+}
+function drawEnch() {
+    const list = gearList(null, true);
+    if (!list.includes(enchPick)) enchPick = list[0] || null;
+    let mid = '', right = '<div class="nd" style="font-size:18px">' + '武器や防具を持っていない' + '</div>';
+    if (enchPick) {
+        const t = enchPick, ids = Object.keys(ENCHANTS).filter(id => enchFits(t, id));
+        if (!ids.includes(enchId)) enchId = ids[0];
+        const e = ENCHANTS[enchId], need = ENCH_COST[enchLv - 1], ok = hasAll(need);
+        mid = ids.map(id => '<button class="pickb' + (id === enchId ? ' on' : '') + '" data-e="' + id + '">' + ENCHANTS[id].n + '<small>' + trf(ENCHANTS[id].d, ENCHANTS[id].v[enchLv - 1]) + '</small></button>').join('');
+        right = '<h3>' + toolImg(t) + ' ' + toolName(t) + '</h3>' +
+            '<div class="stat"><span>' + 'いまの能力' + '</span><span>' + (t.en ? ENCHANTS[t.en.id].n + ' Lv' + t.en.lv : 'なし') + '</span></div>' +
+            '<div style="display:flex;gap:8px;margin:8px 0">' + [1, 2, 3].map(l => '<button class="pickb' + (l === enchLv ? ' on' : '') + '" data-lv="' + l + '" style="flex:1;text-align:center">Lv' + l + '</button>').join('') + '</div>' +
+            '<div style="font-size:19px;font-weight:800">' + e.n + ' Lv' + enchLv + '</div><div class="nd" style="font-size:16px">' + trf(e.d, e.v[enchLv - 1]) + '</div>' +
+            '<div class="nd" style="font-size:16px;margin-top:6px">' + needHtml(need) + '</div>' +
+            (t.en ? '<div class="nd" style="font-size:15px;color:#a8301c">' + 'いまの能力は 消える' + '</div>' : '') +
+            '<button class="wbtn' + (ok ? ' go' : ' no') + '" id="ench-go" style="margin-top:auto;font-size:24px">' + 'エンチャントする' + '</button>';
+    }
+    $('pbody').innerHTML = '<div class="col" style="width:380px"><h4>' + 'つける物' + '</h4><div class="scr">' + gearButtons(list, enchPick) + '</div></div>' +
+        '<div class="col" style="width:330px"><h4>' + '能力' + '</h4><div class="scr">' + mid + '</div></div><div class="detail col">' + right + '</div>';
+    const pb = $('pbody');
+    pb.querySelectorAll('[data-g]').forEach(b => b.onclick = () => { enchPick = list[+b.dataset.g]; SFX.play('select'); drawEnch(); });
+    pb.querySelectorAll('[data-e]').forEach(b => b.onclick = () => { enchId = b.dataset.e; SFX.play('select'); drawEnch(); });
+    pb.querySelectorAll('[data-lv]').forEach(b => b.onclick = () => { enchLv = +b.dataset.lv; SFX.play('select'); drawEnch(); });
+    const go = $('ench-go');
+    if (go) go.onclick = () => {
+        const msg = enchantTool(enchPick, enchId, enchLv);
         if (msg) { SFX.play('error'); H.log(msg, 'warn'); }
         lastHot = ''; if (S.hp > 0) drawPanel();
     };

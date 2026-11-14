@@ -242,7 +242,7 @@ function useHelper(m) {
 }
 function eachTool(fn) { for (let i = 0; i < INV_SIZE; i++) { const s = S.inv[i]; if (s && s.tool) fn(s.tool, i); } }
 // 道具は種類ごとに1つ装備する。何も装備していない種類は、いちばん良いものを自動で持つ
-const toolScore = t => { const s = toolStats(t); return t.k === 'armor' ? s.def : t.k === 'sword' || t.k === 'bow' ? s.atk : s.mine; };
+const toolScore = t => { const s = toolStats(t); return isArmor(t.k) ? s.def : t.k === 'sword' || t.k === 'bow' ? s.atk : s.mine; };
 function equipped(kind) {
     let cur = null, best = null, v = -1;
     eachTool(t => {
@@ -262,11 +262,14 @@ function equipTool(tool) {
 }
 const bestWeapon = () => equipped('sword') || equipped('axe') || equipped('pick');
 const curArmor = () => equipped('armor');
+const armorPieces = () => ARMOR_KINDS.map(equipped).filter(Boolean);   // 身につけている防具(よろい・かぶと・こて・くつ)
+const airMax = () => AIR_MAX + enchV(equipped('helm'), 'breath');
 const maxHp = () => { const a = curArmor(); return 100 + (a ? toolStats(a).hp : 0); };
 function wear(tool, n) {
     if (!tool || circuitMode()) return;   // 回路モードでは 道具はへらない
     const st = toolStats(tool);
     if (st.tough && rnd() < .35) return;
+    if (rnd() * 100 < enchV(tool, 'dura')) return;   // 長持ち
     tool.d -= n || 1;
     if (tool.d <= 0) {
         for (let i = 0; i < INV_SIZE; i++) if (S.inv[i] && S.inv[i].tool === tool) S.inv[i] = null;
@@ -465,8 +468,8 @@ function actMob(m) {
         hurt(mobAtk(m, d), d.n, d);
         H.stopHold();
         if (S.hp <= 0) return;
-        const a = curArmor();
-        if (a && toolStats(a).thorn) damageMob(m, toolStats(a).thorn, true);
+        const th = armorPieces().reduce((s, q) => s + toolStats(q).thorn, 0);
+        if (th) damageMob(m, th, true);
         return;
     }
     if (d.shoot && (dx === 0 || dy === 0) && dist <= d.shoot && lineClear(m.x, m.y, S.x, S.y)) {
@@ -624,11 +627,13 @@ function mobsAct() {
 // ---------- 戦闘 ----------
 function hurt(atk, src, d) {
     if (circuitMode()) return;
-    const a = curArmor(), def = a ? toolStats(a).def : 0;
-    const dmg = Math.max(Math.ceil(atk * .2), Math.round((atk - def) * (.9 + rnd() * .2)));
+    const ps = armorPieces(), def = Math.round(ps.reduce((s, q) => s + toolStats(q).def, 0));
+    let dmg = Math.max(Math.ceil(atk * .2), Math.round((atk - def) * (.9 + rnd() * .2)));
+    if ((d && d.fire) || src === '爆発' || src === '炎の息') { const r = Math.min(90, ps.reduce((s, q) => s + enchV(q, 'fireres'), 0)); dmg = Math.round(dmg * (1 - r / 100)); }
+    if (src === '落下' || src === 'わなの矢') dmg = Math.round(dmg * (1 - enchV(equipped('boot'), 'light') / 100));
     S.hp -= dmg;
     if (S.sleeping) S.wokeBy = src;
-    if (a) wear(a, 1);
+    ps.forEach(q => wear(q, 1));
     if (d && d.poison) { S.hunger = Math.max(0, S.hunger - d.poison); H.log('毒で おなかが減った', 'bad'); }
     H.float(S.x, S.y, '-' + dmg, '#ff5a5a', 1); H.shake(5); H.sfx('hurt');
     H.log(src + 'から ' + dmg + ' のダメージ', 'bad');
@@ -653,19 +658,22 @@ function playerAttack(m) {
     const w = bestWeapon(), st = w ? toolStats(w) : { atk: 0, burn: 0 }, d = MOBS[m.t];
     let dmg = Math.max(1, 2 + st.atk - (d.def || 0));
     dmg = Math.max(1, Math.round(dmg * (.9 + rnd() * .2)));
-    const crit = rnd() < .1;
+    const crit = rnd() * 100 < Math.max(10, enchV(w, 'crit'));
     if (crit) dmg = Math.round(dmg * 1.6);
     if (st.burn) dmg += 5;
+    dmg += enchV(w, 'fire');
     H.slash(m.x, m.y, crit); if (crit) { H.sfx('crit'); H.shake(4); }
     wear(w, 1);
     lastAttack = 'melee'; attackTool = w;
     damageMob(m, dmg, crit);
     lastAttack = null; attackTool = null;
+    if (mobs.includes(m) && !m.big && rnd() * 100 < enchV(w, 'knock')) moveMob(m, Math.sign(m.x - S.x), Math.sign(m.y - S.y));   // ふきとばし
 }
 function killMob(m) {
     const d = MOBS[m.t], idx = mobs.indexOf(m);
     if (idx >= 0) mobs.splice(idx, 1);
     S.kills++;
+    { const v = enchV(attackTool, 'drain'); if (v && !d.animal && S.hp > 0) { S.hp = Math.min(maxHp(), S.hp + v); H.float(S.x, S.y, '+' + v, '#6ad05a'); } }
     if (!d.animal || d.shy) {
         if (m.t === 'deer') ach('deer');
         if (m.t === 'goblin') ach('goblin');
@@ -692,7 +700,7 @@ function rollDrops(drop, luck) {
     for (const r of drop || []) {
         if (r[3] !== undefined && rnd() > r[3]) continue;
         let n = rint(r[1], r[2]);
-        if (luck && rnd() < .2) n *= 2;
+        if (luck && rnd() < (luck === true ? .2 : luck)) n *= 2;
         if (n > 0) out.push({ id: r[0], n });
     }
     return out;
@@ -751,7 +759,7 @@ function die(src) {
     S.f = sp.f; S.x = sp.x; S.y = sp.y;
     if (S.bed && getT(S.bed.f, S.bed.x, S.bed.y) !== T.BED) { S.bed = null; S.spawn = { f: 0, x: CENTER, y: CENTER }; S.f = 0; S.x = CENTER; S.y = CENTER; }
     freeSpot();
-    S.hp = maxHp(); S.hunger = 70; S.air = AIR_MAX;
+    S.hp = maxHp(); S.hunger = 70; S.air = airMax();
     { const pets = mobs.filter(m => MOBS[m.t].pet).map(m => m.hp); mobs = []; pets.forEach(addPet); }
     if (S.f === 2) ensureBoss();
     saveGame();
@@ -902,9 +910,10 @@ function endTurn(n) {
         const before = isNight();
         S.T++;
         S.hungerAcc++;
+        if (S.hungerAcc >= 5 && !circuitMode() && rnd() * 100 < enchV(curArmor(), 'full')) S.hungerAcc = 0;   // 腹もち
         if (S.hungerAcc >= 5 && !circuitMode()) { S.hungerAcc = 0; S.hunger = Math.max(0, S.hunger - 1); if (S.hunger === 20) H.log('おなかが減ってきた…', 'warn'); }
         // HPの自然回復はゆっくり。しっかり治すには寝床で眠る
-        if (S.hunger >= 30 && S.hp < maxHp() && !S.sleeping && S.T % (getT(S.f, S.x, S.y) === T.CARPET ? (S.hunger >= 70 ? 3 : 6) : (S.hunger >= 70 ? 4 : 8)) === 0) S.hp = Math.min(maxHp(), S.hp + 1);
+        if (S.hunger >= 30 && S.hp < maxHp() && !S.sleeping && S.T % Math.max(1, Math.round((getT(S.f, S.x, S.y) === T.CARPET ? (S.hunger >= 70 ? 3 : 6) : (S.hunger >= 70 ? 4 : 8)) / (enchV(equipped('glove'), 'regen') || 1))) === 0) S.hp = Math.min(maxHp(), S.hp + 1);
         S.regenAcc++;
         if (S.regenAcc >= 5) {
             S.regenAcc = 0;
@@ -933,10 +942,11 @@ function endTurn(n) {
     H.refresh();
 }
 function updateBreath() {
-    if (S.air === undefined || circuitMode()) S.air = AIR_MAX;
+    const am = airMax();
+    if (S.air === undefined || circuitMode()) S.air = am;
     if (circuitMode()) return;
-    if (!TILE[getT(S.f, S.x, S.y)].swim) { if (S.air <= 3) ach('breath'); S.air = Math.min(AIR_MAX, S.air + 4); return; }
-    if (S.air === AIR_MAX) H.log('泳いでいる!', 'warn');
+    if (!TILE[getT(S.f, S.x, S.y)].swim) { if (S.air <= 3) ach('breath'); S.air = Math.min(am, S.air + 4); return; }
+    if (S.air >= am) H.log('泳いでいる!', 'warn');
     S.air = Math.max(0, S.air - 1);
     if (S.air === 10) { H.log('息が苦しくなってきた!', 'bad'); H.sfx('warn'); }
     if (S.air > 0) return;
@@ -1670,12 +1680,15 @@ function fireBow(bow) {
         hit = mobAt(nx, ny);
         if (hit) break;
     }
-    removeItem(arrow, 1); wear(bow, 1);
+    if (rnd() * 100 >= enchV(bow, 'save')) removeItem(arrow, 1);   // 矢ひろい
+    wear(bow, 1);
     H.shot(S.x, S.y, x, y, '#f0e8d0', true); H.sfx('attack');
     if (hit && !MOBS[hit.t].npc && !MOBS[hit.t].pet) {
         const d = MOBS[hit.t];
         let dmg = Math.max(1, Math.round((2 + st.atk + (arrow === 'arrow_fe' ? 5 : 0) - (d.def || 0)) * (.9 + rnd() * .2)));
+        if (enchV(bow, 'crit') && rnd() * 100 < enchV(bow, 'crit')) dmg = Math.round(dmg * 1.6);
         if (st.burn) dmg += 5;
+        dmg += enchV(bow, 'fire');
         lastAttack = 'bow'; attackTool = bow;
         hit.bowDist = Math.abs(hit.x - S.x) + Math.abs(hit.y - S.y);
         damageMob(hit, dmg);
@@ -1814,12 +1827,12 @@ function craftRecipe(rec, station) {
 function partNeed(kind, a, b) {
     const need = {};
     const add = (id, n) => { if (id && n) need[id] = (need[id] || 0) + n; };
-    if (kind === 'armor') { add(BODIES[a].item, BODIES[a].cost); add(LININGS[b].item, LININGS[b].cost); }
+    if (isArmor(kind)) { add(BODIES[a].item, pieceCost(kind, a)); if (kind === 'armor') add(LININGS[b].item, LININGS[b].cost); }
     else { const hb = kind === 'bow' ? STRINGS : HANDLES; add(HEADS[a].item, HEADS[a].cost); add(hb[b].item, hb[b].cost); }
     return need;
 }
 function craftTool(kind, a, b, station, gem) {
-    const near = nearStations(), st = kind === 'armor' ? BODIES[a].st : HEADS[a].st;
+    const near = nearStations(), st = isArmor(kind) ? BODIES[a].st : HEADS[a].st;
     if (station !== undefined && st !== station) return STATION_NAME[st] + 'で つくれる';
     if (S.hunger === 0) return 'おなかがペコペコで つくれない';
     if (!near[st]) return STATION_NAME[st] + 'のそばで つくれる';
@@ -1828,21 +1841,51 @@ function craftTool(kind, a, b, station, gem) {
     if (!hasAll(need)) return '材料がたりない';
     if (!fitsAfter(need, null)) return '持ち物がいっぱいで つくれない';
     for (const k in need) removeItem(k, need[k]);
-    const tool = { k: kind, a, b, d: 0 };
+    const tool = { k: kind, a, b: kind === 'armor' || !isArmor(kind) ? b : 'none', d: 0 };
     if (gem) { tool.gem = 1; ach('gem_tool'); }
     tool.d = toolStats(tool).dur;
     putTool(tool);
     S.got['tool_' + kind] = 1;
     if (kind === 'pick' && a === 'gold') ach('gold_pick');
-    if (kind !== 'armor' && kind !== 'bow' && a === 'bone' && b === 'bone') ach('bone_bone');
+    if (!isArmor(kind) && kind !== 'bow' && a === 'bone' && b === 'bone') ach('bone_bone');
     if (kind === 'sword' && a === 'demon' && b === 'nwood') ach('masterpiece');
-    { const has = {}; eachTool(t => { has[t.k] = 1; }); if (Object.keys(TOOL_KINDS).every(k => has[k])) ach('full_gear'); }
+    { const has = {}; eachTool(t => { has[t.k] = 1; }); if (['sword', 'pick', 'axe', 'hoe', 'armor', 'bow'].every(k => has[k])) ach('full_gear'); }
     if (kind === 'pick') S.got.pick_tier = Math.max(S.got.pick_tier || 0, toolStats(tool).tier);
     H.sfx('equip'); H.log(toolName(tool) + 'ができた!', 'good');
     endTurn(2);
     return null;
 }
 
+// 金床: 作ったときの素材(刃・頭・胴の材料)を 同じ数だけ使って +1 をねらう。失敗すると -1
+function forgeCost(t) { const m = isArmor(t.k) ? BODIES[t.a] : HEADS[t.a]; return { [m.item]: isArmor(t.k) ? pieceCost(t.k, t.a) : m.cost }; }
+function forgeTool(t) {
+    const p = t.p || 0;
+    if (p >= FORGE_MAX) return { msg: 'これ以上 強くできない' };
+    if (S.hunger === 0) return { msg: 'おなかがペコペコで つくれない' };
+    const need = forgeCost(t);
+    if (!hasAll(need)) return { msg: '材料がたりない' };
+    for (const k in need) removeItem(k, need[k]);
+    const before = toolStats(t).dur, ok = rnd() < FORGE_RATE[p];
+    t.p = ok ? p + 1 : Math.max(0, p - 1);
+    if (!t.p) delete t.p;
+    const after = toolStats(t).dur;
+    t.d = Math.max(1, Math.min(after, t.d + Math.max(0, after - before)));
+    H.sfx(ok ? 'levelup' : 'error');
+    endTurn(1);
+    return { ok, p: t.p || 0 };
+}
+const enchFits = (t, id) => ENCHANTS[id].for.includes(t.k);
+function enchantTool(t, id, lv) {
+    if (!enchFits(t, id)) return 'つけられない';
+    if (S.hunger === 0) return 'おなかがペコペコで つくれない';
+    const need = ENCH_COST[lv - 1];
+    if (!hasAll(need)) return '材料がたりない';
+    for (const k in need) removeItem(k, need[k]);
+    t.en = { id, lv };
+    H.sfx('unlock');
+    endTurn(1);
+    return null;
+}
 // ---------- 道さがし(タップ移動) ----------
 function pathTo(tx, ty) {
     if (tx === S.x && ty === S.y) return [];

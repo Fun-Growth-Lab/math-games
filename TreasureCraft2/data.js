@@ -60,7 +60,7 @@ defT('DOOR', { n: '扉', door: 1, hp: 5, tool: 'axe', back: 'door' });
 defT('TORCH', { n: '松明', hp: 1, back: 'torch', light: 6 });   // 上を歩ける。「はずす」で しまう
 defT('BENCH', { n: '作業台', solid: 1, hp: 5, tool: 'axe', back: 'bench', station: 'bench' });
 defT('FURNACE', { n: 'かまど', solid: 1, hp: 7, tool: 'pick', back: 'furnace', station: 'furnace', light: 2 });
-defT('ANVIL', { n: '金床', solid: 1, hp: 9, tool: 'pick', back: 'anvil', station: 'bench' }); // 金床は廃止(作業台に統一)。古いセーブに置いてある物は作業台として使える
+defT('ANVIL', { n: '金床', solid: 1, hp: 9, tool: 'pick', back: 'anvil', station: 'anvil' });   // 武器・防具を強化する // 金床は廃止(作業台に統一)。古いセーブに置いてある物は作業台として使える
 defT('BED', { n: '寝床', solid: 1, hp: 4, tool: 'axe', back: 'bed' });
 defT('CHEST', { n: '箱', solid: 1, hp: 5, tool: 'axe', back: 'chest' });
 defT('CROP_C', { n: 'にんじん畑', solid: 1 });
@@ -160,6 +160,7 @@ for (const m in METALS2) {
     defT('FENCE_' + U, Object.assign({ n: M.n + 'の柵', solid: 1, low: 1, hp: Math.round(4 * M.hp), tool: 'pick', tier: 1, back: 'fence_' + m, blast: M.blast, metal: m }, lt));
     defT('FLOOR_' + U, Object.assign({ n: M.n + 'の床', hp: Math.round(3 * M.hp), tool: 'pick', tier: 1, back: 'floor_' + m, floorlike: 1, blast: M.blast, metal: m }, lt));
 }
+defT('ENCH', { n: 'エンチャント台', solid: 1, hp: 9, tool: 'pick', back: 'ench', station: 'ench', light: 3 });   // 武器・防具に 能力をつける
 // 視線をさえぎる物。木や柵はさえぎらない
 ['ROCK', 'BURIED', 'WALL_W', 'WALL_S', 'DOOR', 'RWALL', 'TOWERW', 'SANDB1', 'SANDB2', 'SANDB3', 'HUTW', 'HULL', 'GIANT', 'GIANTB', 'METEOR', 'SPAWNER'].forEach(k => { TILE[T[k]].opaque = 1; });
 TILE.forEach(d => { if (d.wall) d.opaque = 1; });
@@ -183,7 +184,7 @@ const ITEM = {
     feast: { n: 'ごちそう', e: '🍱', food: 100, heal: 40 }, potion: { n: '回復薬', e: '🧪', heal: 60 },
     seed_c: { n: 'にんじんの種', e: '🌱', seed: 'CROP_C' }, nseed: { n: '魔樹の種', c: '#a8306c', plant: 'NTREE', desc: '植えると 魔樹が育つ' }, seed_w: { n: '麦の種', e: '🌱', seed: 'CROP_W' },
     feather_home: { n: '帰還の羽', e: '🕊️', use: 'home' }, shard: { n: '地図のかけら', e: '🗺️', use: 'shard', old: 1 },   // もう手に入らない(古いセーブ用)
-    bench: { n: '作業台', tile: 'BENCH', place: 'BENCH' }, furnace: { n: 'かまど', tile: 'FURNACE', place: 'FURNACE' }, anvil: { n: '金床', tile: 'ANVIL', place: 'ANVIL' },
+    bench: { n: '作業台', tile: 'BENCH', place: 'BENCH' }, furnace: { n: 'かまど', tile: 'FURNACE', place: 'FURNACE' }, anvil: { n: '金床', tile: 'ANVIL', place: 'ANVIL', desc: '武器と防具を強化する' }, ench: { n: 'エンチャント台', tile: 'ENCH', place: 'ENCH', desc: '武器と防具に 能力をつける' },
     bed: { n: '寝床', tile: 'BED', place: 'BED' }, chest: { n: '箱', tile: 'CHEST', place: 'CHEST' }, torch: { n: '松明', tile: 'TORCH', place: 'TORCH' },
     wall_w: { n: '木のかべ', tile: 'WALL_W', place: 'WALL_W', desc: '敵の視線をさえぎる' }, wall_s: { n: '石のかべ', tile: 'WALL_S', place: 'WALL_S', desc: '爆発に1回たえる' }, door: { n: '扉', tile: 'DOOR', place: 'DOOR' },
     floor: { n: '木の床', tile: 'WFLOOR', place: 'WFLOOR' }, arrow_fe: { n: '鉄の矢', c: '#d9dde2', desc: '弓の攻撃+5' }, rail: { n: '線路', tile: 'RAIL', place: 'RAIL', desc: '床にしく' }, ladder: { n: 'はしご', tile: 'LADDER_D', use: 'ladder' }, gate: { n: '門', tile: 'GATE', use: 'gate' }
@@ -232,28 +233,55 @@ const STRINGS = {
     hide: { n: '皮のつる', item: 'hide', cost: 1, range: 5, note: '射程5' },
     silk: { n: '糸のつる', item: 'silk', cost: 1, range: 7, atk: 2, note: '射程7・攻撃+2' }
 };
-const TOOL_KINDS = { sword: { n: '剣', e: '🗡️', head: '刃' }, pick: { n: 'つるはし', e: '⛏️', head: '頭' }, axe: { n: '斧', e: '🪓', head: '頭' }, hoe: { n: 'クワ', e: '🔱', head: '頭' }, shovel: { n: 'スコップ', e: '🪏', head: '頭' }, armor: { n: 'よろい', e: '🛡️', head: '胴' }, bow: { n: '弓', e: '🏹', head: '本体' } };
+const TOOL_KINDS = { sword: { n: '剣', e: '🗡️', head: '刃' }, pick: { n: 'つるはし', e: '⛏️', head: '頭' }, axe: { n: '斧', e: '🪓', head: '頭' }, hoe: { n: 'クワ', e: '🔱', head: '頭' }, shovel: { n: 'スコップ', e: '🪏', head: '頭' }, armor: { n: 'よろい', e: '🛡️', head: '胴' }, helm: { n: 'かぶと', e: '⛑️', head: 'かぶと' }, glove: { n: 'こて', e: '🧤', head: 'こて' }, boot: { n: 'くつ', e: '👢', head: 'くつ' }, bow: { n: '弓', e: '🏹', head: '本体' } };
 
+const ARMOR_KINDS = ['armor', 'helm', 'glove', 'boot'], isArmor = k => ARMOR_KINDS.includes(k);
+const ARMOR_SHARE = { armor: .4, helm: .2, glove: .2, boot: .2 };
+const pieceCost = (k, a) => k === 'armor' ? BODIES[a].cost : Math.ceil(BODIES[a].cost * .4);   // よろい以外は 材料が少ない
+// 金床の強化: +1ごとに 攻撃(守り)と耐久が 元の10%ずつ上がる(+10で2倍)
+const FORGE_MAX = 10, FORGE_RATE = [1, .9, .8, .7, .6, .55, .5, .45, .35, .3];   // 今のプラス値から 1つ上げる確率(+10まで 平均およそ100回)
+const forgeUp = t => 1 + .1 * (t.p || 0);
+// エンチャント: 1つの道具に1つ。Lv1〜3。v は Lvごとの強さ
+const ENCHANTS = {
+    fire: { n: 'ほのお', for: ['sword', 'bow'], v: [3, 6, 9], d: '当てると 追加ダメージ +{0}' },
+    drain: { n: '吸収', for: ['sword', 'bow'], v: [3, 6, 9], d: 'たおすと HP +{0}' },
+    knock: { n: 'ふきとばし', for: ['sword'], v: [30, 60, 100], d: '敵を1マス 押しもどす({0}%)' },
+    crit: { n: '会心', for: ['sword', 'bow'], v: [20, 30, 40], d: '会心の一撃が出る({0}%)' },
+    save: { n: '矢ひろい', for: ['bow'], v: [30, 50, 70], d: '矢がへらない({0}%)' },
+    fast: { n: '速掘り', for: ['pick', 'axe', 'shovel'], v: [1, 2, 3], d: '掘る力 +{0}' },
+    luck: { n: '幸運', for: ['pick', 'axe', 'shovel'], v: [10, 20, 30], d: '2倍とれる +{0}%' },
+    thorn: { n: 'とげ', for: ['armor'], v: [2, 4, 6], d: 'なぐられると {0} やり返す' },
+    full: { n: '腹もち', for: ['armor'], v: [15, 30, 45], d: 'おなかの減り -{0}%' },
+    breath: { n: '水中呼吸', for: ['helm'], v: [20, 40, 60], d: '息 +{0}ターン' },
+    regen: { n: '回復', for: ['glove'], v: [1.3, 1.6, 2], d: 'HPの回復が {0}倍' },
+    light: { n: '身軽', for: ['boot'], v: [50, 75, 100], d: 'わな・落下のダメージ -{0}%' },
+    fireres: { n: 'ほのお耐性', for: ['armor', 'helm', 'glove', 'boot'], v: [25, 50, 75], d: '炎・爆発のダメージ -{0}%' },
+    dura: { n: '長持ち', for: ['sword', 'pick', 'axe', 'hoe', 'shovel', 'bow', 'armor', 'helm', 'glove', 'boot'], v: [25, 40, 55], d: '耐久がへらない({0}%)' }
+};
+const ENCH_COST = [{ crystal: 3 }, { crystal: 3, gem: 1 }, { gem: 2, star: 1 }];
+const enchV = (t, id) => t && t.en && t.en.id === id && ENCHANTS[id] ? ENCHANTS[id].v[t.en.lv - 1] : 0;
 function toolStats(t) {
-    if (t.k === 'armor') {
-        const b = BODIES[t.a], l = LININGS[t.b];
-        return { def: b.def + (l.def || 0), hp: l.hp || 0, thorn: l.thorn || 0, dur: Math.round(b.dur * (t.gem ? 1.3 : 1)) };
+    const up = forgeUp(t);
+    if (isArmor(t.k)) {
+        const b = BODIES[t.a], l = (t.k === 'armor' && LININGS[t.b]) || LININGS.none;
+        return { def: Math.round((b.def * ARMOR_SHARE[t.k] * up + (l.def || 0)) * 10) / 10, hp: l.hp || 0, thorn: (l.thorn || 0) + enchV(t, 'thorn'), dur: Math.round(b.dur * (t.gem ? 1.3 : 1) * up) };
     }
     if (t.k === 'bow') {
         const h = HEADS[t.a], g = STRINGS[t.b];
-        return { atk: Math.round(h.atk * .8) + (g.atk || 0), range: g.range, mine: 0, tier: 0, dur: Math.round(h.dur * (t.gem ? 1.3 : 1)), luck: 0, tough: h.tough || 0, burn: h.burn || 0 };
+        return { atk: Math.round((Math.round(h.atk * .8) + (g.atk || 0)) * up), range: g.range, mine: 0, tier: 0, dur: Math.round(h.dur * (t.gem ? 1.3 : 1) * up), luck: 0, tough: h.tough || 0, burn: h.burn || 0 };
     }
     const h = HEADS[t.a], g = HANDLES[t.b];
     const kindAtk = t.k === 'sword' ? 1 : t.k === 'axe' ? .7 : .4;
     return {
-        atk: Math.round(h.atk * kindAtk) + (g.atk || 0), mine: h.mine + (g.mine || 0), tier: h.tier,
-        dur: Math.round(h.dur * g.durMul * (t.gem ? 1.3 : 1)), luck: h.luck || 0, tough: h.tough || 0, burn: h.burn || 0
+        atk: Math.round((Math.round(h.atk * kindAtk) + (g.atk || 0)) * up), mine: h.mine + (g.mine || 0) + enchV(t, 'fast'), tier: h.tier,
+        dur: Math.round(h.dur * g.durMul * (t.gem ? 1.3 : 1) * up), luck: (h.luck ? .2 : 0) + enchV(t, 'luck') / 100, tough: h.tough || 0, burn: h.burn || 0
     };
 }
 function toolName(t) {
     const g = t.gem ? '宝石つき ' : '';
-    if (t.k === 'armor') return g + BODIES[t.a].n + 'のよろい';
-    return g + HEADS[t.a].n + 'の' + TOOL_KINDS[t.k].n;
+    const p = t.p ? ' +' + t.p : '';
+    if (isArmor(t.k)) return g + BODIES[t.a].n + 'の' + TOOL_KINDS[t.k].n + p;
+    return g + HEADS[t.a].n + 'の' + TOOL_KINDS[t.k].n + p;
 }
 
 // ---------- ふつうのレシピ(個数) ----------
@@ -294,6 +322,8 @@ const RECIPES = [
     { out: 'door', need: { wood: 3 }, st: 'bench' },
     { out: 'ladder', n: 2, need: { wood: 3 }, st: 'bench' },
     { out: 'rail', n: 8, need: { ingot_fe: 1, wood: 1 }, st: 'bench' },
+    { out: 'anvil', need: { ingot_fe: 8 }, st: 'bench' },
+    { out: 'ench', need: { gem: 1, ancient: 3, stone: 10 }, st: 'bench' },
     { out: 'bed', need: { wood: 4, leaf: 5 }, st: 'bench' },
     { out: 'chest', need: { wood: 6 }, st: 'bench' },
     { out: 'furnace', need: { stone: 8 }, st: 'bench' },
@@ -361,7 +391,7 @@ Object.assign(ITEM, {
     gem: { n: '宝石', tile: 'GEM', place: 'GEM', desc: '置くと 光る' }, gmush: { n: '光るきのこ', tile: 'GLOWM', place: 'GLOWM', desc: '置くと 明るい' },
     bow_t: { n: '弓', pseudo: 1 }   // レシピの材料にする「持っている弓(どれでも)」
 });
-const STATION_NAME = { bench: '作業台', furnace: 'かまど' };
+const STATION_NAME = { bench: '作業台', furnace: 'かまど', anvil: '金床', ench: 'エンチャント台' };
 
 // ---------- 魔物 ----------
 // 箱の絵は 1マスを 0〜1 とした [x0,y0,z0,x1,y1,z1,色]。+y(手前)が正面
@@ -417,8 +447,8 @@ const MOBS = {
     mole: { n: 'モグラ兵', hp: 32, atk: 11, spd: .6, agg: 8, drop: [['hide', 1, 1], ['coal', 1, 2]], box: humanoid('#6a4a34', '#7c5a40', '#4a3424', '#111', '#e8d8a8') },
     orec: { n: '鉱石ゴーレム', hp: 75, atk: 17, def: 4, spd: .55, agg: 8, drop: [['ore_fe', 2, 3], ['star', 1, 1, .2]], box: humanoid('#5c6470', '#7fe8ff', '#4a525c', '#102a3a', '#4a525c') },
     // 異世界の敵
-    imp: { n: '炎の子', hp: 42, atk: 16, spd: .9, agg: 10, drop: [['coal', 1, 2]], box: blob('#ff7a2c', '#ffc23c', '#3a1408', .85) },
-    mslime: { n: '溶岩スライム', hp: 65, atk: 20, spd: .5, agg: 8, drop: [['ore_n', 1, 1, .5], ['coal', 1, 1]], box: blob('#c8341c', '#ff9a2c', '#ffe08a', 1.1) },
+    imp: { n: '炎の子', fire: 1, hp: 42, atk: 16, spd: .9, agg: 10, drop: [['coal', 1, 2]], box: blob('#ff7a2c', '#ffc23c', '#3a1408', .85) },
+    mslime: { n: '溶岩スライム', fire: 1, hp: 65, atk: 20, spd: .5, agg: 8, drop: [['ore_n', 1, 1, .5], ['coal', 1, 1]], box: blob('#c8341c', '#ff9a2c', '#ffe08a', 1.1) },
     eye: { n: '魔眼', hp: 50, atk: 16, spd: .6, agg: 10, shoot: 6, drop: [['ore_n', 1, 1, .4]], box: [[.2, .2, .4, .8, .8, 1, '#5c1c6c'], [.32, .8, .54, .68, .82, .9, '#f6f3ea'], [.44, .82, .64, .56, .84, .8, '#d8352c']] },
     knight: { n: '魔骸騎士', hp: 95, atk: 24, def: 6, spd: .7, agg: 10, drop: [['ore_n', 1, 2], ['bone', 1, 2]], box: humanoid('#3c2a4c', '#d8d8cc', '#2a1c38', '#ff3a3a', '#5c1c6c') },
     // 中ボス: 特別な場所にいる主。たおさなくても進めるが、良い物を落とす

@@ -85,11 +85,25 @@ I18N_DICT.push(
     ['地下で役に立つ物を わけてあげよう', 'ちかで やくに たつ ものを わけてあげよう', "I'll share something useful underground."], ['もらう', null, 'Take it'],
     // ----- 名前の組み合わせ -----
     ['{0} ×{1}', null, '{0} ×{1}'], ['+{0} {1}', null, '+{0} {1}'], ['{0} {1}/{2}', null, '{0} {1}/{2}'],
+    // ----- 金床・エンチャント・防具 -----
+    ['かぶと', null, 'Helmet'], ['こて', null, 'Gauntlets'], ['くつ', null, 'Boots'], ['素材', 'そざい', 'Material'],
+    ['金床', 'かなとこ', 'Anvil'], ['エンチャント台', 'エンチャントだい', 'Enchanting Table'], ['武器と防具を強化する', 'ぶきと ぼうぐを きょうか する', 'Upgrades weapons and armor'], ['武器と防具に 能力をつける', 'ぶきと ぼうぐに のうりょくを つける', 'Gives weapons and armor powers'],
+    ['ほのお', null, 'Flame'], ['吸収', 'きゅうしゅう', 'Drain'], ['ふきとばし', null, 'Knockback'], ['会心', 'かいしん', 'Critical'], ['矢ひろい', 'やひろい', 'Arrow Saver'], ['速掘り', 'はやぼり', 'Fast Dig'], ['幸運', 'こううん', 'Luck'],
+    ['とげ', null, 'Thorns'], ['腹もち', 'はらもち', 'Fullness'], ['水中呼吸', 'すいちゅう こきゅう', 'Water Breathing'], ['回復', 'かいふく', 'Regen'], ['身軽', 'みがる', 'Light Feet'], ['ほのお耐性', 'ほのお たいせい', 'Fire Guard'], ['長持ち', 'ながもち', 'Unbreaking'],
+    ['当てると 追加ダメージ +{0}', 'あてると ついかダメージ +{0}', '+{0} damage on hit'], ['たおすと HP +{0}', null, 'HP +{0} on defeat'], ['敵を1マス 押しもどす({0}%)', 'てきを 1マス おしもどす({0}%)', 'Pushes enemies back 1 tile ({0}%)'],
+    ['会心の一撃が出る({0}%)', 'かいしんの いちげきが でる({0}%)', 'Critical hit chance {0}%'], ['矢がへらない({0}%)', 'やが へらない({0}%)', 'Arrows not used up ({0}%)'], ['掘る力 +{0}', 'ほる ちから +{0}', 'Dig +{0}'], ['2倍とれる +{0}%', '2ばい とれる +{0}%', 'Double drops +{0}%'],
+    ['なぐられると {0} やり返す', 'なぐられると {0} やりかえす', 'Hits back {0} when struck'], ['おなかの減り -{0}%', 'おなかの へり -{0}%', 'Hunger -{0}%'], ['息 +{0}ターン', 'いき +{0}ターン', 'Breath +{0} turns'], ['HPの回復が {0}倍', 'HPの かいふくが {0}ばい', 'HP regen ×{0}'],
+    ['わな・落下のダメージ -{0}%', 'わな・らっかの ダメージ -{0}%', 'Trap and fall damage -{0}%'], ['炎・爆発のダメージ -{0}%', 'ほのお・ばくはつの ダメージ -{0}%', 'Fire and blast damage -{0}%'], ['耐久がへらない({0}%)', 'たいきゅうが へらない({0}%)', 'Durability not used ({0}%)'],
+    ['強化', 'きょうか', 'Upgrade'], ['エンチャント', null, 'Enchant'], ['武器や防具を持っていない', 'ぶきや ぼうぐを もっていない', "You don't have any weapons or armor"], ['成功する確率', 'せいこうする かくりつ', 'Success chance'],
+    ['失敗すると +{0} に下がる', 'しっぱいすると +{0} に さがる', 'On failure it drops to +{0}'], ['強化する', 'きょうか する', 'Upgrade'], ['強化する物', 'きょうか する もの', 'Item to upgrade'], ['成功! +{0} になった', 'せいこう! +{0} に なった', 'Success! Now +{0}'],
+    ['失敗… +{0} になった', 'しっぱい… +{0} に なった', 'Failed... Now +{0}'], ['これ以上 強くできない', 'これいじょう つよく できない', "Can't upgrade any further"], ['つけられない', null, "Can't put that on this"],
+    ['いまの能力', 'いまの のうりょく', 'Current power'], ['いまの能力は 消える', 'いまの のうりょくは きえる', 'The current power will be replaced'], ['エンチャントする', null, 'Enchant'], ['つける物', 'つける もの', 'Item'], ['能力', 'のうりょく', 'Power'],
+    ['{0} Lv{1}', null, '{0} Lv{1}'],
 );
 // 道具の名前は 素材と種類の組み合わせ(英語は「Iron Pickaxe」の順)
 function i18nToolName(t) {
     if (LANG === 'ja') return null;
     const g = t.gem ? (LANG === 'en' ? 'Gem ' : 'ほうせきつき ') : '';
-    if (t.k === 'armor') return g + (LANG === 'en' ? tr(BODIES[t.a].n) + ' Armor' : tr(BODIES[t.a].n) + 'の よろい');
-    return g + (LANG === 'en' ? tr(HEADS[t.a].n) + ' ' + tr(TOOL_KINDS[t.k].n) : tr(HEADS[t.a].n) + 'の ' + tr(TOOL_KINDS[t.k].n));
+    const p = t.p ? ' +' + t.p : '', m = isArmor(t.k) ? BODIES[t.a].n : HEADS[t.a].n;
+    return g + (LANG === 'en' ? tr(m) + ' ' + tr(TOOL_KINDS[t.k].n) : tr(m) + 'の ' + tr(TOOL_KINDS[t.k].n)) + p;
 }
