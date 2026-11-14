@@ -806,9 +806,9 @@ function makeBossPlan(m) {
     if (near && roll < .65) {
         const tiles = [];
         for (let y = -3; y <= 3; y++) for (let x = -3; x <= 3; x++) if (Math.max(Math.abs(x), Math.abs(y)) >= 2 && !TILE[getT(S.f, m.x + x, m.y + y)].solid) tiles.push([m.x + x, m.y + y]);
-        return { type: 'slam', tiles, in: ph >= 3 ? 1 : 2, atk: 34, name: 'たたきつけ' };
+        return { type: 'slam', tiles, in: ph >= 3 ? 1 : 2, atk: 39, name: 'たたきつけ' };
     }
-    if (ph >= 2 && roll > .78) return { type: 'nova', tiles: novaTiles(m).tiles, in: 3, atk: 55, name: '魔王の大波動(柱やかべの陰へ!)' };
+    if (ph >= 2 && roll > .78) return { type: 'nova', tiles: novaTiles(m).tiles, in: 3, atk: 63, name: '魔王の大波動(柱やかべの陰へ!)' };
     if (ph >= 2 && roll > .62 && mobs.length < 5) return { type: 'summon', tiles: [], in: 1, name: '手下を呼ぶ' };
     if (roll < .5) {
         const horiz = Math.abs(dx) > Math.abs(dy), sx = horiz ? Math.sign(dx) : 0, sy = horiz ? 0 : (Math.sign(dy) || 1), tiles = [];
@@ -822,14 +822,14 @@ function makeBossPlan(m) {
                 x += sx; y += sy;
             }
         }
-        return { type: 'breath', tiles, in: 2, atk: 40, name: '炎の息' };
+        return { type: 'breath', tiles, in: 2, atk: 46, name: '炎の息' };
     }
     const tiles = [[S.x, S.y]], n = 6 + ph * 4;
     for (let i = 0; i < n; i++) {
         const x = S.x + rint(-4, 4), y = S.y + rint(-4, 4), t = getT(S.f, x, y);
         if (t !== T.CWALL && inArena(x, y)) tiles.push([x, y]);
     }
-    return { type: 'meteor', tiles, in: 2, atk: 30, name: '星ふり' };
+    return { type: 'meteor', tiles, in: 2, atk: 35, name: '星ふり' };
 }
 function runBossPlan(m) {
     const pl = m.plan;
