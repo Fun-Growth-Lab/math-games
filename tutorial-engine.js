@@ -15,6 +15,8 @@
  *   FGLTutorial.begin({ root: '#container', getLang: () => currentLang });
  *   ...練習プレイを開始する処理...
  *   FGLTutorial.run([ {type:'say', target:'#hand', text:{ja:'..', easy:'..', en:'..'}}, ... ]);
+ *   begin の fancy:true で「枠が大きい所から しぼむ動き・押す所の赤い矢印・やさしい色の注意」を使う。warn:{ja,easy,en} で注意の文を変えられる。
+ *   ステップの arrow:true(say でも矢印)/ arrow:対象(矢印だけ別の所を指す)
  */
 (function () {
     'use strict';
@@ -25,6 +27,7 @@
     let layer = null, blockers = [], hole = null, dim = null, cap = null, capText = null,
         capBtn = null, capSkip = null, capCount = null, exitBtn = null, capWarn = null, capFace = null, capName = null;
     const rings = [];
+    let arrowEl = null, holeKey = '';
     let active = false;
     let steps = [], idx = 0, pollTimer = null, skipTimer = null, relayoutTimer = null;
     let origStorage = null, origFetch = null, origBeacon = null;
@@ -97,7 +100,19 @@
             '.fgl-tut-cap.has-face.side{padding-left:92px;min-height:0;}',
             '.fgl-tut-cap.has-face.side .fgl-tut-face{width:64px;height:64px;left:14px;top:20px;transform:none;}',
             '.fgl-tut-exit{position:absolute;right:14px;top:12px;pointer-events:auto;font-family:inherit;font-size:18px;font-weight:800;',
-            'padding:6px 18px;border:2px solid #ffd24a;border-radius:999px;cursor:pointer;color:#ffd24a;background:rgba(24,18,10,0.92);z-index:5;}'
+            'padding:6px 18px;border:2px solid #ffd24a;border-radius:999px;cursor:pointer;color:#ffd24a;background:rgba(24,18,10,0.92);z-index:5;}',
+            // fancy:true のときだけ使う: 枠が大きい所から すっと しぼんで 場所を教え、そのあと ゆっくり ふくらむ / 赤い矢印 / やさしい注意
+            '.fgl-tut-hole.zoom{animation:fglTutPulse 1.3s ease-in-out infinite, fglTutZoom .7s cubic-bezier(.2,.8,.3,1.2), fglTutBreath 1.4s ease-in-out .7s infinite;}',
+            '@keyframes fglTutZoom{0%{transform:scale(2.6);opacity:0}70%{transform:scale(.92);opacity:1}100%{transform:scale(1)}}',
+            '@keyframes fglTutBreath{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}',
+            '.fgl-tut-arrow{position:absolute;width:56px;height:72px;pointer-events:none;z-index:4;filter:drop-shadow(0 3px 3px rgba(0,0,0,.6));}',
+            '.fgl-tut-arrow.down{animation:fglTutArrowD .8s ease-in-out infinite;}',
+            '.fgl-tut-arrow.up{animation:fglTutArrowU .8s ease-in-out infinite;}',
+            '@keyframes fglTutArrowD{0%,100%{transform:translateY(-10px)}50%{transform:translateY(4px)}}',
+            '@keyframes fglTutArrowU{0%,100%{transform:translateY(10px) rotate(180deg)}50%{transform:translateY(-4px) rotate(180deg)}}',
+            '.fgl-tut-warn.gentle{background:#fff3c4;color:#5a3a00;border:3px solid #ffb84a;font-size:21px;}',
+            '.fgl-tut-warn.gentle.on{animation:fglTutSoft .35s ease-out;}',
+            '@keyframes fglTutSoft{0%{transform:scale(.9);opacity:0}100%{transform:scale(1);opacity:1}}'
         ].join('');
         document.head.appendChild(s);
     }
@@ -277,6 +292,7 @@
             if (s.type === 'say') { hole.style.pointerEvents = 'auto'; } else { hole.style.pointerEvents = 'none'; }
         } else {
             hole.style.display = 'none';
+            if (arrowEl) arrowEl.style.display = 'none';
             dim.style.display = 'block';
             // overview:true(画面全体の説明)は、画面の並びが見えるように うすく暗くするだけにする
             dim.style.background = s.overview ? 'rgba(0,0,0,0.22)' : '';
@@ -285,6 +301,7 @@
                 else b.style.display = 'none';
             });
         }
+        if (cfg.fancy) fancyMarks(s, r, m);
         // 操作する物(from)と置く先(to)に目印の枠を重ねる。光る範囲が広い(盤面も含む)時でも、どれを触るかが分かる
         rings.forEach(function (e) { e.parentNode && e.parentNode.removeChild(e); });
         rings.length = 0;
@@ -335,6 +352,29 @@
     }
 
 
+    // fancy: 新しい場所を指すたびに 枠を大きい所から しぼませる。押す所には 赤い矢印を出す
+    function fancyMarks(s, r, m) {
+        const key = r ? [Math.round(r.x), Math.round(r.y), Math.round(r.w), Math.round(r.h), idx].join(',') : '';
+        if (r && key !== holeKey) { hole.classList.remove('zoom'); void hole.offsetWidth; hole.classList.add('zoom'); }
+        holeKey = key;
+        if (!arrowEl) {
+            arrowEl = document.createElement('div'); arrowEl.className = 'fgl-tut-arrow';
+            arrowEl.innerHTML = '<svg viewBox="0 0 56 72" width="56" height="72"><path d="M18 0 H38 V38 H54 L28 70 L2 38 H18 Z" fill="#ff3b30" stroke="#fff" stroke-width="4" stroke-linejoin="round"/></svg>';
+            layer.appendChild(arrowEl);
+        }
+        let a = null;
+        if (r && (s.type === 'do' || s.arrow)) {
+            const at = s.arrow && s.arrow !== true ? s.arrow : (s.only && s.only.from) || null;
+            a = at ? (rectsOf(at, m)[0] || r) : r;
+        }
+        if (!a) { arrowEl.style.display = 'none'; return; }
+        arrowEl.style.display = 'block';
+        const cx = a.x + a.w / 2, up = a.y < 90;   // 上のはしにある物は 下から指す
+        arrowEl.className = 'fgl-tut-arrow ' + (up ? 'up' : 'down');
+        arrowEl.style.left = (cx - 28) + 'px';
+        arrowEl.style.top = (up ? a.y + a.h + 6 : a.y - 78) + 'px';
+    }
+
     /* ---------- 「手順どおりの操作だけ」を許すガード ---------- */
     // 'do' ステップに only:{ from, to, tap, hint } を書くと、
     //   from : 押し始めてよい場所(ドラッグ元・押すボタンなど)。ここ以外を押しても無視して注意を出す。{any:[対象,対象…]} でどれか1つでもOK
@@ -378,7 +418,8 @@
     }
     function warn(o) {
         if (!capWarn) return;
-        capWarn.textContent = pick((o && o.hint) || UI.warn);
+        capWarn.textContent = pick((o && o.hint) || cfg.warn || UI.warn);
+        capWarn.classList.toggle('gentle', !!cfg.fancy);
         capWarn.classList.remove('on'); void capWarn.offsetWidth; capWarn.classList.add('on');
         clearTimeout(warnTimer);
         warnTimer = setTimeout(function () { capWarn.classList.remove('on'); }, 3200);
@@ -543,7 +584,7 @@
     /* ---------- 公開API ---------- */
     // チュートリアル開始の準備(書き込みガード・root設定)
     T.begin = function (opts) {
-        cfg = { root: opts.root, getLang: opts.getLang || cfg.getLang, exitPos: opts.exitPos || 'right', keepClear: opts.keepClear || null, speaker: opts.speaker || null };
+        cfg = { root: opts.root, getLang: opts.getLang || cfg.getLang, exitPos: opts.exitPos || 'right', keepClear: opts.keepClear || null, speaker: opts.speaker || null, fancy: !!opts.fancy, warn: opts.warn || null };
         rootEl = (typeof opts.root === 'string') ? document.querySelector(opts.root) : opts.root;
         if (!rootEl) { console.error('FGLTutorial: root not found'); return; }
         injectCss();
@@ -581,7 +622,7 @@
     T.say = function (text, target, cb) {
         T.run([{ type: 'say', target: target, text: text, after: cb }], { onFinish: function () { T.hide(); } });
     };
-    T.hide = function () { clearTimers(); curStep = null; rings.forEach(function (e) { e.style.display = 'none'; }); if (layer) layer.style.display = 'none'; };
+    T.hide = function () { clearTimers(); curStep = null; rings.forEach(function (e) { e.style.display = 'none'; }); if (arrowEl) arrowEl.style.display = 'none'; if (layer) layer.style.display = 'none'; };
     T.complete = function (msg) {
         clearTimers();
         buildLayer();

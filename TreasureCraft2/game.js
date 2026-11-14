@@ -126,7 +126,7 @@ function loadGame(key) {
         S = o; mobs = [];
         while (S.inv.length < INV_SIZE) S.inv.push(null);
         S.inv.forEach(s => { if (s && s.id === 'bottle_w') s.id = 'bottle'; });   // 水入りびんは なくした   // 持ち物が増えたので 古いセーブの枠を足す
-        S.found = S.found || {}; S.book = S.book || { i: {}, m: {}, p: {} }; S.kept = S.kept || []; S.pets = S.pets || []; S.saplings = S.saplings || []; S.guards = S.guards || {}; S.quests = S.quests || {}; S.dmgT = S.dmgT || {};
+        S.found = S.found || {}; S.book = S.book || { i: {}, m: {}, p: {} }; S.kept = S.kept || []; S.pets = S.pets || []; S.saplings = S.saplings || []; S.guards = S.guards || {}; S.quests = S.quests || {}; S.dmgT = S.dmgT || {}; S.under = S.under || {};
         S.pets.forEach(hp => addPet(hp));
         if (S.f === 2) ensureBoss();
         return true;
@@ -556,7 +556,7 @@ function explode(m) {
             if (n < td.blast) { S.dmg[k] = n + 1; S.dmgT[k] = S.T; continue; }
             delete S.dmg[k];
         }
-        if ((td.hp || td.back) && (!td.door || td.back) && t !== T.SPAWNER && t !== T.METEOR && t !== T.CHEST) { delete S.dmg[exKey(S.f, x, y)]; setT(S.f, x, y, groundOf(S.f, x, y)); }
+        if ((td.hp || td.back) && (!td.door || td.back) && t !== T.SPAWNER && t !== T.METEOR && t !== T.CHEST) { delete S.dmg[exKey(S.f, x, y)]; setT(S.f, x, y, floorUnder(S.f, x, y)); }
     }
     const dist = Math.abs(S.x - m.x) + Math.abs(S.y - m.y);
     if (dist <= 3) { ach('boom'); hurt(dist <= 1 ? 40 : dist === 2 ? 28 : 14, '爆発', null); }
@@ -1315,9 +1315,15 @@ function healDmg() {
     }
 }
 const chipColor = t => ({ [T.TREE]: '#8a5a2c', [T.PINE]: '#6a4424', [T.ROCK]: '#999', [T.WSTONE]: '#888', [T.WDIRT]: '#7a5a3a', [T.ORE_STAR]: '#7fe8ff', [T.ORE_CU]: '#e08a4a', [T.ORE_FE]: '#d8b89a', [T.ORE_AU]: '#ffd84a', [T.ORE_N]: '#c05ab0' })[t] || '#aaa';
+// 物を置いたマスの もとの床(石畳・木の床など)。どけたら もどす
+function floorUnder(f, x, y) {
+    const k = exKey(f, x, y), u = S.under && S.under[k];
+    if (u !== undefined) { delete S.under[k]; return u; }
+    return groundOf(f, x, y);
+}
 function breakTile(x, y, t, tool) {
     const d = TILE[t];
-    const under = TILE[t].floorlike || t === T.FARM ? groundOf(S.f, x, y) : (t === T.RWALL ? T.RFLOOR : groundOf(S.f, x, y));
+    const under = TILE[t].floorlike || t === T.FARM ? groundOf(S.f, x, y) : (t === T.RWALL ? T.RFLOOR : floorUnder(S.f, x, y));
     setT(S.f, x, y, under);
     // 押しっぱなしなら 止めずに そのまま進んで 次を掘る
     H.sfx('garbagebreak');
@@ -1346,7 +1352,7 @@ function takeTile(x, y, t) {
     const k = exKey(S.f, x, y), e = S.ex[k];
     delete S.dmg[k];
     if (TILE[t].disp && e && e.arrows) give('arrow', e.arrows);
-    setT(S.f, x, y, t === T.WIRE_W && e && e.base ? T[e.base] : groundOf(S.f, x, y));
+    setT(S.f, x, y, t === T.WIRE_W && e && e.base ? T[e.base] : floorUnder(S.f, x, y));
     if (t !== T.CHEST) delete S.ex[k];
     give(id, 1); H.sfx('item');
     endTurn(1);
@@ -1527,7 +1533,7 @@ function digInfo() {
     if (soil) return { l: 'ほる', tool: equipped('shovel') || sample('shovel'), ok: !shaftBlock(floorBelow(S.f), x, y) };
     if (t === T.FARM) return { l: 'ほる', tool: equipped('shovel') || sample('shovel'), ok: true };   // 畑は 土にもどる
     if (d.station || t === T.BED || t === T.CHEST) return { l: 'こわす', tool: null, ok: false };   // 中の「片づける」で しまう
-    if (d.ground || t === T.PIT || takeable(t) || t === T.LADDER_U || t === T.STAIRS_U || t === T.CAVEIN || t === T.GATE || !d.hp) return { l: 'ほる', tool: sample('shovel'), ok: false };
+    if ((d.ground && !d.hp) || t === T.PIT || takeable(t) || t === T.LADDER_U || t === T.STAIRS_U || t === T.CAVEIN || t === T.GATE || !d.hp) return { l: 'ほる', tool: sample('shovel'), ok: false };
     if (!d.tool) return { l: 'こわす', tool: null, ok: true };
     const eq = equipped(d.tool), tier = d.tier || 0;
     if (d.tool === 'pick' && tier > 0 && (!eq || toolStats(eq).tier < tier)) return { l: 'こわす', tool: eq || sample('pick'), ok: false };
@@ -1560,7 +1566,7 @@ function digFacing() {
         pruneDmg(); endTurn(1);
         return;
     }
-    if (d.ground) { H.stopHold(); H.log('ここは ほれないようだ', ''); return; }   // 掘れる地面は 上で すんでいる
+    if (d.ground && !d.hp) { H.stopHold(); H.log('ここは ほれないようだ', ''); return; }   // 掘れる地面は 上で すんでいる
     if (t === T.PIT) { H.stopHold(); return; }
     if (takeable(t)) { H.stopHold(); H.log((isWire(t) ? '導線' : d.n) + 'は「はずす」で 外せる', ''); return; }
     if (t === T.LADDER_D || t === T.LADDER_U || t === T.STAIRS_U || t === T.CAVEIN || t === T.GATE) { H.stopHold(); H.log(d.n + 'は こわせない', ''); return; }
@@ -1758,6 +1764,7 @@ function placeOk(it, x, y, t) {
 function placeItem(id, it, x, y, t, after) {
     const place = placeTile(it);
     if (!placeOk(it, x, y, t)) { H.sfx('error'); H.log('そこには 置けない', ''); H.stopHold(); return; }
+    if (!TILE[T[place]].floorlike && t !== groundOf(S.f, x, y) && (TILE[t].ground || TILE[t].floorlike)) (S.under || (S.under = {}))[exKey(S.f, x, y)] = t;   // 床の上に置いた物は 下の床を覚える
     setT(S.f, x, y, T[place]); delete S.dmg['b' + exKey(S.f, x, y)];
     removeItem(id, 1);
     S.got['placed_' + id] = 1;

@@ -476,12 +476,12 @@ const toolImg = t => '<img class="tic" src="' + toolIconUrl({ k: t.k, a: t.a, b:
 function iconHtml(id) { const u = iconUrl(id); return u ? '<img src="' + u + '" alt="">' : (ITEM[id].e || '❔'); }
 const MAKE_ORDER = {
     '': ['bench'],
-    bench: ['torch', 'furnace', 'anvil', 'ench', 'bed', 'wall_w', 'door', 'floor', 'fence', 'chest', 'ladder', 'rail', 'wall_s', 'arrow', 'carpet', 'clamp', 'rod', 'bread', 'arrow_fe', 'glass_w', 'bottle', 'wall_nw', 'floor_nw', 'switch', 'plate', 'bulb', 'conv', 'fconv', 'disp', 'rep', 'notg', 'wall_cu', 'door_cu', 'fence_cu', 'floor_cu', 'wall_fe', 'door_fe', 'fence_fe', 'floor_fe', 'wall_au', 'door_au', 'fence_au', 'floor_au', 'floor_s', 'fence_s', 'door_s', 'fence_nw', 'door_nw', 'wall_sr', 'door_sr', 'fence_sr', 'floor_sr', 'wall_dm', 'door_dm', 'fence_dm', 'floor_dm', 'feather_home', 'crown', 'gate', 'coinpile', 'fossil', 'mclock', 'sball', 'phoenix', 'dpot'],
-    furnace: ['charcoal', 'glass', 'steak', 'ingot_cu', 'roast', 'ingot_fe', 'gfish', 'fegg', 'stew', 'pie', 'potion', 'ingot_au', 'ingot_n', 'feast'],
+    bench: ['torch', 'furnace', 'anvil', 'ench', 'bed', 'wall_w', 'door', 'floor', 'fence', 'chest', 'ladder', 'rail', 'wall_s', 'arrow', 'carpet', 'clamp', 'rod', 'arrow_fe', 'glass_w', 'bottle', 'wall_nw', 'floor_nw', 'switch', 'plate', 'bulb', 'conv', 'fconv', 'disp', 'rep', 'notg', 'wall_cu', 'door_cu', 'fence_cu', 'floor_cu', 'wall_fe', 'door_fe', 'fence_fe', 'floor_fe', 'wall_au', 'door_au', 'fence_au', 'floor_au', 'floor_s', 'fence_s', 'door_s', 'fence_nw', 'door_nw', 'wall_sr', 'door_sr', 'fence_sr', 'floor_sr', 'wall_dm', 'door_dm', 'fence_dm', 'floor_dm', 'feather_home', 'crown', 'gate', 'coinpile', 'fossil', 'mclock', 'sball', 'phoenix', 'dpot'],
+    furnace: ['charcoal', 'glass', 'steak', 'ingot_cu', 'roast', 'bread', 'ingot_fe', 'gfish', 'fegg', 'stew', 'pie', 'potion', 'ingot_au', 'ingot_n', 'feast'],
 };
 // つくる物の分類(作業台・かまど)。[名前, 絵にする物, 入る物]。どれにも入らない物は 1つめの分類に入る
 const MAKE_CATS = {
-    bench: [['くらし', 'bed', ['torch', 'furnace', 'anvil', 'ench', 'bed', 'chest', 'ladder', 'rail', 'carpet', 'bread', 'gate']],
+    bench: [['くらし', 'bed', ['torch', 'furnace', 'anvil', 'ench', 'bed', 'chest', 'ladder', 'rail', 'carpet', 'gate']],
         ['建材', 'wall_s', null],
         ['道具', 'rod', ['arrow', 'arrow_fe', 'rod', 'bottle', 'feather_home']],
         ['回路', 'bulb', ['switch', 'plate', 'bulb', 'conv', 'fconv', 'disp', 'rep', 'notg']],
@@ -733,7 +733,7 @@ let mapFloor = 0;
 const MAP_COL = {};
 function mapColor(t) {
     if (MAP_COL[t]) return MAP_COL[t];
-    const k = TILE[t].key, table = { GRASS: '#7fbf55', GRASS2: '#5fa544', FLOWER: '#c8d070', BERRY: '#5a7ad0', VEG: '#e8a040', WHEATW: '#e0c860', DIRT: '#8a6a44', SAND: '#ecd9a0', SNOW: '#f0f6fb', WATER: '#4a9fd8', TREE: '#3f8a45', PINE: '#2a6e50', CACTUS: '#5a9a4a', ROCK: '#8e8e8a', RWALL: '#c8c090', RFLOOR: '#c8c090', CHEST_W: '#ffd84a', CAVE: '#5a4a3e', WDIRT: '#3a2c20', WSTONE: '#4a4a48', WHARD: '#2e2e3a', MAGMA: '#e8561c', ORE_STAR: '#7fe8ff', GIANT: '#1f6a2a', GIANTB: '#1f6a2a', TOWERW: '#d8d0a8', SANDB1: '#c8a858', SANDB2: '#b89848', SANDB3: '#a88838', METEOR: '#ff6a2c', SCORCH: '#3c3430', HULL: '#6e5230', MAST: '#6e5230', HUTW: '#b8543c', CRYSTAL: '#c8a8ff', SPAWNER: '#c05aff', RAIL: '#a87c40', CAVEIN: '#111111', SAPLING: '#5ab04a', BURIED: '#8e8e8a', WIRE: '#a8301c', WIRE_W: '#c8301c', REP_N: '#a8a8a8', REP_E: '#a8a8a8', REP_S: '#a8a8a8', REP_W: '#a8a8a8', NOT_N: '#4a4a56', NOT_E: '#4a4a56', NOT_S: '#4a4a56', NOT_W: '#4a4a56', CARPET: '#c8443c', CLAMP: '#d8c8ff', CROWN: '#f2c840', WALL_NW: '#6c2448', FLOOR_NW: '#6c2448', STAIRS_U: '#a2a29c', TRAP_PIT: '#c8c090', TRAP_ARROW: '#c8c090', FOSSIL: '#d8d0b8', GEM: '#ff6ac8', GMUSH: '#3ad8c8', GLOWM: '#3ad8c8', VWALL: '#3a2a4a', ASH: '#5c464a', NROCK: '#7a2c2c', CWALL: '#2a1c34', CFLOOR: '#44334c', ORE_N: '#b0349a', NTREE: '#6c2448' };
+    const k = TILE[t].key, table = { GRASS: '#7fbf55', GRASS2: '#5fa544', FLOWER: '#c8d070', BERRY: '#5a7ad0', VEG: '#e8a040', WHEATW: '#e0c860', DIRT: '#8a6a44', SAND: '#ecd9a0', SNOW: '#f0f6fb', WATER: '#4a9fd8', TREE: '#3f8a45', PINE: '#2a6e50', CACTUS: '#5a9a4a', ROCK: '#8e8e8a', RWALL: '#c8c090', RFLOOR: '#a4a49c', FLOOR_ST: '#a4a49c', CHEST_W: '#ffd84a', CAVE: '#5a4a3e', WDIRT: '#3a2c20', WSTONE: '#4a4a48', WHARD: '#2e2e3a', MAGMA: '#e8561c', ORE_STAR: '#7fe8ff', GIANT: '#1f6a2a', GIANTB: '#1f6a2a', TOWERW: '#d8d0a8', SANDB1: '#c8a858', SANDB2: '#b89848', SANDB3: '#a88838', METEOR: '#ff6a2c', SCORCH: '#3c3430', HULL: '#6e5230', MAST: '#6e5230', HUTW: '#b8543c', CRYSTAL: '#c8a8ff', SPAWNER: '#c05aff', RAIL: '#a87c40', CAVEIN: '#111111', SAPLING: '#5ab04a', BURIED: '#8e8e8a', WIRE: '#a8301c', WIRE_W: '#c8301c', REP_N: '#a8a8a8', REP_E: '#a8a8a8', REP_S: '#a8a8a8', REP_W: '#a8a8a8', NOT_N: '#4a4a56', NOT_E: '#4a4a56', NOT_S: '#4a4a56', NOT_W: '#4a4a56', CARPET: '#c8443c', CLAMP: '#d8c8ff', CROWN: '#f2c840', WALL_NW: '#6c2448', FLOOR_NW: '#6c2448', STAIRS_U: '#a2a29c', TRAP_PIT: '#c8c090', TRAP_ARROW: '#c8c090', FOSSIL: '#d8d0b8', GEM: '#ff6ac8', GMUSH: '#3ad8c8', GLOWM: '#3ad8c8', VWALL: '#3a2a4a', ASH: '#5c464a', NROCK: '#7a2c2c', CWALL: '#2a1c34', CFLOOR: '#44334c', ORE_N: '#b0349a', NTREE: '#6c2448' };
     const hex = table[k] || '#6a8a50', n = parseInt(hex.slice(1), 16);
     return (MAP_COL[t] = [n >> 16, (n >> 8) & 255, n & 255]);
 }
@@ -1049,7 +1049,8 @@ $('btn-home').onclick = () => { location.href = '../index.html'; };
 $('btn-sound').onclick = () => { dialog('<h2>設定</h2><div class="langpick"><b>言語</b>' + LANGS.map(l => '<button class="wbtn notr' + (l === LANG ? ' go' : '') + '" data-lang="' + l + '">' + LANG_LABEL[l] + '</button>').join('') + '</div><div id="t-sound"></div><div class="row"><button class="wbtn" id="t-look">主人公をえらぶ</button><button class="wbtn" id="t-code">世界コードではじめる</button><button class="wbtn" id="t-close">とじる</button></div>', b => { soundBtn('#t-sound'); b.querySelectorAll('[data-lang]').forEach(el => el.onclick = () => { if (el.dataset.lang !== LANG) setLang(el.dataset.lang); }); b.querySelector('#t-code').onclick = askWorldCode; b.querySelector('#t-look').onclick = () => openLooks(); b.querySelector('#t-close').onclick = closeDialog; }); };
 // ---------- チュートリアル ----------
 $('btn-tutorial').onclick = () => {
-    FGLTutorial.begin({ root: '#stage', getLang: () => langEasy() });
+    // 枠が しぼむ動き・押す所の赤い矢印・やさしい注意(fancy)
+    FGLTutorial.begin({ root: '#stage', getLang: () => langEasy(), fancy: true, warn: { ja: 'そこじゃないよ。光っているところを 押してみてね', easy: 'そこじゃ ないよ。ひかっている ところを おしてみてね', en: 'Not there. Try the glowing spot!' } });
     H.noAch = true;
     curSlot = null;
     newGame(777777);
@@ -1057,32 +1058,53 @@ $('btn-tutorial').onclick = () => {
     for (let y = -3; y <= 3; y++) for (let x = -3; x <= 3; x++) setT(0, tx + x, ty + y, T.GRASS);
     setT(0, tx + 2, ty, T.TREE);
     S.face = [1, 0];
-    const say = (target, text) => ({ type: 'say', target, text: { ja: text, easy: tr(text), en: tr(text) } });
-    const doo = (target, text, until) => ({ type: 'do', target, text: { ja: text, easy: tr(text), en: tr(text) }, until });
+    const tx3 = text => ({ ja: text, easy: tr(text), en: tr(text) });
+    const say = (target, text, o) => Object.assign({ type: 'say', target, text: tx3(text) }, o || {});
+    const doo = (target, text, until, only) => ({ type: 'do', target, text: tx3(text), until, only });
+    const pad = d => '.pad[data-d="' + d + '"]', PADKEY = { '1,0': ['ArrowRight', 'd', 'D'], '0,-1': ['ArrowUp', 'w', 'W'], '0,1': ['ArrowDown', 's', 'S'] };
+    const padOnly = d => ({ from: pad(d), keys: PADKEY[d] });
+    const me = () => { const p = toScreen(P.rx + .5, P.ry + .5, .7); return { rect: [p[0] - 70, p[1] - 95, 140, 150] }; };
     const panelOpen = () => !$('panel').classList.contains('hidden');
     startPlay();
     FGLTutorial.run([
-        say('#bars', 'これはHPと満腹度。歩いたり掘ったりして 1回行動するたびに 時間が進み、おなかも減るよ。'),
-        doo('#dpad', '▶を長押しして 右の木まで歩き、そのまま押し続けて 木を切ろう。', () => S.got.wood > 0),
+        // まず 画面全体
+        say(null, 'ようこそ! これが ゲームの画面だよ。どこに 何があるか、ひとつずつ 見ていこう。', { overview: true }),
+        say(me, 'まん中にいるのが きみ。足もとの 白いわくは、いま 向いている マスだよ。', { arrow: true }),
+        say('#bars', '左上の 赤いのが HP、オレンジが 満腹度。HPが 0になると たおれちゃうよ。', { arrow: true }),
+        say('#goal', '上の まん中は 目標。つぎに やることが いつも ここに 出るよ。', { arrow: true }),
+        say('#clock', '右上は 日にちと 時間。夜になると まものが 出てくるよ。', { arrow: true }),
+        say('#hot', '下の 8つの わくは 手に持つ物。押すと 持ちかえられるよ。', { arrow: true }),
+        say('#dpad', '左下の 十字ボタンで 歩くよ。1回 押すと 1マス すすむ。', { arrow: true }),
+        say('#actions', '右下は 行動ボタン。いちばん大きいのが「つかう」、となりが「ほる・こわす」だよ。', { arrow: true }),
+        say(null, '1回 うごくたびに 時間が すすむよ。まものも そのあいだに うごくんだ。では やってみよう!', { overview: true }),
+        // 木を切る
+        doo('#dpad', '右の ▶を 1回 押して、右へ 1マス 歩こう。', () => S.x === tx + 1, padOnly('1,0')),
+        doo('#dpad', '目の前に 木が あるね。もう一度 ▶を 押すと 木に ぶつかって 切れるよ。何回か 押そう。', () => S.got.wood > 0, padOnly('1,0')),
         { type: 'run', fn: () => { give('wood', 14); give('leaf', 5); } },
-        doo('#btn-craft', '木材が集まった! 「持ち物」を開こう。', panelOpen),
-        doo('#tab-make', '「つくる」を押そう。', () => tab === 'make'),
-        doo(() => document.querySelector('#rec-bench .mk'), '作業台をつくろう。', () => count('bench') > 0),
-        doo('#panel-close', 'できた! 「とじる」で戻ろう。', () => !panelOpen()),
+        say(null, '木材が 手に入った! 木材で 道具を つくる台(作業台)を つくろう。', { overview: true }),
+        // 作業台をつくる
+        doo('#btn-craft', '「持ち物」ボタンを 押そう。', panelOpen),
+        doo('#tab-make', '上の「つくる」を 押そう。', () => tab === 'make'),
+        doo(() => document.querySelector('#rec-bench .mk'), '作業台の よこの「つくる」を 押そう。', () => count('bench') > 0),
+        doo('#panel-close', 'できた! 右上の「とじる」で もどろう。', () => !panelOpen()),
         { type: 'run', fn: () => { for (let i = 0; i < INV_SIZE; i++) if (S.inv[i] && S.inv[i].id === 'bench') S.sel = i; if (S.sel >= HOT_SIZE) { const q = S.inv[S.sel]; S.inv[S.sel] = S.inv[0]; S.inv[0] = q; S.sel = 0; } S.face = [0, -1]; lastHot = ''; refreshHud(); } },
-        say('#hot', '下の枠で 持つ物をえらぶ。作業台を持っているよ。'),
-        doo('#btn-use', '「置く」で 向いているマス(白いわく)に置こう。', () => S.got.placed_bench),
-        doo('#dpad', '作業台に ぶつかると、作業台でつくれる物が開くよ。▲を押そう。', () => panelOpen() && panelStation() === 'bench'),
+        say('#hot', '作業台を 手に持ったよ。光っている わくが 持っている物だよ。', { arrow: () => $('hot').querySelector('.slot.sel') }),
+        say(me, 'いまは 上を 向いているよ。白いわくの マスに 置けるんだ。', { arrow: true }),
+        doo('#btn-use', '「置く」ボタンを 押して、作業台を 置こう。', () => S.got.placed_bench),
+        // つるはしを組み立てる
+        doo('#dpad', '置いた 作業台に ぶつかると 作業台の 画面が 開くよ。▲を 押そう。', () => panelOpen() && panelStation() === 'bench', padOnly('0,-1')),
         { type: 'run', fn: () => { tab = 'tool'; toolKind = 'pick'; drawPanel(); } },
-        say('#pbody', '素材をえらぶと 性能が変わるのがこのゲームの楽しみ。骨や銅が手に入ったら いろいろ試そう。'),
-        doo('#tool-make', '木のつるはしを 組み立てよう。', () => S.got.tool_pick),
-        doo('#panel-close', '「とじる」で戻ろう。', () => !panelOpen()),
-        { type: 'run', fn: () => { S.face = [0, 1]; VIEW.needDraw = true; } },
-        doo('#btn-dig', '「ほる」を押し続けて 足もとの先に穴をあけよう。', () => getT(0, S.x, S.y + 1) === T.PIT),
+        say('#pbody', 'ここは「組み立て」。左で 道具の 種類、まん中で 素材を えらぶよ。素材で 強さが かわるんだ。'),
+        doo('#tool-make', '木の つるはしが えらばれているよ。「組み立てる」を 押そう。', () => S.got.tool_pick),
+        doo('#panel-close', '「とじる」で もどろう。', () => !panelOpen()),
+        // 穴をほって 地下へ
+        { type: 'run', fn: () => { S.face = [0, 1]; VIEW.needDraw = true; refreshHud(); } },
+        say(me, 'こんどは 下を 向いたよ。この 白いわくの マスを ほって、穴を あけるよ。', { arrow: true }),
+        doo('#btn-dig', '「ほる」ボタンを 何回か 押して、穴を あけよう。', () => getT(0, S.x, S.y + 1) === T.PIT),
         { type: 'run', fn: () => { give('ladder', 2); for (let i = 0; i < INV_SIZE; i++) if (S.inv[i] && S.inv[i].id === 'ladder') { const q = S.inv[i]; S.inv[i] = S.inv[1]; S.inv[1] = q; } S.sel = 1; lastHot = ''; refreshHud(); } },
-        doo('#btn-use', 'はしごを持たせたよ。「かける」で 穴にかけよう。', () => getT(0, S.x, S.y + 1) === T.LADDER_D),
-        doo('#dpad', '▼で はしごに乗ると 地下へ行ける!', () => S.f === 1),
-        say('#goal', '目標はいつもここに出るよ。地下の鉱石で道具を強くして、異世界の魔王をたおそう!')
+        doo('#btn-use', 'はしごを 持たせたよ。「かける」ボタンで 穴に はしごを かけよう。', () => getT(0, S.x, S.y + 1) === T.LADDER_D),
+        doo('#dpad', '▼を 押して はしごに 乗ると 地下へ 行けるよ!', () => S.f === 1, padOnly('0,1')),
+        say('#goal', 'ここは 地下。つぎに やることは いつも 上の 目標に 出るよ。地下の 鉱石で 道具を 強くして、異世界の 魔王を たおそう!', { arrow: true })
     ]);
 };
 

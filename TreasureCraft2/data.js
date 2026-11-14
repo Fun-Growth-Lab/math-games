@@ -13,7 +13,7 @@ defT('SAND', { n: '砂', ground: 1 });
 defT('SNOW', { n: '雪', ground: 1 });
 defT('CAVE', { n: '洞くつの床', ground: 1 });
 defT('ASH', { n: '灰の地面', ground: 1 });
-defT('RFLOOR', { n: '遺跡の床', ground: 1 });
+defT('RFLOOR', { n: '石畳', ground: 1, hp: 6, tool: 'pick', tier: 1, back: 'floor_s', blast: 1 });   // 遺跡などの床。つくる石畳(FLOOR_ST)と同じ: つるはしで はがすと 石畳になる
 defT('CFLOOR', { n: '魔王城の床', ground: 1 });
 defT('WFLOOR', { n: '木の床', hp: 3, tool: 'axe', back: 'floor', floorlike: 1 });
 defT('FARM', { n: '畑', hp: 1, floorlike: 1 });
@@ -328,7 +328,7 @@ const RECIPES = [
     { out: 'chest', need: { wood: 6 }, st: 'bench' },
     { out: 'furnace', need: { stone: 8 }, st: 'bench' },
     { out: 'wall_s', n: 2, need: { stone: 2 }, st: 'bench' },
-    { out: 'bread', need: { wheat: 3 }, st: 'bench' },
+    { out: 'bread', need: { wheat: 3 }, st: 'furnace', t: 2 },
     { out: 'feather_home', need: { feather: 2, ingot_cu: 1 }, st: 'bench' },
     { out: 'charcoal', need: { wood: 2 }, st: 'furnace', t: 2 },
     { out: 'glass', need: { sand: 2 }, st: 'furnace', t: 2 },
