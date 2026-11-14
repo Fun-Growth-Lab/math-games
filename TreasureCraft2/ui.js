@@ -134,9 +134,9 @@ function slotHtml(s, opt) {
 const TOOL_KIND_KEYS = Object.keys(TOOL_KINDS);
 function matColor(t) { return ({ wood: '#a8743c', stone: '#8e8e8a', bone: '#d8d0b8', copper: '#e08a4a', gold: '#ffd84a', iron: '#b8c0c8', ancient: '#5ac8a8', star: '#7fe8ff', demon: '#a030b0', hide: '#9c6a3c' })[t.a] || '#6ad05a'; }
 function slotTip(s) {
-    if (s.tool) { const q = toolStats(s.tool); return toolName(s.tool) + (s.tool.k === 'armor' ? ' 守り' + q.def : s.tool.k === 'bow' ? ' 攻撃' + q.atk + ' 射程' + q.range : ' 攻撃' + q.atk + ' 掘る力' + q.mine) + ' 耐久' + s.tool.d + '/' + q.dur; }
+    if (s.tool) { const q = toolStats(s.tool); return tr(toolName(s.tool)) + ' ' + (s.tool.k === 'armor' ? trf('守り{0}', q.def) : s.tool.k === 'bow' ? trf('攻撃{0}', q.atk) + ' ' + trf('射程{0}', q.range) : trf('攻撃{0}', q.atk) + ' ' + trf('掘る力{0}', q.mine)) + ' ' + trf('耐久{0}/{1}', s.tool.d, q.dur); }
     const it = ITEM[s.id];
-    return it.n + (it.food ? ' 満腹+' + it.food : '') + (it.heal ? ' HP+' + it.heal : '') + (it.desc ? ' ' + it.desc : '');
+    return tr(it.n) + (it.food ? ' ' + trf('満腹+{0}', it.food) : '') + (it.heal ? ' HP+' + it.heal : '') + (it.desc ? ' ' + tr(it.desc) : '');
 }
 // アイテム名の札。マウスは乗せるだけ、タッチは長押しで出る。下の枠をえらんだときも少しだけ出る
 let tipTimer = null, tipLong = false, tipHideT = null;
@@ -179,7 +179,7 @@ function refreshHud() {
     $('air-row').classList.toggle('hidden', air >= AIR_MAX);
     $('air-fill').style.width = (100 * air / AIR_MAX) + '%'; $('air-num').textContent = air + '/' + AIR_MAX;
     const dir = bossDirection();
-    $('clock').innerHTML = (isNight() ? '🌙' : '☀️') + ' ' + dayNo() + '日目 ' + hourStr() + '<small>' + FLOOR_NAME[S.f] + (S.f === 0 ? '・' + BIOME_NAME[biomeAt(S.x, S.y)] : '') + (dir ? '・魔王城 ' + dir.name + ' ' + dir.dist + 'マス' : '') + '</small>';
+    $('clock').innerHTML = (isNight() ? '🌙' : '☀️') + ' ' + dayNo() + '日目 ' + hourStr() + '<small><span>' + FLOOR_NAME[S.f] + '</span>' + (S.f === 0 ? '・<span>' + BIOME_NAME[biomeAt(S.x, S.y)] + '</span>' : '') + (dir ? '・<span>' + trf('魔王城 {0} {1}マス', dir.name, dir.dist) + '</span>' : '') + '</small>';
     const gi = goalIndex();
     $('goal').textContent = circuitMode() ? '回路モード: 自由に回路をつくろう' : gi >= 0 ? '目標: ' + GOALS[gi].t : '魔王をたおした! 自由に遊ぼう';
     // できることに合わせて ボタンの文字を変える。2つあるときだけ もう1つのボタンを出す
@@ -352,6 +352,7 @@ const padUp = e => { if (e.pointerId === padPointer) { padPointer = null; setPad
 dpad.addEventListener('pointerup', padUp); dpad.addEventListener('pointercancel', padUp);
 // 「向きだけ」と「向き固定」は どちらか1つだけ点く
 function setStrafe(on) { strafe = on; $('btn-strafe').classList.toggle('on', on); if (on) { turnOnly = false; $('btn-turn').classList.remove('on'); } }
+if (LANG !== 'ja') { $('btn-turn').querySelector('span').innerHTML = LANG === 'en' ? 'Face<br>only' : 'むき<br>だけ'; $('btn-strafe').querySelector('span').innerHTML = LANG === 'en' ? 'Lock<br>face' : 'むき<br>こてい'; }
 $('btn-turn').addEventListener('click', () => { turnOnly = !turnOnly; $('btn-turn').classList.toggle('on', turnOnly); if (turnOnly) setStrafe(false); });
 $('btn-strafe').addEventListener('click', () => setStrafe(!strafe));
 // 押しっぱなしで続けられるボタン
@@ -586,13 +587,13 @@ function drawTool() {
     // その素材で作ったときの数値
     const headStat = key => {
         const q = toolStats({ k: toolKind, a: key, b: toolB });
-        return armor ? '守り' + q.def + ' 耐久' + q.dur : toolKind === 'sword' || bow ? '攻撃' + q.atk + ' 耐久' + q.dur : '掘る力' + q.mine + ' 耐久' + q.dur;
+        return armor ? trf('守り{0}', q.def) + ' ' + trf('耐久{0}', q.dur) : toolKind === 'sword' || bow ? trf('攻撃{0}', q.atk) + ' ' + trf('耐久{0}', q.dur) : trf('掘る力{0}', q.mine) + ' ' + trf('耐久{0}', q.dur);
     };
     const line = (m, key, on, sel) => {
         const known = !m.item || S.got[m.item] || count(m.item) > 0;
         if (!known) return '<button class="pickb lock" disabled>？？？<small>まだ見つけていない</small></button>';
         const c = m.item ? count(m.item) : 0;
-        const info = sel === 'a' ? headStat(key) + (m.note ? '・' + m.note : '') : (m.note || '&nbsp;');
+        const info = '<span class="notr">' + (sel === 'a' ? headStat(key) + (m.note ? '・' + tr(m.note) : '') : (m.note ? tr(m.note) : '&nbsp;')) + '</span>';
         // 素材が足りないときは 数を赤にして ボタンを薄くする(知っているが今は作れない)
         const short = m.item && c < m.cost;
         return '<button class="pickb' + (on ? ' on' : '') + (short ? ' short' : '') + '" data-' + sel + '="' + key + '">' + m.n + (m.item ? ' <small style="display:inline">' + ITEM[m.item].n + ' <span class="' + (short ? 'lack' : 'ok') + '">' + c + '/' + m.cost + '</span></small>' : '') + '<small>' + info + '</small></button>';
@@ -739,7 +740,7 @@ function drawMap() {
     c.save(); c.translate(232, 18); c.fillStyle = 'rgba(255,248,230,.9)'; c.strokeStyle = '#7c5228'; c.lineWidth = 1.5; c.beginPath(); c.arc(0, 0, 13, 0, 7); c.fill(); c.stroke();
     c.fillStyle = '#d8301c'; c.beginPath(); c.moveTo(0, -10); c.lineTo(3.5, 0); c.lineTo(-3.5, 0); c.closePath(); c.fill();
     c.fillStyle = '#9a9a9a'; c.beginPath(); c.moveTo(0, 10); c.lineTo(3.5, 0); c.lineTo(-3.5, 0); c.closePath(); c.fill(); c.restore();
-    c.font = '900 9px sans-serif'; c.textAlign = 'center'; c.fillStyle = '#5c3c1c'; c.fillText('北', 232, 40);
+    c.font = '900 9px sans-serif'; c.textAlign = 'center'; c.fillStyle = '#5c3c1c'; c.fillText(tr('北'), 232, 40);
     $('map-info').innerHTML = notes.join('<br>');
 }
 // 地図用: まだ読みこんでいないチャンクは作らず、生成式だけで見る(チャンクの入れ物をあふれさせない)
@@ -757,7 +758,7 @@ function dialog(html, wire) { $('dialog-box').innerHTML = html; $('dialog').clas
 function closeDialog() { $('dialog').classList.add('hidden'); }
 // BGM/効果音ボタンは 1つの場所につき1回だけ作る(作るたびに入れ直しの見張りが残り、ボタンがふえるため)
 const SOUND_BTN = {};
-function soundBtn(sel) { if (SOUND_BTN[sel]) SOUND_BTN[sel](); else SOUND_BTN[sel] = FGLBgm.settingsButton(BGM, { parent: sel, sfx: SFX, getLang: () => 'ja' }); }
+function soundBtn(sel) { if (SOUND_BTN[sel]) SOUND_BTN[sel](); else SOUND_BTN[sel] = FGLBgm.settingsButton(BGM, { parent: sel, sfx: SFX, getLang: () => LANG }); }
 function openMenu() {
     saveGame();
     dialog('<h2>メニュー</h2>' + (curSlot && !circuitMode() ? '<b>' + escapeHtml((slotList().find(q => q.id === curSlot) || {}).name || '') + '</b><br>' : circuitMode() ? '<b>回路モード</b><br>' : '') + dayNo() + '日目 / ' + S.T + ' ターン<br>世界コード <b>' + seedToCode(S.seed) + '</b><div class="row menu-main"><button class="wbtn go big" id="m-back">つづける</button><button class="wbtn blue big" id="m-title">セーブしてタイトルへ</button></div><div class="row"><button class="wbtn" id="m-howto">あそびかた</button><button class="wbtn" id="m-keys">キー操作</button><button class="wbtn" id="m-look">主人公</button></div><div id="m-sound"></div>', b => {
@@ -827,7 +828,7 @@ async function showRanking(back) {
     if (!list) return;
     if (!rows) { list.textContent = '読みこめませんでした'; return; }
     if (!rows.length) { list.textContent = 'まだ誰もクリアしていません'; return; }
-    list.innerHTML = rows.map((r, i) => '<div><b>' + (i + 1) + '</b><span>' + escapeHtml(r.name) + '</span><em>' + r.days + '日目</em><small>' + r.turns + 'ターン</small></div>').join('');
+    list.innerHTML = rows.map((r, i) => '<div><b>' + (i + 1) + '</b><span class="notr">' + escapeHtml(r.name) + '</span><em>' + r.days + '日目</em><small>' + r.turns + 'ターン</small></div>').join('');
 }
 (function () {
     const base = 'https://rpxassndgiunoqkxqcco.supabase.co/rest/v1', key = 'sb_publishable_Wnge6OPvSf5l2YEgaPg4rw_nj4CyYAH', GAME = 'treasure_craft2_v1';
@@ -854,7 +855,7 @@ function openHowto() {
     const mob = k => { const s = actorSprite(k, MOBS[k].box, 2, false); const c = mkCanvas(110, 130), x = c.getContext('2d'); x.drawImage(s.cv, 55 - s.ox - 12, 100 - s.oy - 20); return pic(c.toDataURL(), 96); };
     const op = FGLHowto.op;
     FGLHowto.open({
-        lang: 'ja', root: $('stage'), accent: '#7c5228', artBg: 'linear-gradient(#a6dcf4,#8ccb60)', rows: [
+        lang: langSimple(), root: $('stage'), accent: '#7c5228', artBg: 'linear-gradient(#a6dcf4,#8ccb60)', rows: [
             { c: '#5aa83f', art: ic('wood') + op('▶') + ic('bench') + op('▶') + pic(toolIconUrl({ k: 'pick', a: 'iron', b: 'wood' }), 86), t: '集めて つくる', b: '1歩ごとに時間が進む。ぶつかると 切る・掘る・たたかう。集めた素材で道具を組み立てよう' },
             { c: '#7c5228', art: pic(toolIconUrl({ k: 'pick', a: 'iron', b: 'wood' }), 86) + op('▶') + ic('ladder') + op('▶') + ic('star'), t: '地下を掘る', b: '「ほる」で穴をあけ、はしごをかけると地下へ。世界のはしに近い深部に 星晶がある' },
             { c: '#3f4f8c', art: mob('zombie') + mob('wolf') + mob('golem'), t: '夜は気をつけて', b: '夜はまものが増える。寝床で朝まで眠れる。おなかが減るので 料理も大事' },
@@ -903,7 +904,7 @@ const fmtTime = t => { const d = new Date(t); return (d.getMonth() + 1) + '/' + 
 function openSlots() {
     const list = slotList().sort((a, b) => b.updated - a.updated);
     if (!list.length) { closeDialog(); refreshTitleButtons(); return; }
-    const row = q => '<div class="slotrow"><div class="sn"><b>' + (q.mode === 'circuit' ? '<span class="modetag">回路</span>' : '') + escapeHtml(q.name) + '</b><small>' + q.day + '日目 ・ ' + fmtTime(q.updated) + ' に遊んだ</small></div>' +
+    const row = q => '<div class="slotrow"><div class="sn"><b>' + (q.mode === 'circuit' ? '<span class="modetag">回路</span>' : '') + '<span class="notr-if">' + escapeHtml(q.name) + '</span></b><small>' + q.day + '日目 ・ ' + fmtTime(q.updated) + ' に遊んだ</small></div>' +
         '<button class="wbtn go" data-play="' + q.id + '">つづける</button><button class="wbtn" data-ren="' + q.id + '">なまえ</button><button class="wbtn danger" data-del="' + q.id + '">けす</button></div>';
     dialog('<h2>つづきから</h2><div class="slotlist">' + list.map(row).join('') + '</div><div class="row">' + (list.length < SLOT_MAX ? '<button class="wbtn" id="s-new">はじめから</button>' : '') + '<button class="wbtn" id="s-back">もどる</button></div>', b => {
         b.querySelector('#s-back').onclick = closeDialog;
@@ -973,10 +974,10 @@ $('btn-ach').onclick = () => { document.body.classList.add('ach-only'); openPane
 $('btn-rank').onclick = () => showRanking();
 $('btn-howto').onclick = () => openHowto();
 $('btn-home').onclick = () => { location.href = '../index.html'; };
-$('btn-sound').onclick = () => { dialog('<h2>設定</h2><div id="t-sound"></div><div class="row"><button class="wbtn" id="t-look">主人公をえらぶ</button><button class="wbtn" id="t-code">世界コードではじめる</button><button class="wbtn" id="t-close">とじる</button></div>', b => { soundBtn('#t-sound'); b.querySelector('#t-code').onclick = askWorldCode; b.querySelector('#t-look').onclick = () => openLooks(); b.querySelector('#t-close').onclick = closeDialog; }); };
+$('btn-sound').onclick = () => { dialog('<h2>設定</h2><div class="langpick"><b>言語</b>' + LANGS.map(l => '<button class="wbtn notr' + (l === LANG ? ' go' : '') + '" data-lang="' + l + '">' + LANG_LABEL[l] + '</button>').join('') + '</div><div id="t-sound"></div><div class="row"><button class="wbtn" id="t-look">主人公をえらぶ</button><button class="wbtn" id="t-code">世界コードではじめる</button><button class="wbtn" id="t-close">とじる</button></div>', b => { soundBtn('#t-sound'); b.querySelectorAll('[data-lang]').forEach(el => el.onclick = () => { if (el.dataset.lang !== LANG) setLang(el.dataset.lang); }); b.querySelector('#t-code').onclick = askWorldCode; b.querySelector('#t-look').onclick = () => openLooks(); b.querySelector('#t-close').onclick = closeDialog; }); };
 // ---------- チュートリアル ----------
 $('btn-tutorial').onclick = () => {
-    FGLTutorial.begin({ root: '#stage', getLang: () => 'ja' });
+    FGLTutorial.begin({ root: '#stage', getLang: () => langEasy() });
     H.noAch = true;
     curSlot = null;
     newGame(777777);
@@ -1092,7 +1093,7 @@ FGLTitle.mount({
     host: '#title-screen', hue: 100, art: 'compact', skin: 'board', fill: true, tag: 'FUN & GROWTH LAB',
     name: { ja: 'トレジャークラフト2', simple: 'トレジャークラフト2', en: 'Treasure Craft 2' },
     sub: { ja: '≪開発中≫ 掘って つくって 魔王をたおせ', simple: '≪かいはつちゅう≫ ほって つくって まおうを たおせ', en: '[In development] Dig, craft, defeat the demon king' },
-    lang: () => 'ja',
+    lang: () => langSimple(),
     buttons: {
         start: '#btn-start', row: [
             { sel: '#btn-new', ico: 'play' }, { sel: '#btn-tutorial', ico: 'help' }, { sel: '#btn-howto', ico: 'star' }, { sel: '#btn-rank', ico: 'trophy' }, { sel: '#btn-ach', ico: 'star' }, { sel: '#btn-sound', ico: 'gear' },

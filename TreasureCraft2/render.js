@@ -20,14 +20,14 @@ function mkCanvas(w, h) { const c = document.createElement('canvas'); c.width = 
 
 // ---------- 16×16の模様 ----------
 let texSeed = 7;
-const tr = () => { texSeed = (Math.imul(texSeed, 1664525) + 1013904223) | 0; return (texSeed >>> 0) / 4294967296; };
+const trnd = () => { texSeed = (Math.imul(texSeed, 1664525) + 1013904223) | 0; return (texSeed >>> 0) / 4294967296; };
 function speck(cols, fn) {
     const c = mkCanvas(16, 16), x = c.getContext('2d');
-    for (let j = 0; j < 16; j++) for (let i = 0; i < 16; i++) { x.fillStyle = cols[Math.floor(tr() * cols.length)]; x.fillRect(i, j, 1, 1); }
+    for (let j = 0; j < 16; j++) for (let i = 0; i < 16; i++) { x.fillStyle = cols[Math.floor(trnd() * cols.length)]; x.fillRect(i, j, 1, 1); }
     if (fn) fn(x);
     return c;
 }
-const dots = (cols, n) => x => { for (let i = 0; i < n; i++) { x.fillStyle = cols[Math.floor(tr() * cols.length)]; const a = Math.floor(tr() * 13), b = Math.floor(tr() * 13); x.fillRect(a, b, 2 + Math.floor(tr() * 2), 2); } };
+const dots = (cols, n) => x => { for (let i = 0; i < n; i++) { x.fillStyle = cols[Math.floor(trnd() * cols.length)]; const a = Math.floor(trnd() * 13), b = Math.floor(trnd() * 13); x.fillRect(a, b, 2 + Math.floor(trnd() * 2), 2); } };
 const planks = (dark) => x => { x.fillStyle = dark; for (let i = 0; i < 16; i += 4) x.fillRect(i, 0, 1, 16); x.fillRect(2, 6, 1, 3); x.fillRect(10, 9, 1, 3); x.fillStyle = 'rgba(0,0,0,.35)'; for (let i = 0; i < 16; i += 4) { x.fillRect(i + 2, 1, 1, 1); x.fillRect(i + 2, 14, 1, 1); } };
 const bricks = (dark) => x => { x.fillStyle = dark; for (let j = 0; j < 16; j += 4) { x.fillRect(0, j, 16, 1); for (let i = (j % 8 ? 0 : 4); i < 16; i += 8) x.fillRect(i, j, 1, 4); } };
 let TX = null, HIDDEN_SPR = null;
@@ -755,7 +755,7 @@ function drawFx(dt, now) {
     // 手に入れた物は 1つずつ順番に出す
     if (FX.gains.length && now >= FX.nextGain) {
         const g = FX.gains.shift();
-        FX.floats.push({ follow: true, x: S.x, y: S.y, z: 1.35, rise: 1.5, text: '+' + g.n + ' ' + ITEM[g.id].n, c: '#fff6c8', life: 1.15, size: 22 });
+        FX.floats.push({ follow: true, x: S.x, y: S.y, z: 1.35, rise: 1.5, text: '+' + g.n + ' ' + tr(ITEM[g.id].n), c: '#fff6c8', life: 1.15, size: 22 });
         FX.nextGain = now + 430;
     }
     ctx.textAlign = 'center'; ctx.lineJoin = 'round';
@@ -766,8 +766,9 @@ function drawFx(dt, now) {
         const s = q.follow ? toScreen(P.rx + .5, P.ry + .5, q.z) : toScreen(q.x + .5, q.y + .5, q.z);
         ctx.globalAlpha = Math.min(1, q.life * 2);
         ctx.font = '900 ' + (q.size || 22) + 'px "M PLUS Rounded 1c",sans-serif';
-        ctx.strokeStyle = 'rgba(0,0,0,.85)'; ctx.lineWidth = 5; ctx.strokeText(q.text, s[0], s[1]);
-        ctx.fillStyle = q.c; ctx.fillText(q.text, s[0], s[1]);
+        const qt = q.tx || (q.tx = tr(String(q.text)));
+        ctx.strokeStyle = 'rgba(0,0,0,.85)'; ctx.lineWidth = 5; ctx.strokeText(qt, s[0], s[1]);
+        ctx.fillStyle = q.c; ctx.fillText(qt, s[0], s[1]);
         ctx.globalAlpha = 1;
     }
 }
