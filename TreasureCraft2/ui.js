@@ -3,6 +3,8 @@
 const $ = id => document.getElementById(id);
 const SFX = FGLSfx.create({ key: 'treasurecraft2' });
 const BGM = FGLBgm.create({ key: 'treasurecraft2' });
+// ことば: 道具の名前の組み立てと「木」(素材)の名前
+if (LANG !== 'ja') { HEADS.wood.n = LANG === 'en' ? 'Wood' : 'き'; toolName = i18nToolName; }
 const MOVE_MS = 125, SWIM_MS = 240, FIRST_REPEAT_MS = 190;
 const moveWait = () => TILE[getT(S.f, S.x, S.y)].swim ? SWIM_MS : MOVE_MS;
 let ctrlHeld = false;   // Ctrl を押しているあいだは 向きを変えずに歩く
@@ -610,7 +612,7 @@ function drawTool() {
     const chips = '';
     const h = '<div class="col" style="width:170px"><h4>つくる物</h4>' + kinds + chips + '</div>' +
         '<div class="col" style="width:330px"><h4>' + TOOL_KINDS[toolKind].head + 'の素材</h4><div class="scr">' + Object.keys(HA).map(k => line(HA[k], k, k === toolA, 'a')).join('') + '</div></div>' +
-        '<div class="col" style="width:290px"><h4>' + (armor ? '裏地' : bow ? 'つる' : '柄') + '</h4><div class="scr">' + Object.keys(HB).map(k => line(HB[k], k, k === toolB, 'b')).join('') + '</div></div>' +
+        '<div class="col" style="width:290px"><h4>' + (armor ? '裏地' : bow ? (LANG === 'en' ? 'String' : 'つる') : '柄') + '</h4><div class="scr">' + Object.keys(HB).map(k => line(HB[k], k, k === toolB, 'b')).join('') + '</div></div>' +
         '<div class="detail col"><h3>' + toolImg(t) + ' ' + toolName(t) + '</h3><div class="own" style="font-size:16px">持っている ' + ownSame(t) + ' / ' + TOOL_KINDS[toolKind].n + 'は全部で ' + ownKind(toolKind) + '</div>' + stats +
         gemBtn + '<div class="nd" style="font-size:16px;line-height:1.5;margin-top:6px">' + needHtml(need) + '</div>' +
         '<button class="wbtn' + (ok ? ' go' : ' no') + '" id="tool-make" style="margin-top:auto;font-size:24px">組み立てる</button></div>';
@@ -856,10 +858,10 @@ function openHowto() {
     const op = FGLHowto.op;
     FGLHowto.open({
         lang: langSimple(), root: $('stage'), accent: '#7c5228', artBg: 'linear-gradient(#a6dcf4,#8ccb60)', rows: [
-            { c: '#5aa83f', art: ic('wood') + op('▶') + ic('bench') + op('▶') + pic(toolIconUrl({ k: 'pick', a: 'iron', b: 'wood' }), 86), t: '集めて つくる', b: '1歩ごとに時間が進む。ぶつかると 切る・掘る・たたかう。集めた素材で道具を組み立てよう' },
-            { c: '#7c5228', art: pic(toolIconUrl({ k: 'pick', a: 'iron', b: 'wood' }), 86) + op('▶') + ic('ladder') + op('▶') + ic('star'), t: '地下を掘る', b: '「ほる」で穴をあけ、はしごをかけると地下へ。世界のはしに近い深部に 星晶がある' },
-            { c: '#3f4f8c', art: mob('zombie') + mob('wolf') + mob('golem'), t: '夜は気をつけて', b: '夜はまものが増える。寝床で朝まで眠れる。おなかが減るので 料理も大事' },
-            { c: '#8a2a9c', art: ic('gate') + op('▶') + mob('knight') + op('▶') + '<span style="font-size:60px">👑</span>', t: '魔王をたおす', b: '山・雪原・砂漠の魔物の宝と 星晶で門をつくり、異世界へ。光ったマスから にげて 魔王をたおそう' }
+            { c: '#5aa83f', art: ic('wood') + op('▶') + ic('bench') + op('▶') + pic(toolIconUrl({ k: 'pick', a: 'iron', b: 'wood' }), 86), t: tr('集めて つくる'), b: tr('1歩ごとに時間が進む。ぶつかると 切る・掘る・たたかう。集めた素材で道具を組み立てよう') },
+            { c: '#7c5228', art: pic(toolIconUrl({ k: 'pick', a: 'iron', b: 'wood' }), 86) + op('▶') + ic('ladder') + op('▶') + ic('star'), t: tr('地下を掘る'), b: tr('「ほる」で穴をあけ、はしごをかけると地下へ。世界のはしに近い深部に 星晶がある') },
+            { c: '#3f4f8c', art: mob('zombie') + mob('wolf') + mob('golem'), t: tr('夜は気をつけて'), b: tr('夜はまものが増える。寝床で朝まで眠れる。おなかが減るので 料理も大事') },
+            { c: '#8a2a9c', art: ic('gate') + op('▶') + mob('knight') + op('▶') + '<span style="font-size:60px">👑</span>', t: tr('魔王をたおす'), b: tr('山・雪原・砂漠の魔物の宝と 星晶で門をつくり、異世界へ。光ったマスから にげて 魔王をたおそう') }
         ]
     });
 }
@@ -985,8 +987,8 @@ $('btn-tutorial').onclick = () => {
     for (let y = -3; y <= 3; y++) for (let x = -3; x <= 3; x++) setT(0, tx + x, ty + y, T.GRASS);
     setT(0, tx + 2, ty, T.TREE);
     S.face = [1, 0];
-    const say = (target, text) => ({ type: 'say', target, text: { ja: text, easy: text, en: text } });
-    const doo = (target, text, until) => ({ type: 'do', target, text: { ja: text, easy: text, en: text }, until });
+    const say = (target, text) => ({ type: 'say', target, text: { ja: text, easy: tr(text), en: tr(text) } });
+    const doo = (target, text, until) => ({ type: 'do', target, text: { ja: text, easy: tr(text), en: tr(text) }, until });
     const panelOpen = () => !$('panel').classList.contains('hidden');
     startPlay();
     FGLTutorial.run([

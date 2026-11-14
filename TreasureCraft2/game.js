@@ -703,7 +703,7 @@ function dropLoot(x, y, items, quiet) {
     items = items.map(q => Object.assign({ fresh: 1 }, q));   // 拾ったときに 集めた数に入れる印
     const spot = dropPile(x, y, items, 'mob');
     if (!spot) { if (!quiet) for (const q of items) give(q.id, q.n); return; }   // 置ける所がないときは そのまま持ち物へ
-    if (!quiet) H.log(items.map(q => ITEM[q.id].n + (q.n > 1 ? q.n : '')).join('・') + 'を落とした', '');
+    if (!quiet) H.log(trf('{0}を落とした', items.map(q => tr(ITEM[q.id].n) + (q.n > 1 ? (LANG === 'en' ? ' ×' : '') + q.n : '')).join(LANG === 'en' ? ', ' : '・')), '');
 }
 // 魔物の落とし物は2日、自分が死んで落とした荷物は5日で消える
 // 動く床にのっている荷物(S.ex に items)。同じ床に来た荷物は まとまる

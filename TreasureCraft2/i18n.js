@@ -24,6 +24,7 @@ function i18nBuild(list) {
         if (/\{\d\}/.test(ja)) {
             const re = new RegExp('^' + ja.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\\\{(\d)\\\}/g, '([\\s\\S]+?)') + '$');
             const idx = [...ja.matchAll(/\{(\d)\}/g)].map(m => +m[1]);
+            I18N.exact.set(ja, v);   // trf() で そのまま引けるように
             I18N.tpl.push({ re, idx, out: v, len: ja.replace(/\{\d\}/g, '').length });
         } else I18N.exact.set(ja, v);
     }
