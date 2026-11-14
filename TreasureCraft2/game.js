@@ -1450,7 +1450,7 @@ function harvest(x, y, t) {
     endTurn(1);
 }
 // 主人公のいる場所が かべと扉で囲まれているか。水やマグマも まものは通れないので囲いになる
-const ROOM_LIMIT = 150;
+const ROOM_LIMIT = 400;   // 20×20くらいの部屋まで
 function shelterInfo() {
     const seen = new Set([S.y * 1000 + S.x]), q = [[S.x, S.y]], cells = [];
     let fence = false;

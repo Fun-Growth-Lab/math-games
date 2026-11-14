@@ -13,7 +13,7 @@ I18N_DICT.push(
     ['かべで囲って松明をともした部屋で 朝まで眠ろう', 'かべで かこって たいまつを ともした へやで あさまで ねむろう', 'Sleep till morning in a walled room lit by a torch'],
     ['「ほる」で穴をほって、はしごをかけて地下へ行こう', '「ほる」で あなを ほって、はしごを かけて ちかへ いこう', 'Dig a hole, put a Ladder in it and go underground'],
     ['地下で銅鉱石を掘って、銅のかたまりをつくろう', 'ちかで どうこうせきを ほって、どうの かたまりを つくろう', 'Mine Copper Ore underground and smelt a Copper Ingot'],
-    ['石のつるはし以上で 鉄鉱石を掘ろう', 'いしの つるはし いじょうで てっこうせきを ほろう', 'Mine Iron Ore with a Stone Pickaxe or better'],
+    ['銅のつるはし以上で 鉄鉱石を掘ろう', 'どうの つるはし いじょうで てっこうせきを ほろう', 'Mine Iron Ore with a Copper Pickaxe or better'],
     ['鉄のつるはしをつくろう(星晶を掘るのに必要)', 'てつの つるはしを つくろう(せいしょうを ほるのに ひつよう)', 'Build an Iron Pickaxe (needed for Starstone)'],
     ['地下B4より深い階で 星晶を6こ集めよう', 'ちか B4より ふかい かいで せいしょうを 6こ あつめよう', 'Gather 6 Starstone on B4 or deeper'],
     ['夜の山などにいる岩ゴーレムをたおして 大地の核を3こ集めよう', 'よるの やまなどに いる いわゴーレムを たおして だいちの かくを 3こ あつめよう', 'Defeat Rock Golems (mountains at night) for 3 Earth Cores'],

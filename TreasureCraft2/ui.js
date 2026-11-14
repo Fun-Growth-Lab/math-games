@@ -859,9 +859,9 @@ function openKeys() {
     dialog('<h2>キー操作</h2><div class="keys">' + rows.map(r => '<b>' + r[0] + '</b><span>' + r[1] + '</span>').join('') + '</div><div class="row"><button class="wbtn go" id="k-back">とじる</button></div>', b => { b.querySelector('#k-back').onclick = closeDialog; });
 }
 function openBedDialog(x, y) {
-    const night = isNight(), inf = shelterInfo();
-    const line = (ok, a, b) => '<div style="color:' + (ok ? '#2c7a1c' : '#c8301c') + '">' + (ok ? '✔ ' + a : '✖ ' + b) + '</div>';
-    dialog('<h2>寝床</h2>' + line(inf.room, 'かべと扉で囲まれている', '囲まれていない(まものが入ってくる)') + line(inf.lit, '明るい(松明・金の建材)', '暗い(部屋の中に まものがわく)') + (inf.fence ? line(false, '', '柵は敵から見えて 矢も通る') : '') + '<div style="font-size:17px">' + (night ? '朝まで眠ると HPが全回復します。おそわれると目がさめます。' : '少し休むと HPが回復します。夜なら朝まで眠れます。') + '</div><div class="row"><button class="wbtn go" id="b-go">' + (night ? '朝まで眠る' : '少し休む') + '</button><button class="wbtn" id="b-rm">片づける</button><button class="wbtn" id="b-back">もどる</button></div>', b => {
+    const night = isNight();
+    // 囲いや明るさの判定は出さない。眠る前に たしかめることを 書いておくだけ
+    dialog('<h2>寝床</h2><div class="bedcheck"><b>眠る前に たしかめよう</b><div>☐ かべと扉で 囲んだ?(まものが 入ってこない)</div><div>☐ 松明で 明るくした?(部屋の中に まものが わかない)</div></div>' + '<div style="font-size:17px">' + (night ? '朝まで眠ると HPが全回復します。おそわれると目がさめます。' : '少し休むと HPが回復します。夜なら朝まで眠れます。') + '</div><div class="row"><button class="wbtn go" id="b-go">' + (night ? '朝まで眠る' : '少し休む') + '</button><button class="wbtn" id="b-rm">片づける</button><button class="wbtn" id="b-back">もどる</button></div>', b => {
         b.querySelector('#b-go').onclick = () => { closeDialog(); sleep(x, y); };
         b.querySelector('#b-rm').onclick = () => { closeDialog(); removePlaced(x, y); };
         b.querySelector('#b-back').onclick = closeDialog;
