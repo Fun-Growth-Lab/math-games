@@ -2,7 +2,7 @@
 'use strict';
 const TREE_TIME = 960;   // 木の実が木になるまで(2日。畑の4倍)
 const AIR_MAX = 40;   // 息が続くターン数。泳ぎは歩きの半分の速さなので、長押しで約10秒
-const DAY_LEN = 480, DAY_LIGHT = 320, CROP_TIME = 240, INV_SIZE = 64, HOT_SIZE = 8, STACK = 99, SAVE_KEY = 'tc2_save';
+const DAY_LEN = 960, DAY_LIGHT = 640, CROP_TIME = 240, INV_SIZE = 64, HOT_SIZE = 8, STACK = 99, SAVE_KEY = 'tc2_save';
 const H = {
     log() { }, float() { }, chips() { }, shake() { }, sfx() { }, slash() { }, shot() { }, refresh() { }, banner() { }, floorFx() { },
     achieve() { }, seen() { }, victory() { }, dead() { }, openCraft() { }, openChest() { }, openBed() { }, openTrade() { }, openTurn() { }, stopHold() { }, clearPath() { }, gain() { }
@@ -51,7 +51,7 @@ function newGame(seed) {
     seed = seed || newSeed();
     setWorldSeed(seed, null);
     S = {
-        seed, f: 0, x: CENTER, y: CENTER, face: [0, 1], T: 40, air: AIR_MAX, hp: 100, hunger: 100, hungerAcc: 0, regenAcc: 0,
+        seed, f: 0, x: CENTER, y: CENTER, face: [0, 1], T: 80, air: AIR_MAX, hp: 100, hunger: 100, hungerAcc: 0, regenAcc: 0,
         inv: new Array(INV_SIZE).fill(null), sel: 0, ex: {}, dmg: {}, dmgT: {}, got: {}, spawn: { f: 0, x: CENTER, y: CENTER }, bed: null, gate: null,
         graves: [], saplings: [], guards: {}, quests: {}, found: {}, book: { i: {}, m: {}, p: {} }, kept: [], pets: [], deaths: 0, kills: 0, bossHp: MOBS.boss.hp, bossDead: false, cleared: false, seen: Array.from({ length: FLOORS }, () => new Uint8Array(7813)), deepTold: false, lastGoal: -1
     };
@@ -137,13 +137,13 @@ function loadGame(key) {
 const dayNo = () => Math.floor(S.T / DAY_LEN) + 1;
 const dayT = () => S.T % DAY_LEN;
 const isNight = () => dayT() >= DAY_LIGHT;
-const hourStr = () => { const h = (6 + dayT() / 20) % 24; return String(Math.floor(h)).padStart(2, '0') + ':' + String(Math.floor((h % 1) * 60)).padStart(2, '0'); };
+const hourStr = () => { const h = (6 + dayT() / (DAY_LEN / 24)) % 24; return String(Math.floor(h)).padStart(2, '0') + ':' + String(Math.floor((h % 1) * 60)).padStart(2, '0'); };
 // 0=昼 〜 1=夜。夕方と明け方はなめらかに変える
 function nightLevel() {
     const t = dayT();
-    if (t < 20) return 1 - t / 20;
-    if (t < DAY_LIGHT - 40) return 0;
-    if (t < DAY_LIGHT) return (t - (DAY_LIGHT - 40)) / 40;
+    if (t < 40) return 1 - t / 40;
+    if (t < DAY_LIGHT - 80) return 0;
+    if (t < DAY_LIGHT) return (t - (DAY_LIGHT - 80)) / 80;
     return 1;
 }
 
@@ -910,8 +910,8 @@ function endTurn(n) {
         const before = isNight();
         S.T++;
         S.hungerAcc++;
-        if (S.hungerAcc >= 5 && !circuitMode() && rnd() * 100 < enchV(curArmor(), 'full')) S.hungerAcc = 0;   // 腹もち
-        if (S.hungerAcc >= 5 && !circuitMode()) { S.hungerAcc = 0; S.hunger = Math.max(0, S.hunger - 1); if (S.hunger === 20) H.log('おなかが減ってきた…', 'warn'); }
+        if (S.hungerAcc >= HUNGER_EVERY && !circuitMode() && rnd() * 100 < enchV(curArmor(), 'full')) S.hungerAcc = 0;   // 腹もち
+        if (S.hungerAcc >= HUNGER_EVERY && !circuitMode()) { S.hungerAcc = 0; S.hunger = Math.max(0, S.hunger - 1); if (S.hunger === 20) H.log('おなかが減ってきた…', 'warn'); }
         // HPの自然回復はゆっくり。しっかり治すには寝床で眠る
         if (S.hunger >= 30 && S.hp < maxHp() && !S.sleeping && S.T % Math.max(1, Math.round((getT(S.f, S.x, S.y) === T.CARPET ? (S.hunger >= 70 ? 3 : 6) : (S.hunger >= 70 ? 4 : 8)) / (enchV(equipped('glove'), 'regen') || 1))) === 0) S.hp = Math.min(maxHp(), S.hp + 1);
         S.regenAcc++;
@@ -1467,6 +1467,7 @@ function shelterInfo() {
     }
     return { room: true, lit: litNear(S.x, S.y), cells, fence };
 }
+const HUNGER_EVERY = 10;   // 10ターンで 満腹度が1へる
 const REST_TURNS = 60, NIGHT_TURNS = DAY_LEN - DAY_LIGHT;
 // 眠っているあいだも 本当に時間を進める。まものは歩きまわり、部屋がないと襲ってくる
 function sleep(x, y) {

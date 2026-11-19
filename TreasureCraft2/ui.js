@@ -588,7 +588,7 @@ function drawTool() {
     if (!HA[toolA]) toolA = Object.keys(HA)[0];
     if (!HB[toolB]) toolB = armor ? 'none' : bow ? 'hide' : 'wood';
     if (!armor && toolB === 'none') toolB = bow ? 'hide' : 'wood';
-    const kinds = Object.keys(TOOL_KINDS).filter(k => Object.keys(headsAt(k)).length).map(k => '<button class="pickb' + (k === toolKind ? ' on' : '') + '" data-kind="' + k + '" style="font-size:20px">' + toolImg({ k, a: 'iron', b: k === 'bow' ? 'hide' : 'wood' }) + ' ' + TOOL_KINDS[k].n + (ownKind(k) ? ' <small class="own">×' + ownKind(k) + '</small>' : '') + '</button>').join('');
+    const kinds = Object.keys(TOOL_KINDS).filter(k => Object.keys(headsAt(k)).length).map(k => '<button class="pickb kindb' + (k === toolKind ? ' on' : '') + '" data-kind="' + k + '">' + toolImg({ k, a: 'iron', b: k === 'bow' ? 'hide' : 'wood' }) + ' ' + TOOL_KINDS[k].n + (ownKind(k) ? ' <small class="own">×' + ownKind(k) + '</small>' : '') + '</button>').join('');
     // その素材で作ったときの数値
     const headStat = key => {
         const q = toolStats({ k: toolKind, a: key, b: toolB });
@@ -613,7 +613,7 @@ function drawTool() {
     const cmp = (lab, key) => { const v = st[key] || 0, o = cs ? (cs[key] || 0) : 0, d = v - o; return '<div class="stat"><span>' + lab + '</span><span>' + v + (d ? ' <small class="' + (d > 0 ? 'up' : 'down') + '">(' + (d > 0 ? '+' : '') + d + ')</small>' : '') + '</span></div>'; };
     const stats = armor ? cmp('守り', 'def') + cmp('HP', 'hp') + cmp('耐久', 'dur') : bow ? cmp('攻撃', 'atk') + cmp('射程', 'range') + cmp('耐久', 'dur') : (toolKind === 'sword' ? cmp('攻撃', 'atk') + cmp('耐久', 'dur') : cmp('掘る力', 'mine') + cmp('掘れる強さ', 'tier') + cmp('攻撃', 'atk') + cmp('耐久', 'dur'));
     const chips = '';
-    const h = '<div class="col" style="width:170px"><h4>つくる物</h4>' + kinds + chips + '</div>' +
+    const h = '<div class="col" style="width:170px"><h4>つくる物</h4><div class="scr">' + kinds + chips + '</div></div>' +
         '<div class="col" style="width:330px"><h4>' + TOOL_KINDS[toolKind].head + 'の素材</h4><div class="scr">' + Object.keys(HA).map(k => line(HA[k], k, k === toolA, 'a')).join('') + '</div></div>' +
         (toolKind !== 'armor' && armor ? '<div class="col" style="width:290px"></div>' : '<div class="col" style="width:290px"><h4>' + (armor ? '裏地' : bow ? (LANG === 'en' ? 'String' : 'つる') : '柄') + '</h4><div class="scr">' + Object.keys(HB).map(k => line(HB[k], k, k === toolB, 'b')).join('') + '</div></div>') +
         '<div class="detail col"><h3>' + toolImg(t) + ' ' + toolName(t) + '</h3><div class="own" style="font-size:16px">持っている ' + ownSame(t) + ' / ' + TOOL_KINDS[toolKind].n + 'は全部で ' + ownKind(toolKind) + '</div>' + stats +
