@@ -109,6 +109,12 @@ function saveGame() {
     try {
         keptSync();
         S.pets = mobs.filter(m => MOBS[m.t].pet).map(m => m.hp);
+        // まわりの魔物・野生の動物も 残す(なかま・飼っている動物・村人・魔王は 別にもどる)
+        S.mobs = mobs.filter(m => !MOBS[m.t].pet && !m.ref && !MOBS[m.t].npc && !m.big).map(m => {
+            const o = { t: m.t, x: m.x, y: m.y, hp: m.hp, mhp: m.mhp, lv: m.lv, face: m.face };
+            if (m.gkey) o.gkey = m.gkey; if (m.aggro) o.aggro = 1; if (m.fuse) o.fuse = m.fuse;
+            return o;
+        });
         const o = Object.assign({}, S, { seen: S.seen.map(b64), diffs });
         localStorage.setItem(key, JSON.stringify(o));
         { const list = slotList(), q = list.find(q => q.id === curSlot); if (q) { q.updated = Date.now(); q.day = dayNo(); slotWrite(list); } }
@@ -128,6 +134,8 @@ function loadGame(key) {
         S.inv.forEach(s => { if (s && s.id === 'bottle_w') s.id = 'bottle'; });   // 水入りびんは なくした   // 持ち物が増えたので 古いセーブの枠を足す
         S.found = S.found || {}; S.book = S.book || { i: {}, m: {}, p: {} }; S.kept = S.kept || []; S.pets = S.pets || []; S.saplings = S.saplings || []; S.guards = S.guards || {}; S.quests = S.quests || {}; S.dmgT = S.dmgT || {}; S.under = S.under || {};
         S.pets.forEach(hp => addPet(hp));
+        (S.mobs || []).forEach(o => { if (!MOBS[o.t] || mobAt(o.x, o.y)) return; const m = spawnMob(o.t, o.x, o.y); Object.assign(m, { hp: o.hp, mhp: o.mhp || m.mhp, lv: o.lv || m.lv, face: o.face || 2 }); if (o.gkey) m.gkey = o.gkey; if (o.aggro) m.aggro = true; if (o.fuse) m.fuse = o.fuse; });
+        delete S.mobs;
         if (S.f === 2) ensureBoss();
         return true;
     } catch (e) { return false; }
