@@ -368,8 +368,14 @@ function spawnMob(t, x, y) {
     return m;
 }
 const mobAtk = (m, d) => Math.round(d.atk * (1 + .2 * ((m.lv || 1) - 1)));
-function litNear(x, y) {
-    for (let dy = -5; dy <= 5; dy++) for (let dx = -5; dx <= 5; dx++) { const d = TILE[getT(S.f, x + dx, y + dy)]; if ((d.key === 'TORCH' || d.key === 'GLOWM' || d.key === 'GMUSH' || d.metal || d.deco) && d.light && Math.max(Math.abs(dx), Math.abs(dy)) <= d.light - 1) return true; if (d.key === 'BULB' && powered(x + dx, y + dy)) return true; }
+// 明るいか: 画面で明るく見える物(松明・ランプ・マグマ・水晶・光る建材…)の光の円に入っていれば 明るい。まものは 明るい所には わかない
+function litNear(x, y, skip) {   // skip: 数えない物(巣は 自分の光を数えない)
+    for (let dy = -8; dy <= 8; dy++) for (let dx = -8; dx <= 8; dx++) {
+        const d = TILE[getT(S.f, x + dx, y + dy)];
+        if (d.key === skip) continue;
+        if (d.light >= 2 && dx * dx + dy * dy <= d.light * d.light) return true;
+        if (d.key === 'BULB' && dx * dx + dy * dy <= 64 && powered(x + dx, y + dy)) return true;
+    }
     return false;
 }
 // 昼の動物: 水べ(2マス以内に水)なら カモ・カメ(砂漠ならネコ)、それ以外は 土地ごと。砂漠は水べにしか出ない
@@ -637,7 +643,7 @@ function hurt(atk, src, d) {
     if (circuitMode()) return;
     const ps = armorPieces(), def = Math.round(ps.reduce((s, q) => s + toolStats(q).def, 0));
     let dmg = Math.max(Math.ceil(atk * .2), Math.round((atk - def) * (.9 + rnd() * .2)));
-    if ((d && d.fire) || src === '爆発' || src === '炎の息') { const r = Math.min(90, ps.reduce((s, q) => s + enchV(q, 'fireres'), 0)); dmg = Math.round(dmg * (1 - r / 100)); }
+    if ((d && d.fire) || src === '爆発' || src === '炎の息' || src === 'マグマ') { const r = Math.min(90, ps.reduce((s, q) => s + enchV(q, 'fireres'), 0)); dmg = Math.round(dmg * (1 - r / 100)); }
     if (src === '落下' || src === 'わなの矢') dmg = Math.round(dmg * (1 - enchV(equipped('boot'), 'light') / 100));
     S.hp -= dmg;
     if (S.sleeping) S.wokeBy = src;
@@ -1006,7 +1012,7 @@ function worldTick() {
         const s = cavePlaceAt(S.f, S.x, S.y);
         if (s && s.type === 'nest' && getT(S.f, s.x, s.y) === T.SPAWNER && mobs.filter(m => !MOBS[m.t].animal && near2(m.x, m.y, s, 4)).length < 4) {
             const o = pick(DIRS), x = s.x + o[0] * 2, y = s.y + o[1] * 2;
-            if (TILE[getT(S.f, x, y)].ground && !mobAt(x, y) && !(x === S.x && y === S.y)) { spawnMob(s.spawn, x, y); H.chips(x, y, '#c05aff'); }
+            if (TILE[getT(S.f, x, y)].ground && !mobAt(x, y) && !(x === S.x && y === S.y) && !litNear(x, y, 'SPAWNER')) { spawnMob(s.spawn, x, y); H.chips(x, y, '#c05aff'); }   // 明るくすると わかない
         }
     }
     // モンスターハウス: かべに穴があいたら 中に まものが うじゃうじゃ
@@ -1223,6 +1229,30 @@ function bumpMob(m) {
     return false;
 }
 // 動物にエサをやる・オオカミを手なずける。やったら true
+// マグマの やけど(主人公・まもの・動物。動く床で 押しこまれたときも)
+const LAVA_DMG = 10;
+function lavaBurn(m, x, y) {
+    H.chips(x, y, '#ff7a2c');
+    if (m) { if (mobs.includes(m)) damageMob(m, LAVA_DMG, true); }
+    else hurt(LAVA_DMG, 'マグマ', null);
+}
+// バケツ: 水・マグマを くむ / 穴に 入れる
+function scoopAt(x, y, t, id) {
+    if (t !== T.WATER && t !== T.MAGMA) { H.log('ここでは 使えないようだ', ''); return; }
+    if (!S.inv.some(q => !q || (q.id === (t === T.WATER ? 'bucket_w' : 'bucket_l') && q.n < STACK))) { H.sfx('error'); H.log('持ち物がいっぱいで くめない', 'warn'); return; }
+    removeItem(id, 1); give(t === T.WATER ? 'bucket_w' : 'bucket_l', 1);
+    if (t === T.WATER) { setT(S.f, x, y, T.PIT); floodFrom(S.f, x, y); if (DIR4.some(o => getT(S.f, x + o[0], y + o[1]) === T.WATER)) setT(S.f, x, y, T.WATER); }   // 池の水は まわりから すぐ もどる
+    else setT(S.f, x, y, isCave(S.f) ? T.CAVE : S.f === 2 ? T.ASH : groundOf(S.f, x, y));
+    H.sfx('item'); endTurn(1);
+}
+function pourAt(x, y, t, id) {
+    if (t !== T.PIT || mobAt(x, y)) { H.log('ここには 入れられないようだ', ''); return; }
+    const liq = id === 'bucket_l' ? T.MAGMA : T.WATER;
+    removeItem(id, 1); give('bucket', 1);
+    setT(S.f, x, y, liq);
+    if (liq === T.WATER) floodFrom(S.f, x, y);
+    H.sfx('place'); endTurn(1);
+}
 const PET_MAX = 3;
 const FULL_TURNS = 480;   // エサをあげると 半日 満腹   // 連れていける オオカミの数
 function tryFeed(m, s) {
@@ -1270,7 +1300,7 @@ function interact(x, y, t) {
         H.stopHold(); H.log('若木が育っている', '');
         return;
     }
-    if (t === T.MAGMA) { H.stopHold(); H.log('マグマだ!', 'warn'); return; }
+    if (t === T.MAGMA) { H.stopHold(); lavaBurn(null, x, y); endTurn(1); return; }   // マグマには入れない。そちらへ進もうとすると やけど
     if (t === T.PIT) { H.stopHold(); H.refresh(); return; }   // 穴の方を 向くだけ
     if (d.station || t === T.BED || t === T.CHEST) { H.stopHold(); H.log('こわせないようだ', ''); return; }
     if (d.hp) { hitTile(x, y, t); return; }
@@ -1666,6 +1696,8 @@ function buildActions() {
         placeItem(s.id, { place: 'WIRE' }, x, y, t, () => layWire(x, y, axis));
     } });
     if (it.place) list.push({ l: '置く', no: !placeOk(it, x, y, t), run: () => placeItem(s.id, it, x, y, t) });
+    if (it.use === 'bucket') list.push({ l: 'くむ', no: !!fm || !(t === T.WATER || t === T.MAGMA), run: () => scoopAt(x, y, t, s.id) });
+    if (it.use === 'pour') list.push({ l: '入れる', no: !!fm || t !== T.PIT, run: () => pourAt(x, y, t, s.id) });
     if (it.use === 'fill') list.push({ l: 'うめる', no: !((t === T.WATER || t === T.PIT) && !fm), run: () => fillAt(x, y, t, s.id) });
     if (it.use === 'ladder') list.push({ l: 'かける', no: !!fm || !(S.f === 0 ? t === T.PIT : isCave(S.f) && (t === T.PIT || TILE[t].ground)), run: () => useLadder(x, y, t, s.id) });
     if (it.use === 'gate') list.push({ l: '建てる', no: S.f !== 0 || !TILE[t].ground || !!fm, run: () => placeGate(x, y, t, s.id) });

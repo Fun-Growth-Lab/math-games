@@ -193,7 +193,7 @@ function moveOnBelts() {
         // 高速の床は 同じ向きに2マス進む
         for (let i = 0; i < b.n; i++) {
             const nx = x + DIR4[b.d][0], ny = y + DIR4[b.d][1];
-            if (!canRide(nx, ny, !m)) break;
+            if (!canRide(nx, ny, !m)) { if (getT(S.f, nx, ny) === T.MAGMA) lavaBurn(m, nx, ny); break; }
             x = nx; y = ny;
         }
         if (m) { if (x !== m.x || y !== m.y) m.via = [m.x, m.y]; m.x = x; m.y = y; } else if (x !== S.x || y !== S.y) { playerVia = [S.x, S.y]; S.x = x; S.y = y; H.clearPath(); const e = S.ex[exKey(S.f, x, y)]; if (getT(S.f, x, y) === T.GRAVE || (e && e.items)) pickupPile(x, y, true); }

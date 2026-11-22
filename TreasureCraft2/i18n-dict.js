@@ -64,7 +64,7 @@ const I18N_DICT = [
     ['柵は敵から見えて 矢も通る', 'さくは てきから みえて やも とおる', 'Enemies can see and shoot through fences'],
     ['朝まで眠ると HPが全回復します。おそわれると目がさめます。', 'あさまで ねむると HPが ぜんかいふく するよ。おそわれると めが さめるよ。', 'Sleep until morning to fully heal. You wake up if attacked.'],
     ['少し休むと HPが回復します。夜なら朝まで眠れます。', 'すこし やすむと HPが かいふく するよ。よるなら あさまで ねむれるよ。', 'Rest a little to heal. At night you can sleep until morning.'],
-    ['ステータス', null, 'Status'], ['もと', null, 'Base'], ['弓の攻撃', 'ゆみの こうげき', 'Bow ATK'], ['息', 'いき', 'Breath'], ['特別な力', 'とくべつな ちから', 'Special powers'], ['鉄の矢', 'てつの や', 'Iron Arrow'],
+    ['ステータス', null, 'Status'], ['身につけている物', 'みに つけている もの', 'Equipment'], ['✦ 特別な力', '✦ とくべつな ちから', '✦ Special powers'], ['もと', null, 'Base'], ['弓の攻撃', 'ゆみの こうげき', 'Bow ATK'], ['息', 'いき', 'Breath'], ['特別な力', 'とくべつな ちから', 'Special powers'], ['鉄の矢', 'てつの や', 'Iron Arrow'],
     ['眠る前に たしかめよう', 'ねむる まえに たしかめよう', 'Before you sleep, check:'], ['☐ かべと扉で 囲んだ?(まものが 入ってこない)', '☐ かべと とびらで かこんだ?(まものが はいってこない)', '☐ Walled in with doors? (keeps monsters out)'], ['☐ 松明で 明るくした?(部屋の中に まものが わかない)', '☐ たいまつで あかるく した?(へやの なかに まものが わかない)', '☐ Lit with torches? (no monsters spawn inside)'],
     ['朝まで眠る', 'あさまで ねむる', 'Sleep till morning'], ['少し休む', 'すこし やすむ', 'Rest a bit'],
     // 力つきた・クリア・ランキング

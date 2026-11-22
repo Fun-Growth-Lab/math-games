@@ -3,7 +3,7 @@
 'use strict';
 I18N_DICT.push(
     // ----- アイテム -----
-    ['矢', 'や', 'Arrow'], ['矢羽根', 'やばね', 'Fletching'], ['矢の材料', 'やの ざいりょう', 'For making arrows'], ['おなかいっぱい', null, 'Full'], ['釣りざお', 'つりざお', 'Fishing Rod'], ['魚', 'さかな', 'Fish'], ['焼き魚', 'やきざかな', 'Grilled Fish'], ['金の魚', 'きんの さかな', 'Golden Fish'], ['光る魚', 'ひかる さかな', 'Glowing Fish'],
+    ['矢', 'や', 'Arrow'], ['バケツ', null, 'Bucket'], ['水入りバケツ', 'みずいり バケツ', 'Water Bucket'], ['マグマ入りバケツ', 'マグマいり バケツ', 'Magma Bucket'], ['水やマグマを くむ', 'みずや マグマを くむ', 'Scoops water or magma'], ['穴に 水を入れる', 'あなに みずを いれる', 'Pours water into a hole'], ['穴に マグマを入れる', 'あなに マグマを いれる', 'Pours magma into a hole'], ['くむ', null, 'Scoop'], ['入れる', 'いれる', 'Pour'], ['持ち物がいっぱいで くめない', 'もちものが いっぱいで くめない', "Bag full, can't scoop"], ['ここには 入れられないようだ', 'ここには いれられないようだ', "Can't pour it here"], ['矢羽根', 'やばね', 'Fletching'], ['矢の材料', 'やの ざいりょう', 'For making arrows'], ['おなかいっぱい', null, 'Full'], ['釣りざお', 'つりざお', 'Fishing Rod'], ['魚', 'さかな', 'Fish'], ['焼き魚', 'やきざかな', 'Grilled Fish'], ['金の魚', 'きんの さかな', 'Golden Fish'], ['光る魚', 'ひかる さかな', 'Glowing Fish'],
     ['木材', 'もくざい', 'Wood'], ['葉っぱ', 'はっぱ', 'Leaves'], ['石', 'いし', 'Stone'], ['石炭', 'せきたん', 'Coal'], ['木炭', 'もくたん', 'Charcoal'], ['骨', 'ほね', 'Bone'], ['皮', 'かわ', 'Leather'],
     ['羊毛', 'ようもう', 'Wool'], ['羽', 'はね', 'Feather'], ['クモの糸', 'クモの いと', 'Spider Silk'], ['銅鉱石', 'どうこうせき', 'Copper Ore'], ['鉄鉱石', 'てっこうせき', 'Iron Ore'], ['金鉱石', 'きんこうせき', 'Gold Ore'],
     ['魔鉱石', 'まこうせき', 'Demon Ore'], ['銅のかたまり', 'どうの かたまり', 'Copper Ingot'], ['鉄のかたまり', 'てつの かたまり', 'Iron Ingot'], ['金のかたまり', 'きんの かたまり', 'Gold Ingot'], ['魔鋼', 'まこう', 'Demon Steel'],

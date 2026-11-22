@@ -476,14 +476,14 @@ const toolImg = t => '<img class="tic" src="' + toolIconUrl({ k: t.k, a: t.a, b:
 function iconHtml(id) { const u = iconUrl(id); return u ? '<img src="' + u + '" alt="">' : (ITEM[id].e || '❔'); }
 const MAKE_ORDER = {
     '': ['bench'],
-    bench: ['torch', 'furnace', 'anvil', 'ench', 'bed', 'wall_w', 'door', 'floor', 'fence', 'chest', 'ladder', 'rail', 'wall_s', 'fletch', 'arrow', 'carpet', 'clamp', 'rod', 'arrow_fe', 'glass_w', 'bottle', 'wall_nw', 'floor_nw', 'switch', 'plate', 'bulb', 'conv', 'fconv', 'disp', 'rep', 'notg', 'wall_cu', 'door_cu', 'fence_cu', 'floor_cu', 'wall_fe', 'door_fe', 'fence_fe', 'floor_fe', 'wall_au', 'door_au', 'fence_au', 'floor_au', 'floor_s', 'fence_s', 'door_s', 'fence_nw', 'door_nw', 'wall_sr', 'door_sr', 'fence_sr', 'floor_sr', 'wall_dm', 'door_dm', 'fence_dm', 'floor_dm', 'feather_home', 'crown', 'gate', 'coinpile', 'fossil', 'mclock', 'sball', 'phoenix', 'dpot'],
+    bench: ['torch', 'furnace', 'anvil', 'ench', 'bed', 'wall_w', 'door', 'floor', 'fence', 'chest', 'ladder', 'rail', 'bucket', 'wall_s', 'fletch', 'arrow', 'carpet', 'clamp', 'rod', 'arrow_fe', 'glass_w', 'bottle', 'wall_nw', 'floor_nw', 'switch', 'plate', 'bulb', 'conv', 'fconv', 'disp', 'rep', 'notg', 'wall_cu', 'door_cu', 'fence_cu', 'floor_cu', 'wall_fe', 'door_fe', 'fence_fe', 'floor_fe', 'wall_au', 'door_au', 'fence_au', 'floor_au', 'floor_s', 'fence_s', 'door_s', 'fence_nw', 'door_nw', 'wall_sr', 'door_sr', 'fence_sr', 'floor_sr', 'wall_dm', 'door_dm', 'fence_dm', 'floor_dm', 'feather_home', 'crown', 'gate', 'coinpile', 'fossil', 'mclock', 'sball', 'phoenix', 'dpot'],
     furnace: ['charcoal', 'glass', 'steak', 'ingot_cu', 'roast', 'bread', 'ingot_fe', 'gfish', 'fegg', 'stew', 'pie', 'potion', 'ingot_au', 'ingot_n', 'feast'],
 };
 // つくる物の分類(作業台・かまど)。[名前, 絵にする物, 入る物]。どれにも入らない物は 1つめの分類に入る
 const MAKE_CATS = {
     bench: [['くらし', 'bed', ['torch', 'furnace', 'anvil', 'ench', 'bed', 'chest', 'ladder', 'rail', 'carpet', 'gate']],
         ['建材', 'wall_s', null],
-        ['道具', 'rod', ['fletch', 'arrow', 'arrow_fe', 'rod', 'bottle', 'feather_home']],
+        ['道具', 'rod', ['bucket', 'fletch', 'arrow', 'arrow_fe', 'rod', 'bottle', 'feather_home']],
         ['回路', 'bulb', ['switch', 'plate', 'bulb', 'conv', 'fconv', 'disp', 'rep', 'notg']],
         ['かざり', 'crown', ['clamp', 'crown', 'coinpile', 'fossil', 'mclock', 'sball', 'phoenix', 'dpot']]],
     furnace: [['素材', 'ingot_fe', ['charcoal', 'glass', 'ingot_cu', 'ingot_fe', 'ingot_au', 'ingot_n']], ['料理', 'steak', null]]
@@ -610,7 +610,7 @@ function drawTool() {
     const gc = count('gem'), gemBtn = gemKnown ? '<button class="pickb' + (toolGem ? ' on' : '') + (gc < 1 ? ' short' : '') + '" id="tool-gem" style="margin-top:6px">宝石の飾り <small style="display:inline">耐久+30% 宝石 <span class="' + (gc < 1 ? 'lack' : 'ok') + '">' + gc + '/1</span></small></button>' : '';
     const ok = hasAll(need);
     const cur = equipped(toolKind), cs = cur ? toolStats(cur) : null;
-    const cmp = (lab, key) => { const v = st[key] || 0, o = cs ? (cs[key] || 0) : 0, d = v - o; return '<div class="stat"><span>' + lab + '</span><span>' + v + (d ? ' <small class="' + (d > 0 ? 'up' : 'down') + '">(' + (d > 0 ? '+' : '') + d + ')</small>' : '') + '</span></div>'; };
+    const cmp = (lab, key) => { const v = st[key] || 0, o = cs ? (cs[key] || 0) : 0, d = Math.round((v - o) * 10) / 10; return '<div class="stat"><span>' + lab + '</span><span>' + v + (d ? ' <small class="' + (d > 0 ? 'up' : 'down') + '">(' + (d > 0 ? '+' : '') + d + ')</small>' : '') + '</span></div>'; };
     const stats = armor ? cmp('守り', 'def') + cmp('HP', 'hp') + cmp('耐久', 'dur') : bow ? cmp('攻撃', 'atk') + cmp('射程', 'range') + cmp('耐久', 'dur') : (toolKind === 'sword' ? cmp('攻撃', 'atk') + cmp('耐久', 'dur') : cmp('掘る力', 'mine') + cmp('掘れる強さ', 'tier') + cmp('攻撃', 'atk') + cmp('耐久', 'dur'));
     const chips = '';
     const h = '<div class="col" style="width:170px"><h4>つくる物</h4><div class="scr">' + kinds + chips + '</div></div>' +
@@ -699,28 +699,44 @@ function drawEnch() {
     };
 }
 
-// ステータス: 大きな主人公のまわりに 身につけている物。右に 数値と その内わけ(もと + 装備)
+// ステータス: 左に 大きな主人公、まん中に 身につけている物、右に 数値と その内わけ(もと + 装備)
+// 主人公の絵は 拡大でぼやけないよう、6倍の大きさで 描きなおしてから 切りぬく
+const portraitCache = {};
+function heroPortrait(o) {
+    if (portraitCache[o.id]) return portraitCache[o.id];
+    const K = 6, rot = VIEW.rot; VIEW.rot = 0;
+    const spr = boxSprite(o.box.map(b => rotBox(b.slice(), FACE_ROT[2])), { sc: K, w: O_W * K, h: O_H * K, ox: O_X * K, oy: O_Y * K });
+    VIEW.rot = rot;
+    const c = spr.cv.getContext('2d'), W = spr.cv.width, Hh = spr.cv.height, d = c.getImageData(0, 0, W, Hh).data;
+    let x0 = W, x1 = 0, y0 = Hh, y1 = 0;
+    for (let i = 3; i < d.length; i += 4) if (d[i] > 20) { const p = (i - 3) / 4, x = p % W, y = (p / W) | 0; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    const out = mkCanvas(x1 - x0 + 1, y1 - y0 + 1);
+    out.getContext('2d').drawImage(spr.cv, x0, y0, out.width, out.height, 0, 0, out.width, out.height);
+    return (portraitCache[o.id] = out.toDataURL());
+}
 function drawStat() {
     const eq = k => equipped(k);
     const slot = k => {
         const t = eq(k);
-        return '<div class="eqs' + (t ? '' : ' none') + '"><span class="ek">' + TOOL_KINDS[k].n + '</span>' + (t ? toolImg(t) + '<b>' + toolName(t) + '</b>' + (t.en ? '<small>' + ENCHANTS[t.en.id].n + ' Lv' + t.en.lv + '</small>' : '') : '<b>なし</b>') + '</div>';
+        return '<div class="eqs' + (t ? '' : ' none') + '"><div class="ei">' + (t ? toolImg(t) : '') + '</div><div class="et"><span class="ek">' + TOOL_KINDS[k].n + '</span><b>' + (t ? toolName(t) : 'なし') + '</b>' + (t && t.en ? '<small>✦ ' + ENCHANTS[t.en.id].n + ' Lv' + t.en.lv + '</small>' : '') + '</div></div>';
     };
     const num = v => Math.round(v * 10) / 10;
-    const row = (lab, val, parts) => '<div class="srow"><span class="sl">' + lab + '</span><span class="sv">' + val + '</span><span class="sp notr">' + parts.map(p => '<i>' + tr(p[0]) + ' <b>' + p[1] + '</b></i>').join('<em>+</em>') + '</span></div>';
+    const row = (ico, lab, val, parts) => '<div class="srow"><span class="si">' + ico + '</span><div class="sm"><span class="sl">' + lab + '</span><span class="sp notr">' + parts.map(p => '<i>' + tr(p[0]) + ' <b>' + p[1] + '</b></i>').join('<em>+</em>') + '</span></div><span class="sv">' + val + '</span></div>';
     const w = bestWeapon(), ws = w ? toolStats(w) : null, bow = eq('bow'), bs = bow ? toolStats(bow) : null, pick = eq('pick'), ps = pick ? toolStats(pick) : null;
     const armor = ARMOR_KINDS.map(eq).filter(Boolean), body = eq('armor'), lin = body && LININGS[body.b];
     const rows = [];
-    rows.push(row('HP', maxHp(), [['もと', 100]].concat(lin && lin.hp ? [[lin.n, lin.hp]] : [])));
-    { const parts = [['もと', 2]]; if (w) parts.push([toolName(w), ws.atk]); if (ws && ws.burn) parts.push(['炎の追加ダメージ', 5]); if (w && enchV(w, 'fire')) parts.push([ENCHANTS.fire.n, enchV(w, 'fire')]); rows.push(row('攻撃', parts.reduce((s, p) => s + p[1], 0), parts)); }
-    if (bow) { const fe = count('arrow_fe') > 0, parts = [['もと', 2], [toolName(bow), bs.atk]]; if (fe) parts.push(['鉄の矢', 5]); if (enchV(bow, 'fire')) parts.push([ENCHANTS.fire.n, enchV(bow, 'fire')]); rows.push(row('弓の攻撃', parts.reduce((s, p) => s + p[1], 0), parts)); rows.push(row('射程', bs.range, [[toolName(bow), bs.range]])); }
-    { const parts = armor.map(t => [toolName(t), num(toolStats(t).def)]); rows.push(row('守り', Math.round(armor.reduce((s, t) => s + toolStats(t).def, 0)), parts.length ? parts : [['なし', 0]])); }
-    if (pick) rows.push(row('掘る力', ps.mine, [[toolName(pick), ps.mine]]));
-    rows.push(row('息', airMax(), [['もと', AIR_MAX]].concat(enchV(eq('helm'), 'breath') ? [[ENCHANTS.breath.n, enchV(eq('helm'), 'breath')]] : [])));
-    const ens = [w, bow, pick, eq('axe'), eq('shovel'), eq('hoe')].concat(armor).filter(t => t && t.en);
-    const enHtml = ens.length ? '<div class="sen">' + ens.map(t => '<div><b>' + ENCHANTS[t.en.id].n + ' Lv' + t.en.lv + '</b> <span class="notr">' + tr(trf(ENCHANTS[t.en.id].d, ENCHANTS[t.en.id].v[t.en.lv - 1])) + '</span></div>').join('') + '</div>' : '';
-    $('pbody').innerHTML = '<div class="stfig"><div class="eqcol">' + ['sword', 'bow', 'pick', 'axe', 'shovel', 'hoe'].map(slot).join('') + '</div><div class="hero"><img src="' + lookThumb(curLook()) + '" alt=""></div><div class="eqcol">' + ARMOR_KINDS.map(slot).join('') + '</div></div>' +
-        '<div class="detail stlist"><h3>ステータス</h3>' + rows.join('') + (enHtml ? '<h4 style="margin:10px 0 4px">特別な力</h4>' + enHtml : '') + '</div>';
+    rows.push(row('❤️', 'HP', maxHp(), [['もと', 100]].concat(lin && lin.hp ? [[lin.n, lin.hp]] : [])));
+    { const parts = [['もと', 2]]; if (w) parts.push([toolName(w), ws.atk]); if (ws && ws.burn) parts.push(['炎の追加ダメージ', 5]); if (w && enchV(w, 'fire')) parts.push([ENCHANTS.fire.n, enchV(w, 'fire')]); rows.push(row('⚔️', '攻撃', parts.reduce((s, p) => s + p[1], 0), parts)); }
+    { const parts = armor.map(t => [toolName(t), num(toolStats(t).def)]); rows.push(row('🛡️', '守り', Math.round(armor.reduce((s, t) => s + toolStats(t).def, 0)), parts.length ? parts : [['なし', 0]])); }
+    if (bow) { const fe = count('arrow_fe') > 0, parts = [['もと', 2], [toolName(bow), bs.atk]]; if (fe) parts.push(['鉄の矢', 5]); if (enchV(bow, 'fire')) parts.push([ENCHANTS.fire.n, enchV(bow, 'fire')]); rows.push(row('🏹', '弓の攻撃', parts.reduce((s, p) => s + p[1], 0), parts)); rows.push(row('🎯', '射程', bs.range, [[toolName(bow), bs.range]])); }
+    if (pick) rows.push(row('⛏️', '掘る力', ps.mine, [[toolName(pick), ps.mine]]));
+    rows.push(row('🫧', '息', airMax(), [['もと', AIR_MAX]].concat(enchV(eq('helm'), 'breath') ? [[ENCHANTS.breath.n, enchV(eq('helm'), 'breath')]] : [])));
+    const ens = [w, bow, pick, eq('axe'), eq('shovel'), eq('hoe')].concat(armor).filter((t, i, a) => t && t.en && a.indexOf(t) === i);
+    const enHtml = ens.length ? '<div class="sen"><h4>✦ 特別な力</h4>' + ens.map(t => '<div><b>' + ENCHANTS[t.en.id].n + ' Lv' + t.en.lv + '</b><span class="notr">' + tr(trf(ENCHANTS[t.en.id].d, ENCHANTS[t.en.id].v[t.en.lv - 1])) + '</span></div>').join('') + '</div>' : '';
+    const look = curLook();
+    $('pbody').innerHTML = '<div class="stcard"><div class="sthero"><img src="' + heroPortrait(look) + '" alt=""></div><div class="stname">' + look.n + '</div></div>' +
+        '<div class="steq"><h4>身につけている物</h4><div class="eqgrid">' + ['sword', 'helm', 'bow', 'armor', 'pick', 'glove', 'axe', 'boot', 'shovel', 'hoe'].map(slot).join('') + '</div>' + enHtml + '</div>' +
+        '<div class="stlist"><div class="srows">' + rows.join('') + '</div></div>';
 }
 
 // ---------- 箱 ----------
@@ -814,13 +830,7 @@ function drawMap() {
     c.drawImage(mapLayer(mapFloor), 0, 0);
     const pin = (x, y, col, r) => { c.fillStyle = '#000'; c.fillRect((x >> 2) - r - 1, (y >> 2) - r - 1, r * 2 + 3, r * 2 + 3); c.fillStyle = col; c.fillRect((x >> 2) - r, (y >> 2) - r, r * 2 + 1, r * 2 + 1); };
     const notes = [];
-    if (S.f === mapFloor) {
-        // 自分: 向いている方へ とがった 三角
-        const cx = (S.x >> 2) + .5, cy = (S.y >> 2) + .5, fx = S.face[0], fy = S.face[1], px = -fy, py = fx;
-        const tri = r => { c.beginPath(); c.moveTo(cx + fx * r * 1.6, cy + fy * r * 1.6); c.lineTo(cx - fx * r + px * r * 1.2, cy - fy * r + py * r * 1.2); c.lineTo(cx - fx * r - px * r * 1.2, cy - fy * r - py * r * 1.2); c.closePath(); };
-        tri(4.2); c.fillStyle = '#000'; c.fill(); tri(3); c.fillStyle = '#fff'; c.fill();
-        notes.push('▶ 自分');
-    }
+    if (S.f === mapFloor) notes.push('▶ 自分');
     if (S.bed && S.bed.f === mapFloor) { pin(S.bed.x, S.bed.y, '#ff5a5a', 1); notes.push('🟥 寝床'); }
     if (S.gate && (mapFloor === 0 || mapFloor === 2)) { pin(S.gate.x, S.gate.y, '#c05aff', 1); notes.push('🟪 門'); }
     S.graves.filter(g => g.f === mapFloor).forEach(g => pin(g.x, g.y, '#ffd84a', 1));
@@ -830,6 +840,12 @@ function drawMap() {
     for (const k in kinds) notes.push(placeMarkSvg(k) + ' ' + PLACE_NAMES[k] + (kinds[k] > 1 ? ' ×' + kinds[k] : ''));
     if (S.graves.some(g => g.f === mapFloor)) notes.push('🟨 落とした荷物');
     if (mapFloor === 2 && !S.bossDead && S.got.reach_2) { const p = bossPos(); pin(p.x, p.y, '#ff2a2a', 2); notes.push('🔺 魔王城'); }
+    if (S.f === mapFloor) {
+        // 自分: 向いている方へ とがった 三角。ほかの印より あとに描いて いつも いちばん上に
+        const cx = (S.x >> 2) + .5, cy = (S.y >> 2) + .5, fx = S.face[0], fy = S.face[1], px = -fy, py = fx;
+        const tri = r => { c.beginPath(); c.moveTo(cx + fx * r * 1.6, cy + fy * r * 1.6); c.lineTo(cx - fx * r + px * r * 1.2, cy - fy * r + py * r * 1.2); c.lineTo(cx - fx * r - px * r * 1.2, cy - fy * r - py * r * 1.2); c.closePath(); };
+        tri(4.2); c.fillStyle = '#000'; c.fill(); tri(3); c.fillStyle = '#fff'; c.fill();
+    }
     $('map-tabs').innerHTML = FLOOR_ORDER.map(i => (i === 0 || S.got['reach_' + i]) ? '<button class="tab' + (i === mapFloor ? ' on' : '') + '" data-f="' + i + '">' + FLOOR_NAME[i] + '</button>' : '').join('');
     $('map-tabs').querySelectorAll('[data-f]').forEach(b => b.onclick = () => { mapFloor = +b.dataset.f; drawMap(); });
     // コンパス(地図は いつも 北が上)
