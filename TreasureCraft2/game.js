@@ -1250,7 +1250,8 @@ function pourAt(x, y, t, id) {
     const liq = id === 'bucket_l' ? T.MAGMA : T.WATER;
     removeItem(id, 1); give('bucket', 1);
     setT(S.f, x, y, liq);
-    if (liq === T.WATER) floodFrom(S.f, x, y);
+    floodFrom(S.f, x, y, liq === T.MAGMA ? S.T + 1 : undefined);
+    quench(S.f, x, y);
     H.sfx('place'); endTurn(1);
 }
 const PET_MAX = 3;
@@ -1333,13 +1334,27 @@ function pruneDmg() { const k = Object.keys(S.dmg); if (k.length > 60) { delete 
 // 最後に傷をつけてから 1日たった マスは もとの丈夫さにもどる
 // 穴に 水が流れこむ: flood にある水のマスの となりの穴を 次のターンに水にする(1ターンに1マスずつ)
 function floodFrom(f, x, y, ready) { (S.flood || (S.flood = [])).push([f, x, y, ready === undefined ? S.T + 1 : ready]); }   // 次のターンから 広がる
+// 水もマグマも となりの穴へ 流れる(水は1ターン、マグマは2ターンで1マス)
 function flowWater() {
     if (!S.flood || !S.flood.length) return;
     const now = S.flood.filter(q => S.T > q[3]); S.flood = S.flood.filter(q => S.T <= q[3]);
     for (const [f, x, y] of now) {
-        if (getT(f, x, y) !== T.WATER) continue;
-        for (const o of DIR4) { const nx = x + o[0], ny = y + o[1]; if (getT(f, nx, ny) === T.PIT) { setT(f, nx, ny, T.WATER); floodFrom(f, nx, ny, S.T); } }
+        const liq = getT(f, x, y);
+        if (liq !== T.WATER && liq !== T.MAGMA) continue;
+        for (const o of DIR4) {
+            const nx = x + o[0], ny = y + o[1];
+            if (getT(f, nx, ny) !== T.PIT || (f === S.f && mobAt(nx, ny))) continue;
+            setT(f, nx, ny, liq);
+            quench(f, nx, ny);
+            if (getT(f, nx, ny) === liq) floodFrom(f, nx, ny, liq === T.MAGMA ? S.T + 1 : S.T);
+        }
     }
+}
+// マグマと水が ふれたら マグマは 黒曜石になる
+function quench(f, x, y) {
+    const t = getT(f, x, y);
+    if (t === T.MAGMA) { if (DIR4.some(o => getT(f, x + o[0], y + o[1]) === T.WATER)) { setT(f, x, y, T.OBSIDIAN); if (f === S.f) { H.chips(x, y, '#6a4aa0'); H.sfx('tick'); } } }
+    else if (t === T.WATER) for (const o of DIR4) if (getT(f, x + o[0], y + o[1]) === T.MAGMA) { setT(f, x + o[0], y + o[1], T.OBSIDIAN); if (f === S.f) { H.chips(x + o[0], y + o[1], '#6a4aa0'); H.sfx('tick'); } }
 }
 // 埋めた土: 1日たったら となりに いちばん多い 草の地面に変わる(草が まわりにないときは 土のまま)
 const REGROW = [T.GRASS, T.GRASS2, T.FLOWER, T.SNOW];
@@ -1608,7 +1623,8 @@ function digFacing() {
             delete S.dmg[key];
             const wet = DIR4.some(o => getT(S.f, x + o[0], y + o[1]) === T.WATER);
             setT(S.f, x, y, wet ? T.WATER : T.PIT);
-            if (wet) floodFrom(S.f, x, y);
+            if (wet) { floodFrom(S.f, x, y); quench(S.f, x, y); }
+            else for (const o of DIR4) if (getT(S.f, x + o[0], y + o[1]) === T.MAGMA) floodFrom(S.f, x + o[0], y + o[1], S.T);   // マグマが 流れこんでくる
             give(soil, 1); H.stopHold();
         }
         pruneDmg(); endTurn(1);

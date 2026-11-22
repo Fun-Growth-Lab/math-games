@@ -161,6 +161,7 @@ for (const m in METALS2) {
     defT('FLOOR_' + U, Object.assign({ n: M.n + 'の床', hp: Math.round(3 * M.hp), tool: 'pick', tier: 1, back: 'floor_' + m, floorlike: 1, blast: M.blast, metal: m }, lt));
 }
 defT('ENCH', { n: 'エンチャント台', solid: 1, hp: 9, tool: 'pick', back: 'ench', station: 'ench', light: 3 });   // 武器・防具に 能力をつける
+defT('OBSIDIAN', { n: '黒曜石', solid: 1, opaque: 1, hp: 40, tool: 'pick', tier: 5, back: 'obsidian', blast: 99 });   // マグマに水がふれると できる。星晶のつるはし以上
 // 視線をさえぎる物。木や柵はさえぎらない
 ['ROCK', 'BURIED', 'WALL_W', 'WALL_S', 'DOOR', 'RWALL', 'TOWERW', 'SANDB1', 'SANDB2', 'SANDB3', 'HUTW', 'HULL', 'GIANT', 'GIANTB', 'METEOR', 'SPAWNER'].forEach(k => { TILE[T[k]].opaque = 1; });
 TILE.forEach(d => { if (d.wall) d.opaque = 1; });
@@ -173,6 +174,7 @@ const ITEM = {
     wood: { n: '木材', c: '#a8743c' }, leaf: { n: '葉っぱ', c: '#4a9e45' }, stone: { n: '石', c: '#9a9a96' },
     coal: { n: '石炭', c: '#2d2d33' }, charcoal: { n: '木炭', c: '#3a3028' }, bone: { n: '骨', e: '🦴' }, hide: { n: '皮', c: '#9c6a3c' }, wool: { n: '羊毛', c: '#f4f1e8' },
     bucket: { n: 'バケツ', c: '#a8b0b8', use: 'bucket', desc: '水やマグマを くむ' }, bucket_w: { n: '水入りバケツ', c: '#4a9fd8', use: 'pour', desc: '穴に 水を入れる' }, bucket_l: { n: 'マグマ入りバケツ', c: '#e8561c', use: 'pour', desc: '穴に マグマを入れる' },
+    obsidian: { n: '黒曜石', tile: 'OBSIDIAN', place: 'OBSIDIAN', desc: 'とても かたい' },
     feather: { n: '羽', e: '🪶' }, fletch: { n: '矢羽根', c: '#f6f3ea', desc: '矢の材料' }, silk: { n: 'クモの糸', c: '#e3e3ee' },
     ore_cu: { n: '銅鉱石', c: '#c9743c' }, ore_fe: { n: '鉄鉱石', c: '#d8b89a' }, ore_au: { n: '金鉱石', c: '#e8c84a' }, ore_n: { n: '魔鉱石', c: '#b0349a' },
     ingot_cu: { n: '銅のかたまり', c: '#e08a4a' }, ingot_fe: { n: '鉄のかたまり', c: '#d9dde2' }, ingot_au: { n: '金のかたまり', c: '#ffd84a' }, ingot_n: { n: '魔鋼', c: '#8a2a9c' },

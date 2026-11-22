@@ -84,6 +84,7 @@ function buildTextures() {
     TX.ore_au = nugget(deepC, ['#a87a14', '#f2c840', '#fff6b8']); TX.ore_rs = nugget(deepC, ['#7a1010', '#e0301c', '#ffa08a']); TX.ore_star = nugget(hardC, ['#16709c', '#4ac8f0', '#effcff']);
     TX.ore_n = nugget(['#5a2c2c', '#522828', '#623030', '#4a2424'], ['#5a165a', '#c040b0', '#ffc8f4']);
     TX.fossil = speck(deepC, x => { x.fillStyle = '#efe6d0'; x.fillRect(2, 7, 12, 2); for (const i of [4, 8, 12]) x.fillRect(i, 3, 1, 10); x.fillStyle = '#d8ccb0'; x.fillRect(13, 5, 2, 6); });
+    TX.obsidian = speck(['#1e1628', '#241a30', '#18121f'], x => { x.fillStyle = '#6a4aa0'; for (const p of [[2, 4], [9, 2], [12, 9], [5, 12], [14, 14]]) x.fillRect(p[0], p[1], 2, 1); x.fillStyle = '#3c2a58'; x.fillRect(7, 7, 3, 2); });
     TX.vwall = speck(['#2c2236', '#30263c', '#281e30'], x => { x.fillStyle = '#c8a040'; for (const p of [[3, 3], [11, 4], [6, 10], [12, 12], [2, 13]]) { x.fillRect(p[0], p[1], 2, 1); x.fillRect(p[0], p[1] + 1, 1, 1); } x.fillStyle = '#1a1420'; x.fillRect(0, 0, 16, 1); x.fillRect(0, 0, 1, 16); });
     TX.glass = speck(['#cfeefc', '#d8f2fc', '#c4e8f8'], x => { x.fillStyle = '#9ccbe0'; x.fillRect(0, 0, 16, 1); x.fillRect(0, 15, 16, 1); x.fillRect(0, 0, 1, 16); x.fillRect(15, 0, 1, 16); x.fillStyle = '#ffffff'; for (let i = 3; i < 9; i++) x.fillRect(i, 12 - i, 1, 1); for (let i = 7; i < 11; i++) x.fillRect(i, 16 - i, 1, 1); });
     // ひびの入った岩(埋まった宝): ふつうの岩と同じ色で、細いひびが少しだけ
@@ -157,7 +158,7 @@ function buildSprites() {
     HIDDEN_SPR = block(speck(['#1a1720', '#1d1a24', '#17141c', '#201c27']), WH);
     o[T.WDIRT] = [block(TX.dirtw, WH)]; o[T.WSTONE] = [block(TX.stone, WH)]; o[T.WHARD] = [block(TX.hard, WH)]; o[T.BEDROCK] = [block(TX.cwall, WH)];
     o[T.ORE_COAL] = [block(TX.ore_coal, WH)]; o[T.ORE_CU] = [block(TX.ore_cu, WH)]; o[T.ORE_FE] = [block(TX.ore_fe, WH)]; o[T.ORE_AU] = [block(TX.ore_au, WH)]; o[T.ORE_STAR] = [block(TX.ore_star, WH)]; o[T.ORE_RS] = [block(TX.ore_rs, WH)];
-    o[T.FOSSIL] = [block(TX.fossil, WH)]; o[T.VWALL] = [block(TX.vwall, WH)];
+    o[T.FOSSIL] = [block(TX.fossil, WH)]; o[T.VWALL] = [block(TX.vwall, WH)]; o[T.OBSIDIAN] = [block(TX.obsidian, .6)];
     o[T.GEM] = [boxSprite([[.1, .1, 0, .9, .9, .12, '#3a2e4c'], [.3, .3, .1, .7, .7, .72, '#ff6ac8'], [.38, .38, .72, .62, .62, .92, '#ffc8ec'], [.14, .56, .1, .34, .76, .46, '#c84aa8'], [.6, .14, .1, .82, .36, .52, '#ff9ade']])];
     o[T.GMUSH] = [boxSprite([[.4, .4, 0, .6, .6, .95, '#e8e0d0'], [.1, .1, .95, .9, .9, 1.25, '#3ad8c8'], [.26, .26, 1.25, .4, .4, 1.29, '#c8fff4'], [.58, .5, 1.25, .72, .64, 1.29, '#c8fff4']])];
     o[T.GLOWM] = [boxSprite([[.44, .44, 0, .56, .56, .24, '#e8e0d0'], [.3, .3, .24, .7, .7, .38, '#3ad8c8'], [.4, .4, .38, .5, .5, .4, '#c8fff4']])];
