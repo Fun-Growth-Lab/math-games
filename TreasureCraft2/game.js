@@ -960,9 +960,27 @@ function worldTick() {
     // ニワトリが たまごを産む(なついたニワトリは 1日に2こくらい、野生はたまに)
     for (const m of mobs) {
         if (m.t !== 'chicken') continue;
-        if (m.ref ? S.T >= (m.ref.egg || (m.ref.egg = S.T + rint(150, 260))) : rnd() < 1 / 600) {
+        if (m.ref ? (m.ref.full || 0) > S.T && S.T >= (m.ref.egg || (m.ref.egg = S.T + rint(150, 260))) : rnd() < 1 / 600) {
             if (m.ref) m.ref.egg = S.T + rint(180, 300);
             dropLoot(m.x, m.y, [{ id: 'egg', n: 1 }], true);
+        }
+    }
+    // 家畜: 満腹どうしが 3マス以内にいると ときどき 赤ちゃんが生まれる(柵で囲っておく想定)
+    if (S.T % 20 === 0 && S.kept.length < 60) {
+        for (const m of mobs) {
+            const e = m.ref;
+            if (!e || !BREED.includes(m.t) || (e.full || 0) <= S.T || S.T < (e.cd || 0) || rnd() > .2) continue;
+            const mate = mobs.find(q => q !== m && q.t === m.t && q.ref && (q.ref.full || 0) > S.T && S.T >= (q.ref.cd || 0) && Math.abs(q.x - m.x) + Math.abs(q.y - m.y) <= 3);
+            if (!mate) continue;
+            let spot = null;
+            for (const o of DIRS) { const x = m.x + o[0], y = m.y + o[1]; if (mobWalk(getT(S.f, x, y)) && !mobAt(x, y) && !(x === S.x && y === S.y)) spot = [x, y]; }
+            if (!spot) continue;
+            e.cd = mate.ref.cd = S.T + DAY_LEN;
+            const b = { t: m.t, f: S.f, x: spot[0], y: spot[1], cd: S.T + DAY_LEN, pcd: 0 }, nb = spawnMob(m.t, spot[0], spot[1]);
+            S.kept.push(b); nb.ref = b;
+            H.float(spot[0], spot[1], '♥', '#ff7aa0', 1);
+            H.log(MOBS[m.t].n + 'の赤ちゃんが生まれた!', 'good'); ach('baby'); H.sfx('levelup');
+            break;
         }
     }
     if (S.T % 10 === 0 && S.saplings.length) {
@@ -1197,7 +1215,8 @@ function bumpMob(m) {
     return false;
 }
 // 動物にエサをやる・オオカミを手なずける。やったら true
-const PET_MAX = 3;   // 連れていける オオカミの数
+const PET_MAX = 3;
+const FULL_TURNS = 480;   // エサをあげると 半日 満腹   // 連れていける オオカミの数
 function tryFeed(m, s) {
     const d = MOBS[m.t];
     if (m.t === 'pet' && (s.id === 'meat' || s.id === 'steak')) {
@@ -1217,25 +1236,15 @@ function tryFeed(m, s) {
         return true;
     }
     if (!FEED[m.t] || !FEED[m.t].includes(s.id)) return false;
+    if (m.ref && (m.ref.full || 0) > S.T) { H.stopHold(); H.float(m.x, m.y, 'おなかいっぱい', '#ffffff'); return true; }   // 満腹のあいだは あげられない
     removeItem(s.id, 1);
     H.float(m.x, m.y, '♥', '#ff7aa0', 1); H.sfx('item');
     if (!m.ref) {
         const e = { t: m.t, f: S.f, x: m.x, y: m.y, cd: 0, pcd: 0 };
         S.kept.push(e); m.ref = e;
         H.log(d.n + 'がなついた!', 'good');
-    } else {
-        const mate = mobs.find(q => q !== m && q.t === m.t && q.ref && Math.abs(q.x - m.x) + Math.abs(q.y - m.y) <= 3 && S.T >= (q.ref.cd || 0));
-        if (mate && S.T >= (m.ref.cd || 0) && S.kept.length < 40) {
-            let spot = null;
-            for (const o of DIRS) { const x = m.x + o[0], y = m.y + o[1]; if (mobWalk(getT(S.f, x, y)) && !mobAt(x, y) && !(x === S.x && y === S.y)) spot = [x, y]; }
-            if (spot) {
-                m.ref.cd = mate.ref.cd = S.T + 240;
-                const e = { t: m.t, f: S.f, x: spot[0], y: spot[1], cd: S.T + 240, pcd: 0 }, b = spawnMob(m.t, spot[0], spot[1]);
-                S.kept.push(e); b.ref = e;
-                H.log(d.n + 'の赤ちゃんが生まれた!', 'good'); ach('baby'); H.sfx('levelup');
-            }
-        } else H.log('おいしそうに 食べた', '');
     }
+    m.ref.full = S.T + FULL_TURNS;
     endTurn(1);
     return true;
 }

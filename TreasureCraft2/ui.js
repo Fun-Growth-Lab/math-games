@@ -413,7 +413,7 @@ function visibleTabs() {
     if (st === 'anvil') return ['inv', 'forge'];
     if (st === 'ench') return ['inv', 'ench'];
     if (st) return ['inv', 'make'].concat(ASSEMBLE_AT[st] ? ['tool'] : []);
-    return document.body.classList.contains('ach-only') ? ['ach'] : ['inv', 'make', 'book', 'ach'];
+    return document.body.classList.contains('ach-only') ? ['ach'] : ['inv', 'stat', 'make', 'book', 'ach'];
 }
 function drawPanel() {
     const st = panelStation(), vis = visibleTabs();
@@ -427,7 +427,7 @@ function drawPanel() {
     rm.classList.toggle('hidden', !target || !target.back);
     $('panel-sort').classList.toggle('hidden', tab !== 'inv');
     if (target) { rm.textContent = '片づける'; rm.title = target.n + 'を片づける'; }
-    if (tab === 'inv') drawInv(); else if (tab === 'make') drawMake(); else if (tab === 'book') drawBook(); else if (tab === 'ach') drawAch(); else if (tab === 'forge') drawForge(); else if (tab === 'ench') drawEnch(); else drawTool();
+    if (tab === 'inv') drawInv(); else if (tab === 'make') drawMake(); else if (tab === 'book') drawBook(); else if (tab === 'ach') drawAch(); else if (tab === 'stat') drawStat(); else if (tab === 'forge') drawForge(); else if (tab === 'ench') drawEnch(); else drawTool();
 }
 function drawInv() {
     let h = '<div class="grid">';
@@ -476,14 +476,14 @@ const toolImg = t => '<img class="tic" src="' + toolIconUrl({ k: t.k, a: t.a, b:
 function iconHtml(id) { const u = iconUrl(id); return u ? '<img src="' + u + '" alt="">' : (ITEM[id].e || '❔'); }
 const MAKE_ORDER = {
     '': ['bench'],
-    bench: ['torch', 'furnace', 'anvil', 'ench', 'bed', 'wall_w', 'door', 'floor', 'fence', 'chest', 'ladder', 'rail', 'wall_s', 'arrow', 'carpet', 'clamp', 'rod', 'arrow_fe', 'glass_w', 'bottle', 'wall_nw', 'floor_nw', 'switch', 'plate', 'bulb', 'conv', 'fconv', 'disp', 'rep', 'notg', 'wall_cu', 'door_cu', 'fence_cu', 'floor_cu', 'wall_fe', 'door_fe', 'fence_fe', 'floor_fe', 'wall_au', 'door_au', 'fence_au', 'floor_au', 'floor_s', 'fence_s', 'door_s', 'fence_nw', 'door_nw', 'wall_sr', 'door_sr', 'fence_sr', 'floor_sr', 'wall_dm', 'door_dm', 'fence_dm', 'floor_dm', 'feather_home', 'crown', 'gate', 'coinpile', 'fossil', 'mclock', 'sball', 'phoenix', 'dpot'],
+    bench: ['torch', 'furnace', 'anvil', 'ench', 'bed', 'wall_w', 'door', 'floor', 'fence', 'chest', 'ladder', 'rail', 'wall_s', 'fletch', 'arrow', 'carpet', 'clamp', 'rod', 'arrow_fe', 'glass_w', 'bottle', 'wall_nw', 'floor_nw', 'switch', 'plate', 'bulb', 'conv', 'fconv', 'disp', 'rep', 'notg', 'wall_cu', 'door_cu', 'fence_cu', 'floor_cu', 'wall_fe', 'door_fe', 'fence_fe', 'floor_fe', 'wall_au', 'door_au', 'fence_au', 'floor_au', 'floor_s', 'fence_s', 'door_s', 'fence_nw', 'door_nw', 'wall_sr', 'door_sr', 'fence_sr', 'floor_sr', 'wall_dm', 'door_dm', 'fence_dm', 'floor_dm', 'feather_home', 'crown', 'gate', 'coinpile', 'fossil', 'mclock', 'sball', 'phoenix', 'dpot'],
     furnace: ['charcoal', 'glass', 'steak', 'ingot_cu', 'roast', 'bread', 'ingot_fe', 'gfish', 'fegg', 'stew', 'pie', 'potion', 'ingot_au', 'ingot_n', 'feast'],
 };
 // つくる物の分類(作業台・かまど)。[名前, 絵にする物, 入る物]。どれにも入らない物は 1つめの分類に入る
 const MAKE_CATS = {
     bench: [['くらし', 'bed', ['torch', 'furnace', 'anvil', 'ench', 'bed', 'chest', 'ladder', 'rail', 'carpet', 'gate']],
         ['建材', 'wall_s', null],
-        ['道具', 'rod', ['arrow', 'arrow_fe', 'rod', 'bottle', 'feather_home']],
+        ['道具', 'rod', ['fletch', 'arrow', 'arrow_fe', 'rod', 'bottle', 'feather_home']],
         ['回路', 'bulb', ['switch', 'plate', 'bulb', 'conv', 'fconv', 'disp', 'rep', 'notg']],
         ['かざり', 'crown', ['clamp', 'crown', 'coinpile', 'fossil', 'mclock', 'sball', 'phoenix', 'dpot']]],
     furnace: [['素材', 'ingot_fe', ['charcoal', 'glass', 'ingot_cu', 'ingot_fe', 'ingot_au', 'ingot_n']], ['料理', 'steak', null]]
@@ -697,6 +697,30 @@ function drawEnch() {
         if (msg) { SFX.play('error'); H.log(msg, 'warn'); }
         lastHot = ''; if (S.hp > 0) drawPanel();
     };
+}
+
+// ステータス: 大きな主人公のまわりに 身につけている物。右に 数値と その内わけ(もと + 装備)
+function drawStat() {
+    const eq = k => equipped(k);
+    const slot = k => {
+        const t = eq(k);
+        return '<div class="eqs' + (t ? '' : ' none') + '"><span class="ek">' + TOOL_KINDS[k].n + '</span>' + (t ? toolImg(t) + '<b>' + toolName(t) + '</b>' + (t.en ? '<small>' + ENCHANTS[t.en.id].n + ' Lv' + t.en.lv + '</small>' : '') : '<b>なし</b>') + '</div>';
+    };
+    const num = v => Math.round(v * 10) / 10;
+    const row = (lab, val, parts) => '<div class="srow"><span class="sl">' + lab + '</span><span class="sv">' + val + '</span><span class="sp notr">' + parts.map(p => '<i>' + tr(p[0]) + ' <b>' + p[1] + '</b></i>').join('<em>+</em>') + '</span></div>';
+    const w = bestWeapon(), ws = w ? toolStats(w) : null, bow = eq('bow'), bs = bow ? toolStats(bow) : null, pick = eq('pick'), ps = pick ? toolStats(pick) : null;
+    const armor = ARMOR_KINDS.map(eq).filter(Boolean), body = eq('armor'), lin = body && LININGS[body.b];
+    const rows = [];
+    rows.push(row('HP', maxHp(), [['もと', 100]].concat(lin && lin.hp ? [[lin.n, lin.hp]] : [])));
+    { const parts = [['もと', 2]]; if (w) parts.push([toolName(w), ws.atk]); if (ws && ws.burn) parts.push(['炎の追加ダメージ', 5]); if (w && enchV(w, 'fire')) parts.push([ENCHANTS.fire.n, enchV(w, 'fire')]); rows.push(row('攻撃', parts.reduce((s, p) => s + p[1], 0), parts)); }
+    if (bow) { const fe = count('arrow_fe') > 0, parts = [['もと', 2], [toolName(bow), bs.atk]]; if (fe) parts.push(['鉄の矢', 5]); if (enchV(bow, 'fire')) parts.push([ENCHANTS.fire.n, enchV(bow, 'fire')]); rows.push(row('弓の攻撃', parts.reduce((s, p) => s + p[1], 0), parts)); rows.push(row('射程', bs.range, [[toolName(bow), bs.range]])); }
+    { const parts = armor.map(t => [toolName(t), num(toolStats(t).def)]); rows.push(row('守り', Math.round(armor.reduce((s, t) => s + toolStats(t).def, 0)), parts.length ? parts : [['なし', 0]])); }
+    if (pick) rows.push(row('掘る力', ps.mine, [[toolName(pick), ps.mine]]));
+    rows.push(row('息', airMax(), [['もと', AIR_MAX]].concat(enchV(eq('helm'), 'breath') ? [[ENCHANTS.breath.n, enchV(eq('helm'), 'breath')]] : [])));
+    const ens = [w, bow, pick, eq('axe'), eq('shovel'), eq('hoe')].concat(armor).filter(t => t && t.en);
+    const enHtml = ens.length ? '<div class="sen">' + ens.map(t => '<div><b>' + ENCHANTS[t.en.id].n + ' Lv' + t.en.lv + '</b> <span class="notr">' + tr(trf(ENCHANTS[t.en.id].d, ENCHANTS[t.en.id].v[t.en.lv - 1])) + '</span></div>').join('') + '</div>' : '';
+    $('pbody').innerHTML = '<div class="stfig"><div class="eqcol">' + ['sword', 'bow', 'pick', 'axe', 'shovel', 'hoe'].map(slot).join('') + '</div><div class="hero"><img src="' + lookThumb(curLook()) + '" alt=""></div><div class="eqcol">' + ARMOR_KINDS.map(slot).join('') + '</div></div>' +
+        '<div class="detail stlist"><h3>ステータス</h3>' + rows.join('') + (enHtml ? '<h4 style="margin:10px 0 4px">特別な力</h4>' + enHtml : '') + '</div>';
 }
 
 // ---------- 箱 ----------

@@ -27,6 +27,7 @@ const PIX_ART = {
     hide: [['b........b..', 'bbb....bbb..', '.bBBBBBBb...', '.bBBbBBBb...', '..bBBBbBb...', '..bBBBBBb...', '.bBbBBBBBb..', 'bb.bBBBb.bb.', '....bbb.....'], { b: '#7c5230', B: '#b08050' }],
     wool: [['...ww..ww...', '..wWWwwWWw..', '.wWWWWWWWWw.', 'wWWWgWWWWWWw', 'wWWWWWWgWWWw', '.wWWWWWWWWw.', '..wwWWwwWw..', '....ww..w...'], { w: '#dcd8cc', W: '#fbf9f2', g: '#c8c4b8' }],
     feather: [PX_FEATHER, { w: '#c8cdd4', W: '#fbfbfb', g: '#9aa0a8', q: '#7c6a50' }],
+    fletch: [['.....rr.....', '....rWWr....', '...rWWWWr...', '...rWWWWr...', '...rWsWWr...', '....rsWr....', '.....s......', '.....s......', '.....s......', '....sss.....'], { r: '#c8443c', W: '#fbf6ea', s: '#8a5a2c' }],
     feather_home: [PX_FEATHER, { w: '#e8b830', W: '#fff0a0', g: '#c09010', q: '#a87c20' }],
     silk: [['...wwwww....', '..wWWgWWw...', '.wWgWWWgWw..', '.wgWWgWWWw..', '.wWWgWWgWw..', '..wWWWgWw.t.', '...wwwwwtt..', '..........t.'], { w: '#c8c8d8', W: '#f6f6ff', g: '#a8a8bc', t: '#e8e8f4' }],
     berry: [['......gg....', '.....gG.....', '...bb.bb....', '..bBbbBbb...', '..bbbbbbb...', '....bb.bb...', '...bBbbBb...', '...bbbbbb...', '....bb......'], { g: '#3f9a45', G: '#6cc860', b: '#5a4ad0', B: '#a8a0ff' }],

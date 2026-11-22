@@ -172,7 +172,7 @@ const ITEM = {
     fish: { n: '魚', c: '#6aa8d8', food: 8, raw: 1 }, gfish: { n: '焼き魚', c: '#c8843c', food: 28, heal: 5 }, kfish: { n: '金の魚', c: '#ffd84a', food: 40, heal: 40 }, cfish: { n: '光る魚', c: '#b8a0ff', food: 20, heal: 25 },
     wood: { n: '木材', c: '#a8743c' }, leaf: { n: '葉っぱ', c: '#4a9e45' }, stone: { n: '石', c: '#9a9a96' },
     coal: { n: '石炭', c: '#2d2d33' }, charcoal: { n: '木炭', c: '#3a3028' }, bone: { n: '骨', e: '🦴' }, hide: { n: '皮', c: '#9c6a3c' }, wool: { n: '羊毛', c: '#f4f1e8' },
-    feather: { n: '羽', e: '🪶' }, silk: { n: 'クモの糸', c: '#e3e3ee' },
+    feather: { n: '羽', e: '🪶' }, fletch: { n: '矢羽根', c: '#f6f3ea', desc: '矢の材料' }, silk: { n: 'クモの糸', c: '#e3e3ee' },
     ore_cu: { n: '銅鉱石', c: '#c9743c' }, ore_fe: { n: '鉄鉱石', c: '#d8b89a' }, ore_au: { n: '金鉱石', c: '#e8c84a' }, ore_n: { n: '魔鉱石', c: '#b0349a' },
     ingot_cu: { n: '銅のかたまり', c: '#e08a4a' }, ingot_fe: { n: '鉄のかたまり', c: '#d9dde2' }, ingot_au: { n: '金のかたまり', c: '#ffd84a' }, ingot_n: { n: '魔鋼', c: '#8a2a9c' },
     crystal: { n: '水晶', c: '#b8a0ff', tile: 'CRYSTAL', place: 'CRYSTAL', desc: '置くと 光る' }, fence: { n: '柵', tile: 'FENCE', place: 'FENCE', desc: '向こうが見える' },
@@ -289,7 +289,8 @@ const RECIPES = [
     { out: 'bench', need: { wood: 5 } },
     { out: 'torch', n: 2, need: { wood: 1, charcoal: 1 }, st: 'bench' },
     { out: 'torch', n: 3, need: { wood: 1, coal: 1 }, st: 'bench' },
-    { out: 'arrow', n: 8, need: { wood: 1, stone: 1, feather: 1 }, st: 'bench' },
+    { out: 'fletch', n: 10, need: { feather: 1 }, st: 'bench' },
+    { out: 'arrow', n: 8, need: { wood: 1, stone: 1, fletch: 1 }, st: 'bench' },
     { out: 'carpet', n: 2, need: { wool: 1 }, st: 'bench' },
     { out: 'rep', need: { stone: 2, rdust: 2 }, st: 'bench' },
     { out: 'notg', need: { stone: 2, rdust: 1, torch: 1 }, st: 'bench' },
@@ -305,7 +306,7 @@ const RECIPES = [
     { out: 'wall_nw', n: 2, need: { nwood: 2 }, st: 'bench' },
     { out: 'floor_nw', n: 2, need: { nwood: 1 }, st: 'bench' },
     { out: 'fegg', need: { egg: 1 }, st: 'furnace', t: 2 },
-    { out: 'arrow_fe', n: 8, need: { wood: 1, ingot_fe: 1, feather: 1 }, st: 'bench' },
+    { out: 'arrow_fe', n: 8, need: { wood: 1, ingot_fe: 1, fletch: 1 }, st: 'bench' },
     { out: 'glass_w', n: 2, need: { glass: 1 }, st: 'bench' },
     { out: 'bottle', n: 2, need: { glass: 1 }, st: 'bench' },
     { out: 'switch', need: { stone: 1, rdust: 1 }, st: 'bench' },
@@ -519,6 +520,7 @@ const curLook = () => LOOKS.find(o => o.id === lookId());
 const PLAYER_BOX = LOOKS[0].box;
 
 // 動物を飼う: 好きな食べ物と、なでるともらえる物
+const BREED = ['chicken', 'pig', 'sheep', 'cow', 'goat', 'duck'];   // 満腹で 仲間が近くにいると 増える家畜
 const FEED = { chicken: ['wheat', 'berry', 'seed_w'], pig: ['carrot', 'berry'], sheep: ['wheat'], cow: ['wheat'], rabbit: ['carrot'], cat: ['fish'], goat: ['wheat'], duck: ['wheat', 'seed_w'], fox: ['berry', 'meat'], turtle: ['berry'] };
 const PRODUCT = { chicken: 'feather', sheep: 'wool', cow: 'milk', pig: 'mush', cat: 'fish', duck: 'feather', turtle: 'shell' };
 const CRY = { chicken: 'コケコッコー', pig: 'ブーブー', sheep: 'メェー', cow: 'モー', rabbit: 'ピョン', cat: 'ニャー', goat: 'ベェー', duck: 'グワッ', fox: 'コン', turtle: '…' };   // なついた動物の 鳴き声

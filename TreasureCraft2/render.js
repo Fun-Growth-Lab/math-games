@@ -241,12 +241,12 @@ function buildSprites() {
         const U = m.toUpperCase(), c = MC[m];
         o[T['WALL_' + U]] = [block(TX['m' + m], .85)];
         o[T['DOOR_' + U]] = mkDoor(c[0], c[1], c[2]);
-        o[T['FENCE_' + U]] = [boxSprite([[.42, .42, 0, .58, .58, .7, c[0]], [.02, .46, .36, .98, .54, .46, c[1]], [.46, .02, .36, .54, .98, .46, c[1]], [.02, .46, .56, .98, .54, .62, c[1]], [.46, .02, .56, .54, .98, .62, c[1]]])];
+        FENCE_COL[T['FENCE_' + U]] = [c[0], c[1], 2]; o[T['FENCE_' + U]] = [boxSprite(fenceBoxes(FENCE_COL[T['FENCE_' + U]], 0))];
     }
     // 石と魔樹の 扉・柵
     o[T.DOOR_ST] = mkDoor('#5e5e58', '#9a9a92', '#3c3c38'); o[T.DOOR_NW] = mkDoor('#3c1028', '#6c2448', '#ffd84a');
-    const fence2 = (a, b) => [boxSprite([[.42, .42, 0, .58, .58, .7, a], [.02, .46, .36, .98, .54, .46, b], [.46, .02, .36, .54, .98, .46, b], [.02, .46, .56, .98, .54, .62, b], [.46, .02, .56, .54, .98, .62, b]])];
-    o[T.FENCE_ST] = fence2('#6e6e66', '#a4a49c'); o[T.FENCE_NW] = fence2('#3c1028', '#74284e');
+    FENCE_COL[T.FENCE_ST] = ['#6e6e66', '#a4a49c', 2]; FENCE_COL[T.FENCE_NW] = ['#3c1028', '#74284e', 2];
+    o[T.FENCE_ST] = [boxSprite(fenceBoxes(FENCE_COL[T.FENCE_ST], 0))]; o[T.FENCE_NW] = [boxSprite(fenceBoxes(FENCE_COL[T.FENCE_NW], 0))];
     o[T.TORCH] = [boxSprite([[.44, .44, 0, .56, .56, .55, '#8a5a2c'], [.38, .38, .55, .62, .62, .78, '#ffb03c'], [.44, .44, .78, .56, .56, .92, '#ffe88a']])];
     // 作業台: 足のある台。赤い作業マットと道具でかべと見分ける
     o[T.BENCH] = [boxSprite([[.1, .1, 0, .22, .22, .42, '#6e4622'], [.78, .1, 0, .9, .22, .42, '#6e4622'], [.1, .78, 0, .22, .9, .42, '#6e4622'], [.78, .78, 0, .9, .9, .42, '#6e4622'],
@@ -273,13 +273,35 @@ function buildSprites() {
     o[T.HULL] = [block(TX.hull, .8)];
     o[T.MAST] = [boxSprite([[.4, .4, 0, .6, .6, 2.8, '#6e5230'], [.1, .46, 1.2, .9, .54, 2.5, '#e8e0c8']])];
     o[T.HUTW] = [boxSprite([[0, 0, 0, 1, 1, .9, { top: TX.plank, side: TX.plank }], [-.02, -.02, .9, 1.02, 1.02, 1.05, '#b8543c']])];
-    o[T.FENCE] = [boxSprite([[.42, .42, 0, .58, .58, .7, '#a8743c'], [.02, .46, .36, .98, .54, .46, '#c08d54'], [.46, .02, .36, .54, .98, .46, '#c08d54']])];
+    FENCE_COL[T.FENCE] = ['#a8743c', '#c08d54', 1]; o[T.FENCE] = [boxSprite(fenceBoxes(FENCE_COL[T.FENCE], 0))];
     o[T.CRYSTAL] = [boxSprite([[.1, .1, 0, .9, .9, .12, '#4a3e5c'], [.38, .38, .1, .62, .62, .95, '#c8a8ff'], [.14, .56, .1, .32, .76, .58, '#a080f0'], [.64, .2, .1, .84, .4, .68, '#e0c8ff']])];
     o[T.SPAWNER] = [boxSprite([[.08, .08, 0, .92, .92, .9, '#2a1c34'], [.2, .92, .2, .36, .94, .7, '#ff6a2c'], [.5, .92, .3, .66, .94, .76, '#c05aff'], [.3, .3, .9, .7, .7, 1, '#ff6a2c']])];
     OS = o;
 }
 // 導線: 向き(たて・よこ・十字・交差)の線。信号が来ていると明るい
 const wireCache = {};
+// 柵: となりの柵・扉・置いたかべと つながる。形は 真っすぐ・L字・T字・十字(ひとつだけのときは 十字)
+const FENCE_COL = {};   // 柵の種類 → [柱の色, 横木の色, 横木の段数]
+const fenceLinks = t => { const d = TILE[t]; return FENCE_COL[t] !== undefined || d.door || (d.back && d.solid && d.opaque && !d.station); };
+function fenceBoxes(col, mask) {
+    // mask: 北1 東2 南4 西8(世界の向き)。0なら十字、1方向だけなら その向きの真っすぐ
+    if (!mask) mask = 15;
+    else if (mask === 1 || mask === 4) mask = 5;
+    else if (mask === 2 || mask === 8) mask = 10;
+    const out = [[.42, .42, 0, .58, .58, .7, col[0]]], rails = col[2] === 1 ? [[.36, .46]] : [[.36, .46], [.56, .62]];
+    for (const [z0, z1] of rails) {
+        if (mask & 1) out.push([.46, 0, z0, .54, .5, z1, col[1]]);
+        if (mask & 4) out.push([.46, .5, z0, .54, 1, z1, col[1]]);
+        if (mask & 8) out.push([0, .46, z0, .5, .54, z1, col[1]]);
+        if (mask & 2) out.push([.5, .46, z0, 1, .54, z1, col[1]]);
+    }
+    return out;
+}
+function fenceSprite(t, x, y) {
+    const L = (dx, dy) => fenceLinks(getT(S.f, x + dx, y + dy));
+    const mask = (L(0, -1) ? 1 : 0) | (L(1, 0) ? 2 : 0) | (L(0, 1) ? 4 : 0) | (L(-1, 0) ? 8 : 0), key = 'f' + t + ':' + mask;
+    return wireCache[key] || (wireCache[key] = boxSprite(fenceBoxes(FENCE_COL[t], mask)));
+}
 const LIT = '#ff3a1c', DIM = '#9a2818';
 // mode の線の箱。z0 の高さに うすく。lit0/lit1 = 通り道ごとの信号
 function wireBoxes(mode, z0, lit0, lit1) {
@@ -346,6 +368,7 @@ const objSprite = (t, x, y) => { const a = OS[t]; if (!a) return null;
     if (t === T.PIT) return pitSpriteAt(S.f, x, y);
     if (t === T.LADDER_D) return pitSpriteAt(S.f, x, y, LADDER_PARTS);
     if (t === T.WIRE) return wireSprite(x, y);
+    if (FENCE_COL[t] !== undefined) return fenceSprite(t, x, y);
     if (TILE[t].rep) return repSprite(TILE[t].rep - 1, !VIEW.title && repLit(x, y));
     if (TILE[t].inv) return invSprite(TILE[t].inv - 1, !VIEW.title && invLit(x, y));
     if (t === T.WIRE_W) return wallWireSprite(x, y);
