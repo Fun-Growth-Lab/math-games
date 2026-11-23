@@ -162,6 +162,13 @@ for (const m in METALS2) {
 }
 defT('ENCH', { n: 'エンチャント台', solid: 1, hp: 9, tool: 'pick', back: 'ench', station: 'ench', light: 3 });   // 武器・防具に 能力をつける
 defT('OBSIDIAN', { n: '黒曜石', solid: 1, opaque: 1, hp: 40, tool: 'pick', tier: 5, back: 'obsidian', blast: 99 });   // マグマに水がふれると できる。星晶のつるはし以上
+// ピストン(押す)・ねばねばピストン(押して 引きもどす)。頭は のびたときだけ 前のマスに出る
+'NESW'.split('').forEach((c, i) => {
+    defT('PISTON_' + c, { n: 'ピストン', solid: 1, hp: 6, tool: 'pick', back: 'piston', dev: 1, piston: { d: i, s: 0 } });
+    defT('SPISTON_' + c, { n: 'ねばねばピストン', solid: 1, hp: 6, tool: 'pick', back: 'spiston', dev: 1, piston: { d: i, s: 1 } });
+    defT('PHEAD_' + c, { n: 'ピストンの頭', solid: 1, phead: { d: i, s: 0 } });
+    defT('SPHEAD_' + c, { n: 'ピストンの頭', solid: 1, phead: { d: i, s: 1 } });
+});
 // 視線をさえぎる物。木や柵はさえぎらない
 ['ROCK', 'BURIED', 'WALL_W', 'WALL_S', 'DOOR', 'RWALL', 'TOWERW', 'SANDB1', 'SANDB2', 'SANDB3', 'HUTW', 'HULL', 'GIANT', 'GIANTB', 'METEOR', 'SPAWNER'].forEach(k => { TILE[T[k]].opaque = 1; });
 TILE.forEach(d => { if (d.wall) d.opaque = 1; });
@@ -294,6 +301,8 @@ const RECIPES = [
     { out: 'torch', n: 3, need: { wood: 1, coal: 1 }, st: 'bench' },
     { out: 'fletch', n: 10, need: { feather: 1 }, st: 'bench' },
     { out: 'bucket', need: { ingot_fe: 3 }, st: 'bench' },
+    { out: 'piston', need: { wood: 3, stone: 4, ingot_fe: 1, rdust: 1 }, st: 'bench' },
+    { out: 'spiston', need: { piston: 1, jelly: 1 }, st: 'bench' },
     { out: 'arrow', n: 8, need: { wood: 1, stone: 1, fletch: 1 }, st: 'bench' },
     { out: 'carpet', n: 2, need: { wool: 1 }, st: 'bench' },
     { out: 'rep', need: { stone: 2, rdust: 2 }, st: 'bench' },
@@ -386,6 +395,8 @@ Object.assign(ITEM, {
     conv: { n: '動く床', tile: 'CONV_S', place: 'CONV_N', dir: 'CONV', desc: '信号で 上の物を運ぶ' },
     fconv: { n: '高速で動く床', tile: 'FCONV_S', place: 'FCONV_N', dir: 'FCONV', desc: '信号で 上の物を速く運ぶ' },
     disp: { n: '矢の発射台', tile: 'DISP_S', place: 'DISP_N', dir: 'DISP', desc: '信号で 矢を撃つ' },
+    piston: { n: 'ピストン', tile: 'PISTON_S', place: 'PISTON_N', dir: 'PISTON', desc: '信号で ブロックを押す' },
+    spiston: { n: 'ねばねばピストン', tile: 'SPISTON_S', place: 'SPISTON_N', dir: 'SPISTON', desc: '押して 引きもどす' },
     clamp: { n: '水晶のランプ', tile: 'CLAMP', place: 'CLAMP', desc: '松明より明るい' },
     crown: { n: '宝石の王冠', tile: 'CROWN', place: 'CROWN', desc: 'かざる宝物' },
     carpet: { n: 'カーペット', tile: 'CARPET', place: 'CARPET', desc: '上にいると 回復が少し速い' },

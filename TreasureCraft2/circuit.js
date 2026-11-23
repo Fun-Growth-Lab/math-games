@@ -165,10 +165,96 @@ function circuitTick() {
             if (d.disp) fireDispenser(x, y, DIR4[d.disp - 1]);
         }
     }
+    pistonTick(prev);
     moveOnBelts();
 }
 // 階を移ったとき: 信号を いったん空にする(次のターンから広がる)
 function refreshPower() { if (power.f !== S.f) power = { on: new Set(), ch: new Map(), rep: new Map(), not: new Map(), f: S.f, x: S.x, y: S.y }; }
+
+// ---------- ピストン ----------
+// ・信号が来た 次のターンに のびる(信号が切れた 次のターンに ちぢむ)
+// ・そのターンに動くピストンを 全部 先に計算し、最後に まとめて動かす(置いた場所や順番で 結果が変わらない)
+// ・同じマスを 2つ以上のピストンが 動かそうとしたら、関わるピストンは どれも 動かない
+// ・押せるのは 12マスまで。ねばねばピストンは ちぢむとき 前の1マスを 引きもどす
+const PUSH_MAX = 12;
+const headTile = p => T[(p.s ? 'SPHEAD_' : 'PHEAD_') + 'NESW'[p.d]];
+const pistonExtended = (x, y, p) => getT(S.f, x + DIR4[p.d][0], y + DIR4[p.d][1]) === headTile(p);
+// 動かせない物: 世界の土台・宝箱や箱(中身がある)・設備・はしご・水やマグマ・のびているピストン など
+const PIN = new Set(['BEDROCK', 'CWALL', 'CHEST', 'CHEST_W', 'SPAWNER', 'GATE', 'VWALL', 'OBSIDIAN', 'BED', 'MAGMA', 'WATER', 'BURIED', 'GIANT', 'GIANTB', 'METEOR']);
+function pushable(x, y) {
+    const t = getT(S.f, x, y), d = TILE[t];
+    if (!d.solid || d.liquid || d.door || d.station || d.phead || PIN.has(d.key)) return false;
+    if (d.piston && pistonExtended(x, y, d.piston)) return false;
+    if (S.ex[exKey(S.f, x, y)]) return false;   // 中身や向きを持つ物(箱・発射台など)
+    return true;
+}
+const openCell = (x, y) => { const t = getT(S.f, x, y), d = TILE[t]; return (d.ground || d.floorlike) && t !== T.GRAVE; };
+const someoneAt = (x, y) => (x === S.x && y === S.y) ? 'me' : mobAt(x, y);
+// のびる計画: 押す列を数えて 先が空いていれば 成功
+function planExtend(x, y, p) {
+    const [dx, dy] = DIR4[p.d], blocks = [];
+    let cx = x + dx, cy = y + dy;
+    while (!openCell(cx, cy)) {
+        if (!pushable(cx, cy) || blocks.length >= PUSH_MAX) return null;
+        blocks.push([cx, cy]); cx += dx; cy += dy;
+    }
+    const cells = [[x, y], [cx, cy]].concat(blocks);
+    let ent = null;
+    const who = someoneAt(cx, cy);
+    if (who) {   // 先にいる だれかは 1マス 押し出す(その先が 空いていなければ のびない)
+        const ex = cx + dx, ey = cy + dy;
+        if (!openCell(ex, ey) || someoneAt(ex, ey)) return null;
+        ent = { who, to: [ex, ey] }; cells.push([ex, ey]);
+    }
+    return { kind: 'ext', x, y, p, blocks, end: [cx, cy], ent, cells };
+}
+// ちぢむ計画: 頭を消す。ねばねばなら 前の1マスを 引きもどす
+function planRetract(x, y, p) {
+    const [dx, dy] = DIR4[p.d], hx = x + dx, hy = y + dy, fx = hx + dx, fy = hy + dy;
+    const pull = p.s && pushable(fx, fy) ? [fx, fy] : null;
+    const cells = [[x, y], [hx, hy]].concat(pull ? [pull] : []);
+    return { kind: 'ret', x, y, p, head: [hx, hy], pull, cells };
+}
+function pistonDropHead(x, y, p) { const hx = x + DIR4[p.d][0], hy = y + DIR4[p.d][1]; if (getT(S.f, hx, hy) === headTile(p)) setT(S.f, hx, hy, floorUnder(S.f, hx, hy)); }
+function pistonTick(prev) {
+    if (prev.f !== S.f) return;
+    const plans = [];
+    for (let y = S.y - CIRCUIT_R; y <= S.y + CIRCUIT_R; y++) for (let x = S.x - CIRCUIT_R; x <= S.x + CIRCUIT_R; x++) {
+        const d = TILE[getT(S.f, x, y)];
+        if (d.phead) {   // 本体が なくなった頭は 消す
+            const bx = x - DIR4[d.phead.d][0], by = y - DIR4[d.phead.d][1], b = TILE[getT(S.f, bx, by)].piston;
+            if (!b || b.d !== d.phead.d || b.s !== d.phead.s) setT(S.f, x, y, floorUnder(S.f, x, y));
+            continue;
+        }
+        if (!d.piston) continue;
+        const want = prev.on.has(ckey(x, y)), ext = pistonExtended(x, y, d.piston);
+        if (want === ext) continue;
+        const pl = want ? planExtend(x, y, d.piston) : planRetract(x, y, d.piston);
+        if (pl) plans.push(pl);
+    }
+    if (!plans.length) return;
+    // 同じマスを 使う計画は どれも やめる
+    const use = new Map();
+    for (const pl of plans) for (const [cx, cy] of pl.cells) { const k = ckey(cx, cy); use.set(k, (use.get(k) || 0) + 1); }
+    const ok = plans.filter(pl => pl.cells.every(([cx, cy]) => use.get(ckey(cx, cy)) === 1));
+    // まとめて 動かす(計画どうしは マスが 重ならないので 順番は 関係ない)
+    for (const pl of ok) {
+        const [dx, dy] = DIR4[pl.p.d];
+        if (pl.kind === 'ext') {
+            const tiles = pl.blocks.map(([bx, by]) => getT(S.f, bx, by));
+            const endT = getT(S.f, pl.end[0], pl.end[1]);
+            if (endT !== groundOf(S.f, pl.end[0], pl.end[1])) (S.under || (S.under = {}))[exKey(S.f, pl.end[0], pl.end[1])] = endT;   // 押した先の床を 覚える
+            for (let i = pl.blocks.length - 1; i >= 0; i--) setT(S.f, pl.blocks[i][0] + dx, pl.blocks[i][1] + dy, tiles[i]);
+            setT(S.f, pl.x + dx, pl.y + dy, headTile(pl.p));
+            if (pl.ent) { const [ex, ey] = pl.ent.to; if (pl.ent.who === 'me') { S.x = ex; S.y = ey; H.clearPath(); } else { pl.ent.who.x = ex; pl.ent.who.y = ey; } }
+        } else {
+            const [hx, hy] = pl.head;
+            if (pl.pull) { setT(S.f, hx, hy, getT(S.f, pl.pull[0], pl.pull[1])); setT(S.f, pl.pull[0], pl.pull[1], floorUnder(S.f, pl.pull[0], pl.pull[1])); }
+            else setT(S.f, hx, hy, floorUnder(S.f, hx, hy));
+        }
+    }
+    if (ok.length) H.sfx('place');
+}
 
 // ---------- 動く床 ----------
 function beltAt(x, y) { const d = TILE[getT(S.f, x, y)]; return d.belt && powered(x, y) ? d.belt : null; }

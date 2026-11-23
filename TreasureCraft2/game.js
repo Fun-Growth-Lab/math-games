@@ -11,7 +11,7 @@ let S = null;
 // 回路モード: 自由に回路をつくるモード。おなか・HPがへらない、敵が出ない、回路の部品などが ∞。セーブは別
 const CIRCUIT_SAVE_KEY = 'tc2_save_circuit';
 const circuitMode = () => !!(S && S.mode === 'circuit');
-const INF_ITEMS = ['rdust', 'switch', 'plate', 'bulb', 'rep', 'notg', 'conv', 'fconv', 'disp', 'arrow', 'wall_s', 'wall_w', 'wall_fe', 'glass_w', 'floor', 'floor_fe'];
+const INF_ITEMS = ['rdust', 'switch', 'plate', 'bulb', 'rep', 'notg', 'conv', 'fconv', 'disp', 'piston', 'spiston', 'arrow', 'wall_s', 'wall_w', 'wall_fe', 'glass_w', 'floor', 'floor_fe'];
 const infItem = id => circuitMode() && INF_ITEMS.includes(id);
 // 実績を達成する。セーブとは別に残るので、新しい世界でも消えない
 function ach(id) {
@@ -44,6 +44,7 @@ function newCircuitGame(seed) {
     S.inv[7] = tool('pick'); S.inv[17] = tool('axe');
     S.inv[18] = tool('shovel');
     S.inv[19] = { id: 'bed', n: 1 };
+    S.inv[20] = { id: 'piston', n: STACK }; S.inv[21] = { id: 'spiston', n: STACK };
     S.inv[7].tool.eq = 1; S.inv[17].tool.eq = 1; S.inv[18].tool.eq = 1;
     mobs = mobs.filter(m => MOBS[m.t].animal);
 }
@@ -1394,6 +1395,7 @@ function floorUnder(f, x, y) {
 }
 function breakTile(x, y, t, tool) {
     const d = TILE[t];
+    if (d.piston) pistonDropHead(x, y, d.piston);
     const under = TILE[t].floorlike || t === T.FARM ? groundOf(S.f, x, y) : (t === T.RWALL ? T.RFLOOR : floorUnder(S.f, x, y));
     setT(S.f, x, y, under);
     // 押しっぱなしなら 止めずに そのまま進んで 次を掘る
@@ -1414,9 +1416,10 @@ function breakTile(x, y, t, tool) {
     if (isCave(S.f)) foundInRock(x, y, t);
 }
 // 「はずす」で外す物(回路の部品と小物)。つるはしなどで こわすことはできない
-const TAKE_BACK = ['rail', 'switch', 'plate', 'bulb', 'rep', 'notg', 'conv', 'fconv', 'disp', 'torch', 'clamp', 'crown', 'gmush', 'carpet'];
+const TAKE_BACK = ['rail', 'piston', 'spiston', 'switch', 'plate', 'bulb', 'rep', 'notg', 'conv', 'fconv', 'disp', 'torch', 'clamp', 'crown', 'gmush', 'carpet'];
 const takeable = t => isWire(t) || t === T.LADDER_D || !!TILE[t].deco || TAKE_BACK.includes(TILE[t].back);
 function takeTile(x, y, t) {
+    if (TILE[t].piston) pistonDropHead(x, y, TILE[t].piston);
     if (t === T.LADDER_D) { takeLadder(x, y, t); return; }
     const id = isWire(t) ? 'rdust' : TILE[t].back;
     if (!S.inv.some(q => !q || (q.id === id && q.n < STACK)) && !infItem(id)) { H.sfx('error'); H.log('持ち物がいっぱいで はずせない', 'warn'); return; }   // あふれて落とさない
@@ -1650,7 +1653,8 @@ function digFacing() {
 }
 // 向き・形を えらびなおせる物: えらべる形の一覧と 今の番号
 function turnChoices(x, y) {
-    const t = getT(S.f, x, y), dk = TILE[t].key.match(/^(F?CONV|DISP|REP|NOT)_([NESW])$/);
+    const t = getT(S.f, x, y), dk = TILE[t].key.match(/^(F?CONV|DISP|REP|NOT|S?PISTON)_([NESW])$/);
+    if (dk && TILE[t].piston && pistonExtended(x, y, TILE[t].piston)) return null;   // のびている間は 向きを変えない
     if (dk) return { list: 'NESW'.split('').map(c => ({ t: T[dk[1] + '_' + c] })), cur: 'NESW'.indexOf(dk[2]) };
     if (isWire(t)) return { list: WIRE_ORDER.map(w => ({ t, w })), cur: WIRE_ORDER.indexOf(wireMode(S.f, x, y)) };
     return null;
@@ -1674,7 +1678,7 @@ function useActions() {
 function buildActions() {
     const s = S.inv[S.sel];
     const x = S.x + S.face[0], y = S.y + S.face[1], t = getT(S.f, x, y), fm = mobAt(x, y);
-    const dk = TILE[t].key.match(/^(F?CONV|DISP|REP|NOT)_([NESW])$/), nk = false;
+    const dk = TILE[t].key.match(/^(F?CONV|DISP|REP|NOT|S?PISTON)_([NESW])$/) && !(TILE[t].piston && pistonExtended(x, y, TILE[t].piston)), nk = false;
     const rot = (dk || nk || isWire(t)) && !fm ? { l: '向き', run: () => H.openTurn(x, y) } : null;
     const take = takeable(t) && !fm ? { l: 'はずす', run: () => takeTile(x, y, t) } : null;
     const out = items => ({ rot, take, items });

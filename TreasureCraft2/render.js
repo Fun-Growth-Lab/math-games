@@ -254,6 +254,15 @@ function buildSprites() {
         [.02, .02, .42, .98, .98, .56, { top: TX.benchtop, side: TX.wood }], [.5, .16, .56, .9, .56, .58, '#c8443c'],
         [.12, .62, .56, .46, .72, .62, '#b8854c'], [.12, .56, .56, .24, .78, .7, '#d9dde2'], [.56, .68, .56, .9, .86, .6, '#d9dde2'], [.86, .7, .56, .96, .84, .66, '#7c5228']])];
     o[T.FURNACE] = [boxSprite([[.06, .06, 0, .94, .94, .7, { top: TX.brick }], [.16, .16, .7, .84, .84, .82, { top: TX.brick }], [.56, .2, .82, .8, .44, 1.3, '#7c6a5a'], [.6, .24, 1.3, .76, .4, 1.32, '#2a2420'], [.28, .94, .1, .72, .96, .44, '#ff8a2c']])];
+    // ピストン(北向きで作って 回す)。のびているときは 板がなく、頭のマスに 板と棒
+    'NESW'.split('').forEach((c, d) => {
+        for (const s of [0, 1]) {
+            const plate = s ? '#6ac05a' : '#c89a5c', rot = l => boxSprite(l.map(q => rotBoxD(q, d)));
+            const body = [[.06, .2, 0, .94, .94, .8, '#8e8e8a'], [.06, .2, .8, .94, .94, .84, '#a8a8a2']];
+            o[T[(s ? 'SPISTON_' : 'PISTON_') + c]] = [rot(body.concat([[.04, .02, 0, .96, .2, .86, '#a8743c'], [.08, 0, .06, .92, .02, .8, plate]])), rot(body.concat([[.4, 0, .34, .6, .2, .54, '#c8c8c0']]))];
+            o[T[(s ? 'SPHEAD_' : 'PHEAD_') + c]] = [rot([[.4, .16, .34, .6, 1.02, .54, '#c8c8c0'], [.04, .0, 0, .96, .16, .86, '#a8743c'], [.08, -.02, .06, .92, 0, .8, plate]])];
+        }
+    });
     o[T.ENCH] = [boxSprite([[.08, .08, 0, .92, .92, .5, '#3c1c48'], [.04, .04, .5, .96, .96, .62, '#7a2a8c'], [.14, .14, .62, .86, .86, .66, '#c060d8'], [.4, .4, .82, .6, .6, 1.12, '#c8a8ff'], [.44, .44, 1.12, .56, .56, 1.2, '#f0e0ff']], { base: 1 })];
     o[T.ANVIL] = [boxSprite([[.26, .3, 0, .74, .7, .2, '#4a4a54'], [.38, .38, .2, .62, .62, .42, '#3e3e48'], [.12, .28, .42, .88, .72, .6, '#5c5c68']])];
     o[T.BED] = [boxSprite([[.04, .12, 0, .96, .88, .26, '#7c5228'], [.06, .14, .26, .68, .86, .36, '#3a7ac8'], [.3, .14, .36, .36, .86, .37, '#2a5a9c'], [.06, .4, .36, .68, .46, .37, '#2a5a9c'], [.68, .14, .26, .94, .86, .4, '#f4d860']])];
@@ -370,6 +379,7 @@ const objSprite = (t, x, y) => { const a = OS[t]; if (!a) return null;
     if (t === T.LADDER_D) return pitSpriteAt(S.f, x, y, LADDER_PARTS);
     if (t === T.WIRE) return wireSprite(x, y);
     if (FENCE_COL[t] !== undefined) return fenceSprite(t, x, y);
+    if (TILE[t].piston) return a[pistonExtended(x, y, TILE[t].piston) ? 1 : 0];
     if (TILE[t].rep) return repSprite(TILE[t].rep - 1, !VIEW.title && repLit(x, y));
     if (TILE[t].inv) return invSprite(TILE[t].inv - 1, !VIEW.title && invLit(x, y));
     if (t === T.WIRE_W) return wallWireSprite(x, y);
