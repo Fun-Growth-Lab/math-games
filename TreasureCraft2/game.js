@@ -5,7 +5,7 @@ const AIR_MAX = 40;   // 息が続くターン数。泳ぎは歩きの半分の�
 const DAY_LEN = 960, DAY_LIGHT = 640, CROP_TIME = 1920, INV_SIZE = 64, HOT_SIZE = 8, STACK = 99, SAVE_KEY = 'tc2_save';
 const H = {
     log() { }, float() { }, chips() { }, shake() { }, sfx() { }, slash() { }, shot() { }, refresh() { }, banner() { }, floorFx() { },
-    achieve() { }, seen() { }, victory() { }, dead() { }, openCraft() { }, openChest() { }, openBed() { }, openTrade() { }, openTurn() { }, stopHold() { }, clearPath() { }, gain() { }
+    achieve() { }, seen() { }, victory() { }, dead() { }, openCraft() { }, openChest() { }, openBed() { }, openTrade() { }, openTurn() { }, stopHold() { }, clearPath() { }, gain() { }, rideAuto() { }
 };
 let S = null;
 // 回路モード: 自由に回路をつくるモード。おなか・HPがへらない、敵が出ない、回路の部品などが ∞。セーブは別
@@ -1000,12 +1000,12 @@ function bossDirection() {
 }
 
 // ---------- ターン進行 ----------
-function endTurn(n) {
+function endTurn(n, idle) {
     n = n || 1;
     for (let i = 0; i < n; i++) {
         const before = isNight();
         S.T++;
-        S.hungerAcc++;
+        S.hungerAcc += (idle || S.ride) ? .25 : 1;   // 何もしない・トロッコに乗っている ターンは 4分の1
         if (S.hungerAcc >= HUNGER_EVERY && !circuitMode() && rnd() * 100 < enchV(curArmor(), 'full')) S.hungerAcc = 0;   // 腹もち
         if (S.hungerAcc >= HUNGER_EVERY && !circuitMode()) { S.hungerAcc = 0; S.hunger = Math.max(0, S.hunger - 1); if (S.hunger === 20) H.log('おなかが減ってきた…', 'warn'); }
         // HPの自然回復はゆっくり。しっかり治すには寝床で眠る
@@ -1257,7 +1257,7 @@ function youngCrop(x, y, t) {
     return !!c && S.T - c.p < CROP_TIME;
 }
 // keep: 向きを変えずに歩く(Ctrl)
-// トロッコ: 線路に置いて ぶつかると乗る。向きを えらぶと 毎ターン 4マス 線路にそって進む(まがり角は まがる)。
+// トロッコ: 線路に置いて ぶつかると乗る。向きを えらぶと 毎ターン 1マス 線路にそって進む(まがり角は まがる)。乗ると進行モードになる。
 // 線路のおわり・動物などの手前で 止まる。「おりる」で その場に トロッコを置く
 const isRailAt = (x, y) => getT(S.f, x, y) === T.RAIL;
 const cartAt = (x, y) => { const e = S.ex[exKey(S.f, x, y)]; return !!(e && e.cart) && isRailAt(x, y); };
@@ -1266,8 +1266,8 @@ function placeCart(x, y) {
     const k = exKey(S.f, x, y); (S.ex[k] || (S.ex[k] = {})).cart = 1;
     removeItem('cart', 1); H.sfx('place'); endTurn(1);
 }
-function boardCart(x, y) { const k = exKey(S.f, x, y); delete S.ex[k].cart; if (!Object.keys(S.ex[k]).length) delete S.ex[k]; S.ride = 1; S.rideDir = null; H.sfx('place'); }
-function leaveCart() { S.ride = 0; S.rideDir = null; const k = exKey(S.f, S.x, S.y); if (isRailAt(S.x, S.y)) (S.ex[k] || (S.ex[k] = {})).cart = 1; else give('cart', 1); H.sfx('place'); }
+function boardCart(x, y) { const k = exKey(S.f, x, y); delete S.ex[k].cart; if (!Object.keys(S.ex[k]).length) delete S.ex[k]; S.ride = 1; S.rideDir = null; H.sfx('place'); H.rideAuto(true); }
+function leaveCart() { S.ride = 0; S.rideDir = null; H.rideAuto(false); const k = exKey(S.f, S.x, S.y); if (isRailAt(S.x, S.y)) (S.ex[k] || (S.ex[k] = {})).cart = 1; else give('cart', 1); H.sfx('place'); }
 // d の向きに 線路が続けば d、なければ 曲がり角(左右の どちらか1つだけ 線路)の向き
 function railNext(x, y, d) {
     if (isRailAt(x + d[0], y + d[1])) return d;
@@ -1278,7 +1278,7 @@ const cartBlock = (x, y) => { const m = mobAt(x, y); return !!m && !MOBS[m.t].pe
 function rideTick() {
     if (!S.ride || !S.rideDir || S.hp <= 0) return;
     let d = S.rideDir, moved = 0;
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 1; i++) {
         const nd = railNext(S.x, S.y, d);
         if (!nd || cartBlock(S.x + nd[0], S.y + nd[1])) { d = null; break; }
         S.x += nd[0]; S.y += nd[1]; d = nd; S.face = nd; moved++;

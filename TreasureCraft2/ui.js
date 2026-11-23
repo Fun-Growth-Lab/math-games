@@ -341,7 +341,7 @@ function navKey(e) {
 }
 addEventListener('keyup', e => { const k = KEYS[e.key]; if (k) releaseDir(k); });
 addEventListener('blur', () => { held = null; ctrlHeld = false; });
-function waitTurn() { autoPath = []; endTurn(1); }
+function waitTurn() { autoPath = []; endTurn(1, true); }
 // ---------- 進行モード: 画面を開いている間、現実の時間でターンが進む ----------
 // 攻撃されたり HPが30%以下になったら 止まる。空腹で 下の枠が食べ物なら 自動で食べる(生肉は食べない)
 const AUTO_SPD = [[2000, 'ゆっくり'], [1000, 'ふつう'], [500, 'はやい'], [250, 'とてもはやい']];
@@ -355,6 +355,7 @@ function setAuto(on) {
     b.querySelector('span').textContent = on ? 'とめる' : 'すすめる';
 }
 H.hurtHook = () => { if (autoOn) setAuto(false); };
+H.rideAuto = on => { if (!on) { if (autoOn) setAuto(false); } else if (!autoOn && S.hp > maxHp() * .3) setAuto(true); };   // トロッコに乗ると 進行モード、おりたら 解除
 function autoTurn() {
     const s = S.inv[S.sel], it = s && ITEM[s.id];
     if (S.hunger <= 30 && it && it.food > 0 && !it.raw) { eat(s.id, it); lastHot = ''; refreshHud(); }
@@ -1269,7 +1270,6 @@ let fishNext = 0;
 function loop(now) {
     requestAnimationFrame(loop);
     if (fishing && mode === 'play' && canAct() && now >= fishNext) { fishNext = now + 230; fishTick(); }
-    if (mode === 'play' && S.ride && S.rideDir && canAct() && now >= nextAct) { waitTurn(); nextAct = now + 280; }
     if (mode === 'play' && canAct() && now >= nextAct) {
         if (autoPath.length) {
             const d = autoPath.shift();
