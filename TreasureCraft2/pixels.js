@@ -78,6 +78,7 @@ const PIX_ART = {
     shard: [['.ppppp..ppp.', 'pPPPPPppPPp.', 'pPrPPPPPPPp.', 'pPPrPgPPPPpp', 'pPPPgggPbbPp', '.pPPPgPPbPPp', '..ppPPPPPPp.', '....ppp.pp..'], { p: '#b8966a', P: '#f0dfb8', r: '#d8352c', g: '#5aa83f', b: '#4a9fd8' }]
 };
 // 道具: h=頭 H=頭の明るい所 d=頭の暗い所 s=柄 S=柄の明るい所
+const PIX_CROWN = ['h.....h.....h', 'hh...hHh...hh', 'hHh.hHHHh.hHh', 'hHHhHHdHHhHHh', 'hHHHHdddHHHHh', 'hHHHHHdHHHHHh', 'hhhhhhhhhhhhh', 'hHdHHHdHHHdHh', 'hhhhhhhhhhhhh'];
 const PIX_TOOL = {
     sword: ['............Hh', '...........Hhd', '..........Hhd.', '.........Hhd..', '........Hhd...', '.......Hhd....', '......Hhd.....', '.d...Hhd......', '.dd.Hhd.......', '..ddhd........', '...dds........', '..s.dd........', '.sS...........', 'sS............'],
     pick: ['.....hhhhh....', '...hhhHHHhhh..', '..hh....sdhhh.', '.h.....sS..hhh', '......sS....hh', '.....sS.....hh', '....sS.......h', '...sS.........', '..sS..........', '.sS...........', 'sS............'],
@@ -91,6 +92,7 @@ const PIX_TOOL = {
     armor: ['.hhh....hhh.', 'hHHhh..hhHHh', 'hHHHhhhhHHHh', 'hHHHHHHHHHHh', '.ddHHHHHHdd.', '...hHHHHh...', '...hHHHHh...', '...hHHHHh...', '...dddddd...']
 };
 const MAT_PAL = {
+    king: ['#e8b020', '#fff0a0', '#b8301c'],
     wood: ['#a8743c', '#c89a5c', '#7c5228'], stone: ['#8e8e8a', '#b8b8b2', '#6a6a66'], bone: ['#d8d0b8', '#f6f0de', '#b0a890'], copper: ['#d8803c', '#f4b078', '#a85a24'],
     gold: ['#f0c030', '#fff0a0', '#c09010'], iron: ['#b8c0c8', '#eef2f6', '#8a929a'], ancient: ['#3fb898', '#8ae8cc', '#2a8a70'], star: ['#5ac8f0', '#d0f6ff', '#2a90c0'],
     demon: ['#8a2a9c', '#d070e0', '#5c1c6c'], hide: ['#8c6038', '#b88858', '#64421f']
@@ -117,5 +119,6 @@ function toolIconUrl(t) {
     const id = t.k + '_' + t.a + '_' + (isArmor(t.k) ? '' : t.b);
     if (toolIconCache[id]) return toolIconCache[id];
     const m = MAT_PAL[t.a] || MAT_PAL.iron, h = HANDLE_PAL[t.b] || HANDLE_PAL.wood;
+    if (t.a === 'king' && t.k === 'helm') return (toolIconCache[id] = pixelIcon(PIX_CROWN, { h: '#c89418', H: '#ffe27a', d: '#d8303c' }));
     return (toolIconCache[id] = pixelIcon(PIX_TOOL[t.k], { h: m[0], H: m[1], d: m[2], s: h[0], S: h[1] }));
 }

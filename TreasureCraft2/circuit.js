@@ -324,7 +324,7 @@ function fireDispenser(x, y, dir) {
     }
     H.shot(x, y, ex, ey, '#f0e8d0', true); H.sfx('attack');
     if (me) hurt(DISP_DMG, '矢の発射台', null);
-    else if (hit && !MOBS[hit.t].npc && !MOBS[hit.t].pet) damageMob(hit, Math.max(1, DISP_DMG - (MOBS[hit.t].def || 0)));
+    else if (hit && !MOBS[hit.t].npc && !MOBS[hit.t].pet) damageMob(hit, Math.max(1, DISP_DMG - mobDef(MOBS[hit.t])));
 }
 // ぶつかると 持っている矢を入れる
 function loadDispenser(x, y) {

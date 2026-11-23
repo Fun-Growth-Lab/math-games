@@ -82,7 +82,7 @@ Object.assign(H, {
     dead(src) { holdLock = true; autoPath = []; setTimeout(showDead, 50, src); },
     victory() { setTimeout(showVictory, 1200); },
     openCraft(st, x, y) { panelTarget = { x, y, st }; openPanel(st === 'furnace' ? 'make' : st === 'anvil' ? 'forge' : st === 'ench' ? 'ench' : 'tool', true); },
-    openChest(k) { openChest(k); },
+    openChest(k, cap) { openChest(k, cap); },
     openBed(x, y) { openBedDialog(x, y); },
     openTrade(m) { openTrade(m); },
     stopHold() { holdLock = true; autoPath = []; fishing = null; },
@@ -181,9 +181,13 @@ function refreshHud() {
     $('air-row').classList.toggle('hidden', air >= am);
     $('air-fill').style.width = (100 * air / am) + '%'; $('air-num').textContent = air + '/' + am;
     const dir = bossDirection();
-    $('clock').innerHTML = (isNight() ? '🌙' : '☀️') + ' ' + dayNo() + '日目 ' + hourStr() + '<small><span>' + FLOOR_NAME[S.f] + '</span>' + (S.f === 0 ? '・<span>' + BIOME_NAME[biomeAt(S.x, S.y)] + '</span>' : '') + (dir ? '・<span>' + trf('魔王城 {0} {1}マス', dir.name, dir.dist) + '</span>' : '') + '</small>';
+    $('clock').innerHTML = (S.reb ? '<b class="rebb notr">' + trf('転生{0}回目', S.reb) + '</b>' : '') + (isNight() ? '🌙' : '☀️') + ' ' + dayNo() + '日目 ' + hourStr() + '<small><span>' + FLOOR_NAME[S.f] + '</span>' + (S.f === 0 ? '・<span>' + BIOME_NAME[biomeAt(S.x, S.y)] + '</span>' : '') + (dir ? '・<span>' + trf('魔王城 {0} {1}マス', dir.name, dir.dist) + '</span>' : '') + '</small>';
     const gi = goalIndex();
-    $('goal').textContent = circuitMode() ? '回路モード: 自由に回路をつくろう' : gi >= 0 ? '目標: ' + GOALS[gi].t : '魔王をたおした! 自由に遊ぼう';
+    // 目標の帯: 魔王をたおしたあとは OKで消せる。転生した世界では 出さない
+    const done = !circuitMode() && gi < 0;
+    $('goal').classList.toggle('hidden', !circuitMode() && (!!S.reb || (done && !!S.goalOff)));
+    if (done) { if (!$('goal-ok')) { $('goal').innerHTML = '<span>魔王をたおした! 自由に遊ぼう</span><button class="wbtn" id="goal-ok">OK</button>'; $('goal-ok').onclick = () => { S.goalOff = 1; SFX.play('select'); refreshHud(); }; } }
+    else $('goal').textContent = circuitMode() ? '回路モード: 自由に回路をつくろう' : '目標: ' + GOALS[gi].t;
     // できることに合わせて ボタンの文字を変える。2つあるときだけ もう1つのボタンを出す
     // 「ほる」ボタン: 前のマスに合わせて こうげき・ほる・こわす。使う道具の絵(なければ手)。できないときは うすく
     { const di = digInfo(), bt = $('btn-dig'), ic = bt.querySelector('b'), tl = di.tool, k = tl ? tl.k + tl.a + tl.b + (tl.gem ? 'g' : '') : 'hand'; if (ic.dataset.k !== k) { ic.dataset.k = k; ic.innerHTML = tl ? toolImg(tl) : '✋'; } bt.querySelector('span').textContent = di.l; bt.classList.toggle('dim', !di.ok); }
@@ -365,9 +369,9 @@ function autoTick(now) {
     autoLastT = S.T; autoNext = now + autoMs;
 }
 // 速さをえらぶ(メニューと設定)
-function autoSpdPick(el) {
+function autoSpdPick(el, seg) {
     const draw = () => {
-        el.innerHTML = '<div class="langpick spdpick"><b>進行モードの速さ</b>' + AUTO_SPD.map(q => '<button class="wbtn' + (q[0] === autoMs ? ' go' : '') + '" data-ms="' + q[0] + '">' + q[1] + '</button>').join('') + '</div>';
+        el.innerHTML = '<div class="' + (seg ? 'seg' : 'langpick spdpick') + '">' + (seg ? '' : '<b>進行モードの速さ</b>') + AUTO_SPD.map(q => '<button class="wbtn' + (q[0] === autoMs ? ' go' : '') + '" data-ms="' + q[0] + '">' + q[1] + '</button>').join('') + '</div>';
         el.querySelectorAll('[data-ms]').forEach(b => b.onclick = () => { autoMs = +b.dataset.ms; try { localStorage.setItem('tc2_auto_ms', autoMs); } catch (e) { } draw(); });
     };
     draw();
@@ -502,7 +506,7 @@ function invDetail() {
     if (it.use === 'home') h += '復活地点へ もどる<br>';
     if (it.use === 'shard') h += '周りの地図が 広がる<br>';
     const usable = it.food !== undefined || it.heal !== undefined || it.use === 'home' || it.use === 'shard';
-    h += '<br><div style="display:flex;gap:8px">' + (usable ? '<button class="wbtn go" id="inv-use">つかう</button>' : '') + '<button class="wbtn" id="inv-drop">すてる</button></div>';
+    h += '<br><div style="display:flex;gap:8px">' + (usable ? '<button class="wbtn go" id="inv-use">つかう</button>' : '') + (s.id === 'rebox' ? '' : '<button class="wbtn" id="inv-drop">すてる</button>') + '</div>';
     return h;
 }
 function needHtml(need) {
@@ -761,38 +765,40 @@ function drawStat() {
     const w = bestWeapon(), ws = w ? toolStats(w) : null, bow = eq('bow'), bs = bow ? toolStats(bow) : null, pick = eq('pick'), ps = pick ? toolStats(pick) : null;
     const armor = ARMOR_KINDS.map(eq).filter(Boolean), body = eq('armor'), lin = body && LININGS[body.b];
     const rows = [];
-    rows.push(row('❤️', 'HP', maxHp(), [['もと', 100]].concat(lin && lin.hp ? [[lin.n, lin.hp]] : [])));
-    { const parts = [['もと', 2]]; if (w) parts.push([toolName(w), ws.atk]); if (ws && ws.burn) parts.push(['炎の追加ダメージ', 5]); if (w && enchV(w, 'fire')) parts.push([ENCHANTS.fire.n, enchV(w, 'fire')]); rows.push(row('⚔️', '攻撃', parts.reduce((s, p) => s + p[1], 0), parts)); }
+    rows.push(row('❤️', 'HP', maxHp(), [['もと', 100]].concat(lin && lin.hp ? [[lin.n, lin.hp]] : [], armor.filter(t => BODIES[t.a].hp).map(t => [toolName(t), BODIES[t.a].hp]))));
+    { const parts = [['もと', 2]]; if (w) parts.push([toolName(w), ws.atk]); if (ws && ws.burn) parts.push(['炎の追加ダメージ', 5]); armor.filter(t => BODIES[t.a].atk).forEach(t => parts.push([toolName(t), BODIES[t.a].atk])); if (w && enchV(w, 'fire')) parts.push([ENCHANTS.fire.n, enchV(w, 'fire')]); rows.push(row('⚔️', '攻撃', parts.reduce((s, p) => s + p[1], 0), parts)); }
     { const parts = armor.map(t => [toolName(t), num(toolStats(t).def)]); rows.push(row('🛡️', '守り', Math.round(armor.reduce((s, t) => s + toolStats(t).def, 0)), parts.length ? parts : [['なし', 0]])); }
     if (bow) { const fe = count('arrow_fe') > 0, parts = [['もと', 2], [toolName(bow), bs.atk]]; if (fe) parts.push(['鉄の矢', 5]); if (enchV(bow, 'fire')) parts.push([ENCHANTS.fire.n, enchV(bow, 'fire')]); rows.push(row('🏹', '弓の攻撃', parts.reduce((s, p) => s + p[1], 0), parts)); rows.push(row('🎯', '射程', bs.range, [[toolName(bow), bs.range]])); }
     if (pick) rows.push(row('⛏️', '掘る力', ps.mine, [[toolName(pick), ps.mine]]));
     rows.push(row('🫧', '息', airMax(), [['もと', AIR_MAX]].concat(enchV(eq('helm'), 'breath') ? [[ENCHANTS.breath.n, enchV(eq('helm'), 'breath')]] : [])));
     const ens = [w, bow, pick, eq('axe'), eq('shovel'), eq('hoe')].concat(armor).filter((t, i, a) => t && t.en && a.indexOf(t) === i);
     const enHtml = ens.length ? '<div class="sen"><h4>✦ 特別な力</h4>' + ens.map(t => '<div><b>' + ENCHANTS[t.en.id].n + ' Lv' + t.en.lv + '</b><span class="notr">' + tr(trf(ENCHANTS[t.en.id].d, ENCHANTS[t.en.id].v[t.en.lv - 1])) + '</span></div>').join('') + '</div>' : '';
-    const look = curLook();
+    const look = heroLook();
     $('pbody').innerHTML = '<div class="stcard"><div class="sthero"><img src="' + heroPortrait(look) + '" alt=""></div><div class="stname">' + look.n + '</div></div>' +
         '<div class="steq"><h4>身につけている物</h4><div class="eqgrid">' + ['sword', 'helm', 'bow', 'armor', 'pick', 'glove', 'axe', 'boot', 'shovel', 'hoe'].map(slot).join('') + '</div>' + enHtml + '</div>' +
         '<div class="stlist"><div class="srows">' + rows.join('') + '</div></div>';
 }
 
 // ---------- 箱 ----------
-let chestKey = null;
-function openChest(k) {
-    chestKey = k;
-    if (!S.ex[k] || !S.ex[k].items) S.ex[k] = { items: [] };
+let chestKey = null, chestCap = 24;
+function openChest(k, cap) {
+    chestKey = k; chestCap = cap || 24;
+    if (!S.ex[k] || !S.ex[k].items) S.ex[k] = Object.assign({ items: [] }, cap ? { rebox: 1 } : {});
+    $('chest-title').textContent = tr(cap ? '転生の箱' : '箱(タップで出し入れ)');
     held = null; $('chest-modal').classList.remove('hidden'); SFX.play('chest'); drawChest();
 }
 function drawChest() {
     const box = S.ex[chestKey].items;
     let a = '', b = '';
     for (let i = 0; i < INV_SIZE; i++) a += slotHtml(S.inv[i], { i });
-    for (let i = 0; i < 24; i++) b += slotHtml(box[i], { i });
+    for (let i = 0; i < chestCap; i++) b += slotHtml(box[i], { i });
     $('chest-inv').innerHTML = a; $('chest-box').innerHTML = b;
     $('chest-inv').querySelectorAll('.slot').forEach(el => el.onclick = () => {
         const i = +el.dataset.i, s = S.inv[i];
-        if (!s || box.length >= 24) return;
+        if (!s || box.length >= chestCap) return;
+        if (s.id === 'rebox') { SFX.play('error'); return; }   // 転生の箱は 箱に入れられない
         if (s.tool) delete s.tool.eq;
-        if (!s.tool) { const q = box.find(x => x && x.id === s.id && x.n + s.n <= STACK); if (q) { q.n += s.n; S.inv[i] = null; lastHot = ''; drawChest(); return; } }
+        if (!s.tool && chestCap === 24) { const q = box.find(x => x && x.id === s.id && x.n + s.n <= STACK); if (q) { q.n += s.n; S.inv[i] = null; lastHot = ''; drawChest(); return; } }
         box.push(s); S.inv[i] = null; lastHot = ''; SFX.play('select'); drawChest();
     });
     $('chest-box').querySelectorAll('.slot').forEach(el => el.onclick = () => {
@@ -875,6 +881,7 @@ function drawMap() {
     const kinds = {}; fnd.forEach(p => kinds[p.type] = (kinds[p.type] || 0) + 1);
     for (const k in kinds) notes.push(placeMarkSvg(k) + ' ' + PLACE_NAMES[k] + (kinds[k] > 1 ? ' ×' + kinds[k] : ''));
     if (S.graves.some(g => g.f === mapFloor)) notes.push('🟨 落とした荷物');
+    { const rb = reboxes().filter(b => b.f === mapFloor); rb.forEach(b => { pin(b.x, b.y, '#3fe8ff', 2); }); if (rb.length) notes.push('🟦 転生の箱' + (rb.length > 1 ? ' ×' + rb.length : '')); }
     if (mapFloor === 2 && !S.bossDead && S.got.reach_2) { const p = bossPos(); pin(p.x, p.y, '#ff2a2a', 2); notes.push('🔺 魔王城'); }
     if (S.f === mapFloor) {
         // 自分: 向いている方へ とがった 三角。ほかの印より あとに描いて いつも いちばん上に
@@ -882,7 +889,7 @@ function drawMap() {
         const tri = r => { c.beginPath(); c.moveTo(cx + fx * r * 1.6, cy + fy * r * 1.6); c.lineTo(cx - fx * r + px * r * 1.2, cy - fy * r + py * r * 1.2); c.lineTo(cx - fx * r - px * r * 1.2, cy - fy * r - py * r * 1.2); c.closePath(); };
         tri(4.2); c.fillStyle = '#000'; c.fill(); tri(3); c.fillStyle = '#fff'; c.fill();
     }
-    $('map-tabs').innerHTML = FLOOR_ORDER.map(i => (i === 0 || S.got['reach_' + i]) ? '<button class="tab' + (i === mapFloor ? ' on' : '') + '" data-f="' + i + '">' + FLOOR_NAME[i] + '</button>' : '').join('');
+    $('map-tabs').innerHTML = FLOOR_ORDER.map(i => (i === 0 || S.got['reach_' + i] || reboxes().some(b => b.f === i)) ? '<button class="tab' + (i === mapFloor ? ' on' : '') + '" data-f="' + i + '">' + FLOOR_NAME[i] + '</button>' : '').join('');
     $('map-tabs').querySelectorAll('[data-f]').forEach(b => b.onclick = () => { mapFloor = +b.dataset.f; drawMap(); });
     // コンパス(地図は いつも 北が上)
     c.save(); c.translate(232, 18); c.fillStyle = 'rgba(255,248,230,.9)'; c.strokeStyle = '#7c5228'; c.lineWidth = 1.5; c.beginPath(); c.arc(0, 0, 13, 0, 7); c.fill(); c.stroke();
@@ -902,21 +909,44 @@ function getTFast(f, x, y) {
 }
 
 // ---------- ダイアログ ----------
-function dialog(html, wire) { $('dialog-box').innerHTML = html; $('dialog').classList.remove('hidden'); if (wire) wire($('dialog-box')); held = null; autoPath = []; }
+function dialog(html, wire) { $('dialog-box').className = 'sheet box'; $('dialog-box').innerHTML = html; $('dialog').classList.remove('hidden'); if (wire) wire($('dialog-box')); held = null; autoPath = []; }
 function closeDialog() { $('dialog').classList.add('hidden'); }
 // BGM/効果音ボタンは 1つの場所につき1回だけ作る(作るたびに入れ直しの見張りが残り、ボタンがふえるため)
 const SOUND_BTN = {};
 function soundBtn(sel) { if (SOUND_BTN[sel]) SOUND_BTN[sel](); else SOUND_BTN[sel] = FGLBgm.settingsButton(BGM, { parent: sel, sfx: SFX, getLang: () => LANG }); }
+// メニュー: 横長の2列(左 = 世界の情報と大きなボタン、右 = ガイド・速さ・音)。画面の高さに おさまる
 function openMenu() {
     saveGame();
-    dialog('<h2>メニュー</h2>' + (curSlot && !circuitMode() ? '<b>' + escapeHtml((slotList().find(q => q.id === curSlot) || {}).name || '') + '</b><br>' : circuitMode() ? '<b>回路モード</b><br>' : '') + dayNo() + '日目 / ' + S.T + ' ターン<br>世界コード <b>' + seedToCode(S.seed) + '</b><div class="row menu-main"><button class="wbtn go big" id="m-back">つづける</button><button class="wbtn blue big" id="m-title">セーブしてタイトルへ</button></div><div class="row"><button class="wbtn" id="m-howto">あそびかた</button><button class="wbtn" id="m-keys">キー操作</button><button class="wbtn" id="m-look">主人公</button></div><div id="m-spd"></div><div id="m-sound"></div>', b => {
+    const name = circuitMode() ? '回路モード' : curSlot ? ((slotList().find(q => q.id === curSlot) || {}).name || '') : '';
+    dialog('<h2>メニュー</h2><div class="mnu-body">' +
+        '<div class="mnu-l"><div class="mnu-info">' + (name ? '<div class="mi-name">' + escapeHtml(name) + '</div>' : '') +
+        '<div class="mi-grid' + (S.reb ? ' g4' : '') + '">' + (S.reb ? '<div><span>転生</span><b class="notr">' + S.reb + '</b></div>' : '') + '<div><span>日数</span><b class="notr">' + dayNo() + '</b></div><div><span>ターン</span><b class="notr">' + S.T + '</b></div><div><span>世界コード</span><b class="notr">' + seedToCode(S.seed) + '</b></div></div></div>' +
+        '<button class="wbtn go mbig" id="m-back">つづける</button><button class="wbtn blue mbig" id="m-title">セーブしてタイトルへ</button>' + (S.bossDead && !circuitMode() && curSlot ? '<button class="wbtn danger" id="m-reb">✦ 転生する</button>' : '') + '</div>' +
+        '<div class="mnu-r"><div class="mnu-sec"><h4>ガイド</h4><div class="mtiles"><button class="wbtn" id="m-howto"><i>📖</i>あそびかた</button><button class="wbtn" id="m-keys"><i>⌨️</i>キー操作</button><button class="wbtn" id="m-look"><i>🧑</i>主人公</button></div></div>' +
+        '<div class="mnu-sec"><h4>進行モードの速さ</h4><div id="m-spd"></div></div>' +
+        '<div class="mnu-sec"><h4>音</h4><div id="m-sound"></div></div></div></div>', b => {
+        b.classList.add('mnu-box');
         b.querySelector('#m-back').onclick = closeDialog;
         b.querySelector('#m-howto').onclick = () => { closeDialog(); openHowto(); };
         b.querySelector('#m-keys').onclick = openKeys;
         b.querySelector('#m-look').onclick = () => openLooks(openMenu);
         b.querySelector('#m-title').onclick = () => { saveGame(); location.reload(); };
+        if (b.querySelector('#m-reb')) b.querySelector('#m-reb').onclick = openRebirth;
         soundBtn('#m-sound');
-        autoSpdPick(b.querySelector('#m-spd'));
+        autoSpdPick(b.querySelector('#m-spd'), true);
+    });
+}
+function openRebirth() {
+    const n = reboxCount(), mul = Math.round((1 + ((S.reb || 0) + 1) * .2) * 10) / 10;
+    dialog('<h2>転生する?</h2><div class="rebinfo"><div>新しい世界で はじめから。持ち物・家は なくなる</div><div>転生の箱 <b class="notr">' + n + '</b> こと 中身だけが 新しい世界の どこかへ</div><div>敵の強さ <b class="notr">×' + mul + '</b></div></div><div class="row"><button class="wbtn danger" id="r-go">転生する</button><button class="wbtn" id="r-back">もどる</button></div>', b => {
+        b.querySelector('#r-back').onclick = openMenu;
+        b.querySelector('#r-go').onclick = () => {
+            const fl = rebirth(), cnt = {};
+            fl.forEach(f => cnt[f] = (cnt[f] || 0) + 1);
+            closeDialog(); snapView(); lastHot = ''; refreshHud(); saveGame();
+            SFX.play('clearstage');
+            H.banner(trf('転生{0}回目', S.reb), FLOOR_ORDER.filter(f => cnt[f]).map(f => tr(FLOOR_NAME[f]) + (cnt[f] > 1 ? ' ×' + cnt[f] : '')).join('・'));
+        };
     });
 }
 function openTrade(m) {   // 村人に話しかけたとき(手伝い)
@@ -956,17 +986,20 @@ const setName = n => { try { localStorage.setItem('tc2_name', n); } catch (e) { 
 function showVictory() {
     const days = dayNo(), name = getName();
     SFX.play('clearstage');
-    dialog('<h2>魔王をたおした!</h2><b style="font-size:30px;color:#c8301c">' + days + '日目</b> でクリア (' + S.T + ' ターン / 力つきた回数 ' + S.deaths + ')<br>世界コード ' + seedToCode(S.seed) + '<br>実績 ' + achCount() + '/' + ACH.length + '<div class="row"><input id="v-name" maxlength="12" placeholder="ニックネーム" value="' + escapeHtml(name) + '"><button class="wbtn go" id="v-send">ランキングに のせる</button></div><div id="v-msg" style="font-size:16px"></div><div class="row"><button class="wbtn" id="v-rank">ランキングを見る</button><button class="wbtn" id="v-more">このまま遊ぶ</button></div>', b => {
+    dialog('<h2>魔王をたおした!</h2><b style="font-size:30px;color:#c8301c">' + days + '日目</b> でクリア (' + S.T + ' ターン / 力つきた回数 ' + S.deaths + ')<br>世界コード ' + seedToCode(S.seed) + '<br>実績 ' + achCount() + '/' + ACH.length + '' + (S.reb ? '' : '<div class="row"><input id="v-name" maxlength="12" placeholder="ニックネーム" value="' + escapeHtml(name) + '"><button class="wbtn go" id="v-send">ランキングに のせる</button></div>') + '<div id="v-msg" style="font-size:16px"></div><div class="row hidden" id="v-next"><button class="wbtn go" id="v-more">このまま遊ぶ</button><button class="wbtn blue" id="v-title">セーブしてタイトルへ</button></div>', b => {
+        // ランキングに のせたあとで 次へ進める(通信に失敗したときも 進めるようにする)
+        const next = () => b.querySelector('#v-next').classList.remove('hidden');
+        if (S.reb) { next(); b.querySelector('#v-more').onclick = closeDialog; b.querySelector('#v-title').onclick = () => { saveGame(); location.reload(); }; return; }
         b.querySelector('#v-send').onclick = async () => {
             const v = FGLName.validate(b.querySelector('#v-name').value), msg = b.querySelector('#v-msg');
             if (!v.ok) { msg.textContent = v.reason === 'empty' ? 'ニックネームを入れてね' : FGLName.message(v.reason, 'simple'); return; }
             setName(v.name);
             b.querySelector('#v-send').disabled = true;
-            try { await window.saveOnlineScore(v.name, 1000000 - S.T, days); msg.textContent = 'のせました!'; }
-            catch (e) { msg.textContent = '通信に失敗しました'; b.querySelector('#v-send').disabled = false; }
+            try { await window.saveOnlineScore(v.name, 1000000 - S.T, days); msg.textContent = 'のせました!'; b.querySelector('#v-name').disabled = true; b.querySelector('#v-send').classList.add('hidden'); next(); }
+            catch (e) { msg.textContent = '通信に失敗しました'; b.querySelector('#v-send').disabled = false; next(); }
         };
-        b.querySelector('#v-rank').onclick = () => { closeDialog(); showRanking(showVictory); };
         b.querySelector('#v-more').onclick = closeDialog;
+        b.querySelector('#v-title').onclick = () => { saveGame(); location.reload(); };
     });
 }
 async function showRanking(back) {

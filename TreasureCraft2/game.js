@@ -1,8 +1,8 @@
 // トレジャークラフト2: ルール本体(ターン進行・採集・クラフト・戦闘・ボス・セーブ)。DOMには触らず、画面への指示は H.* を通す。
 'use strict';
-const TREE_TIME = 960;   // 木の実が木になるまで(2日。畑の4倍)
+const TREE_TIME = 3840;   // 木の実が木になるまで(4日。畑の2倍)
 const AIR_MAX = 40;   // 息が続くターン数。泳ぎは歩きの半分の速さなので、長押しで約10秒
-const DAY_LEN = 960, DAY_LIGHT = 640, CROP_TIME = 240, INV_SIZE = 64, HOT_SIZE = 8, STACK = 99, SAVE_KEY = 'tc2_save';
+const DAY_LEN = 960, DAY_LIGHT = 640, CROP_TIME = 1920, INV_SIZE = 64, HOT_SIZE = 8, STACK = 99, SAVE_KEY = 'tc2_save';
 const H = {
     log() { }, float() { }, chips() { }, shake() { }, sfx() { }, slash() { }, shot() { }, refresh() { }, banner() { }, floorFx() { },
     achieve() { }, seen() { }, victory() { }, dead() { }, openCraft() { }, openChest() { }, openBed() { }, openTrade() { }, openTurn() { }, stopHold() { }, clearPath() { }, gain() { }
@@ -138,6 +138,8 @@ function loadGame(key) {
         (S.mobs || []).forEach(o => { if (!MOBS[o.t] || mobAt(o.x, o.y)) return; const m = spawnMob(o.t, o.x, o.y); Object.assign(m, { hp: o.hp, mhp: o.mhp || m.mhp, lv: o.lv || m.lv, face: o.face || 2 }); if (o.gkey) m.gkey = o.gkey; if (o.aggro) m.aggro = true; if (o.fuse) m.fuse = o.fuse; });
         delete S.mobs;
         if (S.f === 2) ensureBoss();
+        if (S.bossDead && !S.kingLoot && !circuitMode()) { bossLoot(null); setTimeout(() => H.banner('魔王の落とし物', '魔王の大剣・魔王の王冠・魔王の像・転生の箱'), 600); }
+        else if (S.bossDead && !S.reboxGot && !circuitMode()) { S.reboxGot = 1; give('rebox', 1); setTimeout(() => H.banner('魔王の落とし物', '転生の箱'), 600); }   // 落とし物が できる前に たおした世界
         return true;
     } catch (e) { return false; }
 }
@@ -273,9 +275,11 @@ const bestWeapon = () => equipped('sword') || equipped('axe') || equipped('pick'
 const curArmor = () => equipped('armor');
 const armorPieces = () => ARMOR_KINDS.map(equipped).filter(Boolean);   // 身につけている防具(よろい・かぶと・こて・くつ)
 const airMax = () => AIR_MAX + enchV(equipped('helm'), 'breath');
-const maxHp = () => { const a = curArmor(); return 100 + (a ? toolStats(a).hp : 0); };
+const maxHp = () => 100 + armorPieces().reduce((s, q) => s + toolStats(q).hp, 0);
+const armorAtk = () => armorPieces().reduce((s, q) => s + (toolStats(q).atk || 0), 0);   // 魔王の王冠
+const hasCrown = () => { const h = equipped('helm'); return !!h && h.a === 'king'; };
 function wear(tool, n) {
-    if (!tool || circuitMode()) return;   // 回路モードでは 道具はへらない
+    if (!tool || circuitMode() || tool.a === 'king') return;   // 回路モード・魔王の道具は へらない
     const st = toolStats(tool);
     if (st.tough && rnd() < .35) return;
     if (rnd() * 100 < enchV(tool, 'dura')) return;   // 長持ち
@@ -360,15 +364,21 @@ function mobAt(x, y) {
     }
     return null;
 }
+// 転生した世界は 敵が (1 + 転生回数 × 0.2) 倍 強い(HP・攻撃・守り・毒)
+const foe = d => !d.animal && !d.pet && !d.npc;
+const rebMul = () => 1 + ((S && S.reb) || 0) * .2;
+const mobDef = d => foe(d) ? Math.round((d.def || 0) * rebMul()) : (d.def || 0);
+const bossMax = () => Math.round(MOBS.boss.hp * rebMul());
 function spawnMob(t, x, y) {
     const d = MOBS[t];
     const m = { t, x, y, rx: x, ry: y, ax: 0, ay: 0, hp: d.hp, acc: rnd(), face: 2, flash: 0, scared: 0, lv: 1 };
     if (!d.animal && !d.elite && t !== 'boss' && isCave(S.f)) { m.lv = caveDepth(S.f) + 1; m.hp = Math.round(d.hp * (1 + .35 * (m.lv - 1))); }
+    if (foe(d)) m.hp = Math.round(m.hp * rebMul());
     m.mhp = m.hp;
     mobs.push(m);
     return m;
 }
-const mobAtk = (m, d) => Math.round(d.atk * (1 + .2 * ((m.lv || 1) - 1)));
+const mobAtk = (m, d) => Math.round(d.atk * (1 + .2 * ((m.lv || 1) - 1)) * (foe(d) ? rebMul() : 1));
 // 明るいか: 画面で明るく見える物(松明・ランプ・マグマ・水晶・光る建材…)の光の円に入っていれば 明るい。まものは 明るい所には わかない
 function litNear(x, y, skip) {   // skip: 数えない物(巣は 自分の光を数えない)
     for (let dy = -8; dy <= 8; dy++) for (let dx = -8; dx <= 8; dx++) {
@@ -571,7 +581,7 @@ function explode(m) {
             if (n < td.blast) { S.dmg[k] = n + 1; S.dmgT[k] = S.T; continue; }
             delete S.dmg[k];
         }
-        if ((td.hp || td.back) && (!td.door || td.back) && t !== T.SPAWNER && t !== T.METEOR && t !== T.CHEST) { delete S.dmg[exKey(S.f, x, y)]; setT(S.f, x, y, floorUnder(S.f, x, y)); }
+        if ((td.hp || td.back) && (!td.door || td.back) && t !== T.SPAWNER && t !== T.METEOR && t !== T.CHEST && t !== T.REBOX) { delete S.dmg[exKey(S.f, x, y)]; setT(S.f, x, y, floorUnder(S.f, x, y)); }
     }
     const dist = Math.abs(S.x - m.x) + Math.abs(S.y - m.y);
     if (dist <= 3) { ach('boom'); hurt(dist <= 1 ? 40 : dist === 2 ? 28 : 14, '爆発', null); }
@@ -650,7 +660,7 @@ function hurt(atk, src, d) {
     if (H.hurtHook) H.hurtHook();   // 進行モードを止める
     if (S.sleeping) S.wokeBy = src;
     ps.forEach(q => wear(q, 1));
-    if (d && d.poison) { S.hunger = Math.max(0, S.hunger - d.poison); H.log('毒で おなかが減った', 'bad'); }
+    if (d && d.poison) { S.hunger = Math.max(0, S.hunger - Math.round(d.poison * rebMul())); H.log('毒で おなかが減った', 'bad'); }
     H.float(S.x, S.y, '-' + dmg, '#ff5a5a', 1); H.shake(5); H.sfx('hurt');
     H.log(src + 'から ' + dmg + ' のダメージ', 'bad');
     if (S.hp <= 0) die(src);
@@ -672,7 +682,7 @@ function damageMob(m, dmg, silent) {
 }
 function playerAttack(m) {
     const w = bestWeapon(), st = w ? toolStats(w) : { atk: 0, burn: 0 }, d = MOBS[m.t];
-    let dmg = Math.max(1, 2 + st.atk - (d.def || 0));
+    let dmg = Math.max(1, 2 + st.atk + armorAtk() - mobDef(d));
     dmg = Math.max(1, Math.round(dmg * (.9 + rnd() * .2)));
     const crit = rnd() * 100 < Math.max(10, enchV(w, 'crit'));
     if (crit) dmg = Math.round(dmg * 1.6);
@@ -706,7 +716,7 @@ function killMob(m) {
         }
     }
     H.chips(m.x, m.y, '#ffffff'); H.log(d.n + 'をたおした!', 'good');
-    if (d.boss) { bossDown(); return; }
+    if (d.boss) { bossDown(m); return; }
     if (m.gkey) { S.guards[m.gkey] = 1; H.banner(d.n + 'をたおした!', '良い物を落とした'); H.sfx('levelup'); }
     const items = rollDrops(d.drop, !d.animal && count('rfoot') > 0);
     if (items.length) dropLoot(m.x, m.y, items);
@@ -751,6 +761,7 @@ function dropsExpire() {
         const e = S.ex[k];
         if (!e || !e.items || e.t === undefined || e.f === undefined) continue;
         if (S.T - e.t < DAY_LEN * (e.death ? 5 : 2)) continue;
+        if (e.items.some(q => q && q.id === 'rebox')) continue;   // 転生の箱は なくならない
         S.graves = S.graves.filter(q => !(q.f === e.f && q.x === e.x && q.y === e.y));
         if (getT(e.f, e.x, e.y) === T.GRAVE) setT(e.f, e.x, e.y, pileBase(e));
         if (TILE[getT(e.f, e.x, e.y)].belt) { delete e.items; continue; }
@@ -761,14 +772,14 @@ function die(src) {
     S.deaths++;
     ach('first_death');
     if (src === 'おぼれたこと') ach('drown');
-    const items = S.inv.filter(Boolean);
+    const items = S.inv.filter(s => s && s.id !== 'rebox');
     if (items.length) {
         const spot = dropPile(S.x, S.y, items, 'death') || [S.x, S.y];
         if (!S.ex[exKey(S.f, spot[0], spot[1])]) { const base = getT(S.f, S.x, S.y); setT(S.f, S.x, S.y, T.GRAVE); S.ex[exKey(S.f, S.x, S.y)] = { base, items, t: S.T, f: S.f, x: S.x, y: S.y, death: 1 }; }
         S.graves.push({ f: S.f, x: spot[0], y: spot[1] });
         if (S.graves.length > 5) S.graves.shift();
     }
-    S.inv = new Array(INV_SIZE).fill(null);
+    S.inv = S.inv.map(s => s && s.id === 'rebox' ? s : null);   // 転生の箱は 落とさない
     H.sfx('gameover');
     H.dead(src);
     const sp = S.spawn;
@@ -792,9 +803,9 @@ function freeSpot() {
 function ensureBoss() {
     if (S.bossDead || circuitMode() || mobs.some(m => m.big)) return;
     const p = bossPos(), m = spawnMob('boss', p.x, p.y);
-    m.big = 1; m.hp = S.bossHp; m.cd = 2; m.plan = null; m.walk = 0;
+    m.big = 1; m.hp = S.bossHp; m.mhp = bossMax(); m.cd = 2; m.plan = null; m.walk = 0;
 }
-const bossPhase = m => m.hp > MOBS.boss.hp * .66 ? 1 : m.hp > MOBS.boss.hp * .33 ? 2 : 3;
+const bossPhase = m => m.hp > bossMax() * .66 ? 1 : m.hp > bossMax() * .33 ? 2 : 3;
 function inArena(x, y) { const p = bossPos(); return Math.abs(x - p.x) < ARENA_R && Math.abs(y - p.y) < ARENA_R; }
 const isPlaced = t => TILE[t].back && TILE[t].solid;
 function novaTiles(m) {
@@ -863,7 +874,7 @@ function runBossPlan(m) {
         pl.tiles = n.tiles;
     } else pl.tiles.forEach(q => breakPlaced(q[0], q[1]));
     pl.tiles.forEach(q => { if (rnd() < .3) H.chips(q[0], q[1], pl.type === 'nova' ? '#c05aff' : '#ff8a2c'); });
-    if (pl.tiles.some(q => q[0] === S.x && q[1] === S.y)) hurt(pl.atk, pl.name, null);
+    if (pl.tiles.some(q => q[0] === S.x && q[1] === S.y)) hurt(Math.round(pl.atk * rebMul()), pl.name, null);
 }
 function bossAct(m) {
     if (S.f !== 2) return;
@@ -901,8 +912,17 @@ function bossStep(m, sx, sy) {
     m.x = nx; m.y = ny;
     m.face = sx > 0 ? 1 : sx < 0 ? 3 : sy > 0 ? 2 : 0;
 }
-function bossDown() {
+// 魔王の落とし物: 大剣・王冠・像(1つの世界で1回だけ)
+function bossLoot(m) {
+    const mk = (k, a, b) => { const t = { k, a, b, d: 0 }; t.d = toolStats(t).dur; return { tool: t }; };
+    const items = [mk('sword', 'king', 'wood'), mk('helm', 'king', 'none'), { id: 'statue', n: 1, fresh: 1 }, { id: 'rebox', n: 1, fresh: 1 }, { id: 'feather_home', n: 1, fresh: 1 }];
+    S.kingLoot = 1; S.reboxGot = 1;
+    if (!m) { for (const it of items) { if (it.tool) putTool(it.tool); else give(it.id, it.n); } return; }   // 前にたおした世界: 持ち物へ
+    if (!dropPile(m.x + 1, m.y + 1, items, 'mob')) for (const it of items) { if (it.tool) putTool(it.tool); else give(it.id, it.n); }
+}
+function bossDown(m) {
     S.bossDead = true; S.got.boss_dead = 1; S.bossHp = 0;
+    bossLoot(m);
     ach('victory');
     if (!S.deaths) ach('no_death');
     if (dayNo() <= 30) ach('quick');
@@ -911,6 +931,36 @@ function bossDown() {
     H.shake(14); H.sfx('fanfare');
     if (!S.cleared) { S.cleared = true; H.victory(); }
     saveGame();
+}
+// 転生: 新しい世界で はじめから。転生の箱(置いた物は 中身ごと)だけが 新しい世界の 地上・地下の どこかへ 送られる
+const REBOX_FLOORS = [0, 1, 3, 4, 5, 6];
+function reboxes() { const a = []; for (const k in S.ex) { const e = S.ex[k]; if (!e || !e.rebox) continue; const p = k.split(',').map(Number); if (getT(p[0], p[1], p[2]) === T.REBOX) a.push({ f: p[0], x: p[1], y: p[2], items: e.items || [] }); } return a; }
+function reboxCount() {
+    let n = reboxes().length;
+    S.inv.forEach(s => { if (s && s.id === 'rebox') n += s.n; });
+    for (const k in S.ex) { const e = S.ex[k]; if (e && e.items && !e.rebox) e.items.forEach(q => { if (q && q.id === 'rebox') n += q.n; }); }
+    return n;
+}
+function placeRebox(items) {
+    const f = REBOX_FLOORS[Math.floor(Math.random() * REBOX_FLOORS.length)];
+    let x = CENTER, y = CENTER;
+    for (let i = 0; i < 400; i++) {
+        const a = Math.random() * Math.PI * 2, r = 25 + Math.random() * 175;
+        x = Math.round(CENTER + Math.cos(a) * r); y = Math.round(CENTER + Math.sin(a) * r);
+        const d = TILE[getT(f, x, y)];
+        if (d.ground && !d.solid && !d.swim && !d.liquid && !S.ex[exKey(f, x, y)]) break;
+    }
+    setT(f, x, y, T.REBOX);
+    S.ex[exKey(f, x, y)] = { items: items.slice(0, 4), rebox: 1 };
+    return f;
+}
+function rebirth() {
+    const boxes = reboxes().map(b => b.items), loose = reboxCount() - boxes.length;
+    for (let i = 0; i < loose; i++) boxes.push([]);
+    const reb = (S.reb || 0) + 1;
+    newGame();
+    S.reb = reb; S.bossHp = bossMax();
+    return boxes.map(placeRebox);   // 箱ごとに 置く階を 抽選
 }
 function bossDirection() {
     if (S.f !== 2 || S.bossDead) return null;
@@ -1295,6 +1345,7 @@ function interact(x, y, t) {
     if (d.station) { H.stopHold(); H.openCraft(d.station, x, y); return; }
     if (t === T.BED) { H.stopHold(); H.openBed(x, y); return; }
     if (t === T.CHEST) { H.stopHold(); H.openChest(exKey(S.f, x, y)); return; }
+    if (t === T.REBOX) { H.stopHold(); H.openChest(exKey(S.f, x, y), 4); return; }
     if (t === T.CHEST_W) { openLoot(x, y); return; }
     if (t === T.CROP_C || t === T.CROP_W) { harvest(x, y, t); return; }
     if (t === T.SWITCH_OFF || t === T.SWITCH_ON) { toggleSwitch(x, y, t); return; }
@@ -1306,7 +1357,7 @@ function interact(x, y, t) {
     }
     if (t === T.MAGMA) { H.stopHold(); lavaBurn(null, x, y); endTurn(1); return; }   // マグマには入れない。そちらへ進もうとすると やけど
     if (t === T.PIT) { H.stopHold(); H.refresh(); return; }   // 穴の方を 向くだけ
-    if (d.station || t === T.BED || t === T.CHEST) { H.stopHold(); H.log('こわせないようだ', ''); return; }
+    if (d.station || t === T.BED || t === T.CHEST || t === T.REBOX) { H.stopHold(); H.log('こわせないようだ', ''); return; }
     if (d.hp) { hitTile(x, y, t); return; }
     H.stopHold();
     H.log(d.n + 'は こわせない', '');
@@ -1404,7 +1455,7 @@ function breakTile(x, y, t, tool) {
     if (d.back) give(d.back, 1);
     if (t === T.WIRE_W) { const e = S.ex[exKey(S.f, x, y)]; if (e && e.base) give(TILE[T[e.base]].back, 1); }
     if (t === T.WIRE || t === T.WIRE_W) delete S.ex[exKey(S.f, x, y)];
-    if (t === T.CHEST) {
+    if (t === T.CHEST || t === T.REBOX) {
         const k = exKey(S.f, x, y), c = S.ex[k];
         if (c && c.items) for (const it of c.items) { if (it.tool) putTool(it.tool); else give(it.id, it.n); }
         delete S.ex[k];
@@ -1608,7 +1659,7 @@ function digInfo() {
     const soil = S.f === 0 ? SOIL[t] : d.ground && S.f !== 2 && floorBelow(S.f) >= 0 && t !== T.RFLOOR && t !== T.SCORCH;
     if (soil) return { l: 'ほる', tool: equipped('shovel') || sample('shovel'), ok: !shaftBlock(floorBelow(S.f), x, y) };
     if (t === T.FARM) return { l: 'ほる', tool: equipped('shovel') || sample('shovel'), ok: true };   // 畑は 土にもどる
-    if (d.station || t === T.BED || t === T.CHEST) return { l: 'こわす', tool: null, ok: false };   // 中の「片づける」で しまう
+    if (d.station || t === T.BED || t === T.CHEST || t === T.REBOX) return { l: 'こわす', tool: null, ok: false };   // 中の「片づける」で しまう
     if ((d.ground && !d.hp) || t === T.PIT || takeable(t) || t === T.LADDER_U || t === T.STAIRS_U || t === T.CAVEIN || t === T.GATE || !d.hp) return { l: 'ほる', tool: sample('shovel'), ok: false };
     if (!d.tool) return { l: 'こわす', tool: null, ok: true };
     const eq = equipped(d.tool), tier = d.tier || 0;
@@ -1647,7 +1698,7 @@ function digFacing() {
     if (t === T.PIT) { H.stopHold(); return; }
     if (takeable(t)) { H.stopHold(); H.log((isWire(t) ? '導線' : d.n) + 'は「はずす」で 外せる', ''); return; }
     if (t === T.LADDER_D || t === T.LADDER_U || t === T.STAIRS_U || t === T.CAVEIN || t === T.GATE) { H.stopHold(); H.log(d.n + 'は こわせない', ''); return; }
-    if (d.station || t === T.BED || t === T.CHEST) { H.stopHold(); H.log('こわせないようだ', ''); return; }
+    if (d.station || t === T.BED || t === T.CHEST || t === T.REBOX) { H.stopHold(); H.log('こわせないようだ', ''); return; }
     if (d.hp) { hitTile(x, y, t); return; }
     H.stopHold();
     H.log(d.n + 'は こわせない', '');
@@ -1771,7 +1822,7 @@ function fireBow(bow) {
     H.shot(S.x, S.y, x, y, '#f0e8d0', true); H.sfx('attack');
     if (hit && !MOBS[hit.t].npc && !MOBS[hit.t].pet) {
         const d = MOBS[hit.t];
-        let dmg = Math.max(1, Math.round((2 + st.atk + (arrow === 'arrow_fe' ? 5 : 0) - (d.def || 0)) * (.9 + rnd() * .2)));
+        let dmg = Math.max(1, Math.round((2 + st.atk + armorAtk() + (arrow === 'arrow_fe' ? 5 : 0) - mobDef(d)) * (.9 + rnd() * .2)));
         if (enchV(bow, 'crit') && rnd() * 100 < enchV(bow, 'crit')) dmg = Math.round(dmg * 1.6);
         if (st.burn) dmg += 5;
         dmg += enchV(bow, 'fire');
@@ -1848,6 +1899,7 @@ function placeItem(id, it, x, y, t, after) {
     setT(S.f, x, y, T[place]); delete S.dmg['b' + exKey(S.f, x, y)];
     removeItem(id, 1);
     S.got['placed_' + id] = 1;
+    if (id === 'rebox') S.ex[exKey(S.f, x, y)] = { items: [], rebox: 1 };
     if (id === 'crown') ach('crown');
     if (after) after();
     if (!isWire(getT(S.f, x, y)) && armLinked(x - 1, y, 1)) linkDevice(x, y);   // 回路の部品なら となりの導線と つなぐ

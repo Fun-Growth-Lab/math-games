@@ -45,7 +45,7 @@ defT('ORE_STAR', { n: '星晶', solid: 1, wall: 1, hp: 26, tool: 'pick', tier: 4
 defT('MUSH', { n: 'きのこ', solid: 1, hp: 1, drop: [['mush', 1, 2]] });
 defT('BONES', { n: '骨の山', solid: 1, hp: 2, drop: [['bone', 1, 2]] });
 // 異世界
-defT('NROCK', { n: '赤い岩', solid: 1, wall: 1, hp: 12, tool: 'pick', tier: 3, drop: [['stone', 1, 1]] });
+defT('NROCK', { n: '赤い岩', solid: 1, wall: 1, hp: 12, tool: 'pick', tier: 3, drop: [['nstone', 1, 1]] });
 defT('NTREE', { n: '魔樹', solid: 1, hp: 14, tool: 'axe', drop: [['nwood', 2, 3]] });
 defT('ORE_N', { n: '魔鉱石', solid: 1, wall: 1, hp: 26, tool: 'pick', tier: 4, drop: [['ore_n', 1, 2]], light: 2 });
 defT('CWALL', { n: '魔王城のかべ', solid: 1, wall: 1 });
@@ -162,6 +162,8 @@ for (const m in METALS2) {
 }
 defT('ENCH', { n: 'エンチャント台', solid: 1, hp: 9, tool: 'pick', back: 'ench', station: 'ench', light: 3 });   // 武器・防具に 能力をつける
 defT('OBSIDIAN', { n: '黒曜石', solid: 1, opaque: 1, hp: 40, tool: 'pick', tier: 5, back: 'obsidian', blast: 99 });   // マグマに水がふれると できる。星晶のつるはし以上
+defT('STATUE', { n: '魔王の像', solid: 1, hp: 10, tool: 'pick', back: 'statue', light: 8 });
+defT('REBOX', { n: '転生の箱', solid: 1, hp: 5, back: 'rebox', blast: 99, light: 2 });   // 魔王が落とす。4つ入る。転生すると 中身ごと 新しい世界の どこかへ   // 魔王が落とす。まわりを明るくして 魔物を わかせない
 // ピストン(押す)・ねばねばピストン(押して 引きもどす)。頭は のびたときだけ 前のマスに出る
 'NESW'.split('').forEach((c, i) => {
     defT('PISTON_' + c, { n: 'ピストン', solid: 1, hp: 6, tool: 'pick', back: 'piston', dev: 1, piston: { d: i, s: 0 } });
@@ -182,6 +184,9 @@ const ITEM = {
     coal: { n: '石炭', c: '#2d2d33' }, charcoal: { n: '木炭', c: '#3a3028' }, bone: { n: '骨', e: '🦴' }, hide: { n: '皮', c: '#9c6a3c' }, wool: { n: '羊毛', c: '#f4f1e8' },
     bucket: { n: 'バケツ', c: '#a8b0b8', use: 'bucket', desc: '水やマグマを くむ' }, bucket_w: { n: '水入りバケツ', c: '#4a9fd8', use: 'pour', desc: '穴に 水を入れる' }, bucket_l: { n: 'マグマ入りバケツ', c: '#e8561c', use: 'pour', desc: '穴に マグマを入れる' },
     obsidian: { n: '黒曜石', tile: 'OBSIDIAN', place: 'OBSIDIAN', desc: 'とても かたい' },
+    statue: { n: '魔王の像', tile: 'STATUE', place: 'STATUE', desc: 'まわりが明るくなる' },
+    rebox: { n: '転生の箱', tile: 'REBOX', place: 'REBOX', desc: '中身を 次の世界へ運べる' },
+    nstone: { n: '異世界の石', tile: 'NROCK', place: 'NROCK' },
     feather: { n: '羽', e: '🪶' }, fletch: { n: '矢羽根', c: '#f6f3ea', desc: '矢の材料' }, silk: { n: 'クモの糸', c: '#e3e3ee' },
     ore_cu: { n: '銅鉱石', c: '#c9743c' }, ore_fe: { n: '鉄鉱石', c: '#d8b89a' }, ore_au: { n: '金鉱石', c: '#e8c84a' }, ore_n: { n: '魔鉱石', c: '#b0349a' },
     ingot_cu: { n: '銅のかたまり', c: '#e08a4a' }, ingot_fe: { n: '鉄のかたまり', c: '#d9dde2' }, ingot_au: { n: '金のかたまり', c: '#ffd84a' }, ingot_n: { n: '魔鋼', c: '#8a2a9c' },
@@ -211,7 +216,8 @@ const HEADS = {
     iron: { n: '鉄', item: 'ingot_fe', cost: 3, st: 'bench', tier: 4, atk: 9, mine: 6, dur: 280 },
     ancient: { n: '古代', item: 'ancient', cost: 2, st: 'bench', tier: 4, atk: 12, mine: 7, dur: 380, note: 'へりにくい', tough: 1 },
     star: { n: '星晶', item: 'star', cost: 2, st: 'bench', tier: 5, atk: 13, mine: 9, dur: 520 },
-    demon: { n: '魔鋼', item: 'ingot_n', cost: 3, st: 'bench', tier: 6, atk: 19, mine: 12, dur: 800, burn: 1, note: '炎の追加ダメージ' }
+    demon: { n: '魔鋼', item: 'ingot_n', cost: 3, st: 'bench', tier: 6, atk: 19, mine: 12, dur: 800, burn: 1, note: '炎の追加ダメージ' },
+    king: { n: '魔王', item: 'ingot_n', cost: 3, tier: 6, atk: 25, mine: 12, dur: 9999, burn: 1, kn: { sword: '魔王の大剣' } }   // 魔王が落とす。こわれない
 };
 // 柄の素材
 const HANDLES = {
@@ -228,7 +234,8 @@ const BODIES = {
     copper: { n: '銅', item: 'ingot_cu', cost: 5, st: 'bench', def: 5, dur: 180 },
     iron: { n: '鉄', item: 'ingot_fe', cost: 5, st: 'bench', def: 9, dur: 320 },
     star: { n: '星晶', item: 'star', cost: 3, st: 'bench', def: 12, dur: 480 },
-    demon: { n: '魔鋼', item: 'ingot_n', cost: 5, st: 'bench', def: 16, dur: 700 }
+    demon: { n: '魔鋼', item: 'ingot_n', cost: 5, st: 'bench', def: 16, dur: 700 },
+    king: { n: '魔王', item: 'ingot_n', cost: 5, def: 25, dur: 9999, hp: 30, atk: 5, kn: { helm: '魔王の王冠' } }   // 魔王が落とす。守り5・HP+30・攻撃+5。こわれない
 };
 // よろいの裏地
 const LININGS = {
@@ -274,7 +281,7 @@ function toolStats(t) {
     const up = forgeUp(t);
     if (isArmor(t.k)) {
         const b = BODIES[t.a], l = (t.k === 'armor' && LININGS[t.b]) || LININGS.none;
-        return { def: Math.round((b.def * ARMOR_SHARE[t.k] * up + (l.def || 0)) * 10) / 10, hp: l.hp || 0, thorn: (l.thorn || 0) + enchV(t, 'thorn'), dur: Math.round(b.dur * (t.gem ? 1.3 : 1) * up) };
+        return { def: Math.round((b.def * ARMOR_SHARE[t.k] * up + (l.def || 0)) * 10) / 10, hp: (l.hp || 0) + (b.hp || 0), atk: b.atk || 0, thorn: (l.thorn || 0) + enchV(t, 'thorn'), dur: Math.round(b.dur * (t.gem ? 1.3 : 1) * up) };
     }
     if (t.k === 'bow') {
         const h = HEADS[t.a], g = STRINGS[t.b];
@@ -287,9 +294,11 @@ function toolStats(t) {
         dur: Math.round(h.dur * g.durMul * (t.gem ? 1.3 : 1) * up), luck: (h.luck ? .2 : 0) + enchV(t, 'luck') / 100, tough: h.tough || 0, burn: h.burn || 0
     };
 }
+const kingName = t => { const m = isArmor(t.k) ? BODIES[t.a] : HEADS[t.a]; return m && m.kn && m.kn[t.k]; };
 function toolName(t) {
     const g = t.gem ? '宝石つき ' : '';
     const p = t.p ? ' +' + t.p : '';
+    if (kingName(t)) return g + kingName(t) + p;
     if (isArmor(t.k)) return g + BODIES[t.a].n + 'の' + TOOL_KINDS[t.k].n + p;
     return g + HEADS[t.a].n + 'の' + TOOL_KINDS[t.k].n + p;
 }
@@ -500,14 +509,22 @@ const HATS = {
     bandana: c => [[.28, .3, 1.12, .72, .72, 1.26, c], [.24, .3, 1.0, .3, .36, 1.18, c]],
     ribbon: c => [[.36, .3, 1.26, .48, .42, 1.38, c], [.52, .3, 1.26, .64, .42, 1.38, c], [.46, .32, 1.28, .54, .4, 1.36, c]]
 };
-function makeLook(o) {
+const CROWN = (() => {
+    const g = '#f2c42c', l = '#ffe27a', r = '#d8303c', a = [[.27, .29, 1.27, .73, .73, 1.36, g]];
+    for (const [x, y] of [[.27, .29], [.63, .29], [.27, .63], [.63, .63]]) a.push([x, y, 1.36, x + .1, y + .1, 1.46, l]);
+    a.push([.45, .29, 1.36, .55, .35, 1.52, l], [.45, .67, 1.36, .55, .73, 1.52, l], [.27, .45, 1.36, .33, .55, 1.52, l], [.67, .45, 1.36, .73, .55, 1.52, l]);
+    a.push([.46, .27, 1.29, .54, .29, 1.34, r], [.46, .71, 1.29, .54, .73, 1.34, r], [.25, .46, 1.29, .27, .54, 1.34, r], [.73, .46, 1.29, .75, .54, 1.34, r]);
+    return a;
+})();
+function makeLook(o, crown) {
     let l = humanoid(o.body, SKIN, o.leg, EYE, o.arm || o.body).slice();
     if (o.hair) l = l.concat(HAIR[o.style || 'short'](o.hair));
     if (o.skirt) l.push([.25, .35, .28, .75, .65, .5, o.skirt]);
     if (o.cape) l.push([.24, .28, .3, .76, .34, 1.0, o.cape]);
     if (o.scarf) l.push([.27, .36, .78, .73, .65, .88, o.scarf]);
     if (o.belt) l.push([.28, .38, .5, .72, .62, .56, o.belt]);
-    if (o.hat) l = l.concat(typeof HATS[o.hat] === 'function' ? HATS[o.hat](o.hatc) : HATS[o.hat]);
+    if (o.hat && !crown) l = l.concat(typeof HATS[o.hat] === 'function' ? HATS[o.hat](o.hatc) : HATS[o.hat]);
+    if (crown) l = l.concat(CROWN);
     return withPose(l, 'h');
 }
 const LOOKS = [
@@ -532,6 +549,8 @@ LOOKS.forEach(o => { o.box = makeLook(o); });
 const LOOK_KEY = 'tc2_look';
 function lookId() { try { const v = localStorage.getItem(LOOK_KEY); if (LOOKS.some(o => o.id === v)) return v; } catch (e) { } return 'b1'; }
 const curLook = () => LOOKS.find(o => o.id === lookId());
+// 画面に出す主人公(魔王の王冠をかぶっていれば 王冠つき)
+const heroLook = () => { const o = curLook(); return typeof hasCrown === 'function' && hasCrown() ? (o.kl || (o.kl = { id: o.id + '_k', n: o.n, box: makeLook(o, true) })) : o; };
 const PLAYER_BOX = LOOKS[0].box;
 
 // 動物を飼う: 好きな食べ物と、なでるともらえる物

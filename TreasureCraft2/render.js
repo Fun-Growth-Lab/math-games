@@ -170,6 +170,8 @@ function buildSprites() {
     o[T.RWALL] = [block(TX.rwall, .7)];
     const chest = (a, b) => boxSprite([[.14, .2, 0, .86, .8, .42, a], [.14, .2, .42, .86, .8, .6, b], [.44, .8, .3, .56, .82, .48, '#ffd84a']]);
     o[T.CHEST_W] = [chest('#6e5a3a', '#8a7048')]; o[T.CHEST] = [chest('#a8743c', '#c08d54')];
+    // 転生の箱: 紫の箱に 光る水色の帯と 宝石
+    o[T.REBOX] = [boxSprite([[.12, .12, 0, .88, .88, .5, '#3a2a7c'], [.1, .1, .5, .9, .9, .64, '#5a44b0'], [.11, .44, .04, .89, .56, .64, '#7fe8ff'], [.44, .11, .04, .56, .89, .64, '#7fe8ff'], [.38, .38, .64, .62, .62, .74, '#3fc8f0'], [.43, .43, .74, .57, .57, .84, '#d8fbff']])];
     o[T.GLASS] = [block(TX.glass, .85)];
     // 回路
     // 赤いパネル(床)・赤いかべ。信号が来ていると明るい
@@ -264,6 +266,11 @@ function buildSprites() {
         }
     });
     o[T.ENCH] = [boxSprite([[.08, .08, 0, .92, .92, .5, '#3c1c48'], [.04, .04, .5, .96, .96, .62, '#7a2a8c'], [.14, .14, .62, .86, .86, .66, '#c060d8'], [.4, .4, .82, .6, .6, 1.12, '#c8a8ff'], [.44, .44, 1.12, .56, .56, 1.2, '#f0e0ff']], { base: 1 })];
+    { // 魔王の像: 台の上に 金色の小さな魔王
+        const gold = c => { const v = parseInt(c.slice(1), 16), y = ((v >> 16) * .3 + ((v >> 8) & 255) * .59 + (v & 255) * .11) / 255, k = .78 + y * .5; return '#' + [242, 190, 60].map(q => Math.min(255, Math.round(q * k)).toString(16).padStart(2, '0')).join(''); };
+        const s = .3, fig = MOBS.boss.box.map(b => [.5 + (b[0] - 1.5) * s, .5 + (b[1] - 1.65) * s, .3 + b[2] * s, .5 + (b[3] - 1.5) * s, .5 + (b[4] - 1.65) * s, .3 + b[5] * s, gold(b[6])]);
+        o[T.STATUE] = [boxSprite([[.1, .1, 0, .9, .9, .22, '#7a7a86'], [.16, .16, .22, .84, .84, .3, '#a8a8b6']].concat(fig), { base: 1 })];
+    }
     o[T.ANVIL] = [boxSprite([[.26, .3, 0, .74, .7, .2, '#4a4a54'], [.38, .38, .2, .62, .62, .42, '#3e3e48'], [.12, .28, .42, .88, .72, .6, '#5c5c68']])];
     o[T.BED] = [boxSprite([[.04, .12, 0, .96, .88, .26, '#7c5228'], [.06, .14, .26, .68, .86, .36, '#3a7ac8'], [.3, .14, .36, .36, .86, .37, '#2a5a9c'], [.06, .4, .36, .68, .46, .37, '#2a5a9c'], [.68, .14, .26, .94, .86, .4, '#f4d860']])];
     const crop = (cols, tall) => [0, 1, 2].map(s => boxSprite([[0, 0, 0, 1, 1, 0, { top: TX.farm[0] }]].concat([[.2, .3], [.55, .22], [.3, .66], [.66, .62]].map(p => [p[0], p[1], 0, p[0] + .14, p[1] + .14, tall * (s + 1) / 3, s === 2 ? cols[1] : cols[0]]))));
@@ -686,7 +693,7 @@ function render(now) {
         if (x === S.x && y === S.y && !VIEW.title) {
             const dir = S.face[0] > 0 ? 1 : S.face[0] < 0 ? 3 : S.face[1] > 0 ? 2 : 0;
             const w = stepInfo(P, S.x, S.y);
-            const lk = curLook(), spr = poseSprite('player_' + lk.id, lk.box, dir, P.flash > .3, w.ph);
+            const lk = heroLook(), spr = poseSprite('player_' + lk.id, lk.box, dir, P.flash > .3, w.ph);
             if (TILE[t].swim) {
                 // 水の中: 体を沈めて、水面より下を描かない
                 const wl = toScreen(P.rx + .5, P.ry + .5, 0);
