@@ -260,6 +260,7 @@ addEventListener('keydown', e => {
     if (!canAct()) return;
     if (e.key === ' ' || e.key === 'z' || e.key === 'Z' || e.key === 'Enter') { e.preventDefault(); useSelected(); }
     else if (e.key === 'c' || e.key === 'C') useSelected(1);
+    else if (e.key === 'p' || e.key === 'P') setAuto(!autoOn);
     else if (e.key === 'f' || e.key === 'F') fireBow(equipped('bow'));
     else if (e.key === 'x' || e.key === 'X') digFacing();
     else if (e.key === 'q' || e.key === 'Q') { const now = performance.now(); if (e.repeat && now - (waitTurn.last || 0) < MOVE_MS) return; waitTurn.last = now; waitTurn(); }   // 押しっぱなしで 待ちつづける
@@ -337,6 +338,41 @@ function navKey(e) {
 addEventListener('keyup', e => { const k = KEYS[e.key]; if (k) releaseDir(k); });
 addEventListener('blur', () => { held = null; ctrlHeld = false; });
 function waitTurn() { autoPath = []; endTurn(1); }
+// ---------- 進行モード: 画面を開いている間、現実の時間でターンが進む ----------
+// 攻撃されたり HPが30%以下になったら 止まる。空腹で 下の枠が食べ物なら 自動で食べる(生肉は食べない)
+const AUTO_SPD = [[2000, 'ゆっくり'], [1000, 'ふつう'], [500, 'はやい'], [250, 'とてもはやい']];
+let autoOn = false, autoNext = 0, autoLastT = -1, autoMs = 1000;
+try { autoMs = +localStorage.getItem('tc2_auto_ms') || 1000; } catch (e) { }
+function setAuto(on) {
+    if (on && (mode !== 'play' || S.hp <= maxHp() * .3)) { SFX.play('error'); on = false; }
+    autoOn = on; autoLastT = -1;
+    const b = $('btn-auto'); b.classList.toggle('on', on);
+    b.querySelector('b').textContent = on ? '⏸' : '▶';
+    b.querySelector('span').textContent = on ? 'とめる' : 'すすめる';
+}
+H.hurtHook = () => { if (autoOn) setAuto(false); };
+function autoTurn() {
+    const s = S.inv[S.sel], it = s && ITEM[s.id];
+    if (S.hunger <= 30 && it && it.food > 0 && !it.raw) { eat(s.id, it); lastHot = ''; refreshHud(); }
+    else waitTurn();
+}
+function autoTick(now) {
+    if (mode !== 'play' || S.hp <= maxHp() * .3) { setAuto(false); return; }
+    if (!canAct() || fishing || autoPath.length || held || S.sleeping) { autoLastT = -1; return; }
+    if (S.T !== autoLastT) { autoLastT = S.T; autoNext = now + autoMs; return; }   // 自分で動いたら そこから数えなおす
+    if (now < autoNext || now < nextAct) return;
+    autoTurn();
+    autoLastT = S.T; autoNext = now + autoMs;
+}
+// 速さをえらぶ(メニューと設定)
+function autoSpdPick(el) {
+    const draw = () => {
+        el.innerHTML = '<div class="langpick spdpick"><b>進行モードの速さ</b>' + AUTO_SPD.map(q => '<button class="wbtn' + (q[0] === autoMs ? ' go' : '') + '" data-ms="' + q[0] + '">' + q[1] + '</button>').join('') + '</div>';
+        el.querySelectorAll('[data-ms]').forEach(b => b.onclick = () => { autoMs = +b.dataset.ms; try { localStorage.setItem('tc2_auto_ms', autoMs); } catch (e) { } draw(); });
+    };
+    draw();
+}
+$('btn-auto').addEventListener('click', () => setAuto(!autoOn));
 // 十字ボタン(指をすべらせても切りかわる)
 const dpad = $('dpad');
 let padPointer = null;
@@ -873,13 +909,14 @@ const SOUND_BTN = {};
 function soundBtn(sel) { if (SOUND_BTN[sel]) SOUND_BTN[sel](); else SOUND_BTN[sel] = FGLBgm.settingsButton(BGM, { parent: sel, sfx: SFX, getLang: () => LANG }); }
 function openMenu() {
     saveGame();
-    dialog('<h2>メニュー</h2>' + (curSlot && !circuitMode() ? '<b>' + escapeHtml((slotList().find(q => q.id === curSlot) || {}).name || '') + '</b><br>' : circuitMode() ? '<b>回路モード</b><br>' : '') + dayNo() + '日目 / ' + S.T + ' ターン<br>世界コード <b>' + seedToCode(S.seed) + '</b><div class="row menu-main"><button class="wbtn go big" id="m-back">つづける</button><button class="wbtn blue big" id="m-title">セーブしてタイトルへ</button></div><div class="row"><button class="wbtn" id="m-howto">あそびかた</button><button class="wbtn" id="m-keys">キー操作</button><button class="wbtn" id="m-look">主人公</button></div><div id="m-sound"></div>', b => {
+    dialog('<h2>メニュー</h2>' + (curSlot && !circuitMode() ? '<b>' + escapeHtml((slotList().find(q => q.id === curSlot) || {}).name || '') + '</b><br>' : circuitMode() ? '<b>回路モード</b><br>' : '') + dayNo() + '日目 / ' + S.T + ' ターン<br>世界コード <b>' + seedToCode(S.seed) + '</b><div class="row menu-main"><button class="wbtn go big" id="m-back">つづける</button><button class="wbtn blue big" id="m-title">セーブしてタイトルへ</button></div><div class="row"><button class="wbtn" id="m-howto">あそびかた</button><button class="wbtn" id="m-keys">キー操作</button><button class="wbtn" id="m-look">主人公</button></div><div id="m-spd"></div><div id="m-sound"></div>', b => {
         b.querySelector('#m-back').onclick = closeDialog;
         b.querySelector('#m-howto').onclick = () => { closeDialog(); openHowto(); };
         b.querySelector('#m-keys').onclick = openKeys;
         b.querySelector('#m-look').onclick = () => openLooks(openMenu);
         b.querySelector('#m-title').onclick = () => { saveGame(); location.reload(); };
         soundBtn('#m-sound');
+        autoSpdPick(b.querySelector('#m-spd'));
     });
 }
 function openTrade(m) {   // 村人に話しかけたとき(手伝い)
@@ -894,7 +931,7 @@ function openTrade(m) {   // 村人に話しかけたとき(手伝い)
     draw();
 }
 function openKeys() {
-    const rows = [['矢印 / WASD', '移動(長押しで歩き続ける)'], ['Shift + 矢印', '向きだけ変える'], ['Ctrl + 矢印', '向きを変えずに歩く'], ['R', '画面を回す'], ['Z / スペース / Enter', 'つかう・置く・食べる'], ['C', 'もう1つの使い方(ボタンが出ているとき)'], ['F', '弓をうつ(装備している弓)'], ['X', 'ほる'], ['Q', '1ターンまつ'], ['1〜8', '下の枠をえらぶ(道具なら装備)'], ['E', '持ち物・つくる'], ['M', '地図'], ['Esc', 'メニュー・とじる'], ['G(押している間)', 'グリッド線を出す'], ['H', 'この一覧'],
+    const rows = [['矢印 / WASD', '移動(長押しで歩き続ける)'], ['Shift + 矢印', '向きだけ変える'], ['Ctrl + 矢印', '向きを変えずに歩く'], ['R', '画面を回す'], ['Z / スペース / Enter', 'つかう・置く・食べる'], ['C', 'もう1つの使い方(ボタンが出ているとき)'], ['F', '弓をうつ(装備している弓)'], ['X', 'ほる'], ['Q', '1ターンまつ'], ['P', '進行モード(時間でターンが進む)'], ['1〜8', '下の枠をえらぶ(道具なら装備)'], ['E', '持ち物・つくる'], ['M', '地図'], ['Esc', 'メニュー・とじる'], ['G(押している間)', 'グリッド線を出す'], ['H', 'この一覧'],
         ['画面を開いているとき', '矢印でえらぶ / Enter で決定 / Tab でタブ切りかえ / Esc でとじる']];
     dialog('<h2>キー操作</h2><div class="keys">' + rows.map(r => '<b>' + r[0] + '</b><span>' + r[1] + '</span>').join('') + '</div><div class="row"><button class="wbtn go" id="k-back">とじる</button></div>', b => { b.querySelector('#k-back').onclick = closeDialog; });
 }
@@ -1086,7 +1123,7 @@ $('btn-ach').onclick = () => { document.body.classList.add('ach-only'); openPane
 $('btn-rank').onclick = () => showRanking();
 $('btn-howto').onclick = () => openHowto();
 $('btn-home').onclick = () => { location.href = '../index.html'; };
-$('btn-sound').onclick = () => { dialog('<h2>設定</h2><div class="langpick"><b>言語</b>' + LANGS.map(l => '<button class="wbtn notr' + (l === LANG ? ' go' : '') + '" data-lang="' + l + '">' + LANG_LABEL[l] + '</button>').join('') + '</div><div id="t-sound"></div><div class="row"><button class="wbtn" id="t-look">主人公をえらぶ</button><button class="wbtn" id="t-code">世界コードではじめる</button><button class="wbtn" id="t-close">とじる</button></div>', b => { soundBtn('#t-sound'); b.querySelectorAll('[data-lang]').forEach(el => el.onclick = () => { if (el.dataset.lang !== LANG) setLang(el.dataset.lang); }); b.querySelector('#t-code').onclick = askWorldCode; b.querySelector('#t-look').onclick = () => openLooks(); b.querySelector('#t-close').onclick = closeDialog; }); };
+$('btn-sound').onclick = () => { dialog('<h2>設定</h2><div class="langpick"><b>言語</b>' + LANGS.map(l => '<button class="wbtn notr' + (l === LANG ? ' go' : '') + '" data-lang="' + l + '">' + LANG_LABEL[l] + '</button>').join('') + '</div><div id="t-spd"></div><div id="t-sound"></div><div class="row"><button class="wbtn" id="t-look">主人公をえらぶ</button><button class="wbtn" id="t-code">世界コードではじめる</button><button class="wbtn" id="t-close">とじる</button></div>', b => { soundBtn('#t-sound'); autoSpdPick(b.querySelector('#t-spd')); b.querySelectorAll('[data-lang]').forEach(el => el.onclick = () => { if (el.dataset.lang !== LANG) setLang(el.dataset.lang); }); b.querySelector('#t-code').onclick = askWorldCode; b.querySelector('#t-look').onclick = () => openLooks(); b.querySelector('#t-close').onclick = closeDialog; }); };
 // ---------- チュートリアル ----------
 $('btn-tutorial').onclick = () => {
     // 枠が しぼむ動き・押す所の赤い矢印・やさしい注意(fancy)
@@ -1209,6 +1246,7 @@ function loop(now) {
             nextAct = now + moveWait();
         }
     }
+    if (autoOn) autoTick(now);
     if (VIEW.needDraw) render(now);
 }
 
@@ -1224,7 +1262,7 @@ initRender($('world'));
     refreshTitleButtons();   // セーブがないときは大きなボタンだけ
 })();
 FGLTitle.mount({
-    host: '#title-screen', hue: 100, art: 'compact', skin: 'board', fill: true, tag: 'FUN & GROWTH LAB',
+    host: '#title-screen', hue: 100, art: 'compact', skin: 'board', fill: true, tag: 'FUN & GROWTH LAB', bg: "url('title_bg.webp') center / cover no-repeat",
     name: { ja: 'トレジャークラフト2', simple: 'トレジャークラフト2', en: 'Treasure Craft 2' },
     sub: { ja: '≪開発中≫ 掘って つくって 魔王をたおせ', simple: '≪かいはつちゅう≫ ほって つくって まおうを たおせ', en: '[In development] Dig, craft, defeat the demon king' },
     lang: () => langSimple(),

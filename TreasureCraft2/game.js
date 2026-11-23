@@ -647,6 +647,7 @@ function hurt(atk, src, d) {
     if ((d && d.fire) || src === '爆発' || src === '炎の息' || src === 'マグマ') { const r = Math.min(90, ps.reduce((s, q) => s + enchV(q, 'fireres'), 0)); dmg = Math.round(dmg * (1 - r / 100)); }
     if (src === '落下' || src === 'わなの矢') dmg = Math.round(dmg * (1 - enchV(equipped('boot'), 'light') / 100));
     S.hp -= dmg;
+    if (H.hurtHook) H.hurtHook();   // 進行モードを止める
     if (S.sleeping) S.wokeBy = src;
     ps.forEach(q => wear(q, 1));
     if (d && d.poison) { S.hunger = Math.max(0, S.hunger - d.poison); H.log('毒で おなかが減った', 'bad'); }

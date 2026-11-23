@@ -4,7 +4,7 @@
 const I18N_DICT = [
     // ===== ① 画面のボタン・タイトル・設定 =====
     ['グリッド', null, 'Grid'], ['北', 'きた', 'N'], ['回転', 'かいてん', 'Turn'], ['メニュー', null, 'Menu'],
-    ['地図', 'ちず', 'Map'], ['持ち物', 'もちもの', 'Items'], ['まつ', null, 'Wait'], ['ほる', null, 'Dig'], ['つかう', null, 'Use'],
+    ['地図', 'ちず', 'Map'], ['持ち物', 'もちもの', 'Items'], ['まつ', null, 'Wait'], ['すすめる', null, 'Auto'], ['とめる', null, 'Stop'], ['進行モードの速さ', 'しんこうモードの はやさ', 'Auto-play speed'], ['ゆっくり', null, 'Slow'], ['ふつう', null, 'Normal'], ['はやい', null, 'Fast'], ['とてもはやい', 'とても はやい', 'Very fast'], ['進行モード(時間でターンが進む)', 'しんこうモード(じかんで ターンが すすむ)', 'Auto-play (turns pass with time)'], ['ほる', null, 'Dig'], ['つかう', null, 'Use'],
     ['つくる', null, 'Craft'], ['組み立て', 'くみたて', 'Build'], ['図鑑', 'ずかん', 'Guide'], ['実績', 'じっせき', 'Trophies'],
     ['ならべる', null, 'Sort'], ['片づける', 'かたづける', 'Pick up'], ['{0}を片づける', '{0}を かたづける', 'Pick up the {0}'], ['とじる', null, 'Close'], ['もどる', null, 'Back'],
     ['箱(タップで出し入れ)', 'はこ(タップで だしいれ)', 'Chest (tap to move)'], ['箱を片づける', 'はこを かたづける', 'Pick up chest'], ['箱の中', 'はこの なか', 'In the chest'],
