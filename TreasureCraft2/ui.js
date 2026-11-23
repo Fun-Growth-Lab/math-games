@@ -516,7 +516,7 @@ const toolImg = t => '<img class="tic" src="' + toolIconUrl({ k: t.k, a: t.a, b:
 function iconHtml(id) { const u = iconUrl(id); return u ? '<img src="' + u + '" alt="">' : (ITEM[id].e || '❔'); }
 const MAKE_ORDER = {
     '': ['bench'],
-    bench: ['torch', 'furnace', 'anvil', 'ench', 'bed', 'wall_w', 'door', 'floor', 'fence', 'chest', 'ladder', 'rail', 'cart', 'bucket', 'wall_s', 'fletch', 'arrow', 'carpet', 'clamp', 'rod', 'arrow_fe', 'glass_w', 'bottle', 'wall_nw', 'floor_nw', 'switch', 'plate', 'bulb', 'conv', 'fconv', 'disp', 'piston', 'spiston', 'rep', 'notg', 'wall_cu', 'door_cu', 'fence_cu', 'floor_cu', 'wall_fe', 'door_fe', 'fence_fe', 'floor_fe', 'wall_au', 'door_au', 'fence_au', 'floor_au', 'floor_s', 'fence_s', 'door_s', 'fence_nw', 'door_nw', 'wall_sr', 'door_sr', 'fence_sr', 'floor_sr', 'wall_dm', 'door_dm', 'fence_dm', 'floor_dm', 'feather_home', 'crown', 'gate', 'coinpile', 'fossil', 'mclock', 'sball', 'phoenix', 'dpot'],
+    bench: ['torch', 'furnace', 'anvil', 'ench', 'bed', 'wall_w', 'door', 'floor', 'fence', 'chest', 'ladder', 'rail', 'cart', 'bucket', 'wall_s', 'fletch', 'arrow', 'carpet', 'clamp', 'rod', 'arrow_fe', 'glass_w', 'bottle', 'wall_nw', 'floor_nw', 'switch', 'plate', 'bulb', 'conv', 'disp', 'piston', 'spiston', 'rep', 'notg', 'wall_cu', 'door_cu', 'fence_cu', 'floor_cu', 'wall_fe', 'door_fe', 'fence_fe', 'floor_fe', 'wall_au', 'door_au', 'fence_au', 'floor_au', 'floor_s', 'fence_s', 'door_s', 'fence_nw', 'door_nw', 'wall_sr', 'door_sr', 'fence_sr', 'floor_sr', 'wall_dm', 'door_dm', 'fence_dm', 'floor_dm', 'feather_home', 'crown', 'gate', 'coinpile', 'fossil', 'mclock', 'sball', 'phoenix', 'dpot'],
     furnace: ['charcoal', 'glass', 'steak', 'ingot_cu', 'roast', 'bread', 'ingot_fe', 'gfish', 'fegg', 'stew', 'pie', 'potion', 'ingot_au', 'ingot_n', 'feast'],
 };
 // つくる物の分類(作業台・かまど)。[名前, 絵にする物, 入る物]。どれにも入らない物は 1つめの分類に入る
@@ -524,7 +524,7 @@ const MAKE_CATS = {
     bench: [['くらし', 'bed', ['torch', 'furnace', 'anvil', 'ench', 'bed', 'chest', 'ladder', 'rail', 'cart', 'carpet', 'gate']],
         ['建材', 'wall_s', null],
         ['道具', 'rod', ['bucket', 'fletch', 'arrow', 'arrow_fe', 'rod', 'bottle', 'feather_home']],
-        ['回路', 'bulb', ['switch', 'plate', 'bulb', 'conv', 'fconv', 'disp', 'piston', 'spiston', 'rep', 'notg']],
+        ['回路', 'bulb', ['switch', 'plate', 'bulb', 'conv', 'disp', 'piston', 'spiston', 'rep', 'notg']],
         ['かざり', 'crown', ['clamp', 'crown', 'coinpile', 'fossil', 'mclock', 'sball', 'phoenix', 'dpot']]],
     furnace: [['素材', 'ingot_fe', ['charcoal', 'glass', 'ingot_cu', 'ingot_fe', 'ingot_au', 'ingot_n']], ['料理', 'steak', null]]
 };

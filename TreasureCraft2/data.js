@@ -103,7 +103,7 @@ defT('PLATE', { n: '感圧板', hp: 2, tool: 'pick', back: 'plate' });
 defT('BULB', { n: '電球', solid: 1, hp: 2, back: 'bulb', dev: 1 });
 ['N', 'E', 'S', 'W'].forEach((c, i) => {
     defT('CONV_' + c, { n: '動く床', hp: 3, tool: 'pick', back: 'conv', dev: 1, belt: { d: i, n: 1 } });
-    defT('FCONV_' + c, { n: '高速で動く床', hp: 3, tool: 'pick', back: 'fconv', dev: 1, belt: { d: i, n: 2 } });
+    defT('FCONV_' + c, { n: '高速で動く床', hp: 3, tool: 'pick', back: 'fconv', dev: 1, belt: { d: i, n: 1 } });   // もう つくれない。古いセーブは 読みこみで ふつうの床になる
     defT('DISP_' + c, { n: '矢の発射台', solid: 1, hp: 8, tool: 'pick', back: 'disp', dev: 1, disp: i + 1, opaque: 1 });
 });
 // 金属の建材: 銅=爆発に2回たえる / 鉄=爆発でこわれない / 金=光る(松明のかわりになる)
@@ -349,7 +349,6 @@ const RECIPES = [
     { out: 'plate', need: { stone: 2, rdust: 1 }, st: 'bench' },
     { out: 'bulb', need: { glass: 1, rdust: 1, torch: 1 }, st: 'bench' },
     { out: 'conv', n: 2, need: { ingot_fe: 1, rdust: 1, wood: 2 }, st: 'bench' },
-    { out: 'fconv', n: 2, need: { conv: 2, ingot_au: 1 }, st: 'bench' },
     { out: 'disp', need: { stone: 4, rdust: 2, bow_t: 1 }, st: 'bench' },
     { out: 'rod', need: { wood: 3, leaf: 2 }, st: 'bench' },
     { out: 'gfish', need: { fish: 1 }, st: 'furnace', t: 2 },
@@ -417,7 +416,7 @@ Object.assign(ITEM, {
     plate: { n: '感圧板', tile: 'PLATE', place: 'PLATE', desc: '乗ると ON' },
     bulb: { n: '電球', tile: 'BULB', place: 'BULB', desc: '信号で 光る' },
     conv: { n: '動く床', tile: 'CONV_S', place: 'CONV_N', dir: 'CONV', desc: '信号で 上の物を運ぶ' },
-    fconv: { n: '高速で動く床', tile: 'FCONV_S', place: 'FCONV_N', dir: 'FCONV', desc: '信号で 上の物を速く運ぶ' },
+    fconv: { n: '高速で動く床', tile: 'FCONV_S', place: 'FCONV_N', dir: 'FCONV', old: 1 },   // なくした(古いセーブは ふつうの動く床に かえる)
     disp: { n: '矢の発射台', tile: 'DISP_S', place: 'DISP_N', dir: 'DISP', desc: '信号で 矢を撃つ' },
     piston: { n: 'ピストン', tile: 'PISTON_S', place: 'PISTON_N', dir: 'PISTON', desc: '信号で ブロックを押す' },
     spiston: { n: 'ねばねばピストン', tile: 'SPISTON_S', place: 'SPISTON_N', dir: 'SPISTON', desc: '押して 引きもどす' },

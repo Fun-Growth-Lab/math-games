@@ -11,7 +11,7 @@ let S = null;
 // 回路モード: 自由に回路をつくるモード。おなか・HPがへらない、敵が出ない、回路の部品などが ∞。セーブは別
 const CIRCUIT_SAVE_KEY = 'tc2_save_circuit';
 const circuitMode = () => !!(S && S.mode === 'circuit');
-const INF_ITEMS = ['rdust', 'switch', 'plate', 'bulb', 'rep', 'notg', 'conv', 'fconv', 'disp', 'piston', 'spiston', 'arrow', 'wall_s', 'wall_w', 'wall_fe', 'glass_w', 'floor', 'floor_fe'];
+const INF_ITEMS = ['rdust', 'switch', 'plate', 'bulb', 'rep', 'notg', 'conv', 'disp', 'piston', 'spiston', 'arrow', 'wall_s', 'wall_w', 'wall_fe', 'glass_w', 'floor', 'floor_fe'];
 const infItem = id => circuitMode() && INF_ITEMS.includes(id);
 // 実績を達成する。セーブとは別に残るので、新しい世界でも消えない
 function ach(id) {
@@ -39,7 +39,7 @@ function newCircuitGame(seed) {
     newGame(seed || 0);
     S.mode = 'circuit';
     const tool = (k, b) => ({ tool: { k, a: 'star', b: b || 'wood', d: 520 } });
-    const order = ['rdust', 'switch', 'plate', 'bulb', 'rep', 'notg', 'conv', null, 'fconv', 'disp', 'arrow', 'wall_s', 'wall_w', 'wall_fe', 'glass_w', 'floor', 'floor_fe'];
+    const order = ['rdust', 'switch', 'plate', 'bulb', 'rep', 'notg', 'conv', null, 'piston', 'disp', 'arrow', 'wall_s', 'wall_w', 'wall_fe', 'glass_w', 'floor', 'floor_fe'];
     order.forEach((id, i) => { S.inv[i] = id ? { id, n: STACK } : null; });
     S.inv[7] = tool('pick'); S.inv[17] = tool('axe');
     S.inv[18] = tool('shovel');
@@ -128,6 +128,11 @@ function loadGame(key) {
         const o = JSON.parse(localStorage.getItem(key));
         setWorldSeed(o.seed, o.diffs);
         delete o.diffs;
+        // 高速で動く床は なくした: 置いてある物は ふつうの動く床に、持ち物・箱の中も ふつうの動く床に
+        { const fc = {}; 'NESW'.split('').forEach(c => fc[T['FCONV_' + c]] = T['CONV_' + c]);
+          for (const fl of diffs) for (const ck in fl) { const d = fl[ck]; for (const i in d) if (fc[d[i]] !== undefined) d[i] = fc[d[i]]; }
+          const fix = a => a && a.forEach(q => { if (q && q.id === 'fconv') q.id = 'conv'; });
+          fix(o.inv); for (const k in o.ex) fix(o.ex[k] && o.ex[k].items); }
         o.seen = o.seen.map(unb64);
         while (o.seen.length < FLOORS) o.seen.push(new Uint8Array(7813));
         S = o; mobs = [];
