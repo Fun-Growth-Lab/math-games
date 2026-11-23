@@ -11,7 +11,7 @@ let S = null;
 // 回路モード: 自由に回路をつくるモード。おなか・HPがへらない、敵が出ない、回路の部品などが ∞。セーブは別
 const CIRCUIT_SAVE_KEY = 'tc2_save_circuit';
 const circuitMode = () => !!(S && S.mode === 'circuit');
-const INF_ITEMS = ['rdust', 'switch', 'plate', 'bulb', 'rep', 'notg', 'conv', 'disp', 'piston', 'spiston', 'arrow', 'wall_s', 'wall_w', 'wall_fe', 'glass_w', 'floor', 'floor_fe'];
+const INF_ITEMS = ['rdust', 'switch', 'plate', 'bulb', 'rep', 'notg', 'conv', 'door', 'disp', 'piston', 'spiston', 'arrow', 'wall_s', 'wall_w', 'wall_fe', 'glass_w', 'floor', 'floor_fe'];
 const infItem = id => circuitMode() && INF_ITEMS.includes(id);
 // 実績を達成する。セーブとは別に残るので、新しい世界でも消えない
 function ach(id) {
@@ -39,7 +39,7 @@ function newCircuitGame(seed) {
     newGame(seed || 0);
     S.mode = 'circuit';
     const tool = (k, b) => ({ tool: { k, a: 'star', b: b || 'wood', d: 520 } });
-    const order = ['rdust', 'switch', 'plate', 'bulb', 'rep', 'notg', 'conv', null, 'piston', 'disp', 'arrow', 'wall_s', 'wall_w', 'wall_fe', 'glass_w', 'floor', 'floor_fe'];
+    const order = ['rdust', 'switch', 'plate', 'bulb', 'rep', 'notg', 'conv', null, 'door', 'disp', 'arrow', 'wall_s', 'wall_w', 'wall_fe', 'glass_w', 'floor', 'floor_fe'];
     order.forEach((id, i) => { S.inv[i] = id ? { id, n: STACK } : null; });
     S.inv[7] = tool('pick'); S.inv[17] = tool('axe');
     S.inv[18] = tool('shovel');
@@ -449,12 +449,13 @@ function trySpawn() {
     if (!MOBS[k].animal && hostile >= cap) return;
     spawnMob(k, x, y);
 }
+const doorOpen = (x, y) => !!TILE[getT(S.f, x, y)].door && powered(x, y);   // 信号で開いている扉
 const mobWalk = t => { const d = TILE[t]; return !d.solid && !d.door && !d.swim && !d.trap && t !== T.CAVEIN && t !== T.GATE && t !== T.LADDER_D && t !== T.LADDER_U && t !== T.STAIRS_U; };
 function moveMob(m, dx, dy) {
     const nx = m.x + dx, ny = m.y + dy;
     if (nx === S.x && ny === S.y) return false;
     const nt = getT(S.f, nx, ny);
-    if (!(mobWalk(nt) || (MOBS[m.t].swims && nt === T.WATER)) || mobAt(nx, ny)) return false;
+    if (!(mobWalk(nt) || doorOpen(nx, ny) || (MOBS[m.t].swims && nt === T.WATER)) || mobAt(nx, ny)) return false;
     m.x = nx; m.y = ny;
     m.face = dx > 0 ? 1 : dx < 0 ? 3 : dy > 0 ? 2 : 0;
     return true;
@@ -753,14 +754,14 @@ function rollDrops(drop, luck) {
     return out;
 }
 function giveDrops(drop, luck) { for (const q of rollDrops(drop, luck)) give(q.id, q.n); }
-// 魔物の落とし物: たおした所に 荷物として落ちる(上に乗ると拾う)。2日たつと消える
+// 魔物の落とし物: たおした所に 荷物として落ちる(上に乗ると拾う)。消えない
 function dropLoot(x, y, items, quiet) {
     items = items.map(q => Object.assign({ fresh: 1 }, q));   // 拾ったときに 集めた数に入れる印
     const spot = dropPile(x, y, items, 'mob');
     if (!spot) { if (!quiet) for (const q of items) give(q.id, q.n); return; }   // 置ける所がないときは そのまま持ち物へ
     if (!quiet) H.log(trf('{0}を落とした', items.map(q => tr(ITEM[q.id].n) + (q.n > 1 ? (LANG === 'en' ? ' ×' : '') + q.n : '')).join(LANG === 'en' ? ', ' : '・')), '');
 }
-// 魔物の落とし物は2日、自分が死んで落とした荷物は5日で消える
+// (使っていない) 前は 魔物の落とし物は2日、自分が死んで落とした荷物は5日で消えていた
 // 動く床にのっている荷物(S.ex に items)。同じ床に来た荷物は まとまる
 // 荷物の山に 足す。同じ物は 数をまとめる(道具は べつ)
 function mergeInto(dst, items) {
@@ -806,8 +807,7 @@ function die(src) {
     if (items.length) {
         const spot = dropPile(S.x, S.y, items, 'death') || [S.x, S.y];
         if (!S.ex[exKey(S.f, spot[0], spot[1])]) { const base = getT(S.f, S.x, S.y); setT(S.f, S.x, S.y, T.GRAVE); S.ex[exKey(S.f, S.x, S.y)] = { base, items, t: S.T, f: S.f, x: S.x, y: S.y, death: 1 }; }
-        S.graves.push({ f: S.f, x: spot[0], y: spot[1] });
-        if (S.graves.length > 5) S.graves.shift();
+        if (!S.graves.some(q => q.f === S.f && q.x === spot[0] && q.y === spot[1])) S.graves.push({ f: S.f, x: spot[0], y: spot[1] });   // 倒れたときの荷物は 拾うまで 全部 地図に出す(荷物は消えないので)
     }
     S.inv = S.inv.map(s => s && s.id === 'rebox' ? s : null);   // 転生の箱は 落とさない
     H.sfx('gameover');
@@ -1017,7 +1017,7 @@ function endTurn(n, idle) {
         }
         updateBreath();
         if (S.hp <= 0) break;
-        if (S.T % 20 === 0) { healDmg(); dropsExpire(); regrowGround(); }
+        if (S.T % 20 === 0) { healDmg(); regrowGround(); }   // 落とし物は 消えない(dropsExpire は 使わない)
         flowWater();
         rideTick();
         trapTick();
@@ -1063,6 +1063,12 @@ function worldTick() {
             if (m.ref) m.ref.egg = S.T + rint(180, 300);
             dropLoot(m.x, m.y, [{ id: 'egg', n: 1 }], true);
         }
+    }
+    // 飼っている動物は ときどき 産物を 地面に落とす(羊毛・ミルク・羽など)
+    for (const m of mobs) {
+        const prod = m.ref && PRODUCT[m.t];
+        if (!prod) continue;
+        if (S.T >= (m.ref.pcd || (m.ref.pcd = S.T + rint(150, 260)))) { m.ref.pcd = S.T + rint(200, 300); dropLoot(m.x, m.y, [{ id: prod, n: 1 }], true); }
     }
     // 家畜: 満腹どうしが 3マス以内にいると ときどき 赤ちゃんが生まれる(柵で囲っておく想定)
     if (S.T % 20 === 0 && S.kept.length < 60) {
@@ -1339,21 +1345,19 @@ function springTrap(x, y, t) {
 function bumpMob(m) {
     const d = MOBS[m.t];
     if (d.npc) { H.stopHold(); H.openTrade(m); return true; }
-    if (d.pet) {
-        const x = m.x, y = m.y; m.x = S.x; m.y = S.y; S.x = x; S.y = y;
-        const t = getT(S.f, x, y);   // 入れかわった先が はしご・階段・門なら 歩いて乗ったときと同じ
+    // なついた動物(オオカミ・飼っている動物): 押す。向こうが かべなどで 押せなければ 入れかわる
+    if (d.pet || m.ref) {
+        const dx = m.x - S.x, dy = m.y - S.y, nx = m.x + dx, ny = m.y + dy, nt = getT(S.f, nx, ny);
+        const x = m.x, y = m.y;
+        if ((mobWalk(nt) || doorOpen(nx, ny) || (d.swims && nt === T.WATER)) && !mobAt(nx, ny)) { m.x = nx; m.y = ny; }
+        else { m.x = S.x; m.y = S.y; }
+        if (m.ref) { m.ref.x = m.x; m.ref.y = m.y; }
+        S.x = x; S.y = y;
+        const t = getT(S.f, x, y);   // 進んだ先が はしご・階段・門なら 歩いて乗ったときと同じ
         if (t === T.LADDER_D || t === T.CAVEIN) goDown(x, y);
         else if (t === T.LADDER_U || t === T.STAIRS_U) goUp(x, y);
         else if (t === T.GATE) useGate(x, y);
         endTurn(1); return true;
-    }
-    if (m.ref) {
-        const prod = PRODUCT[m.t];
-        if (!prod || S.T < (m.ref.pcd || 0)) { H.stopHold(); H.float(m.x, m.y, CRY[m.t] || '♪', '#ffffff'); return true; }
-        m.ref.pcd = S.T + 200;
-        give(prod, 1); H.sfx('item'); H.float(m.x, m.y, '♥', '#ff7aa0');
-        endTurn(1);
-        return true;
     }
     return false;
 }

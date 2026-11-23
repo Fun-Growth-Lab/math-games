@@ -427,7 +427,7 @@ const objSprite = (t, x, y) => { const a = OS[t]; if (!a) return null;
         // かべの向きに合わせ、主人公が通るあいだだけ開く
         const so = (dx, dy) => TILE[getT(S.f, x + dx, y + dy)].solid;
         const alongY = so(0, -1) && so(0, 1) && !(so(-1, 0) && so(1, 0));
-        const open = !VIEW.title && Math.abs(P.rx - x) + Math.abs(P.ry - y) < .95;
+        const open = !VIEW.title && (Math.abs(P.rx - x) + Math.abs(P.ry - y) < .95 || powered(x, y));
         return a[(alongY ? 2 : 0) + (open ? 1 : 0)];
     }
     if (t === T.SAPLING) { const c = S.ex[exKey(S.f, x, y)]; return a[c && S.T - c.p > TREE_TIME / 2 ? 1 : 0]; }

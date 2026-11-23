@@ -162,6 +162,8 @@ for (const m in METALS2) {
 }
 defT('ENCH', { n: 'エンチャント台', solid: 1, hp: 9, tool: 'pick', back: 'ench', station: 'ench', light: 3 });   // 武器・防具に 能力をつける
 defT('OBSIDIAN', { n: '黒曜石', solid: 1, opaque: 1, hp: 40, tool: 'pick', tier: 5, back: 'obsidian', blast: 99 });   // マグマに水がふれると できる。星晶のつるはし以上
+// 扉は 信号を受ける装置: 信号が来ている間は 開いて、魔物や動く床の上の物も 通れる
+for (const k in T) if (TILE[T[k]].door) TILE[T[k]].dev = 1;
 defT('STATUE', { n: '魔王の像', solid: 1, hp: 10, tool: 'pick', back: 'statue', light: 8 });
 defT('REBOX', { n: '転生の箱', solid: 1, hp: 5, back: 'rebox', blast: 99, light: 2 });   // 魔王が落とす。4つ入る。転生すると 中身ごと 新しい世界の どこかへ   // 魔王が落とす。まわりを明るくして 魔物を わかせない
 // 魔王城の飾り・罠、異世界の見どころ
@@ -571,7 +573,7 @@ const curLook = () => LOOKS.find(o => o.id === lookId());
 const heroLook = () => { const o = curLook(); return typeof hasCrown === 'function' && hasCrown() ? (o.kl || (o.kl = { id: o.id + '_k', n: o.n, box: makeLook(o, true) })) : o; };
 const PLAYER_BOX = LOOKS[0].box;
 
-// 動物を飼う: 好きな食べ物と、なでるともらえる物
+// 動物を飼う: 好きな食べ物と、ときどき落とす物
 const BREED = ['chicken', 'pig', 'sheep', 'cow', 'goat', 'duck'];   // 満腹で 仲間が近くにいると 増える家畜
 const FEED = { chicken: ['wheat', 'berry', 'seed_w'], pig: ['carrot', 'berry'], sheep: ['wheat'], cow: ['wheat'], rabbit: ['carrot'], cat: ['fish'], goat: ['wheat'], duck: ['wheat', 'seed_w'], fox: ['berry', 'meat'], turtle: ['berry'] };
 const PRODUCT = { chicken: 'feather', sheep: 'wool', cow: 'milk', pig: 'mush', cat: 'fish', duck: 'feather', turtle: 'shell' };

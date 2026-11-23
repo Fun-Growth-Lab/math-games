@@ -260,7 +260,7 @@ function pistonTick(prev) {
 function beltAt(x, y) { const d = TILE[getT(S.f, x, y)]; return d.belt && powered(x, y) ? d.belt : null; }
 function canRide(x, y, isPlayer) {
     const t = getT(S.f, x, y), d = TILE[t];
-    if (d.solid || d.door || d.trap || d.swim) return false;
+    if (d.solid || (d.door && !powered(x, y)) || d.trap || d.swim) return false;
     if (t === T.LADDER_D || t === T.LADDER_U || t === T.STAIRS_U || t === T.GATE || t === T.CAVEIN || t === T.PIT || t === T.MAGMA) return false;
     if (mobAt(x, y)) return false;
     if (!isPlayer && x === S.x && y === S.y) return false;
