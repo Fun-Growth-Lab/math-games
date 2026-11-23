@@ -300,13 +300,30 @@ function moveItemsOnBelts() {
             x = nx; y = ny;
             if (!d.belt) break;   // 床からおりたら止まる
         }
-        if (x === e.x && y === e.y) continue;
+        if (x === e.x && y === e.y) {
+            // 終点(先が かべなど): 床から おろす。となりの荷物と まとめるか 置ける所へ。どうしても 置けなければ 消える
+            const nx = x + DIR4[b.d][0], ny = y + DIR4[b.d][1], nt = getT(S.f, nx, ny), nd = TILE[nt];
+            if (!(nd.belt || nd.ground || nt === T.GRAVE)) unloadBelt(e, b);
+            continue;
+        }
         const items = e.items; delete e.items;
         if (x === S.x && y === S.y) { if (TILE[getT(S.f, x, y)].belt) addToBelt(x, y, items); else putPileAt(x, y, items); pickupPile(x, y, true); continue; }
         if (!putPileAt(x, y, items)) e.items = items;
     }
 }
 
+function unloadBelt(e, b) {
+    const items = e.items, spots = [];
+    for (let r = 1; r <= 2; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const x = e.x + dx, y = e.y + dy, t = getT(S.f, x, y), k = exKey(S.f, x, y);
+        if (x === S.x && y === S.y) continue;
+        if (t === T.GRAVE && S.ex[k] && S.ex[k].items) spots.unshift([x, y]);   // 荷物があれば そこに まとめる
+        else if (TILE[t].ground && !TILE[t].belt && t !== T.RAIL && !mobAt(x, y)) spots.push([x, y]);
+    }
+    delete e.items;
+    if (spots.length) putPileAt(spots[0][0], spots[0][1], items);
+}
 // ---------- 矢の発射台 ----------
 const DISP_RANGE = 6, DISP_DMG = 8;
 function fireDispenser(x, y, dir) {

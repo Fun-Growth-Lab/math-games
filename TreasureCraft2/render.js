@@ -41,6 +41,15 @@ function buildTextures() {
         flower: [0, 1, 2].map((_, i) => speck(['#7fbf55', '#86c65b', '#78b850', '#8ccb60'], dots([['#f4e04a', '#fff'], ['#f07aa8', '#fff'], ['#b08af0', '#f4e04a']][i], 5))),
         scorch: [0, 1].map(() => speck(['#3c3430', '#46403a', '#332c28', '#504840'], dots(['#6a2c1c'], 3))),
         rail: [speck(['#5a4a3e', '#524438', '#625244'], x => { x.fillStyle = '#7c5228'; for (let j = 1; j < 16; j += 4) x.fillRect(0, j, 16, 2); x.fillStyle = '#b8c0c8'; x.fillRect(3, 0, 2, 16); x.fillRect(11, 0, 2, 16); })],
+        railh: [speck(['#5a4a3e', '#524438', '#625244'], x => { x.fillStyle = '#7c5228'; for (let j = 1; j < 16; j += 4) x.fillRect(j, 0, 2, 16); x.fillStyle = '#b8c0c8'; x.fillRect(0, 3, 16, 2); x.fillRect(0, 11, 16, 2); })],
+        railx: [speck(['#5a4a3e', '#524438', '#625244'], x => { x.fillStyle = '#7c5228'; for (let j = 1; j < 16; j += 4) { x.fillRect(0, j, 16, 2); } x.fillStyle = '#b8c0c8'; x.fillRect(3, 0, 2, 16); x.fillRect(11, 0, 2, 16); x.fillRect(0, 3, 16, 2); x.fillRect(0, 11, 16, 2); })],
+        railc: [[16, 0], [0, 0], [16, 16], [0, 16]].map(([cx, cy]) => speck(['#5a4a3e', '#524438', '#625244'], x => {
+            for (let py = 0; py < 16; py++) for (let px = 0; px < 16; px++) {
+                const d = Math.hypot(px + .5 - cx, py + .5 - cy), a = Math.atan2(Math.abs(py + .5 - cy), Math.abs(px + .5 - cx)) * 180 / Math.PI;
+                if ((d >= 3 && d < 5) || (d >= 11 && d < 13)) { x.fillStyle = '#b8c0c8'; x.fillRect(px, py, 1, 1); }
+                else if (d >= 1.5 && d < 14.5 && (a % 22.5) < 6) { x.fillStyle = '#7c5228'; x.fillRect(px, py, 1, 1); }
+            }
+        })),
         dirt: [0, 1].map(() => speck(dirtC)),
         sand: [0, 1].map(() => speck(['#ecd9a0', '#e6d294', '#f0dfaa', '#e2cd8e'])),
         snow: [0, 1].map(() => speck(['#f4f8fc', '#eaf1f8', '#fafcff', '#e2ecf5'])),
@@ -136,7 +145,7 @@ let GS = null, OS = null, LADDER_PARTS = null;
 function buildSprites() {
     buildTextures();
     const g = {};
-    for (const k of ['scorch', 'rail', 'grass', 'grass2', 'flower', 'dirt', 'sand', 'snow', 'cave', 'ash', 'rfloor', 'cfloor', 'wfloor', 'carpet', 'nfloor', 'flcu', 'flfe', 'flau', 'flsr', 'fldm', 'cobble', 'farm', 'water', 'magma']) g[k] = TX[k].map(flatSpr);
+    for (const k of ['scorch', 'rail', 'railh', 'railx', 'railc', 'grass', 'grass2', 'flower', 'dirt', 'sand', 'snow', 'cave', 'ash', 'rfloor', 'cfloor', 'wfloor', 'carpet', 'nfloor', 'flcu', 'flfe', 'flau', 'flsr', 'fldm', 'cobble', 'farm', 'water', 'magma']) g[k] = TX[k].map(flatSpr);
     GS = g;
     const block = (top, h, side, i) => { i = i || 0; return boxSprite([[i, i, 0, 1 - i, 1 - i, h, { top, side: side || top }]]); };
     const o = {};
@@ -165,10 +174,29 @@ function buildSprites() {
     o[T.MUSH] = [boxSprite([[.42, .42, 0, .58, .58, .22, '#efe6d0'], [.26, .26, .22, .74, .74, .38, '#c8443c'], [.36, .74, .28, .46, .76, .34, '#fff']])];
     o[T.BONES] = [boxSprite([[.18, .4, 0, .82, .5, .1, '#e8e0c8'], [.4, .2, .08, .5, .8, .18, '#d8d0b8'], [.54, .54, 0, .8, .8, .26, '#efe8d4']])];
     o[T.NROCK] = [block(TX.nrock, WH)]; o[T.ORE_N] = [block(TX.ore_n, WH)]; o[T.CWALL] = [block(TX.cwall, 1)];
+    { // 魔王城の飾り・罠・異世界の見どころ
+        const cw = { top: TX.cwall, side: TX.cwall }, ban = '#6a2a9c', gold = '#e8c040';
+        o[T.CBANNER] = [boxSprite([[0, 0, 0, 1, 1, 1, cw], [-.03, .3, .2, 0, .7, .92, ban], [1, .3, .2, 1.03, .7, .92, ban], [.3, -.03, .2, .7, 0, .92, ban], [.3, 1, .2, .7, 1.03, .92, ban], [-.04, .44, .6, -.03, .56, .72, gold], [1.03, .44, .6, 1.04, .56, .72, gold], [.44, -.04, .6, .56, -.03, .72, gold], [.44, 1.03, .6, .56, 1.04, .72, gold]])];
+        o[T.CTOWER] = [boxSprite([[0, 0, 0, 1, 1, 1.8, cw], [0, 0, 1.8, .3, .3, 2.05, '#32223c'], [.7, 0, 1.8, 1, .3, 2.05, '#32223c'], [0, .7, 1.8, .3, 1, 2.05, '#32223c'], [.7, .7, 1.8, 1, 1, 2.05, '#32223c'], [.42, -.02, 1.15, .58, 0, 1.45, '#ffb03c'], [.42, 1, 1.15, .58, 1.02, 1.45, '#ffb03c'], [-.02, .42, 1.15, 0, .58, 1.45, '#ffb03c'], [1, .42, 1.15, 1.02, .58, 1.45, '#ffb03c']])];
+        o[T.THRONE] = [boxSprite([[.12, .18, 0, .88, .86, .42, '#c89a2c'], [.2, .24, .42, .8, .8, .5, '#a8242c'], [.12, .1, .42, .88, .28, 1.5, '#c89a2c'], [.22, .28, .6, .78, .3, 1.35, '#a8242c'], [.12, .3, .42, .22, .86, .7, gold], [.78, .3, .42, .88, .86, .7, gold], [.44, .1, 1.5, .56, .22, 1.66, '#d8303c']])];
+        o[T.BRAZIER] = [boxSprite([[.38, .38, 0, .62, .62, .55, '#3a3040'], [.22, .22, .55, .78, .78, .72, '#5a4a5c'], [.28, .28, .72, .72, .72, .98, '#ff6a1c'], [.36, .36, .98, .64, .64, 1.18, '#ffb03c'], [.44, .44, 1.18, .56, .56, 1.3, '#ffe88a']])];
+        const plate = c => [.12, .12, 0, .88, .88, .03, c], vents = c => [[.24, .24, .03, .4, .4, .05, c], [.6, .24, .03, .76, .4, .05, c], [.24, .6, .03, .4, .76, .05, c], [.6, .6, .03, .76, .76, .05, c]];
+        o[T.FTRAP] = [boxSprite([plate('#2a1c1c')].concat(vents('#120a0a'))), boxSprite([plate('#3a1c14')].concat(vents('#ff7a1c'))),
+            boxSprite([plate('#3a1c14')].concat(vents('#ffb03c'), [[.18, .18, .05, .82, .82, .45, '#ff5a1c'], [.28, .28, .45, .72, .72, .8, '#ffa02c'], [.38, .38, .8, .62, .62, 1.02, '#ffe88a']]))];
+        const spikes = []; for (const a of [.25, .5, .75]) for (const b of [.25, .5, .75]) spikes.push([a - .05, b - .05, .03, a + .05, b + .05, .42, '#c8c8d4'], [a - .02, b - .02, .42, a + .02, b + .02, .5, '#eef0f6']);
+        const holes = []; for (const a of [.25, .5, .75]) for (const b of [.25, .5, .75]) holes.push([a - .04, b - .04, .03, a + .04, b + .04, .04, '#141018']);
+        o[T.STRAP] = [boxSprite([plate('#4a4450')].concat(holes)), boxSprite([plate('#4a4450')].concat(spikes))];
+        const statue = e => boxSprite([[.15, .15, 0, .85, .85, .25, '#6a6470'], [.25, .25, .25, .75, .75, .95, '#8a8494'], [.3, .3, .95, .7, .7, 1.3, '#9a94a4'], e > 0 ? [.7, .38, 1.06, .72, .62, 1.16, '#ff3a2a'] : [.28, .38, 1.06, .3, .62, 1.16, '#ff3a2a'], e > 0 ? [.75, .42, .55, .98, .58, .7, '#5a3c24'] : [.02, .42, .55, .25, .58, .7, '#5a3c24']]);
+        o[T.AST_E] = [statue(1)]; o[T.AST_W] = [statue(-1)];
+        o[T.GSTONE] = [boxSprite([[.15, .3, 0, .85, .7, .05, '#3a2a2a'], [.22, .4, .05, .78, .6, .72, '#7a7484'], [.28, .4, .72, .72, .6, .84, '#8a8494'], [.46, .38, .4, .54, .4, .62, '#5a5464'], [.38, .38, .5, .62, .4, .55, '#5a5464']])];
+        o[T.NCRYS] = [boxSprite([[.1, .1, 0, .9, .9, .12, '#3a1c4c'], [.38, .38, .1, .62, .62, 1.0, '#b060e8'], [.14, .56, .1, .32, .76, .6, '#8a3ac8'], [.64, .2, .1, .84, .4, .7, '#d8a0ff']])];
+    }
     o[T.NTREE] = [boxSprite([[.36, .36, 0, .64, .64, 1, { top: TX.ntree }], [.1, .42, .7, .36, .58, .82, '#6c2448'], [.64, .42, .84, .9, .58, .96, '#6c2448'], [.2, .2, 1, .8, .8, 1.3, '#c8342c']])];
     o[T.GATE] = [boxSprite([[.02, .02, 0, .98, .98, .08, '#b8b090'], [.08, .4, 0, .26, .6, 1.2, '#c8c0a0'], [.74, .4, 0, .92, .6, 1.2, '#c8c0a0'], [.14, .4, 1.2, .86, .6, 1.34, '#d8d0b0'], [.34, .38, 1.34, .66, .62, 1.5, '#e8c040'], [.26, .48, .08, .74, .52, 1.2, '#3ad8c8'], [.4, .47, .5, .6, .53, .8, '#c8fff6']])];
     o[T.RWALL] = [block(TX.rwall, .7)];
     const chest = (a, b) => boxSprite([[.14, .2, 0, .86, .8, .42, a], [.14, .2, .42, .86, .8, .6, b], [.44, .8, .3, .56, .82, .48, '#ffd84a']]);
+    CART_SPR = boxSprite([[.2, .16, 0, .34, .26, .16, '#2a2a2e'], [.66, .16, 0, .8, .26, .16, '#2a2a2e'], [.2, .74, 0, .34, .84, .16, '#2a2a2e'], [.66, .74, 0, .8, .84, .16, '#2a2a2e'],
+        [.14, .14, .1, .86, .86, .5, '#7a8088'], [.12, .12, .46, .88, .88, .56, '#a8b0b8'], [.24, .24, .5, .76, .76, .57, '#3a3c42']]);
     o[T.CHEST_W] = [chest('#6e5a3a', '#8a7048')]; o[T.CHEST] = [chest('#a8743c', '#c08d54')];
     // 転生の箱: 紫の箱に 光る水色の帯と 宝石
     o[T.REBOX] = [boxSprite([[.12, .12, 0, .88, .88, .5, '#3a2a7c'], [.1, .1, .5, .9, .9, .64, '#5a44b0'], [.11, .44, .04, .89, .56, .64, '#7fe8ff'], [.44, .11, .04, .56, .89, .64, '#7fe8ff'], [.38, .38, .64, .62, .62, .74, '#3fc8f0'], [.43, .43, .74, .57, .57, .84, '#d8fbff']])];
@@ -381,12 +409,15 @@ function turnThumb(x, y, c) {
     cv.getContext('2d').drawImage(src, x0, y0, bw, bh, (96 - bw * sc) / 2, (80 - bh * sc) / 2, bw * sc, bh * sc);
     return cv;
 }
+let CART_SPR = null;
 const objSprite = (t, x, y) => { const a = OS[t]; if (!a) return null;
     if (t === T.PIT) return pitSpriteAt(S.f, x, y);
     if (t === T.LADDER_D) return pitSpriteAt(S.f, x, y, LADDER_PARTS);
     if (t === T.WIRE) return wireSprite(x, y);
     if (FENCE_COL[t] !== undefined) return fenceSprite(t, x, y);
     if (TILE[t].piston) return a[pistonExtended(x, y, TILE[t].piston) ? 1 : 0];
+    if (TILE[t].ftrap) return a[VIEW.title ? 0 : ftrapState(x, y)];
+    if (TILE[t].strap) return a[!VIEW.title && spikeUp(x, y) ? 1 : 0];
     if (TILE[t].rep) return repSprite(TILE[t].rep - 1, !VIEW.title && repLit(x, y));
     if (TILE[t].inv) return invSprite(TILE[t].inv - 1, !VIEW.title && invLit(x, y));
     if (t === T.WIRE_W) return wallWireSprite(x, y);
@@ -477,12 +508,19 @@ function pitSpriteAt(f, x, y, ladder) {
     if (Object.keys(pitCache).length > 400) for (const k in pitCache) delete pitCache[k];
     return (pitCache[key] = { cv, ox, oy });
 }
+// 線路: となりの線路に合わせて たて・よこ・まがり角・十字
+function railSprite(f, x, y) {
+    const r = (dx, dy) => getT(f, x + dx, y + dy) === T.RAIL, n = r(0, -1), e = r(1, 0), s = r(0, 1), w = r(-1, 0), c = n + e + s + w;
+    if (c >= 3) return GS.railx[0];
+    if (c === 2 && !(n && s) && !(e && w)) return GS.railc[(n ? 0 : 2) + (e ? 0 : 1)];   // 0:北東 1:北西 2:南東 3:南西
+    return (e || w) && !(n || s) ? GS.railh[0] : GS.rail[0];
+}
 function groundSprite(t, f, x, y) {
     const v = ((x * 3 + y * 5) % 3 + 3) % 3, pk = a => a[v % a.length];
     switch (t) {
-        case T.SCORCH: return pk(GS.scorch); case T.RAIL: return GS.rail[0]; case T.TRAP_PIT: case T.TRAP_ARROW: return GS.rfloor[0];
+        case T.SCORCH: return pk(GS.scorch); case T.RAIL: return railSprite(f, x, y); case T.TRAP_PIT: case T.TRAP_ARROW: return GS.rfloor[0];
         case T.GRASS: return pk(GS.grass); case T.GRASS2: return pk(GS.grass2); case T.FLOWER: return pk(GS.flower); case T.DIRT: return pk(GS.dirt); case T.SAND: return pk(GS.sand); case T.SNOW: return pk(GS.snow);
-        case T.CAVE: return pk(GS.cave); case T.ASH: return pk(GS.ash); case T.RFLOOR: return GS.rfloor[0]; case T.CFLOOR: return GS.cfloor[0];
+        case T.CAVE: return pk(GS.cave); case T.ASH: return pk(GS.ash); case T.RFLOOR: return GS.rfloor[0]; case T.CFLOOR: case T.FTRAP: case T.STRAP: return GS.cfloor[0]; case T.CCARPET: return GS.carpet[0]; case T.NBRIDGE: return GS.nfloor[0];
         case T.CROP_C: case T.CROP_W: return GS.farm[0];   // 畑の下も畑の土(すき間に草が見えないように)
         case T.WFLOOR: return GS.wfloor[0]; case T.CARPET: return GS.carpet[0]; case T.FLOOR_NW: return GS.nfloor[0]; case T.FLOOR_CU: return GS.flcu[0]; case T.FLOOR_FE: return GS.flfe[0]; case T.FLOOR_AU: return GS.flau[0]; case T.FLOOR_SR: return GS.flsr[0]; case T.FLOOR_DM: return GS.fldm[0]; case T.FLOOR_ST: return GS.cobble[0]; case T.FARM: return GS.farm[0]; case T.WATER: return pk(GS.water); case T.MAGMA: return pk(GS.magma);
     }
@@ -495,7 +533,7 @@ function underSprite(f, x, y) {
     const k = f * 1000000 + y * 1000 + x;
     let t = underCache.get(k);
     if (t === undefined) {
-        t = f === 0 ? groundOf(0, x, y) : isCave(f) ? T.CAVE : T.ASH;
+        t = f === 0 ? groundOf(0, x, y) : isCave(f) ? T.CAVE : netherGround(x, y);
         if (t === T.WATER) t = T.GRASS;
         if (underCache.size > 30000) underCache.clear();
         underCache.set(k, t);
@@ -658,7 +696,7 @@ function render(now) {
     for (let oi = 0; oi < order.length; oi += 2) {
         const x = order[oi], y = order[oi + 1];
         const hid = caveHidden(f, x, y);
-        const t = getT(f, x, y), spr = hid ? HIDDEN_SPR : OS[t] ? objSprite(t, x, y) : null, here = hid ? null : byTile.get(y * 1000 + x);
+        const t = getT(f, x, y), spr = hid ? HIDDEN_SPR : OS[t] ? objSprite(t, x, y) : t === T.RAIL && cartAt(x, y) ? CART_SPR : null, here = hid ? null : byTile.get(y * 1000 + x);
         if (!spr && !here && !(x === S.x && y === S.y)) continue;
         const s = anchor(x, y);
         if (!visible(s[0], s[1]) && t !== T.GIANT) continue;
@@ -702,7 +740,10 @@ function render(now) {
                 ctx.restore();
                 ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = 2;
                 ctx.beginPath(); ctx.ellipse(wl[0], wl[1] + 2, 22, 8, 0, 0, 7); ctx.stroke();
-            } else drawActor(spr, P.rx, P.ry, P.ax, P.ay, w.hop);
+            } else {
+                if (S.ride) { const a = anchor(P.rx, P.ry); ctx.drawImage(CART_SPR.cv, Math.round(a[0] - CART_SPR.ox), Math.round(a[1] - CART_SPR.oy)); }
+                drawActor(spr, P.rx, P.ry, P.ax, P.ay, w.hop + (S.ride ? .26 : 0));
+            }
         }
     }
     if (fishing) {
@@ -742,7 +783,7 @@ function drawGround(f) {
     ctx.drawImage(L.cv, Math.round(s[0] - GL_W / 2), Math.round(s[1] - GL_H / 2 - 30));
 }
 // 物が主人公の体に画面上で重なるか。手前のマスにあり、左右がそろい、上の端が足もとより上に届くときだけ
-const TALL = { [T.TOWERW]: 2.4, [T.SANDB3]: 1.8, [T.SANDB2]: 1.2, [T.MAST]: 2.8, [T.METEOR]: 1.3, [T.GIANT]: 5.6, [T.TREE]: 1.8, [T.PINE]: 1.6, [T.NTREE]: 1.3, [T.CACTUS]: 1, [T.GATE]: 1.46 };
+const TALL = { [T.CTOWER]: 2, [T.THRONE]: 1.6, [T.TOWERW]: 2.4, [T.SANDB3]: 1.8, [T.SANDB2]: 1.2, [T.MAST]: 2.8, [T.METEOR]: 1.3, [T.GIANT]: 5.6, [T.TREE]: 1.8, [T.PINE]: 1.6, [T.NTREE]: 1.3, [T.CACTUS]: 1, [T.GATE]: 1.46 };
 function hidesPlayer(t, x, y) {
     const h = TALL[t];
     const v = rv(x - S.x, y - S.y);

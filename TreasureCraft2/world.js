@@ -39,7 +39,7 @@ function biomeAt(x, y) {
 }
 
 // ---------- 魔王城 ----------
-const ARENA_R = 13;
+const ARENA_R = 13, CASTLE_R = 31;   // 魔王と戦う部屋 / 城ぜんたい(外庭・城壁・堀をふくむ)
 function bossPos() {
     const a = hash(1, 2, 901) * Math.PI * 2, r = 250 + hash(3, 4, 902) * 90;
     return { x: Math.round(CENTER + Math.cos(a) * r), y: Math.round(CENTER + Math.sin(a) * r) };
@@ -186,12 +186,8 @@ function genNether(x, y) {
     if (x < 8 || y < 8 || x >= WORLD - 8 || y >= WORLD - 8) return T.MAGMA;
     if (!bossP) bossP = bossPos();
     const bx = x - bossP.x, by = y - bossP.y, ab = Math.max(Math.abs(bx), Math.abs(by));
-    if (ab <= ARENA_R) {
-        if (ab === ARENA_R) return (by === ARENA_R && Math.abs(bx) <= 1) ? T.CFLOOR : T.CWALL;   // 手前に入口
-        if (Math.abs(Math.abs(bx) - 7) <= 1 && Math.abs(Math.abs(by) - 7) <= 1) return T.CWALL;   // 柱4本。全体攻撃の陰に隠れる場所
-        return T.CFLOOR;
-    }
-    if (ab <= ARENA_R + 3) return T.ASH;
+    if (ab <= CASTLE_R) return castleTile(bx, by, ab, x, y);
+    { const np = netherPlaceAt(x, y); if (np) { const v = netherTile(np, x, y); if (v !== null) return v; } }
     const ruin = ruinAt(2, x, y);
     if (ruin !== null) return ruin;
     const n = fbm(x, y, 30, 32), r = hash(x, y, 4);
@@ -204,6 +200,48 @@ function genNether(x, y) {
     if (r < .05) return T.BONES;
     return T.ASH;
 }
+// 魔王城。手前(南)が入口。外の堀 → つり橋 → 城門 → 罠の通路 → 魔王の部屋(奥に玉座)
+function castleTile(bx, by, ab, x, y) {
+    const ax = Math.abs(bx), ay = Math.abs(by), r = hash(x, y, 70);
+    if (ab <= ARENA_R) {   // 魔王と戦う部屋
+        if (ab === ARENA_R) return (by === ARENA_R && ax <= 1) ? T.CCARPET : ((bx + by) % 4 === 0 && ax !== ay) ? T.CBANNER : T.CWALL;   // 手前に入口
+        if (Math.abs(ax - 7) <= 1 && Math.abs(ay - 7) <= 1) return T.CWALL;   // 柱4本。全体攻撃の陰に隠れる場所
+        if (bx === 0 && by === -12) return T.THRONE;
+        if ((ax === 2 && by === -12) || (ax === 12 && ay === 12)) return T.BRAZIER;
+        if (ax <= 1 && by >= -12) return T.CCARPET;
+        return T.CFLOOR;
+    }
+    if (ab <= 24) {   // 外庭
+        if (by > ARENA_R && by <= 22 && ax <= 2) {   // 罠の通路(両わきは かべ)
+            if (ax === 2) return by === 15 ? (bx < 0 ? T.AST_E : T.AST_W) : by === 19 ? (bx < 0 ? T.AST_E : T.AST_W) : by === 21 ? (bx > 0 ? T.AST_W : T.AST_E) : T.CWALL;
+            if (by === 16 || by === 20) return T.FTRAP;
+            if (by === 18 || by === 22) return T.STRAP;
+            return T.CCARPET;
+        }
+        if (ax >= 22 && ay >= 22) return T.CTOWER;   // 4すみの塔
+        if (ax % 6 === 4 && ay % 6 === 4) return T.BRAZIER;
+        if (ab >= 15 && r < .05) return r < .025 ? T.FTRAP : T.STRAP;   // 外庭にも ちらばる罠
+        if (r < .07) return T.BONES;
+        return by > 22 && ax <= 1 ? T.CCARPET : T.CFLOOR;
+    }
+    if (ab === 25) {   // 城壁
+        if (by === 25 && ax <= 1) return T.CCARPET;   // 城門
+        if (by === 25 && ax === 2) return T.CTOWER;
+        if (ax >= 23 && ay >= 23) return T.CTOWER;
+        return (bx + by) % 5 === 0 ? T.CBANNER : T.CWALL;
+    }
+    if (ab <= 28) return (by > 25 && ax <= 1) ? T.NBRIDGE : T.MAGMA;   // マグマの堀と つり橋
+    return T.ASH;
+}
+// 異世界で 物の下に見える床
+function netherGround(x, y) {
+    if (!bossP) bossP = bossPos();
+    const ab = Math.max(Math.abs(x - bossP.x), Math.abs(y - bossP.y));
+    if (ab <= 25) return T.CFLOOR;
+    const np = netherPlaceAt(x, y);
+    if (np && (np.type === 'ftemple' || np.type === 'fort')) { const ch = Math.max(Math.abs(x - np.x), Math.abs(y - np.y)); if (ch <= (np.type === 'fort' ? 6 : 4)) return T.CFLOOR; }
+    return T.ASH;
+}
 function genTile(f, x, y) {
     if (x < 0 || y < 0 || x >= WORLD || y >= WORLD) return f === 0 ? T.WATER : f === 2 ? T.MAGMA : T.BEDROCK;
     return f === 0 ? genSurface(x, y) : f === 2 ? genNether(x, y) : genCave(f, x, y);
@@ -211,7 +249,7 @@ function genTile(f, x, y) {
 // こわしたあとに現れる地面
 function groundOf(f, x, y) {
     if (isCave(f)) return T.CAVE;
-    if (f === 2) return T.ASH;
+    if (f === 2) return netherGround(x, y);
     const g = genSurface(x, y);
     if (g === T.WATER) return T.WATER;
     const b = biomeAt(x, y);

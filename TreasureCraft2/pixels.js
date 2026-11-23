@@ -40,6 +40,7 @@ const PIX_ART = {
     jelly: [['...jjjjjj...', '..jJJjjjjj..', '.jJJjjjjjjj.', '.jJjjjkjkjj.', '.jjjjjjjjjj.', 'jjjjjjjjjjjj', '.dddddddddd.'], { j: '#7cd86a', J: '#c8f8b8', k: '#2a5a20', d: '#4ea840' }],
     meat: [['...rrrrrr...', '..rRRrrrrr..', '.rRRrwwrrrr.', '.rrrwWWwrrr.', '.rrrwWWwrrd.', '.rrrrwwrrd..', '..rrrrrrdd..', '...ddddd....'], { r: '#d84a50', R: '#f4909a', w: '#f0d8d0', W: '#fff6f0', d: '#a02c34' }],
     steak: [['...bbbbb....', '..bBBbbbb...', '.bBBbbbbbb..', '.bbbbbbbdb..', '.bbbbbbddb..', '..bbbbddb...', '...bbbdb....', '....ddbww...', '.......wWw..', '........wWw.', '.........w..'], { b: '#a8642c', B: '#e0a060', d: '#6e3e18', w: '#d8d0b8', W: '#fbf6e6' }],
+    cart: [['h.........h', 'hHHHHHHHHHh', 'hHdHHHHHdHh', 'hHHHHHHHHHh', '.hhhhhhhhh.', '..kk...kk..', '..kk...kk..'], { h: '#4c525a', H: '#9aa2aa', d: '#6a7078', k: '#2a2a2e' }],
     bucket: [['.hhhhhhhhh.', 'h.........h', 'hHddddddHdh', '.hHHHHHHHh.', '.hHHHHHHHh.', '.hHHHHHHHh.', '..hHHHHHh..', '..hhhhhhh..'], { h: '#5c626a', H: '#b8c0c8', d: '#3c4048' }],
     bucket_w: [['.hhhhhhhhh.', 'h.........h', 'hwwWwwwwHwh', '.hHHHHHHHh.', '.hHHHHHHHh.', '.hHHHHHHHh.', '..hHHHHHh..', '..hhhhhhh..'], { h: '#5c626a', H: '#b8c0c8', w: '#3a8ad8', W: '#bfe8ff' }],
     bucket_l: [['.hhhhhhhhh.', 'h.........h', 'hooOoooyoh.', '.hHHHHHHHh.', '.hHHHHHHHh.', '.hHHHHHHHh.', '..hHHHHHh..', '..hhhhhhh..'], { h: '#5c626a', H: '#b8c0c8', o: '#e8561c', O: '#ffd84a', y: '#ff9a2c' }],

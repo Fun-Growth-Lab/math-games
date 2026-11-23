@@ -138,6 +138,7 @@ function loadGame(key) {
         (S.mobs || []).forEach(o => { if (!MOBS[o.t] || mobAt(o.x, o.y)) return; const m = spawnMob(o.t, o.x, o.y); Object.assign(m, { hp: o.hp, mhp: o.mhp || m.mhp, lv: o.lv || m.lv, face: o.face || 2 }); if (o.gkey) m.gkey = o.gkey; if (o.aggro) m.aggro = true; if (o.fuse) m.fuse = o.fuse; });
         delete S.mobs;
         if (S.f === 2) ensureBoss();
+        if (S.ride && getT(S.f, S.x, S.y) !== T.RAIL) { S.ride = 0; S.rideDir = null; }
         if (S.bossDead && !S.kingLoot && !circuitMode()) { bossLoot(null); setTimeout(() => H.banner('魔王の落とし物', '魔王の大剣・魔王の王冠・魔王の像・転生の箱'), 600); }
         else if (S.bossDead && !S.reboxGot && !circuitMode()) { S.reboxGot = 1; give('rebox', 1); setTimeout(() => H.banner('魔王の落とし物', '転生の箱'), 600); }   // 落とし物が できる前に たおした世界
         return true;
@@ -453,6 +454,21 @@ function moveMob(m, dx, dy) {
     m.face = dx > 0 ? 1 : dx < 0 ? 3 : dy > 0 ? 2 : 0;
     return true;
 }
+// 魔王城の罠: 炎をふく床(4ターンに1回。前のターンに光る)・とげの床(2ターン出て2ターン引っこむ)・矢をうつ石像(3ターンに1回、横の列)
+const ftrapState = (x, y) => [0, 0, 1, 2][(S.T + ((x + y) & 3)) % 4];   // 0=しずか 1=光る 2=炎
+const spikeUp = (x, y) => (((S.T >> 1) + x + y) & 1) === 0;
+function trapTick() {
+    if (S.f !== 2 || circuitMode() || S.hp <= 0) return;
+    const t = TILE[getT(2, S.x, S.y)], mul = rebMul();
+    if (t.ftrap && ftrapState(S.x, S.y) === 2) { H.chips(S.x, S.y, '#ff7a1c'); hurt(Math.round(22 * mul), '炎のわな', { fire: 1 }); }
+    else if (t.strap && spikeUp(S.x, S.y)) hurt(Math.round(16 * mul), 'とげのわな', null);
+    if (S.hp <= 0) return;
+    for (const s of [1, -1]) for (let i = 1; i <= 7; i++) {
+        const x = S.x - s * i, q = TILE[getT(2, x, S.y)];
+        if (q.ast === s) { if ((S.T + x) % 3 === 0) { H.shot(x, S.y, S.x, S.y, '#e8e0d0', true); H.sfx('attack'); hurt(Math.round(15 * mul), '石像の矢', null); } break; }
+        if (q.solid) break;
+    }
+}
 function lineClear(x0, y0, x1, y1) {
     const dx = Math.sign(x1 - x0), dy = Math.sign(y1 - y0);
     let x = x0 + dx, y = y0 + dy;
@@ -741,15 +757,23 @@ function dropLoot(x, y, items, quiet) {
 }
 // 魔物の落とし物は2日、自分が死んで落とした荷物は5日で消える
 // 動く床にのっている荷物(S.ex に items)。同じ床に来た荷物は まとまる
+// 荷物の山に 足す。同じ物は 数をまとめる(道具は べつ)
+function mergeInto(dst, items) {
+    for (const it of items) {
+        if (!it.tool) { const q = dst.find(z => z && !z.tool && z.id === it.id && z.n + it.n <= STACK); if (q) { q.n += it.n; continue; } }
+        dst.push(it);
+    }
+    return dst;
+}
 function addToBelt(x, y, items) {
     const k = exKey(S.f, x, y), e = S.ex[k] || (S.ex[k] = {});
-    e.items = (e.items || []).concat(items); Object.assign(e, { t: S.T, f: S.f, x, y, drop: 1 });
+    e.items = mergeInto(e.items || [], items); Object.assign(e, { t: S.T, f: S.f, x, y, drop: 1 });
 }
 // 荷物を (x,y) へ。動く床なら床にのせ、荷物があれば まとめ、地面なら 新しい荷物にする。置けたら true
 function putPileAt(x, y, items) {
     const t = getT(S.f, x, y), k = exKey(S.f, x, y);
     if (TILE[t].belt) { addToBelt(x, y, items); return true; }
-    if (t === T.GRAVE && S.ex[k] && S.ex[k].items) { S.ex[k].items = S.ex[k].items.concat(items); S.ex[k].t = S.T; return true; }
+    if (t === T.GRAVE && S.ex[k] && S.ex[k].items) { mergeInto(S.ex[k].items, items); S.ex[k].t = S.T; return true; }
     if (!TILE[t].ground || t === T.RAIL || mobAt(x, y)) return false;
     setT(S.f, x, y, T.GRAVE); S.ex[k] = { base: t, items, t: S.T, f: S.f, x, y, drop: 1 };
     return true;
@@ -769,6 +793,7 @@ function dropsExpire() {
     }
 }
 function die(src) {
+    if (S.ride) leaveCart();
     S.deaths++;
     ach('first_death');
     if (src === 'おぼれたこと') ach('drown');
@@ -963,7 +988,7 @@ function rebirth() {
     return boxes.map(placeRebox);   // 箱ごとに 置く階を 抽選
 }
 function bossDirection() {
-    if (S.f !== 2 || S.bossDead) return null;
+    if (S.f !== 2 || S.bossDead || !S.got.castle_seen) return null;   // 城に近づくまでは わからない
     const p = bossPos(), dx = p.x - S.x, dy = p.y - S.y, dist = Math.abs(dx) + Math.abs(dy);
     const a = Math.atan2(dy, dx) * 180 / Math.PI, names = ['東', '南東', '南', '南西', '西', '北西', '北', '北東'];
     return { dist, name: names[((Math.round(a / 45) % 8) + 8) % 8] };
@@ -989,6 +1014,9 @@ function endTurn(n) {
         if (S.hp <= 0) break;
         if (S.T % 20 === 0) { healDmg(); dropsExpire(); regrowGround(); }
         flowWater();
+        rideTick();
+        trapTick();
+        if (S.hp <= 0) break;
         if (dayT() === 0) {
             H.log(dayNo() + '日目の朝がきた', 'good'); saveGame();
             ach('first_morning');
@@ -1095,9 +1123,14 @@ function worldTick() {
         if (spot) {
             const g = spawnMob(GUARDS[pl.type], spot[0], spot[1]);
             g.gkey = pl.key;
+            if (pl.type === 'fort') for (const o of [[-2, 1], [2, 1]]) { const x = spot[0] + o[0], y = spot[1] + o[1]; if (mobWalk(getT(S.f, x, y)) && !mobAt(x, y)) spawnMob('knight', x, y); }
             H.banner(MOBS[g.t].n + 'だ!', 'この場所の主。にげてもいい');
             H.sfx('warn');
         }
+    }
+    if (pl && pl.type === 'grave' && isNight() && S.T % 6 === 0 && !circuitMode() && mobs.filter(m => m.t === 'skeleton').length < 4) {
+        const x = pl.x + rint(-7, 7), y = pl.y + rint(-7, 7);
+        if (mobWalk(getT(S.f, x, y)) && TILE[getT(S.f, x, y)].ground && !mobAt(x, y) && Math.abs(x - S.x) + Math.abs(y - S.y) >= 4) spawnMob('skeleton', x, y);
     }
     // 飼っている動物
     if (S.T % 5 === 0) {
@@ -1133,6 +1166,7 @@ function wakeMhouse(c) {
 }
 function keptSync() { if (S && S.kept) for (const m of mobs) if (m.ref) { m.ref.x = m.x; m.ref.y = m.y; } }
 function checkArea() {
+    if (S.f === 2 && !S.got.castle_seen) { const p = bossPos(); if (Math.max(Math.abs(S.x - p.x), Math.abs(S.y - p.y)) <= CASTLE_R + 10) { S.got.castle_seen = 1; H.banner('魔王城だ!', ''); H.sfx('warn'); } }
     if (S.f === 0 && distC(S.x, S.y) >= 400) ach('far');
     const pl = placeHere(S.f, S.x, S.y);
     if (pl && !S.found[pl.key]) {
@@ -1218,9 +1252,46 @@ function youngCrop(x, y, t) {
     return !!c && S.T - c.p < CROP_TIME;
 }
 // keep: 向きを変えずに歩く(Ctrl)
+// トロッコ: 線路に置いて ぶつかると乗る。向きを えらぶと 毎ターン 4マス 線路にそって進む(まがり角は まがる)。
+// 線路のおわり・動物などの手前で 止まる。「おりる」で その場に トロッコを置く
+const isRailAt = (x, y) => getT(S.f, x, y) === T.RAIL;
+const cartAt = (x, y) => { const e = S.ex[exKey(S.f, x, y)]; return !!(e && e.cart) && isRailAt(x, y); };
+function placeCart(x, y) {
+    if (!isRailAt(x, y) || cartAt(x, y) || mobAt(x, y) || (x === S.x && y === S.y)) { H.sfx('error'); return; }
+    const k = exKey(S.f, x, y); (S.ex[k] || (S.ex[k] = {})).cart = 1;
+    removeItem('cart', 1); H.sfx('place'); endTurn(1);
+}
+function boardCart(x, y) { const k = exKey(S.f, x, y); delete S.ex[k].cart; if (!Object.keys(S.ex[k]).length) delete S.ex[k]; S.ride = 1; S.rideDir = null; H.sfx('place'); }
+function leaveCart() { S.ride = 0; S.rideDir = null; const k = exKey(S.f, S.x, S.y); if (isRailAt(S.x, S.y)) (S.ex[k] || (S.ex[k] = {})).cart = 1; else give('cart', 1); H.sfx('place'); }
+// d の向きに 線路が続けば d、なければ 曲がり角(左右の どちらか1つだけ 線路)の向き
+function railNext(x, y, d) {
+    if (isRailAt(x + d[0], y + d[1])) return d;
+    const o = [[d[1], d[0]], [-d[1], -d[0]]].filter(q => isRailAt(x + q[0], y + q[1]));
+    return o.length === 1 ? o[0] : null;
+}
+const cartBlock = (x, y) => { const m = mobAt(x, y); return !!m && !MOBS[m.t].pet; };
+function rideTick() {
+    if (!S.ride || !S.rideDir || S.hp <= 0) return;
+    let d = S.rideDir, moved = 0;
+    for (let i = 0; i < 4; i++) {
+        const nd = railNext(S.x, S.y, d);
+        if (!nd || cartBlock(S.x + nd[0], S.y + nd[1])) { d = null; break; }
+        S.x += nd[0]; S.y += nd[1]; d = nd; S.face = nd; moved++;
+    }
+    S.rideDir = d;
+    if (moved) { H.clearPath(); checkArea(); }
+}
+function rideControl(dx, dy) {
+    S.face = [dx, dy];
+    const c = S.rideDir;
+    if (c && c[0] === dx && c[1] === dy) return;
+    if (isRailAt(S.x + dx, S.y + dy) && !cartBlock(S.x + dx, S.y + dy)) { S.rideDir = [dx, dy]; endTurn(1); }
+    else H.refresh();
+}
 function step(dx, dy, keep) {
     if (!S || S.hp <= 0) return;
     fishing = null;
+    if (S.ride) { rideControl(dx, dy); return; }
     if (!keep) S.face = [dx, dy];
     const nx = S.x + dx, ny = S.y + dy, m = mobAt(nx, ny);
     if (nx < 0 || ny < 0 || nx >= WORLD || ny >= WORLD) { H.stopHold(); H.log('ここが世界のはしだ', ''); ach('edge'); return; }
@@ -1229,6 +1300,7 @@ function step(dx, dy, keep) {
     if (!TILE[t].solid || youngCrop(nx, ny, t)) {
         if (TILE[t].door || TILE[getT(S.f, S.x, S.y)].door) H.sfx('toggle');   // 扉の開け閉め
         S.x = nx; S.y = ny;
+        if (t === T.RAIL && cartAt(nx, ny)) boardCart(nx, ny);
         if (t === T.LADDER_D || t === T.CAVEIN) { goDown(nx, ny); endTurn(1); return; }
         if (t === T.GRAVE || (TILE[t].belt && S.ex[exKey(S.f, nx, ny)] && S.ex[exKey(S.f, nx, ny)].items)) pickupPile(nx, ny, true);
         if (TILE[t].trap) { springTrap(nx, ny, t); return; }
@@ -1471,6 +1543,7 @@ function breakTile(x, y, t, tool) {
 const TAKE_BACK = ['rail', 'piston', 'spiston', 'switch', 'plate', 'bulb', 'rep', 'notg', 'conv', 'fconv', 'disp', 'torch', 'clamp', 'crown', 'gmush', 'carpet'];
 const takeable = t => isWire(t) || t === T.LADDER_D || !!TILE[t].deco || TAKE_BACK.includes(TILE[t].back);
 function takeTile(x, y, t) {
+    if (t === T.RAIL && cartAt(x, y)) { delete S.ex[exKey(S.f, x, y)].cart; give('cart', 1); H.sfx('item'); endTurn(1); return; }   // 線路の上の トロッコを先に しまう
     if (TILE[t].piston) pistonDropHead(x, y, TILE[t].piston);
     if (t === T.LADDER_D) { takeLadder(x, y, t); return; }
     const id = isWire(t) ? 'rdust' : TILE[t].back;
@@ -1734,7 +1807,9 @@ function buildActions() {
     const rot = (dk || nk || isWire(t)) && !fm ? { l: '向き', run: () => H.openTurn(x, y) } : null;
     const take = takeable(t) && !fm ? { l: 'はずす', run: () => takeTile(x, y, t) } : null;
     const out = items => ({ rot, take, items });
+    if (S.ride) return { rot: null, take: null, items: [{ l: 'おりる', run: () => { leaveCart(); H.refresh(); } }] };
     if (!s) return out([]);
+    if (s.id === 'cart') return out([{ l: '置く', no: !(t === T.RAIL && !cartAt(x, y) && !fm), run: () => placeCart(x, y) }]);
     if (s.tool) {
         const tillOk = S.f === 0 && (t === T.GRASS || t === T.GRASS2 || t === T.FLOWER || t === T.DIRT) && !fm;
         if (s.tool.k === 'hoe') return out([{ l: 'たがやす', no: !tillOk, run: () => {

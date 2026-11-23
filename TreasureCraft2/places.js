@@ -3,7 +3,8 @@
 const PLACE_NAMES = {
     giant: '巨木', tower: '崩れた塔', pyramid: '砂漠のピラミッド', meteor: '隕石のクレーター', ship: '難破船', village: '村',
     crystal: '水晶の洞窟', lake: '地底湖', nest: 'まものの巣', mine: '廃坑', cave: '洞窟の入口', ruin: '小さな遺跡',
-    mushroom: '光るきのこの森', merchant: '地底の案内人の小屋', vault: '封印の宝物庫', fossil: '化石', geode: '晶洞', bigvein: '大鉱脈', mhouse: 'モンスターハウス'
+    mushroom: '光るきのこの森', merchant: '地底の案内人の小屋', vault: '封印の宝物庫', fossil: '化石', geode: '晶洞', bigvein: '大鉱脈', mhouse: 'モンスターハウス',
+    grave: '骨の墓場', ftemple: '炎の神殿', mforest: '魔晶の森', fort: '魔王軍の砦'
 };
 const near2 = (x, y, p, r) => Math.abs(x - p.x) <= r && Math.abs(y - p.y) <= r;
 
@@ -279,8 +280,58 @@ function mhouseTile(f, x, y) {
 // 埋もれた宝箱(どの地下の階にも): 岩の中に ぽつんと
 const buriedChestAt = (f, x, y) => hash(x, y, 95 + caveDepth(f)) < .0015;
 
+// ---------- 異世界の見どころ(120マスごと) ----------
+const NETHER_GRID = 120, NETHER_R = { grave: 9, ftemple: 10, mforest: 12, fort: 9 }, NETHER_KINDS = ['grave', 'ftemple', 'mforest', 'fort'];
+function netherRegion(gx, gy) {
+    const key = 'n' + gx + ',' + gy;
+    if (regionCache.has(key)) return regionCache.get(key);
+    let out = null;
+    if (hash(gx, gy, 700) < .6) {
+        const x = gx * NETHER_GRID + 20 + Math.floor(hash(gx, gy, 701) * 80), y = gy * NETHER_GRID + 20 + Math.floor(hash(gx, gy, 702) * 80);
+        const b = bossPos(), far = Math.max(Math.abs(x - b.x), Math.abs(y - b.y)) > CASTLE_R + 16;
+        if (far && distC(x, y) > 45 && Math.min(x, y, WORLD - 1 - x, WORLD - 1 - y) > 24) out = { type: NETHER_KINDS[Math.floor(hash(gx, gy, 703) * 4)], x, y };
+    }
+    regionCache.set(key, out);
+    return out;
+}
+function netherPlaceAt(x, y) {
+    const s = netherRegion(Math.floor(x / NETHER_GRID), Math.floor(y / NETHER_GRID));
+    return s && near2(x, y, s, NETHER_R[s.type]) ? s : null;
+}
+function netherTile(s, x, y) {
+    const dx = x - s.x, dy = y - s.y, ch = Math.max(Math.abs(dx), Math.abs(dy)), d = Math.hypot(dx, dy) + vnoise(x, y, 5, 71) * 2, r = hash(x, y, 72);
+    switch (s.type) {
+        case 'grave':   // 骨の墓場: 骨の囲い・墓石の列・まん中に宝箱
+            if (ch === 9) return (dx === 0 || dy === 0) ? T.ASH : T.BONES;
+            if (!dx && !dy) return T.CHEST_W;
+            if (Math.abs(dx) === 2 && dy === 0) return T.BRAZIER;
+            if (ch >= 3 && ch <= 7 && dx % 3 === 0 && dy % 2 === 0) return T.GSTONE;
+            return r < .05 ? T.BONES : T.ASH;
+        case 'ftemple':   // 炎の神殿: マグマに囲まれた神殿。南に橋
+            if (ch <= 4) {
+                if (ch === 4) return dx === 0 && dy === 4 ? T.CCARPET : T.CWALL;
+                if (dx === 0 && dy === -1) return T.CHEST_W;
+                if (Math.abs(dx) === 2 && Math.abs(dy) === 2) return T.BRAZIER;
+                return dx === 0 ? T.CCARPET : T.CFLOOR;
+            }
+            if (Math.abs(dx) <= 1 && dy > 4 && dy <= 8) return T.NBRIDGE;
+            if (ch <= 8) return T.MAGMA;
+            return T.ASH;
+        case 'mforest':   // 魔晶の森: 魔樹と 光る魔晶と 魔鉱石
+            if (d >= 12) return null;
+            if (Math.hypot(dx, dy) < 1.5) return !dx && !dy ? T.CHEST_W : T.ASH;
+            if (Math.hypot(dx, dy) < 2.6) return T.ASH;
+            return r < .16 ? T.NTREE : r < .25 ? T.NCRYS : r < .31 ? T.ORE_N : T.ASH;
+        case 'fort':   // 魔王軍の砦: かべ・4すみの見張り台・宝箱2つ
+            if (ch === 6) return (dy === 6 && Math.abs(dx) <= 1) ? T.CFLOOR : (Math.abs(dx) === 6 && Math.abs(dy) === 6) ? T.CTOWER : (dx + dy) % 3 === 0 ? T.CBANNER : T.CWALL;
+            if (ch < 6) return (Math.abs(dx) === 2 && dy === -3) ? T.CHEST_W : (Math.abs(dx) === 4 && Math.abs(dy) === 4) ? T.BRAZIER : T.CFLOOR;
+            return T.ASH;
+    }
+    return null;
+}
+
 // 特別な場所の主
-const GUARDS = { giant: 'ent', tower: 'warden', pyramid: 'mummy', meteor: 'starbeast', ship: 'captain', nest: 'queen', crystal: 'crystalg', lake: 'lakelord' };
+const GUARDS = { giant: 'ent', tower: 'warden', pyramid: 'mummy', meteor: 'starbeast', ship: 'captain', nest: 'queen', crystal: 'crystalg', lake: 'lakelord', grave: 'graveking', ftemple: 'flamelord', mforest: 'crysbeast', fort: 'general' };
 
 // ---------- いま立っている場所の見どころ ----------
 function placeHere(f, x, y) {
@@ -294,6 +345,9 @@ function placeHere(f, x, y) {
         const s = cavePlaceAt(f, x, y);
         if (s) return { key: pre + s.type + s.x + ',' + s.y, type: s.type, x: s.x, y: s.y };
         if (onMine(f, x, y)) return { key: pre + 'mine' + Math.floor(x / 128) + ',' + Math.floor(y / 128), type: 'mine', x, y };
+    } else if (f === 2) {
+        const s = netherPlaceAt(x, y);
+        if (s) return { key: '2:' + s.type + s.x + ',' + s.y, type: s.type, x: s.x, y: s.y };
     }
     return null;
 }

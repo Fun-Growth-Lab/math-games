@@ -422,7 +422,7 @@ addEventListener('blur', () => setGrid(false));
 $('btn-menu').addEventListener('click', () => { if (canAct()) openMenu(); });
 // 画面タップで その場所へ歩く
 $('world').addEventListener('click', e => {
-    if (!canAct()) return;
+    if (!canAct() || S.ride) return;
     const p = clientToStage(e.clientX, e.clientY), t = tapToTile(p[0], p[1]);
     const dx = t[0] - S.x, dy = t[1] - S.y;
     if (Math.abs(dx) + Math.abs(dy) === 1) { autoPath = []; step(dx, dy); return; }
@@ -516,12 +516,12 @@ const toolImg = t => '<img class="tic" src="' + toolIconUrl({ k: t.k, a: t.a, b:
 function iconHtml(id) { const u = iconUrl(id); return u ? '<img src="' + u + '" alt="">' : (ITEM[id].e || '❔'); }
 const MAKE_ORDER = {
     '': ['bench'],
-    bench: ['torch', 'furnace', 'anvil', 'ench', 'bed', 'wall_w', 'door', 'floor', 'fence', 'chest', 'ladder', 'rail', 'bucket', 'wall_s', 'fletch', 'arrow', 'carpet', 'clamp', 'rod', 'arrow_fe', 'glass_w', 'bottle', 'wall_nw', 'floor_nw', 'switch', 'plate', 'bulb', 'conv', 'fconv', 'disp', 'piston', 'spiston', 'rep', 'notg', 'wall_cu', 'door_cu', 'fence_cu', 'floor_cu', 'wall_fe', 'door_fe', 'fence_fe', 'floor_fe', 'wall_au', 'door_au', 'fence_au', 'floor_au', 'floor_s', 'fence_s', 'door_s', 'fence_nw', 'door_nw', 'wall_sr', 'door_sr', 'fence_sr', 'floor_sr', 'wall_dm', 'door_dm', 'fence_dm', 'floor_dm', 'feather_home', 'crown', 'gate', 'coinpile', 'fossil', 'mclock', 'sball', 'phoenix', 'dpot'],
+    bench: ['torch', 'furnace', 'anvil', 'ench', 'bed', 'wall_w', 'door', 'floor', 'fence', 'chest', 'ladder', 'rail', 'cart', 'bucket', 'wall_s', 'fletch', 'arrow', 'carpet', 'clamp', 'rod', 'arrow_fe', 'glass_w', 'bottle', 'wall_nw', 'floor_nw', 'switch', 'plate', 'bulb', 'conv', 'fconv', 'disp', 'piston', 'spiston', 'rep', 'notg', 'wall_cu', 'door_cu', 'fence_cu', 'floor_cu', 'wall_fe', 'door_fe', 'fence_fe', 'floor_fe', 'wall_au', 'door_au', 'fence_au', 'floor_au', 'floor_s', 'fence_s', 'door_s', 'fence_nw', 'door_nw', 'wall_sr', 'door_sr', 'fence_sr', 'floor_sr', 'wall_dm', 'door_dm', 'fence_dm', 'floor_dm', 'feather_home', 'crown', 'gate', 'coinpile', 'fossil', 'mclock', 'sball', 'phoenix', 'dpot'],
     furnace: ['charcoal', 'glass', 'steak', 'ingot_cu', 'roast', 'bread', 'ingot_fe', 'gfish', 'fegg', 'stew', 'pie', 'potion', 'ingot_au', 'ingot_n', 'feast'],
 };
 // つくる物の分類(作業台・かまど)。[名前, 絵にする物, 入る物]。どれにも入らない物は 1つめの分類に入る
 const MAKE_CATS = {
-    bench: [['くらし', 'bed', ['torch', 'furnace', 'anvil', 'ench', 'bed', 'chest', 'ladder', 'rail', 'carpet', 'gate']],
+    bench: [['くらし', 'bed', ['torch', 'furnace', 'anvil', 'ench', 'bed', 'chest', 'ladder', 'rail', 'cart', 'carpet', 'gate']],
         ['建材', 'wall_s', null],
         ['道具', 'rod', ['bucket', 'fletch', 'arrow', 'arrow_fe', 'rod', 'bottle', 'feather_home']],
         ['回路', 'bulb', ['switch', 'plate', 'bulb', 'conv', 'fconv', 'disp', 'piston', 'spiston', 'rep', 'notg']],
@@ -815,7 +815,7 @@ let mapFloor = 0;
 const MAP_COL = {};
 function mapColor(t) {
     if (MAP_COL[t]) return MAP_COL[t];
-    const k = TILE[t].key, table = { GRASS: '#7fbf55', GRASS2: '#5fa544', FLOWER: '#c8d070', BERRY: '#5a7ad0', VEG: '#e8a040', WHEATW: '#e0c860', DIRT: '#8a6a44', SAND: '#ecd9a0', SNOW: '#f0f6fb', WATER: '#4a9fd8', TREE: '#3f8a45', PINE: '#2a6e50', CACTUS: '#5a9a4a', ROCK: '#8e8e8a', RWALL: '#c8c090', RFLOOR: '#a4a49c', FLOOR_ST: '#a4a49c', CHEST_W: '#ffd84a', CAVE: '#5a4a3e', WDIRT: '#3a2c20', WSTONE: '#4a4a48', WHARD: '#2e2e3a', MAGMA: '#e8561c', ORE_STAR: '#7fe8ff', GIANT: '#1f6a2a', GIANTB: '#1f6a2a', TOWERW: '#d8d0a8', SANDB1: '#c8a858', SANDB2: '#b89848', SANDB3: '#a88838', METEOR: '#ff6a2c', SCORCH: '#3c3430', HULL: '#6e5230', MAST: '#6e5230', HUTW: '#b8543c', CRYSTAL: '#c8a8ff', SPAWNER: '#c05aff', RAIL: '#a87c40', CAVEIN: '#111111', SAPLING: '#5ab04a', BURIED: '#8e8e8a', WIRE: '#a8301c', WIRE_W: '#c8301c', REP_N: '#a8a8a8', REP_E: '#a8a8a8', REP_S: '#a8a8a8', REP_W: '#a8a8a8', NOT_N: '#4a4a56', NOT_E: '#4a4a56', NOT_S: '#4a4a56', NOT_W: '#4a4a56', CARPET: '#c8443c', CLAMP: '#d8c8ff', CROWN: '#f2c840', WALL_NW: '#6c2448', FLOOR_NW: '#6c2448', STAIRS_U: '#a2a29c', TRAP_PIT: '#c8c090', TRAP_ARROW: '#c8c090', FOSSIL: '#d8d0b8', GEM: '#ff6ac8', GMUSH: '#3ad8c8', GLOWM: '#3ad8c8', VWALL: '#3a2a4a', OBSIDIAN: '#2a1c34', ASH: '#5c464a', NROCK: '#7a2c2c', CWALL: '#2a1c34', CFLOOR: '#44334c', ORE_N: '#b0349a', NTREE: '#6c2448' };
+    const k = TILE[t].key, table = { GRASS: '#7fbf55', GRASS2: '#5fa544', FLOWER: '#c8d070', BERRY: '#5a7ad0', VEG: '#e8a040', WHEATW: '#e0c860', DIRT: '#8a6a44', SAND: '#ecd9a0', SNOW: '#f0f6fb', WATER: '#4a9fd8', TREE: '#3f8a45', PINE: '#2a6e50', CACTUS: '#5a9a4a', ROCK: '#8e8e8a', RWALL: '#c8c090', RFLOOR: '#a4a49c', FLOOR_ST: '#a4a49c', CHEST_W: '#ffd84a', CAVE: '#5a4a3e', WDIRT: '#3a2c20', WSTONE: '#4a4a48', WHARD: '#2e2e3a', MAGMA: '#e8561c', ORE_STAR: '#7fe8ff', GIANT: '#1f6a2a', GIANTB: '#1f6a2a', TOWERW: '#d8d0a8', SANDB1: '#c8a858', SANDB2: '#b89848', SANDB3: '#a88838', METEOR: '#ff6a2c', SCORCH: '#3c3430', HULL: '#6e5230', MAST: '#6e5230', HUTW: '#b8543c', CRYSTAL: '#c8a8ff', SPAWNER: '#c05aff', RAIL: '#a87c40', CAVEIN: '#111111', SAPLING: '#5ab04a', BURIED: '#8e8e8a', WIRE: '#a8301c', WIRE_W: '#c8301c', REP_N: '#a8a8a8', REP_E: '#a8a8a8', REP_S: '#a8a8a8', REP_W: '#a8a8a8', NOT_N: '#4a4a56', NOT_E: '#4a4a56', NOT_S: '#4a4a56', NOT_W: '#4a4a56', CARPET: '#c8443c', CLAMP: '#d8c8ff', CROWN: '#f2c840', WALL_NW: '#6c2448', FLOOR_NW: '#6c2448', STAIRS_U: '#a2a29c', TRAP_PIT: '#c8c090', TRAP_ARROW: '#c8c090', FOSSIL: '#d8d0b8', GEM: '#ff6ac8', GMUSH: '#3ad8c8', GLOWM: '#3ad8c8', VWALL: '#3a2a4a', CCARPET: '#a8342c', THRONE: '#e8c040', BRAZIER: '#ff9a2c', CBANNER: '#4a2a6c', CTOWER: '#1c1424', NBRIDGE: '#6c3c2c', FTRAP: '#7a2c1c', STRAP: '#5a5464', AST_E: '#8a8494', AST_W: '#8a8494', GSTONE: '#7a7484', NCRYS: '#b060e8', OBSIDIAN: '#2a1c34', ASH: '#5c464a', NROCK: '#7a2c2c', CWALL: '#2a1c34', CFLOOR: '#44334c', ORE_N: '#b0349a', NTREE: '#6c2448' };
     const hex = table[k] || '#6a8a50', n = parseInt(hex.slice(1), 16);
     return (MAP_COL[t] = [n >> 16, (n >> 8) & 255, n & 255]);
 }
@@ -882,7 +882,7 @@ function drawMap() {
     for (const k in kinds) notes.push(placeMarkSvg(k) + ' ' + PLACE_NAMES[k] + (kinds[k] > 1 ? ' ×' + kinds[k] : ''));
     if (S.graves.some(g => g.f === mapFloor)) notes.push('🟨 落とした荷物');
     { const rb = reboxes().filter(b => b.f === mapFloor); rb.forEach(b => { pin(b.x, b.y, '#3fe8ff', 2); }); if (rb.length) notes.push('🟦 転生の箱' + (rb.length > 1 ? ' ×' + rb.length : '')); }
-    if (mapFloor === 2 && !S.bossDead && S.got.reach_2) { const p = bossPos(); pin(p.x, p.y, '#ff2a2a', 2); notes.push('🔺 魔王城'); }
+    if (mapFloor === 2 && !S.bossDead && S.got.castle_seen) { const p = bossPos(); pin(p.x, p.y, '#ff2a2a', 2); notes.push('🔺 魔王城'); }
     if (S.f === mapFloor) {
         // 自分: 向いている方へ とがった 三角。ほかの印より あとに描いて いつも いちばん上に
         const cx = (S.x >> 2) + .5, cy = (S.y >> 2) + .5, fx = S.face[0], fy = S.face[1], px = -fy, py = fx;
@@ -1269,6 +1269,7 @@ let fishNext = 0;
 function loop(now) {
     requestAnimationFrame(loop);
     if (fishing && mode === 'play' && canAct() && now >= fishNext) { fishNext = now + 230; fishTick(); }
+    if (mode === 'play' && S.ride && S.rideDir && canAct() && now >= nextAct) { waitTurn(); nextAct = now + 280; }
     if (mode === 'play' && canAct() && now >= nextAct) {
         if (autoPath.length) {
             const d = autoPath.shift();

@@ -164,6 +164,19 @@ defT('ENCH', { n: 'エンチャント台', solid: 1, hp: 9, tool: 'pick', back: 
 defT('OBSIDIAN', { n: '黒曜石', solid: 1, opaque: 1, hp: 40, tool: 'pick', tier: 5, back: 'obsidian', blast: 99 });   // マグマに水がふれると できる。星晶のつるはし以上
 defT('STATUE', { n: '魔王の像', solid: 1, hp: 10, tool: 'pick', back: 'statue', light: 8 });
 defT('REBOX', { n: '転生の箱', solid: 1, hp: 5, back: 'rebox', blast: 99, light: 2 });   // 魔王が落とす。4つ入る。転生すると 中身ごと 新しい世界の どこかへ   // 魔王が落とす。まわりを明るくして 魔物を わかせない
+// 魔王城の飾り・罠、異世界の見どころ
+defT('CCARPET', { n: '魔王城のじゅうたん', ground: 1 });
+defT('THRONE', { n: '玉座', solid: 1 });
+defT('BRAZIER', { n: 'かがり火', solid: 1, light: 5 });
+defT('CBANNER', { n: '魔王城のかべ', solid: 1, wall: 1 });
+defT('CTOWER', { n: '魔王城の塔', solid: 1, wall: 1 });
+defT('NBRIDGE', { n: 'つり橋', ground: 1 });
+defT('FTRAP', { n: '炎をふく床', ground: 1, ftrap: 1 });
+defT('STRAP', { n: 'とげの床', ground: 1, strap: 1 });
+defT('AST_E', { n: '石像', solid: 1, hp: 8, tool: 'pick', tier: 2, ast: 1 });    // 東へ 矢をうつ
+defT('AST_W', { n: '石像', solid: 1, hp: 8, tool: 'pick', tier: 2, ast: -1 });   // 西へ 矢をうつ
+defT('GSTONE', { n: '墓石', solid: 1, hp: 6, tool: 'pick', tier: 1, drop: [['nstone', 1, 1]] });
+defT('NCRYS', { n: '魔晶', solid: 1, wall: 1, hp: 10, tool: 'pick', tier: 3, light: 3, drop: [['ore_n', 1, 1], ['crystal', 1, 1]] });
 // ピストン(押す)・ねばねばピストン(押して 引きもどす)。頭は のびたときだけ 前のマスに出る
 'NESW'.split('').forEach((c, i) => {
     defT('PISTON_' + c, { n: 'ピストン', solid: 1, hp: 6, tool: 'pick', back: 'piston', dev: 1, piston: { d: i, s: 0 } });
@@ -182,6 +195,7 @@ const ITEM = {
     fish: { n: '魚', c: '#6aa8d8', food: 8, raw: 1 }, gfish: { n: '焼き魚', c: '#c8843c', food: 28, heal: 5 }, kfish: { n: '金の魚', c: '#ffd84a', food: 40, heal: 40 }, cfish: { n: '光る魚', c: '#b8a0ff', food: 20, heal: 25 },
     wood: { n: '木材', c: '#a8743c' }, leaf: { n: '葉っぱ', c: '#4a9e45' }, stone: { n: '石', c: '#9a9a96' },
     coal: { n: '石炭', c: '#2d2d33' }, charcoal: { n: '木炭', c: '#3a3028' }, bone: { n: '骨', e: '🦴' }, hide: { n: '皮', c: '#9c6a3c' }, wool: { n: '羊毛', c: '#f4f1e8' },
+    cart: { n: 'トロッコ', c: '#8a8a94', desc: '線路に置いて乗る' },
     bucket: { n: 'バケツ', c: '#a8b0b8', use: 'bucket', desc: '水やマグマを くむ' }, bucket_w: { n: '水入りバケツ', c: '#4a9fd8', use: 'pour', desc: '穴に 水を入れる' }, bucket_l: { n: 'マグマ入りバケツ', c: '#e8561c', use: 'pour', desc: '穴に マグマを入れる' },
     obsidian: { n: '黒曜石', tile: 'OBSIDIAN', place: 'OBSIDIAN', desc: 'とても かたい' },
     statue: { n: '魔王の像', tile: 'STATUE', place: 'STATUE', desc: 'まわりが明るくなる' },
@@ -345,6 +359,7 @@ const RECIPES = [
     { out: 'door', need: { wood: 3 }, st: 'bench' },
     { out: 'ladder', n: 2, need: { wood: 3 }, st: 'bench' },
     { out: 'rail', n: 8, need: { ingot_fe: 1, wood: 1 }, st: 'bench' },
+    { out: 'cart', need: { ingot_fe: 5 }, st: 'bench' },
     { out: 'anvil', need: { ingot_fe: 8 }, st: 'bench' },
     { out: 'ench', need: { gem: 1, ancient: 3, stone: 10 }, st: 'bench' },
     { out: 'bed', need: { wood: 4, leaf: 5 }, st: 'bench' },
@@ -477,6 +492,10 @@ const MOBS = {
     eye: { n: '魔眼', hp: 50, atk: 16, spd: .6, agg: 10, shoot: 6, drop: [['ore_n', 1, 1, .4]], box: [[.2, .2, .4, .8, .8, 1, '#5c1c6c'], [.32, .8, .54, .68, .82, .9, '#f6f3ea'], [.44, .82, .64, .56, .84, .8, '#d8352c']] },
     knight: { n: '魔骸騎士', hp: 95, atk: 24, def: 6, spd: .7, agg: 10, drop: [['ore_n', 1, 2], ['bone', 1, 2]], box: humanoid('#3c2a4c', '#d8d8cc', '#2a1c38', '#ff3a3a', '#5c1c6c') },
     // 中ボス: 特別な場所にいる主。たおさなくても進めるが、良い物を落とす
+    graveking: { n: '墓場の王', elite: 1, hp: 300, atk: 26, def: 7, spd: .6, agg: 11, shoot: 6, drop: [['bone', 6, 10], ['ingot_n', 2, 3], ['potion', 1, 2]], box: enlarge(humanoid('#4a3a5c', '#e8e0c8', '#2a2234', '#ff3a3a', '#e8e0c8').concat([[.24, .3, 1.28, .76, .7, 1.36, '#c89a2c'], [.24, .3, 1.36, .34, .4, 1.46, '#e8c040'], [.66, .3, 1.36, .76, .4, 1.46, '#e8c040'], [.45, .3, 1.36, .55, .36, 1.5, '#e8c040']]), 1.5) },
+    flamelord: { n: '炎の魔人', elite: 1, fire: 1, hp: 320, atk: 30, def: 6, spd: .65, agg: 11, drop: [['ingot_n', 2, 4], ['coal', 6, 10], ['star', 1, 2]], box: enlarge(humanoid('#c8341c', '#ff9a2c', '#7a1c10', '#fff27a', '#e8561c').concat([[.3, .32, 1.3, .7, .68, 1.6, '#ffb03c'], [.38, .4, 1.6, .62, .6, 1.85, '#ffe88a']]), 1.5) },
+    crysbeast: { n: '魔晶の獣', elite: 1, hp: 340, atk: 27, def: 10, spd: .55, agg: 11, drop: [['ore_n', 4, 7], ['crystal', 4, 6], ['gem', 1, 2]], box: enlarge(quad('#5a2a7c', '#7a3a9c', '#3a1a5c', 1.1, '#e0c8ff').concat([[.3, .3, .9, .42, .42, 1.25, '#d8a0ff'], [.58, .5, .9, .7, .62, 1.2, '#b060e8']]), 1.5) },
+    general: { n: '魔王軍の将軍', elite: 1, hp: 360, atk: 30, def: 9, spd: .7, agg: 11, drop: [['ingot_n', 3, 5], ['star', 1, 2], ['potion', 1, 2]], box: enlarge(humanoid('#3a2a44', '#9a8aa8', '#2a1c30', '#ff3a3a', '#3a2a44').concat([[.24, .3, .3, .76, .34, 1.0, '#a8242c'], [.3, .32, 1.28, .7, .68, 1.34, '#9a8aa8'], [.46, .32, 1.34, .54, .68, 1.5, '#d8303c']]), 1.5) },
     ent: { n: '森のヌシ', elite: 1, hp: 150, atk: 13, def: 3, spd: .6, agg: 11, drop: [['wood', 8, 12], ['ancient', 2, 2], ['potion', 1, 2]], box: enlarge(humanoid('#7c5228', '#4aa850', '#5c3c1c', '#ffd84a', '#6e4622'), 1.5) },
     warden: { n: '塔の番人', elite: 1, hp: 170, atk: 15, def: 5, spd: .6, agg: 11, drop: [['ingot_fe', 3, 5], ['ancient', 2, 2]], box: enlarge(humanoid('#7c8088', '#a0a4ac', '#585c64', '#ff5a3c', '#6c7078'), 1.5) },
     mummy: { n: 'ファラオ', elite: 1, hp: 190, atk: 16, def: 4, spd: .65, agg: 11, poison: 8, drop: [['ingot_au', 3, 5], ['star', 1, 2]], box: enlarge(humanoid('#e8dcc0', '#e8c84a', '#d8ccb0', '#111', '#f0e4c8'), 1.5) },
