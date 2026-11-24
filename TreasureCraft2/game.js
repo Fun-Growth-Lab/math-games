@@ -295,26 +295,42 @@ function wear(tool, n) {
         H.log(toolName(tool) + 'がこわれた!', 'bad'); H.sfx('garbagebreak');
     }
 }
-// 荷物を落とす。まわりが荷物だらけ(2マス以内に6こ以上)・置ける地面がないときは いちばん近い荷物にまとめる
+// 荷物を落とす
+//   魔物・動物の落とし物: まわり3マス以内に荷物があれば そこへ まとめる(同じ物が入っている山を いちばんに)。
+//   なければ 近くの置ける所へ(動く床の上なら 床にのって 運ばれる)。
+//   倒れたときの荷物: 近くの置ける所へ。荷物だらけ・置けないときは いちばん近い荷物に まとめる
+const DROP_MERGE_R = 3;
 function dropPile(x, y, items, kind) {
-    if (kind !== 'death' && TILE[getT(S.f, x, y)].belt) { addToBelt(x, y, items); return [x, y]; }
+    const death = kind === 'death';
+    if (!death && TILE[getT(S.f, x, y)].belt) { addToBelt(x, y, items); return [x, y]; }
+    if (!death) {
+        let best = null, bs = -Infinity;
+        for (let dy = -DROP_MERGE_R; dy <= DROP_MERGE_R; dy++) for (let dx = -DROP_MERGE_R; dx <= DROP_MERGE_R; dx++) {
+            const nx = x + dx, ny = y + dy, e = S.ex[exKey(S.f, nx, ny)];
+            if (getT(S.f, nx, ny) !== T.GRAVE || !e || !e.items) continue;
+            const same = items.some(it => !it.tool && e.items.some(q => q && q.id === it.id)), sc = (same ? 100 : 0) - Math.max(Math.abs(dx), Math.abs(dy));
+            if (sc > bs) { bs = sc; best = [nx, ny]; }
+        }
+        if (best) { const e = S.ex[exKey(S.f, best[0], best[1])]; mergeInto(e.items, items); e.t = S.T; return best; }
+    }
     let spot = null, near = null, nd = 99, crowd = 0;
     for (let r = 0; r < 6; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
         if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
         const nx = x + dx, ny = y + dy, t = getT(S.f, nx, ny);
         if (t === T.GRAVE && S.ex[exKey(S.f, nx, ny)]) { if (r <= 2) crowd++; if (r < nd) { nd = r; near = [nx, ny]; } }
-        else if (!spot && TILE[t].ground && t !== T.RAIL && !(nx === S.x && ny === S.y) && !mobAt(nx, ny)) spot = [nx, ny];
+        else if (!spot && (TILE[t].ground || (!death && TILE[t].belt)) && t !== T.RAIL && !(nx === S.x && ny === S.y) && !mobAt(nx, ny)) spot = [nx, ny];
     }
     if (near && (crowd >= 6 || !spot)) {
         const e = S.ex[exKey(S.f, near[0], near[1])];
-        for (const it of items) e.items.push(it);
-        e.t = S.T; if (kind === 'death') e.death = 1;
+        mergeInto(e.items, items);
+        e.t = S.T; if (death) e.death = 1;
         return near;
     }
     if (!spot) return null;
+    if (TILE[getT(S.f, spot[0], spot[1])].belt) { addToBelt(spot[0], spot[1], items); return spot; }   // 動く床に のる
     const base = getT(S.f, spot[0], spot[1]);
     setT(S.f, spot[0], spot[1], T.GRAVE);
-    S.ex[exKey(S.f, spot[0], spot[1])] = { base, items, t: S.T, f: S.f, x: spot[0], y: spot[1], drop: kind === 'death' ? 0 : 1, death: kind === 'death' ? 1 : 0 };
+    S.ex[exKey(S.f, spot[0], spot[1])] = { base, items, t: S.T, f: S.f, x: spot[0], y: spot[1], drop: death ? 0 : 1, death: death ? 1 : 0 };
     return spot;
 }
 
