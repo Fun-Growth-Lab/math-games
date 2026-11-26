@@ -425,8 +425,13 @@ body { overflow: hidden; background: #dcecf8; font-family: "M PLUS Rounded 1c", 
 
 /* ---------- RUN選択 ---------- */
 #run-screen { background: radial-gradient(ellipse at 50% 40%, #e8f6ff 0%, #bcdcf3 70%, #95c2e5 100%); }
-.rs-stage { position: relative; z-index: 2; flex: 1; width: 100%; display: flex; align-items: center; padding-top: 10px; justify-content: center; gap: 26px; }
-.rs-card { position: relative; width: 250px; height: 400px; display: flex; flex-direction: column; border: 5px solid var(--line); border-radius: 20px; background: #fffaf0; box-shadow: 0 8px 0 var(--line-dk), 0 18px 28px rgba(0,0,0,0.25); cursor: pointer; transition: transform 0.25s; }
+.rs-stage { position: relative; z-index: 2; flex: 1; min-height: 0; width: 100%; display: flex; align-items: center; padding: 0 18px; gap: 10px; }
+.rs-viewport { flex: 1; height: 100%; overflow: hidden; position: relative; }
+#rs-strip { position: absolute; left: 0; top: 0; height: 100%; display: flex; align-items: center; gap: 22px; padding: 16px 22px 10px; transition: transform 0.35s cubic-bezier(.2,.9,.3,1.15); }
+.rs-arrow { flex-shrink: 0; width: 58px; height: 92px; border-radius: 16px; border: 4px solid var(--line); background: linear-gradient(#ffd84d,#f2a516); color: #5a3a00; font-size: 2rem; font-weight: 900; font-family: inherit; cursor: pointer; box-shadow: 0 5px 0 var(--line-dk); z-index: 3; }
+.rs-arrow:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--line-dk); }
+.rs-arrow:disabled { opacity: 0.35; cursor: default; }
+.rs-card { position: relative; width: 250px; height: 400px; flex-shrink: 0; display: flex; flex-direction: column; border: 5px solid var(--line); border-radius: 20px; background: #fffaf0; box-shadow: 0 8px 0 var(--line-dk), 0 18px 28px rgba(0,0,0,0.25); cursor: pointer; transition: transform 0.25s; }
 .rs-card.sel { transform: translateY(-12px) scale(1.04); box-shadow: 0 8px 0 var(--line-dk), 0 0 0 5px #ffd84d, 0 0 30px 8px rgba(255,216,77,0.6), 0 22px 30px rgba(0,0,0,0.3); }
 .rs-tab { height: 66px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.6rem; color: #fff; background: var(--c); border-bottom: 5px solid var(--line); border-radius: 14px 14px 0 0; text-shadow: 0 3px 0 rgba(0,0,0,0.35); letter-spacing: 3px; }
 .run-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
@@ -718,7 +723,11 @@ body { overflow: hidden; background: #dcecf8; font-family: "M PLUS Rounded 1c", 
         <div class="plaque" data-t>RUNを選ぼう</div>
         <span></span>
     </div>
-    <div class="rs-stage" id="rs-stage"></div>
+    <div class="rs-stage">
+        <button class="rs-arrow" id="rs-prev" onclick="moveRun(-1)">◀</button>
+        <div class="rs-viewport" id="rs-viewport"><div id="rs-strip"></div></div>
+        <button class="rs-arrow" id="rs-next" onclick="moveRun(1)">▶</button>
+    </div>
     <div class="rs-bottom">
         <div class="star-row" id="star-row"></div>
         <div class="border-row" id="border-row"></div>
@@ -874,6 +883,14 @@ const I18N = {
     '試験管 3本<br>カード 30枚<br>チェンジ 3回': ['しけんかん 3本<br>カード 30まい<br>チェンジ 3かい', '3 test tubes<br>30 cards<br>3 changes'],
     '直るのにぴったり1が2回必要': ['なおるのに ぴったり1が 2かい ひつよう', 'A broken tube needs two perfect 1s to be fixed'],
     '1/2が出ない': ['1/2が でない', 'No 1/2 cards'],
+    'もう1本ほしかった': ['もう 1ぽん ほしかった', 'I Wanted One More'],
+    '試験管が2本': ['しけんかんが 2ほん', 'Only 2 test tubes'],
+    '手が足りない': ['手が たりない', 'Not Enough Hands'],
+    '手札が2枚': ['てふだが 2まい', 'Only 2 cards in hand'],
+    'チェンジ禁止': ['チェンジ きんし', 'No Changes'],
+    'チェンジできない': ['チェンジ できない', 'You cannot change cards'],
+    '役がないと始まらない': ['やくが ないと はじまらない', 'No Hand, No Glory'],
+    '役なしの完成は0点': ['やくなしの かんせいは 0てん', 'Completing without a hand scores 0'],
     // プレー画面
     'ステージ': ['ステージ', 'Stage'],
     'スコア': ['スコア', 'Score'],
@@ -1037,6 +1054,15 @@ const RUNS = [
       borders: { 1: [300, 400, 500, 600, 700], 2: [450, 750, 1250, 2100, 3500], 3: [600, 1050, 1750, 3050, 5250], 4: [850, 1400, 2250, 3650, 5900], 5: [1000, 1650, 2700, 4500, 7400] } },
     { id: 'senpai', name: '先輩どこにいったんだろう', c: '#d0503a', short: '1/2が出ない', noHalf: true,
       borders: { 1: [350, 450, 550, 650, 800], 2: [500, 800, 1300, 2150, 3550], 3: [600, 1050, 1750, 3050, 5250], 4: [850, 1400, 2250, 3650, 5900], 5: [1000, 1650, 2700, 4500, 7400] } },
+    // ここから下の4本は ボット測定で、基本RUNと 同じクリア率になるように ボーダーを決めた（試験管2本・チェンジ禁止は バーストで終わりやすく、★1でも 少し むずかしい）
+    { id: 'yaku',   name: '役がないと始まらない', c: '#3b8f2e', short: '役なしの完成は0点', yakuOnly: true,
+      borders: { 1: [300, 400, 450, 550, 650], 2: [400, 650, 1100, 1800, 3000], 3: [600, 1050, 1750, 3050, 5250], 4: [850, 1350, 2200, 3550, 5750], 5: [1000, 1650, 2700, 4500, 7400] } },
+    { id: 'hand2',  name: '手が足りない', c: '#e08a1e', short: '手札が2枚', hand: 2,
+      borders: { 1: [150, 250, 300, 350, 400], 2: [300, 500, 850, 1400, 2300], 3: [500, 850, 1450, 2550, 4350], 4: [700, 1150, 1800, 2950, 4750], 5: [850, 1400, 2300, 3850, 6350] } },
+    { id: 'nochange', name: 'チェンジ禁止', c: '#c23a7a', short: 'チェンジできない', noChange: true,
+      borders: { 1: [100, 150, 200, 250, 300], 2: [200, 300, 500, 850, 1450], 3: [350, 600, 1000, 1750, 3050], 4: [550, 950, 1500, 2400, 3900], 5: [800, 1300, 2100, 3500, 5750] } },
+    { id: 'tube2',  name: 'もう1本ほしかった', c: '#1f9e8a', short: '試験管が2本', tubes: 2,
+      borders: { 1: [100, 150, 200, 250, 300], 2: [100, 200, 300, 500, 850], 3: [250, 450, 700, 1250, 2150], 4: [400, 650, 1050, 1700, 2750], 5: [650, 1100, 1800, 3000, 4900] } },
 ];
 const RUN_BY_ID = {}; RUNS.forEach(r => { RUN_BY_ID[r.id] = r; });
 // 値段とコインは すべて偶数（セールでちょうど半額になるように）
@@ -1113,6 +1139,11 @@ function skillsFired(run, st, ti, ids) {
     return out;
 }
 
+// ガチャに出るスキル（そのRUNで意味のないスキルは出さない）
+function skillPool() {
+    const R = rule();
+    return SKILLS.filter(k => !(R.noChange && (k.id === 'uchi' || k.id === 'charge')) && !((R.tubes || TUBES) < 3 && k.id === 'mitsu'));
+}
 function drawWeight(c) { return run && rule().noHalf && c.id === '1/2' ? 0 : WEIGHT(c); }
 let tutDraw = [];   // チュートリアル中に引くカードを決めておく
 function drawCard() {
@@ -1132,12 +1163,13 @@ function clearCoins(deckLeft) { return { base: CLEAR_COIN, bonus: Math.floor(dec
 function newRun(star, rid) {
     const cardLv = {}; CARDS.forEach(c => { cardLv[c.id] = 1; });
     const yakuLv = {}; YAKU.forEach(y => { yakuLv[y.id] = 1; });
-    return { star, stage: 1, cardLv, yakuLv, coins: 0, discardMax: DISCARDS, broken: [false, false, false], rep: [0, 0, 0], stageScores: [], sale: new Set(), skills: {}, rid };
+    const R = RUN_BY_ID[rid], nt = R.tubes || TUBES;
+    return { star, stage: 1, cardLv, yakuLv, coins: 0, discardMax: R.noChange ? 0 : DISCARDS, broken: Array(nt).fill(false), rep: Array(nt).fill(0), stageScores: [], sale: new Set(), skills: {}, rid };
 }
 function newStage(run) {
     const st = { tubes: [], hand: [], deck: DECK_SIZE, discards: run.discardMax, chain: 0, score: 0, bursts: 0 };
-    for (let i = 0; i < TUBES; i++) st.tubes.push({ ids: [], sum: 0, broken: run.broken[i], rep: run.rep[i] });
-    for (let i = 0; i < HAND; i++) { st.hand.push(drawCard()); st.deck--; }
+    for (let i = 0; i < run.broken.length; i++) st.tubes.push({ ids: [], sum: 0, broken: run.broken[i], rep: run.rep[i] });
+    for (let i = 0; i < (RUN_BY_ID[run.rid].hand || HAND); i++) { st.hand.push(drawCard()); st.deck--; }
     return st;
 }
 function refill(st, slot) {
@@ -1158,14 +1190,16 @@ function playCard(run, st, slot, ti) {
         const base = tb.ids.reduce((a, x) => a + cardPts(run, x), 0);
         const ym = yakuMult(run, yid), cm = comboMult(st.chain);
         const sks = skillsFired(run, st, ti, tb.ids), sk = sks.reduce((a, k) => a * k.m, 1);
-        const pts = Math.round(base * ym * cm * sk);
+        const noYaku = !yid && rule().yakuOnly;   // 役がないと始まらない: 役なしの完成は0点
+        const pts = noYaku ? 0 : Math.round(base * ym * cm * sk);
         let fixed = -1;
         let half = -1;
         if (rule().rep2) {   // 少し時間をくれないか: ぴったり1が2回で なおる。半分なおった管が先、なければ上から
             let k = st.tubes.findIndex(t => t.broken && t.rep === 1); if (k < 0) k = st.tubes.findIndex(t => t.broken);
             if (k >= 0) { st.tubes[k].rep++; if (st.tubes[k].rep >= 2) { st.tubes[k].broken = false; st.tubes[k].rep = 0; fixed = k; } else half = k; }
-        } else for (let k = 0; k < TUBES; k++) if (st.tubes[k].broken) { st.tubes[k].broken = false; fixed = k; break; }
-        res = { type: 'perfect', ids: tb.ids.slice(), ti, yaku: yid, base, ym, cm, sks, chain: st.chain, pts, fixed, half };
+        } else for (let k = 0; k < st.tubes.length; k++) if (st.tubes[k].broken) { st.tubes[k].broken = false; fixed = k; break; }
+        res = { type: 'perfect', ids: tb.ids.slice(), ti, yaku: yid, base, ym, cm, sks, chain: st.chain, pts, fixed, half, noYaku };
+        if (noYaku) res.ym = 0;
         st.score += pts; tb.ids = []; tb.sum = 0;
         if (pts > (run.bestPlay || 0)) { run.bestPlay = pts; run.bestYaku = yid || 'none'; }
         res.coin = ptCoin(pts); run.coins += res.coin;   // 高得点コイン
@@ -1288,7 +1322,7 @@ function goRun() {
     closeModal(); SFX.play('click');
     const i = RUNS.findIndex(r => r.id === selRun);
     if (i < 0 || !runOpen(i)) selRun = 'basic';
-    fixStar(); renderRun(); show('run-screen');
+    fixStar(); renderRun(); show('run-screen'); centerRun();
 }
 function fixStar() { const i = RUNS.findIndex(r => r.id === selRun); while (star > 1 && !starOpen(i, star)) star--; }
 const LOCK_SVG = `<svg viewBox="0 0 24 24"><path d="M7.5 10.5V7.5a4.5 4.5 0 019 0v3" fill="none" stroke="#dfe6ee" stroke-width="2.4"/><rect x="4.5" y="10.5" width="15" height="11" rx="2" fill="#ffc928" stroke="#183048" stroke-width="1.2"/><circle cx="12" cy="15" r="1.6" fill="#7a5410"/><path d="M12 15.5v3" stroke="#7a5410" stroke-width="1.6" stroke-linecap="round"/></svg>`;
@@ -1305,6 +1339,14 @@ function svgTube(x, layers, opt) {
         <rect x="${x + 5}" y="${top + 6}" width="5" height="${bot - top - 24}" rx="2.5" fill="#fff" opacity="0.7"/>${opt.extra || ''}`;
 }
 const STAR = (x, y, r, c) => `<path d="M${x} ${y - r} L${x + r * 0.3} ${y - r * 0.3} L${x + r} ${y} L${x + r * 0.3} ${y + r * 0.3} L${x} ${y + r} L${x - r * 0.3} ${y + r * 0.3} L${x - r} ${y} L${x - r * 0.3} ${y - r * 0.3} Z" fill="${c}"/>`;
+// 絵の中のカード（分数つき）
+function svgCard(x, y, id, rot, opt) {
+    opt = opt || {}; const c = CARD_BY_ID[id], col = cardColor(id), f = 'font-family="M PLUS Rounded 1c, sans-serif"';
+    return `<g transform="rotate(${rot || 0} ${x + 22} ${y + 30})"><rect x="${x}" y="${y}" width="44" height="60" rx="7" fill="${opt.dash ? 'rgba(255,255,255,0.5)' : '#fff'}" stroke="${opt.dash ? '#8a96a6' : '#183048'}" stroke-width="3" ${opt.dash ? 'stroke-dasharray="6 5"' : ''}/>
+        ${opt.dash ? '' : `<rect x="${x + 4}" y="${y + 4}" width="36" height="52" rx="4" fill="${col}" opacity="0.14"/>
+        <text x="${x + 22}" y="${y + 26}" text-anchor="middle" font-size="18" font-weight="900" fill="${col}" ${f}>${c.n}</text><rect x="${x + 11}" y="${y + 30}" width="22" height="3" fill="${col}"/>
+        <text x="${x + 22}" y="${y + 50}" text-anchor="middle" font-size="18" font-weight="900" fill="${col}" ${f}>${c.d}</text>`}</g>`;
+}
 const RUN_ART = {
     basic: () => `<svg viewBox="0 0 240 140" class="run-svg">
         <rect width="240" height="140" fill="#dff1ff"/><rect y="120" width="240" height="20" fill="#9cc3e0"/><rect y="118" width="240" height="5" fill="#183048"/>
@@ -1329,10 +1371,36 @@ const RUN_ART = {
         <text x="36" y="50" font-size="30" font-weight="900" fill="#e8473d" font-family="M PLUS Rounded 1c, sans-serif" transform="rotate(-14 36 50)">?</text>
         <text x="196" y="44" font-size="22" font-weight="900" fill="#e8473d" font-family="M PLUS Rounded 1c, sans-serif" transform="rotate(12 196 44)">?</text>
         <g fill="#c98a4a" opacity="0.8"><ellipse cx="178" cy="108" rx="5" ry="7" transform="rotate(70 178 108)"/><ellipse cx="196" cy="100" rx="5" ry="7" transform="rotate(70 196 100)"/><ellipse cx="214" cy="108" rx="5" ry="7" transform="rotate(70 214 108)"/><ellipse cx="232" cy="100" rx="5" ry="7" transform="rotate(70 232 100)"/></g></svg>`,
+    tube2: () => `<svg viewBox="0 0 240 140" class="run-svg">
+        <rect width="240" height="140" fill="#dcf5ef"/><rect y="120" width="240" height="20" fill="#9fd8cb"/><rect y="118" width="240" height="5" fill="#183048"/>
+        <rect x="36" y="96" width="168" height="12" rx="4" fill="#c98a4a" stroke="#183048" stroke-width="3"/>
+        ${svgTube(56, [[cardColor('1/3'), 28], [cardColor('1/3'), 28], [cardColor('1/6'), 14]])}
+        ${svgTube(105, [[cardColor('3/4'), 63], [cardColor('1/12'), 7]])}
+        <path d="M154 18 V93 a15 15 0 0 0 30 0 V18 Z" fill="rgba(255,255,255,0.45)" stroke="#5b8f86" stroke-width="3" stroke-dasharray="7 6"/>
+        <text x="169" y="68" text-anchor="middle" font-size="30" font-weight="900" fill="#1f9e8a" font-family="M PLUS Rounded 1c, sans-serif">?</text>
+        ${STAR(24, 40, 8, '#ffd84d')}${STAR(214, 34, 10, '#fff')}</svg>`,
+    hand2: () => `<svg viewBox="0 0 240 140" class="run-svg">
+        <rect width="240" height="140" fill="#fff0d9"/><rect y="120" width="240" height="20" fill="#f3c98c"/><rect y="118" width="240" height="5" fill="#183048"/>
+        ${svgCard(52, 40, '1/4', -12)}${svgCard(98, 34, '2/3', 0)}${svgCard(146, 40, '1/2', 12, { dash: true })}
+        <text x="168" y="80" text-anchor="middle" font-size="26" font-weight="900" fill="#e08a1e" font-family="M PLUS Rounded 1c, sans-serif" transform="rotate(12 168 70)">?</text>
+        <g transform="translate(26 16) rotate(-18)"><text font-size="22" font-weight="900" fill="#e08a1e" font-family="M PLUS Rounded 1c, sans-serif">!</text></g>
+        <g transform="translate(206 20) rotate(14)"><text font-size="22" font-weight="900" fill="#e08a1e" font-family="M PLUS Rounded 1c, sans-serif">!</text></g></svg>`,
+    nochange: () => `<svg viewBox="0 0 240 140" class="run-svg">
+        <rect width="240" height="140" fill="#ffe6f1"/><rect y="120" width="240" height="20" fill="#f0b3cf"/><rect y="118" width="240" height="5" fill="#183048"/>
+        <g transform="translate(76 16) scale(3.6)"><g stroke="#2a9a57" stroke-width="2.6" stroke-linecap="round" fill="none"><path d="M4.6 16.4L8.9 9"/><path d="M14.4 7.8L18.7 15.2"/><path d="M16.6 20H8.8"/></g><g fill="#2a9a57"><path d="M10.4 6.4L10.8 10.1L7 7.9Z"/><path d="M20.2 17.8L16.8 16.3L20.6 14.1Z"/><path d="M5.8 20L8.8 22.2L8.8 17.8Z"/></g></g>
+        <circle cx="120" cy="62" r="46" fill="none" stroke="#183048" stroke-width="13"/><circle cx="120" cy="62" r="46" fill="none" stroke="#e83a5a" stroke-width="8"/>
+        <path d="M88 30 L152 94" stroke="#183048" stroke-width="13" stroke-linecap="round"/><path d="M88 30 L152 94" stroke="#e83a5a" stroke-width="8" stroke-linecap="round"/></svg>`,
+    yaku: () => `<svg viewBox="0 0 240 140" class="run-svg">
+        <rect width="240" height="140" fill="#e6f6dc"/><rect y="120" width="240" height="20" fill="#b5dd9c"/><rect y="118" width="240" height="5" fill="#183048"/>
+        <rect x="36" y="96" width="168" height="12" rx="4" fill="#c98a4a" stroke="#183048" stroke-width="3"/>
+        ${svgTube(70, [[cardColor('1/4'), 21], [cardColor('1/4'), 21], [cardColor('1/4'), 21], [cardColor('1/4'), 21]])}
+        ${svgTube(140, [['#b9c3cf', 42], ['#cfd6de', 28], ['#b9c3cf', 14]])}
+        <text x="155" y="64" text-anchor="middle" font-size="34" font-weight="900" fill="#fff" stroke="#183048" stroke-width="4" paint-order="stroke" font-family="M PLUS Rounded 1c, sans-serif">0</text>
+        ${STAR(58, 26, 9, '#ffd84d')}${STAR(116, 40, 7, '#ffd84d')}${STAR(52, 70, 6, '#fff')}${STAR(212, 30, 7, '#fff')}</svg>`,
 };
 function mtArt(ids) { return `<div class="mt">${ids.map(id => `<i style="width:${CARD_BY_ID[id].t / 12 * 100}%; background:${cardColor(id)}"></i>`).join('')}</div>`; }
 function renderRun() {
-    $('rs-stage').innerHTML = RUNS.map((r, i) => {
+    $('rs-strip').innerHTML = RUNS.map((r, i) => {
         if (!runOpen(i)) return `<div class="rs-card locked" style="--c:#8a96a6"><div class="rs-tab">？？？</div><div class="rs-art"><div class="lock-ic">${LOCK_SVG}</div></div>
             <div class="rs-body"><span class="lk-t">${T('まだ秘密')}</span><span class="lk-s">${T('一つ前のRUNを<br>クリアすると開く')}</span></div></div>`;
         const best = bestStar(r.id);
@@ -1343,12 +1411,29 @@ function renderRun() {
             <button class="b3d bg-orange rs-go" onclick="event.stopPropagation(); startRun()">${T('始める')}</button>
         </div>`;
     }).join('');
+    centerRun();
     const ri = RUNS.findIndex(r => r.id === selRun), best = bestStar(selRun), names = ['簡単', '普通', '難しい', '名人', '伝説'];
     $('star-row').innerHTML = [1, 2, 3, 4, 5].filter(k => starVisible(ri, k)).map(k => {
         const lk = !starOpen(ri, k), cl = k <= best;
         return `<button class="star-btn${k === 4 ? ' secret' : ''}${k === 5 ? ' secret5' : ''}${k === star ? ' active' : ''}${lk ? ' locked' : ''}${cl ? ' cleared' : ''}" ${lk ? 'disabled' : ''} onclick="pickStar(${k})">${lk ? '🔒' : '★'.repeat(k)}<small>${T(names[k - 1])}</small></button>`;
     }).join('');
     $('border-row').innerHTML = RUN_BY_ID[selRun].borders[star].map((b, i) => `<div class="border-chip${i === 4 ? ' final' : ''}"><small>${i === 4 ? '👑 FINAL' : T('ステージ {0}', i + 1)}</small>🚩${b}</div>`).join('');
+}
+// えらんだRUNを まん中に
+const RS_W = 250, RS_GAP = 22, RS_PAD = 22;
+function centerRun() {
+    const idx = RUNS.findIndex(r => r.id === selRun), vp = $('rs-viewport');
+    const total = RUNS.length * RS_W + (RUNS.length - 1) * RS_GAP + RS_PAD * 2, vw = vp.clientWidth || 1100;
+    let x = vw / 2 - (RS_PAD + idx * (RS_W + RS_GAP) + RS_W / 2);
+    x = Math.min(0, Math.max(vw - total, x));
+    $('rs-strip').style.transform = `translateX(${x}px)`;
+    $('rs-prev').disabled = idx <= 0;
+    $('rs-next').disabled = idx >= RUNS.length - 1 || !runOpen(idx + 1);
+}
+function moveRun(d) {
+    const i = RUNS.findIndex(r => r.id === selRun) + d;
+    if (i < 0 || i >= RUNS.length || !runOpen(i)) return;
+    pickRun(RUNS[i].id);
 }
 function pickRun(id) { if (selRun === id) return; selRun = id; SFX.play('select'); fixStar(); renderRun(); }
 function pickStar(s) { star = s; SFX.play('select'); renderRun(); }
@@ -1468,7 +1553,7 @@ function renderSide() {
         ${miniTube(y.ex)}
         <div class="yk-l"><span class="yk-name">${T(y.name)}</span><span class="yk-sub">（${T(y.sub)}）</span></div>
         <div class="yk-r"><span class="yk-mul">${fmtMul(yakuMult(run, y.id))}</span><span class="yk-lv">Lv${run.yakuLv[y.id]}</span></div></div>`).join('')
-        + `<div class="yk-row none"><span class="mtube empty"></span><div class="yk-l"><span class="yk-name">${T('役なし')}</span></div><div class="yk-r"><span class="yk-mul" style="color:var(--ink-dim)">×1</span></div></div>`;
+        + `<div class="yk-row none"><span class="mtube empty"></span><div class="yk-l"><span class="yk-name">${T('役なし')}</span></div><div class="yk-r"><span class="yk-mul" style="color:var(--ink-dim)">${rule().yakuOnly ? '×0' : '×1'}</span></div></div>`;
     const cell = c => `<div class="cl-cell${rule().noHalf && c.id === '1/2' ? ' gone' : ''}" style="--cc:${cardColor(c.id)}">${frHTML(c.id)}${run.cardLv[c.id] > 1 ? `<span class="l">Lv${run.cardLv[c.id]}</span>` : ''}<span class="p">${cardPts(run, c.id)}<small>${T('点')}</small></span></div>`;
     const grp = d => `<div class="cl-grp" style="--gc:${DEN_GROUP_COLOR[d]}; --n:${CARDS.filter(c => c.d === d).length}">${CARDS.filter(c => c.d === d).map(cell).join('')}</div>`;
     $('card-list').innerHTML = `<div class="cl-col">${[2, 3, 4].map(grp).join('')}</div><div class="cl-col">${[6, 12].map(grp).join('')}</div>`;
@@ -1741,7 +1826,7 @@ function priceOf(key, base) { return run.sale.has(key) ? Math.ceil(base / 2) : b
 function openShop() {
     closeModal(); SFX.play('coin');
     // 毎回 2品が半額
-    const keys = shopKeys().filter(k => (k !== 'fix' || run.broken.some(b => b)) && (k !== 'disc' || run.discardMax < DISCARD_MAX) && !(k === 'card-1/2' && rule().noHalf));
+    const keys = shopKeys().filter(k => (k !== 'fix' || run.broken.some(b => b)) && (k !== 'disc' || (run.discardMax < DISCARD_MAX && !rule().noChange)) && !(k === 'card-1/2' && rule().noHalf));
     run.sale = new Set();
     keys.forEach(k => { if (Math.random() < SALE_RATE) run.sale.add(k); });
     run.freeGacha = true;   // ステージクリアごとに 1回目は無料
@@ -1774,11 +1859,11 @@ function renderShop() {
             <div class="pt-line"><span class="now">${fmtMul(m)}</span><span class="arr">▶</span><span class="nxt">${fmtMul(m + y.step)}</span></div>
             ${buyBtn(key, PRICE.yaku, `buyYaku('${y.id}')`)}</div>`;
     }).join('');
-    const nb = run.broken.filter(b => b).length, dmax = run.discardMax >= DISCARD_MAX;
+    const nb = run.broken.filter(b => b).length, noCh = !!rule().noChange, dmax = run.discardMax >= DISCARD_MAX || noCh;
     $('shop-items').innerHTML = `
-        <div class="row-item tool${shopFlash === 'disc' ? ' flash' : ''}${run.sale.has('disc') ? ' onsale' : ''}"><span class="ri-ic">${RECYCLE_SVG}</span>
+        <div class="row-item tool${shopFlash === 'disc' ? ' flash' : ''}${noCh ? ' off' : ''}${run.sale.has('disc') ? ' onsale' : ''}"><span class="ri-ic">${RECYCLE_SVG}</span>
             <div class="ri-l"><span class="ri-name">${T('チェンジ回数')}</span><div class="pt-line"><span class="now">${run.discardMax}</span><span class="arr">▶</span><span class="nxt">${dmax ? run.discardMax : run.discardMax + 1}</span><span class="u">${T('回')}</span></div></div>
-            ${dmax ? '<span class="maxed">MAX</span>' : buyBtn('disc', discPrice(), 'buyDisc()')}</div>
+            ${noCh ? '<span class="maxed">🔒</span>' : dmax ? '<span class="maxed">MAX</span>' : buyBtn('disc', discPrice(), 'buyDisc()')}</div>
         <div class="row-item tool${shopFlash === 'fix' ? ' flash' : ''}${nb ? '' : ' off'}${run.sale.has('fix') ? ' onsale' : ''}"><span class="ri-ic"><span class="tube-cap" style="width:42px;height:42px;font-size:1.2rem">🔧</span></span>
             <div class="ri-l"><span class="ri-name">${T('試験管を直す')}</span><span class="ri-sub">${nb ? T('壊れている試験管 {0}本', nb) : T('壊れていない')}</span></div>
             ${buyBtn('fix', PRICE.fix, 'buyFix()', nb === 0)}</div>`;
@@ -1792,7 +1877,7 @@ function pay(key, base) {
 }
 function buyCard(id) { if (pay('card-' + id, PRICE.card)) { run.cardLv[id]++; renderShop(); } }
 function buyYaku(id) { if (pay('yaku-' + id, PRICE.yaku)) { run.yakuLv[id]++; renderShop(); } }
-function buyDisc() { if (run.discardMax < DISCARD_MAX && pay('disc', discPrice())) { run.discardMax++; run.discBuys = (run.discBuys || 0) + 1; renderShop(); } }
+function buyDisc() { if (run.discardMax < DISCARD_MAX && !rule().noChange && pay('disc', discPrice())) { run.discardMax++; run.discBuys = (run.discBuys || 0) + 1; renderShop(); } }
 function buyFix() { const k = run.broken.indexOf(true); if (k >= 0 && pay('fix', PRICE.fix)) { run.broken[k] = false; run.rep[k] = 0; renderShop(); } }
 function leaveShop() { SFX.play('ok'); run.stage++; beginStage(); }
 function renderGachaBtn() {
@@ -1821,7 +1906,7 @@ function doGacha() {
     const p = gachaPrice();
     if (run.coins < p) return;
     run.coins -= p; run.freeGacha = false; SFX.play('buy');
-    const k = SKILLS[Math.floor(Math.random() * SKILLS.length)], lv = (run.skills[k.id] || 0) + 1;
+    const pool = skillPool(), k = pool[Math.floor(Math.random() * pool.length)], lv = (run.skills[k.id] || 0) + 1;
     run.skills[k.id] = lv;
     gachaLast = null; renderShop(); renderGacha();
     const gm = $('gm'); gm.classList.remove('shake'); void gm.offsetWidth; gm.classList.add('shake');
