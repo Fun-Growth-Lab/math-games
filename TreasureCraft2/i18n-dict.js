@@ -32,7 +32,7 @@ const I18N_DICT = [
     ['？？？', null, '???'], ['？', null, '?'], ['まだ材料を見つけていない', 'まだ ざいりょうを みつけていない', 'Materials not found yet'], ['持っている {0}', 'もっている {0}', 'Have {0}'],
     ['({0}ターン)', null, '({0} turns)'], ['作業台・かまどに ぶつかると、そこでつくれる物が出ます', 'さぎょうだい・かまどに ぶつかると、そこで つくれる ものが でるよ', 'Bump into a workbench or furnace to see what you can make there'],
     ['おなかがペコペコで つくれない', 'おなかが ペコペコで つくれない', 'Too hungry to craft'], ['ここでは つくれない', null, "Can't make that here"], ['{0}のそばで つくれる', '{0}の そばで つくれる', 'Make this next to a {0}'],
-    ['材料がたりない', 'ざいりょうが たりない', 'Not enough materials'], ['持ち物がいっぱいで つくれない', 'もちものが いっぱいで つくれない', 'Your bag is full'], ['{0}で つくれる', null, 'Made at a {0}'],
+    ['材料がたりない', 'ざいりょうが たりない', 'Not enough materials'], ['持ち物がいっぱいだ!', 'もちものが いっぱいだ!', 'Your bag is full!'], ['持ち物がいっぱいで つくれない', 'もちものが いっぱいで つくれない', 'Your bag is full'], ['{0}で つくれる', null, 'Made at a {0}'],
     // 実績・図鑑の見出し
     ['世界が変わっても残ります', 'せかいが かわっても のこるよ', 'Kept across all worlds'],
     ['場所', 'ばしょ', 'Places'], ['生き物', 'いきもの', 'Creatures'], ['おたから', null, 'Treasures'], ['アイテム', null, 'Items'],

@@ -568,9 +568,16 @@ function drawMake() {
     });
 }
 // つくるボタン: 1回つくる。押しっぱなしなら 少し待ってから くり返す(ターンは ふつうに進む)
+// つくる画面の中に 知らせを出す(画面を開いている間は 下のログが見えないため)
+function panelToast(msg) {
+    let el = $('ptoast');
+    if (!el) { el = document.createElement('div'); el.id = 'ptoast'; $('panel').querySelector('.sheet').appendChild(el); }
+    el.textContent = tr(msg); el.classList.add('show');
+    clearTimeout(panelToast.t); panelToast.t = setTimeout(() => el.classList.remove('show'), 1600);
+}
 function makeOnce(idx, st) {
     const msg = craftRecipe(RECIPES[idx], st);
-    if (msg) { SFX.play('error'); H.log(msg, 'warn'); }
+    if (msg) { SFX.play('error'); H.log(msg, 'warn'); panelToast(msg); }
     lastHot = ''; if (S.hp > 0) drawPanel();
     return !msg;
 }
@@ -668,7 +675,7 @@ function drawTool() {
     if ($('tool-gem')) $('tool-gem').onclick = () => { toolGem = !toolGem; SFX.play('select'); drawTool(); };
     $('tool-make').onclick = () => {
         const msg = craftTool(toolKind, toolA, toolB, station, toolGem);
-        if (msg) { SFX.play('error'); H.log(msg, 'warn'); }
+        if (msg) { SFX.play('error'); H.log(msg, 'warn'); panelToast(msg); }
         lastHot = ''; if (S.hp > 0) drawPanel();
     };
 }

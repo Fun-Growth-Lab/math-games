@@ -2055,7 +2055,7 @@ function craftRecipe(rec, station) {
     const near = nearStations();
     if (rec.st && !near[rec.st]) return STATION_NAME[rec.st] + 'のそばで つくれる';
     if (!hasAll(rec.need)) return '材料がたりない';
-    if (!fitsAfter(rec.need, rec.out, rec.n || 1)) return '持ち物がいっぱいで つくれない';
+    if (!fitsAfter(rec.need, rec.out, rec.n || 1)) return '持ち物がいっぱいだ!';
     for (const k in rec.need) removeItem(k, rec.need[k]);
     give(rec.out, rec.n || 1);
     if (rec.out === 'feast') ach('feast');
@@ -2078,7 +2078,7 @@ function craftTool(kind, a, b, station, gem) {
     const need = Object.assign({}, partNeed(kind, a, b));
     if (gem) need.gem = (need.gem || 0) + 1;
     if (!hasAll(need)) return '材料がたりない';
-    if (!fitsAfter(need, null)) return '持ち物がいっぱいで つくれない';
+    if (!fitsAfter(need, null)) return '持ち物がいっぱいだ!';
     for (const k in need) removeItem(k, need[k]);
     const tool = { k: kind, a, b: kind === 'armor' || !isArmor(kind) ? b : 'none', d: 0 };
     if (gem) { tool.gem = 1; ach('gem_tool'); }
