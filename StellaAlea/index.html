@@ -165,6 +165,7 @@
         .df .dmk.lhit { background: radial-gradient(#fffbd0,#ffd84a); box-shadow: 0 3px 0 var(--ol), 0 0 16px 5px rgba(255,216,74,.9); animation: pop .4s ease-out; }
         .mk-tip { position:absolute; z-index:9999; pointer-events:none; background:#fff; color: var(--ink); border:3px solid var(--ol); border-radius:12px; padding:4px 12px; font-weight:900; font-size:1rem; line-height:1.3; white-space:nowrap; box-shadow: 0 4px 0 var(--ol); transform: translate(-50%, -100%); }
         .mk-tip b { margin-right:6px; }
+        .fmk.used, .dmk.used { filter: grayscale(1); opacity:.55; }
         svg.mi { display:inline-block; vertical-align:-0.14em; flex-shrink:0; }
         .mk-tip.hidden { display:none; }
         .mark-btn { font-size: 1.25rem; padding: 8px 8px; width: 100%; display:flex; align-items:center; justify-content:center; gap:6px; white-space:nowrap; }
@@ -908,7 +909,8 @@ const SKILLS = [
     { id: 'norr',     kind: 'all', m: 1.6,  test: (v, s, c) => c.rerolls === 0 },
     { id: 'rr2',      kind: 'all', m: 1.6,  test: (v, s, c) => c.rerolls >= 2 },
     { id: 'poor',     kind: 'all', m: 2.0,  test: (v, s, c) => c.coins <= 10 },
-    { id: 'last',     kind: 'all', m: 2.2,  test: (v, s, c) => c.final },
+    // 成長(idは昔のまま 'last'・レア): 倍率はなし。1ゲームおわるごとに、つけている ほかのスキル1つずつ 10%(Lv+1ごとに+2%)で Lv+1
+    { id: 'last',     kind: 'grow', chance: 0.10, step: 0.02, rare: true, test: () => false },
     { id: 'nohand',   kind: 'all', m: 1.5,  test: (v, s, c) => c.role === 'none' }
 ];
 function skillCtx(role, ctx){ return Object.assign({ rerolls: 0, coins: 99, final: false, used: [] }, ctx || {}, { role }); }
@@ -916,6 +918,9 @@ function skillCtx(role, ctx){ return Object.assign({ rerolls: 0, coins: 99, fina
 function roleRepeat(role, sc){ return !!(RULES.noRepeatRole && sc.used && sc.used.indexOf(role) >= 0); }
 const SKILL_BY_ID = {}; SKILLS.forEach(k => SKILL_BY_ID[k.id] = k);
 function lvRate(lv){ return 1 + SKILL_LV_RATE * (lv - 1); }
+// 成長: ほかのスキルが Lvアップする確率
+function growChance(lv){ const k = SKILL_BY_ID.last; return k.chance + k.step * (lv - 1); }
+const SKILL_RARE_W = 0.3;              // レアスキル(成長)の 出やすさ(ふつう=1)
 
 // ---- サイコロ ----
 const DICE_TYPES = [
@@ -938,22 +943,24 @@ const MARKS = [
     { id: 'lucky', w: 12, sell: 2 },   // 4回に1回、倍率×3
     { id: 'match', w: 10, sell: 3 },   // 出た面に同じマークが2つで×2、3つで×3
     { id: 'power', w: 8,  sell: 3 },   // 倍率×1.5
-    { id: 'roulette', w: 8,  sell: 3 }, // ×0.5・1・2・3・4のどれか(各20%)
-    { id: 'bomb',  w: 6,  sell: 3 },   // ×4。このゲームはもうふりなおせない
+    { id: 'roulette', w: 8,  sell: 3 }, // ×0.5・1・1.5・2・2.5のどれか(各20%)
+    { id: 'bomb',  w: 6,  sell: 3 },   // ×3。そのステージはもうふりなおせない。ばくはつした面は そのステージのあいだ グレー(効かない)
     { id: 'piggy', w: 10, sell: 2 },   // ちょきん: 出るたびに、この面の倍率が+0.3ずつたまる(ずっと残る)
-    { id: 'dragon', w: 8, sell: 3 },   // おうかん(idは昔のまま): ステージの3ゲームめだけ ×3
+    { id: 'dragon', w: 8, sell: 3 },   // おうかん(idは昔のまま): ステージの3ゲームめだけ ×2.5
     { id: 'star',  w: 8,  sell: 2 },   // ながれぼし: このゲームの★の効き目が2倍
     { id: 'gem',   w: 10, sell: 2 }    // ほうせき: 出るたびに、このサイコロの売値+3
 ];
 const MARK_BY_ID = {}; MARKS.forEach(m => MARK_BY_ID[m.id] = m);
 const MARK_COUNT_W = [45, 40, 15];       // ガチャのサイコロにつくマークの数 0/1/2個の確率(%)
 const GOLD_COIN = 2, PLUS_POINT = 6, POWER_MULT = 1.5, LUCKY_RATE = 0.25, LUCKY_MULT = 3, MARK_PRICE = 15;
-const ROULETTE = [0.5, 1, 2, 3, 4], BOMB_MULT = 4, PIGGY_STEP = 0.3, DRAGON_MULT = 3, GEM_SELL = 3;
+const ROULETTE = [0.5, 1, 1.5, 2, 2.5], BOMB_MULT = 3, PIGGY_STEP = 0.3, DRAGON_MULT = 2.5, GEM_SELL = 3;
 function randomMark(rnd){ return MARKS[pickW(MARKS, rnd)].id; }
 // 出た面のマーク。ふった時に決まる結果を文字に入れる: ラッキーの当たり='luckyhit'、ルーレット='roulette:倍率'、ちょきん='piggy:倍率'
 const piggyMult = (d, f) => 1 + PIGGY_STEP * (((d.pig && d.pig[f]) || 0) + 1);
+// 面のマーク。そのステージで ばくはつした ばくだんは 'bombx'(グレー・効かない)
+const markAt = (d, f) => d.marks[f] === 'bomb' && d.bombUsed && d.bombUsed[f] ? 'bombx' : d.marks[f];
 function rollMark(d, f, rnd){
-    const m = d.marks[f];
+    const m = markAt(d, f);
     if (m === 'lucky') return rnd() < LUCKY_RATE ? 'luckyhit' : m;
     if (m === 'roulette') return 'roulette:' + ROULETTE[Math.floor(rnd() * ROULETTE.length)];
     if (m === 'piggy') return 'piggy:' + piggyMult(d, f);
@@ -961,15 +968,15 @@ function rollMark(d, f, rnd){
 }
 // その面のマークの、起こりうる結果と確率 [[結果, 確率], ...](ふりなおしの期待値用)
 function markOutcomes(d, f){
-    const m = d.marks[f];
+    const m = markAt(d, f);
     if (m === 'lucky') return [['lucky', 1 - LUCKY_RATE], ['luckyhit', LUCKY_RATE]];
     if (m === 'roulette') return ROULETTE.map(x => ['roulette:' + x, 1 / ROULETTE.length]);
     if (m === 'piggy') return [['piggy:' + piggyMult(d, f), 1]];
     return [[m, 1]];
 }
 // 期待値の計算用のマーク(ちょきんは今の倍率、ルーレット・ラッキーはそのまま=期待値で数える)
-const expMark = (d, f) => d.marks[f] === 'piggy' ? 'piggy:' + piggyMult(d, f) : d.marks[f];
-const baseMark = m => !m ? m : m === 'luckyhit' ? 'lucky' : m.split(':')[0];
+const expMark = (d, f) => d.marks[f] === 'piggy' ? 'piggy:' + piggyMult(d, f) : markAt(d, f);
+const baseMark = m => !m ? m : m === 'luckyhit' ? 'lucky' : m === 'bombx' ? 'bomb' : m.split(':')[0];
 const markVal = m => Number(m.split(':')[1]);
 // 3つの面のマークから {plus: 足す点, mul: 倍率, parts: 式に出すもの}。luckyExp: ラッキーを期待値(当たり確率込み)で数える
 function markEffect(mk, luckyExp, final){
@@ -989,7 +996,7 @@ function markEffect(mk, luckyExp, final){
     const nd = n('dragon'); if (nd && final){ const m = Math.pow(DRAGON_MULT, nd); mul *= m; parts.push({ id: 'dragon', mult: m, cnt: nd }); }
     if (mk.indexOf('match') >= 0){
         const cnt = {}; let top = 0;
-        mk.forEach(m => { if (m){ const b = baseMark(m); cnt[b] = (cnt[b] || 0) + 1; top = Math.max(top, cnt[b]); } });
+        mk.forEach(m => { if (m && m !== 'bombx'){ const b = baseMark(m); cnt[b] = (cnt[b] || 0) + 1; top = Math.max(top, cnt[b]); } });
         if (top >= 2){ const m = top >= 3 ? 3 : 2; mul *= m; parts.push({ id: 'match', mult: m }); }
     }
     return { plus, mul, parts, starX: Math.pow(2, n('star')) };
@@ -1073,6 +1080,7 @@ function calcScore(v, st, skillLv, roleLv, ctx, mk){
         if (k.kind === 'face'){
             const cnt = v.filter(x => x === k.n).length;
             if (cnt){ const m = Math.pow(1 + k.x * rate, cnt); parts.push({ id: k.id, mult: m, cnt }); skillMul *= m; }
+        } else if (k.kind === 'grow'){
         } else if (k.test(v, sum, sc)){
             const m = 1 + (k.m - 1) * rate; parts.push({ id: k.id, mult: m }); skillMul *= m;
         }
@@ -1100,6 +1108,7 @@ function expectedScore(dice, skillLv, roleLv, ctx){
         for (let i = 0; i < act.length; i++){
             const k = act[i].k, rate = act[i].r;
             if (k.kind === 'face'){ const cnt = (v[0] === k.n) + (v[1] === k.n) + (v[2] === k.n); if (cnt) m *= Math.pow(1 + k.x * rate, cnt); }
+            else if (k.kind === 'grow'){}
             else if (k.test(v, sum, sc)) m *= 1 + (k.m - 1) * rate;
         }
         t += (sum + me.plus) * m;
@@ -1182,10 +1191,15 @@ function roleUpPrice(buys, onSale){ const c = roleUpCost(buys); return onSale ? 
 function offerSkills(rnd, skillLv){
     if (RULES.autoSkill){      // 選べない: ランダムな1つが、ふつうより+1高いLvで手に入る
         const pool = SKILLS.map(k => k.id).filter(id => !skillLv || (skillLv[id] || 0) < SKILL_MAX_LV);
-        const id = shuffled(pool, rnd)[0];
+        const id = pickSkillIds(pool, 1, rnd)[0];
         return [{ id, up: (rnd() < SKILL_LV2_RATE ? 2 : 1) + 1 }];
     }
-    return shuffled(SKILLS.map(k => k.id), rnd).slice(0, RULES.offerN || 3).map(id => ({ id, up: rnd() < SKILL_LV2_RATE ? 2 : 1 })); }
+    return pickSkillIds(SKILLS.map(k => k.id), RULES.offerN || 3, rnd).map(id => ({ id, up: rnd() < SKILL_LV2_RATE ? 2 : 1 })); }
+function pickSkillIds(pool, n, rnd){
+    pool = pool.slice(); const out = [];
+    while (out.length < n && pool.length){ const i = pickW(pool.map(id => SKILL_BY_ID[id].rare ? SKILL_RARE_W : 1), rnd); out.push(pool[i]); pool.splice(i, 1); }
+    return out;
+}
 // スキルは、1ゲームおわるたびに3択で獲得(ゲーム全体の最後の1ゲームだけは、なし)
 function hasSkillPick(stage, gameNo){ return !(stage === STAGES && gameNo === GAMES_PER_STAGE); }
 // ふりなおし: 1つだけ振りなおしたとき、いちばん期待値が上がるサイコロの番号と、その期待値
@@ -1306,6 +1320,9 @@ const TX = {
     zorome_banner:  { ja: 'ゾロ目！', ja_easy: 'ぞろめ！', en: 'Triple!' },
     skill_face:   { ja: (n, m) => `${n}の目が出ると、1個につき ×${m}`, ja_easy: (n, m) => `${n}の めが でると、1こに つき ×${m}`, en: (n, m) => `Each die showing ${n} gives ×${m}` },
     skill_cond:   { ja: (c, m) => `${c} のとき ×${m}`, ja_easy: (c, m) => `${c} のとき ×${m}`, en: (c, m) => `${c}: ×${m}` },
+    skill_grow:   { ja: p => `1ゲームごとに、ほかのスキルが ${p}%で レベルアップ`, ja_easy: p => `1ゲームごとに、ほかの スキルが ${p}%で レベルアップ`, en: p => `After each game, other skills level up (${p}%)` },
+    grow_up:      { ja: t => `成長！ ${t}`, ja_easy: t => `せいちょう！ ${t}`, en: t => `Growth! ${t}` },
+    rate_label:   { ja: 'かくりつ', ja_easy: 'かくりつ', en: 'Chance' },
     howto_body: {
         ja: `<h4>① サイコロを3つふる</h4>出た目の<b>和</b>が基本の点です。
             <h4>② 役でばいりつ</h4>ペア×1.5・かいだん×2.5・とびかいだん(1・3・5など)×3.5・ゾロ目×5・ピンゾロ(1・1・1)×50。役はショップでレベルアップできます。
@@ -1424,9 +1441,9 @@ const MARK_NAME = langTable({
     ja_easy: { gold: 'きん', plus: 'プラス', seed: 'たね', retry: 'リターン', lucky: 'ラッキー', match: 'おそろい', power: 'パワー', roulette: 'ルーレット', bomb: 'ばくだん', piggy: 'ちょきん', dragon: 'おうかん', star: 'ながれぼし', gem: 'ほうせき' },
     en: { gold: 'Gold', plus: 'Plus', seed: 'Seed', retry: 'Retry', lucky: 'Lucky', match: 'Match', power: 'Power', roulette: 'Roulette', bomb: 'Bomb', piggy: 'Savings', dragon: 'Crown', star: 'Shooting Star', gem: 'Gem' } });
 const MARK_DESC = langTable({
-    ja: { gold: 'コイン＋2', plus: '合計点に＋6', seed: 'この面の★が1つふえる(3つまで)', retry: 'ふりなおしが1回無料', lucky: '4分の1の確率で ×3', match: '同じマークが2つで×2・3つで×3', power: '×1.5', roulette: '×0.5・1・2・3・4のどれか', bomb: '×4。このゲームはもうふりなおせない', piggy: '出るたびに、この面の倍率が＋0.3たまる', dragon: 'ステージの3ゲームめだけ ×3', star: 'このゲームの★の効き目が2倍', gem: '出るたびに、このサイコロの売値＋3' },
-    ja_easy: { gold: 'コイン＋2', plus: 'ごうけいに ＋6', seed: 'この めんの ★が 1つ ふえる(3つまで)', retry: 'ふりなおしが 1かい ただ', lucky: '4ぶんの1の かくりつで ×3', match: 'おなじ マークが 2つで ×2・3つで ×3', power: '×1.5', roulette: '×0.5・1・2・3・4の どれか', bomb: '×4。この ゲームは もう ふりなおせない', piggy: 'でるたびに、この めんの ばいりつが ＋0.3 たまる', dragon: 'ステージの 3ゲームめだけ ×3', star: 'この ゲームの ★の ききめが 2ばい', gem: 'でるたびに、この サイコロの うりねが ＋3' },
-    en: { gold: '+2 coins', plus: '+6 to the sum', seed: 'This face gains a ★ (max 3)', retry: '1 free re-roll', lucky: '1/4 chance: ×3', match: '2 same marks ×2, 3 same ×3', power: '×1.5', roulette: '×0.5, 1, 2, 3 or 4', bomb: '×4, but no more re-rolls this game', piggy: '+0.3 mult saved each time it shows', dragon: '×3 in the 3rd game of a stage', star: 'Doubles the ★ bonus this game', gem: '+3 sell value each time it shows' } });
+    ja: { gold: 'コイン＋2', plus: '合計点に＋6', seed: 'この面の★が1つふえる(3つまで)', retry: 'ふりなおしが1回無料', lucky: '4分の1の確率で ×3', match: '同じマークが2つで×2・3つで×3', power: '×1.5', roulette: '×0.5・1・1.5・2・2.5のどれか', bomb: '×3(ステージに1回)。このステージはもうふりなおせない', piggy: '出るたびに、この面の倍率が＋0.3たまる', dragon: 'ステージの3ゲームめだけ ×2.5', star: 'このゲームの★の効き目が2倍', gem: '出るたびに、このサイコロの売値＋3' },
+    ja_easy: { gold: 'コイン＋2', plus: 'ごうけいに ＋6', seed: 'この めんの ★が 1つ ふえる(3つまで)', retry: 'ふりなおしが 1かい ただ', lucky: '4ぶんの1の かくりつで ×3', match: 'おなじ マークが 2つで ×2・3つで ×3', power: '×1.5', roulette: '×0.5・1・1.5・2・2.5の どれか', bomb: '×3(ステージに 1かい)。この ステージは もう ふりなおせない', piggy: 'でるたびに、この めんの ばいりつが ＋0.3 たまる', dragon: 'ステージの 3ゲームめだけ ×2.5', star: 'この ゲームの ★の ききめが 2ばい', gem: 'でるたびに、この サイコロの うりねが ＋3' },
+    en: { gold: '+2 coins', plus: '+6 to the sum', seed: 'This face gains a ★ (max 3)', retry: '1 free re-roll', lucky: '1/4 chance: ×3', match: '2 same marks ×2, 3 same ×3', power: '×1.5', roulette: '×0.5, 1, 1.5, 2 or 2.5', bomb: '×3 (once per stage), but no more re-rolls this stage', piggy: '+0.3 mult saved each time it shows', dragon: '×2.5 in the 3rd game of a stage', star: 'Doubles the ★ bonus this game', gem: '+3 sell value each time it shows' } });
 // マークの絵はすべて自前のSVG(絵文字はパソコンによって出なかったり形が変わるため)
 const mkSvg = b => `<svg class="mi" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true">${b}</svg>`;
 const MARK_ICON = {
@@ -1447,18 +1464,18 @@ const MARK_ICON = {
 MARK_ICON.luckyhit = MARK_ICON.lucky;
 const MARK_COLOR = { gold: '#ffd84a', plus: '#7ee08a', seed: '#9ae66e', retry: '#7ad0ff', lucky: '#62d97e', match: '#ff9ad0', power: '#ffb04a', roulette: '#ff7ab8', bomb: '#ff6b5a', piggy: '#ffc46b', dragon: '#ffcf5a', star: '#8fb8ff', gem: '#6fe3e0' };
 const SKILL_NAME = langTable({
-    ja: { f1: '1の目', f2: '2の目', f3: '3の目', f4: '4の目', f5: '5の目', f6: '6の目', alleven: '全ぐうすう', allodd: '全きすう', le10: '10以下', ge11: '11以上', even: 'ぐうすう', odd: 'きすう', prime: 'そすう', m3: '3のばいすう', m4: '4のばいすう', m5: '5のばいすう', m6: '6のばいすう', allle3: '全部3以下', allge4: '全部4以上', norr: 'ノーふりなおし', rr2: 'ねばり', poor: 'つつましい', last: 'ラストゲーム', nohand: '役なし' },
-    ja_easy: { f1: '1の め', f2: '2の め', f3: '3の め', f4: '4の め', f5: '5の め', f6: '6の め', alleven: 'ぜんぶ ぐうすう', allodd: 'ぜんぶ きすう', le10: '10いか', ge11: '11いじょう', even: 'ぐうすう', odd: 'きすう', prime: 'そすう', m3: '3の ばいすう', m4: '4の ばいすう', m5: '5の ばいすう', m6: '6の ばいすう', allle3: 'ぜんぶ 3いか', allge4: 'ぜんぶ 4いじょう', norr: 'ふりなおし なし', rr2: 'ねばり', poor: 'つつましい', last: 'ラストゲーム', nohand: 'やくなし' },
-    en: { f1: 'Face 1', f2: 'Face 2', f3: 'Face 3', f4: 'Face 4', f5: 'Face 5', f6: 'Face 6', alleven: 'All Even', allodd: 'All Odd', le10: '10 or less', ge11: '11 or more', even: 'Even Sum', odd: 'Odd Sum', prime: 'Prime Sum', m3: 'Mult. of 3', m4: 'Mult. of 4', m5: 'Mult. of 5', m6: 'Mult. of 6', allle3: 'All 3 or Less', allge4: 'All 4 or More', norr: 'No Re-roll', rr2: 'Persistence', poor: 'Frugal', last: 'Last Game', nohand: 'No Hand' } });
+    ja: { f1: '1の目', f2: '2の目', f3: '3の目', f4: '4の目', f5: '5の目', f6: '6の目', alleven: '全ぐうすう', allodd: '全きすう', le10: '10以下', ge11: '11以上', even: 'ぐうすう', odd: 'きすう', prime: 'そすう', m3: '3のばいすう', m4: '4のばいすう', m5: '5のばいすう', m6: '6のばいすう', allle3: '全部3以下', allge4: '全部4以上', norr: 'ノーふりなおし', rr2: 'ねばり', poor: 'つつましい', last: '成長', nohand: '役なし' },
+    ja_easy: { f1: '1の め', f2: '2の め', f3: '3の め', f4: '4の め', f5: '5の め', f6: '6の め', alleven: 'ぜんぶ ぐうすう', allodd: 'ぜんぶ きすう', le10: '10いか', ge11: '11いじょう', even: 'ぐうすう', odd: 'きすう', prime: 'そすう', m3: '3の ばいすう', m4: '4の ばいすう', m5: '5の ばいすう', m6: '6の ばいすう', allle3: 'ぜんぶ 3いか', allge4: 'ぜんぶ 4いじょう', norr: 'ふりなおし なし', rr2: 'ねばり', poor: 'つつましい', last: 'せいちょう', nohand: 'やくなし' },
+    en: { f1: 'Face 1', f2: 'Face 2', f3: 'Face 3', f4: 'Face 4', f5: 'Face 5', f6: 'Face 6', alleven: 'All Even', allodd: 'All Odd', le10: '10 or less', ge11: '11 or more', even: 'Even Sum', odd: 'Odd Sum', prime: 'Prime Sum', m3: 'Mult. of 3', m4: 'Mult. of 4', m5: 'Mult. of 5', m6: 'Mult. of 6', allle3: 'All 3 or Less', allge4: 'All 4 or More', norr: 'No Re-roll', rr2: 'Persistence', poor: 'Frugal', last: 'Growth', nohand: 'No Hand' } });
 const SKILL_COND = langTable({
-    ja: { alleven: 'すべての目が ぐうすう', allodd: 'すべての目が きすう', le10: '和が 10以下', ge11: '和が 11以上', even: '和が ぐうすう', odd: '和が きすう', prime: '和が そすう（2,3,5,7,11,13,17）', m3: '和が 3のばいすう', m4: '和が 4のばいすう', m5: '和が 5のばいすう', m6: '和が 6のばいすう', allle3: 'すべての目が 3以下', allge4: 'すべての目が 4以上', norr: 'このゲームで ふりなおしを していない', rr2: 'このゲームで ふりなおしを 2回以上した', poor: 'コインが 10以下', last: 'ステージの 3ゲームめ(最後)', nohand: '役が なし' },
-    ja_easy: { alleven: 'ぜんぶの めが ぐうすう', allodd: 'ぜんぶの めが きすう', le10: 'ごうけいが 10いか', ge11: 'ごうけいが 11いじょう', even: 'ごうけいが ぐうすう', odd: 'ごうけいが きすう', prime: 'ごうけいが そすう（2,3,5,7,11,13,17）', m3: 'ごうけいが 3の ばいすう', m4: 'ごうけいが 4の ばいすう', m5: 'ごうけいが 5の ばいすう', m6: 'ごうけいが 6の ばいすう', allle3: 'ぜんぶの めが 3いか', allge4: 'ぜんぶの めが 4いじょう', norr: 'このゲームで ふりなおしを していない', rr2: 'このゲームで ふりなおしを 2かい いじょう した', poor: 'コインが 10いか', last: 'ステージの 3ゲームめ(さいご)', nohand: 'やくが なし' },
-    en: { alleven: 'All dice are even', allodd: 'All dice are odd', le10: 'Sum is 10 or less', ge11: 'Sum is 11 or more', even: 'Sum is even', odd: 'Sum is odd', prime: 'Sum is prime (2,3,5,7,11,13,17)', m3: 'Sum is a multiple of 3', m4: 'Sum is a multiple of 4', m5: 'Sum is a multiple of 5', m6: 'Sum is a multiple of 6', allle3: 'All dice are 3 or less', allge4: 'All dice are 4 or more', norr: 'You have not re-rolled this game', rr2: 'You re-rolled 2 or more times this game', poor: 'You have 10 coins or less', last: 'The 3rd (last) game of a stage', nohand: 'The hand is No Hand' } });
+    ja: { alleven: 'すべての目が ぐうすう', allodd: 'すべての目が きすう', le10: '和が 10以下', ge11: '和が 11以上', even: '和が ぐうすう', odd: '和が きすう', prime: '和が そすう（2,3,5,7,11,13,17）', m3: '和が 3のばいすう', m4: '和が 4のばいすう', m5: '和が 5のばいすう', m6: '和が 6のばいすう', allle3: 'すべての目が 3以下', allge4: 'すべての目が 4以上', norr: 'このゲームで ふりなおしを していない', rr2: 'このゲームで ふりなおしを 2回以上した', poor: 'コインが 10以下', last: 'いつも', nohand: '役が なし' },
+    ja_easy: { alleven: 'ぜんぶの めが ぐうすう', allodd: 'ぜんぶの めが きすう', le10: 'ごうけいが 10いか', ge11: 'ごうけいが 11いじょう', even: 'ごうけいが ぐうすう', odd: 'ごうけいが きすう', prime: 'ごうけいが そすう（2,3,5,7,11,13,17）', m3: 'ごうけいが 3の ばいすう', m4: 'ごうけいが 4の ばいすう', m5: 'ごうけいが 5の ばいすう', m6: 'ごうけいが 6の ばいすう', allle3: 'ぜんぶの めが 3いか', allge4: 'ぜんぶの めが 4いじょう', norr: 'このゲームで ふりなおしを していない', rr2: 'このゲームで ふりなおしを 2かい いじょう した', poor: 'コインが 10いか', last: 'いつも', nohand: 'やくが なし' },
+    en: { alleven: 'All dice are even', allodd: 'All dice are odd', le10: 'Sum is 10 or less', ge11: 'Sum is 11 or more', even: 'Sum is even', odd: 'Sum is odd', prime: 'Sum is prime (2,3,5,7,11,13,17)', m3: 'Sum is a multiple of 3', m4: 'Sum is a multiple of 4', m5: 'Sum is a multiple of 5', m6: 'Sum is a multiple of 6', allle3: 'All dice are 3 or less', allge4: 'All dice are 4 or more', norr: 'You have not re-rolled this game', rr2: 'You re-rolled 2 or more times this game', poor: 'You have 10 coins or less', last: 'Always', nohand: 'The hand is No Hand' } });
 // スキルのアイコンの文字(2行のときは \n)
 const SKILL_GLYPH = {
-    ja:      { alleven: '全偶', allodd: '全奇', even: '偶', odd: '奇', prime: '素', m3: '3倍', m4: '4倍', m5: '5倍', m6: '6倍', allle3: '全小', allge4: '全大', norr: '🔄✕', rr2: '🔄2+', poor: '🪙\n10↓', last: '最終', nohand: '無役' },
-    ja_easy: { alleven: 'ぜん\nぐう', allodd: 'ぜん\nき', even: 'ぐう', odd: 'き', prime: 'そ', m3: '3の\nばい', m4: '4の\nばい', m5: '5の\nばい', m6: '6の\nばい', allle3: 'ぜん\nしょう', allge4: 'ぜん\nだい', norr: '🔄✕', rr2: '🔄2+', poor: '🪙\n10↓', last: 'さいご', nohand: 'やく\nなし' },
-    en:      { alleven: 'ALL\nEVEN', allodd: 'ALL\nODD', even: 'EVEN', odd: 'ODD', prime: 'PRIME', m3: 'MULT\n3', m4: 'MULT\n4', m5: 'MULT\n5', m6: 'MULT\n6', allle3: 'ALL\n≤3', allge4: 'ALL\n≥4', norr: '🔄✕', rr2: '🔄2+', poor: '🪙\n≤10', last: 'LAST', nohand: 'NO\nHAND' }
+    ja:      { alleven: '全偶', allodd: '全奇', even: '偶', odd: '奇', prime: '素', m3: '3倍', m4: '4倍', m5: '5倍', m6: '6倍', allle3: '全小', allge4: '全大', norr: '🔄✕', rr2: '🔄2+', poor: '🪙\n10↓', last: '成長', nohand: '無役' },
+    ja_easy: { alleven: 'ぜん\nぐう', allodd: 'ぜん\nき', even: 'ぐう', odd: 'き', prime: 'そ', m3: '3の\nばい', m4: '4の\nばい', m5: '5の\nばい', m6: '6の\nばい', allle3: 'ぜん\nしょう', allge4: 'ぜん\nだい', norr: '🔄✕', rr2: '🔄2+', poor: '🪙\n10↓', last: 'せい\nちょう', nohand: 'やく\nなし' },
+    en:      { alleven: 'ALL\nEVEN', allodd: 'ALL\nODD', even: 'EVEN', odd: 'ODD', prime: 'PRIME', m3: 'MULT\n3', m4: 'MULT\n4', m5: 'MULT\n5', m6: 'MULT\n6', allle3: 'ALL\n≤3', allge4: 'ALL\n≥4', norr: '🔄✕', rr2: '🔄2+', poor: '🪙\n≤10', last: 'GROW', nohand: 'NO\nHAND' }
 };
 const TYPE_NAME = langTable({
     ja: { normal: 'ノーマル', onepair: 'ワンペア', trio: 'トリオ', twopair: 'ツーペア', fullhouse: 'フルハウス', threepair: 'スリーペア', doubletrio: 'ダブルトリオ', charm: 'お守り', ones: 'ピンだけ' },
@@ -1505,12 +1522,14 @@ function skillIcon(id, mode){
 }
 const TYPE_COLOR = { normal: '#b4aee0', onepair: '#58b0ff', trio: '#62d97e', twopair: '#35d0c0', fullhouse: '#b08cff', threepair: '#ff7ab8', doubletrio: '#ffc93d', charm: '#ff8a5c', ones: '#8f9bb8' };
 function fm(m){ return String(Number(m.toFixed(2))); }
-function skillMultAt(id, lv){
+function skillMultAt(id, lv, g){
     const k = SKILL_BY_ID[id], r = lvRate(lv);
+    if (k.kind === 'grow') return 1;
     return k.kind === 'face' ? 1 + k.x * r : 1 + (k.m - 1) * r;
 }
 function skillDesc(id, lv){
     const k = SKILL_BY_ID[id];
+    if (k.kind === 'grow') return tx('skill_grow', Math.round(growChance(lv) * 100));
     return k.kind === 'face' ? tx('skill_face', k.n, fm(skillMultAt(id, lv))) : tx('skill_cond', SKILL_COND[id], fm(skillMultAt(id, lv)));
 }
 function toast(msg){ const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; $('container').appendChild(t); setTimeout(() => t.remove(), 1800); }
@@ -1536,15 +1555,15 @@ function dieFaceHtml(v, stars, cls, style, die, mark){
     for (let i = 0; i < 9; i++) p += `<i class="${PIP_POS[v].indexOf(i) >= 0 ? 'on' : ''}"></i>`;
     const st = stars ? `<div class="dst">${STAR_SVG.repeat(stars)}</div>` : '';
     const tc = die ? ` t-${die.type}${die.starTotal >= 4 ? ' glow' : ''}` : '';
-    const mk = mark ? `<div class="dmk${mark === 'luckyhit' ? ' lhit' : ''}" data-mk="${baseMark(mark)}">${MARK_ICON[baseMark(mark)]}</div>` : '';
+    const mk = mark ? `<div class="dmk${mark === 'luckyhit' ? ' lhit' : ''}${mark === 'bombx' ? ' used' : ''}" data-mk="${baseMark(mark)}">${MARK_ICON[baseMark(mark)]}</div>` : '';
     return `<div class="df ${cls || ''}${tc}${v === 1 ? ' one' : ''}" style="--pc:${PIP_COLOR[v]};${style || ''}"><div class="pips">${p}</div>${st}${mk}</div>`;
 }
 function faceCell(v, s, size, hit, mark, click){
-    return `<div class="fc ${size}${s ? ' s' : ''}${hit ? ' hit' : ''}${mark ? ' has-mk' : ''}" style="--c:${FACE_COLOR[v]}"${click ? ` onclick="${click}"` : ''}>${mark ? `<span class="fmk" data-mk="${baseMark(mark)}">${MARK_ICON[mark]}</span>` : ''}<b>${v}</b><i>${s ? '★'.repeat(s) : ''}</i></div>`;
+    return `<div class="fc ${size}${s ? ' s' : ''}${hit ? ' hit' : ''}${mark ? ' has-mk' : ''}" style="--c:${FACE_COLOR[v]}"${click ? ` onclick="${click}"` : ''}>${mark ? `<span class="fmk${mark === 'bombx' ? ' used' : ''}" data-mk="${baseMark(mark)}">${MARK_ICON[baseMark(mark)]}</span>` : ''}<b>${v}</b><i>${s ? '★'.repeat(s) : ''}</i></div>`;
 }
 // click: 面ごとに呼ぶ関数名(マークをつけるとき)。fn(サイコロのid, 面の番号)
 function facesHtml(d, size, hitIdx, click){
-    return `<div class="faces${size === 'xl' ? ' g3' : ''}">` + d.faces.map((v, i) => faceCell(v, d.stars[i], size, i === hitIdx, d.marks && d.marks[i], click ? `${click}(${d.id},${i})` : '')).join('') + '</div>';
+    return `<div class="faces${size === 'xl' ? ' g3' : ''}">` + d.faces.map((v, i) => faceCell(v, d.stars[i], size, i === hitIdx, d.marks && markAt(d, i), click ? `${click}(${d.id},${i})` : '')).join('') + '</div>';
 }
 // サイコロカード。o: { size:'md'|'lg', inuse, tagN, click, sell, foot }
 function dieCardHtml(d, o){
@@ -1954,7 +1973,8 @@ function stageHtml(ds, r){
 }
 // ---- 1ゲームのはじまり: コインを もらう ----
 function beginGame(){
-    run.coins += GAME_COIN; run.gameRerolls = 0; run.freeRerolls = 0; run.bombLock = false;
+    run.coins += GAME_COIN; run.gameRerolls = 0; run.freeRerolls = 0;
+    if (run.gameNo === 1){ run.bombLock = false; run.dice.forEach(d => d.bombUsed = null); }   // ばくだんは ステージごとに 復活
     run.phase = 'ready'; run.pending = 0; run.cur = null; run.curRes = null;
     renderPlay();
     bumpCoin();
@@ -1983,7 +2003,7 @@ function skillPanelHtml(id, lv, o){
     const c = skillColor(id);
     return `<div class="sk${o.cls ? ' ' + o.cls : ''}" id="${o.noId ? '' : 'sk-' + id}" style="--c:${c}"><div class="sk-ic">${skillIcon(id, o.icon || false)}</div>
         <div class="sk-mid"><div class="sk-nm">${SKILL_NAME[id]}</div><div class="lvp">${[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => `<i class="${n <= lv ? 'on' : ''}"></i>`).join('')}</div></div>
-        <div class="sk-ml">×${fm(skillMultAt(id, lv))}</div>${o.tag ? `<div class="tag-n">${o.tag}</div>` : ''}</div>`;
+        <div class="sk-ml">${SKILL_BY_ID[id].kind === 'grow' ? Math.round(growChance(lv) * 100) + '%' : '×' + fm(skillMultAt(id, lv))}</div>${o.tag ? `<div class="tag-n">${o.tag}</div>` : ''}</div>`;
 }
 function renderSkills(){
     $('skill-list').innerHTML = run.equipped.map(id => id ? skillPanelHtml(id, run.skillLv[id], { icon: 'big' }) : '<div class="sk empty">＋</div>').join('');
@@ -2249,6 +2269,13 @@ function afterResult(){
     run.total += run.pending;
     run.sumScore += run.pending;
     run.usedRoles.push(run.curRes.role);
+    // 成長: つけている ほかのスキルが 1つずつ 抽選で Lv+1
+    if (run.equipped.indexOf('last') >= 0 && run.skillLv.last){
+        const p = growChance(run.skillLv.last), ups = [];
+        run.equipped.forEach(id => { if (!id || id === 'last' || (run.skillLv[id] || 0) >= SKILL_MAX_LV) return;
+            if (Math.random() < p){ run.skillLv[id]++; ups.push(`${SKILL_NAME[id]} Lv${run.skillLv[id]}`); } });
+        if (ups.length){ toast(tx('grow_up', ups.join('・'))); SFX.play('ok'); renderSkills(); }
+    }
     // 金: コイン / たね: その面の★が1つふえる
     { const { r, ds } = run.cur; let gold = 0;
       r.mk.forEach((m, i) => {
@@ -2256,6 +2283,7 @@ function afterResult(){
           if (m === 'seed'){ const d = ds[i], f = r.idx[i]; if (d.stars[f] < MAX_STAR_PER_FACE){ d.stars[f]++; recountStars(d); } }
           if (baseMark(m) === 'piggy'){ const d = ds[i], f = r.idx[i]; d.pig = d.pig || [0, 0, 0, 0, 0, 0]; d.pig[f]++; }      // ちょきん: たまる
           if (m === 'gem') ds[i].gem = (ds[i].gem || 0) + GEM_SELL;                                                            // ほうせき: 売値が上がる
+          if (m === 'bomb'){ const d = ds[i]; d.bombUsed = d.bombUsed || [false, false, false, false, false, false]; d.bombUsed[r.idx[i]] = true; }   // ばくだん: このステージは もう効かない
       });
       if (gold){ run.coins += gold; $('hud-coin').textContent = run.coins; bumpCoin(); SFX.play('coin'); } }
     if (run.pending > run.bestGame){ run.bestGame = run.pending; run.bestRole = run.curRes.role; }
@@ -2281,7 +2309,7 @@ function renderPick(){
         const id = o.id, lv = run.skillLv[id] || 0, maxed = lv >= SKILL_MAX_LV, nl = Math.min(SKILL_MAX_LV, lv + o.up);
         return `<div class="pk${o.up > 1 ? ' rare' : ''}" style="--c:${skillColor(id)}" onclick="pickSkill('${id}',${o.up})">${o.up > 1 ? '<div class="pk-rare">Lv+2！</div>' : ''}<div class="pk-top">${skillIcon(id, 'big')}<div class="pk-lv${lv ? '' : ' new'}">${lv ? (maxed ? `Lv${lv} MAX` : `Lv${lv} → ${nl}`) : `NEW！ Lv${nl}`}</div></div>
             <div class="pk-body"><div class="pk-name">${SKILL_NAME[id]}</div><div class="pk-desc">${skillDesc(id, nl)}</div>
-            <div class="pk-ml"><small>${tx('mult_label')}</small>×${fm(skillMultAt(id, nl))}</div></div></div>`;
+            <div class="pk-ml">${SKILL_BY_ID[id].kind === 'grow' ? `<small>${tx('rate_label')}</small>${Math.round(growChance(nl) * 100)}%` : `<small>${tx('mult_label')}</small>×${fm(skillMultAt(id, nl))}`}</div></div></div>`;
     }).join('');
     const rb = $('btn-reload');
     rb.parentElement.style.display = RULES.autoSkill ? 'none' : '';      // 何も考えずに走れ！: スキルは選べない(リロードもない)
