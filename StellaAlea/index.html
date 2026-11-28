@@ -936,29 +936,62 @@ const MARKS = [
     { id: 'retry', w: 15, sell: 2 },   // このゲームのふりなおしが1回無料
     { id: 'lucky', w: 12, sell: 2 },   // 4回に1回、倍率×3
     { id: 'match', w: 10, sell: 3 },   // 出た面に同じマークが2つで×2、3つで×3
-    { id: 'power', w: 8,  sell: 3 }    // 倍率×1.5
+    { id: 'power', w: 8,  sell: 3 },   // 倍率×1.5
+    { id: 'roulette', w: 8,  sell: 3 }, // ×0.5・1・2・3・4のどれか(各20%)
+    { id: 'bomb',  w: 6,  sell: 3 },   // ×4。このゲームはもうふりなおせない
+    { id: 'piggy', w: 10, sell: 2 },   // ちょきん: 出るたびに、この面の倍率が+0.3ずつたまる(ずっと残る)
+    { id: 'dragon', w: 8, sell: 3 },   // ステージの3ゲームめだけ ×3
+    { id: 'star',  w: 8,  sell: 2 },   // ながれぼし: このゲームの★の効き目が2倍
+    { id: 'gem',   w: 10, sell: 2 }    // ほうせき: 出るたびに、このサイコロの売値+3
 ];
 const MARK_BY_ID = {}; MARKS.forEach(m => MARK_BY_ID[m.id] = m);
 const MARK_COUNT_W = [45, 40, 15];       // ガチャのサイコロにつくマークの数 0/1/2個の確率(%)
 const GOLD_COIN = 2, PLUS_POINT = 6, POWER_MULT = 1.5, LUCKY_RATE = 0.25, LUCKY_MULT = 3, MARK_PRICE = 15;
+const ROULETTE = [0.5, 1, 2, 3, 4], BOMB_MULT = 4, PIGGY_STEP = 0.3, DRAGON_MULT = 3, GEM_SELL = 3;
 function randomMark(rnd){ return MARKS[pickW(MARKS, rnd)].id; }
-// 出た面のマーク。ラッキーは、ふった時に当たり('luckyhit')かどうかを決める
-function rollMark(m, rnd){ return m === 'lucky' && rnd() < LUCKY_RATE ? 'luckyhit' : m; }
-const baseMark = m => m === 'luckyhit' ? 'lucky' : m;
+// 出た面のマーク。ふった時に決まる結果を文字に入れる: ラッキーの当たり='luckyhit'、ルーレット='roulette:倍率'、ちょきん='piggy:倍率'
+const piggyMult = (d, f) => 1 + PIGGY_STEP * (((d.pig && d.pig[f]) || 0) + 1);
+function rollMark(d, f, rnd){
+    const m = d.marks[f];
+    if (m === 'lucky') return rnd() < LUCKY_RATE ? 'luckyhit' : m;
+    if (m === 'roulette') return 'roulette:' + ROULETTE[Math.floor(rnd() * ROULETTE.length)];
+    if (m === 'piggy') return 'piggy:' + piggyMult(d, f);
+    return m;
+}
+// その面のマークの、起こりうる結果と確率 [[結果, 確率], ...](ふりなおしの期待値用)
+function markOutcomes(d, f){
+    const m = d.marks[f];
+    if (m === 'lucky') return [['lucky', 1 - LUCKY_RATE], ['luckyhit', LUCKY_RATE]];
+    if (m === 'roulette') return ROULETTE.map(x => ['roulette:' + x, 1 / ROULETTE.length]);
+    if (m === 'piggy') return [['piggy:' + piggyMult(d, f), 1]];
+    return [[m, 1]];
+}
+// 期待値の計算用のマーク(ちょきんは今の倍率、ルーレット・ラッキーはそのまま=期待値で数える)
+const expMark = (d, f) => d.marks[f] === 'piggy' ? 'piggy:' + piggyMult(d, f) : d.marks[f];
+const baseMark = m => !m ? m : m === 'luckyhit' ? 'lucky' : m.split(':')[0];
+const markVal = m => Number(m.split(':')[1]);
 // 3つの面のマークから {plus: 足す点, mul: 倍率, parts: 式に出すもの}。luckyExp: ラッキーを期待値(当たり確率込み)で数える
-function markEffect(mk, luckyExp){
+function markEffect(mk, luckyExp, final){
     let plus = 0, mul = 1; const parts = [];
     const n = id => mk.filter(m => m === id).length;
+    const nb = id => mk.filter(m => baseMark(m) === id).length;
     const np = n('plus'); if (np){ plus = PLUS_POINT * np; }
     const nw = n('power'); if (nw){ const m = Math.pow(POWER_MULT, nw); mul *= m; parts.push({ id: 'power', mult: m, cnt: nw }); }
     const nl = luckyExp ? n('lucky') : n('luckyhit');
     if (nl){ const m = Math.pow(luckyExp ? 1 + LUCKY_RATE * (LUCKY_MULT - 1) : LUCKY_MULT, nl); mul *= m; if (!luckyExp) parts.push({ id: 'lucky', mult: m, cnt: nl }); }
+    // ルーレット: 期待値では(0.5+1+2+3+4)/5
+    mk.forEach(m => { if (baseMark(m) !== 'roulette') return;
+        const x = m.indexOf(':') > 0 ? markVal(m) : ROULETTE.reduce((a, b) => a + b, 0) / ROULETTE.length;
+        mul *= x; if (m.indexOf(':') > 0) parts.push({ id: 'roulette', mult: x }); });
+    const nbo = n('bomb'); if (nbo){ const m = Math.pow(BOMB_MULT, nbo); mul *= m; parts.push({ id: 'bomb', mult: m, cnt: nbo }); }
+    mk.forEach(m => { if (baseMark(m) === 'piggy' && m.indexOf(':') > 0){ const x = markVal(m); mul *= x; parts.push({ id: 'piggy', mult: x }); } });
+    const nd = n('dragon'); if (nd && final){ const m = Math.pow(DRAGON_MULT, nd); mul *= m; parts.push({ id: 'dragon', mult: m, cnt: nd }); }
     if (mk.indexOf('match') >= 0){
         const cnt = {}; let top = 0;
         mk.forEach(m => { if (m){ const b = baseMark(m); cnt[b] = (cnt[b] || 0) + 1; top = Math.max(top, cnt[b]); } });
         if (top >= 2){ const m = top >= 3 ? 3 : 2; mul *= m; parts.push({ id: 'match', mult: m }); }
     }
-    return { plus, mul, parts };
+    return { plus, mul, parts, starX: Math.pow(2, n('star')) };
 }
 
 function pickW(arr, rnd){
@@ -1018,7 +1051,7 @@ function gachaDie(rnd){
     return makeDie(type, faces, scatterStars(starCountFor(rnd), rnd), marks);
 }
 function sellValue(d){
-    const mk = (d.marks || []).reduce((s, m) => s + (m ? MARK_BY_ID[m].sell : 0), 0);
+    const mk = (d.marks || []).reduce((s, m) => s + (m ? MARK_BY_ID[m].sell : 0), 0) + (d.gem || 0);
     if (d.starTotal === 0) return 1 + mk;
     return Math.max(1, Math.round(DICE_TYPE_BY_ID[d.type].sell * STAR_SELL_FACTOR[Math.min(5, d.starTotal - 1)])) + mk;
 }
@@ -1027,7 +1060,7 @@ function sellValue(d){
 // v: 出た目3つ  st: その面の☆3つ  skillLv: {id:Lv}  roleLv: {id:Lv}  mk: その面のマーク3つ
 function calcScore(v, st, skillLv, roleLv, ctx, mk){
     const sum = v[0] + v[1] + v[2];
-    const me = markEffect(mk || [null, null, null], false);
+    const me = markEffect(mk || [null, null, null], false, !!(ctx && ctx.final));
     const role = judgeRole(v);
     const sc = skillCtx(role, ctx);
     const rm = roleRepeat(role, sc) ? 0 : roleMult(role, roleLv[role] || 1);
@@ -1044,13 +1077,13 @@ function calcScore(v, st, skillLv, roleLv, ctx, mk){
         }
     });
     const starCount = st[0] + st[1] + st[2];
-    const starMul = 1 + STAR_MULT_STEP * starCount;
+    const starMul = 1 + STAR_MULT_STEP * starCount * me.starX;     // ながれぼしで★の効き目が2倍
     const total = Math.round((sum + me.plus) * rm * skillMul * starMul * me.mul);
     return { sum, plus: me.plus, role, roleMult: rm, parts, skillMul, starCount, starMul, markParts: me.parts, markMul: me.mul, total };
 }
 function rollDice(dice, rnd){
     const idx = dice.map(d => Math.floor(rnd() * 6));
-    return { idx, v: dice.map((d, i) => d.faces[idx[i]]), st: dice.map((d, i) => d.stars[idx[i]]), mk: dice.map((d, i) => rollMark(d.marks[idx[i]], rnd)) };
+    return { idx, v: dice.map((d, i) => d.faces[idx[i]]), st: dice.map((d, i) => d.stars[idx[i]]), mk: dice.map((d, i) => rollMark(d, idx[i], rnd)) };
 }
 // 3つのサイコロの期待得点(216通りを全部数える。calcScoreと同じ式を軽くしたもの)
 function expectedScore(dice, skillLv, roleLv, ctx){
@@ -1061,8 +1094,8 @@ function expectedScore(dice, skillLv, roleLv, ctx){
         const v = [dice[0].faces[a], dice[1].faces[b], dice[2].faces[c]];
         const sum = v[0] + v[1] + v[2];
         const role = judgeRole(v), sc = skillCtx(role, ctx);
-        const me = markEffect([dice[0].marks[a], dice[1].marks[b], dice[2].marks[c]], true);
-        let m = (roleRepeat(role, sc) ? 0 : rm[role]) * (1 + STAR_MULT_STEP * (dice[0].stars[a] + dice[1].stars[b] + dice[2].stars[c])) * me.mul;
+        const me = markEffect([expMark(dice[0], a), expMark(dice[1], b), expMark(dice[2], c)], true, sc.final);
+        let m = (roleRepeat(role, sc) ? 0 : rm[role]) * (1 + STAR_MULT_STEP * me.starX * (dice[0].stars[a] + dice[1].stars[b] + dice[2].stars[c])) * me.mul;
         for (let i = 0; i < act.length; i++){
             const k = act[i].k, rate = act[i].r;
             if (k.kind === 'face'){ const cnt = (v[0] === k.n) + (v[1] === k.n) + (v[2] === k.n); if (cnt) m *= Math.pow(1 + k.x * rate, cnt); }
@@ -1085,8 +1118,8 @@ const TARGETS_FULL = [
 // 序盤のステージほど、難易度(★・RUN)によるボーダーの差を小さくする(ステージ1で高得点を出すのは難しいため)。
 // ★1のボーダーを土台にして、差の倍率を ステージごとの重み(EARLY_W)乗する
 const EARLY_W = [0.25, 0.4, 0.55, 0.7, 0.85, 1, 1];
-// 面マーク・とびかいだんを入れ、同じ数字3つのサイコロをなくしたときに、ボットの★1クリア率が約82%に下がったので、全体を0.92倍にした(sim4.js)
-const BORDER_ADJ = 0.92;
+// 全体のボーダーの倍率。面マーク・とびかいだんを入れて同じ数字3つのサイコロをなくしたとき0.92倍にしたが、マークを13種にしたら★1クリア率が0.92倍で約95%・1倍で約84%になったので、あいだの0.96倍にした(sim4.js)
+const BORDER_ADJ = 0.96;
 const TARGETS = TARGETS_FULL.map((row, k) => row.map((v, i) => Math.round(BORDER_ADJ * (k === 0 ? v : TARGETS_FULL[0][i] * Math.pow(v / TARGETS_FULL[0][i], EARLY_W[i])))));
 const RUN_RULES = {
     basic:   {},
@@ -1141,7 +1174,7 @@ function clearBonus(total, border){ return total >= border * 2 ? 5 * Math.floor(
 function clearCoins(total, border){ return (CLEAR_COIN + (total && border ? clearBonus(total, border) : 0)) * (RULES.coinMul || 1); }
 // ふりなおしのコスト(このゲームでn回目をふるとき)。Infinity=できない
 // free: リターンのマークで手に入れた無料ぶん
-function rerollCostAt(done, free){ return RULES.noReroll ? Infinity : (free > 0 || (RULES.firstRerollFree && done === 0) ? 0 : REROLL_COST); }
+function rerollCostAt(done, free, bomb){ return RULES.noReroll || bomb ? Infinity : (free > 0 || (RULES.firstRerollFree && done === 0) ? 0 : REROLL_COST); }
 function roleUpCost(buys){ return ROLE_COST_BASE + ROLE_COST_STEP * buys; }
 function roleUpPrice(buys, onSale){ const c = roleUpCost(buys); return onSale ? Math.ceil(c * ROLE_SALE_RATE) : c; }
 // スキルえらびの3枚。{id, up}: upは上がるレベル(ふつう1、10%で2)
@@ -1159,18 +1192,14 @@ function rerollEval(ds, r, skillLv, roleLv, ctx){
     ctx = ctx || {};
     const mk = r.mk || [null, null, null];
     const cur = calcScore(r.v, r.st, skillLv, roleLv, ctx, mk).total;
+    if (mk.indexOf('bomb') >= 0) return { i: -1, exp: cur, cur };
     const c2 = Object.assign({}, ctx, { rerolls: (ctx.rerolls || 0) + 1, coins: (ctx.coins === undefined ? 99 : ctx.coins) - rerollCostAt(ctx.rerolls || 0, ctx.free || 0) });
     let bi = -1, bv = cur;
     for (let i = 0; i < 3; i++){
         let t = 0;
         for (let f = 0; f < 6; f++){
             const v = r.v.slice(), st = r.st.slice(), m2 = mk.slice(); v[i] = ds[i].faces[f]; st[i] = ds[i].stars[f];
-            const fm0 = ds[i].marks[f];
-            if (fm0 === 'lucky'){
-                m2[i] = 'lucky'; const lo = calcScore(v, st, skillLv, roleLv, c2, m2).total;
-                m2[i] = 'luckyhit'; const hi = calcScore(v, st, skillLv, roleLv, c2, m2).total;
-                t += lo + (hi - lo) * LUCKY_RATE;
-            } else { m2[i] = fm0; t += calcScore(v, st, skillLv, roleLv, c2, m2).total; }
+            markOutcomes(ds[i], f).forEach(([m, pr]) => { m2[i] = m; t += pr * calcScore(v, st, skillLv, roleLv, c2, m2).total; });
         }
         t /= 6;
         if (t > bv){ bv = t; bi = i; }
@@ -1390,15 +1419,15 @@ const ROLE_NAME = langTable({
     ja_easy: { none: 'やくなし', pair: 'ペア', stairs: 'かいだん', tobi: 'とびかいだん', zorome: 'ぞろめ', pinzoro: 'ピンゾロ' },
     en: { none: 'No Hand', pair: 'Pair', stairs: 'Straight', tobi: 'Skip Straight', zorome: 'Triple', pinzoro: 'Triple 1s' } });
 const MARK_NAME = langTable({
-    ja: { gold: '金', plus: 'プラス', seed: 'たね', retry: 'リターン', lucky: 'ラッキー', match: 'おそろい', power: 'パワー' },
-    ja_easy: { gold: 'きん', plus: 'プラス', seed: 'たね', retry: 'リターン', lucky: 'ラッキー', match: 'おそろい', power: 'パワー' },
-    en: { gold: 'Gold', plus: 'Plus', seed: 'Seed', retry: 'Retry', lucky: 'Lucky', match: 'Match', power: 'Power' } });
+    ja: { gold: '金', plus: 'プラス', seed: 'たね', retry: 'リターン', lucky: 'ラッキー', match: 'おそろい', power: 'パワー', roulette: 'ルーレット', bomb: 'ばくだん', piggy: 'ちょきん', dragon: 'ドラゴン', star: 'ながれぼし', gem: 'ほうせき' },
+    ja_easy: { gold: 'きん', plus: 'プラス', seed: 'たね', retry: 'リターン', lucky: 'ラッキー', match: 'おそろい', power: 'パワー', roulette: 'ルーレット', bomb: 'ばくだん', piggy: 'ちょきん', dragon: 'ドラゴン', star: 'ながれぼし', gem: 'ほうせき' },
+    en: { gold: 'Gold', plus: 'Plus', seed: 'Seed', retry: 'Retry', lucky: 'Lucky', match: 'Match', power: 'Power', roulette: 'Roulette', bomb: 'Bomb', piggy: 'Savings', dragon: 'Dragon', star: 'Shooting Star', gem: 'Gem' } });
 const MARK_DESC = langTable({
-    ja: { gold: 'コイン＋2', plus: '合計点に＋6', seed: 'この面の★が1つふえる(3つまで)', retry: 'ふりなおしが1回無料', lucky: '4分の1の確率で ×3', match: '同じマークが2つで×2・3つで×3', power: '×1.5' },
-    ja_easy: { gold: 'コイン＋2', plus: 'ごうけいに ＋6', seed: 'この めんの ★が 1つ ふえる(3つまで)', retry: 'ふりなおしが 1かい ただ', lucky: '4ぶんの1の かくりつで ×3', match: 'おなじ マークが 2つで ×2・3つで ×3', power: '×1.5' },
-    en: { gold: '+2 coins', plus: '+6 to the sum', seed: 'This face gains a ★ (max 3)', retry: '1 free re-roll', lucky: '1/4 chance: ×3', match: '2 same marks ×2, 3 same ×3', power: '×1.5' } });
-const MARK_ICON = { gold: '🪙', plus: '➕', seed: '🌱', retry: '🔄', lucky: '🍀', luckyhit: '🍀', match: '🔗', power: '⚡' };
-const MARK_COLOR = { gold: '#ffd84a', plus: '#7ee08a', seed: '#9ae66e', retry: '#7ad0ff', lucky: '#62d97e', match: '#ff9ad0', power: '#ffb04a' };
+    ja: { gold: 'コイン＋2', plus: '合計点に＋6', seed: 'この面の★が1つふえる(3つまで)', retry: 'ふりなおしが1回無料', lucky: '4分の1の確率で ×3', match: '同じマークが2つで×2・3つで×3', power: '×1.5', roulette: '×0.5・1・2・3・4のどれか', bomb: '×4。このゲームはもうふりなおせない', piggy: '出るたびに、この面の倍率が＋0.3たまる', dragon: 'ステージの3ゲームめだけ ×3', star: 'このゲームの★の効き目が2倍', gem: '出るたびに、このサイコロの売値＋3' },
+    ja_easy: { gold: 'コイン＋2', plus: 'ごうけいに ＋6', seed: 'この めんの ★が 1つ ふえる(3つまで)', retry: 'ふりなおしが 1かい ただ', lucky: '4ぶんの1の かくりつで ×3', match: 'おなじ マークが 2つで ×2・3つで ×3', power: '×1.5', roulette: '×0.5・1・2・3・4の どれか', bomb: '×4。この ゲームは もう ふりなおせない', piggy: 'でるたびに、この めんの ばいりつが ＋0.3 たまる', dragon: 'ステージの 3ゲームめだけ ×3', star: 'この ゲームの ★の ききめが 2ばい', gem: 'でるたびに、この サイコロの うりねが ＋3' },
+    en: { gold: '+2 coins', plus: '+6 to the sum', seed: 'This face gains a ★ (max 3)', retry: '1 free re-roll', lucky: '1/4 chance: ×3', match: '2 same marks ×2, 3 same ×3', power: '×1.5', roulette: '×0.5, 1, 2, 3 or 4', bomb: '×4, but no more re-rolls this game', piggy: '+0.3 mult saved each time it shows', dragon: '×3 in the 3rd game of a stage', star: 'Doubles the ★ bonus this game', gem: '+3 sell value each time it shows' } });
+const MARK_ICON = { gold: '🪙', plus: '➕', seed: '🌱', retry: '🔄', lucky: '🍀', luckyhit: '🍀', match: '🔗', power: '⚡', roulette: '🎰', bomb: '💣', piggy: '💰', dragon: '🐉', star: '🌠', gem: '💎' };
+const MARK_COLOR = { gold: '#ffd84a', plus: '#7ee08a', seed: '#9ae66e', retry: '#7ad0ff', lucky: '#62d97e', match: '#ff9ad0', power: '#ffb04a', roulette: '#ff7ab8', bomb: '#ff6b5a', piggy: '#ffc46b', dragon: '#c27cff', star: '#8fb8ff', gem: '#6fe3e0' };
 const SKILL_NAME = langTable({
     ja: { f1: '1の目', f2: '2の目', f3: '3の目', f4: '4の目', f5: '5の目', f6: '6の目', alleven: '全ぐうすう', allodd: '全きすう', le10: '10以下', ge11: '11以上', even: 'ぐうすう', odd: 'きすう', prime: 'そすう', m3: '3のばいすう', m4: '4のばいすう', m5: '5のばいすう', m6: '6のばいすう', allle3: '全部3以下', allge4: '全部4以上', norr: 'ノーふりなおし', rr2: 'ねばり', poor: 'つつましい', last: 'ラストゲーム', nohand: '役なし' },
     ja_easy: { f1: '1の め', f2: '2の め', f3: '3の め', f4: '4の め', f5: '5の め', f6: '6の め', alleven: 'ぜんぶ ぐうすう', allodd: 'ぜんぶ きすう', le10: '10いか', ge11: '11いじょう', even: 'ぐうすう', odd: 'きすう', prime: 'そすう', m3: '3の ばいすう', m4: '4の ばいすう', m5: '5の ばいすう', m6: '6の ばいすう', allle3: 'ぜんぶ 3いか', allge4: 'ぜんぶ 4いじょう', norr: 'ふりなおし なし', rr2: 'ねばり', poor: 'つつましい', last: 'ラストゲーム', nohand: 'やくなし' },
@@ -1489,7 +1518,7 @@ function dieFaceHtml(v, stars, cls, style, die, mark){
     for (let i = 0; i < 9; i++) p += `<i class="${PIP_POS[v].indexOf(i) >= 0 ? 'on' : ''}"></i>`;
     const st = stars ? `<div class="dst">${STAR_SVG.repeat(stars)}</div>` : '';
     const tc = die ? ` t-${die.type}${die.starTotal >= 4 ? ' glow' : ''}` : '';
-    const mk = mark ? `<div class="dmk${mark === 'luckyhit' ? ' lhit' : ''}" data-mk="${baseMark(mark)}">${MARK_ICON[mark]}</div>` : '';
+    const mk = mark ? `<div class="dmk${mark === 'luckyhit' ? ' lhit' : ''}" data-mk="${baseMark(mark)}">${MARK_ICON[baseMark(mark)]}</div>` : '';
     return `<div class="df ${cls || ''}${tc}${v === 1 ? ' one' : ''}" style="--pc:${PIP_COLOR[v]};${style || ''}"><div class="pips">${p}</div>${st}${mk}</div>`;
 }
 function faceCell(v, s, size, hit, mark, click){
@@ -1907,7 +1936,7 @@ function stageHtml(ds, r){
 }
 // ---- 1ゲームのはじまり: コインを もらう ----
 function beginGame(){
-    run.coins += GAME_COIN; run.gameRerolls = 0; run.freeRerolls = 0;
+    run.coins += GAME_COIN; run.gameRerolls = 0; run.freeRerolls = 0; run.bombLock = false;
     run.phase = 'ready'; run.pending = 0; run.cur = null; run.curRes = null;
     renderPlay();
     bumpCoin();
@@ -2105,7 +2134,7 @@ function doRoll(){
         done[i] = true; SFX.play('place');
         $('dslot-' + i).innerHTML = dieFaceHtml(d.faces[r.idx[i]], d.stars[r.idx[i]], 'big land', '', d, r.mk[i]);
         $('dstrip-' + i).innerHTML = facesHtml(d, 'xl', r.idx[i]);
-        if (i === ds.length - 1){ clearInterval(iv); run.freeRerolls += r.mk.filter(m => m === 'retry').length; setTimeout(() => showResult(false), 450); }
+        if (i === ds.length - 1){ clearInterval(iv); run.freeRerolls += r.mk.filter(m => m === 'retry').length; if (r.mk.indexOf('bomb') >= 0) run.bombLock = true; setTimeout(() => showResult(false), 450); }
     }, 650 + i * 380));
 }
 // ---- ふりなおし: コインをはらって、サイコロを1つ(何回でも)振りなおせる ----
@@ -2113,7 +2142,7 @@ function markRerollable(){
     run.cur.ds.forEach((d, i) => {
         const el = $('dslot-' + i);
         el.querySelectorAll('.rr-badge').forEach(b => b.remove());
-        const cost = rerollCostAt(run.gameRerolls, run.freeRerolls);
+        const cost = rerollCostAt(run.gameRerolls, run.freeRerolls, run.bombLock);
         if (!isFinite(cost)){ el.classList.remove('rr'); el.removeAttribute('onclick'); return; }
         const ok = run.coins >= cost;
         el.classList.toggle('rr', ok);
@@ -2125,7 +2154,7 @@ function clearRerollable(){
     run.cur.ds.forEach((d, i) => { const el = $('dslot-' + i); el.classList.remove('rr'); el.removeAttribute('onclick'); el.querySelectorAll('.rr-badge').forEach(b => b.remove()); });
 }
 function rerollDie(i){
-    const cost = rerollCostAt(run.gameRerolls, run.freeRerolls);
+    const cost = rerollCostAt(run.gameRerolls, run.freeRerolls, run.bombLock);
     if (run.phase !== 'shown' || !isFinite(cost) || run.coins < cost) return;
     if (run.freeRerolls > 0 && !(RULES.firstRerollFree && run.gameRerolls === 0)) run.freeRerolls--;     // リターンの無料ぶんを使う
     run.gameRerolls++;
@@ -2138,8 +2167,9 @@ function rerollDie(i){
     setTimeout(() => {
         clearInterval(iv);
         const f = Math.floor(rnd() * 6);
-        r.idx[i] = f; r.v[i] = d.faces[f]; r.st[i] = d.stars[f]; r.mk[i] = rollMark(d.marks[f], rnd);
+        r.idx[i] = f; r.v[i] = d.faces[f]; r.st[i] = d.stars[f]; r.mk[i] = rollMark(d, f, rnd);
         if (r.mk[i] === 'retry') run.freeRerolls++;
+        if (r.mk[i] === 'bomb') run.bombLock = true;
         el.innerHTML = dieFaceHtml(d.faces[f], d.stars[f], 'big land', '', d, r.mk[i]);
         $('dstrip-' + i).innerHTML = facesHtml(d, 'xl', f);
         setTimeout(() => showResult(true), 350);
@@ -2156,15 +2186,22 @@ function showResult(instant){
     if (res.plus) pieces.push(`<span class="op">+</span>` + chip(MARK_ICON.plus + MARK_NAME.plus, '+' + res.plus, MARK_COLOR.plus));
     pieces.push(`<span class="op">×</span>` + chip(ROLE_NAME[res.role], fm(res.roleMult), ROLE_COLOR[res.role]));
     res.parts.forEach(p => pieces.push(`<span class="op">×</span>` + chip(SKILL_NAME[p.id] + (p.cnt > 1 ? tx('count', p.cnt) : ''), fm(p.mult), skillColor(p.id))));
-    if (res.starCount) pieces.push(`<span class="op">×</span>` + chip('★' + res.starCount, fm(res.starMul), 'var(--gold)'));
-    res.markParts.forEach(p => pieces.push(`<span class="op">×</span>` + chip(MARK_ICON[p.id] + MARK_NAME[p.id] + (p.cnt > 1 ? tx('count', p.cnt) : ''), fm(p.mult), MARK_COLOR[p.id])));
+    if (res.starCount) pieces.push(`<span class="op">×</span>` + chip('★' + res.starCount + (r.mk.indexOf('star') >= 0 ? MARK_ICON.star : ''), fm(res.starMul), 'var(--gold)'));
+    res.markParts.forEach(p => pieces.push(`<span class="op">×</span>` + chip(MARK_ICON[p.id] + MARK_NAME[p.id] + (p.cnt > 1 ? tx('count', p.cnt) : ''), fm(p.mult), MARK_COLOR[p.id]).replace('class="chip"', p.id === 'roulette' ? 'class="chip roul"' : 'class="chip"')));
     const big = res.role === 'pinzoro' || res.role === 'zorome';
     const banner = res.role === 'none' ? `<div class="role-banner none">${ROLE_NAME.none}</div>` : `<div class="role-banner${big ? ' big' : ''}">${res.role === 'pinzoro' ? tx('pinzoro_banner') : (res.role === 'zorome' ? tx('zorome_banner') : ROLE_NAME[res.role])}</div>`;
     $('brk').innerHTML = `<div class="brk-top">${banner}<div id="brk-total" style="min-height:58px"></div></div><div class="chips" id="brk-chips"></div>`;
     renderRoleList(res.role);
     const box = $('brk-chips');
     const step = instant ? 0 : 300;
-    const add = h => { box.insertAdjacentHTML('beforeend', h); fitChips(); if (!instant) SFX.play('select'); };
+    const add = h => {
+        box.insertAdjacentHTML('beforeend', h); fitChips(); if (!instant) SFX.play('select');
+        const ch = box.lastElementChild;
+        if (!instant && ch && ch.classList.contains('roul')){
+            const b = ch.querySelector('b'), fin = b.textContent; let k = 0;
+            const iv = setInterval(() => { b.textContent = fm(ROULETTE[k++ % ROULETTE.length]); if (k > 9){ clearInterval(iv); b.textContent = fin; } }, 60);
+        }
+    };
     pieces.forEach((h, i) => { if (instant) add(h); else setTimeout(() => add(h), step * i); });
     res.parts.forEach((p, i) => { const e = $('sk-' + p.id); if (e) setTimeout(() => { e.classList.remove('hit'); void e.offsetWidth; e.classList.add('hit'); }, instant ? 0 : 300 * (2 + i)); });
     setTimeout(() => {
@@ -2199,6 +2236,8 @@ function afterResult(){
       r.mk.forEach((m, i) => {
           if (m === 'gold') gold += GOLD_COIN;
           if (m === 'seed'){ const d = ds[i], f = r.idx[i]; if (d.stars[f] < MAX_STAR_PER_FACE){ d.stars[f]++; recountStars(d); } }
+          if (baseMark(m) === 'piggy'){ const d = ds[i], f = r.idx[i]; d.pig = d.pig || [0, 0, 0, 0, 0, 0]; d.pig[f]++; }      // ちょきん: たまる
+          if (m === 'gem') ds[i].gem = (ds[i].gem || 0) + GEM_SELL;                                                            // ほうせき: 売値が上がる
       });
       if (gold){ run.coins += gold; $('hud-coin').textContent = run.coins; bumpCoin(); SFX.play('coin'); } }
     if (run.pending > run.bestGame){ run.bestGame = run.pending; run.bestRole = run.curRes.role; }
@@ -2464,7 +2503,7 @@ const HOWTO_ROWS = () => { const I = (n, h, x) => FGLHowto.img('howto/' + n + '.
       b: { ja: '1ゲームごとに スキルを 3つから 1つ。ショップの <em>ガチャ</em> で サイコロを 集めて、つかう3つを えらぼう。', simple: '1ゲームごとに スキルを 3つから 1つ。ショップの <em>ガチャ</em> で サイコロを あつめて、つかう 3つを えらぼう。', en: 'After each game, pick 1 of 3 skills. Collect dice from the shop <em>gacha</em> and choose your best 3.' } },
     { c: '#d9a21b', art: FGLHowto.emo('🪙') + FGLHowto.emo('⚡') + FGLHowto.emo('🍀') + FGLHowto.emo('🔗'),
       t: { ja: '面の マーク', simple: 'めんの マーク', en: 'Face marks' },
-      b: { ja: 'マークの ついた 面が 出ると 効く。<em>金</em>・<em>プラス</em>・<em>パワー</em> など7つ。ショップで 好きな 面に つけられる。', simple: 'マークの ついた めんが でると きく。<em>きん</em>・<em>プラス</em>・<em>パワー</em> など 7つ。ショップで すきな めんに つけられる。', en: 'A marked face works when rolled: <em>Gold</em>, <em>Plus</em>, <em>Power</em> and more (7 kinds). Add one to any face in the shop.' } },
+      b: { ja: 'マークの ついた 面が 出ると 効く。<em>金</em>・<em>ルーレット</em>・<em>ばくだん</em> など13こ。ショップで 好きな 面に つけられる。', simple: 'マークの ついた めんが でると きく。<em>きん</em>・<em>ルーレット</em>・<em>ばくだん</em> など 13こ。ショップで すきな めんに つけられる。', en: 'A marked face works when rolled: <em>Gold</em>, <em>Roulette</em>, <em>Bomb</em> and more (13 kinds). Add one to any face in the shop.' } },
 ]; };
 FGLHowto.preload(['bar', 'coin', 'dice', 'faces', 'kaidan', 'reroll', 'zorome'].map(n => 'howto/' + n + '.webp'));
 function openHowTo(){
