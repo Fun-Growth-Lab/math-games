@@ -105,6 +105,10 @@
         .modal-box { background: linear-gradient(#2e2670,#1d1850); border:5px solid var(--ol); outline: 3px solid var(--gold); border-radius: 26px; padding: 24px 36px; text-align:center; min-width:420px; max-width:1120px; max-height:690px; overflow:auto; box-shadow: 0 20px 50px rgba(0,0,0,.6); }
         .modal-msg { font-size: 1.4rem; font-weight: 800; margin-bottom: 18px; line-height: 1.6; }
         .modal-title { font-size: 2rem; font-weight: 900; color: var(--gold); margin-bottom: 12px; text-shadow: 0 3px 0 var(--ol); }
+        .grow-pop { position:absolute; left:50%; top:28px; transform:translateX(-50%); z-index:1000; display:flex; align-items:center; gap:16px; background: linear-gradient(#ffd0ea,#ff9ad0); color: var(--ink); border:4px solid var(--ol); border-radius:18px; padding:6px 22px; text-align:center; box-shadow: 0 5px 0 var(--ol), 0 0 24px 6px rgba(255,154,208,.7); animation: pop .35s ease-out; pointer-events:none; white-space:nowrap; }
+        .grow-pop b { display:block; font-size:1.6rem; font-weight:900; line-height:1.2; }
+        .grow-pop div { font-size:1.3rem; font-weight:900; }
+        .grow-pop.out { transition: opacity .4s; opacity:0; }
         .toast { position:absolute; left:50%; top:90px; transform: translateX(-50%); background: rgba(0,0,0,.88); border:3px solid var(--gold); border-radius: 14px; padding: 8px 22px; font-weight:900; font-size:1.2rem; z-index: 999; }
         .coin-pill { display:inline-flex; align-items:center; gap:8px; background: linear-gradient(#3b2e00,#241b00); border:4px solid var(--ol); outline:2px solid var(--gold); border-radius: 999px; padding: 2px 18px 2px 8px; font-weight:900; font-size:1.7rem; color: var(--gold); box-shadow: 0 4px 0 var(--ol); }
         .coin-pill i { width:34px; height:34px; border-radius:50%; background: radial-gradient(circle at 35% 30%, #fff3a8, var(--gold) 50%, var(--gold-dk)); border:3px solid #fff1b8; display:flex; align-items:center; justify-content:center; font-style:normal; font-size:1.1rem; color:#8a5a00; box-shadow: inset 0 -3px 0 rgba(0,0,0,.2); }
@@ -1129,7 +1133,7 @@ const TARGETS_FULL = [
 // ★1のボーダーを土台にして、差の倍率を ステージごとの重み(EARLY_W)乗する
 const EARLY_W = [0.25, 0.4, 0.55, 0.7, 0.85, 1, 1];
 // 全体のボーダーの倍率。面マーク・とびかいだんを入れて同じ数字3つのサイコロをなくしたとき0.92倍にしたが、マークを13種にしたら★1クリア率が0.92倍で約95%・1倍で約84%になったので、あいだの0.96倍にした(sim4.js)
-const BORDER_ADJ = 0.96;
+const BORDER_ADJ = 0.98;
 const TARGETS = TARGETS_FULL.map((row, k) => row.map((v, i) => Math.round(BORDER_ADJ * (k === 0 ? v : TARGETS_FULL[0][i] * Math.pow(v / TARGETS_FULL[0][i], EARLY_W[i])))));
 const RUN_RULES = {
     basic:   {},
@@ -1303,6 +1307,7 @@ const TX = {
     see_result:   { ja: 'けっかを見る', ja_easy: 'けっかを みる', en: 'See Result' },
     reload:       { ja: '🔄 リロード', ja_easy: '🔄 リロード', en: '🔄 Reload' },
     mult_label:   { ja: 'ばいりつ', ja_easy: 'ばいりつ', en: 'Mult.' },
+    gacha_free:   { ja: '無料', ja_easy: 'ただ', en: 'FREE' },
     end_clear:    { ja: '🌟 ステージ全クリア！ 🌟', ja_easy: '🌟 ステージ ぜんぶ クリア！ 🌟', en: '🌟 All Stages Clear! 🌟' },
     end_over:     { ja: 'ゲームオーバー', ja_easy: 'ゲームオーバー', en: 'Game Over' },
     end_reached:  { ja: 'とうたつ', ja_easy: 'とうたつ', en: 'Reached' },
@@ -1321,7 +1326,7 @@ const TX = {
     skill_face:   { ja: (n, m) => `${n}の目が出ると、1個につき ×${m}`, ja_easy: (n, m) => `${n}の めが でると、1こに つき ×${m}`, en: (n, m) => `Each die showing ${n} gives ×${m}` },
     skill_cond:   { ja: (c, m) => `${c} のとき ×${m}`, ja_easy: (c, m) => `${c} のとき ×${m}`, en: (c, m) => `${c}: ×${m}` },
     skill_grow:   { ja: p => `1ゲームごとに、ほかのスキルが ${p}%で レベルアップ`, ja_easy: p => `1ゲームごとに、ほかの スキルが ${p}%で レベルアップ`, en: p => `After each game, other skills level up (${p}%)` },
-    grow_up:      { ja: t => `成長！ ${t}`, ja_easy: t => `せいちょう！ ${t}`, en: t => `Growth! ${t}` },
+    grow_up:      { ja: '成長！', ja_easy: 'せいちょう！', en: 'Growth!' },
     rate_label:   { ja: 'かくりつ', ja_easy: 'かくりつ', en: 'Chance' },
     howto_body: {
         ja: `<h4>① サイコロを3つふる</h4>出た目の<b>和</b>が基本の点です。
@@ -1441,9 +1446,9 @@ const MARK_NAME = langTable({
     ja_easy: { gold: 'きん', plus: 'プラス', seed: 'たね', retry: 'リターン', lucky: 'ラッキー', match: 'おそろい', power: 'パワー', roulette: 'ルーレット', bomb: 'ばくだん', piggy: 'ちょきん', dragon: 'おうかん', star: 'ながれぼし', gem: 'ほうせき' },
     en: { gold: 'Gold', plus: 'Plus', seed: 'Seed', retry: 'Retry', lucky: 'Lucky', match: 'Match', power: 'Power', roulette: 'Roulette', bomb: 'Bomb', piggy: 'Savings', dragon: 'Crown', star: 'Shooting Star', gem: 'Gem' } });
 const MARK_DESC = langTable({
-    ja: { gold: 'コイン＋2', plus: '合計点に＋6', seed: 'この面の★が1つふえる(3つまで)', retry: 'ふりなおしが1回無料', lucky: '4分の1の確率で ×3', match: '同じマークが2つで×2・3つで×3', power: '×1.5', roulette: '×0.5・1・1.5・2・2.5のどれか', bomb: '×3(ステージに1回)。このステージはもうふりなおせない', piggy: '出るたびに、この面の倍率が＋0.3たまる', dragon: 'ステージの3ゲームめだけ ×2.5', star: 'このゲームの★の効き目が2倍', gem: '出るたびに、このサイコロの売値＋3' },
-    ja_easy: { gold: 'コイン＋2', plus: 'ごうけいに ＋6', seed: 'この めんの ★が 1つ ふえる(3つまで)', retry: 'ふりなおしが 1かい ただ', lucky: '4ぶんの1の かくりつで ×3', match: 'おなじ マークが 2つで ×2・3つで ×3', power: '×1.5', roulette: '×0.5・1・1.5・2・2.5の どれか', bomb: '×3(ステージに 1かい)。この ステージは もう ふりなおせない', piggy: 'でるたびに、この めんの ばいりつが ＋0.3 たまる', dragon: 'ステージの 3ゲームめだけ ×2.5', star: 'この ゲームの ★の ききめが 2ばい', gem: 'でるたびに、この サイコロの うりねが ＋3' },
-    en: { gold: '+2 coins', plus: '+6 to the sum', seed: 'This face gains a ★ (max 3)', retry: '1 free re-roll', lucky: '1/4 chance: ×3', match: '2 same marks ×2, 3 same ×3', power: '×1.5', roulette: '×0.5, 1, 1.5, 2 or 2.5', bomb: '×3 (once per stage), but no more re-rolls this stage', piggy: '+0.3 mult saved each time it shows', dragon: '×2.5 in the 3rd game of a stage', star: 'Doubles the ★ bonus this game', gem: '+3 sell value each time it shows' } });
+    ja: { gold: 'コイン＋2', plus: '合計点に＋6', seed: 'この面の★が1つふえる(3つまで)', retry: 'ふりなおしが1回無料', lucky: '4分の1の確率で ×3', match: '同じマークが2つで×2・3つで×3', power: '×1.5', roulette: '×0.5・1・1.5・2・2.5のどれか', bomb: '×3(ステージに1回)。このステージはもうふりなおせない', piggy: '出るたびに強くなる(×1.3→×1.6→×1.9…)', dragon: 'ステージの3ゲームめだけ ×2.5', star: 'このゲームの★の効き目が2倍', gem: '出るたびに、このサイコロの売値＋3' },
+    ja_easy: { gold: 'コイン＋2', plus: 'ごうけいに ＋6', seed: 'この めんの ★が 1つ ふえる(3つまで)', retry: 'ふりなおしが 1かい ただ', lucky: '4ぶんの1の かくりつで ×3', match: 'おなじ マークが 2つで ×2・3つで ×3', power: '×1.5', roulette: '×0.5・1・1.5・2・2.5の どれか', bomb: '×3(ステージに 1かい)。この ステージは もう ふりなおせない', piggy: 'でるたびに つよくなる(×1.3→×1.6→×1.9…)', dragon: 'ステージの 3ゲームめだけ ×2.5', star: 'この ゲームの ★の ききめが 2ばい', gem: 'でるたびに、この サイコロの うりねが ＋3' },
+    en: { gold: '+2 coins', plus: '+6 to the sum', seed: 'This face gains a ★ (max 3)', retry: '1 free re-roll', lucky: '1/4 chance: ×3', match: '2 same marks ×2, 3 same ×3', power: '×1.5', roulette: '×0.5, 1, 1.5, 2 or 2.5', bomb: '×3 (once per stage), but no more re-rolls this stage', piggy: 'Grows each time it shows (×1.3→×1.6→×1.9…)', dragon: '×2.5 in the 3rd game of a stage', star: 'Doubles the ★ bonus this game', gem: '+3 sell value each time it shows' } });
 // マークの絵はすべて自前のSVG(絵文字はパソコンによって出なかったり形が変わるため)
 const mkSvg = b => `<svg class="mi" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true">${b}</svg>`;
 const MARK_ICON = {
@@ -2273,8 +2278,13 @@ function afterResult(){
     if (run.equipped.indexOf('last') >= 0 && run.skillLv.last){
         const p = growChance(run.skillLv.last), ups = [];
         run.equipped.forEach(id => { if (!id || id === 'last' || (run.skillLv[id] || 0) >= SKILL_MAX_LV) return;
-            if (Math.random() < p){ run.skillLv[id]++; ups.push(`${SKILL_NAME[id]} Lv${run.skillLv[id]}`); } });
-        if (ups.length){ toast(tx('grow_up', ups.join('・'))); SFX.play('ok'); renderSkills(); }
+            if (Math.random() < p){ run.skillLv[id]++; ups.push(`${SKILL_NAME[id]} Lv${run.skillLv[id] - 1} → ${run.skillLv[id]}`); } });
+        if (ups.length){
+            const el = document.createElement('div'); el.className = 'grow-pop';
+            el.innerHTML = `<b>${tx('grow_up')}</b>` + ups.map(u => `<div>${u}</div>`).join('');
+            $('container').appendChild(el); setTimeout(() => el.classList.add('out'), 2600); setTimeout(() => el.remove(), 3100);
+            SFX.play('ok'); renderSkills();
+        }
     }
     // 金: コイン / たね: その面の★が1つふえる
     { const { r, ds } = run.cur; let gold = 0;
@@ -2354,6 +2364,7 @@ function enterShop(){
     run.saleRole = cand.length ? cand[Math.floor(rnd() * cand.length)] : null;
     run.boughtRoles = [];
     run.gachaLast = null;
+    run.gachaFree = true;                // ガチャは 1回のショップで 1回 無料
     // マークをつけるのは1回のショップで3回まで
     run.markOffer = []; run.markCount = 0; run.markSel = null;
     goTo('shop-screen');
@@ -2363,8 +2374,9 @@ function enterShop(){
 function renderShop(){
     $('shop-coin').textContent = run.coins;
     const full = run.dice.length >= DICE_CAP;
-    $('btn-gacha').disabled = run.coins < GACHA_PRICE || full;
-    $('btn-gacha').innerHTML = full ? tx('full') : `${tx('gacha')}<span class="coin-pill" style="font-size:1.35rem;padding:0 12px 0 6px;box-shadow:none;border-width:3px"><i style="width:26px;height:26px;font-size:.9rem">$</i>${GACHA_PRICE}</span>`;
+    const gp = run.gachaFree ? 0 : GACHA_PRICE;
+    $('btn-gacha').disabled = run.coins < gp || full;
+    $('btn-gacha').innerHTML = full ? tx('full') : `${tx('gacha')}<span class="coin-pill" style="font-size:1.35rem;padding:0 12px 0 6px;box-shadow:none;border-width:3px">${run.gachaFree ? tx('gacha_free') : `<i style="width:26px;height:26px;font-size:.9rem">$</i>${GACHA_PRICE}`}</span>`;
     const g = run.gachaLast;
     const rare = g && (g.starTotal >= 4 || g.type === 'threepair' || g.marks.filter(Boolean).length >= 2 || g.marks.indexOf('power') >= 0);
     $('gacha-show').innerHTML = g ? `${rare ? `<div class="rare">${tx('rare')}</div>` : ''}${dieCardHtml(g, { size: 'lg', foot: false })}` : '';
@@ -2453,8 +2465,9 @@ function applyMark(id, face, sure){
     renderShop();
 }
 function buyGacha(){
-    if (run.coins < GACHA_PRICE || run.dice.length >= DICE_CAP) return;
-    run.coins -= GACHA_PRICE; SFX.play('buy'); setTimeout(() => SFX.play('chest'), 350);
+    const gp = run.gachaFree ? 0 : GACHA_PRICE;
+    if (run.coins < gp || run.dice.length >= DICE_CAP) return;
+    run.coins -= gp; run.gachaFree = false; SFX.play('buy'); setTimeout(() => SFX.play('chest'), 350);
     const d = gachaDie(rnd);
     run.dice.push(d);
     run.gachaLast = d;
