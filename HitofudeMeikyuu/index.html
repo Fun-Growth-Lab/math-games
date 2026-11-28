@@ -252,6 +252,8 @@
         }
 
         /* ==================== RANKING ==================== */
+        .bv-score { text-align:center; font-size:22px; font-weight:900; color:#ffd24a; margin:-6px 0 10px; min-height:1px; }
+        .bv-score:empty { display:none; }
         #ranking-screen {
             position: absolute; top:0; left:0; width:100%; height:100%;
             background: radial-gradient(ellipse at 50% 30%, #3a3a3a 0%, #1a1a1a 60%, #0d0d0d 100%);
@@ -1178,6 +1180,7 @@
     <div id="battle-victory-overlay" class="overlay hidden">
         <div class="ov-box" style="max-width:1200px; text-align:left; max-height:704px; overflow-y:auto; padding:22px 44px;">
             <div class="ov-title" style="text-align:center;" id="bv-title">🏆 てきを たおした！</div>
+            <div id="bv-score" class="bv-score"></div>
             <div id="bv-grid" class="fr-grid"></div>
             <div style="display:flex; gap:12px; justify-content:center;">
                 <button class="btn btn-gray btn-sm" id="bv-potion-btn" onclick="openPotionMenu()">🧪 ポーションを使う（所持:0）</button>
@@ -1349,7 +1352,7 @@
     const _hdr  = { 'apikey': _key, 'Authorization': 'Bearer ' + _key,
                     'Content-Type': 'application/json', 'Prefer': 'return=minimal' };
 
-    window.saveOnlineScore = async (name, score, floorReached, difficulty, jobName) => {
+    window.saveOnlineScore = async (name, score, floorReached, difficulty, jobName, battleRounds) => {
         if ((score || 0) <= 0) return;
         const res = await fetch(`${_base}/rankings`, {
             method: 'POST',
@@ -1361,7 +1364,7 @@
                 player_name: FGLName.display(name || 'ななしさん', 'ななしさん'),
                 point_score: score       || 0,
                 stage_score: floorReached || 0,
-                turns:       0,
+                turns:       battleRounds || 0,
                 class_name:  jobName     || ''
             })
         });
@@ -1513,6 +1516,7 @@ const UI_TEXT = {
 
     floor_clear_title: { ja: '🏁 フロアクリア！', ja_easy: '🏁 フロアクリア！', en: '🏁 Floor Clear!' },
     btn_next: { ja: 'つぎへ ▶', ja_easy: 'つぎへ ▶', en: 'Next ▶' },
+    score_label: { ja: 'スコア', ja_easy: 'スコア', en: 'Score' },
     battle_victory_title: { ja: '🏆 てきを たおした！', ja_easy: '🏆 てきを たおした！', en: '🏆 Enemy Defeated!' },
     skill_trim_title: { ja: '✨ 引き継ぐスキルを選ぶ', ja_easy: '✨ ひきつぐ スキルを えらぶ', en: '✨ Choose Skills to Keep' },
     btn_confirm: { ja: 'けってい ▶', ja_easy: 'けってい ▶', en: 'Confirm ▶' },
@@ -1749,6 +1753,15 @@ const CHEST_SCORE = { gold: 100, silver: 60, wood: 30 };
 const PERFECT_SCORE_BONUS = 30; // フロアをパーフェクト踏破するたびに加算
 const GAME_CLEAR_SCORE_BONUS = 1000; // 15階のボスを倒してクリアした場合に加算
 const FLOOR_SCORE_MULT = 50; // 到達階層 × 50
+// 戦闘ボーナス（敵を倒すたびに加算）：少ないターンで倒すほど＋倒した瞬間の残りHPが多いほど高い。ボス階は2倍
+const BATTLE_TURN_SCORE = [0, 60, 38, 15]; // index＝撃破ターン数（4ターン以上は0）
+const BATTLE_HP_SCORE_MULT = 0.45;          // 残りHP% × 0.45（満タンで45点）
+function battleBonusScore(){
+    const turnPts = BATTLE_TURN_SCORE[battleRound] || 0;
+    const hpPct = player.maxHp > 0 ? Math.max(0, Math.min(100, player.hp / player.maxHp * 100)) : 0;
+    const hpPts = Math.round(hpPct * BATTLE_HP_SCORE_MULT);
+    return (turnPts + hpPts) * (isBossFloor(floor) ? 2 : 1);
+}
 let keys = [];   // [{r,c,type,name,img}, ...] x3 (金銀木)
 let chests = []; // [{r,c,type,name,img}, ...] x3 (金銀木)
 let keyTaken = [];    // 地面から拾い済みか（keysと対応）
@@ -2391,8 +2404,9 @@ function createPlayer(){
         },
         inventory: [], // 未装備の在庫（アイコンで管理する）
         potions: { p30: 1, p50: 0, p100: 0, b_atk: 0, b_def: 0, b_mag: 0 }, // HP回復・強化ポーションのストック数（最初から小回復ポーションを1つ所持）
-        score: 0, // 宝箱・パーフェクトなどで積み上がるランキング用スコア
-        perfectCount: 0
+        score: 0, // 宝箱・パーフェクト・戦闘ボーナスで積み上がるランキング用スコア
+        perfectCount: 0,
+        battleRounds: 0 // 戦闘でかかったターンの合計（ワールドランキングのturns列に記録）
     };
 }
 let player = createPlayer();
@@ -2451,7 +2465,7 @@ function autoSaveGame(){
             },
             inventory: player.inventory.map(serializeGearItem),
             potions: Object.assign({}, player.potions),
-            score: player.score, perfectCount: player.perfectCount,
+            score: player.score, perfectCount: player.perfectCount, battleRounds: player.battleRounds,
             job: player.job, gender: player.gender
         }
     };
@@ -2539,7 +2553,7 @@ function continueGame(){
         },
         inventory: p.inventory.map(rehydrateGearItem),
         potions: p.potions,
-        score: p.score, perfectCount: p.perfectCount,
+        score: p.score, perfectCount: p.perfectCount, battleRounds: p.battleRounds || 0,
         job: p.job, gender: p.gender
     };
     document.getElementById('title-screen').classList.add('hidden');
@@ -3955,6 +3969,9 @@ function rollChestTierForVictory(){
 // ボスがこの後まだ復活する場合は、同じ画面のタイトルを「ボスが復活した！」に差し替えて知らせる
 // （ポーションボタン・つぎへボタンはそのまま使えるので、復活前にHP回復の猶予がある）
 function onEnemyDefeated(){
+    const battleBonus = tutorialActive ? 0 : battleBonusScore();
+    player.score += battleBonus;
+    player.battleRounds += battleRound;
     const levelBefore = player.level;
     const leveledUp = gainExp(ENEMY_DEFEAT_EXP);
     const tierType = rollChestTierForVictory();
@@ -3964,6 +3981,8 @@ function onEnemyDefeated(){
     player.inventory.push(item);
     renderRewardGrid('bv-grid', ENEMY_DEFEAT_EXP, leveledUp, levelBefore, player.level, false, [item]);
     document.getElementById('bv-title').textContent = bossRevivalsLeft > 0 ? ui('boss_revive_title') : ui('battle_victory_title');
+    const bvScoreEl = document.getElementById('bv-score');
+    bvScoreEl.textContent = battleBonus > 0 ? `${ui('score_label')} +${battleBonus}` : '';
     updatePotionButtons();
     document.getElementById('battle-victory-overlay').classList.remove('hidden');
     // 経験値・報酬アイテムはここで確定済みのため、再抽選されないようここから先の状態を保存対象にする
@@ -4142,7 +4161,7 @@ function renderPlayerNameList(){
 }
 
 // ---- ランキング用スコア計算 ----
-// 宝箱・パーフェクトの累計（player.score）＋最終レベル×100＋到達階層×50＋クリアボーナス
+// 宝箱・パーフェクト・戦闘ボーナスの累計（player.score）＋最終レベル×100＋到達階層×50＋クリアボーナス
 function computeFinalScore(cleared){
     return player.score + player.level * 100 + floor * FLOOR_SCORE_MULT + (cleared ? GAME_CLEAR_SCORE_BONUS : 0);
 }
@@ -4184,7 +4203,7 @@ async function submitScoreToWorld(which){
     msg.style.color = 'var(--text-dim)';
     msg.textContent = ui('world_submit_sending');
     try {
-        await window.saveOnlineScore(getCurPlayerName(), lastFinalScore, floor, selectedDifficulty, jobName);
+        await window.saveOnlineScore(getCurPlayerName(), lastFinalScore, floor, selectedDifficulty, jobName, player.battleRounds);
         msg.style.color = '#ffd24a';
         msg.textContent = ui('world_submit_done');
     } catch (e){
