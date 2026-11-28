@@ -949,7 +949,7 @@ const MARKS = [
     { id: 'power', w: 8,  sell: 3 },   // 倍率×1.5
     { id: 'roulette', w: 8,  sell: 3 }, // ×0.5・1・1.5・2・2.5のどれか(各20%)
     { id: 'bomb',  w: 6,  sell: 3 },   // ×3。そのステージはもうふりなおせない。ばくはつした面は そのステージのあいだ グレー(効かない)
-    { id: 'piggy', w: 10, sell: 2 },   // ちょきん: 出るたびに、この面の倍率が+0.3ずつたまる(ずっと残る)
+    { id: 'piggy', w: 10, sell: 2 },   // ちょきん: マーク自体が倍率。1回目×1.0、出るたびに+0.2(ずっと残る)
     { id: 'dragon', w: 8, sell: 3 },   // おうかん(idは昔のまま): ステージの3ゲームめだけ ×2.5
     { id: 'star',  w: 8,  sell: 2 },   // ながれぼし: このゲームの★の効き目が2倍
     { id: 'gem',   w: 10, sell: 2 }    // ほうせき: 出るたびに、このサイコロの売値+3
@@ -957,10 +957,10 @@ const MARKS = [
 const MARK_BY_ID = {}; MARKS.forEach(m => MARK_BY_ID[m.id] = m);
 const MARK_COUNT_W = [45, 40, 15];       // ガチャのサイコロにつくマークの数 0/1/2個の確率(%)
 const GOLD_COIN = 2, PLUS_POINT = 6, POWER_MULT = 1.5, LUCKY_RATE = 0.25, LUCKY_MULT = 3, MARK_PRICE = 15;
-const ROULETTE = [0.5, 1, 1.5, 2, 2.5], BOMB_MULT = 3, PIGGY_STEP = 0.3, DRAGON_MULT = 2.5, GEM_SELL = 3;
+const ROULETTE = [0.5, 1, 1.5, 2, 2.5], BOMB_MULT = 3, PIGGY_STEP = 0.2, DRAGON_MULT = 2.5, GEM_SELL = 3;
 function randomMark(rnd){ return MARKS[pickW(MARKS, rnd)].id; }
 // 出た面のマーク。ふった時に決まる結果を文字に入れる: ラッキーの当たり='luckyhit'、ルーレット='roulette:倍率'、ちょきん='piggy:倍率'
-const piggyMult = (d, f) => 1 + PIGGY_STEP * (((d.pig && d.pig[f]) || 0) + 1);
+const piggyMult = (d, f) => 1 + PIGGY_STEP * ((d.pig && d.pig[f]) || 0);   // 1回目×1.0、そのあと出るたびに+0.2
 // 面のマーク。そのステージで ばくはつした ばくだんは 'bombx'(グレー・効かない)
 const markAt = (d, f) => d.marks[f] === 'bomb' && d.bombUsed && d.bombUsed[f] ? 'bombx' : d.marks[f];
 function rollMark(d, f, rnd){
@@ -996,7 +996,7 @@ function markEffect(mk, luckyExp, final){
         const x = m.indexOf(':') > 0 ? markVal(m) : ROULETTE.reduce((a, b) => a + b, 0) / ROULETTE.length;
         mul *= x; if (m.indexOf(':') > 0) parts.push({ id: 'roulette', mult: x }); });
     const nbo = n('bomb'); if (nbo){ const m = Math.pow(BOMB_MULT, nbo); mul *= m; parts.push({ id: 'bomb', mult: m, cnt: nbo }); }
-    mk.forEach(m => { if (baseMark(m) === 'piggy' && m.indexOf(':') > 0){ const x = markVal(m); mul *= x; parts.push({ id: 'piggy', mult: x }); } });
+    mk.forEach(m => { if (baseMark(m) === 'piggy' && m.indexOf(':') > 0){ const x = markVal(m); mul *= x; if (x > 1) parts.push({ id: 'piggy', mult: x }); } });   // ×1.0 のときは式に出さない
     const nd = n('dragon'); if (nd && final){ const m = Math.pow(DRAGON_MULT, nd); mul *= m; parts.push({ id: 'dragon', mult: m, cnt: nd }); }
     if (mk.indexOf('match') >= 0){
         const cnt = {}; let top = 0;
@@ -1446,9 +1446,9 @@ const MARK_NAME = langTable({
     ja_easy: { gold: 'きん', plus: 'プラス', seed: 'たね', retry: 'リターン', lucky: 'ラッキー', match: 'おそろい', power: 'パワー', roulette: 'ルーレット', bomb: 'ばくだん', piggy: 'ちょきん', dragon: 'おうかん', star: 'ながれぼし', gem: 'ほうせき' },
     en: { gold: 'Gold', plus: 'Plus', seed: 'Seed', retry: 'Retry', lucky: 'Lucky', match: 'Match', power: 'Power', roulette: 'Roulette', bomb: 'Bomb', piggy: 'Savings', dragon: 'Crown', star: 'Shooting Star', gem: 'Gem' } });
 const MARK_DESC = langTable({
-    ja: { gold: 'コイン＋2', plus: '合計点に＋6', seed: 'この面の★が1つふえる(3つまで)', retry: 'ふりなおしが1回無料', lucky: '4分の1の確率で ×3', match: '同じマークが2つで×2・3つで×3', power: '×1.5', roulette: '×0.5・1・1.5・2・2.5のどれか', bomb: '×3(ステージに1回)。このステージはもうふりなおせない', piggy: '出るたびに強くなる(×1.3→×1.6→×1.9…)', dragon: 'ステージの3ゲームめだけ ×2.5', star: 'このゲームの★の効き目が2倍', gem: '出るたびに、このサイコロの売値＋3' },
-    ja_easy: { gold: 'コイン＋2', plus: 'ごうけいに ＋6', seed: 'この めんの ★が 1つ ふえる(3つまで)', retry: 'ふりなおしが 1かい ただ', lucky: '4ぶんの1の かくりつで ×3', match: 'おなじ マークが 2つで ×2・3つで ×3', power: '×1.5', roulette: '×0.5・1・1.5・2・2.5の どれか', bomb: '×3(ステージに 1かい)。この ステージは もう ふりなおせない', piggy: 'でるたびに つよくなる(×1.3→×1.6→×1.9…)', dragon: 'ステージの 3ゲームめだけ ×2.5', star: 'この ゲームの ★の ききめが 2ばい', gem: 'でるたびに、この サイコロの うりねが ＋3' },
-    en: { gold: '+2 coins', plus: '+6 to the sum', seed: 'This face gains a ★ (max 3)', retry: '1 free re-roll', lucky: '1/4 chance: ×3', match: '2 same marks ×2, 3 same ×3', power: '×1.5', roulette: '×0.5, 1, 1.5, 2 or 2.5', bomb: '×3 (once per stage), but no more re-rolls this stage', piggy: 'Grows each time it shows (×1.3→×1.6→×1.9…)', dragon: '×2.5 in the 3rd game of a stage', star: 'Doubles the ★ bonus this game', gem: '+3 sell value each time it shows' } });
+    ja: { gold: 'コイン＋2', plus: '合計点に＋6', seed: 'この面の★が1つふえる(3つまで)', retry: 'ふりなおしが1回無料', lucky: '4分の1の確率で ×3', match: '同じマークが2つで×2・3つで×3', power: '×1.5', roulette: '×0.5・1・1.5・2・2.5のどれか', bomb: '×3(ステージに1回)。このステージはもうふりなおせない', piggy: '出るたびに強くなる(×1.0→×1.2→×1.4…)', dragon: 'ステージの3ゲームめだけ ×2.5', star: 'このゲームの★の効き目が2倍', gem: '出るたびに、このサイコロの売値＋3' },
+    ja_easy: { gold: 'コイン＋2', plus: 'ごうけいに ＋6', seed: 'この めんの ★が 1つ ふえる(3つまで)', retry: 'ふりなおしが 1かい ただ', lucky: '4ぶんの1の かくりつで ×3', match: 'おなじ マークが 2つで ×2・3つで ×3', power: '×1.5', roulette: '×0.5・1・1.5・2・2.5の どれか', bomb: '×3(ステージに 1かい)。この ステージは もう ふりなおせない', piggy: 'でるたびに つよくなる(×1.0→×1.2→×1.4…)', dragon: 'ステージの 3ゲームめだけ ×2.5', star: 'この ゲームの ★の ききめが 2ばい', gem: 'でるたびに、この サイコロの うりねが ＋3' },
+    en: { gold: '+2 coins', plus: '+6 to the sum', seed: 'This face gains a ★ (max 3)', retry: '1 free re-roll', lucky: '1/4 chance: ×3', match: '2 same marks ×2, 3 same ×3', power: '×1.5', roulette: '×0.5, 1, 1.5, 2 or 2.5', bomb: '×3 (once per stage), but no more re-rolls this stage', piggy: 'Grows each time it shows (×1.0→×1.2→×1.4…)', dragon: '×2.5 in the 3rd game of a stage', star: 'Doubles the ★ bonus this game', gem: '+3 sell value each time it shows' } });
 // マークの絵はすべて自前のSVG(絵文字はパソコンによって出なかったり形が変わるため)
 const mkSvg = b => `<svg class="mi" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true">${b}</svg>`;
 const MARK_ICON = {
